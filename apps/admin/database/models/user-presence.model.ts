@@ -1,34 +1,34 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // User online/offline presence tracking
 export interface IUserPresence extends Document {
   userId: string;
   username: string;
-  
+
   // Status
-  status: 'online' | 'away' | 'offline';
+  status: "online" | "away" | "offline";
   lastSeen: Date;
   lastHeartbeat: Date;
-  
+
   // Activity
   currentPage?: string; // Current page/route
   isInCompetition: boolean;
   activeCompetitionId?: string;
   isInChallenge: boolean;
   activeChallengeId?: string;
-  
+
   // Challenge availability
   acceptingChallenges: boolean; // User toggle to accept/decline challenges
-  
+
   // Stats
   totalOnlineTime: number; // Total time online in minutes
   sessionsToday: number;
-  
+
   // Connection info
   socketId?: string;
   userAgent?: string;
   ipAddress?: string;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,8 +48,8 @@ const UserPresenceSchema = new Schema<IUserPresence>(
     status: {
       type: String,
       required: true,
-      enum: ['online', 'away', 'offline'],
-      default: 'offline',
+      enum: ["online", "away", "offline"],
+      default: "offline",
     },
     lastSeen: {
       type: Date,
@@ -107,7 +107,7 @@ const UserPresenceSchema = new Schema<IUserPresence>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -118,7 +118,7 @@ UserPresenceSchema.index({ status: 1, acceptingChallenges: 1 });
 // Static method to update heartbeat and check for stale sessions
 UserPresenceSchema.statics.updateHeartbeat = async function (
   userId: string,
-  data?: Partial<IUserPresence>
+  data?: Partial<IUserPresence>,
 ) {
   const now = new Date();
   return this.findOneAndUpdate(
@@ -127,27 +127,27 @@ UserPresenceSchema.statics.updateHeartbeat = async function (
       $set: {
         lastHeartbeat: now,
         lastSeen: now,
-        status: 'online',
+        status: "online",
         ...data,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   );
 };
 
 // Static method to mark stale sessions as offline
 UserPresenceSchema.statics.markStaleAsOffline = async function (
-  staleThresholdMinutes: number = 2
+  staleThresholdMinutes: number = 2,
 ) {
   const threshold = new Date(Date.now() - staleThresholdMinutes * 60 * 1000);
   return this.updateMany(
     {
-      status: { $ne: 'offline' },
+      status: { $ne: "offline" },
       lastHeartbeat: { $lt: threshold },
     },
     {
-      $set: { status: 'offline' },
-    }
+      $set: { status: "offline" },
+    },
   );
 };
 
@@ -155,14 +155,14 @@ UserPresenceSchema.statics.markStaleAsOffline = async function (
 UserPresenceSchema.statics.getChallengeable = async function () {
   const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes
   return this.find({
-    status: 'online',
+    status: "online",
     acceptingChallenges: true,
     lastHeartbeat: { $gte: threshold },
   }).lean();
 };
 
 const UserPresence =
-  models?.UserPresence || model<IUserPresence>('UserPresence', UserPresenceSchema);
+  models?.UserPresence ||
+  model<IUserPresence>("UserPresence", UserPresenceSchema);
 
 export default UserPresence;
-

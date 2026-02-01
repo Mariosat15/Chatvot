@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+import { useEffect, useRef } from "react";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 /**
  * Global presence tracker component that should be added to the root layout.
  * This tracks user online/offline status across all pages.
- * 
- * IMPORTANT: Users stay ONLINE as long as they are logged in, even if the 
+ *
+ * IMPORTANT: Users stay ONLINE as long as they are logged in, even if the
  * browser tab is in the background. They only go offline when:
  * - They close the browser/tab completely
  * - They log out
@@ -22,12 +22,12 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
     const sendHeartbeat = async () => {
       // Always send heartbeat - user is online as long as they're logged in
       try {
-        await fetch('/api/user/presence', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'online' }),
+        await fetch("/api/user/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "online" }),
         });
-      } catch (error) {
+      } catch {
         // Silently fail - presence is non-critical
       }
     };
@@ -37,26 +37,35 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
 
     // Set up interval for heartbeats - keeps user online even in background tabs
     // The heartbeat continues regardless of tab visibility
-    heartbeatRef.current = setInterval(sendHeartbeat, PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT);
+    heartbeatRef.current = setInterval(
+      sendHeartbeat,
+      PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT,
+    );
 
     // Handle page unload - mark as offline ONLY when browser/tab is closed
     const handleBeforeUnload = () => {
-      navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
+      navigator.sendBeacon(
+        "/api/user/presence",
+        JSON.stringify({ status: "offline" }),
+      );
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     // Cleanup
     return () => {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
       }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
       // Send offline status on cleanup (component unmount = likely logout or navigation away)
       try {
-        navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
-      } catch (e) {
+        navigator.sendBeacon(
+          "/api/user/presence",
+          JSON.stringify({ status: "offline" }),
+        );
+      } catch {
         // Ignore errors on cleanup
       }
     };
@@ -65,4 +74,3 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
   // This component doesn't render anything visible
   return null;
 }
-

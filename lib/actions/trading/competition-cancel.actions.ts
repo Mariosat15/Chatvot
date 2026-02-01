@@ -1,12 +1,12 @@
-'use server';
+"use server";
 
-import { revalidatePath } from 'next/cache';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import mongoose from 'mongoose';
+import { revalidatePath } from "next/cache";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import mongoose from "mongoose";
 
 /**
  * Cancel a competition and refund ALL participants their FULL entry fee
@@ -14,7 +14,7 @@ import mongoose from 'mongoose';
  */
 export async function cancelCompetitionAndRefund(
   competitionId: string,
-  reason: string
+  reason: string,
 ): Promise<{ success: boolean; refundedCount: number; totalRefunded: number }> {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -22,13 +22,16 @@ export async function cancelCompetitionAndRefund(
   try {
     await connectToDatabase();
 
-    console.log(`🚫 Starting competition cancellation and refund: ${competitionId}`);
+    console.log(
+      `🚫 Starting competition cancellation and refund: ${competitionId}`,
+    );
     console.log(`   Reason: ${reason}`);
 
     // Get the competition
-    const competition = await Competition.findById(competitionId).session(session);
+    const competition =
+      await Competition.findById(competitionId).session(session);
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
     // Get all participants
@@ -43,7 +46,8 @@ export async function cancelCompetitionAndRefund(
     let refundedCount = 0;
 
     // Import notification service
-    const { notificationService } = await import('@/lib/services/notification.service');
+    const { notificationService } =
+      await import("@/lib/services/notification.service");
 
     // Refund each participant
     for (const participant of participants) {
@@ -67,62 +71,67 @@ export async function cancelCompetitionAndRefund(
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
         {
-          $inc: { 
+          $inc: {
             creditBalance: refundAmount,
             totalWonFromCompetitions: refundAmount, // Track refund as credits received
           },
         },
-        { session }
+        { session },
       );
 
       // Create refund transaction
       await WalletTransaction.create(
-        [{
-          userId,
-          transactionType: 'competition_refund',
-          amount: refundAmount,
-          balanceBefore: wallet.creditBalance,
-          balanceAfter: newBalance,
-          competitionId: competitionId,
-          status: 'completed',
-          description: `Competition cancelled - Full refund for "${competition.name}"`,
-          metadata: {
-            competitionName: competition.name,
-            cancellationReason: reason,
-            originalEntryFee: entryFee,
+        [
+          {
+            userId,
+            transactionType: "competition_refund",
+            amount: refundAmount,
+            balanceBefore: wallet.creditBalance,
+            balanceAfter: newBalance,
+            competitionId: competitionId,
+            status: "completed",
+            description: `Competition cancelled - Full refund for "${competition.name}"`,
+            metadata: {
+              competitionName: competition.name,
+              cancellationReason: reason,
+              originalEntryFee: entryFee,
+            },
           },
-        }],
-        { session }
+        ],
+        { session },
       );
 
       // Update participant status
       await CompetitionParticipant.findByIdAndUpdate(
         participant._id,
         {
-          $set: { 
-            status: 'refunded',
+          $set: {
+            status: "refunded",
           },
         },
-        { session }
+        { session },
       );
 
       // Send notifications
       try {
         await notificationService.notifyCompetitionCancelled(
           userId,
-          competitionId,
           competition.name,
           reason,
-          entryFee
         );
       } catch (notifError) {
-        console.error(`Error sending cancellation notification to ${userId}:`, notifError);
+        console.error(
+          `Error sending cancellation notification to ${userId}:`,
+          notifError,
+        );
       }
 
       totalRefunded += refundAmount;
       refundedCount++;
 
-      console.log(`   💰 Refunded ${refundAmount} credits to user ${userId} (new balance: ${newBalance})`);
+      console.log(
+        `   💰 Refunded ${refundAmount} credits to user ${userId} (new balance: ${newBalance})`,
+      );
     }
 
     // Update competition status and clear prize pool (it's been refunded)
@@ -130,12 +139,12 @@ export async function cancelCompetitionAndRefund(
       competitionId,
       {
         $set: {
-          status: 'cancelled',
+          status: "cancelled",
           cancellationReason: reason,
           prizePool: 0, // Prize pool is now empty (refunded)
         },
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -147,8 +156,8 @@ export async function cancelCompetitionAndRefund(
     // Revalidate pages to show updated status
     revalidatePath(`/competitions/${competitionId}`);
     revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath('/competitions');
-    revalidatePath('/admin/competitions');
+    revalidatePath("/competitions");
+    revalidatePath("/admin/competitions");
 
     return {
       success: true,
@@ -157,7 +166,7 @@ export async function cancelCompetitionAndRefund(
     };
   } catch (error) {
     await session.abortTransaction();
-    console.error('❌ Error cancelling competition:', error);
+    console.error("❌ Error cancelling competition:", error);
     throw error;
   } finally {
     session.endSession();
@@ -171,21 +180,21 @@ export async function cancelCompetitionAndRefund(
 export async function adminCancelCompetition(
   competitionId: string,
   reason: string,
-  adminId: string
+  _adminId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
     await connectToDatabase();
 
     const competition = await Competition.findById(competitionId);
     if (!competition) {
-      return { success: false, message: 'Competition not found' };
+      return { success: false, message: "Competition not found" };
     }
 
     // Can only cancel upcoming or draft competitions manually
-    if (!['upcoming', 'draft'].includes(competition.status)) {
-      return { 
-        success: false, 
-        message: `Cannot cancel a ${competition.status} competition. Only draft or upcoming competitions can be cancelled.` 
+    if (!["upcoming", "draft"].includes(competition.status)) {
+      return {
+        success: false,
+        message: `Cannot cancel a ${competition.status} competition. Only draft or upcoming competitions can be cancelled.`,
       };
     }
 
@@ -202,21 +211,21 @@ export async function adminCancelCompetition(
     // No participants - just cancel
     await Competition.findByIdAndUpdate(competitionId, {
       $set: {
-        status: 'cancelled',
+        status: "cancelled",
         cancellationReason: reason,
       },
     });
 
     return {
       success: true,
-      message: 'Competition cancelled (no participants to refund).',
+      message: "Competition cancelled (no participants to refund).",
     };
   } catch (error) {
-    console.error('Error in adminCancelCompetition:', error);
+    console.error("Error in adminCancelCompetition:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to cancel competition',
+      message:
+        error instanceof Error ? error.message : "Failed to cancel competition",
     };
   }
 }
-

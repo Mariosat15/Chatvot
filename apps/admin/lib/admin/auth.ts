@@ -1,13 +1,15 @@
-import { jwtVerify, SignJWT } from 'jose';
-import { cookies, headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import { Admin } from '@/database/models/admin.model';
-import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
-import mongoose from 'mongoose';
+import { jwtVerify, SignJWT } from "jose";
+import { cookies, headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import { Admin } from "@/database/models/admin.model";
+import {
+  ADMIN_SECTIONS,
+  type AdminSection,
+} from "@/database/models/admin-employee.model";
+import mongoose from "mongoose";
+import { getAdminJwtSecret } from "./jwt-secret";
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
-);
+const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
 
 export interface AdminAuthResult {
   isAuthenticated: boolean;
@@ -34,13 +36,13 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
   try {
     // Try cookie-based auth first
     const cookieStore = await cookies();
-    let token = cookieStore.get('admin_token')?.value;
+    let token = cookieStore.get("admin_token")?.value;
 
     // If no cookie, try Bearer token from Authorization header
     if (!token) {
       const headersList = await headers();
-      const authHeader = headersList.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
+      const authHeader = headersList.get("authorization");
+      if (authHeader?.startsWith("Bearer ")) {
         token = authHeader.substring(7);
       }
     }
@@ -50,63 +52,81 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
     }
 
     const { payload } = await jwtVerify(token, SECRET_KEY);
-    
+
     // Fetch admin details from database for fresh data
     // This also validates that the admin still exists (wasn't deleted)
-    let adminName = 'Admin';
-    let isSuperAdmin = payload.isSuperAdmin as boolean || false;
-    let role = payload.role as string || 'admin';
-    let allowedSections = payload.allowedSections as AdminSection[] || [];
-    
+    let adminName = "Admin";
+    let isSuperAdmin = (payload.isSuperAdmin as boolean) || false;
+    let role = (payload.role as string) || "admin";
+    let allowedSections = (payload.allowedSections as AdminSection[]) || [];
+
     try {
       await connectToDatabase();
       const admin = await Admin.findById(payload.adminId)
-        .select('name email role allowedSections status createdAt forceLogoutAt isLockedOut tempPasswordExpiresAt')
+        .select(
+          "name email role allowedSections status createdAt forceLogoutAt isLockedOut tempPasswordExpiresAt",
+        )
         .lean();
-      
+
       // If admin doesn't exist anymore (deleted), return unauthenticated
       if (!admin) {
-        console.log(`❌ Admin ${payload.adminId} no longer exists - session invalidated`);
+        console.log(
+          `❌ Admin ${payload.adminId} no longer exists - session invalidated`,
+        );
         return { isAuthenticated: false };
       }
-      
+
       // If admin is disabled, return unauthenticated
-      if (admin.status === 'disabled') {
-        console.log(`❌ Admin ${admin.email} is disabled - session invalidated`);
+      if (admin.status === "disabled") {
+        console.log(
+          `❌ Admin ${admin.email} is disabled - session invalidated`,
+        );
         return { isAuthenticated: false };
       }
-      
+
       // Check if admin is locked out (toggle-based lockout)
       // IMPORTANT: Treat undefined as false (not locked out)
       if ((admin as any).isLockedOut === true) {
-        console.log(`❌ Admin ${admin.email} is locked out - session invalidated`);
+        console.log(
+          `❌ Admin ${admin.email} is locked out - session invalidated`,
+        );
         return { isAuthenticated: false };
       }
-      
+
       // Check if force logout was triggered after token was issued
       if (admin.forceLogoutAt && payload.iat) {
         const tokenIssuedAt = new Date((payload.iat as number) * 1000);
         if (new Date(admin.forceLogoutAt) > tokenIssuedAt) {
-          console.log(`❌ Admin ${admin.email} was force logged out - session invalidated`);
+          console.log(
+            `❌ Admin ${admin.email} was force logged out - session invalidated`,
+          );
           return { isAuthenticated: false };
         }
       }
-      
-      adminName = admin.name || 'Admin';
-      
+
+      adminName = admin.name || "Admin";
+
       // Determine if this is the original/super admin (check by email or first created)
-      const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
-      const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
-      const isOriginalAdmin = admin.email.toLowerCase() === defaultAdminEmail || 
-        (oldestAdmin && oldestAdmin._id.toString() === (admin._id as any).toString());
-      
+      const defaultAdminEmail = (
+        process.env.ADMIN_EMAIL || "admin@email.com"
+      ).toLowerCase();
+      const oldestAdmin = await Admin.findOne({})
+        .sort({ createdAt: 1 })
+        .select("_id");
+      const isOriginalAdmin: boolean =
+        admin.email.toLowerCase() === defaultAdminEmail ||
+        (oldestAdmin !== null &&
+          oldestAdmin._id.toString() === (admin._id as any).toString());
+
       isSuperAdmin = isOriginalAdmin;
-      role = isOriginalAdmin ? 'Super Admin' : (admin.role || 'Employee');
-      
+      role = isOriginalAdmin ? "Super Admin" : admin.role || "Employee";
+
       // Super admins have access to all sections, others get their assigned sections
-      allowedSections = isOriginalAdmin ? [...ADMIN_SECTIONS] : (admin.allowedSections as AdminSection[] || []);
+      allowedSections = isOriginalAdmin
+        ? [...ADMIN_SECTIONS]
+        : (admin.allowedSections as AdminSection[]) || [];
     } catch (dbError) {
-      console.error('Error fetching admin details:', dbError);
+      console.error("Error fetching admin details:", dbError);
       // On database error, be safe and invalidate session
       return { isAuthenticated: false };
     }
@@ -127,18 +147,21 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
 
 export async function requireAdminAuth() {
   const auth = await verifyAdminAuth();
-  
+
   if (!auth.isAuthenticated) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized");
   }
-  
+
   return auth;
 }
 
 /**
  * Check if admin has access to a specific section
  */
-export function hasAccessToSection(auth: AdminAuthResult, section: AdminSection): boolean {
+export function hasAccessToSection(
+  auth: AdminAuthResult,
+  section: AdminSection,
+): boolean {
   if (!auth.isAuthenticated) return false;
   if (auth.isSuperAdmin) return true;
   return auth.allowedSections?.includes(section) || false;
@@ -147,17 +170,19 @@ export function hasAccessToSection(auth: AdminAuthResult, section: AdminSection)
 /**
  * Require admin to have access to specific section
  */
-export async function requireSectionAccess(section: AdminSection): Promise<AdminAuthResult> {
+export async function requireSectionAccess(
+  section: AdminSection,
+): Promise<AdminAuthResult> {
   const auth = await verifyAdminAuth();
-  
+
   if (!auth.isAuthenticated) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized");
   }
-  
+
   if (!hasAccessToSection(auth, section)) {
     throw new Error(`Access denied to section: ${section}`);
   }
-  
+
   return auth;
 }
 
@@ -174,11 +199,11 @@ export async function getAdminSession(): Promise<{
 } | null> {
   try {
     const auth = await verifyAdminAuth();
-    
+
     if (!auth.isAuthenticated || !auth.adminId || !auth.email) {
       return null;
     }
-    
+
     return {
       id: auth.adminId,
       email: auth.email,
@@ -196,7 +221,7 @@ export async function getAdminSession(): Promise<{
 // GAME MASTER AUTHENTICATION
 // ============================================
 
-const GAMEMASTER_SECTIONS: AdminSection[] = ['gamemaster-dashboard'];
+const GAMEMASTER_SECTIONS: AdminSection[] = ["gamemaster-dashboard"];
 
 /**
  * Verify game master authentication
@@ -206,13 +231,13 @@ export async function verifyGameMasterAuth(): Promise<GameMasterAuthResult> {
   try {
     // Try cookie-based auth first
     const cookieStore = await cookies();
-    let token = cookieStore.get('gm_token')?.value;
+    let token = cookieStore.get("gm_token")?.value;
 
     // If no cookie, try Bearer token from Authorization header with GM prefix
     if (!token) {
       const headersList = await headers();
-      const authHeader = headersList.get('authorization');
-      if (authHeader?.startsWith('GM ')) {
+      const authHeader = headersList.get("authorization");
+      if (authHeader?.startsWith("GM ")) {
         token = authHeader.substring(3);
       }
     }
@@ -222,33 +247,39 @@ export async function verifyGameMasterAuth(): Promise<GameMasterAuthResult> {
     }
 
     const { payload } = await jwtVerify(token, SECRET_KEY);
-    
+
     // Verify this is a game master token
-    if (payload.tokenType !== 'gamemaster') {
+    if (payload.tokenType !== "gamemaster") {
       return { isAuthenticated: false, isGameMaster: false };
     }
 
     // Verify game master subscription is still active
     await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
       return { isAuthenticated: false, isGameMaster: false };
     }
 
-    const subscription = await db.collection('gamemastersubscriptions').findOne({
-      userId: payload.userId,
-      status: 'active',
-    });
+    const subscription = await db
+      .collection("gamemastersubscriptions")
+      .findOne({
+        userId: payload.userId,
+        status: "active",
+      });
 
     if (!subscription) {
-      console.log(`❌ Game master subscription not found or inactive for user ${payload.userId}`);
+      console.log(
+        `❌ Game master subscription not found or inactive for user ${payload.userId}`,
+      );
       return { isAuthenticated: false, isGameMaster: false };
     }
 
     // Check if subscription has expired
     if (new Date(subscription.endDate) < new Date()) {
-      console.log(`❌ Game master subscription expired for user ${payload.userId}`);
+      console.log(
+        `❌ Game master subscription expired for user ${payload.userId}`,
+      );
       return { isAuthenticated: false, isGameMaster: false };
     }
 
@@ -263,7 +294,7 @@ export async function verifyGameMasterAuth(): Promise<GameMasterAuthResult> {
       allowedSections: GAMEMASTER_SECTIONS,
     };
   } catch (error) {
-    console.error('Error verifying game master auth:', error);
+    console.error("Error verifying game master auth:", error);
     return { isAuthenticated: false, isGameMaster: false };
   }
 }
@@ -274,19 +305,19 @@ export async function verifyGameMasterAuth(): Promise<GameMasterAuthResult> {
 export async function generateGameMasterToken(
   userId: string,
   email: string,
-  name: string
+  name: string,
 ): Promise<string> {
   const token = await new SignJWT({
     userId,
     email,
     name,
-    tokenType: 'gamemaster',
+    tokenType: "gamemaster",
   })
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime('7d')  // Game master tokens valid for 7 days
+    .setExpirationTime("7d") // Game master tokens valid for 7 days
     .sign(SECRET_KEY);
-  
+
   return token;
 }
 
@@ -296,7 +327,7 @@ export async function generateGameMasterToken(
  */
 export async function verifyAnyAuth(): Promise<{
   isAuthenticated: boolean;
-  authType: 'admin' | 'gamemaster' | null;
+  authType: "admin" | "gamemaster" | null;
   adminAuth?: AdminAuthResult;
   gmAuth?: GameMasterAuthResult;
 }> {
@@ -305,7 +336,7 @@ export async function verifyAnyAuth(): Promise<{
   if (adminAuth.isAuthenticated) {
     return {
       isAuthenticated: true,
-      authType: 'admin',
+      authType: "admin",
       adminAuth,
     };
   }
@@ -315,7 +346,7 @@ export async function verifyAnyAuth(): Promise<{
   if (gmAuth.isAuthenticated) {
     return {
       isAuthenticated: true,
-      authType: 'gamemaster',
+      authType: "gamemaster",
       gmAuth,
     };
   }
@@ -331,10 +362,10 @@ export async function verifyAnyAuth(): Promise<{
  */
 export async function requireGameMasterAuth(): Promise<GameMasterAuthResult> {
   const auth = await verifyGameMasterAuth();
-  
+
   if (!auth.isAuthenticated || !auth.isGameMaster) {
-    throw new Error('Game Master authentication required');
+    throw new Error("Game Master authentication required");
   }
-  
+
   return auth;
 }

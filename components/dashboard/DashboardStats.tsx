@@ -1,7 +1,14 @@
-'use client';
+"use client";
 
-import { TrendingUp, TrendingDown, Trophy, Target, Activity, DollarSign } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import {
+  TrendingUp,
+  TrendingDown,
+  Trophy,
+  Target,
+  Activity,
+  DollarSign,
+} from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 interface DashboardStatsProps {
   overallStats: {
@@ -19,60 +26,68 @@ interface DashboardStatsProps {
 
 export default function DashboardStats({ overallStats }: DashboardStatsProps) {
   const isProfitable = overallStats.totalPnL >= 0;
-  const pnlPercentage = overallStats.totalCapital > 0
-    ? (overallStats.totalPnL / overallStats.totalCapital) * 100
-    : 0;
+  const pnlPercentage =
+    overallStats.totalCapital > 0
+      ? (overallStats.totalPnL / overallStats.totalCapital) * 100
+      : 0;
 
   const stats = [
     {
-      label: 'Active Competitions',
+      label: "Active Competitions",
       value: overallStats.activeCompetitionsCount,
       icon: Trophy,
-      color: 'text-yellow-500',
-      bgColor: 'bg-yellow-500/10',
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-500/10",
       trend: null,
     },
     {
-      label: 'Total Capital',
+      label: "Total Capital",
       value: formatCurrency(overallStats.totalCapital),
       icon: DollarSign,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
       trend: null,
     },
     {
-      label: 'Total P&L',
+      label: "Total P&L",
       value: formatCurrency(overallStats.totalPnL),
       icon: isProfitable ? TrendingUp : TrendingDown,
-      color: isProfitable ? 'text-green-500' : 'text-red-500',
-      bgColor: isProfitable ? 'bg-green-500/10' : 'bg-red-500/10',
-      trend: `${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%`,
+      color: isProfitable ? "text-green-500" : "text-red-500",
+      bgColor: isProfitable ? "bg-green-500/10" : "bg-red-500/10",
+      trend: `${pnlPercentage >= 0 ? "+" : ""}${pnlPercentage.toFixed(2)}%`,
     },
     {
-      label: 'Open Positions',
+      label: "Open Positions",
       value: overallStats.totalPositions,
       icon: Activity,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
       trend: null,
     },
     {
-      label: 'Total Trades',
+      label: "Total Trades",
       value: overallStats.totalTrades,
       icon: Target,
-      color: 'text-indigo-500',
-      bgColor: 'bg-indigo-500/10',
+      color: "text-indigo-500",
+      bgColor: "bg-indigo-500/10",
       trend: `${overallStats.totalWinningTrades}W / ${overallStats.totalLosingTrades}L`,
     },
     {
-      label: 'Overall Win Rate',
+      label: "Overall Win Rate",
       value: `${overallStats.overallWinRate.toFixed(1)}%`,
       icon: Trophy,
-      color: overallStats.overallWinRate >= 50 ? 'text-green-500' : 'text-orange-500',
-      bgColor: overallStats.overallWinRate >= 50 ? 'bg-green-500/10' : 'bg-orange-500/10',
-      trend: overallStats.profitFactor > 0 
-        ? `PF: ${overallStats.profitFactor === 9999 ? '∞' : overallStats.profitFactor.toFixed(2)}`
-        : null,
+      color:
+        overallStats.overallWinRate >= 50
+          ? "text-green-500"
+          : "text-orange-500",
+      bgColor:
+        overallStats.overallWinRate >= 50
+          ? "bg-green-500/10"
+          : "bg-orange-500/10",
+      trend:
+        overallStats.profitFactor > 0
+          ? `PF: ${overallStats.profitFactor === 9999 ? "∞" : overallStats.profitFactor.toFixed(2)}`
+          : null,
     },
   ];
 
@@ -100,4 +115,3 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     </div>
   );
 }
-

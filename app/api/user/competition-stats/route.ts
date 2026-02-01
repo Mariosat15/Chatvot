@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/user/competition-stats
@@ -18,27 +18,37 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = session.user.id;
     const { searchParams } = new URL(req.url);
-    const competitionId = searchParams.get('competitionId');
-    const challengeId = searchParams.get('challengeId');
-    const contestType = searchParams.get('type') || 'competition'; // 'competition' or 'challenge'
+    const competitionId = searchParams.get("competitionId");
+    const challengeId = searchParams.get("challengeId");
+    const contestType = searchParams.get("type") || "competition"; // 'competition' or 'challenge'
 
     await connectToDatabase();
 
     // Get all user's competition participations
-    const allCompetitionParticipations = await CompetitionParticipant.find({ userId })
-      .populate('competitionId', 'name status prizePool entryFee startTime endTime startingCapital')
+    const allCompetitionParticipations = await CompetitionParticipant.find({
+      userId,
+    })
+      .populate(
+        "competitionId",
+        "name status prizePool entryFee startTime endTime startingCapital",
+      )
       .lean();
 
     // Get all user's challenge participations
-    const allChallengeParticipations = await ChallengeParticipant.find({ userId })
-      .populate('challengeId', 'name status prizePool entryFee startTime endTime startingCapital')
+    const allChallengeParticipations = await ChallengeParticipant.find({
+      userId,
+    })
+      .populate(
+        "challengeId",
+        "name status prizePool entryFee startTime endTime startingCapital",
+      )
       .lean();
 
     // Calculate all-time stats (combining competitions + challenges)
@@ -54,7 +64,8 @@ export async function GET(req: NextRequest) {
       challengeWins: 0,
       challengeLosses: 0,
       // Combined Stats
-      totalContests: allCompetitionParticipations.length + allChallengeParticipations.length,
+      totalContests:
+        allCompetitionParticipations.length + allChallengeParticipations.length,
       totalPnL: 0,
       totalTrades: 0,
       winningTrades: 0,
@@ -68,9 +79,22 @@ export async function GET(req: NextRequest) {
       averagePnLPerContest: 0,
       biggestWin: 0,
       biggestLoss: 0,
-      rankHistory: [] as { date: string; rank: number; name: string; type: string }[],
-      pnlHistory: [] as { date: string; pnl: number; name: string; type: string }[],
-      monthlyPerformance: {} as Record<string, { pnl: number; contests: number; winRate: number }>,
+      rankHistory: [] as {
+        date: string;
+        rank: number;
+        name: string;
+        type: string;
+      }[],
+      pnlHistory: [] as {
+        date: string;
+        pnl: number;
+        name: string;
+        type: string;
+      }[],
+      monthlyPerformance: {} as Record<
+        string,
+        { pnl: number; contests: number; winRate: number }
+      >,
     };
 
     let rankSum = 0;
@@ -82,8 +106,8 @@ export async function GET(req: NextRequest) {
       if (!comp) continue;
 
       // Count by status
-      if (comp.status === 'active') allTimeStats.activeCompetitions++;
-      if (comp.status === 'completed') allTimeStats.completedCompetitions++;
+      if (comp.status === "active") allTimeStats.activeCompetitions++;
+      if (comp.status === "completed") allTimeStats.completedCompetitions++;
 
       // Accumulate stats
       allTimeStats.totalPnL += participation.pnl || 0;
@@ -102,17 +126,22 @@ export async function GET(req: NextRequest) {
 
       // Track ranks
       if (participation.currentRank) {
-        if (!allTimeStats.bestRank || participation.currentRank < allTimeStats.bestRank) {
+        if (
+          !allTimeStats.bestRank ||
+          participation.currentRank < allTimeStats.bestRank
+        ) {
           allTimeStats.bestRank = participation.currentRank;
         }
         rankSum += participation.currentRank;
         rankedContests++;
 
         allTimeStats.rankHistory.push({
-          date: comp.endTime ? new Date(comp.endTime).toISOString() : new Date().toISOString(),
+          date: comp.endTime
+            ? new Date(comp.endTime).toISOString()
+            : new Date().toISOString(),
           rank: participation.currentRank,
           name: comp.name,
-          type: 'competition',
+          type: "competition",
         });
       }
 
@@ -123,19 +152,25 @@ export async function GET(req: NextRequest) {
 
       // PnL history
       allTimeStats.pnlHistory.push({
-        date: comp.endTime ? new Date(comp.endTime).toISOString() : new Date().toISOString(),
+        date: comp.endTime
+          ? new Date(comp.endTime).toISOString()
+          : new Date().toISOString(),
         pnl: participation.pnl || 0,
         name: comp.name,
-        type: 'competition',
+        type: "competition",
       });
 
       // Monthly performance
-      const monthKey = comp.startTime 
-        ? new Date(comp.startTime).toISOString().slice(0, 7) 
+      const monthKey = comp.startTime
+        ? new Date(comp.startTime).toISOString().slice(0, 7)
         : new Date().toISOString().slice(0, 7);
-      
+
       if (!allTimeStats.monthlyPerformance[monthKey]) {
-        allTimeStats.monthlyPerformance[monthKey] = { pnl: 0, contests: 0, winRate: 0 };
+        allTimeStats.monthlyPerformance[monthKey] = {
+          pnl: 0,
+          contests: 0,
+          winRate: 0,
+        };
       }
       allTimeStats.monthlyPerformance[monthKey].pnl += participation.pnl || 0;
       allTimeStats.monthlyPerformance[monthKey].contests++;
@@ -147,8 +182,8 @@ export async function GET(req: NextRequest) {
       if (!challenge) continue;
 
       // Count by status
-      if (challenge.status === 'active') allTimeStats.activeChallenges++;
-      if (challenge.status === 'completed') {
+      if (challenge.status === "active") allTimeStats.activeChallenges++;
+      if (challenge.status === "completed") {
         allTimeStats.completedChallenges++;
         if (participation.isWinner) {
           allTimeStats.challengeWins++;
@@ -179,64 +214,105 @@ export async function GET(req: NextRequest) {
 
       // PnL history
       allTimeStats.pnlHistory.push({
-        date: challenge.endTime ? new Date(challenge.endTime).toISOString() : new Date().toISOString(),
+        date: challenge.endTime
+          ? new Date(challenge.endTime).toISOString()
+          : new Date().toISOString(),
         pnl: participation.pnl || 0,
-        name: challenge.name || '1v1 Challenge',
-        type: 'challenge',
+        name: challenge.name || "1v1 Challenge",
+        type: "challenge",
       });
 
       // Rank history for challenges (1st or 2nd)
-      if (challenge.status === 'completed') {
+      if (challenge.status === "completed") {
         allTimeStats.rankHistory.push({
-          date: challenge.endTime ? new Date(challenge.endTime).toISOString() : new Date().toISOString(),
+          date: challenge.endTime
+            ? new Date(challenge.endTime).toISOString()
+            : new Date().toISOString(),
           rank: participation.isWinner ? 1 : 2,
-          name: challenge.name || '1v1 Challenge',
-          type: 'challenge',
+          name: challenge.name || "1v1 Challenge",
+          type: "challenge",
         });
       }
 
       // Monthly performance
-      const monthKey = challenge.startTime 
-        ? new Date(challenge.startTime).toISOString().slice(0, 7) 
+      const monthKey = challenge.startTime
+        ? new Date(challenge.startTime).toISOString().slice(0, 7)
         : new Date().toISOString().slice(0, 7);
-      
+
       if (!allTimeStats.monthlyPerformance[monthKey]) {
-        allTimeStats.monthlyPerformance[monthKey] = { pnl: 0, contests: 0, winRate: 0 };
+        allTimeStats.monthlyPerformance[monthKey] = {
+          pnl: 0,
+          contests: 0,
+          winRate: 0,
+        };
       }
       allTimeStats.monthlyPerformance[monthKey].pnl += participation.pnl || 0;
       allTimeStats.monthlyPerformance[monthKey].contests++;
     }
 
     // Calculate derived stats
-    allTimeStats.averageRank = rankedContests > 0 ? rankSum / rankedContests : 0;
-    allTimeStats.netProfit = allTimeStats.totalPrizesWon - allTimeStats.totalEntryFees + allTimeStats.totalPnL;
-    allTimeStats.winRate = allTimeStats.totalTrades > 0 
-      ? (allTimeStats.winningTrades / allTimeStats.totalTrades) * 100 
-      : 0;
-    allTimeStats.averagePnLPerContest = allTimeStats.totalContests > 0 
-      ? allTimeStats.totalPnL / allTimeStats.totalContests 
-      : 0;
+    allTimeStats.averageRank =
+      rankedContests > 0 ? rankSum / rankedContests : 0;
+    allTimeStats.netProfit =
+      allTimeStats.totalPrizesWon -
+      allTimeStats.totalEntryFees +
+      allTimeStats.totalPnL;
+    allTimeStats.winRate =
+      allTimeStats.totalTrades > 0
+        ? (allTimeStats.winningTrades / allTimeStats.totalTrades) * 100
+        : 0;
+    allTimeStats.averagePnLPerContest =
+      allTimeStats.totalContests > 0
+        ? allTimeStats.totalPnL / allTimeStats.totalContests
+        : 0;
 
     // Sort histories by date
-    allTimeStats.rankHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    allTimeStats.pnlHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    allTimeStats.rankHistory.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+    allTimeStats.pnlHistory.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
 
     // Calculate monthly win rates
     for (const monthKey of Object.keys(allTimeStats.monthlyPerformance)) {
-      const monthCompParticipations = allCompetitionParticipations.filter(p => {
-        const comp = p.competitionId as any;
-        return comp?.startTime && new Date(comp.startTime).toISOString().slice(0, 7) === monthKey;
-      });
-      const monthChalParticipations = allChallengeParticipations.filter(p => {
+      const monthCompParticipations = allCompetitionParticipations.filter(
+        (p) => {
+          const comp = p.competitionId as any;
+          return (
+            comp?.startTime &&
+            new Date(comp.startTime).toISOString().slice(0, 7) === monthKey
+          );
+        },
+      );
+      const monthChalParticipations = allChallengeParticipations.filter((p) => {
         const chal = p.challengeId as any;
-        return chal?.startTime && new Date(chal.startTime).toISOString().slice(0, 7) === monthKey;
+        return (
+          chal?.startTime &&
+          new Date(chal.startTime).toISOString().slice(0, 7) === monthKey
+        );
       });
-      
-      const monthWins = monthCompParticipations.reduce((sum, p) => sum + (p.winningTrades || 0), 0) +
-                        monthChalParticipations.reduce((sum, p) => sum + (p.winningTrades || 0), 0);
-      const monthTotal = monthCompParticipations.reduce((sum, p) => sum + (p.totalTrades || 0), 0) +
-                         monthChalParticipations.reduce((sum, p) => sum + (p.totalTrades || 0), 0);
-      allTimeStats.monthlyPerformance[monthKey].winRate = monthTotal > 0 ? (monthWins / monthTotal) * 100 : 0;
+
+      const monthWins =
+        monthCompParticipations.reduce(
+          (sum, p) => sum + (p.winningTrades || 0),
+          0,
+        ) +
+        monthChalParticipations.reduce(
+          (sum, p) => sum + (p.winningTrades || 0),
+          0,
+        );
+      const monthTotal =
+        monthCompParticipations.reduce(
+          (sum, p) => sum + (p.totalTrades || 0),
+          0,
+        ) +
+        monthChalParticipations.reduce(
+          (sum, p) => sum + (p.totalTrades || 0),
+          0,
+        );
+      allTimeStats.monthlyPerformance[monthKey].winRate =
+        monthTotal > 0 ? (monthWins / monthTotal) * 100 : 0;
     }
 
     // Current competition stats (if competitionId provided)
@@ -245,89 +321,146 @@ export async function GET(req: NextRequest) {
     let equityCurve: { time: string; equity: number }[] = [];
 
     if (competitionId) {
-      const participation = await CompetitionParticipant.findOne({
+      const participation = (await CompetitionParticipant.findOne({
         competitionId,
         userId,
-      }).lean();
+      }).lean()) as {
+        _id: { toString(): string };
+        startingCapital?: number;
+        currentCapital?: number;
+        pnl?: number;
+        pnlPercentage?: number;
+        totalTrades?: number;
+        winningTrades?: number;
+        losingTrades?: number;
+        winRate?: number;
+        realizedPnl?: number;
+        role?: string;
+        isWinner?: boolean;
+        username?: string;
+        currentRank?: number;
+      } | null;
 
-      console.log('🔍 DEBUG - Competition Stats Query:');
-      console.log('  competitionId:', competitionId);
-      console.log('  userId:', userId);
-      console.log('  participation found:', !!participation);
-      console.log('  participation._id:', participation?._id?.toString());
+      console.log("🔍 DEBUG - Competition Stats Query:");
+      console.log("  competitionId:", competitionId);
+      console.log("  userId:", userId);
+      console.log("  participation found:", !!participation);
+      console.log("  participation._id:", participation?._id?.toString());
 
       if (participation) {
-        const competition = await Competition.findById(competitionId).lean();
-        
+        const competition = (await Competition.findById(
+          competitionId,
+        ).lean()) as {
+          name?: string;
+          status?: string;
+          startTime?: Date;
+          endTime?: Date;
+          startingCapital?: number;
+          currentParticipants?: number;
+        } | null;
+
         // Get all positions for this competition
         // Note: participantId is stored as string in DB, so convert ObjectId to string
         const participantIdStr = participation._id.toString();
-        console.log('  Querying positions with participantId:', participantIdStr);
-        
+        console.log(
+          "  Querying positions with participantId:",
+          participantIdStr,
+        );
+
         const positions = await TradingPosition.find({
           competitionId,
           participantId: participantIdStr,
-        }).sort({ openedAt: 1 }).lean();
-        
-        console.log('  Positions found:', positions.length);
-        
+        })
+          .sort({ openedAt: 1 })
+          .lean();
+
+        console.log("  Positions found:", positions.length);
+
         // Also try querying just by competitionId and userId to see if positions exist
         const altPositions = await TradingPosition.find({
           competitionId,
           userId,
         }).lean();
-        console.log('  Alt query (by userId) found:', altPositions.length);
+        console.log("  Alt query (by userId) found:", altPositions.length);
         if (altPositions.length > 0) {
-          console.log('  First position participantId:', altPositions[0].participantId);
-          console.log('  Expected participantId:', participantIdStr);
-          console.log('  Match:', altPositions[0].participantId === participantIdStr);
+          console.log(
+            "  First position participantId:",
+            altPositions[0].participantId,
+          );
+          console.log("  Expected participantId:", participantIdStr);
+          console.log(
+            "  Match:",
+            altPositions[0].participantId === participantIdStr,
+          );
         }
 
         // DEBUG: Check position statuses and PnL values
-        const openCount = positions.filter(p => p.status === 'open').length;
-        const closedCount = positions.filter(p => p.status === 'closed').length;
-        console.log('  Open positions:', openCount);
-        console.log('  Closed positions:', closedCount);
-        
+        const openCount = positions.filter((p) => p.status === "open").length;
+        const closedCount = positions.filter(
+          (p) => p.status === "closed",
+        ).length;
+        console.log("  Open positions:", openCount);
+        console.log("  Closed positions:", closedCount);
+
         if (positions.length > 0) {
-          console.log('  Sample position fields:', Object.keys(positions[0]));
-          console.log('  First position status:', positions[0].status);
-          console.log('  First position unrealizedPnl:', positions[0].unrealizedPnl);
-          
+          console.log("  Sample position fields:", Object.keys(positions[0]));
+          console.log("  First position status:", positions[0].status);
+          console.log(
+            "  First position unrealizedPnl:",
+            positions[0].unrealizedPnl,
+          );
+
           // Show all closed positions PnL
-          const closedOnes = positions.filter(p => p.status === 'closed');
+          const closedOnes = positions.filter((p) => p.status === "closed");
           if (closedOnes.length > 0) {
-            console.log('  Closed positions PnL values:', closedOnes.map(p => ({
-              symbol: p.symbol,
-              pnl: p.unrealizedPnl,
-              side: p.side
-            })));
+            console.log(
+              "  Closed positions PnL values:",
+              closedOnes.map((p) => ({
+                symbol: p.symbol,
+                pnl: p.unrealizedPnl,
+                side: p.side,
+              })),
+            );
           }
         }
 
         // Calculate live stats
-        const openPositions = positions.filter(p => p.status === 'open');
-        
+        const openPositions = positions.filter((p) => p.status === "open");
+
         // Get actual P&L from TradeHistory (where realizedPnl is stored for closed trades)
         const tradeHistory = await TradeHistory.find({
           competitionId,
           participantId: participantIdStr,
-        }).sort({ closedAt: 1 }).lean();
-        
-        console.log('  TradeHistory records found:', tradeHistory.length);
+        })
+          .sort({ closedAt: 1 })
+          .lean();
+
+        console.log("  TradeHistory records found:", tradeHistory.length);
         if (tradeHistory.length > 0) {
-          console.log('  Sample trade realizedPnl:', tradeHistory[0].realizedPnl);
+          console.log(
+            "  Sample trade realizedPnl:",
+            tradeHistory[0].realizedPnl,
+          );
         }
-        
+
         // Unrealized P&L from open positions
-        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
+        const unrealizedPnL = openPositions.reduce(
+          (sum, p) => sum + (p.unrealizedPnl || 0),
+          0,
+        );
         // Realized P&L from trade history
-        const realizedPnL = tradeHistory.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
-        
+        const realizedPnL = tradeHistory.reduce(
+          (sum, t) => sum + (t.realizedPnl || 0),
+          0,
+        );
+
         // Build equity curve from trade history
         let runningEquity = competition?.startingCapital || 10000;
-        equityCurve.push({ time: new Date(competition?.startTime || Date.now()).toISOString(), equity: runningEquity });
-        
+        equityCurve.push({
+          time: new Date(competition?.startTime || Date.now()).toISOString(),
+          equity: runningEquity,
+        });
+
         for (const trade of tradeHistory) {
           runningEquity += trade.realizedPnl || 0;
           equityCurve.push({
@@ -347,12 +480,17 @@ export async function GET(req: NextRequest) {
         // Calculate session stats (today)
         const today = new Date();
         today.setUTCHours(0, 0, 0, 0);
-        
-        const todayTrades = tradeHistory.filter(t => 
-          t.closedAt && new Date(t.closedAt) >= today
+
+        const todayTrades = tradeHistory.filter(
+          (t) => t.closedAt && new Date(t.closedAt) >= today,
         );
-        const todayPnL = todayTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
-        const todayWins = todayTrades.filter(t => (t.realizedPnl || 0) > 0).length;
+        const todayPnL = todayTrades.reduce(
+          (sum, t) => sum + (t.realizedPnl || 0),
+          0,
+        );
+        const todayWins = todayTrades.filter(
+          (t) => (t.realizedPnl || 0) > 0,
+        ).length;
 
         // Calculate winning streak from trade history
         let winStreak = 0;
@@ -366,7 +504,7 @@ export async function GET(req: NextRequest) {
             isWinStreak = pnl > 0;
             currentStreak = 1;
           } else {
-            if ((pnl > 0) === isWinStreak) {
+            if (pnl > 0 === isWinStreak) {
               currentStreak++;
             } else {
               break;
@@ -378,19 +516,33 @@ export async function GET(req: NextRequest) {
         else loseStreak = currentStreak;
 
         // Calculate average trade stats from TradeHistory
-        const winningTrades = tradeHistory.filter(t => (t.realizedPnl || 0) > 0);
-        const losingTrades = tradeHistory.filter(t => (t.realizedPnl || 0) < 0);
-        const avgWinAmount = winningTrades.length > 0 
-          ? winningTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0) / winningTrades.length 
-          : 0;
-        const avgLossAmount = losingTrades.length > 0 
-          ? Math.abs(losingTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0)) / losingTrades.length 
-          : 0;
-        const profitFactor = avgLossAmount > 0 ? avgWinAmount / avgLossAmount : avgWinAmount > 0 ? Infinity : 0;
+        const winningTrades = tradeHistory.filter(
+          (t) => (t.realizedPnl || 0) > 0,
+        );
+        const losingTrades = tradeHistory.filter(
+          (t) => (t.realizedPnl || 0) < 0,
+        );
+        const avgWinAmount =
+          winningTrades.length > 0
+            ? winningTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0) /
+              winningTrades.length
+            : 0;
+        const avgLossAmount =
+          losingTrades.length > 0
+            ? Math.abs(
+                losingTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0),
+              ) / losingTrades.length
+            : 0;
+        const profitFactor =
+          avgLossAmount > 0
+            ? avgWinAmount / avgLossAmount
+            : avgWinAmount > 0
+              ? Infinity
+              : 0;
 
         currentCompetitionStats = {
-          competitionName: competition?.name || 'Unknown',
-          competitionStatus: competition?.status || 'unknown',
+          competitionName: competition?.name || "Unknown",
+          competitionStatus: competition?.status || "unknown",
           startTime: competition?.startTime,
           endTime: competition?.endTime,
           startingCapital: competition?.startingCapital || 10000,
@@ -402,19 +554,28 @@ export async function GET(req: NextRequest) {
           totalTrades: participation.totalTrades || 0,
           winningTrades: participation.winningTrades || 0,
           losingTrades: participation.losingTrades || 0,
-          winRate: participation.totalTrades > 0 
-            ? ((participation.winningTrades || 0) / participation.totalTrades) * 100 
-            : 0,
+          winRate:
+            (participation.totalTrades || 0) > 0
+              ? ((participation.winningTrades || 0) /
+                  (participation.totalTrades || 1)) *
+                100
+              : 0,
           openPositionsCount: openPositions.length,
           unrealizedPnL,
           realizedPnL,
           equity: (participation.currentCapital || 0) + unrealizedPnL,
-          marginUsed: openPositions.reduce((sum, p) => sum + (p.marginRequired || 0), 0),
-          availableMargin: (participation.currentCapital || 0) - openPositions.reduce((sum, p) => sum + (p.marginRequired || 0), 0),
+          marginUsed: openPositions.reduce(
+            (sum, p) => sum + (p.marginRequired || 0),
+            0,
+          ),
+          availableMargin:
+            (participation.currentCapital || 0) -
+            openPositions.reduce((sum, p) => sum + (p.marginRequired || 0), 0),
           // Session stats
           todayPnL,
           todayTrades: todayTrades.length,
-          todayWinRate: todayTrades.length > 0 ? (todayWins / todayTrades.length) * 100 : 0,
+          todayWinRate:
+            todayTrades.length > 0 ? (todayWins / todayTrades.length) * 100 : 0,
           // Streaks
           winStreak,
           loseStreak,
@@ -424,15 +585,27 @@ export async function GET(req: NextRequest) {
           avgWin: avgWinAmount,
           avgLoss: avgLossAmount,
           profitFactor: profitFactor === Infinity ? 999 : profitFactor,
-          largestWin: tradeHistory.length > 0 ? Math.max(...tradeHistory.map(t => t.realizedPnl || 0), 0) : 0,
-          largestLoss: tradeHistory.length > 0 ? Math.min(...tradeHistory.map(t => t.realizedPnl || 0), 0) : 0,
+          largestWin:
+            tradeHistory.length > 0
+              ? Math.max(...tradeHistory.map((t) => t.realizedPnl || 0), 0)
+              : 0,
+          largestLoss:
+            tradeHistory.length > 0
+              ? Math.min(...tradeHistory.map((t) => t.realizedPnl || 0), 0)
+              : 0,
           // Holding times from TradeHistory
-          avgHoldingTime: tradeHistory.length > 0 
-            ? tradeHistory.reduce((sum, t) => sum + (t.holdingTimeSeconds || 0), 0) / tradeHistory.length / 60 // in minutes
-            : 0,
+          avgHoldingTime:
+            tradeHistory.length > 0
+              ? tradeHistory.reduce(
+                  (sum, t) => sum + (t.holdingTimeSeconds || 0),
+                  0,
+                ) /
+                tradeHistory.length /
+                60 // in minutes
+              : 0,
         };
 
-        livePositions = openPositions.map(p => ({
+        livePositions = openPositions.map((p) => ({
           id: p._id?.toString(),
           symbol: p.symbol,
           side: p.side,
@@ -452,36 +625,69 @@ export async function GET(req: NextRequest) {
     let challengeEquityCurve: { time: string; equity: number }[] = [];
 
     if (challengeId) {
-      const participation = await ChallengeParticipant.findOne({
+      const participation = (await ChallengeParticipant.findOne({
         challengeId,
         userId,
-      }).lean();
+      }).lean()) as {
+        _id: { toString(): string };
+        startingCapital?: number;
+        currentCapital?: number;
+        pnl?: number;
+        pnlPercentage?: number;
+        totalTrades?: number;
+        winningTrades?: number;
+        losingTrades?: number;
+        winRate?: number;
+        realizedPnl?: number;
+        role?: string;
+        isWinner?: boolean;
+      } | null;
 
       if (participation) {
-        const challenge = await Challenge.findById(challengeId).lean();
-        
+        const challenge = (await Challenge.findById(challengeId).lean()) as {
+          name?: string;
+          status?: string;
+          startTime?: Date;
+          endTime?: Date;
+        } | null;
+
         // Get opponent
-        const opponent = await ChallengeParticipant.findOne({
+        const opponent = (await ChallengeParticipant.findOne({
           challengeId,
           userId: { $ne: userId },
-        }).lean();
-        
+        }).lean()) as {
+          username?: string;
+          currentCapital?: number;
+          pnl?: number;
+          pnlPercentage?: number;
+          totalTrades?: number;
+          isWinner?: boolean;
+        } | null;
+
         // Get all positions for this challenge
         // Note: participantId is stored as string in DB, so convert ObjectId to string
         const positions = await TradingPosition.find({
           challengeId,
           participantId: participation._id.toString(),
-        }).sort({ openedAt: 1 }).lean();
+        })
+          .sort({ openedAt: 1 })
+          .lean();
 
-        const openPositions = positions.filter(p => p.status === 'open');
-        const closedPositions = positions.filter(p => p.status === 'closed');
-        
-        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
-        
+        const openPositions = positions.filter((p) => p.status === "open");
+        const closedPositions = positions.filter((p) => p.status === "closed");
+
+        const unrealizedPnL = openPositions.reduce(
+          (sum, p) => sum + (p.unrealizedPnl || 0),
+          0,
+        );
+
         // Build equity curve
         let runningEquity = participation.startingCapital || 10000;
-        challengeEquityCurve.push({ time: new Date(challenge?.startTime || Date.now()).toISOString(), equity: runningEquity });
-        
+        challengeEquityCurve.push({
+          time: new Date(challenge?.startTime || Date.now()).toISOString(),
+          equity: runningEquity,
+        });
+
         for (const pos of closedPositions) {
           runningEquity += pos.unrealizedPnl || 0;
           challengeEquityCurve.push({
@@ -498,8 +704,8 @@ export async function GET(req: NextRequest) {
         }
 
         currentChallengeStats = {
-          challengeName: challenge?.name || '1v1 Challenge',
-          challengeStatus: challenge?.status || 'unknown',
+          challengeName: challenge?.name || "1v1 Challenge",
+          challengeStatus: challenge?.status || "unknown",
           startTime: challenge?.startTime,
           endTime: challenge?.endTime,
           startingCapital: participation.startingCapital || 10000,
@@ -517,20 +723,26 @@ export async function GET(req: NextRequest) {
           role: participation.role,
           isWinner: participation.isWinner,
           // Opponent stats
-          opponent: opponent ? {
-            username: opponent.username,
-            currentCapital: opponent.currentCapital,
-            pnl: opponent.pnl,
-            pnlPercentage: opponent.pnlPercentage,
-            totalTrades: opponent.totalTrades,
-            isWinner: opponent.isWinner,
-          } : null,
+          opponent: opponent
+            ? {
+                username: opponent.username,
+                currentCapital: opponent.currentCapital,
+                pnl: opponent.pnl,
+                pnlPercentage: opponent.pnlPercentage,
+                totalTrades: opponent.totalTrades,
+                isWinner: opponent.isWinner,
+              }
+            : null,
           // Your lead/deficit
-          leadAmount: opponent ? (participation.pnl || 0) - (opponent.pnl || 0) : 0,
-          isLeading: opponent ? (participation.pnl || 0) > (opponent.pnl || 0) : false,
+          leadAmount: opponent
+            ? (participation.pnl || 0) - (opponent.pnl || 0)
+            : 0,
+          isLeading: opponent
+            ? (participation.pnl || 0) > (opponent.pnl || 0)
+            : false,
         };
 
-        challengePositions = openPositions.map(p => ({
+        challengePositions = openPositions.map((p) => ({
           id: p._id?.toString(),
           symbol: p.symbol,
           side: p.side,
@@ -555,8 +767,10 @@ export async function GET(req: NextRequest) {
       challengeEquityCurve,
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
-    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+    console.error("Error fetching stats:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch stats" },
+      { status: 500 },
+    );
   }
 }
-

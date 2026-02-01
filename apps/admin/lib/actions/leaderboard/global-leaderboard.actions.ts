@@ -1,12 +1,12 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import UserBadge from '@/database/models/user-badge.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { getAllUsers } from '@/lib/utils/user-lookup';
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import UserBadge from "@/database/models/user-badge.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { getAllUsers } from "@/lib/utils/user-lookup";
 
 export interface GlobalLeaderboardEntry {
   userId: string;
@@ -16,32 +16,32 @@ export interface GlobalLeaderboardEntry {
   rank: number;
   isTied?: boolean;
   tiedWith?: string[];
-  
+
   // Title
   userTitle?: string;
   userTitleIcon?: string;
   userTitleColor?: string;
-  
+
   // Overall stats
   totalPnl: number;
   totalPnlPercentage: number;
   totalTrades: number;
   winRate: number;
   profitFactor: number;
-  
+
   // Competition stats
   competitionsEntered: number;
   competitionsWon: number;
   podiumFinishes: number;
-  
+
   // Challenge stats
   challengesEntered?: number;
   challengesWon?: number;
-  
+
   // Badges
   totalBadges: number;
   legendaryBadges: number;
-  
+
   // Score (for ranking)
   overallScore: number;
 }
@@ -49,49 +49,56 @@ export interface GlobalLeaderboardEntry {
 /**
  * Get global leaderboard - ranks ALL users (including those without competition/challenge history)
  */
-export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLeaderboardEntry[]> {
+export async function getGlobalLeaderboard(
+  limit: number = 0,
+): Promise<GlobalLeaderboardEntry[]> {
   await connectToDatabase();
 
   try {
     // First, get ALL users from the database
     const allUsers = await getAllUsers();
-    
+
     // Get all competition participants
-    const allCompetitionParticipants = await CompetitionParticipant.find({}).lean();
-    
+    const allCompetitionParticipants = await CompetitionParticipant.find(
+      {},
+    ).lean();
+
     // Get all challenge participants
     const allChallengeParticipants = await ChallengeParticipant.find({}).lean();
-    
+
     // Group by userId - start with all users (even those with no history)
     // Users are identified by EMAIL (role-based filtering already done in getAllUsers)
-    const userStatsMap = new Map<string, {
-      userId: string;
-      email: string;
-      username: string;
-      profileImage?: string;
-      totalPnl: number;
-      totalCapital: number;
-      totalTrades: number;
-      winningTrades: number;
-      losingTrades: number;
-      competitionsEntered: number;
-      competitionsWon: number;
-      podiumFinishes: number;
-      challengesEntered: number;
-      challengesWon: number;
-      grossProfit: number;
-      grossLoss: number;
-    }>();
+    const userStatsMap = new Map<
+      string,
+      {
+        userId: string;
+        email: string;
+        username: string;
+        profileImage?: string;
+        totalPnl: number;
+        totalCapital: number;
+        totalTrades: number;
+        winningTrades: number;
+        losingTrades: number;
+        competitionsEntered: number;
+        competitionsWon: number;
+        podiumFinishes: number;
+        challengesEntered: number;
+        challengesWon: number;
+        grossProfit: number;
+        grossLoss: number;
+      }
+    >();
 
     // Initialize all users with zero stats
     // Only traders are returned by getAllUsers (filtered by role field)
     for (const user of allUsers) {
       if (!user.id || !user.email) continue;
-      
+
       userStatsMap.set(user.id, {
         userId: user.id,
         email: user.email, // Primary identifier
-        username: user.name || user.email.split('@')[0] || 'Unknown', // Display name
+        username: user.name || user.email.split("@")[0] || "Unknown", // Display name
         profileImage: user.profileImage,
         totalPnl: 0,
         totalCapital: 0,
@@ -111,7 +118,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     // Add competition stats
     for (const participant of allCompetitionParticipants) {
       const userId = participant.userId;
-      
+
       // Skip if user is not in our trader list (they might be admin or deleted)
       if (!userStatsMap.has(userId)) {
         // Only add if they have valid data - but since they're from competitions,
@@ -126,7 +133,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       userStats.winningTrades += participant.winningTrades || 0;
       userStats.losingTrades += participant.losingTrades || 0;
       userStats.competitionsEntered += 1;
-      
+
       if (participant.currentRank === 1) {
         userStats.competitionsWon += 1;
       }
@@ -146,7 +153,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     // Add challenge stats
     for (const participant of allChallengeParticipants) {
       const userId = participant.userId;
-      
+
       // Skip if user is not in our trader list (they might be admin or deleted)
       if (!userStatsMap.has(userId)) {
         continue;
@@ -159,7 +166,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       userStats.winningTrades += participant.winningTrades || 0;
       userStats.losingTrades += participant.losingTrades || 0;
       userStats.challengesEntered += 1;
-      
+
       if (participant.isWinner) {
         userStats.challengesWon += 1;
       }
@@ -176,16 +183,16 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     // Get badge counts for each user
     const allUserBadges = await UserBadge.find({}).lean();
     const badgeCounts = new Map<string, { total: number; legendary: number }>();
-    
+
     for (const userBadge of allUserBadges) {
       if (!badgeCounts.has(userBadge.userId)) {
         badgeCounts.set(userBadge.userId, { total: 0, legendary: 0 });
       }
       const counts = badgeCounts.get(userBadge.userId)!;
       counts.total += 1;
-      
+
       // Check if legendary (simplified check - you can import BADGES to check rarity)
-      if (userBadge.badgeId.startsWith('legend_')) {
+      if (userBadge.badgeId.startsWith("legend_")) {
         counts.legendary += 1;
       }
     }
@@ -194,9 +201,16 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     const leaderboardEntries: GlobalLeaderboardEntry[] = [];
 
     for (const [userId, stats] of userStatsMap.entries()) {
-      const winRate = stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
-      const profitFactor = stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
-      const totalPnlPercentage = stats.totalCapital > 0 ? (stats.totalPnl / stats.totalCapital) * 100 : 0;
+      const winRate =
+        stats.totalTrades > 0
+          ? (stats.winningTrades / stats.totalTrades) * 100
+          : 0;
+      const profitFactor =
+        stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
+      const totalPnlPercentage =
+        stats.totalCapital > 0
+          ? (stats.totalPnl / stats.totalCapital) * 100
+          : 0;
 
       const badges = badgeCounts.get(userId) || { total: 0, legendary: 0 };
 
@@ -244,33 +258,37 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     const epsilon = 0.0001; // For floating point comparison
     for (let i = 0; i < leaderboardEntries.length; i++) {
       const current = leaderboardEntries[i];
-      
+
       if (i === 0) {
         // First entry
         current.rank = 1;
         current.isTied = false;
       } else {
         const previous = leaderboardEntries[i - 1];
-        
+
         // Check if tied with previous (same overall score)
-        const isTied = Math.abs(current.overallScore - previous.overallScore) < epsilon;
-        
+        const isTied =
+          Math.abs(current.overallScore - previous.overallScore) < epsilon;
+
         if (isTied) {
           // Same rank as previous
           current.rank = previous.rank;
           current.isTied = true;
           previous.isTied = true;
-          
+
           // Track who they're tied with
           if (!current.tiedWith) current.tiedWith = [];
           if (!previous.tiedWith) previous.tiedWith = [];
-          
+
           current.tiedWith.push(previous.userId);
           previous.tiedWith.push(current.userId);
-          
+
           // Also link to all previously tied users at this rank
           for (let j = i - 2; j >= 0; j--) {
-            if (leaderboardEntries[j].rank === current.rank && leaderboardEntries[j].isTied) {
+            if (
+              leaderboardEntries[j].rank === current.rank &&
+              leaderboardEntries[j].isTied
+            ) {
               if (!current.tiedWith!.includes(leaderboardEntries[j].userId)) {
                 current.tiedWith!.push(leaderboardEntries[j].userId);
               }
@@ -290,19 +308,21 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     }
 
     // Get entries (all if limit is 0, otherwise top N)
-    const topEntries = limit > 0 ? leaderboardEntries.slice(0, limit) : leaderboardEntries;
+    const topEntries =
+      limit > 0 ? leaderboardEntries.slice(0, limit) : leaderboardEntries;
 
     // Fetch titles for all users
-    const { getUsersWithTitles } = await import('@/lib/services/xp-level.service');
-    const { getTitleByXP } = await import('@/lib/constants/levels');
-    
-    const userIds = topEntries.map(entry => entry.userId);
+    const { getUsersWithTitles } =
+      await import("@/lib/services/xp-level.service");
+    const { getTitleByXP } = await import("@/lib/constants/levels");
+
+    const userIds = topEntries.map((entry) => entry.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
     // Add title information to each entry
-    const entriesWithTitles = topEntries.map(entry => {
+    const entriesWithTitles = topEntries.map((entry) => {
       const userLevel = userLevels.get(entry.userId);
-      
+
       // Get title info - always show at least default level
       let titleLevel;
       if (userLevel) {
@@ -324,7 +344,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
 
     return entriesWithTitles;
   } catch (error) {
-    console.error('Error getting global leaderboard:', error);
+    console.error("Error getting global leaderboard:", error);
     return [];
   }
 }
@@ -380,12 +400,14 @@ export async function getUserGlobalRank(userId: string): Promise<{
   percentile: number;
 }> {
   const leaderboard = await getGlobalLeaderboard(999999); // Get all
-  const userEntry = leaderboard.find(entry => entry.userId === userId);
+  const userEntry = leaderboard.find((entry) => entry.userId === userId);
 
   return {
     rank: userEntry?.rank || 0,
     totalUsers: leaderboard.length,
-    percentile: userEntry ? ((leaderboard.length - userEntry.rank + 1) / leaderboard.length) * 100 : 0,
+    percentile: userEntry
+      ? ((leaderboard.length - userEntry.rank + 1) / leaderboard.length) * 100
+      : 0,
   };
 }
 
@@ -401,4 +423,3 @@ export async function getMyLeaderboardPosition() {
   const userId = session.user.id;
   return getUserGlobalRank(userId);
 }
-

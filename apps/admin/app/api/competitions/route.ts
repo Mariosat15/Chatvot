@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = getAdminJwtSecret();
 
 async function verifyAdminToken(request: NextRequest) {
   try {
-    const token = request.cookies.get('admin_token')?.value;
+    const token = request.cookies.get("admin_token")?.value;
     if (!token) return null;
 
     const payload = jwt.verify(token, JWT_SECRET) as { email: string };
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await verifyAdminToken(request);
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -36,11 +37,10 @@ export async function GET(request: NextRequest) {
       competitions: JSON.parse(JSON.stringify(competitions)),
     });
   } catch (error) {
-    console.error('Error fetching competitions:', error);
+    console.error("Error fetching competitions:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch competitions' },
-      { status: 500 }
+      { error: "Failed to fetch competitions" },
+      { status: 500 },
     );
   }
 }
-

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 
 /**
  * POST /api/gamemaster/schedule-cancel
@@ -18,20 +18,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = session.user.id;
     const body = await req.json();
     const { action } = body; // 'schedule' or 'unschedule'
 
-    if (!action || !['schedule', 'unschedule'].includes(action)) {
+    if (!action || !["schedule", "unschedule"].includes(action)) {
       return NextResponse.json(
         { error: 'Invalid action. Must be "schedule" or "unschedule"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,23 +39,25 @@ export async function POST(req: NextRequest) {
 
     if (!subscription) {
       return NextResponse.json(
-        { error: 'No Game Master subscription found' },
-        { status: 404 }
+        { error: "No Game Master subscription found" },
+        { status: 404 },
       );
     }
 
-    if (subscription.status !== 'active') {
+    if (subscription.status !== "active") {
       return NextResponse.json(
-        { error: 'Only active subscriptions can be scheduled for cancellation' },
-        { status: 400 }
+        {
+          error: "Only active subscriptions can be scheduled for cancellation",
+        },
+        { status: 400 },
       );
     }
 
-    if (action === 'schedule') {
+    if (action === "schedule") {
       if (subscription.scheduledForDeletion) {
         return NextResponse.json(
-          { error: 'Subscription is already scheduled for cancellation' },
-          { status: 400 }
+          { error: "Subscription is already scheduled for cancellation" },
+          { status: 400 },
         );
       }
 
@@ -68,9 +67,17 @@ export async function POST(req: NextRequest) {
       subscription.autoRenew = false; // Also disable auto-renewal
       await subscription.save();
 
-      const daysRemaining = Math.max(0, Math.ceil((subscription.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+      const daysRemaining = Math.max(
+        0,
+        Math.ceil(
+          (subscription.endDate.getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      );
 
-      console.log(`📅 [GM SCHEDULE CANCEL] User ${userId} scheduled their Game Master subscription for deletion after expiry (${daysRemaining} days)`);
+      console.log(
+        `📅 [GM SCHEDULE CANCEL] User ${userId} scheduled their Game Master subscription for deletion after expiry (${daysRemaining} days)`,
+      );
 
       return NextResponse.json({
         success: true,
@@ -84,8 +91,8 @@ export async function POST(req: NextRequest) {
       // Unschedule
       if (!subscription.scheduledForDeletion) {
         return NextResponse.json(
-          { error: 'Subscription is not scheduled for cancellation' },
-          { status: 400 }
+          { error: "Subscription is not scheduled for cancellation" },
+          { status: 400 },
         );
       }
 
@@ -94,20 +101,23 @@ export async function POST(req: NextRequest) {
       // Note: We don't automatically re-enable autoRenew - user can enable it separately
       await subscription.save();
 
-      console.log(`✅ [GM UNSCHEDULE CANCEL] User ${userId} unscheduled their Game Master subscription cancellation`);
+      console.log(
+        `✅ [GM UNSCHEDULE CANCEL] User ${userId} unscheduled their Game Master subscription cancellation`,
+      );
 
       return NextResponse.json({
         success: true,
-        message: 'Cancellation cancelled. Your subscription will not be deleted after expiry. You may want to enable auto-renewal.',
+        message:
+          "Cancellation cancelled. Your subscription will not be deleted after expiry. You may want to enable auto-renewal.",
         scheduledForDeletion: false,
         autoRenew: subscription.autoRenew,
       });
     }
   } catch (error) {
-    console.error('Error scheduling/unscheduling GM cancellation:', error);
+    console.error("Error scheduling/unscheduling GM cancellation:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -123,26 +133,32 @@ export async function GET(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
 
-    const subscription = await GameMasterSubscription.findOne({ userId: session.user.id });
+    const subscription = await GameMasterSubscription.findOne({
+      userId: session.user.id,
+    });
 
     if (!subscription) {
       return NextResponse.json(
-        { error: 'No Game Master subscription found' },
-        { status: 404 }
+        { error: "No Game Master subscription found" },
+        { status: 404 },
       );
     }
 
-    const daysRemaining = subscription.status === 'active' 
-      ? Math.max(0, Math.ceil((subscription.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-      : 0;
+    const daysRemaining =
+      subscription.status === "active"
+        ? Math.max(
+            0,
+            Math.ceil(
+              (subscription.endDate.getTime() - new Date().getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          )
+        : 0;
 
     return NextResponse.json({
       success: true,
@@ -153,10 +169,10 @@ export async function GET(req: NextRequest) {
       autoRenew: subscription.autoRenew,
     });
   } catch (error) {
-    console.error('Error getting scheduled cancellation status:', error);
+    console.error("Error getting scheduled cancellation status:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

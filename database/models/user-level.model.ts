@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 export interface IUserLevel extends Document {
   userId: string;
@@ -36,7 +36,7 @@ const UserLevelSchema = new Schema<IUserLevel>(
     },
     currentTitle: {
       type: String,
-      default: 'Novice Trader',
+      default: "Novice Trader",
     },
     totalBadgesEarned: {
       type: Number,
@@ -60,10 +60,10 @@ const UserLevelSchema = new Schema<IUserLevel>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-const UserLevel = models.UserLevel || model<IUserLevel>('UserLevel', UserLevelSchema);
+const UserLevel =
+  models.UserLevel || model<IUserLevel>("UserLevel", UserLevelSchema);
 
 export default UserLevel;
-

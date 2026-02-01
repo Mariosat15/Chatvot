@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { priceHealthMonitor } from '@/lib/services/price-health-monitor.service';
-import { priceSnapshotService } from '@/lib/services/price-snapshot.service';
+import { NextRequest, NextResponse } from "next/server";
+import { priceHealthMonitor } from "@/lib/services/price-health-monitor.service";
+import { priceSnapshotService } from "@/lib/services/price-snapshot.service";
 
 /**
  * GET /api/internal/price-health
@@ -9,11 +9,11 @@ import { priceSnapshotService } from '@/lib/services/price-snapshot.service';
 export async function GET(request: NextRequest) {
   try {
     // Verify internal API key
-    const internalKey = request.headers.get('x-internal-key');
-    const expectedKey = process.env.INTERNAL_API_KEY || 'internal-key';
-    
+    const internalKey = request.headers.get("x-internal-key");
+    const expectedKey = process.env.INTERNAL_API_KEY || "internal-key";
+
     if (internalKey !== expectedKey) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Initialize health monitor if not already (async - loads enabled symbols from DB)
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Get health snapshot
     const healthSnapshot = priceHealthMonitor.getHealthSnapshot();
-    
+
     // Get snapshot service status
     const snapshotStatus = priceSnapshotService.getStatus();
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         healthyCount: healthSnapshot.healthyCount,
         degradedCount: healthSnapshot.degradedCount,
         criticalCount: healthSnapshot.criticalCount,
-        symbols: healthSnapshot.symbols.map(s => ({
+        symbols: healthSnapshot.symbols.map((s) => ({
           symbol: s.symbol,
           status: s.status,
           lastUpdate: s.lastUpdate,
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
           source: s.source,
           lastPrice: s.lastPrice,
         })),
-        alerts: healthSnapshot.alerts.map(a => ({
+        alerts: healthSnapshot.alerts.map((a) => ({
           id: a.id,
           type: a.type,
           severity: a.severity,
@@ -62,12 +62,11 @@ export async function GET(request: NextRequest) {
         snapshotInterval: snapshotStatus.snapshotInterval,
       },
     });
-
   } catch (error) {
-    console.error('Error getting price health:', error);
+    console.error("Error getting price health:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -78,18 +77,18 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const internalKey = request.headers.get('x-internal-key');
-    const expectedKey = process.env.INTERNAL_API_KEY || 'internal-key';
-    
+    const internalKey = request.headers.get("x-internal-key");
+    const expectedKey = process.env.INTERNAL_API_KEY || "internal-key";
+
     if (internalKey !== expectedKey) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const { action, alertId, acknowledgedBy } = body;
 
     // Action: Refresh enabled symbols (called when admin changes symbol enabled state)
-    if (action === 'refreshSymbols') {
+    if (action === "refreshSymbols") {
       await priceHealthMonitor.refreshEnabledSymbols();
       const monitoredSymbols = priceHealthMonitor.getMonitoredSymbols();
       return NextResponse.json({
@@ -101,26 +100,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Action: Acknowledge alert
-    if (action === 'acknowledge' || alertId) {
+    if (action === "acknowledge" || alertId) {
       if (!alertId) {
-        return NextResponse.json({ error: 'alertId is required' }, { status: 400 });
+        return NextResponse.json(
+          { error: "alertId is required" },
+          { status: 400 },
+        );
       }
 
-      const success = priceHealthMonitor.acknowledgeAlert(alertId, acknowledgedBy || 'admin');
+      const success = priceHealthMonitor.acknowledgeAlert(
+        alertId,
+        acknowledgedBy || "admin",
+      );
 
       return NextResponse.json({
         success,
-        message: success ? 'Alert acknowledged' : 'Alert not found',
+        message: success ? "Alert acknowledged" : "Alert not found",
       });
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
-    console.error('Error processing price-health action:', error);
+    console.error("Error processing price-health action:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

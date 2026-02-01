@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -11,50 +11,98 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { 
-  Sparkles, Loader2, Wand2, RefreshCw, Check, 
-  Lightbulb, Anchor, Rocket, Crown, Flame, Zap,
-  Target, Trophy, Swords, Gamepad2
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import {
+  Sparkles,
+  Loader2,
+  Wand2,
+  RefreshCw,
+  Check,
+  Lightbulb,
+  Anchor,
+  Rocket,
+  Crown,
+  Flame,
+  Zap,
+  Target,
+  Trophy,
+  Swords,
+  Gamepad2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface AIGeneratorDialogProps {
   onGenerate: (data: { title?: string; description?: string }) => void;
-  generateType?: 'both' | 'title' | 'description';
+  generateType?: "both" | "title" | "description";
   currentTitle?: string;
   currentDescription?: string;
 }
 
 // Pre-made theme suggestions
 const THEME_SUGGESTIONS = [
-  { icon: Anchor, label: 'Pirate Theme', prompt: 'pirate theme with treasure hunting and sea adventure' },
-  { icon: Rocket, label: 'Space Theme', prompt: 'space exploration and galactic trading mission' },
-  { icon: Crown, label: 'Royal Theme', prompt: 'medieval kingdom with knights and royal treasury' },
-  { icon: Flame, label: 'Fire Theme', prompt: 'intense fire and heat with blazing competition' },
-  { icon: Zap, label: 'Electric Theme', prompt: 'high voltage electric energy and lightning speed trading' },
-  { icon: Target, label: 'Sniper Theme', prompt: 'precision sniper with accuracy and perfect shots' },
-  { icon: Trophy, label: 'Champion Theme', prompt: 'ultimate championship with legendary winners' },
-  { icon: Swords, label: 'Battle Theme', prompt: 'epic battle arena with warriors competing for glory' },
-  { icon: Gamepad2, label: 'Gaming Theme', prompt: 'arcade gaming with high scores and power-ups' },
+  {
+    icon: Anchor,
+    label: "Pirate Theme",
+    prompt: "pirate theme with treasure hunting and sea adventure",
+  },
+  {
+    icon: Rocket,
+    label: "Space Theme",
+    prompt: "space exploration and galactic trading mission",
+  },
+  {
+    icon: Crown,
+    label: "Royal Theme",
+    prompt: "medieval kingdom with knights and royal treasury",
+  },
+  {
+    icon: Flame,
+    label: "Fire Theme",
+    prompt: "intense fire and heat with blazing competition",
+  },
+  {
+    icon: Zap,
+    label: "Electric Theme",
+    prompt: "high voltage electric energy and lightning speed trading",
+  },
+  {
+    icon: Target,
+    label: "Sniper Theme",
+    prompt: "precision sniper with accuracy and perfect shots",
+  },
+  {
+    icon: Trophy,
+    label: "Champion Theme",
+    prompt: "ultimate championship with legendary winners",
+  },
+  {
+    icon: Swords,
+    label: "Battle Theme",
+    prompt: "epic battle arena with warriors competing for glory",
+  },
+  {
+    icon: Gamepad2,
+    label: "Gaming Theme",
+    prompt: "arcade gaming with high scores and power-ups",
+  },
 ];
 
 export default function AIGeneratorDialog({
   onGenerate,
-  generateType = 'both',
-  currentTitle = '',
-  currentDescription = '',
+  generateType = "both",
+  currentTitle = "",
+  currentDescription = "",
 }: AIGeneratorDialogProps) {
   const [open, setOpen] = useState(false);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [generatedTitle, setGeneratedTitle] = useState('');
-  const [generatedDescription, setGeneratedDescription] = useState('');
+  const [generatedTitle, setGeneratedTitle] = useState("");
+  const [generatedDescription, setGeneratedDescription] = useState("");
   const [hasGenerated, setHasGenerated] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Please enter a theme or description');
+      toast.error("Please enter a theme or description");
       return;
     }
 
@@ -62,21 +110,21 @@ export default function AIGeneratorDialog({
     setHasGenerated(false);
 
     try {
-      const response = await fetch('/api/ai/generate-competition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/ai/generate-competition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim(), type: generateType }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate content');
+        throw new Error(data.error || "Failed to generate content");
       }
 
-      if (generateType === 'title' && data.title) {
+      if (generateType === "title" && data.title) {
         setGeneratedTitle(data.title);
-      } else if (generateType === 'description' && data.description) {
+      } else if (generateType === "description" && data.description) {
         setGeneratedDescription(data.description);
       } else if (data.title && data.description) {
         setGeneratedTitle(data.title);
@@ -84,11 +132,12 @@ export default function AIGeneratorDialog({
       }
 
       setHasGenerated(true);
-      toast.success('Content generated successfully!');
-
+      toast.success("Content generated successfully!");
     } catch (error) {
-      console.error('Generation error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate content');
+      console.error("Generation error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to generate content",
+      );
     } finally {
       setLoading(false);
     }
@@ -96,21 +145,27 @@ export default function AIGeneratorDialog({
 
   const handleApply = () => {
     const result: { title?: string; description?: string } = {};
-    
-    if ((generateType === 'both' || generateType === 'title') && generatedTitle) {
+
+    if (
+      (generateType === "both" || generateType === "title") &&
+      generatedTitle
+    ) {
       result.title = generatedTitle;
     }
-    if ((generateType === 'both' || generateType === 'description') && generatedDescription) {
+    if (
+      (generateType === "both" || generateType === "description") &&
+      generatedDescription
+    ) {
       result.description = generatedDescription;
     }
 
     onGenerate(result);
     setOpen(false);
-    setPrompt('');
-    setGeneratedTitle('');
-    setGeneratedDescription('');
+    setPrompt("");
+    setGeneratedTitle("");
+    setGeneratedDescription("");
     setHasGenerated(false);
-    toast.success('Content applied!');
+    toast.success("Content applied!");
   };
 
   const handleThemeClick = (themePrompt: string) => {
@@ -141,7 +196,8 @@ export default function AIGeneratorDialog({
             </span>
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Describe your competition theme and let AI create engaging content for you.
+            Describe your competition theme and let AI create engaging content
+            for you.
           </DialogDescription>
         </DialogHeader>
 
@@ -162,8 +218,8 @@ export default function AIGeneratorDialog({
                     onClick={() => handleThemeClick(theme.prompt)}
                     className={`p-2 rounded-lg border text-xs font-medium transition-all flex items-center gap-2 ${
                       prompt === theme.prompt
-                        ? 'bg-purple-500/20 border-purple-500 text-purple-300'
-                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:bg-gray-800 hover:border-gray-600'
+                        ? "bg-purple-500/20 border-purple-500 text-purple-300"
+                        : "bg-gray-800/50 border-gray-700 text-gray-400 hover:bg-gray-800 hover:border-gray-600"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -224,23 +280,33 @@ export default function AIGeneratorDialog({
                 Generated Content Preview
               </div>
 
-              {(generateType === 'both' || generateType === 'title') && generatedTitle && (
-                <div>
-                  <Label className="text-xs text-gray-400 mb-1 block">Title</Label>
-                  <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-                    <p className="text-gray-100 font-semibold">{generatedTitle}</p>
+              {(generateType === "both" || generateType === "title") &&
+                generatedTitle && (
+                  <div>
+                    <Label className="text-xs text-gray-400 mb-1 block">
+                      Title
+                    </Label>
+                    <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+                      <p className="text-gray-100 font-semibold">
+                        {generatedTitle}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {(generateType === 'both' || generateType === 'description') && generatedDescription && (
-                <div>
-                  <Label className="text-xs text-gray-400 mb-1 block">Description</Label>
-                  <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-                    <p className="text-gray-300 text-sm">{generatedDescription}</p>
+              {(generateType === "both" || generateType === "description") &&
+                generatedDescription && (
+                  <div>
+                    <Label className="text-xs text-gray-400 mb-1 block">
+                      Description
+                    </Label>
+                    <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+                      <p className="text-gray-300 text-sm">
+                        {generatedDescription}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Apply Button */}
               <Button
@@ -258,4 +324,3 @@ export default function AIGeneratorDialog({
     </Dialog>
   );
 }
-

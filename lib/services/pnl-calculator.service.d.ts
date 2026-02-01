@@ -11,171 +11,171 @@
  * - Equity: Current capital + unrealized P&L
  */
 export declare const FOREX_PAIRS: {
-    'EUR/USD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/USD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'AUD/USD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/CAD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'NZD/USD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/GBP': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/AUD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/CAD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'EUR/NZD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/AUD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/CAD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'GBP/NZD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'AUD/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'AUD/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'AUD/CAD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'AUD/NZD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'CAD/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'CAD/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'CHF/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'NZD/JPY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'NZD/CHF': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'NZD/CAD': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/MXN': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/ZAR': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/TRY': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/SEK': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
-    'USD/NOK': {
-        name: string;
-        pip: number;
-        contractSize: number;
-    };
+  "EUR/USD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/USD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "AUD/USD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/CAD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "NZD/USD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/GBP": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/AUD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/CAD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "EUR/NZD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/AUD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/CAD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "GBP/NZD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "AUD/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "AUD/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "AUD/CAD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "AUD/NZD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "CAD/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "CAD/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "CHF/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "NZD/JPY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "NZD/CHF": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "NZD/CAD": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/MXN": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/ZAR": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/TRY": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/SEK": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
+  "USD/NOK": {
+    name: string;
+    pip: number;
+    contractSize: number;
+  };
 };
 export type ForexSymbol = keyof typeof FOREX_PAIRS;
 /**
@@ -192,7 +192,13 @@ export type ForexSymbol = keyof typeof FOREX_PAIRS;
  * @param symbol - Forex pair symbol
  * @returns Unrealized profit/loss in USD
  */
-export declare function calculateUnrealizedPnL(side: 'long' | 'short', entryPrice: number, currentPrice: number, quantity: number, symbol: ForexSymbol): number;
+export declare function calculateUnrealizedPnL(
+  side: "long" | "short",
+  entryPrice: number,
+  currentPrice: number,
+  quantity: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Calculate unrealized P&L percentage (ROI)
  *
@@ -203,7 +209,10 @@ export declare function calculateUnrealizedPnL(side: 'long' | 'short', entryPric
  * @param marginUsed - Margin used for position
  * @returns P&L percentage
  */
-export declare function calculatePnLPercentage(pnl: number, marginUsed: number): number;
+export declare function calculatePnLPercentage(
+  pnl: number,
+  marginUsed: number,
+): number;
 /**
  * Calculate margin required to open a position
  *
@@ -216,7 +225,12 @@ export declare function calculatePnLPercentage(pnl: number, marginUsed: number):
  * @param symbol - Forex pair symbol
  * @returns Required margin in USD
  */
-export declare function calculateMarginRequired(quantity: number, entryPrice: number, leverage: number, symbol: ForexSymbol): number;
+export declare function calculateMarginRequired(
+  quantity: number,
+  entryPrice: number,
+  leverage: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Calculate maintenance margin (minimum margin to keep position open)
  *
@@ -225,7 +239,9 @@ export declare function calculateMarginRequired(quantity: number, entryPrice: nu
  * @param initialMargin - Initial margin used
  * @returns Maintenance margin
  */
-export declare function calculateMaintenanceMargin(initialMargin: number): number;
+export declare function calculateMaintenanceMargin(
+  initialMargin: number,
+): number;
 /**
  * Calculate current equity
  *
@@ -236,7 +252,10 @@ export declare function calculateMaintenanceMargin(initialMargin: number): numbe
  * @param unrealizedPnL - Total unrealized P&L from all positions
  * @returns Current equity
  */
-export declare function calculateEquity(currentCapital: number, unrealizedPnL: number): number;
+export declare function calculateEquity(
+  currentCapital: number,
+  unrealizedPnL: number,
+): number;
 /**
  * Calculate margin level
  *
@@ -252,7 +271,10 @@ export declare function calculateEquity(currentCapital: number, unrealizedPnL: n
  * @param usedMargin - Total margin used for all positions
  * @returns Margin level percentage
  */
-export declare function calculateMarginLevel(equity: number, usedMargin: number): number;
+export declare function calculateMarginLevel(
+  equity: number,
+  usedMargin: number,
+): number;
 /**
  * Check if margin call should be triggered
  *
@@ -260,7 +282,10 @@ export declare function calculateMarginLevel(equity: number, usedMargin: number)
  * @param threshold - Margin call threshold from admin settings (default: 100%)
  * @returns True if margin call triggered
  */
-export declare function isMarginCall(marginLevel: number, threshold?: number): boolean;
+export declare function isMarginCall(
+  marginLevel: number,
+  threshold?: number,
+): boolean;
 /**
  * Check if position should be liquidated
  *
@@ -268,7 +293,10 @@ export declare function isMarginCall(marginLevel: number, threshold?: number): b
  * @param threshold - Liquidation threshold from admin settings (default: 50%)
  * @returns True if should liquidate
  */
-export declare function shouldLiquidate(marginLevel: number, threshold?: number): boolean;
+export declare function shouldLiquidate(
+  marginLevel: number,
+  threshold?: number,
+): boolean;
 /**
  * Calculate liquidation price for a position
  *
@@ -288,7 +316,14 @@ export declare function shouldLiquidate(marginLevel: number, threshold?: number)
  * @param symbol - Forex pair symbol
  * @returns Liquidation price
  */
-export declare function calculateLiquidationPrice(side: 'long' | 'short', entryPrice: number, quantity: number, marginUsed: number, leverage: number, symbol: ForexSymbol): number;
+export declare function calculateLiquidationPrice(
+  side: "long" | "short",
+  entryPrice: number,
+  quantity: number,
+  marginUsed: number,
+  leverage: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Calculate pip value
  *
@@ -299,7 +334,10 @@ export declare function calculateLiquidationPrice(side: 'long' | 'short', entryP
  * @param symbol - Forex pair symbol
  * @returns Pip value in USD
  */
-export declare function calculatePipValue(quantity: number, symbol: ForexSymbol): number;
+export declare function calculatePipValue(
+  quantity: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Calculate number of pips moved
  *
@@ -308,7 +346,11 @@ export declare function calculatePipValue(quantity: number, symbol: ForexSymbol)
  * @param symbol - Forex pair symbol
  * @returns Number of pips
  */
-export declare function calculatePipsMoved(entryPrice: number, currentPrice: number, symbol: ForexSymbol): number;
+export declare function calculatePipsMoved(
+  entryPrice: number,
+  currentPrice: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Validate order quantity
  *
@@ -317,9 +359,13 @@ export declare function calculatePipsMoved(entryPrice: number, currentPrice: num
  * @param maxLot - Maximum lot size (default 100)
  * @returns True if valid
  */
-export declare function validateQuantity(quantity: number, minLot?: number, maxLot?: number): {
-    valid: boolean;
-    error?: string;
+export declare function validateQuantity(
+  quantity: number,
+  minLot?: number,
+  maxLot?: number,
+): {
+  valid: boolean;
+  error?: string;
 };
 /**
  * Validate stop loss / take profit levels
@@ -330,9 +376,14 @@ export declare function validateQuantity(quantity: number, minLot?: number, maxL
  * @param takeProfit - Take profit price (optional)
  * @returns Validation result
  */
-export declare function validateSLTP(side: 'long' | 'short', entryPrice: number, stopLoss?: number, takeProfit?: number): {
-    valid: boolean;
-    error?: string;
+export declare function validateSLTP(
+  side: "long" | "short",
+  entryPrice: number,
+  stopLoss?: number,
+  takeProfit?: number,
+): {
+  valid: boolean;
+  error?: string;
 };
 /**
  * Calculate potential profit/loss at take profit/stop loss
@@ -344,7 +395,13 @@ export declare function validateSLTP(side: 'long' | 'short', entryPrice: number,
  * @param symbol - Forex pair symbol
  * @returns Potential P&L
  */
-export declare function calculatePotentialPnL(side: 'long' | 'short', entryPrice: number, exitPrice: number, quantity: number, symbol: ForexSymbol): number;
+export declare function calculatePotentialPnL(
+  side: "long" | "short",
+  entryPrice: number,
+  exitPrice: number,
+  quantity: number,
+  symbol: ForexSymbol,
+): number;
 /**
  * Calculate risk/reward ratio
  *
@@ -354,4 +411,9 @@ export declare function calculatePotentialPnL(side: 'long' | 'short', entryPrice
  * @param side - 'long' or 'short'
  * @returns Risk/reward ratio (e.g., 1:2 = 2.0)
  */
-export declare function calculateRiskRewardRatio(entryPrice: number, stopLoss: number, takeProfit: number, _side: 'long' | 'short'): number;
+export declare function calculateRiskRewardRatio(
+  entryPrice: number,
+  stopLoss: number,
+  takeProfit: number,
+  _side: "long" | "short",
+): number;

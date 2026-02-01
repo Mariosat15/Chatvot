@@ -1,16 +1,23 @@
-import { Schema, model, models, type Document, type Model, Types } from 'mongoose';
+import {
+  Schema,
+  model,
+  models,
+  type Document,
+  type Model,
+  Types,
+} from "mongoose";
 
 // ============================================
 // AI Knowledge Source - Tracks uploaded documents and URLs
 // ============================================
 
-export type SourceType = 'document' | 'url' | 'help_article' | 'manual';
+export type SourceType = "document" | "url" | "help_article" | "manual";
 
 // CRITICAL: Audience determines which AI agents can access this knowledge
 // - 'customer': ONLY customer support AI (public-facing, safe info)
 // - 'admin': ONLY admin AI agent (internal data, company info)
 // - 'both': Accessible by both agents
-export type KnowledgeAudience = 'customer' | 'admin' | 'both';
+export type KnowledgeAudience = "customer" | "admin" | "both";
 
 export interface IAIKnowledgeSource extends Document {
   _id: Types.ObjectId;
@@ -23,7 +30,7 @@ export interface IAIKnowledgeSource extends Document {
   helpArticleId?: string;
   mimeType?: string;
   fileSize?: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   errorMessage?: string;
   chunksCount: number;
   tokensCount: number;
@@ -44,15 +51,15 @@ export interface IAIKnowledgeSource extends Document {
 const AIKnowledgeSourceSchema = new Schema<IAIKnowledgeSource>(
   {
     name: { type: String, required: true },
-    type: { 
-      type: String, 
-      enum: ['document', 'url', 'help_article', 'manual'],
-      required: true 
+    type: {
+      type: String,
+      enum: ["document", "url", "help_article", "manual"],
+      required: true,
     },
     audience: {
       type: String,
-      enum: ['customer', 'admin', 'both'],
-      default: 'customer', // Default to customer for safety
+      enum: ["customer", "admin", "both"],
+      default: "customer", // Default to customer for safety
       required: true,
     },
     originalFileName: { type: String },
@@ -61,10 +68,10 @@ const AIKnowledgeSourceSchema = new Schema<IAIKnowledgeSource>(
     helpArticleId: { type: String },
     mimeType: { type: String },
     fileSize: { type: Number },
-    status: { 
-      type: String, 
-      enum: ['pending', 'processing', 'completed', 'failed'],
-      default: 'pending'
+    status: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed"],
+      default: "pending",
     },
     errorMessage: { type: String },
     chunksCount: { type: Number, default: 0 },
@@ -80,17 +87,18 @@ const AIKnowledgeSourceSchema = new Schema<IAIKnowledgeSource>(
     },
     createdBy: { type: String, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Index for efficient queries
 AIKnowledgeSourceSchema.index({ type: 1, status: 1 });
 AIKnowledgeSourceSchema.index({ isActive: 1 });
 AIKnowledgeSourceSchema.index({ audience: 1 }); // NEW: Index for audience filtering
-AIKnowledgeSourceSchema.index({ 'metadata.category': 1 });
+AIKnowledgeSourceSchema.index({ "metadata.category": 1 });
 
-export const AIKnowledgeSource: Model<IAIKnowledgeSource> = 
-  models?.AIKnowledgeSource || model<IAIKnowledgeSource>('AIKnowledgeSource', AIKnowledgeSourceSchema);
+export const AIKnowledgeSource: Model<IAIKnowledgeSource> =
+  models?.AIKnowledgeSource ||
+  model<IAIKnowledgeSource>("AIKnowledgeSource", AIKnowledgeSourceSchema);
 
 // ============================================
 // AI Knowledge Chunk - Vectorized text chunks
@@ -119,11 +127,15 @@ export interface IAIKnowledgeChunk extends Document {
 
 const AIKnowledgeChunkSchema = new Schema<IAIKnowledgeChunk>(
   {
-    sourceId: { type: Schema.Types.ObjectId, ref: 'AIKnowledgeSource', required: true },
+    sourceId: {
+      type: Schema.Types.ObjectId,
+      ref: "AIKnowledgeSource",
+      required: true,
+    },
     audience: {
       type: String,
-      enum: ['customer', 'admin', 'both'],
-      default: 'customer',
+      enum: ["customer", "admin", "both"],
+      default: "customer",
       required: true,
     },
     content: { type: String, required: true },
@@ -140,7 +152,7 @@ const AIKnowledgeChunkSchema = new Schema<IAIKnowledgeChunk>(
     },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes for efficient vector search and retrieval
@@ -148,10 +160,14 @@ AIKnowledgeChunkSchema.index({ sourceId: 1 });
 AIKnowledgeChunkSchema.index({ contentHash: 1 }, { unique: true });
 AIKnowledgeChunkSchema.index({ isActive: 1 });
 AIKnowledgeChunkSchema.index({ audience: 1, isActive: 1 }); // NEW: Fast audience filtering
-AIKnowledgeChunkSchema.index({ 'metadata.sectionTitle': 'text', content: 'text' });
+AIKnowledgeChunkSchema.index({
+  "metadata.sectionTitle": "text",
+  content: "text",
+});
 
-export const AIKnowledgeChunk: Model<IAIKnowledgeChunk> = 
-  models?.AIKnowledgeChunk || model<IAIKnowledgeChunk>('AIKnowledgeChunk', AIKnowledgeChunkSchema);
+export const AIKnowledgeChunk: Model<IAIKnowledgeChunk> =
+  models?.AIKnowledgeChunk ||
+  model<IAIKnowledgeChunk>("AIKnowledgeChunk", AIKnowledgeChunkSchema);
 
 // ============================================
 // AI Knowledge Settings - Configuration
@@ -173,19 +189,20 @@ export interface IAIKnowledgeSettings extends Document {
 
 const AIKnowledgeSettingsSchema = new Schema<IAIKnowledgeSettings>(
   {
-    _id: { type: String, default: 'ai-knowledge-settings' },
+    _id: { type: String, default: "ai-knowledge-settings" },
     autoIndexHelpArticles: { type: Boolean, default: true },
     autoIndexOnHelpUpdate: { type: Boolean, default: true },
     chunkSize: { type: Number, default: 500 }, // ~500 tokens per chunk
     chunkOverlap: { type: Number, default: 50 }, // 50 token overlap
-    embeddingModel: { type: String, default: 'text-embedding-ada-002' },
+    embeddingModel: { type: String, default: "text-embedding-ada-002" },
     maxChunksPerQuery: { type: Number, default: 5 },
     similarityThreshold: { type: Number, default: 0.7 },
     categories: [{ type: String }],
     lastFullIndexAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const AIKnowledgeSettings: Model<IAIKnowledgeSettings> = 
-  models?.AIKnowledgeSettings || model<IAIKnowledgeSettings>('AIKnowledgeSettings', AIKnowledgeSettingsSchema);
+export const AIKnowledgeSettings: Model<IAIKnowledgeSettings> =
+  models?.AIKnowledgeSettings ||
+  model<IAIKnowledgeSettings>("AIKnowledgeSettings", AIKnowledgeSettingsSchema);

@@ -1,8 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Trophy, Award, Settings, Bell, ShoppingBag, Shield } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  Trophy,
+  Award,
+  Settings,
+  Bell,
+  ShoppingBag,
+  Shield,
+} from "lucide-react";
 
 interface ProfileTabsProps {
   overviewContent: React.ReactNode;
@@ -13,17 +20,31 @@ interface ProfileTabsProps {
   verificationContent?: React.ReactNode;
 }
 
-export default function ProfileTabs({ overviewContent, badgesContent, settingsContent, notificationsContent, arsenalContent, verificationContent }: ProfileTabsProps) {
+export default function ProfileTabs({
+  overviewContent,
+  badgesContent,
+  settingsContent,
+  notificationsContent,
+  arsenalContent,
+  verificationContent,
+}: ProfileTabsProps) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'settings' | 'notifications' | 'arsenal' | 'verification'>('overview');
-  
+  const [activeTab, setActiveTab] = useState<
+    | "overview"
+    | "badges"
+    | "settings"
+    | "notifications"
+    | "arsenal"
+    | "verification"
+  >("overview");
+
   // Handle tab from URL query param
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'arsenal') {
-      setActiveTab('arsenal');
-    } else if (tab === 'verification') {
-      setActiveTab('verification');
+    const tab = searchParams.get("tab");
+    if (tab === "arsenal") {
+      setActiveTab("arsenal");
+    } else if (tab === "verification") {
+      setActiveTab("verification");
     }
   }, [searchParams]);
 
@@ -32,33 +53,33 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
       {/* Tab Buttons */}
       <div className="flex gap-4 border-b border-gray-700 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => setActiveTab("overview")}
           className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'overview'
-              ? 'text-primary-400 border-b-2 border-primary-400'
-              : 'text-gray-400 hover:text-gray-300'
+            activeTab === "overview"
+              ? "text-primary-400 border-b-2 border-primary-400"
+              : "text-gray-400 hover:text-gray-300"
           }`}
         >
           <Trophy className="h-5 w-5" />
           Overview
         </button>
         <button
-          onClick={() => setActiveTab('badges')}
+          onClick={() => setActiveTab("badges")}
           className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'badges'
-              ? 'text-primary-400 border-b-2 border-primary-400'
-              : 'text-gray-400 hover:text-gray-300'
+            activeTab === "badges"
+              ? "text-primary-400 border-b-2 border-primary-400"
+              : "text-gray-400 hover:text-gray-300"
           }`}
         >
           <Award className="h-5 w-5" />
           Badges
         </button>
         <button
-          onClick={() => setActiveTab('notifications')}
+          onClick={() => setActiveTab("notifications")}
           className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'notifications'
-              ? 'text-primary-400 border-b-2 border-primary-400'
-              : 'text-gray-400 hover:text-gray-300'
+            activeTab === "notifications"
+              ? "text-primary-400 border-b-2 border-primary-400"
+              : "text-gray-400 hover:text-gray-300"
           }`}
         >
           <Bell className="h-5 w-5" />
@@ -66,11 +87,11 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
         </button>
         {arsenalContent && (
           <button
-            onClick={() => setActiveTab('arsenal')}
+            onClick={() => setActiveTab("arsenal")}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'arsenal'
-                ? 'text-cyan-400 border-b-2 border-cyan-400'
-                : 'text-gray-400 hover:text-gray-300'
+              activeTab === "arsenal"
+                ? "text-cyan-400 border-b-2 border-cyan-400"
+                : "text-gray-400 hover:text-gray-300"
             }`}
           >
             <ShoppingBag className="h-5 w-5" />
@@ -79,11 +100,11 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
         )}
         {verificationContent && (
           <button
-            onClick={() => setActiveTab('verification')}
+            onClick={() => setActiveTab("verification")}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'verification'
-                ? 'text-green-400 border-b-2 border-green-400'
-                : 'text-gray-400 hover:text-gray-300'
+              activeTab === "verification"
+                ? "text-green-400 border-b-2 border-green-400"
+                : "text-gray-400 hover:text-gray-300"
             }`}
           >
             <Shield className="h-5 w-5" />
@@ -92,11 +113,11 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
         )}
         {settingsContent && (
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => setActiveTab("settings")}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'settings'
-                ? 'text-primary-400 border-b-2 border-primary-400'
-                : 'text-gray-400 hover:text-gray-300'
+              activeTab === "settings"
+                ? "text-primary-400 border-b-2 border-primary-400"
+                : "text-gray-400 hover:text-gray-300"
             }`}
           >
             <Settings className="h-5 w-5" />
@@ -107,14 +128,16 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'overview' && overviewContent}
-        {activeTab === 'badges' && badgesContent}
-        {activeTab === 'notifications' && (notificationsContent || <div className="text-gray-400">Loading notifications...</div>)}
-        {activeTab === 'arsenal' && arsenalContent}
-        {activeTab === 'verification' && verificationContent}
-        {activeTab === 'settings' && settingsContent}
+        {activeTab === "overview" && overviewContent}
+        {activeTab === "badges" && badgesContent}
+        {activeTab === "notifications" &&
+          (notificationsContent || (
+            <div className="text-gray-400">Loading notifications...</div>
+          ))}
+        {activeTab === "arsenal" && arsenalContent}
+        {activeTab === "verification" && verificationContent}
+        {activeTab === "settings" && settingsContent}
       </div>
     </div>
   );
 }
-

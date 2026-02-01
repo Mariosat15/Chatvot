@@ -1,5 +1,5 @@
-import Stripe from 'stripe';
-import { getPaymentProviderCredentials } from '@/lib/services/settings.service';
+import Stripe from "stripe";
+import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
 
 /**
  * Get Stripe client with credentials from database
@@ -7,40 +7,45 @@ import { getPaymentProviderCredentials } from '@/lib/services/settings.service';
  */
 export async function getStripeClient(): Promise<Stripe> {
   try {
-    const stripeConfig = await getPaymentProviderCredentials('stripe');
-    
+    const stripeConfig = await getPaymentProviderCredentials("stripe");
+
     if (stripeConfig && (stripeConfig as any).secret_key) {
       return new Stripe((stripeConfig as any).secret_key, {
-        apiVersion: '2024-11-20.acacia' as any,
+        apiVersion: "2024-11-20.acacia" as any,
         typescript: true,
       });
     }
   } catch (error) {
-    console.error('⚠️ Error getting Stripe config from database:', error);
+    console.error("⚠️ Error getting Stripe config from database:", error);
   }
-  
+
   // Fallback to environment variables
   const envKey = process.env.STRIPE_SECRET_KEY;
   if (!envKey) {
-    throw new Error('Stripe is not configured. Please configure it in the admin panel.');
+    throw new Error(
+      "Stripe is not configured. Please configure it in the admin panel.",
+    );
   }
-  
+
   return new Stripe(envKey, {
-    apiVersion: '2024-11-20.acacia' as any,
+    apiVersion: "2024-11-20.acacia" as any,
     typescript: true,
   });
 }
 
 // Legacy export for backward compatibility (deprecated - use getStripeClient() instead)
 // This will fail if STRIPE_SECRET_KEY is not in .env, which is expected
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-  apiVersion: '2024-11-20.acacia' as any,
-  typescript: true,
-});
+export const stripe = new Stripe(
+  process.env.STRIPE_SECRET_KEY || "sk_test_placeholder",
+  {
+    apiVersion: "2024-11-20.acacia" as any,
+    typescript: true,
+  },
+);
 
 // Stripe configuration
 export const STRIPE_CONFIG = {
-  currency: 'eur',
+  currency: "eur",
   minimumDeposit: 5, // Minimum €5
   maximumDeposit: 10000, // Maximum €10,000
   minimumWithdrawal: 10, // Minimum €10
@@ -56,4 +61,3 @@ export const eurToCents = (amount: number): number => {
 export const centsToEur = (amount: number): number => {
   return amount / 100;
 };
-

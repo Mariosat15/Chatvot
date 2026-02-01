@@ -1,12 +1,15 @@
 /**
  * Fraud Settings Service
- * 
+ *
  * Centralized service to get fraud detection settings
  * with caching for performance
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import FraudSettings, { DEFAULT_FRAUD_SETTINGS, IFraudSettings } from '@/database/models/fraud/fraud-settings.model';
+import { connectToDatabase } from "@/database/mongoose";
+import FraudSettings, {
+  DEFAULT_FRAUD_SETTINGS,
+  IFraudSettings,
+} from "@/database/models/fraud/fraud-settings.model";
 
 // Cache settings for 30 seconds (reduced from 5 minutes for faster settings updates)
 let cachedSettings: IFraudSettings | null = null;
@@ -18,17 +21,18 @@ const CACHE_DURATION = 30 * 1000; // 30 seconds - short cache for near real-time
  */
 export async function getFraudSettings(): Promise<IFraudSettings> {
   const now = Date.now();
-  
+
   // Return cached settings if still valid
-  if (cachedSettings && (now - cacheTime) < CACHE_DURATION) {
+  if (cachedSettings && now - cacheTime < CACHE_DURATION) {
     return cachedSettings;
   }
 
   try {
     await connectToDatabase();
-    
-    let settings = await FraudSettings.findOne().lean() as IFraudSettings | null;
-    
+
+    let settings =
+      (await FraudSettings.findOne().lean()) as IFraudSettings | null;
+
     // Create default settings if none exist
     if (!settings) {
       const created = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
@@ -36,7 +40,9 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
     }
 
     // Log when cache is refreshed with key values
-    console.log(`📋 [FraudSettings] Cache refreshed: maxAccountsPerDevice=${settings.maxAccountsPerDevice}, multiAccountDetectionEnabled=${settings.multiAccountDetectionEnabled}`);
+    console.log(
+      `📋 [FraudSettings] Cache refreshed: maxAccountsPerDevice=${settings.maxAccountsPerDevice}, multiAccountDetectionEnabled=${settings.multiAccountDetectionEnabled}`,
+    );
 
     // Update cache
     cachedSettings = settings;
@@ -44,7 +50,7 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
 
     return cachedSettings;
   } catch (error) {
-    console.error('Error fetching fraud settings, using defaults:', error);
+    console.error("Error fetching fraud settings, using defaults:", error);
     return DEFAULT_FRAUD_SETTINGS as IFraudSettings;
   }
 }
@@ -96,4 +102,3 @@ export async function shouldCreateAlert(riskScore: number): Promise<boolean> {
   const settings = await getFraudSettings();
   return riskScore > settings.alertThreshold;
 }
-

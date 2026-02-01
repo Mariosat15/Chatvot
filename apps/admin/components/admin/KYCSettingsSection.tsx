@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Shield,
   Save,
@@ -27,22 +27,28 @@ import {
   Search,
   Users,
   Fingerprint,
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -50,8 +56,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 interface KYCSettings {
   enabled: boolean;
@@ -75,10 +81,10 @@ interface KYCSettings {
 }
 
 const DOCUMENT_TYPES = [
-  { value: 'PASSPORT', label: 'Passport' },
-  { value: 'ID_CARD', label: 'ID Card' },
-  { value: 'DRIVERS_LICENSE', label: "Driver's License" },
-  { value: 'RESIDENCE_PERMIT', label: 'Residence Permit' },
+  { value: "PASSPORT", label: "Passport" },
+  { value: "ID_CARD", label: "ID Card" },
+  { value: "DRIVERS_LICENSE", label: "Driver's License" },
+  { value: "RESIDENCE_PERMIT", label: "Residence Permit" },
 ];
 
 export default function KYCSettingsSection() {
@@ -89,13 +95,15 @@ export default function KYCSettingsSection() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [testing, setTesting] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
-  
+
   // Temporary state for provider config dialog
-  const [tempApiKey, setTempApiKey] = useState('');
-  const [tempApiSecret, setTempApiSecret] = useState('');
-  const [tempBaseUrl, setTempBaseUrl] = useState('https://stationapi.veriff.com');
+  const [tempApiKey, setTempApiKey] = useState("");
+  const [tempApiSecret, setTempApiSecret] = useState("");
+  const [tempBaseUrl, setTempBaseUrl] = useState(
+    "https://stationapi.veriff.com",
+  );
   const [savingProvider, setSavingProvider] = useState(false);
-  
+
   // Scan duplicates state
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<{
@@ -117,14 +125,14 @@ export default function KYCSettingsSection() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/kyc-settings');
+      const response = await fetch("/api/kyc-settings");
       const data = await response.json();
       if (data.settings) {
         setSettings(data.settings);
       }
     } catch (error) {
-      console.error('Error fetching KYC settings:', error);
-      toast.error('Failed to load KYC settings');
+      console.error("Error fetching KYC settings:", error);
+      toast.error("Failed to load KYC settings");
     } finally {
       setLoading(false);
     }
@@ -133,27 +141,29 @@ export default function KYCSettingsSection() {
   const handleScanDuplicates = async () => {
     setScanning(true);
     setScanResults(null);
-    
+
     try {
-      const response = await fetch('/api/kyc-settings/scan-duplicates', {
-        method: 'POST',
+      const response = await fetch("/api/kyc-settings/scan-duplicates", {
+        method: "POST",
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         setScanResults(data);
         if (data.stats.duplicateGroupsFound > 0) {
-          toast.warning(`Found ${data.stats.duplicateGroupsFound} duplicate group(s)!`);
+          toast.warning(
+            `Found ${data.stats.duplicateGroupsFound} duplicate group(s)!`,
+          );
         } else {
-          toast.success('No duplicates found. All KYC sessions are unique.');
+          toast.success("No duplicates found. All KYC sessions are unique.");
         }
       } else {
-        toast.error(data.error || 'Failed to scan for duplicates');
+        toast.error(data.error || "Failed to scan for duplicates");
       }
     } catch (error) {
-      console.error('Error scanning for duplicates:', error);
-      toast.error('Failed to scan for duplicates');
+      console.error("Error scanning for duplicates:", error);
+      toast.error("Failed to scan for duplicates");
     } finally {
       setScanning(false);
     }
@@ -164,22 +174,22 @@ export default function KYCSettingsSection() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/kyc-settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/kyc-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
-        toast.success('KYC settings saved successfully');
+        toast.success("KYC settings saved successfully");
       } else {
-        toast.error('Failed to save KYC settings');
+        toast.error("Failed to save KYC settings");
       }
     } catch (error) {
-      console.error('Error saving KYC settings:', error);
-      toast.error('Failed to save KYC settings');
+      console.error("Error saving KYC settings:", error);
+      toast.error("Failed to save KYC settings");
     } finally {
       setSaving(false);
     }
@@ -187,17 +197,17 @@ export default function KYCSettingsSection() {
 
   const handleSaveProvider = async () => {
     if (!tempApiKey || !tempApiSecret) {
-      toast.error('Please fill in API Key and Secret');
+      toast.error("Please fill in API Key and Secret");
       return;
     }
 
     setSavingProvider(true);
     try {
-      const response = await fetch('/api/kyc-settings/provider', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/kyc-settings/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: 'veriff',
+          provider: "veriff",
           apiKey: tempApiKey,
           apiSecret: tempApiSecret,
           baseUrl: tempBaseUrl,
@@ -206,17 +216,17 @@ export default function KYCSettingsSection() {
 
       if (response.ok) {
         const data = await response.json();
-        toast.success('Veriff credentials saved successfully');
+        toast.success("Veriff credentials saved successfully");
         setConfigDialogOpen(false);
         // Refresh settings
         fetchSettings();
       } else {
         const error = await response.json();
-        toast.error(error.message || 'Failed to save credentials');
+        toast.error(error.message || "Failed to save credentials");
       }
     } catch (error) {
-      console.error('Error saving provider:', error);
-      toast.error('Failed to save credentials');
+      console.error("Error saving provider:", error);
+      toast.error("Failed to save credentials");
     } finally {
       setSavingProvider(false);
     }
@@ -225,9 +235,9 @@ export default function KYCSettingsSection() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const response = await fetch('/api/kyc-settings/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/kyc-settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: tempApiKey || settings?.veriffApiKey,
           apiSecret: tempApiSecret || settings?.veriffApiSecret,
@@ -237,37 +247,41 @@ export default function KYCSettingsSection() {
 
       const data = await response.json();
       if (data.success) {
-        toast.success('Connection successful! Veriff API is working.');
+        toast.success("Connection successful! Veriff API is working.");
       } else {
-        toast.error(data.message || 'Connection failed');
+        toast.error(data.message || "Connection failed");
       }
     } catch (error) {
-      toast.error('Failed to test connection');
+      toast.error("Failed to test connection");
     } finally {
       setTesting(false);
     }
   };
 
   const openConfigDialog = () => {
-    setTempApiKey(settings?.veriffApiKey || '');
-    setTempApiSecret('');
-    setTempBaseUrl(settings?.veriffBaseUrl || 'https://stationapi.veriff.com');
+    setTempApiKey(settings?.veriffApiKey || "");
+    setTempApiSecret("");
+    setTempBaseUrl(settings?.veriffBaseUrl || "https://stationapi.veriff.com");
     setConfigDialogOpen(true);
   };
 
   const copyWebhookUrl = () => {
-    const url = typeof window !== 'undefined' 
-      ? `${window.location.origin
-          .replace(':3001', ':3000')
-          .replace('admin.', '')}/api/kyc/webhook`
-      : '/api/kyc/webhook';
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin
+            .replace(":3001", ":3000")
+            .replace("admin.", "")}/api/kyc/webhook`
+        : "/api/kyc/webhook";
     navigator.clipboard.writeText(url);
     setCopiedWebhook(true);
     setTimeout(() => setCopiedWebhook(false), 2000);
-    toast.success('Webhook URL copied to clipboard');
+    toast.success("Webhook URL copied to clipboard");
   };
 
-  const updateSetting = <K extends keyof KYCSettings>(key: K, value: KYCSettings[K]) => {
+  const updateSetting = <K extends keyof KYCSettings>(
+    key: K,
+    value: KYCSettings[K],
+  ) => {
     if (settings) {
       setSettings({ ...settings, [key]: value });
     }
@@ -278,10 +292,11 @@ export default function KYCSettingsSection() {
     const types = settings.allowedDocumentTypes.includes(type)
       ? settings.allowedDocumentTypes.filter((t) => t !== type)
       : [...settings.allowedDocumentTypes, type];
-    updateSetting('allowedDocumentTypes', types);
+    updateSetting("allowedDocumentTypes", types);
   };
 
-  const isVeriffConfigured = settings?.veriffApiKey && settings?.veriffApiSecret;
+  const isVeriffConfigured =
+    settings?.veriffApiKey && settings?.veriffApiSecret;
 
   if (loading) {
     return (
@@ -308,14 +323,19 @@ export default function KYCSettingsSection() {
             <Shield className="h-6 w-6 text-green-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">KYC Verification Settings</h2>
+            <h2 className="text-xl font-bold text-white">
+              KYC Verification Settings
+            </h2>
             <p className="text-sm text-gray-400">
               Configure identity verification providers and requirements
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={settings.enabled ? 'default' : 'secondary'} className="px-3 py-1">
+          <Badge
+            variant={settings.enabled ? "default" : "secondary"}
+            className="px-3 py-1"
+          >
             {settings.enabled ? (
               <>
                 <CheckCircle className="h-3 w-3 mr-1" />
@@ -330,7 +350,7 @@ export default function KYCSettingsSection() {
           </Badge>
           <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
@@ -340,11 +360,17 @@ export default function KYCSettingsSection() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-lg ${settings.enabled ? 'bg-green-500/20' : 'bg-gray-700'}`}>
-                <Shield className={`h-6 w-6 ${settings.enabled ? 'text-green-400' : 'text-gray-400'}`} />
+              <div
+                className={`p-3 rounded-lg ${settings.enabled ? "bg-green-500/20" : "bg-gray-700"}`}
+              >
+                <Shield
+                  className={`h-6 w-6 ${settings.enabled ? "text-green-400" : "text-gray-400"}`}
+                />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Enable KYC Verification</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  Enable KYC Verification
+                </h3>
                 <p className="text-sm text-gray-400">
                   When enabled, users will be required to verify their identity
                 </p>
@@ -352,7 +378,7 @@ export default function KYCSettingsSection() {
             </div>
             <Switch
               checked={settings.enabled}
-              onCheckedChange={(checked) => updateSetting('enabled', checked)}
+              onCheckedChange={(checked) => updateSetting("enabled", checked)}
             />
           </div>
         </CardContent>
@@ -387,15 +413,21 @@ export default function KYCSettingsSection() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-white">KYC Providers</h3>
-                <p className="text-sm text-gray-400">Configure identity verification providers</p>
+                <h3 className="text-lg font-semibold text-white">
+                  KYC Providers
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Configure identity verification providers
+                </p>
               </div>
             </div>
 
             {/* Veriff Provider Card */}
-            <Card className={`bg-gray-800/50 border-2 transition-all ${
-              isVeriffConfigured ? 'border-green-500/50' : 'border-gray-700'
-            }`}>
+            <Card
+              className={`bg-gray-800/50 border-2 transition-all ${
+                isVeriffConfigured ? "border-green-500/50" : "border-gray-700"
+              }`}
+            >
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
@@ -412,11 +444,14 @@ export default function KYCSettingsSection() {
                             Configured
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-gray-700 text-gray-400">
+                          <Badge
+                            variant="secondary"
+                            className="bg-gray-700 text-gray-400"
+                          >
                             Not Configured
                           </Badge>
                         )}
-                        {settings.veriffBaseUrl?.includes('test') && (
+                        {settings.veriffBaseUrl?.includes("test") && (
                           <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                             <TestTube className="h-3 w-3 mr-1" />
                             Sandbox
@@ -424,21 +459,34 @@ export default function KYCSettingsSection() {
                         )}
                       </div>
                       <p className="text-sm text-gray-400 mt-1">
-                        AI-powered identity verification with document scanning and facial recognition
+                        AI-powered identity verification with document scanning
+                        and facial recognition
                       </p>
-                      
+
                       {/* Features */}
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-gray-300 border-gray-600"
+                        >
                           Document Verification
                         </Badge>
-                        <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-gray-300 border-gray-600"
+                        >
                           Face Match
                         </Badge>
-                        <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-gray-300 border-gray-600"
+                        >
                           Liveness Detection
                         </Badge>
-                        <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-gray-300 border-gray-600"
+                        >
                           200+ Countries
                         </Badge>
                       </div>
@@ -456,7 +504,9 @@ export default function KYCSettingsSection() {
                             <div>
                               <p className="text-gray-400">Environment</p>
                               <p className="text-white">
-                                {settings.veriffBaseUrl?.includes('test') ? 'Sandbox' : 'Production'}
+                                {settings.veriffBaseUrl?.includes("test")
+                                  ? "Sandbox"
+                                  : "Production"}
                               </p>
                             </div>
                           </div>
@@ -467,13 +517,14 @@ export default function KYCSettingsSection() {
                   <div className="flex flex-col gap-2">
                     <Button
                       onClick={openConfigDialog}
-                      className={isVeriffConfigured 
-                        ? 'bg-blue-600 hover:bg-blue-700' 
-                        : 'bg-green-600 hover:bg-green-700'
+                      className={
+                        isVeriffConfigured
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-green-600 hover:bg-green-700"
                       }
                     >
                       <Key className="h-4 w-4 mr-2" />
-                      {isVeriffConfigured ? 'Update Credentials' : 'Configure'}
+                      {isVeriffConfigured ? "Update Credentials" : "Configure"}
                     </Button>
                     <a
                       href="https://www.veriff.com"
@@ -497,7 +548,9 @@ export default function KYCSettingsSection() {
                     <div className="space-y-3">
                       <div className="p-3 bg-gray-900/50 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <Label className="text-gray-300 text-sm">Webhook Events URL</Label>
+                          <Label className="text-gray-300 text-sm">
+                            Webhook Events URL
+                          </Label>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -512,17 +565,18 @@ export default function KYCSettingsSection() {
                           </Button>
                         </div>
                         <code className="block p-2 bg-gray-800 rounded text-xs text-green-400 break-all">
-                          {typeof window !== 'undefined' 
+                          {typeof window !== "undefined"
                             ? `${window.location.origin
-                                .replace(':3001', ':3000')
-                                .replace('admin.', '')}/api/kyc/webhook`
-                            : '/api/kyc/webhook'}
+                                .replace(":3001", ":3000")
+                                .replace("admin.", "")}/api/kyc/webhook`
+                            : "/api/kyc/webhook"}
                         </code>
                       </div>
                       <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <p className="text-xs text-gray-300">
                           <Info className="h-3 w-3 inline mr-1" />
-                          Add this URL in your Veriff Dashboard → Settings → Webhook events URL and Webhook decisions URL
+                          Add this URL in your Veriff Dashboard → Settings →
+                          Webhook events URL and Webhook decisions URL
                         </p>
                       </div>
                     </div>
@@ -539,9 +593,12 @@ export default function KYCSettingsSection() {
                     <Plug className="h-8 w-8 text-gray-500" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-medium text-gray-400">More providers coming soon</h4>
+                    <h4 className="text-lg font-medium text-gray-400">
+                      More providers coming soon
+                    </h4>
                     <p className="text-sm text-gray-500">
-                      Additional KYC providers will be available in future updates
+                      Additional KYC providers will be available in future
+                      updates
                     </p>
                   </div>
                 </div>
@@ -558,62 +615,94 @@ export default function KYCSettingsSection() {
                 <Settings className="h-5 w-5" />
                 General Settings
               </CardTitle>
-              <CardDescription>Configure when KYC verification is required</CardDescription>
+              <CardDescription>
+                Configure when KYC verification is required
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* When KYC is Required */}
               <div className="space-y-4">
-                <h4 className="text-sm font-medium text-white">KYC Requirements</h4>
-                
+                <h4 className="text-sm font-medium text-white">
+                  KYC Requirements
+                </h4>
+
                 <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                   <div>
-                    <p className="font-medium text-white">Required for Withdrawals</p>
-                    <p className="text-sm text-gray-400">Users must verify identity before withdrawing</p>
+                    <p className="font-medium text-white">
+                      Required for Withdrawals
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Users must verify identity before withdrawing
+                    </p>
                   </div>
                   <Switch
                     checked={settings.requiredForWithdrawal}
-                    onCheckedChange={(checked) => updateSetting('requiredForWithdrawal', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("requiredForWithdrawal", checked)
+                    }
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                   <div>
-                    <p className="font-medium text-white">Required for Deposits</p>
-                    <p className="text-sm text-gray-400">Users must verify identity before depositing</p>
+                    <p className="font-medium text-white">
+                      Required for Deposits
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Users must verify identity before depositing
+                    </p>
                   </div>
                   <Switch
                     checked={settings.requiredForDeposit}
-                    onCheckedChange={(checked) => updateSetting('requiredForDeposit', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("requiredForDeposit", checked)
+                    }
                   />
                 </div>
 
                 <div className="p-4 bg-gray-900/50 rounded-lg space-y-2">
-                  <Label className="text-white">Minimum Amount Threshold (€)</Label>
+                  <Label className="text-white">
+                    Minimum Amount Threshold (€)
+                  </Label>
                   <Input
                     type="number"
                     value={settings.requiredAmount}
-                    onChange={(e) => updateSetting('requiredAmount', parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateSetting(
+                        "requiredAmount",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
                     className="bg-gray-800 border-gray-600"
                     placeholder="0 = Always required"
                   />
                   <p className="text-xs text-gray-400">
-                    Set to 0 to require KYC for all amounts, or specify a minimum amount
+                    Set to 0 to require KYC for all amounts, or specify a
+                    minimum amount
                   </p>
                 </div>
               </div>
 
               {/* Auto Actions */}
               <div className="space-y-4 pt-4 border-t border-gray-700">
-                <h4 className="text-sm font-medium text-white">Automatic Actions</h4>
+                <h4 className="text-sm font-medium text-white">
+                  Automatic Actions
+                </h4>
 
                 <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                   <div>
-                    <p className="font-medium text-white">Auto-Approve on Success</p>
-                    <p className="text-sm text-gray-400">Automatically approve verified users</p>
+                    <p className="font-medium text-white">
+                      Auto-Approve on Success
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Automatically approve verified users
+                    </p>
                   </div>
                   <Switch
                     checked={settings.autoApproveOnSuccess}
-                    onCheckedChange={(checked) => updateSetting('autoApproveOnSuccess', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("autoApproveOnSuccess", checked)
+                    }
                   />
                 </div>
 
@@ -623,11 +712,15 @@ export default function KYCSettingsSection() {
                       <AlertTriangle className="h-4 w-4" />
                       Auto-Suspend on Failure
                     </p>
-                    <p className="text-sm text-gray-400">Suspend users who fail verification</p>
+                    <p className="text-sm text-gray-400">
+                      Suspend users who fail verification
+                    </p>
                   </div>
                   <Switch
                     checked={settings.autoSuspendOnFail}
-                    onCheckedChange={(checked) => updateSetting('autoSuspendOnFail', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("autoSuspendOnFail", checked)
+                    }
                   />
                 </div>
               </div>
@@ -641,11 +734,18 @@ export default function KYCSettingsSection() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-gray-300">Max Verification Attempts</Label>
+                    <Label className="text-gray-300">
+                      Max Verification Attempts
+                    </Label>
                     <Input
                       type="number"
                       value={settings.maxVerificationAttempts}
-                      onChange={(e) => updateSetting('maxVerificationAttempts', parseInt(e.target.value) || 3)}
+                      onChange={(e) =>
+                        updateSetting(
+                          "maxVerificationAttempts",
+                          parseInt(e.target.value) || 3,
+                        )
+                      }
                       className="bg-gray-800 border-gray-600"
                       min={1}
                       max={10}
@@ -653,11 +753,18 @@ export default function KYCSettingsSection() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-gray-300">Session Expiry (minutes)</Label>
+                    <Label className="text-gray-300">
+                      Session Expiry (minutes)
+                    </Label>
                     <Input
                       type="number"
                       value={settings.sessionExpiryMinutes}
-                      onChange={(e) => updateSetting('sessionExpiryMinutes', parseInt(e.target.value) || 30)}
+                      onChange={(e) =>
+                        updateSetting(
+                          "sessionExpiryMinutes",
+                          parseInt(e.target.value) || 30,
+                        )
+                      }
                       className="bg-gray-800 border-gray-600"
                       min={5}
                       max={120}
@@ -665,16 +772,25 @@ export default function KYCSettingsSection() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-gray-300">Verification Valid (days)</Label>
+                    <Label className="text-gray-300">
+                      Verification Valid (days)
+                    </Label>
                     <Input
                       type="number"
                       value={settings.verificationValidDays}
-                      onChange={(e) => updateSetting('verificationValidDays', parseInt(e.target.value) || 365)}
+                      onChange={(e) =>
+                        updateSetting(
+                          "verificationValidDays",
+                          parseInt(e.target.value) || 365,
+                        )
+                      }
                       className="bg-gray-800 border-gray-600"
                       min={30}
                       max={1825}
                     />
-                    <p className="text-xs text-gray-400">How long a successful verification remains valid</p>
+                    <p className="text-xs text-gray-400">
+                      How long a successful verification remains valid
+                    </p>
                   </div>
                 </div>
               </div>
@@ -690,20 +806,24 @@ export default function KYCSettingsSection() {
                 <FileText className="h-5 w-5" />
                 Verification Options
               </CardTitle>
-              <CardDescription>Configure accepted documents and countries</CardDescription>
+              <CardDescription>
+                Configure accepted documents and countries
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Document Types */}
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-white">Accepted Document Types</h4>
+                <h4 className="text-sm font-medium text-white">
+                  Accepted Document Types
+                </h4>
                 <div className="grid grid-cols-2 gap-3">
                   {DOCUMENT_TYPES.map((doc) => (
                     <div
                       key={doc.value}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                         settings.allowedDocumentTypes.includes(doc.value)
-                          ? 'bg-green-500/20 border-green-500/50'
-                          : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
+                          ? "bg-green-500/20 border-green-500/50"
+                          : "bg-gray-900/50 border-gray-700 hover:border-gray-600"
                       }`}
                       onClick={() => toggleDocumentType(doc.value)}
                     >
@@ -726,23 +846,25 @@ export default function KYCSettingsSection() {
                       <Globe className="h-4 w-4" />
                       Allowed Countries
                     </h4>
-                    <p className="text-xs text-gray-400">Leave empty to allow all countries</p>
+                    <p className="text-xs text-gray-400">
+                      Leave empty to allow all countries
+                    </p>
                   </div>
                   <Badge variant="secondary">
                     {settings.allowedCountries.length === 0
-                      ? 'All Countries'
+                      ? "All Countries"
                       : `${settings.allowedCountries.length} Selected`}
                   </Badge>
                 </div>
                 <Textarea
-                  value={settings.allowedCountries.join(', ')}
+                  value={settings.allowedCountries.join(", ")}
                   onChange={(e) =>
                     updateSetting(
-                      'allowedCountries',
+                      "allowedCountries",
                       e.target.value
-                        .split(',')
+                        .split(",")
                         .map((c) => c.trim().toUpperCase())
-                        .filter(Boolean)
+                        .filter(Boolean),
                     )
                   }
                   className="bg-gray-800 border-gray-600"
@@ -762,7 +884,9 @@ export default function KYCSettingsSection() {
                 <MessageSquare className="h-5 w-5" />
                 User Messages
               </CardTitle>
-              <CardDescription>Customize messages shown to users during KYC</CardDescription>
+              <CardDescription>
+                Customize messages shown to users during KYC
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
@@ -770,7 +894,9 @@ export default function KYCSettingsSection() {
                   <Label className="text-white">KYC Required Message</Label>
                   <Textarea
                     value={settings.kycRequiredMessage}
-                    onChange={(e) => updateSetting('kycRequiredMessage', e.target.value)}
+                    onChange={(e) =>
+                      updateSetting("kycRequiredMessage", e.target.value)
+                    }
                     className="bg-gray-800 border-gray-600"
                     rows={2}
                   />
@@ -780,7 +906,9 @@ export default function KYCSettingsSection() {
                   <Label className="text-white">KYC Pending Message</Label>
                   <Textarea
                     value={settings.kycPendingMessage}
-                    onChange={(e) => updateSetting('kycPendingMessage', e.target.value)}
+                    onChange={(e) =>
+                      updateSetting("kycPendingMessage", e.target.value)
+                    }
                     className="bg-gray-800 border-gray-600"
                     rows={2}
                   />
@@ -790,7 +918,9 @@ export default function KYCSettingsSection() {
                   <Label className="text-white">KYC Approved Message</Label>
                   <Textarea
                     value={settings.kycApprovedMessage}
-                    onChange={(e) => updateSetting('kycApprovedMessage', e.target.value)}
+                    onChange={(e) =>
+                      updateSetting("kycApprovedMessage", e.target.value)
+                    }
                     className="bg-gray-800 border-gray-600"
                     rows={2}
                   />
@@ -800,7 +930,9 @@ export default function KYCSettingsSection() {
                   <Label className="text-white">KYC Declined Message</Label>
                   <Textarea
                     value={settings.kycDeclinedMessage}
-                    onChange={(e) => updateSetting('kycDeclinedMessage', e.target.value)}
+                    onChange={(e) =>
+                      updateSetting("kycDeclinedMessage", e.target.value)
+                    }
                     className="bg-gray-800 border-gray-600"
                     rows={2}
                   />
@@ -829,9 +961,14 @@ export default function KYCSettingsSection() {
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5" />
                     <div className="text-sm text-gray-300">
-                      <p className="font-medium text-orange-400 mb-1">What this does:</p>
+                      <p className="font-medium text-orange-400 mb-1">
+                        What this does:
+                      </p>
                       <ul className="list-disc list-inside space-y-1 text-gray-400">
-                        <li>Scans all approved KYC sessions for duplicate documents</li>
+                        <li>
+                          Scans all approved KYC sessions for duplicate
+                          documents
+                        </li>
                         <li>Creates fraud alerts for any duplicates found</li>
                         <li>Updates fraud scores for involved users (+50%)</li>
                         <li>Applies suspensions if auto-suspend is enabled</li>
@@ -860,11 +997,13 @@ export default function KYCSettingsSection() {
 
                 {/* Scan Results */}
                 {scanResults && (
-                  <div className={`p-4 rounded-lg border ${
-                    scanResults.stats.duplicateGroupsFound > 0 
-                      ? 'bg-red-500/10 border-red-500/30'
-                      : 'bg-green-500/10 border-green-500/30'
-                  }`}>
+                  <div
+                    className={`p-4 rounded-lg border ${
+                      scanResults.stats.duplicateGroupsFound > 0
+                        ? "bg-red-500/10 border-red-500/30"
+                        : "bg-green-500/10 border-green-500/30"
+                    }`}
+                  >
                     <div className="flex items-start gap-3">
                       {scanResults.stats.duplicateGroupsFound > 0 ? (
                         <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
@@ -872,68 +1011,117 @@ export default function KYCSettingsSection() {
                         <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
                       )}
                       <div className="flex-1">
-                        <p className={`font-medium ${
-                          scanResults.stats.duplicateGroupsFound > 0 ? 'text-red-400' : 'text-green-400'
-                        }`}>
+                        <p
+                          className={`font-medium ${
+                            scanResults.stats.duplicateGroupsFound > 0
+                              ? "text-red-400"
+                              : "text-green-400"
+                          }`}
+                        >
                           {scanResults.message}
                         </p>
-                        
+
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
                           <div className="bg-gray-800/50 p-2 rounded">
-                            <p className="text-xs text-gray-500">Sessions Scanned</p>
-                            <p className="text-lg font-bold text-white">{scanResults.stats.sessionsScanned}</p>
+                            <p className="text-xs text-gray-500">
+                              Sessions Scanned
+                            </p>
+                            <p className="text-lg font-bold text-white">
+                              {scanResults.stats.sessionsScanned}
+                            </p>
                           </div>
                           <div className="bg-gray-800/50 p-2 rounded">
-                            <p className="text-xs text-gray-500">Duplicates Found</p>
-                            <p className={`text-lg font-bold ${
-                              scanResults.stats.duplicateGroupsFound > 0 ? 'text-red-400' : 'text-green-400'
-                            }`}>
+                            <p className="text-xs text-gray-500">
+                              Duplicates Found
+                            </p>
+                            <p
+                              className={`text-lg font-bold ${
+                                scanResults.stats.duplicateGroupsFound > 0
+                                  ? "text-red-400"
+                                  : "text-green-400"
+                              }`}
+                            >
                               {scanResults.stats.duplicateGroupsFound}
                             </p>
                           </div>
                           <div className="bg-gray-800/50 p-2 rounded">
-                            <p className="text-xs text-gray-500">Alerts Created</p>
-                            <p className="text-lg font-bold text-orange-400">{scanResults.stats.alertsCreated}</p>
+                            <p className="text-xs text-gray-500">
+                              Alerts Created
+                            </p>
+                            <p className="text-lg font-bold text-orange-400">
+                              {scanResults.stats.alertsCreated}
+                            </p>
                           </div>
                           <div className="bg-gray-800/50 p-2 rounded">
-                            <p className="text-xs text-gray-500">Scores Updated</p>
-                            <p className="text-lg font-bold text-blue-400">{scanResults.stats.scoresUpdated}</p>
+                            <p className="text-xs text-gray-500">
+                              Scores Updated
+                            </p>
+                            <p className="text-lg font-bold text-blue-400">
+                              {scanResults.stats.scoresUpdated}
+                            </p>
                           </div>
                           <div className="bg-gray-800/50 p-2 rounded">
-                            <p className="text-xs text-gray-500">Users Suspended</p>
-                            <p className="text-lg font-bold text-purple-400">{scanResults.stats.usersSuspended}</p>
+                            <p className="text-xs text-gray-500">
+                              Users Suspended
+                            </p>
+                            <p className="text-lg font-bold text-purple-400">
+                              {scanResults.stats.usersSuspended}
+                            </p>
                           </div>
                         </div>
 
                         {/* Duplicate Details */}
-                        {scanResults.duplicates && scanResults.duplicates.length > 0 && (
-                          <div className="mt-4 space-y-2">
-                            <p className="text-sm font-medium text-gray-300">Duplicate Groups:</p>
-                            {scanResults.duplicates.map((dup, index) => (
-                              <div key={index} className="p-3 bg-gray-800/70 rounded border border-gray-700">
-                                <div className="flex items-center justify-between mb-2">
-                                  <Badge variant="outline" className="text-orange-400 border-orange-400">
-                                    {dup.matchType.replace('_', ' ')}
-                                  </Badge>
-                                  {dup.alertExisted ? (
-                                    <Badge variant="secondary" className="bg-gray-700">Alert already existed</Badge>
-                                  ) : (
-                                    <Badge variant="secondary" className="bg-red-500/20 text-red-400">New alert created</Badge>
+                        {scanResults.duplicates &&
+                          scanResults.duplicates.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                              <p className="text-sm font-medium text-gray-300">
+                                Duplicate Groups:
+                              </p>
+                              {scanResults.duplicates.map((dup, index) => (
+                                <div
+                                  key={index}
+                                  className="p-3 bg-gray-800/70 rounded border border-gray-700"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-orange-400 border-orange-400"
+                                    >
+                                      {dup.matchType.replace("_", " ")}
+                                    </Badge>
+                                    {dup.alertExisted ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-gray-700"
+                                      >
+                                        Alert already existed
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-red-500/20 text-red-400"
+                                      >
+                                        New alert created
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                                    <Users className="h-4 w-4" />
+                                    <span>
+                                      {dup.userIds.length} accounts involved
+                                    </span>
+                                  </div>
+                                  {dup.documentInfo && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Document: {dup.documentInfo.type} from{" "}
+                                      {dup.documentInfo.country} (
+                                      {dup.documentInfo.numberMasked})
+                                    </div>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-sm text-gray-400">
-                                  <Users className="h-4 w-4" />
-                                  <span>{dup.userIds.length} accounts involved</span>
-                                </div>
-                                {dup.documentInfo && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    Document: {dup.documentInfo.type} from {dup.documentInfo.country} ({dup.documentInfo.numberMasked})
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                              ))}
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -955,7 +1143,7 @@ export default function KYCSettingsSection() {
               Configure Veriff
             </DialogTitle>
             <DialogDescription>
-              Enter your Veriff API credentials. Get them from{' '}
+              Enter your Veriff API credentials. Get them from{" "}
               <a
                 href="https://station.veriff.com"
                 target="_blank"
@@ -975,7 +1163,17 @@ export default function KYCSettingsSection() {
                 Setup Instructions
               </h4>
               <ol className="text-xs text-gray-300 space-y-1 list-decimal list-inside">
-                <li>Go to <a href="https://station.veriff.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">station.veriff.com</a></li>
+                <li>
+                  Go to{" "}
+                  <a
+                    href="https://station.veriff.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline"
+                  >
+                    station.veriff.com
+                  </a>
+                </li>
                 <li>Navigate to Workspace → All integrations</li>
                 <li>Create or select your integration</li>
                 <li>Copy API Key and create a Shared Secret Key</li>
@@ -997,7 +1195,7 @@ export default function KYCSettingsSection() {
               <Label className="text-white">Shared Secret Key</Label>
               <div className="relative">
                 <Input
-                  type={showApiSecret ? 'text' : 'password'}
+                  type={showApiSecret ? "text" : "password"}
                   value={tempApiSecret}
                   onChange={(e) => setTempApiSecret(e.target.value)}
                   className="bg-gray-900 border-gray-600 font-mono pr-10"
@@ -1010,7 +1208,11 @@ export default function KYCSettingsSection() {
                   className="absolute right-2 top-1/2 -translate-y-1/2"
                   onClick={() => setShowApiSecret(!showApiSecret)}
                 >
-                  {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showApiSecret ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
               <p className="text-xs text-gray-400">

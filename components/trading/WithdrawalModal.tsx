@@ -1,15 +1,39 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Coins, Loader2, CheckCircle2, XCircle, TrendingDown, AlertTriangle, Clock, Shield, CreditCard, Building2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Coins,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  TrendingDown,
+  AlertTriangle,
+  Clock,
+  Shield,
+  CreditCard,
+  Building2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface WithdrawalModalProps {
   children: React.ReactNode;
@@ -17,7 +41,7 @@ interface WithdrawalModalProps {
 
 interface WithdrawalMethod {
   id: string;
-  type: 'original_method' | 'bank_account';
+  type: "original_method" | "bank_account";
   label: string;
   details: string;
   cardBrand?: string;
@@ -61,15 +85,14 @@ interface WithdrawalInfo {
   nuveiEnabled?: boolean; // Whether Nuvei automatic withdrawals are enabled by admin
 }
 
-
 export default function WithdrawalModal({ children }: WithdrawalModalProps) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [selectedMethodId, setSelectedMethodId] = useState('');
-  const [userNote, setUserNote] = useState('');
+  const [amount, setAmount] = useState("");
+  const [selectedMethodId, setSelectedMethodId] = useState("");
+  const [userNote, setUserNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchingInfo, setFetchingInfo] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState<{
     message: string;
     netAmountEUR: number;
@@ -77,7 +100,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     isAutoApproved: boolean;
     isAutomatic?: boolean;
   } | null>(null);
-  const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(null);
+  const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(
+    null,
+  );
   const router = useRouter();
 
   // Fetch withdrawal info when modal opens
@@ -89,23 +114,27 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
 
   const fetchWithdrawalInfo = async () => {
     setFetchingInfo(true);
-    setError('');
+    setError("");
     try {
-      const response = await fetch('/api/wallet/withdraw');
+      const response = await fetch("/api/wallet/withdraw");
       const data = await response.json();
-      
+
       if (!response.ok) {
-        setError(data.error || 'Failed to fetch withdrawal information');
+        setError(data.error || "Failed to fetch withdrawal information");
         return;
       }
-      
+
       setWithdrawalInfo(data);
-      
+
       // Set default method: prefer default bank account, then original method, then first available
       const methods = data.availableWithdrawalMethods || [];
-      const defaultBankAccount = methods.find((m: WithdrawalMethod) => m.type === 'bank_account' && m.isDefault);
-      const originalMethod = methods.find((m: WithdrawalMethod) => m.type === 'original_method');
-      
+      const defaultBankAccount = methods.find(
+        (m: WithdrawalMethod) => m.type === "bank_account" && m.isDefault,
+      );
+      const originalMethod = methods.find(
+        (m: WithdrawalMethod) => m.type === "original_method",
+      );
+
       if (defaultBankAccount) {
         setSelectedMethodId(defaultBankAccount.id);
       } else if (originalMethod) {
@@ -114,8 +143,8 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         setSelectedMethodId(methods[0].id);
       }
     } catch (err) {
-      setError('Failed to connect to server');
-      console.error('Failed to fetch withdrawal info:', err);
+      setError("Failed to connect to server");
+      console.error("Failed to fetch withdrawal info:", err);
     } finally {
       setFetchingInfo(false);
     }
@@ -123,52 +152,60 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       const amountEUR = parseFloat(amount);
 
       if (isNaN(amountEUR) || amountEUR <= 0) {
-        setError('Please enter a valid amount');
+        setError("Please enter a valid amount");
         setLoading(false);
         return;
       }
-      
+
       if (!selectedMethodId) {
-        setError('Please select a withdrawal method');
+        setError("Please select a withdrawal method");
         setLoading(false);
         return;
       }
 
       // Get selected method details
-      const selectedMethod = withdrawalInfo?.availableWithdrawalMethods?.find(m => m.id === selectedMethodId);
-      
+      const selectedMethod = withdrawalInfo?.availableWithdrawalMethods?.find(
+        (m) => m.id === selectedMethodId,
+      );
+
       if (!selectedMethod) {
-        setError('Selected withdrawal method not found');
+        setError("Selected withdrawal method not found");
         setLoading(false);
         return;
       }
-      
+
       // Check if Nuvei automatic withdrawals are enabled by admin
       const isAutomatic = withdrawalInfo?.nuveiEnabled === true;
-      
+
       if (isAutomatic) {
         // AUTOMATIC WITHDRAWAL via Nuvei
-        const withdrawalMethod = selectedMethod.type === 'original_method' ? 'card_payout' : 'bank_transfer';
-        
+        const withdrawalMethod =
+          selectedMethod.type === "original_method"
+            ? "card_payout"
+            : "bank_transfer";
+
         // Check if we have required data for automatic processing
-        const canTryAutomatic = withdrawalMethod === 'bank_transfer' || 
-          (withdrawalMethod === 'card_payout' && selectedMethod.userPaymentOptionId);
-        
+        const canTryAutomatic =
+          withdrawalMethod === "bank_transfer" ||
+          (withdrawalMethod === "card_payout" &&
+            selectedMethod.userPaymentOptionId);
+
         if (canTryAutomatic) {
           const requestBody: any = {
             amountEUR,
             withdrawalMethod,
           };
-          
-          if (withdrawalMethod === 'card_payout') {
-            requestBody.userPaymentOptionId = selectedMethod.userPaymentOptionId;
+
+          if (withdrawalMethod === "card_payout") {
+            requestBody.userPaymentOptionId =
+              selectedMethod.userPaymentOptionId;
             requestBody.cardDetails = {
               cardBrand: selectedMethod.cardBrand,
               cardLast4: selectedMethod.cardLast4,
@@ -177,26 +214,26 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           } else {
             requestBody.bankAccountId = selectedMethod.id;
           }
-          
+
           try {
-            const response = await fetch('/api/nuvei/withdrawal', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/nuvei/withdrawal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(requestBody),
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
               // Automatic withdrawal succeeded
               setSuccess({
-                message: data.message || 'Withdrawal submitted for processing',
+                message: data.message || "Withdrawal submitted for processing",
                 netAmountEUR: data.netAmountEUR,
-                processingHours: withdrawalMethod === 'card_payout' ? 72 : 48,
+                processingHours: withdrawalMethod === "card_payout" ? 72 : 48,
                 isAutoApproved: true,
                 isAutomatic: true,
               });
-              
+
               setTimeout(() => {
                 router.refresh();
                 setOpen(false);
@@ -206,33 +243,44 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             } else {
               // Automatic failed - show error (credits already refunded by the API)
               // DO NOT fall back to manual as that creates duplicate withdrawal requests
-              const errorMsg = data.error || 'Automatic withdrawal failed';
-              setError(`${errorMsg}\n\nYour credits have been refunded. Please contact support if you need assistance.`);
+              const errorMsg = data.error || "Automatic withdrawal failed";
+              setError(
+                `${errorMsg}\n\nYour credits have been refunded. Please contact support if you need assistance.`,
+              );
               setLoading(false);
               return;
             }
           } catch (err) {
-            console.error('Automatic withdrawal error:', err);
-            setError('Automatic withdrawal failed. Your credits have been refunded. Please try again or contact support.');
+            console.error("Automatic withdrawal error:", err);
+            setError(
+              "Automatic withdrawal failed. Your credits have been refunded. Please try again or contact support.",
+            );
             setLoading(false);
             return;
           }
         } else {
           // Can't try automatic (e.g., no UPO for card refund) - show helpful error
-          if (withdrawalMethod === 'card_payout' && !selectedMethod.userPaymentOptionId) {
-            setError('Card refund requires a saved card from a previous deposit. Please make a deposit first or choose bank transfer.');
+          if (
+            withdrawalMethod === "card_payout" &&
+            !selectedMethod.userPaymentOptionId
+          ) {
+            setError(
+              "Card refund requires a saved card from a previous deposit. Please make a deposit first or choose bank transfer.",
+            );
           } else {
-            setError('Automatic withdrawal is not available for this method. Please contact support.');
+            setError(
+              "Automatic withdrawal is not available for this method. Please contact support.",
+            );
           }
           setLoading(false);
           return;
         }
       }
-      
+
       // MANUAL WITHDRAWAL - Nuvei automatic is disabled by admin
-      const response = await fetch('/api/wallet/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/wallet/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountEUR,
           withdrawalMethodId: selectedMethodId,
@@ -243,7 +291,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Withdrawal request failed');
+        setError(data.error || "Withdrawal request failed");
         setLoading(false);
         return;
       }
@@ -254,14 +302,16 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         processingHours: data.withdrawalRequest.estimatedProcessingHours,
         isAutoApproved: data.withdrawalRequest.isAutoApproved,
       });
-      
+
       setTimeout(() => {
         router.refresh();
         setOpen(false);
         resetModal();
       }, 4000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Withdrawal request failed');
+      setError(
+        err instanceof Error ? err.message : "Withdrawal request failed",
+      );
       setLoading(false);
     }
   };
@@ -270,12 +320,12 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
   const calculateWithdrawal = () => {
     const eurAmount = parseFloat(amount) || 0;
     if (!withdrawalInfo) return null;
-    
+
     const { feePercentage, feeFixed, conversionRate } = withdrawalInfo.settings;
-    const platformFee = (eurAmount * feePercentage / 100) + feeFixed;
+    const platformFee = (eurAmount * feePercentage) / 100 + feeFixed;
     const netAmount = eurAmount - platformFee;
     const creditsRequired = eurAmount * conversionRate;
-    
+
     return {
       eurAmount,
       platformFee,
@@ -287,10 +337,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
   const withdrawal = calculateWithdrawal();
 
   const resetModal = () => {
-    setAmount('');
-    setSelectedMethodId('');
-    setUserNote('');
-    setError('');
+    setAmount("");
+    setSelectedMethodId("");
+    setUserNote("");
+    setError("");
     setSuccess(null);
     setLoading(false);
   };
@@ -305,7 +355,11 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="bg-gray-900 border-gray-700 max-sm:border-0" fullScreenMobile size="default">
+      <DialogContent
+        className="bg-gray-900 border-gray-700 max-sm:border-0"
+        fullScreenMobile
+        size="default"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
             <Coins className="h-5 w-5 text-yellow-500" />
@@ -348,20 +402,25 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               <XCircle className="h-8 w-8 text-red-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-100">Cannot Withdraw</h3>
-              <p className="text-sm text-red-400 mt-2">{withdrawalInfo?.reason}</p>
-              {withdrawalInfo?.settings?.requireKYC && !withdrawalInfo?.wallet?.kycVerified && (
-                <Button
-                  className="mt-4 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => {
-                    setOpen(false);
-                    router.push('/profile?tab=verification');
-                  }}
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Complete KYC Verification
-                </Button>
-              )}
+              <h3 className="text-xl font-semibold text-gray-100">
+                Cannot Withdraw
+              </h3>
+              <p className="text-sm text-red-400 mt-2">
+                {withdrawalInfo?.reason}
+              </p>
+              {withdrawalInfo?.settings?.requireKYC &&
+                !withdrawalInfo?.wallet?.kycVerified && (
+                  <Button
+                    className="mt-4 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      setOpen(false);
+                      router.push("/profile?tab=verification");
+                    }}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Complete KYC Verification
+                  </Button>
+                )}
             </div>
           </div>
         ) : (
@@ -370,7 +429,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             {/* Status Badges */}
             <div className="flex flex-wrap gap-2">
               {withdrawalInfo.isSandbox && (
-                <Badge className="bg-purple-500/20 text-purple-300">SANDBOX MODE</Badge>
+                <Badge className="bg-purple-500/20 text-purple-300">
+                  SANDBOX MODE
+                </Badge>
               )}
               {withdrawalInfo.wallet.kycVerified && (
                 <Badge className="bg-green-500/20 text-green-300">
@@ -402,7 +463,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             <div className="rounded-lg bg-gray-800 border border-gray-700 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Available Balance</span>
-                <span className="text-yellow-400 font-bold text-lg" suppressHydrationWarning>
+                <span
+                  className="text-yellow-400 font-bold text-lg"
+                  suppressHydrationWarning
+                >
                   {withdrawalInfo.wallet.balance.toLocaleString()} Credits
                 </span>
               </div>
@@ -410,7 +474,6 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 ≈ €{withdrawalInfo.wallet.balanceEUR.toFixed(2)} EUR
               </p>
             </div>
-            
 
             {/* Amount Input */}
             <div className="space-y-2">
@@ -418,7 +481,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 Amount (EUR)
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">€</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">
+                  €
+                </span>
                 <Input
                   id="withdrawal-amount"
                   type="number"
@@ -426,7 +491,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   min={withdrawalInfo.settings.minimumWithdrawal}
                   max={Math.min(
                     withdrawalInfo.settings.maximumWithdrawal,
-                    withdrawalInfo.wallet.balanceEUR
+                    withdrawalInfo.wallet.balanceEUR,
                   )}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -437,12 +502,14 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 />
               </div>
               <p className="text-xs text-gray-500">
-                Min: €{withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} | 
-                Max: €{Math.min(
+                Min: €{withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} |
+                Max: €
+                {Math.min(
                   withdrawalInfo.settings.maximumWithdrawal,
-                  withdrawalInfo.wallet.balanceEUR
+                  withdrawalInfo.wallet.balanceEUR,
                 ).toFixed(2)}
-                {withdrawalInfo.wallet.balanceEUR < withdrawalInfo.settings.maximumWithdrawal && (
+                {withdrawalInfo.wallet.balanceEUR <
+                  withdrawalInfo.settings.maximumWithdrawal && (
                   <span className="text-gray-600"> (limited by balance)</span>
                 )}
               </p>
@@ -456,11 +523,16 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 // Generate smart presets based on balance
                 const presets: number[] = [];
                 if (minEUR <= maxEUR) presets.push(minEUR);
-                if (minEUR * 2 <= maxEUR && minEUR * 2 > minEUR) presets.push(minEUR * 2);
-                if (minEUR * 5 <= maxEUR && !presets.includes(minEUR * 5)) presets.push(minEUR * 5);
-                if (maxEUR > 0 && !presets.includes(maxEUR)) presets.push(maxEUR);
+                if (minEUR * 2 <= maxEUR && minEUR * 2 > minEUR)
+                  presets.push(minEUR * 2);
+                if (minEUR * 5 <= maxEUR && !presets.includes(minEUR * 5))
+                  presets.push(minEUR * 5);
+                if (maxEUR > 0 && !presets.includes(maxEUR))
+                  presets.push(maxEUR);
                 // Fill remaining slots
-                const suggestions = [10, 25, 50, 100, 200, 500].filter(v => v >= minEUR && v <= maxEUR && !presets.includes(v));
+                const suggestions = [10, 25, 50, 100, 200, 500].filter(
+                  (v) => v >= minEUR && v <= maxEUR && !presets.includes(v),
+                );
                 while (presets.length < 4 && suggestions.length > 0) {
                   presets.push(suggestions.shift()!);
                 }
@@ -475,10 +547,14 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   onClick={() => setAmount(preset.toString())}
                   disabled={loading}
                   className={`bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100 ${
-                    preset === Math.floor(withdrawalInfo.wallet.balanceEUR) ? 'border-yellow-500/50 text-yellow-400' : ''
+                    preset === Math.floor(withdrawalInfo.wallet.balanceEUR)
+                      ? "border-yellow-500/50 text-yellow-400"
+                      : ""
                   }`}
                 >
-                  {preset === Math.floor(withdrawalInfo.wallet.balanceEUR) ? 'All' : `€${preset}`}
+                  {preset === Math.floor(withdrawalInfo.wallet.balanceEUR)
+                    ? "All"
+                    : `€${preset}`}
                 </Button>
               ))}
             </div>
@@ -486,8 +562,13 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             {/* Withdrawal Method Selection */}
             <div className="space-y-2">
               <Label className="text-gray-300">Where to Send Funds</Label>
-              {withdrawalInfo.availableWithdrawalMethods && withdrawalInfo.availableWithdrawalMethods.length > 0 ? (
-                <Select value={selectedMethodId} onValueChange={setSelectedMethodId} disabled={loading}>
+              {withdrawalInfo.availableWithdrawalMethods &&
+              withdrawalInfo.availableWithdrawalMethods.length > 0 ? (
+                <Select
+                  value={selectedMethodId}
+                  onValueChange={setSelectedMethodId}
+                  disabled={loading}
+                >
                   <SelectTrigger className="bg-gray-800 border-gray-700">
                     <SelectValue placeholder="Select withdrawal method" />
                   </SelectTrigger>
@@ -495,17 +576,26 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                     {withdrawalInfo.availableWithdrawalMethods.map((method) => (
                       <SelectItem key={method.id} value={method.id}>
                         <div className="flex items-center gap-2">
-                          {method.type === 'original_method' ? (
+                          {method.type === "original_method" ? (
                             <CreditCard className="h-4 w-4 text-blue-400" />
                           ) : (
                             <Building2 className="h-4 w-4 text-green-400" />
                           )}
                           <div className="flex flex-col">
-                            <span className="text-gray-100">{method.label}</span>
-                            <span className="text-xs text-gray-400">{method.details}</span>
+                            <span className="text-gray-100">
+                              {method.label}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {method.details}
+                            </span>
                           </div>
                           {method.isDefault && (
-                            <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-300 ml-2">Default</Badge>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-green-500/20 text-green-300 ml-2"
+                            >
+                              Default
+                            </Badge>
                           )}
                         </div>
                       </SelectItem>
@@ -517,46 +607,58 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-sm text-amber-300 font-medium">No withdrawal method available</p>
+                      <p className="text-sm text-amber-300 font-medium">
+                        No withdrawal method available
+                      </p>
                       <p className="text-xs text-amber-200/70 mt-1">
-                        Please add a bank account in your wallet settings or make a deposit first.
+                        Please add a bank account in your wallet settings or
+                        make a deposit first.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-              
+
               {/* Show selected method details */}
-              {selectedMethodId && withdrawalInfo.availableWithdrawalMethods && (
-                <div className="mt-2 p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  {(() => {
-                    const selected = withdrawalInfo.availableWithdrawalMethods.find(m => m.id === selectedMethodId);
-                    if (!selected) return null;
-                    
-                    if (selected.type === 'original_method') {
-                      return (
-                        <div className="flex items-center gap-2 text-sm">
-                          <CreditCard className="h-4 w-4 text-blue-400" />
-                          <span className="text-gray-400">Refund to card:</span>
-                          <span className="text-white font-medium">
-                            {selected.cardBrand} •••• {selected.cardLast4}
-                          </span>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Building2 className="h-4 w-4 text-green-400" />
-                          <span className="text-gray-400">Bank transfer to:</span>
-                          <span className="text-white font-medium">
-                            {selected.bankName ? `${selected.bankName} ` : ''}****{selected.ibanLast4}
-                          </span>
-                        </div>
-                      );
-                    }
-                  })()}
-                </div>
-              )}
+              {selectedMethodId &&
+                withdrawalInfo.availableWithdrawalMethods && (
+                  <div className="mt-2 p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+                    {(() => {
+                      const selected =
+                        withdrawalInfo.availableWithdrawalMethods.find(
+                          (m) => m.id === selectedMethodId,
+                        );
+                      if (!selected) return null;
+
+                      if (selected.type === "original_method") {
+                        return (
+                          <div className="flex items-center gap-2 text-sm">
+                            <CreditCard className="h-4 w-4 text-blue-400" />
+                            <span className="text-gray-400">
+                              Refund to card:
+                            </span>
+                            <span className="text-white font-medium">
+                              {selected.cardBrand} •••• {selected.cardLast4}
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Building2 className="h-4 w-4 text-green-400" />
+                            <span className="text-gray-400">
+                              Bank transfer to:
+                            </span>
+                            <span className="text-white font-medium">
+                              {selected.bankName ? `${selected.bankName} ` : ""}
+                              ****{selected.ibanLast4}
+                            </span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
             </div>
 
             {/* Withdrawal Breakdown */}
@@ -564,32 +666,46 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               <div className="rounded-lg bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 p-4 space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingDown className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-semibold text-white">Withdrawal Breakdown</span>
+                  <span className="text-sm font-semibold text-white">
+                    Withdrawal Breakdown
+                  </span>
                 </div>
 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Withdrawal Amount:</span>
-                    <span className="font-semibold text-white">€{withdrawal.eurAmount.toFixed(2)}</span>
+                    <span className="font-semibold text-white">
+                      €{withdrawal.eurAmount.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">
                       Platform Fee ({withdrawalInfo.settings.feePercentage}%
-                      {withdrawalInfo.settings.feeFixed > 0 && ` + €${withdrawalInfo.settings.feeFixed}`}):
+                      {withdrawalInfo.settings.feeFixed > 0 &&
+                        ` + €${withdrawalInfo.settings.feeFixed}`}
+                      ):
                     </span>
-                    <span className="font-semibold text-red-400">-€{withdrawal.platformFee.toFixed(2)}</span>
+                    <span className="font-semibold text-red-400">
+                      -€{withdrawal.platformFee.toFixed(2)}
+                    </span>
                   </div>
 
                   <div className="border-t border-yellow-500/30 pt-2"></div>
 
                   <div className="flex items-center justify-between bg-green-500/10 p-3 rounded-lg">
-                    <span className="text-green-300 font-semibold">💶 You Will Receive:</span>
-                    <span className="font-bold text-green-400 text-lg">€{withdrawal.netAmount.toFixed(2)}</span>
+                    <span className="text-green-300 font-semibold">
+                      💶 You Will Receive:
+                    </span>
+                    <span className="font-bold text-green-400 text-lg">
+                      €{withdrawal.netAmount.toFixed(2)}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Credits Deducted:</span>
-                    <span suppressHydrationWarning>{withdrawal.creditsRequired.toLocaleString()} Credits</span>
+                    <span suppressHydrationWarning>
+                      {withdrawal.creditsRequired.toLocaleString()} Credits
+                    </span>
                   </div>
                 </div>
               </div>
@@ -615,7 +731,8 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   <p>• Card refunds typically arrive in 3-5 business days</p>
                   <p>• Bank transfers typically arrive in 3-5 business days</p>
                   <p className="text-blue-400/70 italic mt-2">
-                    Note: Processing times may vary depending on your bank, card issuer, or public holidays.
+                    Note: Processing times may vary depending on your bank, card
+                    issuer, or public holidays.
                   </p>
                 </div>
               </div>
@@ -642,10 +759,11 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               <Button
                 type="submit"
                 disabled={
-                  loading || 
-                  !withdrawal || 
-                  withdrawal.eurAmount < withdrawalInfo.settings.minimumWithdrawal ||
-                  !selectedMethodId || 
+                  loading ||
+                  !withdrawal ||
+                  withdrawal.eurAmount <
+                    withdrawalInfo.settings.minimumWithdrawal ||
+                  !selectedMethodId ||
                   !withdrawalInfo.hasWithdrawalMethod
                 }
                 className="flex-1 font-semibold bg-yellow-500 hover:bg-yellow-600 text-gray-900"
@@ -656,7 +774,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                     Processing...
                   </>
                 ) : (
-                  'Submit Withdrawal'
+                  "Submit Withdrawal"
                 )}
               </Button>
             </div>

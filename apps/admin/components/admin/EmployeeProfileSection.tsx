@@ -1,29 +1,29 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   User,
   Mail,
@@ -43,7 +43,7 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface Profile {
   id: string;
@@ -76,63 +76,63 @@ interface Notification {
 }
 
 const TIMEZONES = [
-  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
-  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
-  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
-  { value: 'Europe/London', label: 'London (GMT)' },
-  { value: 'Europe/Paris', label: 'Paris (CET)' },
-  { value: 'Europe/Berlin', label: 'Berlin (CET)' },
-  { value: 'Europe/Athens', label: 'Athens (EET)' },
-  { value: 'Asia/Dubai', label: 'Dubai (GST)' },
-  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
-  { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
-  { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+  { value: "UTC", label: "UTC (Coordinated Universal Time)" },
+  { value: "America/New_York", label: "Eastern Time (US & Canada)" },
+  { value: "America/Chicago", label: "Central Time (US & Canada)" },
+  { value: "America/Denver", label: "Mountain Time (US & Canada)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (US & Canada)" },
+  { value: "Europe/London", label: "London (GMT)" },
+  { value: "Europe/Paris", label: "Paris (CET)" },
+  { value: "Europe/Berlin", label: "Berlin (CET)" },
+  { value: "Europe/Athens", label: "Athens (EET)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Singapore", label: "Singapore (SGT)" },
+  { value: "Australia/Sydney", label: "Sydney (AEST)" },
 ];
 
 const LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'it', label: 'Italian' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'el', label: 'Greek' },
-  { value: 'ru', label: 'Russian' },
-  { value: 'zh', label: 'Chinese' },
-  { value: 'ja', label: 'Japanese' },
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "it", label: "Italian" },
+  { value: "pt", label: "Portuguese" },
+  { value: "el", label: "Greek" },
+  { value: "ru", label: "Russian" },
+  { value: "zh", label: "Chinese" },
+  { value: "ja", label: "Japanese" },
 ];
 
 export default function EmployeeProfileSection() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
-  
+  const [activeTab, setActiveTab] = useState("profile");
+
   // Profile form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [timezone, setTimezone] = useState('UTC');
-  const [language, setLanguage] = useState('en');
-  const [bio, setBio] = useState('');
-  const [department, setDepartment] = useState('');
-  const [title, setTitle] = useState('');
-  const [avatar, setAvatar] = useState('');
-  
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
+  const [language, setLanguage] = useState("en");
+  const [bio, setBio] = useState("");
+  const [department, setDepartment] = useState("");
+  const [title, setTitle] = useState("");
+  const [avatar, setAvatar] = useState("");
+
   // Password change state
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  
+
   // Notifications state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -143,23 +143,23 @@ export default function EmployeeProfileSection() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/employee/profile');
+      const response = await fetch("/api/employee/profile");
       const data = await response.json();
-      
+
       if (data.success && data.profile) {
         setProfile(data.profile);
-        setName(data.profile.name || '');
-        setPhone(data.profile.phone || '');
-        setTimezone(data.profile.timezone || 'UTC');
-        setLanguage(data.profile.language || 'en');
-        setBio(data.profile.bio || '');
-        setDepartment(data.profile.department || '');
-        setTitle(data.profile.title || '');
-        setAvatar(data.profile.avatar || '');
+        setName(data.profile.name || "");
+        setPhone(data.profile.phone || "");
+        setTimezone(data.profile.timezone || "UTC");
+        setLanguage(data.profile.language || "en");
+        setBio(data.profile.bio || "");
+        setDepartment(data.profile.department || "");
+        setTitle(data.profile.title || "");
+        setAvatar(data.profile.avatar || "");
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile');
+      console.error("Error fetching profile:", error);
+      toast.error("Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -168,15 +168,15 @@ export default function EmployeeProfileSection() {
   const fetchNotifications = async () => {
     try {
       setLoadingNotifications(true);
-      const response = await fetch('/api/employee/notifications?limit=50');
+      const response = await fetch("/api/employee/notifications?limit=50");
       const data = await response.json();
-      
+
       if (data.success) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error("Error fetching notifications:", error);
     } finally {
       setLoadingNotifications(false);
     }
@@ -185,9 +185,9 @@ export default function EmployeeProfileSection() {
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/employee/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employee/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           phone,
@@ -199,18 +199,18 @@ export default function EmployeeProfileSection() {
           avatar,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Profile updated successfully');
-        setProfile(prev => prev ? { ...prev, ...data.profile } : null);
+        toast.success("Profile updated successfully");
+        setProfile((prev) => (prev ? { ...prev, ...data.profile } : null));
       } else {
-        toast.error(data.error || 'Failed to update profile');
+        toast.error(data.error || "Failed to update profile");
       }
     } catch (error) {
-      console.error('Error saving profile:', error);
-      toast.error('Failed to save profile');
+      console.error("Error saving profile:", error);
+      toast.error("Failed to save profile");
     } finally {
       setSaving(false);
     }
@@ -218,47 +218,49 @@ export default function EmployeeProfileSection() {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error('Please fill in all password fields');
+      toast.error("Please fill in all password fields");
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
+      toast.error("New passwords do not match");
       return;
     }
-    
+
     if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error("Password must be at least 8 characters");
       return;
     }
-    
+
     try {
       setChangingPassword(true);
-      const response = await fetch('/api/employee/profile/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employee/profile/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentPassword,
           newPassword,
           confirmPassword,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Password changed successfully');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+        toast.success("Password changed successfully");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
         // Update profile to reflect mustChangePassword is now false
-        setProfile(prev => prev ? { ...prev, mustChangePassword: false } : null);
+        setProfile((prev) =>
+          prev ? { ...prev, mustChangePassword: false } : null,
+        );
       } else {
-        toast.error(data.error || 'Failed to change password');
+        toast.error(data.error || "Failed to change password");
       }
     } catch (error) {
-      console.error('Error changing password:', error);
-      toast.error('Failed to change password');
+      console.error("Error changing password:", error);
+      toast.error("Failed to change password");
     } finally {
       setChangingPassword(false);
     }
@@ -266,51 +268,53 @@ export default function EmployeeProfileSection() {
 
   const handleMarkAllRead = async () => {
     try {
-      const response = await fetch('/api/employee/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employee/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAllRead: true }),
       });
-      
+
       if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         setUnreadCount(0);
-        toast.success('All notifications marked as read');
+        toast.success("All notifications marked as read");
       }
     } catch (error) {
-      console.error('Error marking notifications as read:', error);
+      console.error("Error marking notifications as read:", error);
     }
   };
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch('/api/employee/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employee/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId }),
       });
-      
+
       if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => n._id === notificationId ? { ...n, isRead: true } : n)
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n._id === notificationId ? { ...n, isRead: true } : n,
+          ),
         );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error("Error marking notification as read:", error);
     }
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image must be less than 2MB');
+      toast.error("Image must be less than 2MB");
       return;
     }
-    
+
     // Convert to base64
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -322,35 +326,35 @@ export default function EmployeeProfileSection() {
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'customer_assigned':
-      case 'customer_transferred_in':
-        return '👤';
-      case 'customer_unassigned':
-      case 'customer_transferred_out':
-        return '📤';
-      case 'password_changed':
-        return '🔐';
-      case 'profile_updated':
-        return '📝';
-      case 'role_changed':
-        return '🎭';
-      case 'sections_updated':
-        return '📋';
-      case 'account_suspended':
-        return '⛔';
-      case 'account_activated':
-        return '✅';
+      case "customer_assigned":
+      case "customer_transferred_in":
+        return "👤";
+      case "customer_unassigned":
+      case "customer_transferred_out":
+        return "📤";
+      case "password_changed":
+        return "🔐";
+      case "profile_updated":
+        return "📝";
+      case "role_changed":
+        return "🎭";
+      case "sections_updated":
+        return "📋";
+      case "account_suspended":
+        return "⛔";
+      case "account_activated":
+        return "✅";
       default:
-        return '📬';
+        return "📬";
     }
   };
 
@@ -379,17 +383,30 @@ export default function EmployeeProfileSection() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="bg-gray-800 border border-gray-700">
-          <TabsTrigger value="profile" className="data-[state=active]:bg-blue-500">
+          <TabsTrigger
+            value="profile"
+            className="data-[state=active]:bg-blue-500"
+          >
             <User className="h-4 w-4 mr-2" />
             Profile
           </TabsTrigger>
-          <TabsTrigger value="security" className="data-[state=active]:bg-blue-500">
+          <TabsTrigger
+            value="security"
+            className="data-[state=active]:bg-blue-500"
+          >
             <Lock className="h-4 w-4 mr-2" />
             Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="data-[state=active]:bg-blue-500">
+          <TabsTrigger
+            value="notifications"
+            className="data-[state=active]:bg-blue-500"
+          >
             <Bell className="h-4 w-4 mr-2" />
             Notifications
             {unreadCount > 0 && (
@@ -413,7 +430,7 @@ export default function EmployeeProfileSection() {
                   <Avatar className="h-32 w-32 border-4 border-gray-700">
                     <AvatarImage src={avatar} />
                     <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white text-3xl">
-                      {getInitials(name || profile?.name || 'U')}
+                      {getInitials(name || profile?.name || "U")}
                     </AvatarFallback>
                   </Avatar>
                   <button
@@ -443,7 +460,9 @@ export default function EmployeeProfileSection() {
             {/* Profile Details Card */}
             <Card className="bg-gray-900 border-gray-800 lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-white">Personal Information</CardTitle>
+                <CardTitle className="text-white">
+                  Personal Information
+                </CardTitle>
                 <CardDescription>Update your personal details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -454,64 +473,66 @@ export default function EmployeeProfileSection() {
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         value={name}
-                        onChange={e => setName(e.target.value)}
+                        onChange={(e) => setName(e.target.value)}
                         className="pl-10 bg-gray-800 border-gray-700 text-white"
                         placeholder="Enter your name"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label className="text-gray-300">Email (Cannot change)</Label>
+                    <Label className="text-gray-300">
+                      Email (Cannot change)
+                    </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        value={profile?.email || ''}
+                        value={profile?.email || ""}
                         disabled
                         className="pl-10 bg-gray-800/50 border-gray-700 text-gray-400"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-gray-300">Phone Number</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         value={phone}
-                        onChange={e => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(e.target.value)}
                         className="pl-10 bg-gray-800 border-gray-700 text-white"
                         placeholder="+1 234 567 8900"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-gray-300">Job Title</Label>
                     <div className="relative">
                       <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         value={title}
-                        onChange={e => setTitle(e.target.value)}
+                        onChange={(e) => setTitle(e.target.value)}
                         className="pl-10 bg-gray-800 border-gray-700 text-white"
                         placeholder="e.g. Customer Support Specialist"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-gray-300">Department</Label>
                     <div className="relative">
                       <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         value={department}
-                        onChange={e => setDepartment(e.target.value)}
+                        onChange={(e) => setDepartment(e.target.value)}
                         className="pl-10 bg-gray-800 border-gray-700 text-white"
                         placeholder="e.g. Customer Success"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-gray-300">Timezone</Label>
                     <Select value={timezone} onValueChange={setTimezone}>
@@ -520,15 +541,19 @@ export default function EmployeeProfileSection() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {TIMEZONES.map(tz => (
-                          <SelectItem key={tz.value} value={tz.value} className="text-white">
+                        {TIMEZONES.map((tz) => (
+                          <SelectItem
+                            key={tz.value}
+                            value={tz.value}
+                            className="text-white"
+                          >
                             {tz.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-gray-300">Language</Label>
                     <Select value={language} onValueChange={setLanguage}>
@@ -537,8 +562,12 @@ export default function EmployeeProfileSection() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {LANGUAGES.map(lang => (
-                          <SelectItem key={lang.value} value={lang.value} className="text-white">
+                        {LANGUAGES.map((lang) => (
+                          <SelectItem
+                            key={lang.value}
+                            value={lang.value}
+                            className="text-white"
+                          >
                             {lang.label}
                           </SelectItem>
                         ))}
@@ -546,17 +575,17 @@ export default function EmployeeProfileSection() {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label className="text-gray-300">Bio</Label>
                   <Textarea
                     value={bio}
-                    onChange={e => setBio(e.target.value)}
+                    onChange={(e) => setBio(e.target.value)}
                     className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
                     placeholder="Tell us a bit about yourself..."
                   />
                 </div>
-                
+
                 <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleSaveProfile}
@@ -593,9 +622,9 @@ export default function EmployeeProfileSection() {
                 <Label className="text-gray-300">Current Password</Label>
                 <div className="relative">
                   <Input
-                    type={showCurrentPassword ? 'text' : 'password'}
+                    type={showCurrentPassword ? "text" : "password"}
                     value={currentPassword}
-                    onChange={e => setCurrentPassword(e.target.value)}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
                     className="bg-gray-800 border-gray-700 text-white pr-10"
                     placeholder="Enter current password"
                   />
@@ -604,20 +633,24 @@ export default function EmployeeProfileSection() {
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                   >
-                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showCurrentPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
-              
+
               <Separator className="bg-gray-700" />
-              
+
               <div className="space-y-2">
                 <Label className="text-gray-300">New Password</Label>
                 <div className="relative">
                   <Input
-                    type={showNewPassword ? 'text' : 'password'}
+                    type={showNewPassword ? "text" : "password"}
                     value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     className="bg-gray-800 border-gray-700 text-white pr-10"
                     placeholder="Enter new password (min 8 characters)"
                   />
@@ -626,26 +659,35 @@ export default function EmployeeProfileSection() {
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                   >
-                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-gray-300">Confirm New Password</Label>
                 <Input
                   type="password"
                   value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   className="bg-gray-800 border-gray-700 text-white"
                   placeholder="Confirm new password"
                 />
               </div>
-              
+
               <div className="flex justify-end pt-4">
                 <Button
                   onClick={handleChangePassword}
-                  disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  disabled={
+                    changingPassword ||
+                    !currentPassword ||
+                    !newPassword ||
+                    !confirmPassword
+                  }
                   className="bg-blue-500 hover:bg-blue-600"
                 >
                   {changingPassword ? (
@@ -669,23 +711,29 @@ export default function EmployeeProfileSection() {
                 <div className="flex justify-between py-2 border-b border-gray-800">
                   <span className="text-gray-400">Account Created</span>
                   <span className="text-white">
-                    {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}
+                    {profile?.createdAt
+                      ? new Date(profile.createdAt).toLocaleDateString()
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-800">
                   <span className="text-gray-400">Last Login</span>
                   <span className="text-white">
-                    {profile?.lastLogin ? new Date(profile.lastLogin).toLocaleString() : 'N/A'}
+                    {profile?.lastLogin
+                      ? new Date(profile.lastLogin).toLocaleString()
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-800">
                   <span className="text-gray-400">Role</span>
-                  <Badge className="bg-blue-500/20 text-blue-400">{profile?.role}</Badge>
+                  <Badge className="bg-blue-500/20 text-blue-400">
+                    {profile?.role}
+                  </Badge>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-800">
                   <span className="text-gray-400">Status</span>
                   <Badge className="bg-green-500/20 text-green-400">
-                    {profile?.isOnline ? 'Online' : 'Offline'}
+                    {profile?.isOnline ? "Online" : "Offline"}
                   </Badge>
                 </div>
               </div>
@@ -714,7 +762,9 @@ export default function EmployeeProfileSection() {
                   disabled={loadingNotifications}
                   className="border-gray-700 text-gray-300"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingNotifications ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${loadingNotifications ? "animate-spin" : ""}`}
+                  />
                   Refresh
                 </Button>
                 {unreadCount > 0 && (
@@ -738,23 +788,31 @@ export default function EmployeeProfileSection() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {notifications.map(notification => (
+                  {notifications.map((notification) => (
                     <div
                       key={notification._id}
                       className={`p-4 rounded-lg border transition-colors ${
                         notification.isRead
-                          ? 'bg-gray-800/50 border-gray-700'
-                          : 'bg-blue-500/10 border-blue-500/30'
+                          ? "bg-gray-800/50 border-gray-700"
+                          : "bg-blue-500/10 border-blue-500/30"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
-                          <span className="text-2xl">{getNotificationIcon(notification.type)}</span>
+                          <span className="text-2xl">
+                            {getNotificationIcon(notification.type)}
+                          </span>
                           <div>
-                            <h4 className="text-white font-medium">{notification.title}</h4>
-                            <p className="text-gray-400 text-sm mt-1">{notification.message}</p>
+                            <h4 className="text-white font-medium">
+                              {notification.title}
+                            </h4>
+                            <p className="text-gray-400 text-sm mt-1">
+                              {notification.message}
+                            </p>
                             <p className="text-gray-500 text-xs mt-2">
-                              {new Date(notification.createdAt).toLocaleString()}
+                              {new Date(
+                                notification.createdAt,
+                              ).toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -780,4 +838,3 @@ export default function EmployeeProfileSection() {
     </div>
   );
 }
-

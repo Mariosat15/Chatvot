@@ -1,46 +1,46 @@
-import { Schema, model, models } from 'mongoose';
+import { Schema, model, models } from "mongoose";
 
 const AppSettingsSchema = new Schema({
   // Singleton pattern - only one document should exist
   _id: {
     type: String,
-    default: 'app-settings',
+    default: "app-settings",
   },
-  
+
   // Currency Settings
   currency: {
     code: {
       type: String,
-      default: 'EUR',
-      enum: ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'],
+      default: "EUR",
+      enum: ["EUR", "USD", "GBP", "JPY", "AUD", "CAD", "CHF"],
     },
     symbol: {
       type: String,
-      default: '€',
+      default: "€",
     },
     name: {
       type: String,
-      default: 'Euro',
+      default: "Euro",
     },
     exchangeRateToEUR: {
       type: Number,
       default: 1.0, // 1 EUR = X of selected currency
     },
   },
-  
+
   // Credits/Virtual Currency Settings
   credits: {
     name: {
       type: String,
-      default: 'Volt Credits',
+      default: "Volt Credits",
     },
     symbol: {
       type: String,
-      default: '⚡',
+      default: "⚡",
     },
     icon: {
       type: String,
-      default: 'zap', // Lucide icon name
+      default: "zap", // Lucide icon name
     },
     // Conversion: 1 credit = X EUR
     valueInEUR: {
@@ -57,7 +57,7 @@ const AppSettingsSchema = new Schema({
       default: 2,
     },
   },
-  
+
   // Transaction Limits & Fees
   transactions: {
     minimumDeposit: {
@@ -77,31 +77,31 @@ const AppSettingsSchema = new Schema({
       max: 20,
     },
   },
-  
+
   // Branding
   branding: {
     primaryColor: {
       type: String,
-      default: '#EAB308', // yellow-500
+      default: "#EAB308", // yellow-500
     },
     accentColor: {
       type: String,
-      default: '#F59E0B', // yellow-600
+      default: "#F59E0B", // yellow-600
     },
   },
-  
+
   updatedAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-AppSettingsSchema.pre('save', function(next) {
+AppSettingsSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
 });
 
-const AppSettings = models.AppSettings || model('AppSettings', AppSettingsSchema);
+const AppSettings =
+  models.AppSettings || model("AppSettings", AppSettingsSchema);
 
 export default AppSettings;
-

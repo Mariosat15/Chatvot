@@ -1,18 +1,18 @@
 /**
  * Universal Ranking Utility
- * 
+ *
  * Handles all ranking methods for competitions and challenges.
  * Extensible for future ranking types.
  */
 
 // All supported ranking methods
-export type RankingMethod = 
-  | 'pnl' 
-  | 'roi' 
-  | 'total_capital' 
-  | 'win_rate' 
-  | 'total_wins' 
-  | 'profit_factor'
+export type RankingMethod =
+  | "pnl"
+  | "roi"
+  | "total_capital"
+  | "win_rate"
+  | "total_wins"
+  | "profit_factor"
   // Future types can be added here
   | string; // Allow unknown types for forward compatibility
 
@@ -47,7 +47,8 @@ export function getTotalPnL(stats: ParticipantStats): number {
  */
 export function getTotalROI(stats: ParticipantStats): number {
   const totalPnl = getTotalPnL(stats);
-  const startingCapital = stats.startingCapital || stats.currentCapital - totalPnl || 10000;
+  const startingCapital =
+    stats.startingCapital || stats.currentCapital - totalPnl || 10000;
   if (startingCapital === 0) return 0;
   return (totalPnl / startingCapital) * 100;
 }
@@ -67,38 +68,38 @@ const RANKING_REGISTRY: Record<string, RankingConfig> = {
   pnl: {
     // IMPORTANT: Uses realized + unrealized P&L for accurate live status
     getValue: (stats) => getTotalPnL(stats),
-    label: 'P&L',
-    displayLabel: 'Total P&L', // Changed to clarify it includes open positions
+    label: "P&L",
+    displayLabel: "Total P&L", // Changed to clarify it includes open positions
     higherIsBetter: true,
-    formatValue: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`,
+    formatValue: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`,
   },
   roi: {
     // IMPORTANT: Uses total P&L for accurate ROI
     getValue: (stats) => getTotalROI(stats),
-    label: 'ROI',
-    displayLabel: 'Total ROI',
+    label: "ROI",
+    displayLabel: "Total ROI",
     higherIsBetter: true,
-    formatValue: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`,
+    formatValue: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`,
   },
   total_capital: {
     // Current capital already includes unrealized P&L effects
     getValue: (stats) => stats.currentCapital || 0,
-    label: 'Capital',
-    displayLabel: 'Your Capital',
+    label: "Capital",
+    displayLabel: "Your Capital",
     higherIsBetter: true,
     formatValue: (v) => `$${v.toLocaleString()}`,
   },
   win_rate: {
     getValue: (stats) => stats.winRate || 0,
-    label: 'Win Rate',
-    displayLabel: 'Your Win Rate',
+    label: "Win Rate",
+    displayLabel: "Your Win Rate",
     higherIsBetter: true,
     formatValue: (v) => `${v.toFixed(1)}%`,
   },
   total_wins: {
     getValue: (stats) => stats.winningTrades || 0,
-    label: 'Wins',
-    displayLabel: 'Your Wins',
+    label: "Wins",
+    displayLabel: "Your Wins",
     higherIsBetter: true,
     formatValue: (v) => `${Math.floor(v)} wins`,
   },
@@ -109,10 +110,10 @@ const RANKING_REGISTRY: Record<string, RankingConfig> = {
       if (losses === 0) return wins > 0 ? 9999 : 0;
       return wins / losses;
     },
-    label: 'Profit Factor',
-    displayLabel: 'Profit Factor',
+    label: "Profit Factor",
+    displayLabel: "Profit Factor",
     higherIsBetter: true,
-    formatValue: (v) => v >= 9999 ? '∞' : v.toFixed(2),
+    formatValue: (v) => (v >= 9999 ? "∞" : v.toFixed(2)),
   },
 };
 
@@ -122,9 +123,9 @@ const RANKING_REGISTRY: Record<string, RankingConfig> = {
  */
 export function getRankingConfig(method: RankingMethod): RankingConfig {
   const config = RANKING_REGISTRY[method];
-  
+
   if (config) return config;
-  
+
   // Default config for unknown/future methods - fallback to P&L
   console.warn(`Unknown ranking method: ${method}, falling back to P&L`);
   return RANKING_REGISTRY.pnl;
@@ -133,7 +134,10 @@ export function getRankingConfig(method: RankingMethod): RankingConfig {
 /**
  * Get the ranking value for a participant based on the method
  */
-export function getRankingValue(stats: ParticipantStats, method: RankingMethod): number {
+export function getRankingValue(
+  stats: ParticipantStats,
+  method: RankingMethod,
+): number {
   const config = getRankingConfig(method);
   return config.getValue(stats);
 }
@@ -145,31 +149,34 @@ export function getRankingValue(stats: ParticipantStats, method: RankingMethod):
 export function determineWinningStatus(
   myStats: ParticipantStats,
   opponentStats: ParticipantStats,
-  method: RankingMethod
-): 'winning' | 'losing' | 'tied' {
+  method: RankingMethod,
+): "winning" | "losing" | "tied" {
   const config = getRankingConfig(method);
   const myValue = config.getValue(myStats);
   const opponentValue = config.getValue(opponentStats);
-  
+
   // Use epsilon for floating point comparison
   const epsilon = 0.001;
-  
+
   if (Math.abs(myValue - opponentValue) < epsilon) {
-    return 'tied';
+    return "tied";
   }
-  
+
   // Check if higher is better or lower is better
   if (config.higherIsBetter) {
-    return myValue > opponentValue ? 'winning' : 'losing';
+    return myValue > opponentValue ? "winning" : "losing";
   } else {
-    return myValue < opponentValue ? 'winning' : 'losing';
+    return myValue < opponentValue ? "winning" : "losing";
   }
 }
 
 /**
  * Format a ranking value for display
  */
-export function formatRankingValue(value: number, method: RankingMethod): string {
+export function formatRankingValue(
+  value: number,
+  method: RankingMethod,
+): string {
   const config = getRankingConfig(method);
   return config.formatValue(value);
 }
@@ -194,7 +201,10 @@ export function getMyStatLabel(method: RankingMethod): string {
  * Register a new ranking method (for plugins/extensions)
  * Call this to add custom ranking types at runtime
  */
-export function registerRankingMethod(method: string, config: RankingConfig): void {
+export function registerRankingMethod(
+  method: string,
+  config: RankingConfig,
+): void {
   RANKING_REGISTRY[method] = config;
 }
 
@@ -211,4 +221,3 @@ export function getAvailableRankingMethods(): string[] {
 export function isValidRankingMethod(method: string): boolean {
   return method in RANKING_REGISTRY;
 }
-

@@ -1,4 +1,4 @@
-import { Document, Model } from 'mongoose';
+import { Document, Model } from "mongoose";
 /**
  * Price Cache Model
  *
@@ -12,33 +12,45 @@ import { Document, Model } from 'mongoose';
  * - TTL index auto-removes stale prices (older than 5 minutes)
  */
 export interface IPriceCache extends Document {
-    symbol: string;
+  symbol: string;
+  bid: number;
+  ask: number;
+  spread: number;
+  timestamp: number;
+  updatedAt: Date;
+}
+interface IPriceCacheModel extends Model<IPriceCache> {
+  updatePrice(
+    symbol: string,
+    bid: number,
+    ask: number,
+    timestamp: number,
+  ): Promise<void>;
+  getPrice(symbol: string): Promise<{
     bid: number;
     ask: number;
     spread: number;
     timestamp: number;
-    updatedAt: Date;
-}
-interface IPriceCacheModel extends Model<IPriceCache> {
-    updatePrice(symbol: string, bid: number, ask: number, timestamp: number): Promise<void>;
-    getPrice(symbol: string): Promise<{
+  } | null>;
+  getAllPrices(): Promise<
+    Map<
+      string,
+      {
         bid: number;
         ask: number;
         spread: number;
         timestamp: number;
-    } | null>;
-    getAllPrices(): Promise<Map<string, {
-        bid: number;
-        ask: number;
-        spread: number;
-        timestamp: number;
-    }>>;
-    bulkUpdatePrices(prices: Array<{
-        symbol: string;
-        bid: number;
-        ask: number;
-        timestamp: number;
-    }>): Promise<void>;
+      }
+    >
+  >;
+  bulkUpdatePrices(
+    prices: Array<{
+      symbol: string;
+      bid: number;
+      ask: number;
+      timestamp: number;
+    }>,
+  ): Promise<void>;
 }
 declare const PriceCache: IPriceCacheModel;
 export default PriceCache;

@@ -1,8 +1,8 @@
 /**
  * Simple in-memory rate limiter for API routes
- * 
+ *
  * SECURITY: Prevents brute force attacks and API abuse
- * 
+ *
  * Note: For production at scale, consider using Redis-based rate limiting
  * This implementation works for single-server deployments
  */
@@ -22,7 +22,7 @@ let cleanupTimer: NodeJS.Timeout | null = null;
 
 function startCleanup() {
   if (cleanupTimer) return;
-  
+
   cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of rateLimitStore.entries()) {
@@ -31,7 +31,7 @@ function startCleanup() {
       }
     }
   }, CLEANUP_INTERVAL);
-  
+
   // Don't keep the process alive just for cleanup
   if (cleanupTimer.unref) {
     cleanupTimer.unref();
@@ -58,20 +58,22 @@ export interface RateLimitResult {
 
 /**
  * Check if a request should be rate limited
- * 
+ *
  * @param identifier - Unique identifier (e.g., userId, IP + endpoint)
  * @param config - Rate limit configuration
  * @returns Result indicating if request is allowed
  */
 export function checkRateLimit(
   identifier: string,
-  config: RateLimitConfig
+  config: RateLimitConfig,
 ): RateLimitResult {
-  const key = config.keyPrefix ? `${config.keyPrefix}:${identifier}` : identifier;
+  const key = config.keyPrefix
+    ? `${config.keyPrefix}:${identifier}`
+    : identifier;
   const now = Date.now();
-  
+
   const entry = rateLimitStore.get(key);
-  
+
   // If no entry or window expired, create new entry
   if (!entry || entry.resetAt < now) {
     const resetAt = now + config.windowMs;
@@ -82,7 +84,7 @@ export function checkRateLimit(
       resetAt,
     };
   }
-  
+
   // Check if limit exceeded
   if (entry.count >= config.maxRequests) {
     return {
@@ -92,11 +94,11 @@ export function checkRateLimit(
       retryAfterMs: entry.resetAt - now,
     };
   }
-  
+
   // Increment count
   entry.count++;
   rateLimitStore.set(key, entry);
-  
+
   return {
     success: true,
     remaining: config.maxRequests - entry.count,
@@ -109,39 +111,44 @@ export function checkRateLimit(
  */
 export const RateLimiters = {
   // Strict limit for deposits: 5 attempts per minute per user
-  deposit: (userId: string) => checkRateLimit(userId, {
-    maxRequests: 5,
-    windowMs: 60 * 1000,
-    keyPrefix: 'deposit',
-  }),
-  
+  deposit: (userId: string) =>
+    checkRateLimit(userId, {
+      maxRequests: 5,
+      windowMs: 60 * 1000,
+      keyPrefix: "deposit",
+    }),
+
   // Strict limit for withdrawals: 3 attempts per minute per user
-  withdrawal: (userId: string) => checkRateLimit(userId, {
-    maxRequests: 3,
-    windowMs: 60 * 1000,
-    keyPrefix: 'withdrawal',
-  }),
-  
+  withdrawal: (userId: string) =>
+    checkRateLimit(userId, {
+      maxRequests: 3,
+      windowMs: 60 * 1000,
+      keyPrefix: "withdrawal",
+    }),
+
   // Login attempts: 5 per minute per IP
-  login: (ipAddress: string) => checkRateLimit(ipAddress, {
-    maxRequests: 5,
-    windowMs: 60 * 1000,
-    keyPrefix: 'login',
-  }),
-  
+  login: (ipAddress: string) =>
+    checkRateLimit(ipAddress, {
+      maxRequests: 5,
+      windowMs: 60 * 1000,
+      keyPrefix: "login",
+    }),
+
   // API general: 60 requests per minute per user
-  apiGeneral: (userId: string) => checkRateLimit(userId, {
-    maxRequests: 60,
-    windowMs: 60 * 1000,
-    keyPrefix: 'api',
-  }),
-  
+  apiGeneral: (userId: string) =>
+    checkRateLimit(userId, {
+      maxRequests: 60,
+      windowMs: 60 * 1000,
+      keyPrefix: "api",
+    }),
+
   // Payment webhooks: 100 per minute per IP (for legitimate webhook traffic)
-  webhook: (ipAddress: string) => checkRateLimit(ipAddress, {
-    maxRequests: 100,
-    windowMs: 60 * 1000,
-    keyPrefix: 'webhook',
-  }),
+  webhook: (ipAddress: string) =>
+    checkRateLimit(ipAddress, {
+      maxRequests: 100,
+      windowMs: 60 * 1000,
+      keyPrefix: "webhook",
+    }),
 };
 
 /**
@@ -151,33 +158,36 @@ export const RateLimiters = {
 export function getClientIP(request: Request): string {
   // Try various headers in order of priority
   const headers = [
-    'cf-connecting-ip',      // Cloudflare
-    'x-real-ip',             // Nginx
-    'x-forwarded-for',       // Standard proxy header
-    'x-client-ip',           // Some load balancers
+    "cf-connecting-ip", // Cloudflare
+    "x-real-ip", // Nginx
+    "x-forwarded-for", // Standard proxy header
+    "x-client-ip", // Some load balancers
   ];
-  
+
   for (const header of headers) {
     const value = request.headers.get(header);
     if (value) {
       // x-forwarded-for can contain multiple IPs, take the first one
-      const ip = value.split(',')[0].trim();
+      const ip = value.split(",")[0].trim();
       if (ip) return ip;
     }
   }
-  
+
   // Fallback to unknown
-  return 'unknown';
+  return "unknown";
 }
 
 /**
  * Create rate limit response headers
  */
-export function getRateLimitHeaders(result: RateLimitResult): Record<string, string> {
+export function getRateLimitHeaders(
+  result: RateLimitResult,
+): Record<string, string> {
   return {
-    'X-RateLimit-Remaining': result.remaining.toString(),
-    'X-RateLimit-Reset': Math.ceil(result.resetAt / 1000).toString(),
-    ...(result.retryAfterMs ? { 'Retry-After': Math.ceil(result.retryAfterMs / 1000).toString() } : {}),
+    "X-RateLimit-Remaining": result.remaining.toString(),
+    "X-RateLimit-Reset": Math.ceil(result.resetAt / 1000).toString(),
+    ...(result.retryAfterMs
+      ? { "Retry-After": Math.ceil(result.retryAfterMs / 1000).toString() }
+      : {}),
   };
 }
-

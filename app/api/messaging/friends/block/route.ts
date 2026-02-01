@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import MessagingService from '@/lib/services/messaging/messaging.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import MessagingService from "@/lib/services/messaging/messaging.service";
 
 /**
  * POST /api/messaging/friends/block
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -19,15 +19,15 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
+        { error: "User ID is required" },
+        { status: 400 },
       );
     }
 
     if (userId === session.user.id) {
       return NextResponse.json(
-        { error: 'Cannot block yourself' },
-        { status: 400 }
+        { error: "Cannot block yourself" },
+        { status: 400 },
       );
     }
 
@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error blocking user:', error);
+    console.error("Error blocking user:", error);
     return NextResponse.json(
-      { error: 'Failed to block user' },
-      { status: 500 }
+      { error: "Failed to block user" },
+      { status: 500 },
     );
   }
 }
@@ -51,7 +51,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -59,8 +59,8 @@ export async function DELETE(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
+        { error: "User ID is required" },
+        { status: 400 },
       );
     }
 
@@ -68,11 +68,10 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error unblocking user:', error);
+    console.error("Error unblocking user:", error);
     return NextResponse.json(
-      { error: 'Failed to unblock user' },
-      { status: 500 }
+      { error: "Failed to unblock user" },
+      { status: 500 },
     );
   }
 }
-

@@ -1,13 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   Swords,
   DollarSign,
@@ -20,7 +32,7 @@ import {
   Zap,
   Info,
   Scale,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface ChallengeSettings {
   platformFeePercentage: number;
@@ -40,7 +52,7 @@ interface ChallengeSettings {
   challengeCooldownMinutes: number;
   maxPendingChallenges: number;
   maxActiveChallenges: number;
-  tiePrizeDistribution: 'split_equally' | 'challenger_wins' | 'both_lose';
+  tiePrizeDistribution: "split_equally" | "challenger_wins" | "both_lose";
 }
 
 export default function ChallengeSettingsSection() {
@@ -54,12 +66,12 @@ export default function ChallengeSettingsSection() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/challenge-settings');
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch("/api/challenge-settings");
+      if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setSettings(data.settings);
     } catch (error) {
-      toast.error('Failed to load challenge settings');
+      toast.error("Failed to load challenge settings");
       console.error(error);
     } finally {
       setLoading(false);
@@ -71,30 +83,34 @@ export default function ChallengeSettingsSection() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/challenge-settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/challenge-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || 'Failed to save settings', {
+        toast.error(data.error || "Failed to save settings", {
           duration: 5000,
-          description: response.status === 400 ? 'Please check your input values' : undefined,
+          description:
+            response.status === 400
+              ? "Please check your input values"
+              : undefined,
         });
         return;
       }
 
-      toast.success('Challenge settings saved successfully', {
+      toast.success("Challenge settings saved successfully", {
         description: `Cooldown: ${data.settings?.challengeCooldownMinutes || 0}min, Max Pending: ${data.settings?.maxPendingChallenges || 0}, Max Active: ${data.settings?.maxActiveChallenges || 0}`,
       });
     } catch (error) {
-      toast.error('Failed to save settings', {
-        description: error instanceof Error ? error.message : 'Network or server error',
+      toast.error("Failed to save settings", {
+        description:
+          error instanceof Error ? error.message : "Network or server error",
       });
-      console.error('Save error:', error);
+      console.error("Save error:", error);
     } finally {
       setSaving(false);
     }
@@ -104,14 +120,14 @@ export default function ChallengeSettingsSection() {
   const updateSetting = (key: keyof ChallengeSettings, value: any) => {
     if (settings) {
       // For number fields, ensure we don't save NaN
-      if (typeof value === 'number' && isNaN(value)) {
+      if (typeof value === "number" && isNaN(value)) {
         console.warn(`Ignoring NaN value for ${key}`);
         return;
       }
       setSettings({ ...settings, [key]: value });
     }
   };
-  
+
   // Helper to safely parse number input
   const parseNumberInput = (value: string, min: number = 0): number => {
     const parsed = parseInt(value, 10);
@@ -161,7 +177,9 @@ export default function ChallengeSettingsSection() {
                 <span className="text-white text-sm">Challenges</span>
                 <Switch
                   checked={settings.challengesEnabled}
-                  onCheckedChange={(val) => updateSetting('challengesEnabled', val)}
+                  onCheckedChange={(val) =>
+                    updateSetting("challengesEnabled", val)
+                  }
                 />
               </div>
               <Button
@@ -186,10 +204,14 @@ export default function ChallengeSettingsSection() {
         <div className="flex items-start gap-3">
           <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
           <div>
-            <h4 className="text-blue-300 font-medium">Universal Trading Settings</h4>
+            <h4 className="text-blue-300 font-medium">
+              Universal Trading Settings
+            </h4>
             <p className="text-blue-300/70 text-sm mt-1">
-              Trading settings (leverage, position size, margin thresholds) are configured in 
-              <strong> Settings → Trading Risk</strong> and apply universally to both competitions and challenges.
+              Trading settings (leverage, position size, margin thresholds) are
+              configured in
+              <strong> Settings → Trading Risk</strong> and apply universally to
+              both competitions and challenges.
             </p>
           </div>
         </div>
@@ -215,7 +237,12 @@ export default function ChallengeSettingsSection() {
                   min="0"
                   max="50"
                   value={settings.platformFeePercentage}
-                  onChange={(e) => updateSetting('platformFeePercentage', parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "platformFeePercentage",
+                      parseFloat(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
                 <span className="text-yellow-400 font-bold">%</span>
@@ -242,7 +269,9 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.minEntryFee}
-                  onChange={(e) => updateSetting('minEntryFee', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting("minEntryFee", parseInt(e.target.value))
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -252,7 +281,9 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.maxEntryFee}
-                  onChange={(e) => updateSetting('maxEntryFee', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting("maxEntryFee", parseInt(e.target.value))
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -277,7 +308,12 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.minDurationMinutes}
-                  onChange={(e) => updateSetting('minDurationMinutes', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "minDurationMinutes",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -286,7 +322,12 @@ export default function ChallengeSettingsSection() {
                 <Input
                   type="number"
                   value={settings.defaultDurationMinutes}
-                  onChange={(e) => updateSetting('defaultDurationMinutes', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "defaultDurationMinutes",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -295,21 +336,35 @@ export default function ChallengeSettingsSection() {
                 <Input
                   type="number"
                   value={settings.maxDurationMinutes}
-                  onChange={(e) => updateSetting('maxDurationMinutes', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "maxDurationMinutes",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
             </div>
             <div>
-              <Label className="text-gray-400 text-xs">Accept Deadline (mins)</Label>
+              <Label className="text-gray-400 text-xs">
+                Accept Deadline (mins)
+              </Label>
               <Input
                 type="number"
                 min="1"
                 value={settings.acceptDeadlineMinutes}
-                onChange={(e) => updateSetting('acceptDeadlineMinutes', parseInt(e.target.value))}
+                onChange={(e) =>
+                  updateSetting(
+                    "acceptDeadlineMinutes",
+                    parseInt(e.target.value),
+                  )
+                }
                 className="bg-gray-800 border-gray-600 text-white"
               />
-              <p className="text-xs text-gray-500 mt-1">Time to accept a challenge</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Time to accept a challenge
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -331,7 +386,12 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="100"
                   value={settings.minStartingCapital}
-                  onChange={(e) => updateSetting('minStartingCapital', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "minStartingCapital",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -340,7 +400,12 @@ export default function ChallengeSettingsSection() {
                 <Input
                   type="number"
                   value={settings.defaultStartingCapital}
-                  onChange={(e) => updateSetting('defaultStartingCapital', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "defaultStartingCapital",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -349,7 +414,12 @@ export default function ChallengeSettingsSection() {
                 <Input
                   type="number"
                   value={settings.maxStartingCapital}
-                  onChange={(e) => updateSetting('maxStartingCapital', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "maxStartingCapital",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -374,7 +444,12 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.maxPendingChallenges}
-                  onChange={(e) => updateSetting('maxPendingChallenges', parseNumberInput(e.target.value, 1))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "maxPendingChallenges",
+                      parseNumberInput(e.target.value, 1),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -384,7 +459,12 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.maxActiveChallenges}
-                  onChange={(e) => updateSetting('maxActiveChallenges', parseNumberInput(e.target.value, 1))}
+                  onChange={(e) =>
+                    updateSetting(
+                      "maxActiveChallenges",
+                      parseNumberInput(e.target.value, 1),
+                    )
+                  }
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -395,10 +475,17 @@ export default function ChallengeSettingsSection() {
                 type="number"
                 min="0"
                 value={settings.challengeCooldownMinutes}
-                onChange={(e) => updateSetting('challengeCooldownMinutes', parseNumberInput(e.target.value, 0))}
+                onChange={(e) =>
+                  updateSetting(
+                    "challengeCooldownMinutes",
+                    parseNumberInput(e.target.value, 0),
+                  )
+                }
                 className="bg-gray-800 border-gray-600 text-white"
               />
-              <p className="text-xs text-gray-500 mt-1">Between challenges to same user (0 = no cooldown)</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Between challenges to same user (0 = no cooldown)
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -410,52 +497,70 @@ export default function ChallengeSettingsSection() {
               <Scale className="h-5 w-5 text-orange-400" />
               Tie Resolution
             </CardTitle>
-            <CardDescription>What happens when both players have exact same performance</CardDescription>
+            <CardDescription>
+              What happens when both players have exact same performance
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label className="text-gray-400">Prize Distribution on Tie</Label>
               <Select
-                value={settings.tiePrizeDistribution || 'split_equally'}
-                onValueChange={(value: 'split_equally' | 'challenger_wins' | 'both_lose') => 
-                  updateSetting('tiePrizeDistribution', value)
-                }
+                value={settings.tiePrizeDistribution || "split_equally"}
+                onValueChange={(
+                  value: "split_equally" | "challenger_wins" | "both_lose",
+                ) => updateSetting("tiePrizeDistribution", value)}
               >
                 <SelectTrigger className="bg-gray-800 border-gray-600 text-white mt-2">
                   <SelectValue placeholder="Select tie resolution" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="split_equally" className="text-white hover:bg-gray-700">
+                  <SelectItem
+                    value="split_equally"
+                    className="text-white hover:bg-gray-700"
+                  >
                     <div className="flex items-center gap-2">
                       <span>🤝</span>
                       <div>
                         <div className="font-medium">Split Equally</div>
-                        <div className="text-xs text-gray-400">Both players share the prize 50/50</div>
+                        <div className="text-xs text-gray-400">
+                          Both players share the prize 50/50
+                        </div>
                       </div>
                     </div>
                   </SelectItem>
-                  <SelectItem value="challenger_wins" className="text-white hover:bg-gray-700">
+                  <SelectItem
+                    value="challenger_wins"
+                    className="text-white hover:bg-gray-700"
+                  >
                     <div className="flex items-center gap-2">
                       <span>⚔️</span>
                       <div>
                         <div className="font-medium">Challenger Wins</div>
-                        <div className="text-xs text-gray-400">Challenger gets full prize (challenger advantage)</div>
+                        <div className="text-xs text-gray-400">
+                          Challenger gets full prize (challenger advantage)
+                        </div>
                       </div>
                     </div>
                   </SelectItem>
-                  <SelectItem value="both_lose" className="text-white hover:bg-gray-700">
+                  <SelectItem
+                    value="both_lose"
+                    className="text-white hover:bg-gray-700"
+                  >
                     <div className="flex items-center gap-2">
                       <span>❌</span>
                       <div>
                         <div className="font-medium">Both Lose</div>
-                        <div className="text-xs text-gray-400">No winner - prize goes to platform</div>
+                        <div className="text-xs text-gray-400">
+                          No winner - prize goes to platform
+                        </div>
                       </div>
                     </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500 mt-2">
-                This setting applies when both players finish with identical P&L after all tiebreakers
+                This setting applies when both players finish with identical P&L
+                after all tiebreakers
               </p>
             </div>
           </CardContent>
@@ -475,21 +580,29 @@ export default function ChallengeSettingsSection() {
             <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
               <div>
                 <Label className="text-white">Require Both Online</Label>
-                <p className="text-xs text-gray-500">Both players must be online to start</p>
+                <p className="text-xs text-gray-500">
+                  Both players must be online to start
+                </p>
               </div>
               <Switch
                 checked={settings.requireBothOnline}
-                onCheckedChange={(val) => updateSetting('requireBothOnline', val)}
+                onCheckedChange={(val) =>
+                  updateSetting("requireBothOnline", val)
+                }
               />
             </div>
             <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
               <div>
                 <Label className="text-white">Allow During Competitions</Label>
-                <p className="text-xs text-gray-500">Users can challenge while in competition</p>
+                <p className="text-xs text-gray-500">
+                  Users can challenge while in competition
+                </p>
               </div>
               <Switch
                 checked={settings.allowChallengeWhileInCompetition}
-                onCheckedChange={(val) => updateSetting('allowChallengeWhileInCompetition', val)}
+                onCheckedChange={(val) =>
+                  updateSetting("allowChallengeWhileInCompetition", val)
+                }
               />
             </div>
           </div>

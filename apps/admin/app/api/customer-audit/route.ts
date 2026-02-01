@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { customerAuditService } from '@/lib/services/customer-audit.service';
-import { AuditActionCategory, AUDIT_CATEGORY_CONFIG } from '@/database/models/customer-audit-trail.model';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { customerAuditService } from "@/lib/services/customer-audit.service";
+import {
+  AuditActionCategory,
+  AUDIT_CATEGORY_CONFIG,
+} from "@/database/models/customer-audit-trail.model";
+import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * GET /api/customer-audit
@@ -12,22 +15,22 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const customerId = searchParams.get('customerId');
-    const employeeId = searchParams.get('employeeId');
-    const category = searchParams.get('category') as AuditActionCategory | null;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const skip = parseInt(searchParams.get('skip') || '0');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const customerId = searchParams.get("customerId");
+    const employeeId = searchParams.get("employeeId");
+    const category = searchParams.get("category") as AuditActionCategory | null;
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const skip = parseInt(searchParams.get("skip") || "0");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
     if (!customerId && !employeeId) {
       return NextResponse.json(
-        { error: 'Either customerId or employeeId is required' },
-        { status: 400 }
+        { error: "Either customerId or employeeId is required" },
+        { status: 400 },
       );
     }
 
@@ -59,10 +62,10 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error fetching audit trail:', error);
+    console.error("Error fetching audit trail:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch audit trail' },
-      { status: 500 }
+      { error: "Failed to fetch audit trail" },
+      { status: 500 },
     );
   }
 }
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -83,8 +86,8 @@ export async function POST(request: NextRequest) {
 
     if (!customerId || !note) {
       return NextResponse.json(
-        { error: 'customerId and note are required' },
-        { status: 400 }
+        { error: "customerId and note are required" },
+        { status: 400 },
       );
     }
 
@@ -94,24 +97,23 @@ export async function POST(request: NextRequest) {
       { customerId, customerEmail, customerName },
       {
         employeeId: auth.adminId!,
-        employeeName: auth.name || 'Admin',
+        employeeName: auth.name || "Admin",
         employeeEmail: auth.email!,
-        employeeRole: auth.role || 'Super Admin',
+        employeeRole: auth.role || "Super Admin",
         isSuperAdmin: auth.isSuperAdmin,
       },
-      note
+      note,
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Note added to customer audit trail',
+      message: "Note added to customer audit trail",
     });
   } catch (error) {
-    console.error('Error adding audit note:', error);
+    console.error("Error adding audit note:", error);
     return NextResponse.json(
-      { error: 'Failed to add audit note' },
-      { status: 500 }
+      { error: "Failed to add audit note" },
+      { status: 500 },
     );
   }
 }
-

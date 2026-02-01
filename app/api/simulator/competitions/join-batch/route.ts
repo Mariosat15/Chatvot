@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 /**
  * POST /api/simulator/competitions/join-batch
@@ -12,14 +12,14 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
  * Available in development OR with simulator mode header (for production simulation tests)
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
-  const isDev = process.env.NODE_ENV === 'development';
+  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
+  const isDev = process.env.NODE_ENV === "development";
 
   // Allow in development OR with simulator mode header
   if (!isSimulatorMode && !isDev) {
     return NextResponse.json(
-      { success: false, error: 'Only available in simulator mode' },
-      { status: 403 }
+      { success: false, error: "Only available in simulator mode" },
+      { status: 403 },
     );
   }
 
@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
 
     if (!competitionId || !userIds || !Array.isArray(userIds)) {
       return NextResponse.json(
-        { success: false, error: 'competitionId and userIds array required' },
-        { status: 400 }
+        { success: false, error: "competitionId and userIds array required" },
+        { status: 400 },
       );
     }
 
@@ -40,15 +40,15 @@ export async function POST(request: NextRequest) {
     const competition = await Competition.findById(competitionId);
     if (!competition) {
       return NextResponse.json(
-        { success: false, error: 'Competition not found' },
-        { status: 404 }
+        { success: false, error: "Competition not found" },
+        { status: 404 },
       );
     }
 
-    if (competition.status !== 'upcoming' && competition.status !== 'active') {
+    if (competition.status !== "upcoming" && competition.status !== "active") {
       return NextResponse.json(
-        { success: false, error: 'Competition is not accepting participants' },
-        { status: 400 }
+        { success: false, error: "Competition is not accepting participants" },
+        { status: 400 },
       );
     }
 
@@ -57,29 +57,35 @@ export async function POST(request: NextRequest) {
       competitionId,
       userId: { $in: userIds },
     }).lean();
-    const alreadyJoinedSet = new Set(existingParticipants.map(p => p.userId));
-    
+    const alreadyJoinedSet = new Set(existingParticipants.map((p) => p.userId));
+
     // Filter to only new users
-    const newUserIds = userIds.filter((id: string) => !alreadyJoinedSet.has(id));
-    
+    const newUserIds = userIds.filter(
+      (id: string) => !alreadyJoinedSet.has(id),
+    );
+
     if (newUserIds.length === 0) {
       return NextResponse.json({
         success: true,
         joined: 0,
         alreadyJoined: userIds.length,
-        message: 'All users already joined',
+        message: "All users already joined",
       });
     }
 
     // Check available spots
-    const availableSpots = competition.maxParticipants - competition.currentParticipants;
+    const availableSpots =
+      competition.maxParticipants - competition.currentParticipants;
     const usersToJoin = newUserIds.slice(0, availableSpots);
 
     if (usersToJoin.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Competition is full',
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Competition is full",
+        },
+        { status: 400 },
+      );
     }
 
     const entryFee = competition.entryFee || 0;
@@ -93,10 +99,12 @@ export async function POST(request: NextRequest) {
       // If there's an entry fee, handle wallet operations
       if (entryFee > 0) {
         // Get all wallets in one query
-        const wallets = await CreditWallet.find({ userId: { $in: usersToJoin } })
+        const wallets = await CreditWallet.find({
+          userId: { $in: usersToJoin },
+        })
           .session(mongoSession)
           .lean();
-        const walletMap = new Map(wallets.map(w => [w.userId, w]));
+        const walletMap = new Map(wallets.map((w) => [w.userId, w]));
 
         // Filter users with sufficient balance
         const usersWithBalance = usersToJoin.filter((userId: string) => {
@@ -107,10 +115,13 @@ export async function POST(request: NextRequest) {
         if (usersWithBalance.length === 0) {
           await mongoSession.abortTransaction();
           mongoSession.endSession();
-          return NextResponse.json({
-            success: false,
-            error: 'No users have sufficient balance',
-          }, { status: 400 });
+          return NextResponse.json(
+            {
+              success: false,
+              error: "No users have sufficient balance",
+            },
+            { status: 400 },
+          );
         }
 
         // Bulk update wallets
@@ -118,9 +129,9 @@ export async function POST(request: NextRequest) {
           updateOne: {
             filter: { userId },
             update: {
-              $inc: { 
-                creditBalance: -entryFee, 
-                totalSpentOnCompetitions: entryFee 
+              $inc: {
+                creditBalance: -entryFee,
+                totalSpentOnCompetitions: entryFee,
               },
             },
           },
@@ -131,13 +142,13 @@ export async function POST(request: NextRequest) {
           const wallet = walletMap.get(userId);
           return {
             userId,
-            transactionType: 'competition_entry',
+            transactionType: "competition_entry",
             amount: -entryFee,
             balanceBefore: wallet?.creditBalance || 0,
             balanceAfter: (wallet?.creditBalance || 0) - entryFee,
-            currency: 'EUR',
+            currency: "EUR",
             exchangeRate: 1,
-            status: 'completed',
+            status: "completed",
             competitionId,
             description: `Entry fee for ${competition.name}`,
             processedAt: now,
@@ -165,18 +176,27 @@ export async function POST(request: NextRequest) {
           winRate: 0,
           maxDrawdown: 0,
           currentDrawdown: 0,
-          status: 'active',
+          status: "active",
           joinedAt: now,
         }));
 
         // Execute all operations atomically within transaction
-        await CreditWallet.bulkWrite(walletOps, { ordered: false, session: mongoSession });
-        await WalletTransaction.insertMany(transactions, { ordered: false, session: mongoSession });
-        await CompetitionParticipant.insertMany(participants, { ordered: false, session: mongoSession });
+        await CreditWallet.bulkWrite(walletOps, {
+          ordered: false,
+          session: mongoSession,
+        });
+        await WalletTransaction.insertMany(transactions, {
+          ordered: false,
+          session: mongoSession,
+        });
+        await CompetitionParticipant.insertMany(participants, {
+          ordered: false,
+          session: mongoSession,
+        });
         await Competition.findByIdAndUpdate(
           competitionId,
           { $inc: { currentParticipants: usersWithBalance.length } },
-          { session: mongoSession }
+          { session: mongoSession },
         );
 
         // Commit transaction - all operations succeed or all fail
@@ -210,15 +230,18 @@ export async function POST(request: NextRequest) {
           winRate: 0,
           maxDrawdown: 0,
           currentDrawdown: 0,
-          status: 'active',
+          status: "active",
           joinedAt: now,
         }));
 
-        await CompetitionParticipant.insertMany(participants, { ordered: false, session: mongoSession });
+        await CompetitionParticipant.insertMany(participants, {
+          ordered: false,
+          session: mongoSession,
+        });
         await Competition.findByIdAndUpdate(
           competitionId,
           { $inc: { currentParticipants: usersToJoin.length } },
-          { session: mongoSession }
+          { session: mongoSession },
         );
 
         // Commit transaction
@@ -238,11 +261,13 @@ export async function POST(request: NextRequest) {
       throw txError;
     }
   } catch (error) {
-    console.error('Batch competition join error:', error);
+    console.error("Batch competition join error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
     );
   }
 }
-

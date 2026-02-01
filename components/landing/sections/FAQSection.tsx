@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, HelpCircle } from 'lucide-react';
-import { LandingTheme } from '@/lib/themes/landing-themes';
-import SectionWrapper from './SectionWrapper';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, HelpCircle } from "lucide-react";
+import { LandingTheme } from "@/lib/themes/landing-themes";
+import SectionWrapper from "./SectionWrapper";
 
 interface FAQItem {
   id: string;
@@ -38,28 +38,32 @@ export default function FAQSection({
   subtitle = "Got Questions? We've Got Answers",
 }: FAQSectionProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#00f0ff',
-    secondary: propColors?.secondary || '#ff00ff',
-    accent: propColors?.accent || '#ffd700',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#00f0ff",
+    secondary: propColors?.secondary || "#ff00ff",
+    accent: propColors?.accent || "#ffd700",
+    text: propColors?.text || "#ffffff",
   };
-  const effectiveHeadingFont = propFont || 'inherit';
+  const effectiveHeadingFont = propFont || "inherit";
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const enabledFAQs = faqItems
-    .filter(item => item.enabled)
+    .filter((item) => item.enabled)
     .sort((a, b) => a.order - b.order);
 
   // Get unique categories
-  const categories = ['all', ...new Set(enabledFAQs.map(item => item.category))];
+  const categories = [
+    "all",
+    ...new Set(enabledFAQs.map((item) => item.category)),
+  ];
 
-  const filteredFAQs = selectedCategory === 'all' 
-    ? enabledFAQs 
-    : enabledFAQs.filter(item => item.category === selectedCategory);
+  const filteredFAQs =
+    selectedCategory === "all"
+      ? enabledFAQs
+      : enabledFAQs.filter((item) => item.category === selectedCategory);
 
   const toggleItem = (id: string) => {
-    setOpenItems(prev => {
+    setOpenItems((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -77,9 +81,9 @@ export default function FAQSection({
   return (
     <SectionWrapper id="faq">
       <div className="text-center max-w-3xl mx-auto mb-12">
-        <div 
+        <div
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-          style={{ 
+          style={{
             backgroundColor: `${effectiveColors.primary}15`,
             border: `1px solid ${effectiveColors.primary}30`,
             color: effectiveColors.primary,
@@ -88,10 +92,13 @@ export default function FAQSection({
           <HelpCircle className="h-4 w-4" />
           {subtitle}
         </div>
-        
-        <h2 
+
+        <h2
           className="text-4xl md:text-5xl font-black"
-          style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+          style={{
+            color: effectiveColors.text,
+            fontFamily: effectiveHeadingFont,
+          }}
         >
           {title}
         </h2>
@@ -100,19 +107,21 @@ export default function FAQSection({
       {/* Category Filter */}
       {categories.length > 2 && (
         <div className="flex flex-wrap justify-center gap-2 mb-10">
-          {categories.map(category => (
+          {categories.map((category) => (
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
               className="px-4 py-2 rounded-full text-sm font-medium transition-all"
-              style={{ 
-                backgroundColor: selectedCategory === category 
-                  ? effectiveColors.primary 
-                  : `${effectiveColors.primary}10`,
-                color: selectedCategory === category 
-                  ? theme?.colors?.background 
-                  : effectiveColors.primary,
-                border: `1px solid ${selectedCategory === category ? effectiveColors.primary : effectiveColors.primary + '30'}`,
+              style={{
+                backgroundColor:
+                  selectedCategory === category
+                    ? effectiveColors.primary
+                    : `${effectiveColors.primary}10`,
+                color:
+                  selectedCategory === category
+                    ? theme?.colors?.background
+                    : effectiveColors.primary,
+                border: `1px solid ${selectedCategory === category ? effectiveColors.primary : effectiveColors.primary + "30"}`,
               }}
             >
               {category.charAt(0).toUpperCase() + category.slice(1)}
@@ -131,7 +140,7 @@ export default function FAQSection({
             viewport={{ once: true }}
             transition={{ delay: index * 0.05 }}
             className="rounded-2xl overflow-hidden"
-            style={{ 
+            style={{
               backgroundColor: theme?.colors?.backgroundCard,
               border: `1px solid ${openItems.has(item.id) ? effectiveColors.primary : theme?.colors?.border}`,
             }}
@@ -139,11 +148,13 @@ export default function FAQSection({
             <button
               onClick={() => toggleItem(item.id)}
               className="w-full p-5 md:p-6 flex items-center justify-between text-left transition-colors"
-              style={{ 
-                backgroundColor: openItems.has(item.id) ? `${effectiveColors.primary}08` : 'transparent',
+              style={{
+                backgroundColor: openItems.has(item.id)
+                  ? `${effectiveColors.primary}08`
+                  : "transparent",
               }}
             >
-              <span 
+              <span
                 className="font-bold text-lg pr-4"
                 style={{ color: effectiveColors.text }}
               >
@@ -154,28 +165,28 @@ export default function FAQSection({
                 transition={{ duration: 0.2 }}
                 className="flex-shrink-0"
               >
-                <ChevronDown 
-                  className="h-5 w-5" 
-                  style={{ color: effectiveColors.primary }} 
+                <ChevronDown
+                  className="h-5 w-5"
+                  style={{ color: effectiveColors.primary }}
                 />
               </motion.div>
             </button>
-            
+
             <AnimatePresence>
               {openItems.has(item.id) && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
+                  animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div 
+                  <div
                     className="px-5 md:px-6 pb-5 md:pb-6 leading-relaxed"
-                    style={{ 
+                    style={{
                       color: theme?.colors?.textMuted,
                       borderTop: `1px solid ${theme?.colors?.border}`,
-                      paddingTop: '1.25rem',
+                      paddingTop: "1.25rem",
                     }}
                   >
                     {item.answer}
@@ -197,10 +208,10 @@ export default function FAQSection({
         <p className="text-lg mb-4" style={{ color: theme?.colors?.textMuted }}>
           Still have questions?
         </p>
-        <a 
+        <a
           href="/help"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:scale-105"
-          style={{ 
+          style={{
             backgroundColor: `${effectiveColors.primary}15`,
             color: effectiveColors.primary,
             border: `1px solid ${effectiveColors.primary}30`,

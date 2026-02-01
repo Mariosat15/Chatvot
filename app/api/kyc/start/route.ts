@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import veriffService from '@/lib/services/veriff.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import veriffService from "@/lib/services/veriff.service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const result = await veriffService.createSession(session.user.id, {
-      firstName: body.firstName || session.user.name?.split(' ')[0],
-      lastName: body.lastName || session.user.name?.split(' ').slice(1).join(' '),
+      firstName: body.firstName || session.user.name?.split(" ")[0],
+      lastName:
+        body.lastName || session.user.name?.split(" ").slice(1).join(" "),
       email: session.user.email,
       dateOfBirth: body.dateOfBirth,
     });
@@ -31,11 +32,10 @@ export async function POST(req: NextRequest) {
       sessionId: result.sessionId,
     });
   } catch (error: any) {
-    console.error('Error starting KYC verification:', error);
+    console.error("Error starting KYC verification:", error);
     return NextResponse.json(
-      { error: error.message || 'Failed to start KYC verification' },
-      { status: 500 }
+      { error: error.message || "Failed to start KYC verification" },
+      { status: 500 },
     );
   }
 }
-

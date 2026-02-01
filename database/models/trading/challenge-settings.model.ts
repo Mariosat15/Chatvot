@@ -1,4 +1,4 @@
-import { Schema, model, models, Document, Model } from 'mongoose';
+import { Schema, model, models, Document, Model } from "mongoose";
 
 // Interface for the static methods
 interface IChallengeSettingsModel extends Model<IChallengeSettings> {
@@ -18,40 +18,40 @@ let cacheTimestamp = 0;
 export interface IChallengeSettings extends Document {
   // Platform Fee
   platformFeePercentage: number; // % taken by platform from prize pool
-  
+
   // Entry Fee Limits
   minEntryFee: number; // Minimum entry fee in credits
   maxEntryFee: number; // Maximum entry fee in credits
-  
+
   // Starting Capital Options
   defaultStartingCapital: number;
   minStartingCapital: number;
   maxStartingCapital: number;
-  
+
   // Duration Limits
   minDurationMinutes: number; // Minimum challenge duration
   maxDurationMinutes: number; // Maximum challenge duration
   defaultDurationMinutes: number;
-  
+
   // Accept Deadline
   acceptDeadlineMinutes: number; // How long challenged user has to accept
-  
+
   // Asset Classes allowed in challenges
-  defaultAssetClasses: ('stocks' | 'forex' | 'crypto' | 'indices')[];
-  
+  defaultAssetClasses: ("stocks" | "forex" | "crypto" | "indices")[];
+
   // Feature Toggles
   challengesEnabled: boolean; // Master switch to enable/disable challenges
   requireBothOnline: boolean; // Both users must be online to start
   allowChallengeWhileInCompetition: boolean; // Allow users in competitions to challenge
-  
+
   // Cooldowns
   challengeCooldownMinutes: number; // Cooldown between sending challenges to same user
   maxPendingChallenges: number; // Max pending challenges a user can have
   maxActiveChallenges: number; // Max active challenges at once
-  
+
   // Tie Resolution (when both players have exact same performance)
-  tiePrizeDistribution: 'split_equally' | 'challenger_wins' | 'both_lose';
-  
+  tiePrizeDistribution: "split_equally" | "challenger_wins" | "both_lose";
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -122,7 +122,7 @@ const ChallengeSettingsSchema = new Schema<IChallengeSettings>(
     defaultAssetClasses: [
       {
         type: String,
-        enum: ['stocks', 'forex', 'crypto', 'indices'],
+        enum: ["stocks", "forex", "crypto", "indices"],
       },
     ],
     challengesEnabled: {
@@ -161,37 +161,37 @@ const ChallengeSettingsSchema = new Schema<IChallengeSettings>(
     // Tie Resolution - how to handle ties when both players have exact same performance
     tiePrizeDistribution: {
       type: String,
-      enum: ['split_equally', 'challenger_wins', 'both_lose'],
+      enum: ["split_equally", "challenger_wins", "both_lose"],
       required: true,
-      default: 'split_equally', // Fair default: both players split the prize
+      default: "split_equally", // Fair default: both players split the prize
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Singleton pattern with in-memory caching
 ChallengeSettingsSchema.statics.getSingleton = async function () {
   const now = Date.now();
-  
+
   // Return cached settings if valid
-  if (cachedSettings && (now - cacheTimestamp) < CACHE_TTL_MS) {
+  if (cachedSettings && now - cacheTimestamp < CACHE_TTL_MS) {
     return cachedSettings;
   }
-  
+
   // Fetch from DB
   let settings = await this.findOne();
   if (!settings) {
     settings = await this.create({
-      defaultAssetClasses: ['stocks', 'forex', 'crypto', 'indices'],
+      defaultAssetClasses: ["stocks", "forex", "crypto", "indices"],
     });
   }
-  
+
   // Update cache
   cachedSettings = settings;
   cacheTimestamp = now;
-  
+
   return settings;
 };
 
@@ -203,6 +203,9 @@ ChallengeSettingsSchema.statics.clearCache = function () {
 
 const ChallengeSettings =
   (models?.ChallengeSettings as IChallengeSettingsModel) ||
-  model<IChallengeSettings, IChallengeSettingsModel>('ChallengeSettings', ChallengeSettingsSchema);
+  model<IChallengeSettings, IChallengeSettingsModel>(
+    "ChallengeSettings",
+    ChallengeSettingsSchema,
+  );
 
 export default ChallengeSettings;

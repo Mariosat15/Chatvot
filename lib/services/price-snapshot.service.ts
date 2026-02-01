@@ -1,13 +1,13 @@
 /**
  * Price Snapshot Service
- * 
+ *
  * Takes periodic snapshots of all forex prices during active competitions.
  * Used for risk mitigation - provides fallback prices for emergency finalization.
  */
 
-import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
-import { priceHealthMonitor } from './price-health-monitor.service';
-import { connectToDatabase } from '@/database/mongoose';
+import { ForexSymbol } from "./pnl-calculator.service";
+import { priceHealthMonitor } from "./price-health-monitor.service";
+import { connectToDatabase } from "@/database/mongoose";
 
 // ============================================
 // Types
@@ -19,7 +19,7 @@ export interface PriceSnapshotData {
   ask: number;
   mid: number;
   spread: number;
-  source: 'websocket' | 'api' | 'cache' | 'fallback';
+  source: "websocket" | "api" | "rest" | "cache" | "fallback";
   isValid: boolean;
   staleDuration?: number;
 }
@@ -28,7 +28,7 @@ export interface SnapshotResult {
   success: boolean;
   snapshotId?: string;
   timestamp: Date;
-  healthStatus: 'healthy' | 'degraded' | 'critical';
+  healthStatus: "healthy" | "degraded" | "critical";
   priceCount: number;
   healthyCount: number;
 }
@@ -44,7 +44,7 @@ const MAX_SNAPSHOTS_PER_COMPETITION = 1440; // Keep 24 hours of snapshots (at 1/
 // Global State
 // ============================================
 
-const GLOBAL_KEY = '__PRICE_SNAPSHOT_SERVICE__';
+const GLOBAL_KEY = "__PRICE_SNAPSHOT_SERVICE__";
 
 interface SnapshotGlobalState {
   snapshotTimer: NodeJS.Timeout | null;
@@ -62,7 +62,9 @@ function getGlobalState(): SnapshotGlobalState {
       snapshotCount: 0,
     };
   }
-  return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as SnapshotGlobalState;
+  return (globalThis as Record<string, unknown>)[
+    GLOBAL_KEY
+  ] as SnapshotGlobalState;
 }
 
 // ============================================
@@ -70,26 +72,28 @@ function getGlobalState(): SnapshotGlobalState {
 // ============================================
 
 class PriceSnapshotService {
-  private get state() { return getGlobalState(); }
+  private get state() {
+    return getGlobalState();
+  }
 
   /**
    * Start automatic snapshot collection
    */
   start(): void {
     if (this.state.isRunning) {
-      console.log('📸 [PriceSnapshot] Already running');
+      console.log("📸 [PriceSnapshot] Already running");
       return;
     }
 
-    console.log('📸 [PriceSnapshot] Starting automatic snapshot collection');
+    console.log("📸 [PriceSnapshot] Starting automatic snapshot collection");
     this.state.isRunning = true;
 
     // Take initial snapshot
-    this.takeSnapshot('auto').catch(console.error);
+    this.takeSnapshot("auto").catch(console.error);
 
     // Schedule periodic snapshots
     this.state.snapshotTimer = setInterval(() => {
-      this.takeSnapshot('auto').catch(console.error);
+      this.takeSnapshot("auto").catch(console.error);
     }, SNAPSHOT_INTERVAL_MS);
   }
 
@@ -102,17 +106,17 @@ class PriceSnapshotService {
       this.state.snapshotTimer = null;
     }
     this.state.isRunning = false;
-    console.log('📸 [PriceSnapshot] Stopped');
+    console.log("📸 [PriceSnapshot] Stopped");
   }
 
   /**
    * Take a snapshot of all prices
    */
   async takeSnapshot(
-    type: 'auto' | 'manual' | 'alert',
+    type: "auto" | "manual" | "alert",
     competitionId?: string,
     triggeredBy?: string,
-    notes?: string
+    notes?: string,
   ): Promise<SnapshotResult> {
     try {
       const timestamp = new Date();
@@ -130,7 +134,7 @@ class PriceSnapshotService {
           mid: symbolInfo.lastPrice,
           spread: symbolInfo.lastPrice * 0.0001,
           source: symbolInfo.source,
-          isValid: symbolInfo.status !== 'critical' && !symbolInfo.isStale,
+          isValid: symbolInfo.status !== "critical" && !symbolInfo.isStale,
           staleDuration: symbolInfo.staleDuration,
         };
 
@@ -154,7 +158,9 @@ class PriceSnapshotService {
 
       // Save to database
       await connectToDatabase();
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
 
       const snapshot = await PriceSnapshot.create({
         competitionId,
@@ -179,7 +185,9 @@ class PriceSnapshotService {
 
       // Log occasionally
       if (this.state.snapshotCount % 10 === 0) {
-        console.log(`📸 [PriceSnapshot] Snapshot #${this.state.snapshotCount}: ${healthyCount}/${prices.length} healthy (${healthSnapshot.overallStatus})`);
+        console.log(
+          `📸 [PriceSnapshot] Snapshot #${this.state.snapshotCount}: ${healthyCount}/${prices.length} healthy (${healthSnapshot.overallStatus})`,
+        );
       }
 
       return {
@@ -190,13 +198,12 @@ class PriceSnapshotService {
         priceCount: prices.length,
         healthyCount,
       };
-
     } catch (error) {
-      console.error('📸 [PriceSnapshot] Error taking snapshot:', error);
+      console.error("📸 [PriceSnapshot] Error taking snapshot:", error);
       return {
         success: false,
         timestamp: new Date(),
-        healthStatus: 'critical',
+        healthStatus: "critical",
         priceCount: 0,
         healthyCount: 0,
       };
@@ -211,10 +218,10 @@ class PriceSnapshotService {
     ask: number;
     mid: number;
     spread: number;
-    source: 'websocket' | 'api' | 'cache' | 'fallback';
+    source: "websocket" | "api" | "rest" | "cache" | "fallback";
   } | null> {
     try {
-      const { getCachedPrice } = await import('./websocket-price-streamer');
+      const { getCachedPrice } = await import("./websocket-price-streamer");
       const price = getCachedPrice(symbol);
       if (price) {
         return {
@@ -236,26 +243,30 @@ class PriceSnapshotService {
    */
   private async cleanupOldSnapshots(competitionId: string): Promise<void> {
     try {
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
-      
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
+
       // Count snapshots for this competition
       const count = await PriceSnapshot.countDocuments({ competitionId });
-      
+
       if (count > MAX_SNAPSHOTS_PER_COMPETITION) {
         // Delete oldest snapshots beyond limit
         const toDelete = count - MAX_SNAPSHOTS_PER_COMPETITION;
         const oldSnapshots = await PriceSnapshot.find({ competitionId })
           .sort({ timestamp: 1 })
           .limit(toDelete)
-          .select('_id');
-        
-        const ids = oldSnapshots.map(s => s._id);
+          .select("_id");
+
+        const ids = oldSnapshots.map((s) => s._id);
         await PriceSnapshot.deleteMany({ _id: { $in: ids } });
-        
-        console.log(`📸 [PriceSnapshot] Cleaned up ${toDelete} old snapshots for competition ${competitionId}`);
+
+        console.log(
+          `📸 [PriceSnapshot] Cleaned up ${toDelete} old snapshots for competition ${competitionId}`,
+        );
       }
     } catch (error) {
-      console.error('Error cleaning up snapshots:', error);
+      console.error("Error cleaning up snapshots:", error);
     }
   }
 
@@ -269,14 +280,18 @@ class PriceSnapshotService {
   } | null> {
     try {
       await connectToDatabase();
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
 
-      const query: Record<string, unknown> = { healthStatus: 'healthy' };
+      const query: Record<string, unknown> = { healthStatus: "healthy" };
       if (competitionId) {
         query.competitionId = competitionId;
       }
 
-      const snapshot = await PriceSnapshot.findOne(query).sort({ timestamp: -1 });
+      const snapshot = await PriceSnapshot.findOne(query).sort({
+        timestamp: -1,
+      });
       if (!snapshot) return null;
 
       const prices = new Map<string, { bid: number; ask: number }>();
@@ -292,7 +307,7 @@ class PriceSnapshotService {
         prices,
       };
     } catch (error) {
-      console.error('Error getting last healthy snapshot:', error);
+      console.error("Error getting last healthy snapshot:", error);
       return null;
     }
   }
@@ -308,7 +323,9 @@ class PriceSnapshotService {
   } | null> {
     try {
       await connectToDatabase();
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
 
       const snapshot = await PriceSnapshot.findById(snapshotId);
       if (!snapshot) return null;
@@ -325,7 +342,7 @@ class PriceSnapshotService {
         prices,
       };
     } catch (error) {
-      console.error('Error getting snapshot by ID:', error);
+      console.error("Error getting snapshot by ID:", error);
       return null;
     }
   }
@@ -335,18 +352,22 @@ class PriceSnapshotService {
    */
   async getRecentSnapshots(
     competitionId?: string,
-    limit: number = 60
-  ): Promise<Array<{
-    snapshotId: string;
-    timestamp: Date;
-    healthStatus: string;
-    healthyCount: number;
-    totalCount: number;
-    snapshotType: string;
-  }>> {
+    limit: number = 60,
+  ): Promise<
+    Array<{
+      snapshotId: string;
+      timestamp: Date;
+      healthStatus: string;
+      healthyCount: number;
+      totalCount: number;
+      snapshotType: string;
+    }>
+  > {
     try {
       await connectToDatabase();
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
 
       const query: Record<string, unknown> = {};
       if (competitionId) {
@@ -356,9 +377,11 @@ class PriceSnapshotService {
       const snapshots = await PriceSnapshot.find(query)
         .sort({ timestamp: -1 })
         .limit(limit)
-        .select('timestamp healthStatus healthySymbolCount totalSymbolCount snapshotType');
+        .select(
+          "timestamp healthStatus healthySymbolCount totalSymbolCount snapshotType",
+        );
 
-      return snapshots.map(s => ({
+      return snapshots.map((s) => ({
         snapshotId: s._id.toString(),
         timestamp: s.timestamp,
         healthStatus: s.healthStatus,
@@ -367,7 +390,7 @@ class PriceSnapshotService {
         snapshotType: s.snapshotType,
       }));
     } catch (error) {
-      console.error('Error getting recent snapshots:', error);
+      console.error("Error getting recent snapshots:", error);
       return [];
     }
   }
@@ -375,10 +398,15 @@ class PriceSnapshotService {
   /**
    * Mark a snapshot as used for finalization
    */
-  async markSnapshotAsUsed(snapshotId: string, competitionId: string): Promise<void> {
+  async markSnapshotAsUsed(
+    snapshotId: string,
+    competitionId: string,
+  ): Promise<void> {
     try {
       await connectToDatabase();
-      const PriceSnapshot = (await import('@/database/models/trading/price-snapshot.model')).default;
+      const PriceSnapshot = (
+        await import("@/database/models/trading/price-snapshot.model")
+      ).default;
 
       await PriceSnapshot.findByIdAndUpdate(snapshotId, {
         $set: {
@@ -387,7 +415,7 @@ class PriceSnapshotService {
         },
       });
     } catch (error) {
-      console.error('Error marking snapshot as used:', error);
+      console.error("Error marking snapshot as used:", error);
     }
   }
 

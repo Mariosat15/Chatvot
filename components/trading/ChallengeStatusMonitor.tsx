@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface ChallengeStatusMonitorProps {
   challengeId: string;
@@ -15,8 +15,8 @@ interface ChallengeStatusMonitorProps {
  * Monitors challenge status and refreshes/redirects when status changes
  * Polls every 5 seconds to detect status changes
  */
-export default function ChallengeStatusMonitor({ 
-  challengeId, 
+export default function ChallengeStatusMonitor({
+  challengeId,
   initialStatus,
   userId,
 }: ChallengeStatusMonitorProps) {
@@ -27,7 +27,7 @@ export default function ChallengeStatusMonitor({
 
   useEffect(() => {
     // Poll for active challenges (can end)
-    if (!['pending', 'active'].includes(initialStatus)) {
+    if (!["pending", "active"].includes(initialStatus)) {
       return;
     }
 
@@ -38,67 +38,67 @@ export default function ChallengeStatusMonitor({
           if (response.status === 404) {
             return;
           }
-          console.error('Failed to fetch challenge status');
+          console.error("Failed to fetch challenge status");
           return;
         }
 
         const data = await response.json();
         const newStatus = data.challenge?.status;
-        
+
         if (!newStatus) return;
-        
+
         // If status changed, handle it
         if (newStatus !== lastStatusRef.current && !hasRedirectedRef.current) {
           lastStatusRef.current = newStatus;
-          
+
           // Handle declined challenges
-          if (newStatus === 'declined') {
+          if (newStatus === "declined") {
             hasRedirectedRef.current = true;
-            
+
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
             }
 
-            toast.error('❌ Challenge Declined', {
-              description: 'Your opponent has declined the challenge.',
+            toast.error("❌ Challenge Declined", {
+              description: "Your opponent has declined the challenge.",
               duration: 8000,
             });
 
-            router.push('/challenges');
+            router.push("/challenges");
             return;
           }
 
           // Handle expired challenges
-          if (newStatus === 'expired') {
+          if (newStatus === "expired") {
             hasRedirectedRef.current = true;
-            
+
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
             }
 
-            toast.error('⏰ Challenge Expired', {
-              description: 'The challenge was not accepted in time.',
+            toast.error("⏰ Challenge Expired", {
+              description: "The challenge was not accepted in time.",
               duration: 8000,
             });
 
-            router.push('/challenges');
+            router.push("/challenges");
             return;
           }
 
           // Handle started challenges (pending → active)
-          if (newStatus === 'active' && lastStatusRef.current === 'pending') {
-            toast.success('⚔️ Challenge Started!', {
-              description: 'The challenge is now live. Good luck!',
+          if (newStatus === "active" && lastStatusRef.current === "pending") {
+            toast.success("⚔️ Challenge Started!", {
+              description: "The challenge is now live. Good luck!",
               duration: 5000,
             });
             router.refresh();
             return;
           }
-          
+
           // Handle completed challenges (active → completed)
-          if (newStatus === 'completed') {
+          if (newStatus === "completed") {
             hasRedirectedRef.current = true;
-            
+
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
             }
@@ -110,23 +110,23 @@ export default function ChallengeStatusMonitor({
             const isLoser = winnerId && winnerId !== userId && !isTie;
 
             if (isTie) {
-              toast.info('🤝 Challenge Ended - Tie!', {
-                description: 'The challenge ended in a tie. View the results.',
+              toast.info("🤝 Challenge Ended - Tie!", {
+                description: "The challenge ended in a tie. View the results.",
                 duration: 5000,
               });
             } else if (isWinner) {
-              toast.success('🏆 You Won!', {
-                description: 'Congratulations! You won the challenge!',
+              toast.success("🏆 You Won!", {
+                description: "Congratulations! You won the challenge!",
                 duration: 5000,
               });
             } else if (isLoser) {
-              toast.error('😔 Challenge Ended', {
-                description: 'You lost this challenge. Better luck next time!',
+              toast.error("😔 Challenge Ended", {
+                description: "You lost this challenge. Better luck next time!",
                 duration: 5000,
               });
             } else {
-              toast('⚔️ Challenge Ended', {
-                description: 'The challenge has ended. View the results.',
+              toast("⚔️ Challenge Ended", {
+                description: "The challenge has ended. View the results.",
                 duration: 5000,
               });
             }
@@ -137,7 +137,7 @@ export default function ChallengeStatusMonitor({
             }, 2000);
           }
         }
-      } catch (error) {
+      } catch {
         // Fail silently
       }
     };
@@ -146,7 +146,10 @@ export default function ChallengeStatusMonitor({
     const timeoutId = setTimeout(checkChallengeStatus, 3000);
 
     // Poll at optimized interval (10 seconds instead of 5)
-    pollIntervalRef.current = setInterval(checkChallengeStatus, PERFORMANCE_INTERVALS.CHALLENGE_STATUS);
+    pollIntervalRef.current = setInterval(
+      checkChallengeStatus,
+      PERFORMANCE_INTERVALS.CHALLENGE_STATUS,
+    );
 
     return () => {
       clearTimeout(timeoutId);
@@ -158,4 +161,3 @@ export default function ChallengeStatusMonitor({
 
   return null;
 }
-

@@ -1,43 +1,92 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Search, TrendingUp, ArrowLeftRight, Globe, Star, ChevronDown, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from "react";
+import {
+  ForexSymbol,
+  FOREX_PAIRS,
+} from "@/lib/services/pnl-calculator.service";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  Search,
+  TrendingUp,
+  ArrowLeftRight,
+  Globe,
+  Star,
+  ChevronDown,
+  ChevronRight,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
 
 // Default categorized forex pairs (fallback)
 const DEFAULT_PAIR_CATEGORIES = {
   major: {
-    name: 'Major Pairs',
+    name: "Major Pairs",
     icon: TrendingUp,
-    description: 'Most traded, tightest spreads',
-    pairs: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'] as ForexSymbol[],
+    description: "Most traded, tightest spreads",
+    pairs: [
+      "EUR/USD",
+      "GBP/USD",
+      "USD/JPY",
+      "USD/CHF",
+      "AUD/USD",
+      "USD/CAD",
+      "NZD/USD",
+    ] as ForexSymbol[],
   },
   cross: {
-    name: 'Cross Pairs',
+    name: "Cross Pairs",
     icon: ArrowLeftRight,
-    description: 'Currency crosses without USD',
+    description: "Currency crosses without USD",
     pairs: [
-      'EUR/GBP', 'EUR/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD',
-      'GBP/JPY', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD',
-      'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD',
-      'CAD/JPY', 'CAD/CHF', 'CHF/JPY',
-      'NZD/JPY', 'NZD/CHF', 'NZD/CAD',
+      "EUR/GBP",
+      "EUR/JPY",
+      "EUR/CHF",
+      "EUR/AUD",
+      "EUR/CAD",
+      "EUR/NZD",
+      "GBP/JPY",
+      "GBP/CHF",
+      "GBP/AUD",
+      "GBP/CAD",
+      "GBP/NZD",
+      "AUD/JPY",
+      "AUD/CHF",
+      "AUD/CAD",
+      "AUD/NZD",
+      "CAD/JPY",
+      "CAD/CHF",
+      "CHF/JPY",
+      "NZD/JPY",
+      "NZD/CHF",
+      "NZD/CAD",
     ] as ForexSymbol[],
   },
   exotic: {
-    name: 'Exotic Pairs',
+    name: "Exotic Pairs",
     icon: Globe,
-    description: 'Emerging market currencies',
-    pairs: ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'] as ForexSymbol[],
+    description: "Emerging market currencies",
+    pairs: [
+      "USD/MXN",
+      "USD/ZAR",
+      "USD/TRY",
+      "USD/SEK",
+      "USD/NOK",
+    ] as ForexSymbol[],
   },
   custom: {
-    name: 'Custom',
+    name: "Custom",
     icon: Sparkles,
-    description: 'Custom added symbols',
+    description: "Custom added symbols",
     pairs: [] as ForexSymbol[],
   },
 };
@@ -47,7 +96,7 @@ type PairCategoriesType = typeof DEFAULT_PAIR_CATEGORIES;
 interface TradingSymbolData {
   symbol: ForexSymbol;
   name: string;
-  category: 'major' | 'cross' | 'exotic' | 'custom';
+  category: "major" | "cross" | "exotic" | "custom";
   enabled: boolean;
 }
 
@@ -57,26 +106,26 @@ function getPairInfo(symbol: ForexSymbol) {
   return {
     symbol,
     name: config?.name || symbol,
-    base: symbol.split('/')[0],
-    quote: symbol.split('/')[1],
+    base: symbol.split("/")[0],
+    quote: symbol.split("/")[1],
   };
 }
 
 // Currency flag emoji mapping
 const CURRENCY_FLAGS: Record<string, string> = {
-  EUR: '🇪🇺',
-  USD: '🇺🇸',
-  GBP: '🇬🇧',
-  JPY: '🇯🇵',
-  CHF: '🇨🇭',
-  AUD: '🇦🇺',
-  CAD: '🇨🇦',
-  NZD: '🇳🇿',
-  MXN: '🇲🇽',
-  ZAR: '🇿🇦',
-  TRY: '🇹🇷',
-  SEK: '🇸🇪',
-  NOK: '🇳🇴',
+  EUR: "🇪🇺",
+  USD: "🇺🇸",
+  GBP: "🇬🇧",
+  JPY: "🇯🇵",
+  CHF: "🇨🇭",
+  AUD: "🇦🇺",
+  CAD: "🇨🇦",
+  NZD: "🇳🇿",
+  MXN: "🇲🇽",
+  ZAR: "🇿🇦",
+  TRY: "🇹🇷",
+  SEK: "🇸🇪",
+  NOK: "🇳🇴",
 };
 
 interface SymbolSelectorProps {
@@ -98,8 +147,10 @@ export function SymbolSelector({
   favorites = [],
   onToggleFavorite,
 }: SymbolSelectorProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({
     major: true,
     cross: true,
     exotic: true,
@@ -107,16 +158,18 @@ export function SymbolSelector({
     favorites: true,
   });
   const [isLoadingSymbols, setIsLoadingSymbols] = useState(true);
-  const [pairCategories, setPairCategories] = useState<PairCategoriesType>(DEFAULT_PAIR_CATEGORIES);
+  const [pairCategories, setPairCategories] = useState<PairCategoriesType>(
+    DEFAULT_PAIR_CATEGORIES,
+  );
 
   // Fetch enabled symbols from database
   useEffect(() => {
     const fetchSymbols = async () => {
       try {
-        const res = await fetch('/api/trading/symbols');
+        const res = await fetch("/api/trading/symbols");
         if (res.ok) {
           const data = await res.json();
-          
+
           // Group symbols by category
           const grouped: PairCategoriesType = {
             major: { ...DEFAULT_PAIR_CATEGORIES.major, pairs: [] },
@@ -124,25 +177,28 @@ export function SymbolSelector({
             exotic: { ...DEFAULT_PAIR_CATEGORIES.exotic, pairs: [] },
             custom: { ...DEFAULT_PAIR_CATEGORIES.custom, pairs: [] },
           };
-          
+
           data.symbols.forEach((sym: TradingSymbolData) => {
             if (sym.enabled && grouped[sym.category]) {
               grouped[sym.category].pairs.push(sym.symbol);
             }
           });
-          
+
           // Only update if we have symbols
-          const totalPairs = Object.values(grouped).reduce((sum, cat) => sum + cat.pairs.length, 0);
+          const totalPairs = Object.values(grouped).reduce(
+            (sum, cat) => sum + cat.pairs.length,
+            0,
+          );
           if (totalPairs > 0) {
             setPairCategories(grouped);
           }
         }
       } catch (error) {
-        console.error('Failed to fetch symbols, using defaults:', error);
+        console.error("Failed to fetch symbols, using defaults:", error);
       }
       setIsLoadingSymbols(false);
     };
-    
+
     if (open) {
       fetchSymbols();
     }
@@ -151,7 +207,7 @@ export function SymbolSelector({
   // Filter pairs based on search
   const filteredCategories = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    
+
     if (!query) {
       // Return only categories that have pairs
       const result: Partial<PairCategoriesType> = {};
@@ -164,13 +220,13 @@ export function SymbolSelector({
     }
 
     const filtered: Partial<PairCategoriesType> = {};
-    
+
     Object.entries(pairCategories).forEach(([key, category]) => {
       const matchingPairs = category.pairs.filter((symbol) => {
         const info = getPairInfo(symbol);
         return (
           symbol.toLowerCase().includes(query) ||
-          symbol.replace('/', '').toLowerCase().includes(query) ||
+          symbol.replace("/", "").toLowerCase().includes(query) ||
           info.name.toLowerCase().includes(query) ||
           info.base.toLowerCase().includes(query) ||
           info.quote.toLowerCase().includes(query)
@@ -197,7 +253,7 @@ export function SymbolSelector({
       const info = getPairInfo(symbol);
       return (
         symbol.toLowerCase().includes(query) ||
-        symbol.replace('/', '').toLowerCase().includes(query) ||
+        symbol.replace("/", "").toLowerCase().includes(query) ||
         info.name.toLowerCase().includes(query)
       );
     });
@@ -213,19 +269,23 @@ export function SymbolSelector({
   const handleSelect = (symbol: ForexSymbol) => {
     onSelectSymbol(symbol);
     onOpenChange(false);
-    setSearchQuery('');
+    setSearchQuery("");
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="bg-[#131722] border-[#2b2b43] text-white max-w-md p-0 gap-0 overflow-hidden" 
-        style={{ zIndex: 99999 }} 
+      <DialogContent
+        className="bg-[#131722] border-[#2b2b43] text-white max-w-md p-0 gap-0 overflow-hidden"
+        style={{ zIndex: 99999 }}
         container={portalContainer}
       >
         <DialogHeader className="px-4 pt-4 pb-3 border-b border-[#2b2b43]">
-          <DialogTitle className="text-white text-lg font-semibold">Select Symbol</DialogTitle>
-          <DialogDescription className="text-[#787b86] text-sm">Choose a currency pair to trade</DialogDescription>
+          <DialogTitle className="text-white text-lg font-semibold">
+            Select Symbol
+          </DialogTitle>
+          <DialogDescription className="text-[#787b86] text-sm">
+            Choose a currency pair to trade
+          </DialogDescription>
         </DialogHeader>
 
         {/* Search Input */}
@@ -250,13 +310,20 @@ export function SymbolSelector({
             <div className="border-b border-[#2b2b43]">
               <button
                 type="button"
-                onClick={(e) => { e.preventDefault(); toggleCategory('favorites'); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  toggleCategory("favorites");
+                }}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1e222d] transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <Star className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-medium text-white">Favorites</span>
-                  <span className="text-xs text-[#787b86]">({favoritePairs.length})</span>
+                  <span className="text-sm font-medium text-white">
+                    Favorites
+                  </span>
+                  <span className="text-xs text-[#787b86]">
+                    ({favoritePairs.length})
+                  </span>
                 </div>
                 {expandedCategories.favorites ? (
                   <ChevronDown className="h-4 w-4 text-[#787b86]" />
@@ -289,63 +356,82 @@ export function SymbolSelector({
           )}
 
           {/* Category Sections */}
-          {!isLoadingSymbols && Object.entries(filteredCategories).map(([key, category]) => {
-            if (!category || category.pairs.length === 0) return null;
-            const Icon = category.icon;
-            const isExpanded = expandedCategories[key];
+          {!isLoadingSymbols &&
+            Object.entries(filteredCategories).map(([key, category]) => {
+              if (!category || category.pairs.length === 0) return null;
+              const Icon = category.icon;
+              const isExpanded = expandedCategories[key];
 
-            return (
-              <div key={key} className="border-b border-[#2b2b43] last:border-b-0">
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); toggleCategory(key); }}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1e222d] transition-colors"
+              return (
+                <div
+                  key={key}
+                  className="border-b border-[#2b2b43] last:border-b-0"
                 >
-                  <div className="flex items-center gap-2">
-                    <Icon className={cn(
-                      "h-4 w-4",
-                      key === 'major' && "text-green-500",
-                      key === 'cross' && "text-blue-500",
-                      key === 'exotic' && "text-purple-500",
-                      key === 'custom' && "text-yellow-500"
-                    )} />
-                    <span className="text-sm font-medium text-white">{category.name}</span>
-                    <span className="text-xs text-[#787b86]">({category.pairs.length})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#787b86] hidden sm:block">{category.description}</span>
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-[#787b86]" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-[#787b86]" />
-                    )}
-                  </div>
-                </button>
-                {isExpanded && (
-                  <div className="pb-2">
-                    {category.pairs.map((symbol) => (
-                      <PairItem
-                        key={symbol}
-                        symbol={symbol}
-                        isSelected={selectedSymbol === symbol}
-                        isFavorite={favorites.includes(symbol)}
-                        onSelect={handleSelect}
-                        onToggleFavorite={onToggleFavorite}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleCategory(key);
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1e222d] transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        className={cn(
+                          "h-4 w-4",
+                          key === "major" && "text-green-500",
+                          key === "cross" && "text-blue-500",
+                          key === "exotic" && "text-purple-500",
+                          key === "custom" && "text-yellow-500",
+                        )}
                       />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      <span className="text-sm font-medium text-white">
+                        {category.name}
+                      </span>
+                      <span className="text-xs text-[#787b86]">
+                        ({category.pairs.length})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[#787b86] hidden sm:block">
+                        {category.description}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-[#787b86]" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-[#787b86]" />
+                      )}
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="pb-2">
+                      {category.pairs.map((symbol) => (
+                        <PairItem
+                          key={symbol}
+                          symbol={symbol}
+                          isSelected={selectedSymbol === symbol}
+                          isFavorite={favorites.includes(symbol)}
+                          onSelect={handleSelect}
+                          onToggleFavorite={onToggleFavorite}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
           {/* No Results */}
-          {!isLoadingSymbols && Object.keys(filteredCategories).length === 0 && favoritePairs.length === 0 && (
-            <div className="py-8 text-center">
-              <Search className="h-8 w-8 text-[#787b86] mx-auto mb-2" />
-              <p className="text-[#787b86] text-sm">No pairs found for "{searchQuery}"</p>
-            </div>
-          )}
+          {!isLoadingSymbols &&
+            Object.keys(filteredCategories).length === 0 &&
+            favoritePairs.length === 0 && (
+              <div className="py-8 text-center">
+                <Search className="h-8 w-8 text-[#787b86] mx-auto mb-2" />
+                <p className="text-[#787b86] text-sm">
+                  No pairs found for "{searchQuery}"
+                </p>
+              </div>
+            )}
         </div>
       </DialogContent>
     </Dialog>
@@ -367,8 +453,8 @@ function PairItem({
   onToggleFavorite?: (symbol: ForexSymbol) => void;
 }) {
   const info = getPairInfo(symbol);
-  const baseFlag = CURRENCY_FLAGS[info.base] || '💱';
-  const quoteFlag = CURRENCY_FLAGS[info.quote] || '💱';
+  const baseFlag = CURRENCY_FLAGS[info.base] || "💱";
+  const quoteFlag = CURRENCY_FLAGS[info.quote] || "💱";
 
   return (
     <button
@@ -380,7 +466,7 @@ function PairItem({
       }}
       className={cn(
         "w-full flex items-center justify-between px-4 py-2 hover:bg-[#1e222d] transition-colors group",
-        isSelected && "bg-[#2962ff]/20 hover:bg-[#2962ff]/30"
+        isSelected && "bg-[#2962ff]/20 hover:bg-[#2962ff]/30",
       )}
     >
       <div className="flex items-center gap-3">
@@ -389,13 +475,15 @@ function PairItem({
           <span className="text-lg">{baseFlag}</span>
           <span className="text-lg">{quoteFlag}</span>
         </div>
-        
+
         {/* Symbol and Name */}
         <div className="text-left">
-          <div className={cn(
-            "text-sm font-medium",
-            isSelected ? "text-[#2962ff]" : "text-white"
-          )}>
+          <div
+            className={cn(
+              "text-sm font-medium",
+              isSelected ? "text-[#2962ff]" : "text-white",
+            )}
+          >
             {symbol}
           </div>
           <div className="text-[10px] text-[#787b86] truncate max-w-[150px]">
@@ -415,7 +503,9 @@ function PairItem({
           }}
           className={cn(
             "p-1 rounded hover:bg-[#2b2b43] transition-colors",
-            isFavorite ? "text-yellow-500" : "text-[#787b86] opacity-0 group-hover:opacity-100"
+            isFavorite
+              ? "text-yellow-500"
+              : "text-[#787b86] opacity-0 group-hover:opacity-100",
           )}
         >
           <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
@@ -423,9 +513,7 @@ function PairItem({
       )}
 
       {/* Selected Indicator */}
-      {isSelected && (
-        <div className="w-1.5 h-1.5 rounded-full bg-[#2962ff]" />
-      )}
+      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#2962ff]" />}
     </button>
   );
 }
@@ -441,8 +529,8 @@ export function SymbolSelectorButton({
   className?: string;
 }) {
   const info = getPairInfo(symbol);
-  const baseFlag = CURRENCY_FLAGS[info.base] || '💱';
-  const quoteFlag = CURRENCY_FLAGS[info.quote] || '💱';
+  const baseFlag = CURRENCY_FLAGS[info.base] || "💱";
+  const quoteFlag = CURRENCY_FLAGS[info.quote] || "💱";
 
   return (
     <Button
@@ -455,7 +543,7 @@ export function SymbolSelectorButton({
       }}
       className={cn(
         "h-8 px-2 gap-1.5 hover:bg-[#2a2e39] text-white",
-        className
+        className,
       )}
     >
       <div className="flex -space-x-1">
@@ -469,4 +557,3 @@ export function SymbolSelectorButton({
 }
 
 export default SymbolSelector;
-

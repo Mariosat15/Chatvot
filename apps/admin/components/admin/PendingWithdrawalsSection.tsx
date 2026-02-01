@@ -1,15 +1,28 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   Wallet,
   RefreshCw,
@@ -33,7 +46,7 @@ import {
   Download,
   Building2,
   CreditCard,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface WithdrawalRequest {
   _id: string;
@@ -44,7 +57,14 @@ interface WithdrawalRequest {
   amountEUR: number;
   platformFee: number;
   netAmountEUR: number;
-  status: 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | 'cancelled' | 'failed';
+  status:
+    | "pending"
+    | "approved"
+    | "processing"
+    | "completed"
+    | "rejected"
+    | "cancelled"
+    | "failed";
   payoutMethod: string;
   payoutId?: string;
   rejectionReason?: string;
@@ -103,13 +123,13 @@ interface WithdrawalStats {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  approved: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  processing: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  rejected: 'bg-red-500/20 text-red-300 border-red-500/30',
-  cancelled: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  failed: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  pending: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  approved: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  processing: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+  completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  rejected: "bg-red-500/20 text-red-300 border-red-500/30",
+  cancelled: "bg-gray-500/20 text-gray-300 border-gray-500/30",
+  failed: "bg-orange-500/20 text-orange-300 border-orange-500/30",
 };
 
 // Admin bank account interface
@@ -126,48 +146,53 @@ interface AdminBankAccount {
   isDefault: boolean;
 }
 
-type TabType = 'pending' | 'history';
+type TabType = "pending" | "history";
 
 export default function PendingWithdrawalsSection() {
-  const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [stats, setStats] = useState<WithdrawalStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('pending');
-  const [sandboxFilter, setSandboxFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [sandboxFilter, setSandboxFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  
+
   // History tab filters
-  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
-  const [historyDateFrom, setHistoryDateFrom] = useState('');
-  const [historyDateTo, setHistoryDateTo] = useState('');
-  const [historyMinAmount, setHistoryMinAmount] = useState('');
-  const [historyMaxAmount, setHistoryMaxAmount] = useState('');
-  const [historyCompanyBankFilter, setHistoryCompanyBankFilter] = useState('all');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyMinAmount, setHistoryMinAmount] = useState("");
+  const [historyMaxAmount, setHistoryMaxAmount] = useState("");
+  const [historyCompanyBankFilter, setHistoryCompanyBankFilter] =
+    useState("all");
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyWithdrawals, setHistoryWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [historyWithdrawals, setHistoryWithdrawals] = useState<
+    WithdrawalRequest[]
+  >([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  
+
   // Admin bank accounts for withdrawal processing
-  const [adminBankAccounts, setAdminBankAccounts] = useState<AdminBankAccount[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState<string>('');
-  
+  const [adminBankAccounts, setAdminBankAccounts] = useState<
+    AdminBankAccount[]
+  >([]);
+  const [selectedBankId, setSelectedBankId] = useState<string>("");
+
   // Action dialog state
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
     withdrawal: WithdrawalRequest | null;
     action: string;
-  }>({ open: false, withdrawal: null, action: '' });
-  const [actionReason, setActionReason] = useState('');
-  const [actionNote, setActionNote] = useState('');
+  }>({ open: false, withdrawal: null, action: "" });
+  const [actionReason, setActionReason] = useState("");
+  const [actionNote, setActionNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   // Detail dialog state
@@ -181,27 +206,39 @@ export default function PendingWithdrawalsSection() {
     fetchAdminBankAccounts();
     clearSelection(); // Clear selection when filters change
   }, [statusFilter, sandboxFilter, page]);
-  
+
   useEffect(() => {
-    if (activeTab === 'history') {
+    if (activeTab === "history") {
       fetchHistoryWithdrawals();
     }
-  }, [activeTab, historyStatusFilter, historyDateFrom, historyDateTo, historyMinAmount, historyMaxAmount, historyCompanyBankFilter, historyPage, sandboxFilter]);
-  
+  }, [
+    activeTab,
+    historyStatusFilter,
+    historyDateFrom,
+    historyDateTo,
+    historyMinAmount,
+    historyMaxAmount,
+    historyCompanyBankFilter,
+    historyPage,
+    sandboxFilter,
+  ]);
+
   const fetchAdminBankAccounts = async () => {
     try {
-      const response = await fetch('/api/admin-bank-accounts');
+      const response = await fetch("/api/admin-bank-accounts");
       if (response.ok) {
         const data = await response.json();
         setAdminBankAccounts(data.accounts || []);
         // Set default bank as selected
-        const defaultBank = data.accounts?.find((b: AdminBankAccount) => b.isDefault);
+        const defaultBank = data.accounts?.find(
+          (b: AdminBankAccount) => b.isDefault,
+        );
         if (defaultBank) {
           setSelectedBankId(defaultBank._id);
         }
       }
     } catch (error) {
-      console.error('Error fetching admin bank accounts:', error);
+      console.error("Error fetching admin bank accounts:", error);
     }
   };
 
@@ -211,77 +248,77 @@ export default function PendingWithdrawalsSection() {
       const params = new URLSearchParams({
         status: statusFilter,
         page: page.toString(),
-        limit: '20',
+        limit: "20",
       });
-      if (sandboxFilter !== 'all') {
-        params.set('sandbox', sandboxFilter);
+      if (sandboxFilter !== "all") {
+        params.set("sandbox", sandboxFilter);
       }
 
       const response = await fetch(`/api/withdrawals?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      
+      if (!response.ok) throw new Error("Failed to fetch");
+
       const data = await response.json();
       setWithdrawals(data.withdrawals);
       setStats(data.stats);
       setTotalPages(data.pagination.pages);
       setTotal(data.pagination.total);
     } catch (error) {
-      toast.error('Failed to load withdrawals');
+      toast.error("Failed to load withdrawals");
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const fetchHistoryWithdrawals = async () => {
     setHistoryLoading(true);
     try {
       const params = new URLSearchParams({
         page: historyPage.toString(),
-        limit: '20',
-        historyMode: 'true', // Signal we want history (completed/rejected/etc)
+        limit: "20",
+        historyMode: "true", // Signal we want history (completed/rejected/etc)
       });
-      
+
       // Status filter for history
-      if (historyStatusFilter !== 'all') {
-        params.set('status', historyStatusFilter);
+      if (historyStatusFilter !== "all") {
+        params.set("status", historyStatusFilter);
       } else {
         // Default to history statuses
-        params.set('status', 'completed,rejected,cancelled,failed');
+        params.set("status", "completed,rejected,cancelled,failed");
       }
-      
-      if (sandboxFilter !== 'all') {
-        params.set('sandbox', sandboxFilter);
+
+      if (sandboxFilter !== "all") {
+        params.set("sandbox", sandboxFilter);
       }
-      
+
       if (historyDateFrom) {
-        params.set('dateFrom', historyDateFrom);
+        params.set("dateFrom", historyDateFrom);
       }
       if (historyDateTo) {
-        params.set('dateTo', historyDateTo);
+        params.set("dateTo", historyDateTo);
       }
       if (historyMinAmount) {
-        params.set('minAmount', historyMinAmount);
+        params.set("minAmount", historyMinAmount);
       }
       if (historyMaxAmount) {
-        params.set('maxAmount', historyMaxAmount);
+        params.set("maxAmount", historyMaxAmount);
       }
       if (searchQuery) {
-        params.set('search', searchQuery);
+        params.set("search", searchQuery);
       }
-      if (historyCompanyBankFilter && historyCompanyBankFilter !== 'all') {
-        params.set('companyBankId', historyCompanyBankFilter);
+      if (historyCompanyBankFilter && historyCompanyBankFilter !== "all") {
+        params.set("companyBankId", historyCompanyBankFilter);
       }
 
       const response = await fetch(`/api/withdrawals?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      
+      if (!response.ok) throw new Error("Failed to fetch");
+
       const data = await response.json();
       setHistoryWithdrawals(data.withdrawals);
       setHistoryTotalPages(data.pagination.pages);
       setHistoryTotal(data.pagination.total);
     } catch (error) {
-      toast.error('Failed to load withdrawal history');
+      toast.error("Failed to load withdrawal history");
       console.error(error);
     } finally {
       setHistoryLoading(false);
@@ -294,14 +331,16 @@ export default function PendingWithdrawalsSection() {
     setActionLoading(true);
     try {
       // Get selected bank details for completed withdrawals
-      const selectedBank = actionDialog.action === 'completed' && selectedBankId
-        ? adminBankAccounts.find(b => b._id === selectedBankId)
-        : null;
+      const selectedBank =
+        actionDialog.action === "completed" && selectedBankId
+          ? adminBankAccounts.find((b) => b._id === selectedBankId)
+          : null;
 
       // Get all withdrawals to process (either single or bulk)
-      const withdrawalsToProcess = selectedIds.size > 1 && selectedIds.has(actionDialog.withdrawal._id)
-        ? getSelectedWithdrawals()
-        : [actionDialog.withdrawal];
+      const withdrawalsToProcess =
+        selectedIds.size > 1 && selectedIds.has(actionDialog.withdrawal._id)
+          ? getSelectedWithdrawals()
+          : [actionDialog.withdrawal];
 
       let successCount = 0;
       let errorCount = 0;
@@ -309,30 +348,35 @@ export default function PendingWithdrawalsSection() {
       for (const withdrawal of withdrawalsToProcess) {
         try {
           const response = await fetch(`/api/withdrawals/${withdrawal._id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               action: actionDialog.action,
               reason: actionReason,
               adminNote: actionNote,
               // Include company bank details when completing (send full details, backend will mask)
-              companyBankUsed: selectedBank ? {
-                bankId: selectedBank._id,
-                accountName: selectedBank.accountName,
-                accountHolderName: selectedBank.accountHolderName,
-                bankName: selectedBank.bankName,
-                iban: selectedBank.iban,
-                accountNumber: selectedBank.accountNumber,
-                country: selectedBank.country,
-                currency: selectedBank.currency,
-              } : undefined,
+              companyBankUsed: selectedBank
+                ? {
+                    bankId: selectedBank._id,
+                    accountName: selectedBank.accountName,
+                    accountHolderName: selectedBank.accountHolderName,
+                    bankName: selectedBank.bankName,
+                    iban: selectedBank.iban,
+                    accountNumber: selectedBank.accountNumber,
+                    country: selectedBank.country,
+                    currency: selectedBank.currency,
+                  }
+                : undefined,
             }),
           });
 
           const data = await response.json();
           if (!response.ok) {
             errorCount++;
-            console.error(`Failed to process withdrawal ${withdrawal._id}:`, data.error);
+            console.error(
+              `Failed to process withdrawal ${withdrawal._id}:`,
+              data.error,
+            );
           } else {
             successCount++;
           }
@@ -347,24 +391,24 @@ export default function PendingWithdrawalsSection() {
         toast.success(
           withdrawalsToProcess.length === 1
             ? `Withdrawal ${actionDialog.action} successfully`
-            : `${successCount} withdrawal(s) ${actionDialog.action} successfully`
+            : `${successCount} withdrawal(s) ${actionDialog.action} successfully`,
         );
       } else if (successCount > 0) {
         toast.warning(`${successCount} succeeded, ${errorCount} failed`);
       } else {
-        toast.error('Failed to process withdrawals');
+        toast.error("Failed to process withdrawals");
       }
 
-      setActionDialog({ open: false, withdrawal: null, action: '' });
-      setActionReason('');
-      setActionNote('');
+      setActionDialog({ open: false, withdrawal: null, action: "" });
+      setActionReason("");
+      setActionNote("");
       clearSelection(); // Clear selection after bulk action
       fetchWithdrawals();
-      if (activeTab === 'history') {
+      if (activeTab === "history") {
         fetchHistoryWithdrawals();
       }
     } catch (error) {
-      toast.error('Failed to process action');
+      toast.error("Failed to process action");
       console.error(error);
     } finally {
       setActionLoading(false);
@@ -373,13 +417,13 @@ export default function PendingWithdrawalsSection() {
 
   const openActionDialog = (withdrawal: WithdrawalRequest, action: string) => {
     setActionDialog({ open: true, withdrawal, action });
-    setActionReason('');
-    setActionNote('');
+    setActionReason("");
+    setActionNote("");
   };
 
   // Selection handlers
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
         newSet.delete(id);
@@ -391,13 +435,16 @@ export default function PendingWithdrawalsSection() {
   };
 
   const selectAll = () => {
-    const currentList = activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals;
+    const currentList =
+      activeTab === "pending"
+        ? filteredWithdrawals
+        : filteredHistoryWithdrawals;
     if (selectedIds.size === currentList.length) {
       // Deselect all
       setSelectedIds(new Set());
     } else {
       // Select all
-      setSelectedIds(new Set(currentList.map(w => w._id)));
+      setSelectedIds(new Set(currentList.map((w) => w._id)));
     }
   };
 
@@ -407,8 +454,11 @@ export default function PendingWithdrawalsSection() {
 
   // Get selected withdrawals
   const getSelectedWithdrawals = (): WithdrawalRequest[] => {
-    const currentList = activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals;
-    return currentList.filter(w => selectedIds.has(w._id));
+    const currentList =
+      activeTab === "pending"
+        ? filteredWithdrawals
+        : filteredHistoryWithdrawals;
+    return currentList.filter((w) => selectedIds.has(w._id));
   };
 
   // Check if all selected have same status (for bulk actions)
@@ -416,12 +466,12 @@ export default function PendingWithdrawalsSection() {
     const selected = getSelectedWithdrawals();
     if (selected.length === 0) return null;
     const firstStatus = selected[0].status;
-    return selected.every(w => w.status === firstStatus) ? firstStatus : null;
+    return selected.every((w) => w.status === firstStatus) ? firstStatus : null;
   };
 
   // Generate Reference ID from withdrawal ID (matches email format)
   const getRefId = (id: string) => id.slice(-8).toUpperCase();
-  
+
   const filteredWithdrawals = searchQuery
     ? withdrawals.filter((w) => {
         const query = searchQuery.toLowerCase();
@@ -435,7 +485,7 @@ export default function PendingWithdrawalsSection() {
         );
       })
     : withdrawals;
-    
+
   const filteredHistoryWithdrawals = searchQuery
     ? historyWithdrawals.filter((w) => {
         const query = searchQuery.toLowerCase();
@@ -453,24 +503,29 @@ export default function PendingWithdrawalsSection() {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
   };
-  
+
   const resetHistoryFilters = () => {
-    setHistoryStatusFilter('all');
-    setHistoryDateFrom('');
-    setHistoryDateTo('');
-    setHistoryMinAmount('');
-    setHistoryMaxAmount('');
-    setHistoryCompanyBankFilter('all');
-    setSearchQuery('');
+    setHistoryStatusFilter("all");
+    setHistoryDateFrom("");
+    setHistoryDateTo("");
+    setHistoryMinAmount("");
+    setHistoryMaxAmount("");
+    setHistoryCompanyBankFilter("all");
+    setSearchQuery("");
     setHistoryPage(1);
   };
 
   // Render withdrawal row (shared between tabs)
-  const renderWithdrawalRow = (withdrawal: WithdrawalRequest, showActions: boolean = true) => (
+  const renderWithdrawalRow = (
+    withdrawal: WithdrawalRequest,
+    showActions: boolean = true,
+  ) => (
     <div
       key={withdrawal._id}
       className={`bg-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-colors ${
-        selectedIds.has(withdrawal._id) ? 'ring-2 ring-teal-500 bg-teal-500/10' : ''
+        selectedIds.has(withdrawal._id)
+          ? "ring-2 ring-teal-500 bg-teal-500/10"
+          : ""
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -488,7 +543,10 @@ export default function PendingWithdrawalsSection() {
             <Badge className={STATUS_COLORS[withdrawal.status]}>
               {withdrawal.status.toUpperCase()}
             </Badge>
-            <span className="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-0.5 rounded select-all" title="Reference ID - Click to copy">
+            <span
+              className="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-0.5 rounded select-all"
+              title="Reference ID - Click to copy"
+            >
               REF: {getRefId(withdrawal._id)}
             </span>
             {withdrawal.isSandbox && (
@@ -497,27 +555,35 @@ export default function PendingWithdrawalsSection() {
               </Badge>
             )}
             {withdrawal.kycVerified && (
-              <Badge className="bg-green-500/20 text-green-300">
-                KYC ✓
-              </Badge>
+              <Badge className="bg-green-500/20 text-green-300">KYC ✓</Badge>
             )}
             {withdrawal.companyBankUsed && (
               <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">
                 <Building2 className="h-3 w-3 mr-1" />
-                {withdrawal.companyBankUsed.accountName || withdrawal.companyBankUsed.bankName}
+                {withdrawal.companyBankUsed.accountName ||
+                  withdrawal.companyBankUsed.bankName}
               </Badge>
             )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-gray-500 text-xs">User</p>
-              <p className="text-white font-medium truncate" title={withdrawal.userName}>
-                {withdrawal.userName || 'Unknown'}
+              <p
+                className="text-white font-medium truncate"
+                title={withdrawal.userName}
+              >
+                {withdrawal.userName || "Unknown"}
               </p>
-              <p className="text-xs text-gray-400 truncate" title={withdrawal.userEmail}>
+              <p
+                className="text-xs text-gray-400 truncate"
+                title={withdrawal.userEmail}
+              >
                 {withdrawal.userEmail}
               </p>
-              <p className="text-[10px] text-gray-500 font-mono truncate" title={withdrawal.userId}>
+              <p
+                className="text-[10px] text-gray-500 font-mono truncate"
+                title={withdrawal.userId}
+              >
                 ID: {withdrawal.userId.slice(0, 12)}...
               </p>
             </div>
@@ -533,38 +599,46 @@ export default function PendingWithdrawalsSection() {
             <div>
               <p className="text-gray-500 text-xs">Method</p>
               <p className="text-white flex items-center gap-1">
-                {withdrawal.payoutMethod === 'original_method' || withdrawal.payoutMethod === 'nuvei_card_payout' || withdrawal.payoutMethod === 'card_payout' ? (
+                {withdrawal.payoutMethod === "original_method" ||
+                withdrawal.payoutMethod === "nuvei_card_payout" ||
+                withdrawal.payoutMethod === "card_payout" ? (
                   <>
                     <CreditCard className="h-3 w-3 text-blue-400" />
                     <span>Card Payout</span>
                   </>
-                ) : withdrawal.payoutMethod === 'bank_transfer' || withdrawal.payoutMethod === 'nuvei_bank_transfer' ? (
+                ) : withdrawal.payoutMethod === "bank_transfer" ||
+                  withdrawal.payoutMethod === "nuvei_bank_transfer" ? (
                   <>
                     <Building2 className="h-3 w-3 text-teal-400" />
                     <span>Bank Transfer</span>
                   </>
                 ) : (
-                  withdrawal.payoutMethod?.replace(/_/g, ' ')
+                  withdrawal.payoutMethod?.replace(/_/g, " ")
                 )}
               </p>
               {/* Show bank hint for bank transfers */}
-              {withdrawal.payoutMethod === 'bank_transfer' && withdrawal.userBankDetails && (
-                <p className="text-[10px] text-teal-400/70 truncate" title={withdrawal.userBankDetails.iban}>
-                  IBAN: ...{withdrawal.userBankDetails.ibanLast4 || withdrawal.userBankDetails.iban?.slice(-4)}
-                </p>
-              )}
+              {withdrawal.payoutMethod === "bank_transfer" &&
+                withdrawal.userBankDetails && (
+                  <p
+                    className="text-[10px] text-teal-400/70 truncate"
+                    title={withdrawal.userBankDetails.iban}
+                  >
+                    IBAN: ...
+                    {withdrawal.userBankDetails.ibanLast4 ||
+                      withdrawal.userBankDetails.iban?.slice(-4)}
+                  </p>
+                )}
               {/* Show card hint for original method */}
-              {withdrawal.payoutMethod === 'original_method' && withdrawal.originalCardDetails?.last4 && (
-                <p className="text-[10px] text-blue-400/70">
-                  Card: ****{withdrawal.originalCardDetails.last4}
-                </p>
-              )}
+              {withdrawal.payoutMethod === "original_method" &&
+                withdrawal.originalCardDetails?.last4 && (
+                  <p className="text-[10px] text-blue-400/70">
+                    Card: ****{withdrawal.originalCardDetails.last4}
+                  </p>
+                )}
             </div>
             <div>
               <p className="text-gray-500 text-xs">Requested</p>
-              <p className="text-white">
-                {formatDate(withdrawal.requestedAt)}
-              </p>
+              <p className="text-white">{formatDate(withdrawal.requestedAt)}</p>
             </div>
             {withdrawal.completedAt && (
               <div>
@@ -602,12 +676,12 @@ export default function PendingWithdrawalsSection() {
           </Button>
           {showActions && (
             <>
-              {withdrawal.status === 'pending' && (
+              {withdrawal.status === "pending" && (
                 <>
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => openActionDialog(withdrawal, 'approved')}
+                    onClick={() => openActionDialog(withdrawal, "approved")}
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Approve
@@ -615,29 +689,29 @@ export default function PendingWithdrawalsSection() {
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => openActionDialog(withdrawal, 'rejected')}
+                    onClick={() => openActionDialog(withdrawal, "rejected")}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
                     Reject
                   </Button>
                 </>
               )}
-              {withdrawal.status === 'approved' && (
+              {withdrawal.status === "approved" && (
                 <Button
                   size="sm"
                   className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => openActionDialog(withdrawal, 'processing')}
+                  onClick={() => openActionDialog(withdrawal, "processing")}
                 >
                   <PlayCircle className="h-4 w-4 mr-1" />
                   Process
                 </Button>
               )}
-              {withdrawal.status === 'processing' && (
+              {withdrawal.status === "processing" && (
                 <>
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => openActionDialog(withdrawal, 'completed')}
+                    onClick={() => openActionDialog(withdrawal, "completed")}
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Complete
@@ -645,7 +719,7 @@ export default function PendingWithdrawalsSection() {
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => openActionDialog(withdrawal, 'failed')}
+                    onClick={() => openActionDialog(withdrawal, "failed")}
                   >
                     <AlertTriangle className="h-4 w-4 mr-1" />
                     Failed
@@ -684,12 +758,14 @@ export default function PendingWithdrawalsSection() {
             <Button
               onClick={() => {
                 fetchWithdrawals();
-                if (activeTab === 'history') fetchHistoryWithdrawals();
+                if (activeTab === "history") fetchHistoryWithdrawals();
               }}
               disabled={loading || historyLoading}
               className="bg-white/20 hover:bg-white/30 text-white"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${(loading || historyLoading) ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${loading || historyLoading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
@@ -699,27 +775,33 @@ export default function PendingWithdrawalsSection() {
         <div className="px-6 pt-4 border-b border-gray-700">
           <div className="flex gap-2">
             <button
-              onClick={() => setActiveTab('pending')}
+              onClick={() => setActiveTab("pending")}
               className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
-                activeTab === 'pending'
-                  ? 'bg-gray-700 text-white border-b-2 border-teal-500'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                activeTab === "pending"
+                  ? "bg-gray-700 text-white border-b-2 border-teal-500"
+                  : "text-gray-400 hover:text-white hover:bg-gray-700/50"
               }`}
             >
               <Clock className="h-4 w-4" />
               Pending Requests
-              {stats && stats.pending.count + stats.approved.count + stats.processing.count > 0 && (
-                <Badge className="bg-amber-500/20 text-amber-300 text-xs">
-                  {stats.pending.count + stats.approved.count + stats.processing.count}
-                </Badge>
-              )}
+              {stats &&
+                stats.pending.count +
+                  stats.approved.count +
+                  stats.processing.count >
+                  0 && (
+                  <Badge className="bg-amber-500/20 text-amber-300 text-xs">
+                    {stats.pending.count +
+                      stats.approved.count +
+                      stats.processing.count}
+                  </Badge>
+                )}
             </button>
             <button
-              onClick={() => setActiveTab('history')}
+              onClick={() => setActiveTab("history")}
               className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
-                activeTab === 'history'
-                  ? 'bg-gray-700 text-white border-b-2 border-teal-500'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                activeTab === "history"
+                  ? "bg-gray-700 text-white border-b-2 border-teal-500"
+                  : "text-gray-400 hover:text-white hover:bg-gray-700/50"
               }`}
             >
               <History className="h-4 w-4" />
@@ -729,24 +811,26 @@ export default function PendingWithdrawalsSection() {
         </div>
 
         {/* Stats (only show for pending tab) */}
-        {activeTab === 'pending' && stats && (
+        {activeTab === "pending" && stats && (
           <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {Object.entries(stats).map(([status, data]) => (
               <div
                 key={status}
                 className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  statusFilter === status
-                    ? 'ring-2 ring-teal-500'
-                    : ''
+                  statusFilter === status ? "ring-2 ring-teal-500" : ""
                 } ${STATUS_COLORS[status]}`}
                 onClick={() => {
                   setStatusFilter(status);
                   setPage(1);
                 }}
               >
-                <p className="text-xs uppercase font-medium opacity-70">{status}</p>
+                <p className="text-xs uppercase font-medium opacity-70">
+                  {status}
+                </p>
                 <p className="text-2xl font-bold">{data.count}</p>
-                <p className="text-xs opacity-70">€{data.totalAmount.toFixed(2)}</p>
+                <p className="text-xs opacity-70">
+                  €{data.totalAmount.toFixed(2)}
+                </p>
               </div>
             ))}
           </div>
@@ -754,7 +838,7 @@ export default function PendingWithdrawalsSection() {
       </div>
 
       {/* Filters */}
-      {activeTab === 'pending' ? (
+      {activeTab === "pending" ? (
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
@@ -767,7 +851,13 @@ export default function PendingWithdrawalsSection() {
               />
             </div>
           </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v);
+              setPage(1);
+            }}
+          >
             <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -782,7 +872,13 @@ export default function PendingWithdrawalsSection() {
               <SelectItem value="failed">Failed</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={sandboxFilter} onValueChange={(v) => { setSandboxFilter(v); setPage(1); }}>
+          <Select
+            value={sandboxFilter}
+            onValueChange={(v) => {
+              setSandboxFilter(v);
+              setPage(1);
+            }}
+          >
             <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
               <SelectValue placeholder="Mode" />
             </SelectTrigger>
@@ -817,11 +913,17 @@ export default function PendingWithdrawalsSection() {
                   />
                 </div>
               </div>
-              
+
               {/* Status Filter */}
               <div>
                 <Label className="text-gray-400 text-xs">Status</Label>
-                <Select value={historyStatusFilter} onValueChange={(v) => { setHistoryStatusFilter(v); setHistoryPage(1); }}>
+                <Select
+                  value={historyStatusFilter}
+                  onValueChange={(v) => {
+                    setHistoryStatusFilter(v);
+                    setHistoryPage(1);
+                  }}
+                >
                   <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -834,11 +936,17 @@ export default function PendingWithdrawalsSection() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Mode Filter */}
               <div>
                 <Label className="text-gray-400 text-xs">Mode</Label>
-                <Select value={sandboxFilter} onValueChange={(v) => { setSandboxFilter(v); setHistoryPage(1); }}>
+                <Select
+                  value={sandboxFilter}
+                  onValueChange={(v) => {
+                    setSandboxFilter(v);
+                    setHistoryPage(1);
+                  }}
+                >
                   <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -849,30 +957,36 @@ export default function PendingWithdrawalsSection() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Date From */}
               <div>
                 <Label className="text-gray-400 text-xs">From Date</Label>
                 <Input
                   type="date"
                   value={historyDateFrom}
-                  onChange={(e) => { setHistoryDateFrom(e.target.value); setHistoryPage(1); }}
+                  onChange={(e) => {
+                    setHistoryDateFrom(e.target.value);
+                    setHistoryPage(1);
+                  }}
                   className="mt-1 bg-gray-700 border-gray-600"
                 />
               </div>
-              
+
               {/* Date To */}
               <div>
                 <Label className="text-gray-400 text-xs">To Date</Label>
                 <Input
                   type="date"
                   value={historyDateTo}
-                  onChange={(e) => { setHistoryDateTo(e.target.value); setHistoryPage(1); }}
+                  onChange={(e) => {
+                    setHistoryDateTo(e.target.value);
+                    setHistoryPage(1);
+                  }}
                   className="mt-1 bg-gray-700 border-gray-600"
                 />
               </div>
             </div>
-            
+
             {/* Second row: Amount filters, company bank, and actions */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
               <div>
@@ -881,7 +995,10 @@ export default function PendingWithdrawalsSection() {
                   type="number"
                   placeholder="0.00"
                   value={historyMinAmount}
-                  onChange={(e) => { setHistoryMinAmount(e.target.value); setHistoryPage(1); }}
+                  onChange={(e) => {
+                    setHistoryMinAmount(e.target.value);
+                    setHistoryPage(1);
+                  }}
                   className="mt-1 bg-gray-700 border-gray-600"
                 />
               </div>
@@ -891,14 +1008,25 @@ export default function PendingWithdrawalsSection() {
                   type="number"
                   placeholder="No limit"
                   value={historyMaxAmount}
-                  onChange={(e) => { setHistoryMaxAmount(e.target.value); setHistoryPage(1); }}
+                  onChange={(e) => {
+                    setHistoryMaxAmount(e.target.value);
+                    setHistoryPage(1);
+                  }}
                   className="mt-1 bg-gray-700 border-gray-600"
                 />
               </div>
               {/* Company Bank Filter */}
               <div>
-                <Label className="text-gray-400 text-xs">Processed By Bank</Label>
-                <Select value={historyCompanyBankFilter} onValueChange={(v) => { setHistoryCompanyBankFilter(v); setHistoryPage(1); }}>
+                <Label className="text-gray-400 text-xs">
+                  Processed By Bank
+                </Label>
+                <Select
+                  value={historyCompanyBankFilter}
+                  onValueChange={(v) => {
+                    setHistoryCompanyBankFilter(v);
+                    setHistoryPage(1);
+                  }}
+                >
                   <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
                     <SelectValue placeholder="All Banks" />
                   </SelectTrigger>
@@ -909,7 +1037,9 @@ export default function PendingWithdrawalsSection() {
                         <div className="flex items-center gap-2">
                           <Building2 className="h-3 w-3" />
                           <span>{bank.accountName}</span>
-                          {bank.isDefault && <span className="text-emerald-400 text-xs">★</span>}
+                          {bank.isDefault && (
+                            <span className="text-emerald-400 text-xs">★</span>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -946,57 +1076,71 @@ export default function PendingWithdrawalsSection() {
           <div className="space-y-4">
             <CardTitle className="text-white flex items-center justify-between">
               <span>
-                {activeTab === 'pending' 
-                  ? `Withdrawal Requests (${total})` 
-                  : `Withdrawal History (${historyTotal})`
-                }
+                {activeTab === "pending"
+                  ? `Withdrawal Requests (${total})`
+                  : `Withdrawal History (${historyTotal})`}
               </span>
               {/* Pagination */}
-              {(activeTab === 'pending' ? totalPages : historyTotalPages) > 1 && (
+              {(activeTab === "pending" ? totalPages : historyTotalPages) >
+                1 && (
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => activeTab === 'pending' 
-                      ? setPage((p) => Math.max(1, p - 1))
-                      : setHistoryPage((p) => Math.max(1, p - 1))
+                    onClick={() =>
+                      activeTab === "pending"
+                        ? setPage((p) => Math.max(1, p - 1))
+                        : setHistoryPage((p) => Math.max(1, p - 1))
                     }
-                    disabled={activeTab === 'pending' ? page === 1 : historyPage === 1}
+                    disabled={
+                      activeTab === "pending" ? page === 1 : historyPage === 1
+                    }
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm text-gray-400">
-                    Page {activeTab === 'pending' ? page : historyPage} of {activeTab === 'pending' ? totalPages : historyTotalPages}
+                    Page {activeTab === "pending" ? page : historyPage} of{" "}
+                    {activeTab === "pending" ? totalPages : historyTotalPages}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => activeTab === 'pending'
-                      ? setPage((p) => Math.min(totalPages, p + 1))
-                      : setHistoryPage((p) => Math.min(historyTotalPages, p + 1))
+                    onClick={() =>
+                      activeTab === "pending"
+                        ? setPage((p) => Math.min(totalPages, p + 1))
+                        : setHistoryPage((p) =>
+                            Math.min(historyTotalPages, p + 1),
+                          )
                     }
-                    disabled={activeTab === 'pending' ? page === totalPages : historyPage === historyTotalPages}
+                    disabled={
+                      activeTab === "pending"
+                        ? page === totalPages
+                        : historyPage === historyTotalPages
+                    }
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               )}
             </CardTitle>
-            
+
             {/* Selection Controls & Bulk Actions */}
-            {activeTab === 'pending' && (
+            {activeTab === "pending" && (
               <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
                 {/* Select All Checkbox */}
                 <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white">
                   <input
                     type="checkbox"
-                    checked={filteredWithdrawals.length > 0 && selectedIds.size === filteredWithdrawals.length}
+                    checked={
+                      filteredWithdrawals.length > 0 &&
+                      selectedIds.size === filteredWithdrawals.length
+                    }
                     onChange={selectAll}
                     className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500 focus:ring-offset-gray-800"
                   />
                   Select All
                 </label>
-                
+
                 {/* Selected Count */}
                 {selectedIds.size > 0 && (
                   <>
@@ -1013,14 +1157,14 @@ export default function PendingWithdrawalsSection() {
                       <XCircle className="h-3 w-3 mr-1" />
                       Clear
                     </Button>
-                    
+
                     <div className="h-4 w-px bg-gray-600" />
-                    
+
                     {/* Bulk Actions based on common status */}
                     {(() => {
                       const commonStatus = getCommonStatus();
                       const selected = getSelectedWithdrawals();
-                      
+
                       if (!commonStatus || selected.length === 0) {
                         return (
                           <span className="text-xs text-amber-400">
@@ -1028,11 +1172,13 @@ export default function PendingWithdrawalsSection() {
                           </span>
                         );
                       }
-                      
+
                       return (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-400">Bulk Actions:</span>
-                          {commonStatus === 'pending' && (
+                          <span className="text-xs text-gray-400">
+                            Bulk Actions:
+                          </span>
+                          {commonStatus === "pending" && (
                             <>
                               <Button
                                 size="sm"
@@ -1040,7 +1186,7 @@ export default function PendingWithdrawalsSection() {
                                 onClick={() => {
                                   // Process first selected
                                   if (selected.length > 0) {
-                                    openActionDialog(selected[0], 'approved');
+                                    openActionDialog(selected[0], "approved");
                                   }
                                 }}
                               >
@@ -1053,7 +1199,7 @@ export default function PendingWithdrawalsSection() {
                                 className="h-7 text-xs"
                                 onClick={() => {
                                   if (selected.length > 0) {
-                                    openActionDialog(selected[0], 'rejected');
+                                    openActionDialog(selected[0], "rejected");
                                   }
                                 }}
                               >
@@ -1062,13 +1208,13 @@ export default function PendingWithdrawalsSection() {
                               </Button>
                             </>
                           )}
-                          {commonStatus === 'approved' && (
+                          {commonStatus === "approved" && (
                             <Button
                               size="sm"
                               className="bg-purple-600 hover:bg-purple-700 h-7 text-xs"
                               onClick={() => {
                                 if (selected.length > 0) {
-                                  openActionDialog(selected[0], 'processing');
+                                  openActionDialog(selected[0], "processing");
                                 }
                               }}
                             >
@@ -1076,14 +1222,14 @@ export default function PendingWithdrawalsSection() {
                               Process ({selectedIds.size})
                             </Button>
                           )}
-                          {commonStatus === 'processing' && (
+                          {commonStatus === "processing" && (
                             <>
                               <Button
                                 size="sm"
                                 className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs"
                                 onClick={() => {
                                   if (selected.length > 0) {
-                                    openActionDialog(selected[0], 'completed');
+                                    openActionDialog(selected[0], "completed");
                                   }
                                 }}
                               >
@@ -1096,7 +1242,7 @@ export default function PendingWithdrawalsSection() {
                                 className="h-7 text-xs"
                                 onClick={() => {
                                   if (selected.length > 0) {
-                                    openActionDialog(selected[0], 'failed');
+                                    openActionDialog(selected[0], "failed");
                                   }
                                 }}
                               >
@@ -1115,21 +1261,26 @@ export default function PendingWithdrawalsSection() {
           </div>
         </CardHeader>
         <CardContent>
-          {(activeTab === 'pending' ? loading : historyLoading) ? (
+          {(activeTab === "pending" ? loading : historyLoading) ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="h-8 w-8 text-teal-400 animate-spin" />
             </div>
-          ) : (activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals).length === 0 ? (
+          ) : (activeTab === "pending"
+              ? filteredWithdrawals
+              : filteredHistoryWithdrawals
+            ).length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              {activeTab === 'pending' 
-                ? 'No withdrawal requests found' 
-                : 'No withdrawal history matching filters'
-              }
+              {activeTab === "pending"
+                ? "No withdrawal requests found"
+                : "No withdrawal history matching filters"}
             </div>
           ) : (
             <div className="space-y-3">
-              {(activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals).map((withdrawal) => 
-                renderWithdrawalRow(withdrawal, activeTab === 'pending')
+              {(activeTab === "pending"
+                ? filteredWithdrawals
+                : filteredHistoryWithdrawals
+              ).map((withdrawal) =>
+                renderWithdrawalRow(withdrawal, activeTab === "pending"),
               )}
             </div>
           )}
@@ -1137,41 +1288,56 @@ export default function PendingWithdrawalsSection() {
       </Card>
 
       {/* Action Dialog */}
-      <Dialog open={actionDialog.open} onOpenChange={(open) => !open && setActionDialog({ open: false, withdrawal: null, action: '' })}>
+      <Dialog
+        open={actionDialog.open}
+        onOpenChange={(open) =>
+          !open &&
+          setActionDialog({ open: false, withdrawal: null, action: "" })
+        }
+      >
         <DialogContent className="bg-gray-800 border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-white">
-              {actionDialog.action === 'approved' && '✅ Approve Withdrawal'}
-              {actionDialog.action === 'rejected' && '❌ Reject Withdrawal'}
-              {actionDialog.action === 'processing' && '⚡ Start Processing'}
-              {actionDialog.action === 'completed' && '🎉 Mark as Completed'}
-              {actionDialog.action === 'failed' && '⚠️ Mark as Failed'}
-              {selectedIds.size > 1 && actionDialog.withdrawal && selectedIds.has(actionDialog.withdrawal._id) && (
-                <Badge className="ml-2 bg-teal-500/20 text-teal-300">
-                  Bulk: {selectedIds.size} selected
-                </Badge>
-              )}
+              {actionDialog.action === "approved" && "✅ Approve Withdrawal"}
+              {actionDialog.action === "rejected" && "❌ Reject Withdrawal"}
+              {actionDialog.action === "processing" && "⚡ Start Processing"}
+              {actionDialog.action === "completed" && "🎉 Mark as Completed"}
+              {actionDialog.action === "failed" && "⚠️ Mark as Failed"}
+              {selectedIds.size > 1 &&
+                actionDialog.withdrawal &&
+                selectedIds.has(actionDialog.withdrawal._id) && (
+                  <Badge className="ml-2 bg-teal-500/20 text-teal-300">
+                    Bulk: {selectedIds.size} selected
+                  </Badge>
+                )}
             </DialogTitle>
             <DialogDescription>
               {actionDialog.withdrawal && (
                 <>
-                  {selectedIds.size > 1 && selectedIds.has(actionDialog.withdrawal._id) ? (
+                  {selectedIds.size > 1 &&
+                  selectedIds.has(actionDialog.withdrawal._id) ? (
                     <div className="space-y-1">
                       <span className="text-amber-300 font-medium">
                         Processing {selectedIds.size} withdrawals:
                       </span>
                       <div className="text-xs text-gray-400 max-h-24 overflow-y-auto">
-                        {getSelectedWithdrawals().map(w => (
-                          <div key={w._id}>• €{w.amountEUR.toFixed(2)} - {w.userEmail}</div>
+                        {getSelectedWithdrawals().map((w) => (
+                          <div key={w._id}>
+                            • €{w.amountEUR.toFixed(2)} - {w.userEmail}
+                          </div>
                         ))}
                       </div>
                       <div className="text-sm text-white font-medium mt-2">
-                        Total: €{getSelectedWithdrawals().reduce((sum, w) => sum + w.amountEUR, 0).toFixed(2)}
+                        Total: €
+                        {getSelectedWithdrawals()
+                          .reduce((sum, w) => sum + w.amountEUR, 0)
+                          .toFixed(2)}
                       </div>
                     </div>
                   ) : (
                     <span>
-                      €{actionDialog.withdrawal.amountEUR.toFixed(2)} for {actionDialog.withdrawal.userEmail}
+                      €{actionDialog.withdrawal.amountEUR.toFixed(2)} for{" "}
+                      {actionDialog.withdrawal.userEmail}
                     </span>
                   )}
                 </>
@@ -1180,42 +1346,61 @@ export default function PendingWithdrawalsSection() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Bank selection for completed withdrawals */}
-            {actionDialog.action === 'completed' && adminBankAccounts.length > 0 && (
-              <div>
-                <Label className="text-gray-300">Company Bank Account Used <span className="text-red-400">*</span></Label>
-                <p className="text-xs text-gray-500 mb-2">Select which company bank account processed this withdrawal (required)</p>
-                <Select value={selectedBankId} onValueChange={setSelectedBankId}>
-                  <SelectTrigger className={`bg-gray-700 border-gray-600 ${!selectedBankId ? 'border-red-500/50' : ''}`}>
-                    <SelectValue placeholder="⚠️ Select bank account..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {adminBankAccounts.map((bank) => (
-                      <SelectItem key={bank._id} value={bank._id}>
-                        <div className="flex items-center gap-2">
-                          <span>{bank.accountName}</span>
-                          <span className="text-gray-400 text-xs">({bank.bankName})</span>
-                          {bank.isDefault && (
-                            <span className="text-emerald-400 text-xs">★ Default</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {actionDialog.action === 'completed' && adminBankAccounts.length === 0 && (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                <p className="text-amber-300 text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  No company bank accounts configured
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Add bank accounts in Settings → Company Details to track which bank processed withdrawals.
-                </p>
-              </div>
-            )}
-            {(actionDialog.action === 'rejected' || actionDialog.action === 'failed') && (
+            {actionDialog.action === "completed" &&
+              adminBankAccounts.length > 0 && (
+                <div>
+                  <Label className="text-gray-300">
+                    Company Bank Account Used{" "}
+                    <span className="text-red-400">*</span>
+                  </Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Select which company bank account processed this withdrawal
+                    (required)
+                  </p>
+                  <Select
+                    value={selectedBankId}
+                    onValueChange={setSelectedBankId}
+                  >
+                    <SelectTrigger
+                      className={`bg-gray-700 border-gray-600 ${!selectedBankId ? "border-red-500/50" : ""}`}
+                    >
+                      <SelectValue placeholder="⚠️ Select bank account..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {adminBankAccounts.map((bank) => (
+                        <SelectItem key={bank._id} value={bank._id}>
+                          <div className="flex items-center gap-2">
+                            <span>{bank.accountName}</span>
+                            <span className="text-gray-400 text-xs">
+                              ({bank.bankName})
+                            </span>
+                            {bank.isDefault && (
+                              <span className="text-emerald-400 text-xs">
+                                ★ Default
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            {actionDialog.action === "completed" &&
+              adminBankAccounts.length === 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-amber-300 text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    No company bank accounts configured
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Add bank accounts in Settings → Company Details to track
+                    which bank processed withdrawals.
+                  </p>
+                </div>
+              )}
+            {(actionDialog.action === "rejected" ||
+              actionDialog.action === "failed") && (
               <div>
                 <Label className="text-gray-300">Reason (required)</Label>
                 <Textarea
@@ -1239,26 +1424,36 @@ export default function PendingWithdrawalsSection() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setActionDialog({ open: false, withdrawal: null, action: '' })}
+              onClick={() =>
+                setActionDialog({ open: false, withdrawal: null, action: "" })
+              }
             >
               Cancel
             </Button>
             <Button
               onClick={handleAction}
               disabled={
-                actionLoading || 
-                ((actionDialog.action === 'rejected' || actionDialog.action === 'failed') && !actionReason) ||
-                (actionDialog.action === 'completed' && adminBankAccounts.length > 0 && !selectedBankId)
+                actionLoading ||
+                ((actionDialog.action === "rejected" ||
+                  actionDialog.action === "failed") &&
+                  !actionReason) ||
+                (actionDialog.action === "completed" &&
+                  adminBankAccounts.length > 0 &&
+                  !selectedBankId)
               }
               className={
-                actionDialog.action === 'approved' || actionDialog.action === 'completed'
-                  ? 'bg-emerald-600 hover:bg-emerald-700'
-                  : actionDialog.action === 'rejected' || actionDialog.action === 'failed'
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-purple-600 hover:bg-purple-700'
+                actionDialog.action === "approved" ||
+                actionDialog.action === "completed"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : actionDialog.action === "rejected" ||
+                      actionDialog.action === "failed"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-purple-600 hover:bg-purple-700"
               }
             >
-              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {actionLoading && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Confirm
             </Button>
           </DialogFooter>
@@ -1266,7 +1461,12 @@ export default function PendingWithdrawalsSection() {
       </Dialog>
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialog.open} onOpenChange={(open) => !open && setDetailDialog({ open: false, withdrawal: null })}>
+      <Dialog
+        open={detailDialog.open}
+        onOpenChange={(open) =>
+          !open && setDetailDialog({ open: false, withdrawal: null })
+        }
+      >
         <DialogContent className="bg-gray-800 border-gray-700 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Withdrawal Details</DialogTitle>
@@ -1276,16 +1476,25 @@ export default function PendingWithdrawalsSection() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Reference ID</p>
-                  <p className="text-white font-mono text-sm select-all">{getRefId(detailDialog.withdrawal._id)}</p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-1 select-all" title="Full ID">{detailDialog.withdrawal._id}</p>
+                  <p className="text-white font-mono text-sm select-all">
+                    {getRefId(detailDialog.withdrawal._id)}
+                  </p>
+                  <p
+                    className="text-[10px] text-gray-500 font-mono mt-1 select-all"
+                    title="Full ID"
+                  >
+                    {detailDialog.withdrawal._id}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Status</p>
-                  <Badge className={STATUS_COLORS[detailDialog.withdrawal.status]}>
+                  <Badge
+                    className={STATUS_COLORS[detailDialog.withdrawal.status]}
+                  >
                     {detailDialog.withdrawal.status.toUpperCase()}
                   </Badge>
                 </div>
-                
+
                 {/* Enhanced User Information */}
                 <div className="col-span-2 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <p className="text-xs text-blue-400 font-semibold mb-3 flex items-center gap-1">
@@ -1296,11 +1505,15 @@ export default function PendingWithdrawalsSection() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500">Full Name</p>
-                        <p className="text-white font-medium">{detailDialog.withdrawal.userName || 'Not provided'}</p>
+                        <p className="text-white font-medium">
+                          {detailDialog.withdrawal.userName || "Not provided"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Email</p>
-                        <p className="text-white break-all">{detailDialog.withdrawal.userEmail}</p>
+                        <p className="text-white break-all">
+                          {detailDialog.withdrawal.userEmail}
+                        </p>
                       </div>
                     </div>
                     <div>
@@ -1313,64 +1526,102 @@ export default function PendingWithdrawalsSection() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Amount</p>
-                  <p className="text-emerald-400 font-bold">€{detailDialog.withdrawal.amountEUR.toFixed(2)}</p>
-                  <p className="text-xs text-gray-500">{detailDialog.withdrawal.amountCredits} credits</p>
+                  <p className="text-emerald-400 font-bold">
+                    €{detailDialog.withdrawal.amountEUR.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {detailDialog.withdrawal.amountCredits} credits
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Platform Fee</p>
-                  <p className="text-amber-400">€{detailDialog.withdrawal.platformFee.toFixed(2)}</p>
+                  <p className="text-amber-400">
+                    €{detailDialog.withdrawal.platformFee.toFixed(2)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Net Amount</p>
-                  <p className="text-white font-bold">€{detailDialog.withdrawal.netAmountEUR.toFixed(2)}</p>
+                  <p className="text-white font-bold">
+                    €{detailDialog.withdrawal.netAmountEUR.toFixed(2)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Payout Method</p>
                   <p className="text-white">
-                    {(detailDialog.withdrawal.payoutMethod === 'original_method' || detailDialog.withdrawal.payoutMethod === 'nuvei_card_payout' || detailDialog.withdrawal.payoutMethod === 'card_payout')
-                      ? '💳 Card Payout'
-                      : (detailDialog.withdrawal.payoutMethod === 'bank_transfer' || detailDialog.withdrawal.payoutMethod === 'nuvei_bank_transfer')
-                        ? '🏦 Bank Transfer'
-                        : detailDialog.withdrawal.payoutMethod?.replace(/_/g, ' ') || 'Manual'}
+                    {detailDialog.withdrawal.payoutMethod ===
+                      "original_method" ||
+                    detailDialog.withdrawal.payoutMethod ===
+                      "nuvei_card_payout" ||
+                    detailDialog.withdrawal.payoutMethod === "card_payout"
+                      ? "💳 Card Payout"
+                      : detailDialog.withdrawal.payoutMethod ===
+                            "bank_transfer" ||
+                          detailDialog.withdrawal.payoutMethod ===
+                            "nuvei_bank_transfer"
+                        ? "🏦 Bank Transfer"
+                        : detailDialog.withdrawal.payoutMethod?.replace(
+                            /_/g,
+                            " ",
+                          ) || "Manual"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">KYC Status</p>
-                  <p className={detailDialog.withdrawal.kycVerified ? 'text-green-400' : 'text-amber-400'}>
-                    {detailDialog.withdrawal.kycVerified ? 'Verified ✓' : 'Not Verified'}
+                  <p
+                    className={
+                      detailDialog.withdrawal.kycVerified
+                        ? "text-green-400"
+                        : "text-amber-400"
+                    }
+                  >
+                    {detailDialog.withdrawal.kycVerified
+                      ? "Verified ✓"
+                      : "Not Verified"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Wallet Before</p>
-                  <p className="text-white">{detailDialog.withdrawal.walletBalanceBefore} credits</p>
+                  <p className="text-white">
+                    {detailDialog.withdrawal.walletBalanceBefore} credits
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Wallet After</p>
-                  <p className="text-white">{detailDialog.withdrawal.walletBalanceAfter} credits</p>
+                  <p className="text-white">
+                    {detailDialog.withdrawal.walletBalanceAfter} credits
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Requested At</p>
-                  <p className="text-white">{formatDate(detailDialog.withdrawal.requestedAt)}</p>
+                  <p className="text-white">
+                    {formatDate(detailDialog.withdrawal.requestedAt)}
+                  </p>
                 </div>
                 {detailDialog.withdrawal.processedAt && (
                   <div>
                     <p className="text-xs text-gray-500">Processed At</p>
-                    <p className="text-white">{formatDate(detailDialog.withdrawal.processedAt)}</p>
+                    <p className="text-white">
+                      {formatDate(detailDialog.withdrawal.processedAt)}
+                    </p>
                   </div>
                 )}
                 {detailDialog.withdrawal.completedAt && (
                   <div>
                     <p className="text-xs text-gray-500">Completed At</p>
-                    <p className="text-white">{formatDate(detailDialog.withdrawal.completedAt)}</p>
+                    <p className="text-white">
+                      {formatDate(detailDialog.withdrawal.completedAt)}
+                    </p>
                   </div>
                 )}
                 {detailDialog.withdrawal.payoutId && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Payout ID</p>
-                    <p className="text-white font-mono text-sm">{detailDialog.withdrawal.payoutId}</p>
+                    <p className="text-white font-mono text-sm">
+                      {detailDialog.withdrawal.payoutId}
+                    </p>
                   </div>
                 )}
-                
+
                 {/* Company Bank Used Section - Enhanced */}
                 {detailDialog.withdrawal.companyBankUsed && (
                   <div className="col-span-2 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
@@ -1382,77 +1633,114 @@ export default function PendingWithdrawalsSection() {
                       {detailDialog.withdrawal.companyBankUsed.accountName && (
                         <div>
                           <p className="text-gray-500 text-xs">Account Name</p>
-                          <p className="text-white font-medium">{detailDialog.withdrawal.companyBankUsed.accountName}</p>
+                          <p className="text-white font-medium">
+                            {
+                              detailDialog.withdrawal.companyBankUsed
+                                .accountName
+                            }
+                          </p>
                         </div>
                       )}
-                      {detailDialog.withdrawal.companyBankUsed.accountHolderName && (
+                      {detailDialog.withdrawal.companyBankUsed
+                        .accountHolderName && (
                         <div>
-                          <p className="text-gray-500 text-xs">Account Holder</p>
-                          <p className="text-white">{detailDialog.withdrawal.companyBankUsed.accountHolderName}</p>
+                          <p className="text-gray-500 text-xs">
+                            Account Holder
+                          </p>
+                          <p className="text-white">
+                            {
+                              detailDialog.withdrawal.companyBankUsed
+                                .accountHolderName
+                            }
+                          </p>
                         </div>
                       )}
                       {detailDialog.withdrawal.companyBankUsed.bankName && (
                         <div>
                           <p className="text-gray-500 text-xs">Bank</p>
-                          <p className="text-white">{detailDialog.withdrawal.companyBankUsed.bankName}</p>
+                          <p className="text-white">
+                            {detailDialog.withdrawal.companyBankUsed.bankName}
+                          </p>
                         </div>
                       )}
                       {detailDialog.withdrawal.companyBankUsed.country && (
                         <div>
                           <p className="text-gray-500 text-xs">Country</p>
-                          <p className="text-white uppercase">{detailDialog.withdrawal.companyBankUsed.country}</p>
+                          <p className="text-white uppercase">
+                            {detailDialog.withdrawal.companyBankUsed.country}
+                          </p>
                         </div>
                       )}
                       {detailDialog.withdrawal.companyBankUsed.iban && (
                         <div>
                           <p className="text-gray-500 text-xs">IBAN</p>
-                          <p className="text-cyan-300 font-mono">{detailDialog.withdrawal.companyBankUsed.iban}</p>
+                          <p className="text-cyan-300 font-mono">
+                            {detailDialog.withdrawal.companyBankUsed.iban}
+                          </p>
                         </div>
                       )}
-                      {detailDialog.withdrawal.companyBankUsed.accountNumber && (
+                      {detailDialog.withdrawal.companyBankUsed
+                        .accountNumber && (
                         <div>
                           <p className="text-gray-500 text-xs">Account #</p>
-                          <p className="text-cyan-300 font-mono">{detailDialog.withdrawal.companyBankUsed.accountNumber}</p>
+                          <p className="text-cyan-300 font-mono">
+                            {
+                              detailDialog.withdrawal.companyBankUsed
+                                .accountNumber
+                            }
+                          </p>
                         </div>
                       )}
                       {detailDialog.withdrawal.companyBankUsed.currency && (
                         <div>
                           <p className="text-gray-500 text-xs">Currency</p>
-                          <p className="text-white uppercase">{detailDialog.withdrawal.companyBankUsed.currency}</p>
+                          <p className="text-white uppercase">
+                            {detailDialog.withdrawal.companyBankUsed.currency}
+                          </p>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
-                
+
                 {detailDialog.withdrawal.rejectionReason && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Rejection Reason</p>
-                    <p className="text-red-400">{detailDialog.withdrawal.rejectionReason}</p>
+                    <p className="text-red-400">
+                      {detailDialog.withdrawal.rejectionReason}
+                    </p>
                   </div>
                 )}
                 {detailDialog.withdrawal.failureReason && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Failure Reason</p>
-                    <p className="text-orange-400">{detailDialog.withdrawal.failureReason}</p>
+                    <p className="text-orange-400">
+                      {detailDialog.withdrawal.failureReason}
+                    </p>
                   </div>
                 )}
                 {detailDialog.withdrawal.adminNote && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Admin Note</p>
-                    <p className="text-gray-300">{detailDialog.withdrawal.adminNote}</p>
+                    <p className="text-gray-300">
+                      {detailDialog.withdrawal.adminNote}
+                    </p>
                   </div>
                 )}
                 {detailDialog.withdrawal.processedByEmail && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Processed By</p>
-                    <p className="text-gray-300">{detailDialog.withdrawal.processedByEmail}</p>
+                    <p className="text-gray-300">
+                      {detailDialog.withdrawal.processedByEmail}
+                    </p>
                   </div>
                 )}
               </div>
 
               {/* Payment Method Details Section - Show ONLY the method user selected */}
-              {(detailDialog.withdrawal.payoutMethod === 'original_method' || detailDialog.withdrawal.payoutMethod === 'nuvei_card_payout' || detailDialog.withdrawal.payoutMethod === 'card_payout') ? (
+              {detailDialog.withdrawal.payoutMethod === "original_method" ||
+              detailDialog.withdrawal.payoutMethod === "nuvei_card_payout" ||
+              detailDialog.withdrawal.payoutMethod === "card_payout" ? (
                 // Card Payout - User chose to payout to original card
                 <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                   <h4 className="text-blue-300 font-semibold mb-3 flex items-center gap-2">
@@ -1463,26 +1751,49 @@ export default function PendingWithdrawalsSection() {
                       <>
                         <div>
                           <p className="text-xs text-gray-500">Card Brand</p>
-                          <p className="text-white font-medium capitalize">{detailDialog.withdrawal.originalCardDetails.brand || 'Card'}</p>
+                          <p className="text-white font-medium capitalize">
+                            {detailDialog.withdrawal.originalCardDetails
+                              .brand || "Card"}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Card Number</p>
                           <p className="text-blue-300 font-mono font-bold">
-                            •••• •••• •••• {detailDialog.withdrawal.originalCardDetails.last4 || '****'}
+                            •••• •••• ••••{" "}
+                            {detailDialog.withdrawal.originalCardDetails
+                              .last4 || "****"}
                           </p>
                         </div>
-                        {detailDialog.withdrawal.originalCardDetails.expMonth && detailDialog.withdrawal.originalCardDetails.expYear && (
+                        {detailDialog.withdrawal.originalCardDetails.expMonth &&
+                          detailDialog.withdrawal.originalCardDetails
+                            .expYear && (
+                            <div>
+                              <p className="text-xs text-gray-500">Expiry</p>
+                              <p className="text-white font-mono">
+                                {String(
+                                  detailDialog.withdrawal.originalCardDetails
+                                    .expMonth,
+                                ).padStart(2, "0")}
+                                /
+                                {
+                                  detailDialog.withdrawal.originalCardDetails
+                                    .expYear
+                                }
+                              </p>
+                            </div>
+                          )}
+                        {detailDialog.withdrawal.originalCardDetails
+                          .country && (
                           <div>
-                            <p className="text-xs text-gray-500">Expiry</p>
-                            <p className="text-white font-mono">
-                              {String(detailDialog.withdrawal.originalCardDetails.expMonth).padStart(2, '0')}/{detailDialog.withdrawal.originalCardDetails.expYear}
+                            <p className="text-xs text-gray-500">
+                              Card Country
                             </p>
-                          </div>
-                        )}
-                        {detailDialog.withdrawal.originalCardDetails.country && (
-                          <div>
-                            <p className="text-xs text-gray-500">Card Country</p>
-                            <p className="text-white uppercase">{detailDialog.withdrawal.originalCardDetails.country}</p>
+                            <p className="text-white uppercase">
+                              {
+                                detailDialog.withdrawal.originalCardDetails
+                                  .country
+                              }
+                            </p>
                           </div>
                         )}
                       </>
@@ -1492,14 +1803,19 @@ export default function PendingWithdrawalsSection() {
                           ⚠️ Card details not stored (old deposit)
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
-                          Look up the payment in Stripe using the Payment ID below to find the card used.
+                          Look up the payment in Stripe using the Payment ID
+                          below to find the card used.
                         </p>
                       </div>
                     )}
                     <div className="col-span-2">
-                      <p className="text-xs text-gray-500">Original Payment ID</p>
+                      <p className="text-xs text-gray-500">
+                        Original Payment ID
+                      </p>
                       <p className="text-white font-mono text-xs select-all">
-                        {detailDialog.withdrawal.originalPaymentId || detailDialog.withdrawal.originalPaymentMethod || 'Look up in Stripe Dashboard'}
+                        {detailDialog.withdrawal.originalPaymentId ||
+                          detailDialog.withdrawal.originalPaymentMethod ||
+                          "Look up in Stripe Dashboard"}
                       </p>
                     </div>
                     <div className="col-span-2 pt-2 border-t border-blue-500/20">
@@ -1509,22 +1825,48 @@ export default function PendingWithdrawalsSection() {
                       </p>
                     </div>
                   </div>
-                  {detailDialog.withdrawal.status !== 'completed' && (
+                  {detailDialog.withdrawal.status !== "completed" && (
                     <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
                       <p className="text-xs text-gray-400">
                         📋 <strong>To process this withdrawal:</strong>
                       </p>
                       <ol className="text-xs text-gray-400 mt-1 space-y-1">
-                        <li>1. Log into your payment provider dashboard (Stripe, etc.)</li>
-                        <li>2. Find the original payment: <span className="font-mono text-blue-300 select-all">{detailDialog.withdrawal.originalPaymentId || 'Search by user email'}</span></li>
-                        <li>3. Issue a refund of €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the card</li>
-                        <li>4. Use reference: <span className="font-mono text-blue-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
-                        <li>5. Mark this withdrawal as &quot;Completed&quot;</li>
+                        <li>
+                          1. Log into your payment provider dashboard (Stripe,
+                          etc.)
+                        </li>
+                        <li>
+                          2. Find the original payment:{" "}
+                          <span className="font-mono text-blue-300 select-all">
+                            {detailDialog.withdrawal.originalPaymentId ||
+                              "Search by user email"}
+                          </span>
+                        </li>
+                        <li>
+                          3. Issue a refund of €
+                          {detailDialog.withdrawal.netAmountEUR.toFixed(2)} to
+                          the card
+                        </li>
+                        <li>
+                          4. Use reference:{" "}
+                          <span className="font-mono text-blue-300 select-all">
+                            WD-
+                            {detailDialog.withdrawal._id
+                              .slice(-12)
+                              .toUpperCase()}
+                          </span>
+                        </li>
+                        <li>
+                          5. Mark this withdrawal as &quot;Completed&quot;
+                        </li>
                       </ol>
                     </div>
                   )}
                 </div>
-              ) : (detailDialog.withdrawal.payoutMethod === 'bank_transfer' || detailDialog.withdrawal.payoutMethod === 'nuvei_bank_transfer') && detailDialog.withdrawal.userBankDetails ? (
+              ) : (detailDialog.withdrawal.payoutMethod === "bank_transfer" ||
+                  detailDialog.withdrawal.payoutMethod ===
+                    "nuvei_bank_transfer") &&
+                detailDialog.withdrawal.userBankDetails ? (
                 // Bank Transfer - User chose bank transfer with their bank details
                 <div className="mt-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
                   <h4 className="text-teal-300 font-semibold mb-3 flex items-center gap-2">
@@ -1538,7 +1880,12 @@ export default function PendingWithdrawalsSection() {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-xs text-gray-500">Account Holder</p>
-                      <p className="text-white font-medium">{detailDialog.withdrawal.userBankDetails.accountHolderName}</p>
+                      <p className="text-white font-medium">
+                        {
+                          detailDialog.withdrawal.userBankDetails
+                            .accountHolderName
+                        }
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">IBAN</p>
@@ -1548,57 +1895,90 @@ export default function PendingWithdrawalsSection() {
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Country</p>
-                      <p className="text-white">{detailDialog.withdrawal.userBankDetails.country}</p>
+                      <p className="text-white">
+                        {detailDialog.withdrawal.userBankDetails.country}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Currency</p>
-                      <p className="text-white uppercase">{detailDialog.withdrawal.userBankDetails.currency || 'EUR'}</p>
+                      <p className="text-white uppercase">
+                        {detailDialog.withdrawal.userBankDetails.currency ||
+                          "EUR"}
+                      </p>
                     </div>
                     {detailDialog.withdrawal.userBankDetails.bankName && (
                       <div>
                         <p className="text-xs text-gray-500">Bank Name</p>
-                        <p className="text-white">{detailDialog.withdrawal.userBankDetails.bankName}</p>
+                        <p className="text-white">
+                          {detailDialog.withdrawal.userBankDetails.bankName}
+                        </p>
                       </div>
                     )}
                     {detailDialog.withdrawal.userBankDetails.swiftBic && (
                       <div>
                         <p className="text-xs text-gray-500">BIC/SWIFT Code</p>
-                        <p className="text-white font-mono">{detailDialog.withdrawal.userBankDetails.swiftBic}</p>
+                        <p className="text-white font-mono">
+                          {detailDialog.withdrawal.userBankDetails.swiftBic}
+                        </p>
                       </div>
                     )}
                     <div className="col-span-2 pt-2 border-t border-teal-500/20">
-                      <p className="text-xs text-gray-500">Amount to Transfer</p>
+                      <p className="text-xs text-gray-500">
+                        Amount to Transfer
+                      </p>
                       <p className="text-emerald-400 font-bold text-xl">
                         €{detailDialog.withdrawal.netAmountEUR.toFixed(2)}
                       </p>
                     </div>
                   </div>
-                  {detailDialog.withdrawal.status !== 'completed' && (
+                  {detailDialog.withdrawal.status !== "completed" && (
                     <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
                       <p className="text-xs text-gray-400">
                         📋 <strong>To process this withdrawal:</strong>
                       </p>
                       <ol className="text-xs text-gray-400 mt-1 space-y-1">
                         <li>1. Log into your company bank account</li>
-                        <li>2. Transfer €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the IBAN above</li>
-                        <li>3. Use reference: <span className="font-mono text-teal-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
-                        <li>4. Mark this withdrawal as &quot;Completed&quot;</li>
+                        <li>
+                          2. Transfer €
+                          {detailDialog.withdrawal.netAmountEUR.toFixed(2)} to
+                          the IBAN above
+                        </li>
+                        <li>
+                          3. Use reference:{" "}
+                          <span className="font-mono text-teal-300 select-all">
+                            WD-
+                            {detailDialog.withdrawal._id
+                              .slice(-12)
+                              .toUpperCase()}
+                          </span>
+                        </li>
+                        <li>
+                          4. Mark this withdrawal as &quot;Completed&quot;
+                        </li>
                       </ol>
                     </div>
                   )}
                 </div>
-              ) : detailDialog.withdrawal.status !== 'completed' && detailDialog.withdrawal.status !== 'rejected' && (
-                // No payment method details available
-                <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <p className="text-amber-300 text-sm flex items-center gap-2">
-                    ⚠️ Payment method details unavailable
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Method: {detailDialog.withdrawal.payoutMethod?.replace(/_/g, ' ') || 'Unknown'}
-                    <br />
-                    Contact the user to verify their withdrawal details before processing.
-                  </p>
-                </div>
+              ) : (
+                detailDialog.withdrawal.status !== "completed" &&
+                detailDialog.withdrawal.status !== "rejected" && (
+                  // No payment method details available
+                  <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <p className="text-amber-300 text-sm flex items-center gap-2">
+                      ⚠️ Payment method details unavailable
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Method:{" "}
+                      {detailDialog.withdrawal.payoutMethod?.replace(
+                        /_/g,
+                        " ",
+                      ) || "Unknown"}
+                      <br />
+                      Contact the user to verify their withdrawal details before
+                      processing.
+                    </p>
+                  </div>
+                )
               )}
             </div>
           )}

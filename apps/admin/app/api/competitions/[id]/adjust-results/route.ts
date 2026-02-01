@@ -1,20 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import Incident from '@/database/models/incident.model';
-import { notificationService } from '@/lib/services/notification.service';
-import mongoose from 'mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import Incident from "@/database/models/incident.model";
+import { notificationService } from "@/lib/services/notification.service";
+import mongoose from "mongoose";
 
 /**
  * POST /api/competitions/[id]/adjust-results
  * Adjust competition results after finalization
- * 
+ *
  * Requires an incident ID for audit trail
- * 
+ *
  * Body: {
  *   incidentId: string (required),
  *   adjustments: [{
@@ -29,7 +29,7 @@ import mongoose from 'mongoose';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
@@ -37,7 +37,7 @@ export async function POST(
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: competitionId } = await params;
@@ -47,15 +47,21 @@ export async function POST(
     // Require incident ID for audit trail
     if (!incidentId) {
       return NextResponse.json(
-        { error: 'incidentId is required for result adjustments (audit trail)' },
-        { status: 400 }
+        {
+          error: "incidentId is required for result adjustments (audit trail)",
+        },
+        { status: 400 },
       );
     }
 
-    if (!adjustments || !Array.isArray(adjustments) || adjustments.length === 0) {
+    if (
+      !adjustments ||
+      !Array.isArray(adjustments) ||
+      adjustments.length === 0
+    ) {
       return NextResponse.json(
-        { error: 'adjustments array is required' },
-        { status: 400 }
+        { error: "adjustments array is required" },
+        { status: 400 },
       );
     }
 
@@ -65,26 +71,37 @@ export async function POST(
     const incident = await Incident.findById(incidentId).session(mongoSession);
     if (!incident) {
       await mongoSession.abortTransaction();
-      return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
-    }
-
-    // Get competition
-    const competition = await Competition.findById(competitionId).session(mongoSession);
-    if (!competition) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json({ error: 'Competition not found' }, { status: 404 });
-    }
-
-    // Only completed or emergency_ended competitions can have results adjusted
-    if (!['completed', 'emergency_ended'].includes(competition.status)) {
-      await mongoSession.abortTransaction();
       return NextResponse.json(
-        { error: `Cannot adjust results for a ${competition.status} competition. Must be completed or emergency_ended.` },
-        { status: 400 }
+        { error: "Incident not found" },
+        { status: 404 },
       );
     }
 
-    console.log(`🔧 [ResultAdjustment] Processing ${adjustments.length} adjustments for competition ${competitionId}`);
+    // Get competition
+    const competition =
+      await Competition.findById(competitionId).session(mongoSession);
+    if (!competition) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { error: "Competition not found" },
+        { status: 404 },
+      );
+    }
+
+    // Only completed or emergency_ended competitions can have results adjusted
+    if (!["completed", "emergency_ended"].includes(competition.status)) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        {
+          error: `Cannot adjust results for a ${competition.status} competition. Must be completed or emergency_ended.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    console.log(
+      `🔧 [ResultAdjustment] Processing ${adjustments.length} adjustments for competition ${competitionId}`,
+    );
 
     const results: Array<{
       participantId: string;
@@ -112,61 +129,70 @@ export async function POST(
       try {
         if (!adj.participantId || !adj.reason) {
           results.push({
-            participantId: adj.participantId || 'unknown',
-            adjustment: 'validation_failed',
+            participantId: adj.participantId || "unknown",
+            adjustment: "validation_failed",
             success: false,
-            error: 'participantId and reason are required',
+            error: "participantId and reason are required",
           });
           continue;
         }
 
         // Get participant
-        const participant = await CompetitionParticipant.findById(adj.participantId).session(mongoSession);
+        const participant = await CompetitionParticipant.findById(
+          adj.participantId,
+        ).session(mongoSession);
         if (!participant) {
           results.push({
             participantId: adj.participantId,
-            adjustment: 'not_found',
+            adjustment: "not_found",
             success: false,
-            error: 'Participant not found',
+            error: "Participant not found",
           });
           continue;
         }
 
         const previousRank = participant.finalRank;
         const previousPrize = participant.prizeWon || 0;
-        let adjustmentType = '';
+        let adjustmentType = "";
 
         // Handle disqualification
-        if (adj.disqualify && participant.status !== 'disqualified') {
-          participant.status = 'disqualified';
+        if (adj.disqualify && participant.status !== "disqualified") {
+          participant.status = "disqualified";
           participant.disqualificationReason = adj.reason;
-          adjustmentType = 'disqualified';
+          adjustmentType = "disqualified";
 
           // If they had a prize, we need to reclaim it
           if (previousPrize > 0) {
-            const wallet = await CreditWallet.findOne({ userId: participant.userId }).session(mongoSession);
+            const wallet = await CreditWallet.findOne({
+              userId: participant.userId,
+            }).session(mongoSession);
             if (wallet && wallet.creditBalance >= previousPrize) {
               await CreditWallet.findByIdAndUpdate(
                 wallet._id,
                 { $inc: { creditBalance: -previousPrize } },
-                { session: mongoSession }
+                { session: mongoSession },
               );
 
-              await WalletTransaction.create([{
-                userId: participant.userId.toString(),
-                transactionType: 'prize_reclaim',
-                amount: -previousPrize,
-                balanceBefore: wallet.creditBalance,
-                balanceAfter: wallet.creditBalance - previousPrize,
-                competitionId,
-                status: 'completed',
-                description: `Prize reclaimed due to disqualification: ${adj.reason}`,
-                metadata: {
-                  incidentId,
-                  reason: adj.reason,
-                  adjustedBy: auth.adminId,
-                },
-              }], { session: mongoSession });
+              await WalletTransaction.create(
+                [
+                  {
+                    userId: participant.userId.toString(),
+                    transactionType: "prize_reclaim",
+                    amount: -previousPrize,
+                    balanceBefore: wallet.creditBalance,
+                    balanceAfter: wallet.creditBalance - previousPrize,
+                    competitionId,
+                    status: "completed",
+                    description: `Prize reclaimed due to disqualification: ${adj.reason}`,
+                    metadata: {
+                      incidentId,
+                      reason: adj.reason,
+                      adjustedBy: auth.adminId,
+                    },
+                  },
+                ],
+                { session: mongoSession },
+              );
 
               totalPrizeAdjustment -= previousPrize;
               participant.prizeWon = 0;
@@ -174,36 +200,38 @@ export async function POST(
               // Notify user
               await notificationService.createCustom({
                 userId: participant.userId.toString(),
-                type: 'disqualification_adjustment',
-                title: '⚠️ Competition Result Adjusted',
+                type: "disqualification_adjustment",
+                title: "⚠️ Competition Result Adjusted",
                 message: `You have been disqualified from ${competition.name}. Your prize of €${previousPrize.toFixed(2)} has been reclaimed. Reason: ${adj.reason}`,
-                icon: 'alert-triangle',
-                category: 'trading',
-                priority: 'urgent',
-                color: 'red',
+                icon: "alert-triangle",
+                category: "trading",
+                priority: "urgent",
+                color: "red",
               });
             }
           }
         }
 
         // Handle reinstatement
-        if (adj.reinstate && participant.status === 'disqualified') {
-          participant.status = 'completed';
+        if (adj.reinstate && participant.status === "disqualified") {
+          participant.status = "completed";
           participant.disqualificationReason = undefined;
-          adjustmentType = 'reinstated';
+          adjustmentType = "reinstated";
         }
 
         // Handle rank change
         if (adj.newRank !== undefined && adj.newRank !== previousRank) {
           participant.finalRank = adj.newRank;
-          adjustmentType += adjustmentType ? ', rank_changed' : 'rank_changed';
+          adjustmentType += adjustmentType ? ", rank_changed" : "rank_changed";
         }
 
         // Handle prize change
         if (adj.newPrize !== undefined && adj.newPrize !== previousPrize) {
           const prizeDiff = adj.newPrize - previousPrize;
-          
-          const wallet = await CreditWallet.findOne({ userId: participant.userId }).session(mongoSession);
+
+          const wallet = await CreditWallet.findOne({
+            userId: participant.userId,
+          }).session(mongoSession);
           if (wallet) {
             // Check if reducing prize is possible
             if (prizeDiff < 0 && wallet.creditBalance < Math.abs(prizeDiff)) {
@@ -211,9 +239,9 @@ export async function POST(
                 participantId: adj.participantId,
                 userId: participant.userId.toString(),
                 username: participant.username,
-                adjustment: 'prize_change_failed',
+                adjustment: "prize_change_failed",
                 success: false,
-                error: 'Insufficient balance to reduce prize',
+                error: "Insufficient balance to reduce prize",
               });
               continue;
             }
@@ -221,41 +249,52 @@ export async function POST(
             await CreditWallet.findByIdAndUpdate(
               wallet._id,
               { $inc: { creditBalance: prizeDiff } },
-              { session: mongoSession }
+              { session: mongoSession },
             );
 
-            await WalletTransaction.create([{
-              userId: participant.userId.toString(),
-              transactionType: prizeDiff > 0 ? 'prize_adjustment_add' : 'prize_adjustment_deduct',
-              amount: prizeDiff,
-              balanceBefore: wallet.creditBalance,
-              balanceAfter: wallet.creditBalance + prizeDiff,
-              competitionId,
-              status: 'completed',
-              description: `Prize adjustment for ${competition.name}: ${adj.reason}`,
-              metadata: {
-                incidentId,
-                previousPrize,
-                newPrize: adj.newPrize,
-                reason: adj.reason,
-                adjustedBy: auth.adminId,
-              },
-            }], { session: mongoSession });
+            await WalletTransaction.create(
+              [
+                {
+                  userId: participant.userId.toString(),
+                  transactionType:
+                    prizeDiff > 0
+                      ? "prize_adjustment_add"
+                      : "prize_adjustment_deduct",
+                  amount: prizeDiff,
+                  balanceBefore: wallet.creditBalance,
+                  balanceAfter: wallet.creditBalance + prizeDiff,
+                  competitionId,
+                  status: "completed",
+                  description: `Prize adjustment for ${competition.name}: ${adj.reason}`,
+                  metadata: {
+                    incidentId,
+                    previousPrize,
+                    newPrize: adj.newPrize,
+                    reason: adj.reason,
+                    adjustedBy: auth.adminId,
+                  },
+                },
+              ],
+              { session: mongoSession },
+            );
 
             participant.prizeWon = adj.newPrize;
             totalPrizeAdjustment += prizeDiff;
-            adjustmentType += adjustmentType ? ', prize_changed' : 'prize_changed';
+            adjustmentType += adjustmentType
+              ? ", prize_changed"
+              : "prize_changed";
 
             // Notify user
             await notificationService.createCustom({
               userId: participant.userId.toString(),
-              type: 'prize_adjustment',
-              title: prizeDiff > 0 ? '💰 Prize Adjustment' : '⚠️ Prize Adjustment',
+              type: "prize_adjustment",
+              title:
+                prizeDiff > 0 ? "💰 Prize Adjustment" : "⚠️ Prize Adjustment",
               message: `Your prize for ${competition.name} has been adjusted by €${prizeDiff.toFixed(2)}. New prize: €${adj.newPrize.toFixed(2)}. Reason: ${adj.reason}`,
-              icon: 'gift',
-              category: 'trading',
-              priority: 'high',
-              color: prizeDiff > 0 ? 'green' : 'yellow',
+              icon: "gift",
+              category: "trading",
+              priority: "high",
+              color: prizeDiff > 0 ? "green" : "yellow",
             });
           }
         }
@@ -277,19 +316,19 @@ export async function POST(
           participantId: adj.participantId,
           userId: participant.userId.toString(),
           username: participant.username,
-          adjustment: adjustmentType || 'no_change',
+          adjustment: adjustmentType || "no_change",
           success: true,
-          prizeChange: adj.newPrize !== undefined ? adj.newPrize - previousPrize : 0,
+          prizeChange:
+            adj.newPrize !== undefined ? adj.newPrize - previousPrize : 0,
         });
 
         console.log(`   ✅ ${participant.username}: ${adjustmentType}`);
-
       } catch (error) {
         results.push({
           participantId: adj.participantId,
-          adjustment: 'error',
+          adjustment: "error",
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
@@ -297,8 +336,8 @@ export async function POST(
     // Update incident with result adjustments
     if (!incident.resolution) {
       incident.resolution = {
-        summary: '',
-        action: '',
+        summary: "",
+        action: "",
         compensations: [],
         resultAdjustments: [],
         resolvedAt: new Date(),
@@ -310,12 +349,13 @@ export async function POST(
       ...resultAdjustments,
     ];
 
-    incident.resolution.action = globalReason || `Result adjustments for ${competition.name}`;
+    incident.resolution.action =
+      globalReason || `Result adjustments for ${competition.name}`;
 
     incident.auditLog.push({
       timestamp: new Date(),
-      action: 'results_adjusted',
-      by: auth.adminId || 'admin',
+      action: "results_adjusted",
+      by: auth.adminId || "admin",
       byEmail: auth.email,
       details: `Adjusted ${resultAdjustments.length} participant results. Total prize adjustment: €${totalPrizeAdjustment.toFixed(2)}`,
       metadata: { competitionId, results },
@@ -325,7 +365,9 @@ export async function POST(
 
     await mongoSession.commitTransaction();
 
-    console.log(`🔧 [ResultAdjustment] Complete: ${resultAdjustments.length} adjustments, €${totalPrizeAdjustment.toFixed(2)} prize change`);
+    console.log(
+      `🔧 [ResultAdjustment] Complete: ${resultAdjustments.length} adjustments, €${totalPrizeAdjustment.toFixed(2)} prize change`,
+    );
 
     return NextResponse.json({
       success: true,
@@ -333,13 +375,12 @@ export async function POST(
       results,
       totalPrizeAdjustment,
     });
-
   } catch (error) {
     await mongoSession.abortTransaction();
-    console.error('Error adjusting results:', error);
+    console.error("Error adjusting results:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   } finally {
     mongoSession.endSession();

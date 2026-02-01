@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import AdminBankAccount from '@/database/models/admin-bank-account.model';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import AdminBankAccount from "@/database/models/admin-bank-account.model";
+import { getAdminSession } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin-bank-accounts
@@ -11,11 +11,11 @@ export async function GET() {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     const accounts = await AdminBankAccount.find({ isActive: true })
       .sort({ isDefault: -1, accountName: 1 })
       .lean();
@@ -25,10 +25,10 @@ export async function GET() {
       accounts,
     });
   } catch (error) {
-    console.error('Error fetching admin bank accounts:', error);
+    console.error("Error fetching admin bank accounts:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch bank accounts' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch bank accounts" },
+      { status: 500 },
     );
   }
 }
@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     const body = await request.json();
     const {
       accountName,
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!accountName || !accountHolderName || !bankName || !country) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { success: false, error: "Missing required fields" },
+        { status: 400 },
       );
     }
 
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       accountHolderName,
       bankName,
       country: country.toUpperCase(),
-      currency: currency?.toLowerCase() || 'eur',
+      currency: currency?.toLowerCase() || "eur",
       iban: iban?.toUpperCase(),
       accountNumber,
       routingNumber,
@@ -95,14 +95,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       account,
-      message: 'Bank account added successfully',
+      message: "Bank account added successfully",
     });
   } catch (error) {
-    console.error('Error adding admin bank account:', error);
+    console.error("Error adding admin bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to add bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to add bank account" },
+      { status: 500 },
     );
   }
 }
-

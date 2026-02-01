@@ -5,13 +5,13 @@
  * Prevents users from losing more than their capital
  */
 export declare const RISK_THRESHOLDS: {
-    MARGIN_CALL: number;
-    LIQUIDATION: number;
-    MAX_POSITION_SIZE: number;
-    MAX_OPEN_POSITIONS: number;
-    MAX_LEVERAGE: number;
+  MARGIN_CALL: number;
+  LIQUIDATION: number;
+  MAX_POSITION_SIZE: number;
+  MAX_OPEN_POSITIONS: number;
+  MAX_LEVERAGE: number;
 };
-export type MarginStatus = 'safe' | 'warning' | 'danger' | 'liquidation';
+export type MarginStatus = "safe" | "warning" | "danger" | "liquidation";
 /**
  * Calculate margin status for a participant
  *
@@ -20,15 +20,20 @@ export type MarginStatus = 'safe' | 'warning' | 'danger' | 'liquidation';
  * @param totalUsedMargin - Sum of all used margin
  * @returns Margin status and level
  */
-export declare function getMarginStatus(currentCapital: number, totalUnrealizedPnL: number, totalUsedMargin: number, thresholds?: {
+export declare function getMarginStatus(
+  currentCapital: number,
+  totalUnrealizedPnL: number,
+  totalUsedMargin: number,
+  thresholds?: {
     liquidation: number;
     marginCall: number;
     warning: number;
-}): {
-    status: MarginStatus;
-    marginLevel: number;
-    equity: number;
-    message: string;
+  },
+): {
+  status: MarginStatus;
+  marginLevel: number;
+  equity: number;
+  message: string;
 };
 /**
  * Validate if a new order can be placed
@@ -48,9 +53,17 @@ export declare function getMarginStatus(currentCapital: number, totalUnrealizedP
  * @param maxLeverage - Max leverage allowed (competition rule)
  * @returns Validation result
  */
-export declare function validateNewOrder(availableCapital: number, marginRequired: number, currentOpenPositions: number, quantity: number, leverage: number, maxPositions?: number, maxLeverage?: number): {
-    valid: boolean;
-    error?: string;
+export declare function validateNewOrder(
+  availableCapital: number,
+  marginRequired: number,
+  currentOpenPositions: number,
+  quantity: number,
+  leverage: number,
+  maxPositions?: number,
+  maxLeverage?: number,
+): {
+  valid: boolean;
+  error?: string;
 };
 /**
  * Calculate maximum position size given available capital
@@ -60,7 +73,11 @@ export declare function validateNewOrder(availableCapital: number, marginRequire
  * @param leverage - Leverage to use
  * @returns Maximum lot size
  */
-export declare function calculateMaxPositionSize(availableCapital: number, entryPrice: number, leverage: number): number;
+export declare function calculateMaxPositionSize(
+  availableCapital: number,
+  entryPrice: number,
+  leverage: number,
+): number;
 /**
  * Calculate recommended stop loss distance based on risk percentage
  *
@@ -71,7 +88,13 @@ export declare function calculateMaxPositionSize(availableCapital: number, entry
  * @param quantity - Position size in lots
  * @returns Recommended stop loss price
  */
-export declare function calculateRecommendedStopLoss(entryPrice: number, side: 'long' | 'short', riskPercentage: number, capital: number, quantity: number): number;
+export declare function calculateRecommendedStopLoss(
+  entryPrice: number,
+  side: "long" | "short",
+  riskPercentage: number,
+  capital: number,
+  quantity: number,
+): number;
 /**
  * Calculate position risk as percentage of capital
  *
@@ -81,7 +104,12 @@ export declare function calculateRecommendedStopLoss(entryPrice: number, side: '
  * @param capital - Total capital
  * @returns Risk percentage
  */
-export declare function calculatePositionRisk(entryPrice: number, stopLoss: number, quantity: number, capital: number): number;
+export declare function calculatePositionRisk(
+  entryPrice: number,
+  stopLoss: number,
+  quantity: number,
+  capital: number,
+): number;
 /**
  * Check if total risk across all positions is within acceptable limits
  *
@@ -90,14 +118,18 @@ export declare function calculatePositionRisk(entryPrice: number, stopLoss: numb
  * @param maxTotalRisk - Max total risk percentage (default 10%)
  * @returns Validation result
  */
-export declare function validateTotalRisk(positions: Array<{
+export declare function validateTotalRisk(
+  positions: Array<{
     entryPrice: number;
     stopLoss?: number;
     quantity: number;
-}>, capital: number, maxTotalRisk?: number): {
-    valid: boolean;
-    totalRisk: number;
-    error?: string;
+  }>,
+  capital: number,
+  maxTotalRisk?: number,
+): {
+  valid: boolean;
+  totalRisk: number;
+  error?: string;
 };
 /**
  * Generate risk warnings based on participant status
@@ -107,21 +139,25 @@ export declare function validateTotalRisk(positions: Array<{
  * @param maxPositions - Max allowed positions
  * @returns Array of warning messages
  */
-export declare function getRiskWarnings(marginStatus: MarginStatus, openPositions: number, maxPositions: number): string[];
+export declare function getRiskWarnings(
+  marginStatus: MarginStatus,
+  openPositions: number,
+  maxPositions: number,
+): string[];
 declare const _default: {
-    getMarginStatus: typeof getMarginStatus;
-    validateNewOrder: typeof validateNewOrder;
-    calculateMaxPositionSize: typeof calculateMaxPositionSize;
-    calculateRecommendedStopLoss: typeof calculateRecommendedStopLoss;
-    calculatePositionRisk: typeof calculatePositionRisk;
-    validateTotalRisk: typeof validateTotalRisk;
-    getRiskWarnings: typeof getRiskWarnings;
-    RISK_THRESHOLDS: {
-        MARGIN_CALL: number;
-        LIQUIDATION: number;
-        MAX_POSITION_SIZE: number;
-        MAX_OPEN_POSITIONS: number;
-        MAX_LEVERAGE: number;
-    };
+  getMarginStatus: typeof getMarginStatus;
+  validateNewOrder: typeof validateNewOrder;
+  calculateMaxPositionSize: typeof calculateMaxPositionSize;
+  calculateRecommendedStopLoss: typeof calculateRecommendedStopLoss;
+  calculatePositionRisk: typeof calculatePositionRisk;
+  validateTotalRisk: typeof validateTotalRisk;
+  getRiskWarnings: typeof getRiskWarnings;
+  RISK_THRESHOLDS: {
+    MARGIN_CALL: number;
+    LIQUIDATION: number;
+    MAX_POSITION_SIZE: number;
+    MAX_OPEN_POSITIONS: number;
+    MAX_LEVERAGE: number;
+  };
 };
 export default _default;

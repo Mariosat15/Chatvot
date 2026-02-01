@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 import "./globals.css";
@@ -17,7 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ChartVolt",
-  description: "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.",
+  description:
+    "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.",
 };
 
 export default function RootLayout({

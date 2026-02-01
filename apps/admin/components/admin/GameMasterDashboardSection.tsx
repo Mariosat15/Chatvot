@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Users, 
-  DollarSign, 
-  Trophy, 
-  Link, 
-  Copy, 
-  RefreshCw, 
+import { useState, useEffect, useCallback } from "react";
+import {
+  Users,
+  DollarSign,
+  Trophy,
+  Link,
+  Copy,
+  RefreshCw,
   Calendar,
   TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
-  Plus
-} from 'lucide-react';
+  Plus,
+} from "lucide-react";
 
 interface DashboardStats {
   totalReferredUsers: number;
@@ -93,19 +93,19 @@ export default function GameMasterDashboardSection() {
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/gamemaster/dashboard');
+      const response = await fetch("/api/gamemaster/dashboard");
       if (response.status === 401) {
-        setError('not_gamemaster');
+        setError("not_gamemaster");
         return;
       }
       if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
+        throw new Error("Failed to fetch dashboard data");
       }
       const result = await response.json();
       setData(result);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -127,17 +127,21 @@ export default function GameMasterDashboardSection() {
   };
 
   const regenerateLink = async () => {
-    if (!confirm('Are you sure you want to regenerate your referral link? Your old link will stop working.')) {
+    if (
+      !confirm(
+        "Are you sure you want to regenerate your referral link? Your old link will stop working.",
+      )
+    ) {
       return;
     }
     setRegenerating(true);
     try {
-      const response = await fetch('/api/gamemaster/link', { method: 'POST' });
+      const response = await fetch("/api/gamemaster/link", { method: "POST" });
       if (response.ok) {
         await fetchDashboard();
       }
     } catch (err) {
-      console.error('Failed to regenerate link:', err);
+      console.error("Failed to regenerate link:", err);
     } finally {
       setRegenerating(false);
     }
@@ -151,17 +155,22 @@ export default function GameMasterDashboardSection() {
     );
   }
 
-  if (error === 'not_gamemaster') {
+  if (error === "not_gamemaster") {
     return (
       <div className="text-center py-12 max-w-md mx-auto">
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-8">
           <Trophy className="h-16 w-16 text-purple-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Game Master Access Required</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">
+            Game Master Access Required
+          </h2>
           <p className="text-gray-400 mb-6">
-            This dashboard is for Game Masters only. To become a Game Master, purchase a Game Master package from the Marketplace and activate it.
+            This dashboard is for Game Masters only. To become a Game Master,
+            purchase a Game Master package from the Marketplace and activate it.
           </p>
           <div className="space-y-3 text-left bg-gray-800/50 rounded-lg p-4">
-            <p className="text-sm text-gray-300 font-semibold">How to become a Game Master:</p>
+            <p className="text-sm text-gray-300 font-semibold">
+              How to become a Game Master:
+            </p>
             <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
               <li>Go to the main platform Marketplace</li>
               <li>Purchase a Game Master package</li>
@@ -179,7 +188,7 @@ export default function GameMasterDashboardSection() {
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
         <p className="text-red-500">{error}</p>
-        <button 
+        <button
           onClick={fetchDashboard}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
@@ -191,16 +200,25 @@ export default function GameMasterDashboardSection() {
 
   if (!data) return null;
 
-  const { subscription, stats, recentReferrals, recentCompetitions, recentEarnings } = data;
+  const {
+    subscription,
+    stats,
+    recentReferrals,
+    recentCompetitions,
+    recentEarnings,
+  } = data;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Game Master Dashboard</h2>
+          <h2 className="text-2xl font-bold text-white">
+            Game Master Dashboard
+          </h2>
           <p className="text-gray-400">
-            Package: {subscription.packageName} • {subscription.daysRemaining} days remaining
+            Package: {subscription.packageName} • {subscription.daysRemaining}{" "}
+            days remaining
           </p>
         </div>
         <button
@@ -216,7 +234,9 @@ export default function GameMasterDashboardSection() {
       <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-6 border border-blue-700/50">
         <div className="flex items-center gap-2 mb-4">
           <Link className="h-5 w-5 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">Your Referral Link</h3>
+          <h3 className="text-lg font-semibold text-white">
+            Your Referral Link
+          </h3>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex-1 bg-gray-900/50 rounded px-4 py-3 font-mono text-sm text-gray-300 break-all">
@@ -244,13 +264,19 @@ export default function GameMasterDashboardSection() {
             disabled={regenerating}
             className="flex items-center gap-2 px-4 py-3 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${regenerating ? "animate-spin" : ""}`}
+            />
             New Link
           </button>
         </div>
         <p className="mt-3 text-sm text-gray-400">
-          Referral Code: <span className="font-mono text-blue-400">{subscription.referralCode}</span> • 
-          Earn {subscription.limits.referralFeePercentage}% of entry fees from users who sign up with your link
+          Referral Code:{" "}
+          <span className="font-mono text-blue-400">
+            {subscription.referralCode}
+          </span>{" "}
+          • Earn {subscription.limits.referralFeePercentage}% of entry fees from
+          users who sign up with your link
         </p>
       </div>
 
@@ -262,7 +288,9 @@ export default function GameMasterDashboardSection() {
               <Users className="h-5 w-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{stats.totalReferredUsers}</p>
+              <p className="text-2xl font-bold text-white">
+                {stats.totalReferredUsers}
+              </p>
               <p className="text-sm text-gray-400">Referred Users</p>
             </div>
           </div>
@@ -274,7 +302,9 @@ export default function GameMasterDashboardSection() {
               <DollarSign className="h-5 w-5 text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{(stats.totalEarnings ?? 0).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-white">
+                {(stats.totalEarnings ?? 0).toFixed(2)}
+              </p>
               <p className="text-sm text-gray-400">Total Earnings</p>
             </div>
           </div>
@@ -286,7 +316,9 @@ export default function GameMasterDashboardSection() {
               <Clock className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{(stats.pendingEarnings ?? 0).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-white">
+                {(stats.pendingEarnings ?? 0).toFixed(2)}
+              </p>
               <p className="text-sm text-gray-400">Pending Payout</p>
             </div>
           </div>
@@ -298,7 +330,9 @@ export default function GameMasterDashboardSection() {
               <Trophy className="h-5 w-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{stats.totalCompetitions}</p>
+              <p className="text-2xl font-bold text-white">
+                {stats.totalCompetitions}
+              </p>
               <p className="text-sm text-gray-400">Competitions Created</p>
             </div>
           </div>
@@ -307,23 +341,32 @@ export default function GameMasterDashboardSection() {
 
       {/* Subscription Info */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Subscription Details</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          Subscription Details
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-gray-400 text-sm">Status</p>
-            <p className={`text-lg font-medium ${subscription.status === 'active' ? 'text-green-400' : 'text-red-400'}`}>
-              {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+            <p
+              className={`text-lg font-medium ${subscription.status === "active" ? "text-green-400" : "text-red-400"}`}
+            >
+              {subscription.status.charAt(0).toUpperCase() +
+                subscription.status.slice(1)}
             </p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Auto-Renewal</p>
-            <p className={`text-lg font-medium ${subscription.autoRenew ? 'text-green-400' : 'text-yellow-400'}`}>
-              {subscription.autoRenew ? 'Enabled' : 'Disabled'}
+            <p
+              className={`text-lg font-medium ${subscription.autoRenew ? "text-green-400" : "text-yellow-400"}`}
+            >
+              {subscription.autoRenew ? "Enabled" : "Disabled"}
             </p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Renewal Price</p>
-            <p className="text-lg font-medium text-white">{subscription.renewalPrice} Credits</p>
+            <p className="text-lg font-medium text-white">
+              {subscription.renewalPrice} Credits
+            </p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">End Date</p>
@@ -334,12 +377,15 @@ export default function GameMasterDashboardSection() {
           <div>
             <p className="text-gray-400 text-sm">Competitions Today</p>
             <p className="text-lg font-medium text-white">
-              {subscription.currentPeriodCompetitionsCreated} / {subscription.limits.maxCompetitionsPerDay}
+              {subscription.currentPeriodCompetitionsCreated} /{" "}
+              {subscription.limits.maxCompetitionsPerDay}
             </p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Max Users per Competition</p>
-            <p className="text-lg font-medium text-white">{subscription.limits.maxUsersPerCompetition}</p>
+            <p className="text-lg font-medium text-white">
+              {subscription.limits.maxUsersPerCompetition}
+            </p>
           </div>
         </div>
       </div>
@@ -349,22 +395,37 @@ export default function GameMasterDashboardSection() {
         {/* Recent Referrals */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Recent Referrals</h3>
-            <button className="text-blue-400 text-sm hover:text-blue-300">View All</button>
+            <h3 className="text-lg font-semibold text-white">
+              Recent Referrals
+            </h3>
+            <button className="text-blue-400 text-sm hover:text-blue-300">
+              View All
+            </button>
           </div>
           {recentReferrals.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">No referrals yet. Share your link!</p>
+            <p className="text-gray-400 text-center py-8">
+              No referrals yet. Share your link!
+            </p>
           ) : (
             <div className="space-y-3">
               {recentReferrals.map((referral) => (
-                <div key={referral.id} className="flex items-center gap-3 p-3 bg-gray-900/50 rounded">
+                <div
+                  key={referral.id}
+                  className="flex items-center gap-3 p-3 bg-gray-900/50 rounded"
+                >
                   <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-white font-medium">
-                    {referral.name?.charAt(0) || '?'}
+                    {referral.name?.charAt(0) || "?"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{referral.name}</p>
-                    <p className="text-gray-400 text-sm truncate">{referral.email}</p>
-                    <p className="text-gray-500 text-xs font-mono mt-0.5">ID: {referral.id}</p>
+                    <p className="text-white font-medium truncate">
+                      {referral.name}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {referral.email}
+                    </p>
+                    <p className="text-gray-500 text-xs font-mono mt-0.5">
+                      ID: {referral.id}
+                    </p>
                   </div>
                   <p className="text-gray-400 text-sm">
                     {new Date(referral.createdAt).toLocaleDateString()}
@@ -378,24 +439,39 @@ export default function GameMasterDashboardSection() {
         {/* Recent Earnings */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Recent Earnings</h3>
-            <button className="text-blue-400 text-sm hover:text-blue-300">View All</button>
+            <h3 className="text-lg font-semibold text-white">
+              Recent Earnings
+            </h3>
+            <button className="text-blue-400 text-sm hover:text-blue-300">
+              View All
+            </button>
           </div>
           {recentEarnings.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">No earnings yet. Refer users to competitions!</p>
+            <p className="text-gray-400 text-center py-8">
+              No earnings yet. Refer users to competitions!
+            </p>
           ) : (
             <div className="space-y-3">
               {recentEarnings.map((earning) => (
-                <div key={earning.id} className="flex items-center justify-between p-3 bg-gray-900/50 rounded">
+                <div
+                  key={earning.id}
+                  className="flex items-center justify-between p-3 bg-gray-900/50 rounded"
+                >
                   <div>
-                    <p className="text-white font-medium">{earning.sourceName}</p>
+                    <p className="text-white font-medium">
+                      {earning.sourceName}
+                    </p>
                     <p className="text-gray-400 text-sm">
                       From {earning.referredUserName} • {earning.sourceType}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-green-400 font-medium">+{(earning.netEarning ?? 0).toFixed(2)}</p>
-                    <p className={`text-sm ${earning.status === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
+                    <p className="text-green-400 font-medium">
+                      +{(earning.netEarning ?? 0).toFixed(2)}
+                    </p>
+                    <p
+                      className={`text-sm ${earning.status === "paid" ? "text-green-400" : "text-yellow-400"}`}
+                    >
                       {earning.status}
                     </p>
                   </div>
@@ -409,9 +485,14 @@ export default function GameMasterDashboardSection() {
       {/* Competitions */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Your Competitions</h3>
-          <button 
-            disabled={subscription.currentPeriodCompetitionsCreated >= subscription.limits.maxCompetitionsPerDay}
+          <h3 className="text-lg font-semibold text-white">
+            Your Competitions
+          </h3>
+          <button
+            disabled={
+              subscription.currentPeriodCompetitionsCreated >=
+              subscription.limits.maxCompetitionsPerDay
+            }
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
@@ -419,7 +500,9 @@ export default function GameMasterDashboardSection() {
           </button>
         </div>
         {recentCompetitions.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No competitions created yet.</p>
+          <p className="text-gray-400 text-center py-8">
+            No competitions created yet.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -438,17 +521,24 @@ export default function GameMasterDashboardSection() {
                   <tr key={comp.id} className="border-b border-gray-700/50">
                     <td className="py-3 text-white">{comp.name}</td>
                     <td className="py-3">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        comp.status === 'active' ? 'bg-green-900/50 text-green-400' :
-                        comp.status === 'upcoming' ? 'bg-blue-900/50 text-blue-400' :
-                        comp.status === 'completed' ? 'bg-gray-700 text-gray-300' :
-                        'bg-red-900/50 text-red-400'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          comp.status === "active"
+                            ? "bg-green-900/50 text-green-400"
+                            : comp.status === "upcoming"
+                              ? "bg-blue-900/50 text-blue-400"
+                              : comp.status === "completed"
+                                ? "bg-gray-700 text-gray-300"
+                                : "bg-red-900/50 text-red-400"
+                        }`}
+                      >
                         {comp.status}
                       </span>
                     </td>
                     <td className="py-3 text-gray-300">{comp.participants}</td>
-                    <td className="py-3 text-gray-300">{comp.prizePool} Credits</td>
+                    <td className="py-3 text-gray-300">
+                      {comp.prizePool} Credits
+                    </td>
                     <td className="py-3 text-gray-400 text-sm">
                       {new Date(comp.startTime).toLocaleDateString()}
                     </td>

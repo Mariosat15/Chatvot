@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import mongoose, { Types } from 'mongoose';
-import MessagingService from '@/lib/services/messaging/messaging.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose, { Types } from "mongoose";
+import MessagingService from "@/lib/services/messaging/messaging.service";
 
 /**
  * POST /api/messaging/support/new-ticket
@@ -13,31 +13,33 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     const userId = session.user.id;
-    const userName = session.user.name || 'User';
+    const userName = session.user.name || "User";
 
-    console.log(`🆕 [NewTicket] Creating new ticket for user: ${userName} (${userId})`);
+    console.log(
+      `🆕 [NewTicket] Creating new ticket for user: ${userName} (${userId})`,
+    );
 
     // Find current active (non-archived) support conversation
-    const activeConversation = await db.collection('conversations').findOne({
-      type: 'user-to-support',
-      'participants.id': userId,
-      'participants.type': 'user',
-      $or: [
-        { isArchived: { $ne: true } },
-        { isResolved: { $ne: true } }
-      ],
-      status: { $ne: 'archived' }
+    const activeConversation = await db.collection("conversations").findOne({
+      type: "user-to-support",
+      "participants.id": userId,
+      "participants.type": "user",
+      $or: [{ isArchived: { $ne: true } }, { isResolved: { $ne: true } }],
+      status: { $ne: "archived" },
     });
 
     // If there's an active conversation, archive it first
@@ -46,31 +48,31 @@ export async function POST(request: NextRequest) {
       console.log(`📦 [NewTicket] Archiving current ticket #${ticketNumber}`);
 
       // Archive the current conversation
-      await db.collection('conversations').updateOne(
+      await db.collection("conversations").updateOne(
         { _id: activeConversation._id },
         {
           $set: {
             isResolved: true,
             isArchived: true,
-            status: 'archived',
+            status: "archived",
             resolvedAt: new Date(),
             archivedAt: new Date(),
-            resolvedBy: 'user',
-            resolvedByName: 'User (started new ticket)',
+            resolvedBy: "user",
+            resolvedByName: "User (started new ticket)",
             updatedAt: new Date(),
-          }
-        }
+          },
+        },
       );
 
       // Add system message about closure
-      await db.collection('messages').insertOne({
+      await db.collection("messages").insertOne({
         conversationId: activeConversation._id,
-        senderId: 'system',
-        senderType: 'system',
-        senderName: 'System',
+        senderId: "system",
+        senderType: "system",
+        senderName: "System",
         content: `✅ Ticket #${ticketNumber} closed. User started a new conversation.`,
-        messageType: 'system',
-        status: 'sent',
+        messageType: "system",
+        status: "sent",
         readBy: [],
         isDeleted: false,
         createdAt: new Date(),
@@ -85,15 +87,17 @@ export async function POST(request: NextRequest) {
     const conversation = await MessagingService.getOrCreateSupportConversation(
       userId,
       userName,
-      session.user.image
+      session.user.image ?? undefined,
     );
 
-    console.log(`✅ [NewTicket] Created new ticket #${(conversation as any).ticketNumber || '?'}`);
+    console.log(
+      `✅ [NewTicket] Created new ticket #${(conversation as any).ticketNumber || "?"}`,
+    );
 
     // Get messages for the new conversation
     const messages = await MessagingService.getMessages(
       conversation._id.toString(),
-      { limit: 50 }
+      { limit: 50 },
     );
 
     return NextResponse.json({
@@ -104,7 +108,7 @@ export async function POST(request: NextRequest) {
         status: conversation.status,
         ticketNumber: (conversation as any).ticketNumber || null,
         isArchived: false,
-        participants: conversation.participants.filter(p => p.isActive),
+        participants: conversation.participants.filter((p) => p.isActive),
         lastMessage: conversation.lastMessage,
         unreadCount: 0,
         isAIHandled: conversation.isAIHandled,
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest) {
         createdAt: conversation.createdAt,
         lastActivityAt: conversation.lastActivityAt,
       },
-      messages: messages.reverse().map(msg => ({
+      messages: messages.reverse().map((msg) => ({
         id: msg._id.toString(),
         senderId: msg.senderId,
         senderType: msg.senderType,
@@ -132,10 +136,10 @@ export async function POST(request: NextRequest) {
       previousTicketNumber: activeConversation?.ticketNumber || null,
     });
   } catch (error) {
-    console.error('❌ [NewTicket] Error:', error);
+    console.error("❌ [NewTicket] Error:", error);
     return NextResponse.json(
-      { error: 'Failed to create new ticket' },
-      { status: 500 }
+      { error: "Failed to create new ticket" },
+      { status: 500 },
     );
   }
 }

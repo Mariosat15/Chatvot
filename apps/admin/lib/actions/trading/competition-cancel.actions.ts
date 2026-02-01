@@ -1,16 +1,16 @@
-'use server';
+"use server";
 
-import { revalidatePath } from 'next/cache';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradingOrder from '@/database/models/trading/trading-order.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import mongoose from 'mongoose';
-import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { revalidatePath } from "next/cache";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradingOrder from "@/database/models/trading/trading-order.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import mongoose from "mongoose";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 
 /**
  * Cancel a competition and refund ALL participants their FULL entry fee
@@ -18,7 +18,7 @@ import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
  */
 export async function cancelCompetitionAndRefund(
   competitionId: string,
-  reason: string
+  reason: string,
 ): Promise<{ success: boolean; refundedCount: number; totalRefunded: number }> {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -26,13 +26,16 @@ export async function cancelCompetitionAndRefund(
   try {
     await connectToDatabase();
 
-    console.log(`🚫 Starting competition cancellation and refund: ${competitionId}`);
+    console.log(
+      `🚫 Starting competition cancellation and refund: ${competitionId}`,
+    );
     console.log(`   Reason: ${reason}`);
 
     // Get the competition
-    const competition = await Competition.findById(competitionId).session(session);
+    const competition =
+      await Competition.findById(competitionId).session(session);
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
     // Get all participants
@@ -47,7 +50,8 @@ export async function cancelCompetitionAndRefund(
     let refundedCount = 0;
 
     // Import notification service
-    const { notificationService } = await import('@/lib/services/notification.service');
+    const { notificationService } =
+      await import("@/lib/services/notification.service");
 
     // Refund each participant
     for (const participant of participants) {
@@ -69,43 +73,45 @@ export async function cancelCompetitionAndRefund(
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
         {
-          $inc: { 
+          $inc: {
             creditBalance: refundAmount,
             totalWonFromCompetitions: refundAmount, // Track refunds as credits received
           },
         },
-        { session }
+        { session },
       );
 
       // Create refund transaction
       await WalletTransaction.create(
-        [{
-          userId,
-          transactionType: 'competition_refund',
-          amount: refundAmount,
-          balanceBefore: wallet.creditBalance,
-          balanceAfter: newBalance,
-          competitionId: competitionId,
-          status: 'completed',
-          description: `Competition cancelled - Full refund for "${competition.name}"`,
-          metadata: {
-            competitionName: competition.name,
-            cancellationReason: reason,
-            originalEntryFee: entryFee,
+        [
+          {
+            userId,
+            transactionType: "competition_refund",
+            amount: refundAmount,
+            balanceBefore: wallet.creditBalance,
+            balanceAfter: newBalance,
+            competitionId: competitionId,
+            status: "completed",
+            description: `Competition cancelled - Full refund for "${competition.name}"`,
+            metadata: {
+              competitionName: competition.name,
+              cancellationReason: reason,
+              originalEntryFee: entryFee,
+            },
           },
-        }],
-        { session }
+        ],
+        { session },
       );
 
       // Update participant status
       await CompetitionParticipant.findByIdAndUpdate(
         participant._id,
         {
-          $set: { 
-            status: 'refunded',
+          $set: {
+            status: "refunded",
           },
         },
-        { session }
+        { session },
       );
 
       // Send notifications
@@ -115,16 +121,21 @@ export async function cancelCompetitionAndRefund(
           competitionId,
           competition.name,
           reason,
-          entryFee
+          entryFee,
         );
       } catch (notifError) {
-        console.error(`Error sending cancellation notification to ${userId}:`, notifError);
+        console.error(
+          `Error sending cancellation notification to ${userId}:`,
+          notifError,
+        );
       }
 
       totalRefunded += refundAmount;
       refundedCount++;
 
-      console.log(`   💰 Refunded ${refundAmount} credits to user ${userId} (new balance: ${newBalance})`);
+      console.log(
+        `   💰 Refunded ${refundAmount} credits to user ${userId} (new balance: ${newBalance})`,
+      );
     }
 
     // Update competition status and clear prize pool (it's been refunded)
@@ -132,12 +143,12 @@ export async function cancelCompetitionAndRefund(
       competitionId,
       {
         $set: {
-          status: 'cancelled',
+          status: "cancelled",
           cancellationReason: reason,
           prizePool: 0, // Prize pool is now empty (refunded)
         },
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -149,8 +160,8 @@ export async function cancelCompetitionAndRefund(
     // Revalidate pages to show updated status
     revalidatePath(`/competitions/${competitionId}`);
     revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath('/competitions');
-    revalidatePath('/competitions');
+    revalidatePath("/competitions");
+    revalidatePath("/competitions");
 
     return {
       success: true,
@@ -159,7 +170,7 @@ export async function cancelCompetitionAndRefund(
     };
   } catch (error) {
     await session.abortTransaction();
-    console.error('❌ Error cancelling competition:', error);
+    console.error("❌ Error cancelling competition:", error);
     throw error;
   } finally {
     session.endSession();
@@ -173,21 +184,21 @@ export async function cancelCompetitionAndRefund(
 export async function adminCancelCompetition(
   competitionId: string,
   reason: string,
-  adminId: string
+  adminId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
     await connectToDatabase();
 
     const competition = await Competition.findById(competitionId);
     if (!competition) {
-      return { success: false, message: 'Competition not found' };
+      return { success: false, message: "Competition not found" };
     }
 
     // Can only cancel upcoming or draft competitions manually
-    if (!['upcoming', 'draft'].includes(competition.status)) {
-      return { 
-        success: false, 
-        message: `Cannot cancel a ${competition.status} competition. Only draft or upcoming competitions can be cancelled.` 
+    if (!["upcoming", "draft"].includes(competition.status)) {
+      return {
+        success: false,
+        message: `Cannot cancel a ${competition.status} competition. Only draft or upcoming competitions can be cancelled.`,
       };
     }
 
@@ -204,20 +215,21 @@ export async function adminCancelCompetition(
     // No participants - just cancel
     await Competition.findByIdAndUpdate(competitionId, {
       $set: {
-        status: 'cancelled',
+        status: "cancelled",
         cancellationReason: reason,
       },
     });
 
     return {
       success: true,
-      message: 'Competition cancelled (no participants to refund).',
+      message: "Competition cancelled (no participants to refund).",
     };
   } catch (error) {
-    console.error('Error in adminCancelCompetition:', error);
+    console.error("Error in adminCancelCompetition:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to cancel competition',
+      message:
+        error instanceof Error ? error.message : "Failed to cancel competition",
     };
   }
 }
@@ -227,16 +239,16 @@ export async function adminCancelCompetition(
  * - Closes all open positions using last valid prices
  * - Refunds ALL entry fees to ALL participants
  * - Marks competition as cancelled with emergency flag
- * 
+ *
  * Use this when price feed issues compromise competition fairness
  */
 export async function emergencyCancelActiveCompetition(
   competitionId: string,
   reason: string,
   adminId: string,
-  snapshotPrices?: Map<string, { bid: number; ask: number }>
-): Promise<{ 
-  success: boolean; 
+  snapshotPrices?: Map<string, { bid: number; ask: number }>,
+): Promise<{
+  success: boolean;
   message: string;
   closedPositions?: number;
   refundedCount?: number;
@@ -248,18 +260,23 @@ export async function emergencyCancelActiveCompetition(
   try {
     await connectToDatabase();
 
-    console.log(`🚨 [EMERGENCY CANCEL] Starting emergency cancellation: ${competitionId}`);
+    console.log(
+      `🚨 [EMERGENCY CANCEL] Starting emergency cancellation: ${competitionId}`,
+    );
     console.log(`   Reason: ${reason}`);
     console.log(`   Admin: ${adminId}`);
 
-    const competition = await Competition.findById(competitionId).session(mongoSession);
+    const competition =
+      await Competition.findById(competitionId).session(mongoSession);
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
     // Must be active to emergency cancel
-    if (competition.status !== 'active') {
-      throw new Error(`Cannot emergency cancel a ${competition.status} competition. Only active competitions can be emergency cancelled.`);
+    if (competition.status !== "active") {
+      throw new Error(
+        `Cannot emergency cancel a ${competition.status} competition. Only active competitions can be emergency cancelled.`,
+      );
     }
 
     // Step 1: Pause the competition immediately to prevent new trades
@@ -273,7 +290,7 @@ export async function emergencyCancelActiveCompetition(
     // Step 2: Close all open positions
     const openPositions = await TradingPosition.find({
       competitionId: competitionId,
-      status: 'open',
+      status: "open",
     }).session(mongoSession);
 
     console.log(`📊 Found ${openPositions.length} open positions to close`);
@@ -282,16 +299,19 @@ export async function emergencyCancelActiveCompetition(
 
     // Get prices - either from snapshot or fetch current
     let pricesMap: Map<string, { bid: number; ask: number }>;
-    
+
     if (snapshotPrices && snapshotPrices.size > 0) {
       pricesMap = snapshotPrices;
       console.log(`📸 Using snapshot prices for position closing`);
     } else {
       // Fetch current prices
-      const { fetchRealForexPrices } = await import('@/lib/services/real-forex-prices.service');
-      const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+      const { fetchRealForexPrices } =
+        await import("@/lib/services/real-forex-prices.service");
+      const uniqueSymbols = [
+        ...new Set(openPositions.map((p) => p.symbol)),
+      ] as ForexSymbol[];
       const fetchedPrices = await fetchRealForexPrices(uniqueSymbols);
-      
+
       pricesMap = new Map();
       fetchedPrices.forEach((price, symbol) => {
         pricesMap.set(symbol, { bid: price.bid, ask: price.ask });
@@ -304,17 +324,20 @@ export async function emergencyCancelActiveCompetition(
       try {
         const prices = pricesMap.get(position.symbol);
         if (!prices) {
-          console.warn(`⚠️ No price available for ${position.symbol}, skipping position ${position._id}`);
+          console.warn(
+            `⚠️ No price available for ${position.symbol}, skipping position ${position._id}`,
+          );
           continue;
         }
 
         // Determine exit price based on position side
-        const exitPrice = position.side === 'long' ? prices.bid : prices.ask;
+        const exitPrice = position.side === "long" ? prices.bid : prices.ask;
 
         // Calculate P&L
-        const priceDiff = position.side === 'long' 
-          ? exitPrice - position.entryPrice 
-          : position.entryPrice - exitPrice;
+        const priceDiff =
+          position.side === "long"
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
         const realizedPnl = priceDiff * position.quantity * 100000; // Standard lot size
 
         // Update position
@@ -322,8 +345,8 @@ export async function emergencyCancelActiveCompetition(
           position._id,
           {
             $set: {
-              status: 'closed',
-              closeReason: 'competition_cancelled',
+              status: "closed",
+              closeReason: "competition_cancelled",
               exitPrice: exitPrice,
               currentPrice: exitPrice,
               pnl: realizedPnl,
@@ -331,70 +354,83 @@ export async function emergencyCancelActiveCompetition(
               closedAt: new Date(),
             },
           },
-          { session: mongoSession }
+          { session: mongoSession },
         );
 
         // Create close order
-        await TradingOrder.create([{
-          competitionId: position.competitionId,
-          userId: position.userId,
-          participantId: position.participantId,
-          symbol: position.symbol,
-          side: position.side === 'long' ? 'sell' : 'buy',
-          orderType: 'market',
-          quantity: position.quantity,
-          executedPrice: exitPrice,
-          leverage: position.leverage,
-          marginRequired: 0,
-          status: 'filled',
-          filledQuantity: position.quantity,
-          remainingQuantity: 0,
-          placedAt: new Date(),
-          executedAt: new Date(),
-          orderSource: 'system',
-          positionId: position._id.toString(),
-        }], { session: mongoSession });
+        await TradingOrder.create(
+          [
+            {
+              competitionId: position.competitionId,
+              userId: position.userId,
+              participantId: position.participantId,
+              symbol: position.symbol,
+              side: position.side === "long" ? "sell" : "buy",
+              orderType: "market",
+              quantity: position.quantity,
+              executedPrice: exitPrice,
+              leverage: position.leverage,
+              marginRequired: 0,
+              status: "filled",
+              filledQuantity: position.quantity,
+              remainingQuantity: 0,
+              placedAt: new Date(),
+              executedAt: new Date(),
+              orderSource: "system",
+              positionId: position._id.toString(),
+            },
+          ],
+          { session: mongoSession },
+        );
 
         // Calculate trade metrics
         const priceChange = exitPrice - position.entryPrice;
         const priceChangePercentage = (priceChange / position.entryPrice) * 100;
-        const realizedPnlPercentage = position.marginUsed > 0 
-          ? (realizedPnl / position.marginUsed) * 100 
-          : 0;
+        const realizedPnlPercentage =
+          position.marginUsed > 0
+            ? (realizedPnl / position.marginUsed) * 100
+            : 0;
         const closedAt = new Date();
-        const holdingTimeSeconds = Math.floor((closedAt.getTime() - position.openedAt.getTime()) / 1000);
+        const holdingTimeSeconds = Math.floor(
+          (closedAt.getTime() - position.openedAt.getTime()) / 1000,
+        );
 
         // Create trade history with all required fields
-        await TradeHistory.create([{
-          competitionId: position.competitionId,
-          challengeId: position.challengeId,
-          participantId: position.participantId,
-          userId: position.userId,
-          positionId: position._id.toString(),
-          symbol: position.symbol,
-          side: position.side,
-          quantity: position.quantity,
-          orderType: 'market',
-          entryPrice: position.entryPrice,
-          exitPrice: exitPrice,
-          priceChange,
-          priceChangePercentage,
-          realizedPnl,
-          realizedPnlPercentage,
-          openedAt: position.openedAt,
-          closedAt,
-          holdingTimeSeconds,
-          closeReason: 'emergency_cancel',
-          leverage: position.leverage,
-          marginUsed: position.marginUsed || 0,
-          hadStopLoss: !!position.stopLoss,
-          stopLossPrice: position.stopLoss,
-          hadTakeProfit: !!position.takeProfit,
-          takeProfitPrice: position.takeProfit,
-          openOrderId: position.orderId || `emergency_${position._id}`,
-          closeOrderId: `emergency_close_${position._id}`,
-          isWinner: realizedPnl > 0,
-        }], { session: mongoSession });
+        await TradeHistory.create(
+          [
+            {
+              competitionId: position.competitionId,
+              challengeId: position.challengeId,
+              participantId: position.participantId,
+              userId: position.userId,
+              positionId: position._id.toString(),
+              symbol: position.symbol,
+              side: position.side,
+              quantity: position.quantity,
+              orderType: "market",
+              entryPrice: position.entryPrice,
+              exitPrice: exitPrice,
+              priceChange,
+              priceChangePercentage,
+              realizedPnl,
+              realizedPnlPercentage,
+              openedAt: position.openedAt,
+              closedAt,
+              holdingTimeSeconds,
+              closeReason: "emergency_cancel",
+              leverage: position.leverage,
+              marginUsed: position.marginUsed || 0,
+              hadStopLoss: !!position.stopLoss,
+              stopLossPrice: position.stopLoss,
+              hadTakeProfit: !!position.takeProfit,
+              takeProfitPrice: position.takeProfit,
+              openOrderId: position.orderId || `emergency_${position._id}`,
+              closeOrderId: `emergency_close_${position._id}`,
+              isWinner: realizedPnl > 0,
+            },
+          ],
+          { session: mongoSession },
+        );
 
         closedPositions++;
       } catch (posError) {
@@ -415,13 +451,16 @@ export async function emergencyCancelActiveCompetition(
     let totalRefunded = 0;
     let refundedCount = 0;
 
-    const { notificationService } = await import('@/lib/services/notification.service');
+    const { notificationService } =
+      await import("@/lib/services/notification.service");
 
     for (const participant of participants) {
       const userId = participant.userId.toString();
 
       // Get wallet
-      const wallet = await CreditWallet.findOne({ userId }).session(mongoSession);
+      const wallet = await CreditWallet.findOne({ userId }).session(
+        mongoSession,
+      );
       if (!wallet) {
         console.log(`⚠️ No wallet found for user ${userId}, skipping`);
         continue;
@@ -434,50 +473,57 @@ export async function emergencyCancelActiveCompetition(
       // Update wallet AND track refund in totalWonFromCompetitions for reconciliation
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
-        { $inc: { 
-          creditBalance: refundAmount,
-          totalWonFromCompetitions: refundAmount, // Track refunds as credits received
-        } },
-        { session: mongoSession }
+        {
+          $inc: {
+            creditBalance: refundAmount,
+            totalWonFromCompetitions: refundAmount, // Track refunds as credits received
+          },
+        },
+        { session: mongoSession },
       );
 
       // Create refund transaction
-      await WalletTransaction.create([{
-        userId,
-        transactionType: 'competition_refund',
-        amount: refundAmount,
-        balanceBefore: wallet.creditBalance,
-        balanceAfter: newBalance,
-        competitionId: competitionId,
-        status: 'completed',
-        description: `Emergency cancellation - Full refund for "${competition.name}"`,
-        metadata: {
-          competitionName: competition.name,
-          cancellationReason: reason,
-          originalEntryFee: entryFee,
-          isEmergency: true,
-          cancelledBy: adminId,
-        },
-      }], { session: mongoSession });
+      await WalletTransaction.create(
+        [
+          {
+            userId,
+            transactionType: "competition_refund",
+            amount: refundAmount,
+            balanceBefore: wallet.creditBalance,
+            balanceAfter: newBalance,
+            competitionId: competitionId,
+            status: "completed",
+            description: `Emergency cancellation - Full refund for "${competition.name}"`,
+            metadata: {
+              competitionName: competition.name,
+              cancellationReason: reason,
+              originalEntryFee: entryFee,
+              isEmergency: true,
+              cancelledBy: adminId,
+            },
+          },
+        ],
+        { session: mongoSession },
+      );
 
       // Update participant status
       await CompetitionParticipant.findByIdAndUpdate(
         participant._id,
-        { $set: { status: 'refunded' } },
-        { session: mongoSession }
+        { $set: { status: "refunded" } },
+        { session: mongoSession },
       );
 
       // Send notification
       try {
         await notificationService.createCustom({
           userId,
-          type: 'competition_emergency_cancelled',
-          title: '🚨 Competition Emergency Cancelled',
+          type: "competition_emergency_cancelled",
+          title: "🚨 Competition Emergency Cancelled",
           message: `${competition.name} has been emergency cancelled due to: ${reason}. Your full entry fee of €${entryFee.toFixed(2)} has been refunded.`,
-          icon: 'alert-octagon',
-          category: 'trading',
-          priority: 'urgent',
-          color: 'red',
+          icon: "alert-octagon",
+          category: "trading",
+          priority: "urgent",
+          color: "red",
         });
       } catch (notifError) {
         console.error(`Error sending notification to ${userId}:`, notifError);
@@ -492,7 +538,7 @@ export async function emergencyCancelActiveCompetition(
       competitionId,
       {
         $set: {
-          status: 'cancelled',
+          status: "cancelled",
           cancellationReason: `EMERGENCY: ${reason}`,
           prizePool: 0,
           isPaused: false,
@@ -501,12 +547,14 @@ export async function emergencyCancelActiveCompetition(
           emergencyEndedBy: adminId,
         },
       },
-      { session: mongoSession }
+      { session: mongoSession },
     );
 
     await mongoSession.commitTransaction();
 
-    console.log(`✅ [EMERGENCY CANCEL] Competition "${competition.name}" cancelled successfully`);
+    console.log(
+      `✅ [EMERGENCY CANCEL] Competition "${competition.name}" cancelled successfully`,
+    );
     console.log(`   Closed positions: ${closedPositions}`);
     console.log(`   Refunded: ${refundedCount} participants`);
     console.log(`   Total refunded: ${totalRefunded} credits`);
@@ -514,7 +562,7 @@ export async function emergencyCancelActiveCompetition(
     // Revalidate pages
     revalidatePath(`/competitions/${competitionId}`);
     revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath('/competitions');
+    revalidatePath("/competitions");
 
     return {
       success: true,
@@ -523,16 +571,17 @@ export async function emergencyCancelActiveCompetition(
       refundedCount,
       totalRefunded,
     };
-
   } catch (error) {
     await mongoSession.abortTransaction();
-    console.error('❌ [EMERGENCY CANCEL] Error:', error);
+    console.error("❌ [EMERGENCY CANCEL] Error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to emergency cancel competition',
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to emergency cancel competition",
     };
   } finally {
     mongoSession.endSession();
   }
 }
-

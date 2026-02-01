@@ -1,16 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Clock, Timer, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Clock, Timer, CheckCircle, AlertCircle } from "lucide-react";
 
 interface LiveCountdownProps {
   targetDate: Date;
   label: string;
-  type: 'start' | 'end';
-  status: 'upcoming' | 'active' | 'completed';
+  type: "start" | "end";
+  status: "upcoming" | "active" | "completed";
 }
 
-export default function LiveCountdown({ targetDate, label, type, status }: LiveCountdownProps) {
+export default function LiveCountdown({
+  targetDate,
+  label,
+  type,
+  status,
+}: LiveCountdownProps) {
   const [timeRemaining, setTimeRemaining] = useState<{
     days: number;
     hours: number;
@@ -26,12 +31,20 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 0 });
+        setTimeRemaining({
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+          total: 0,
+        });
         return;
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -51,7 +64,7 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
   const isComplete = timeRemaining.total <= 0;
 
   // For "starts in" countdown
-  if (type === 'start' && status === 'upcoming') {
+  if (type === "start" && status === "upcoming") {
     if (isComplete) {
       return (
         <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-xl">
@@ -72,27 +85,35 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
         <div className="grid grid-cols-4 gap-2">
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.days.toString().padStart(2, '0')}
+              {timeRemaining.days.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Days</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Days
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.hours.toString().padStart(2, '0')}
+              {timeRemaining.hours.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Hours</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Hours
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.minutes.toString().padStart(2, '0')}
+              {timeRemaining.minutes.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Mins</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Mins
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg relative">
             <div className="text-3xl font-black text-yellow-400 tabular-nums animate-pulse">
-              {timeRemaining.seconds.toString().padStart(2, '0')}
+              {timeRemaining.seconds.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Secs</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Secs
+            </div>
           </div>
         </div>
       </div>
@@ -100,7 +121,7 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
   }
 
   // For "ends in" countdown (active competition)
-  if (type === 'end' && status === 'active') {
+  if (type === "end" && status === "active") {
     if (isComplete) {
       return (
         <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-xl">
@@ -116,14 +137,20 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
     const isWarning = timeRemaining.total < 60 * 60 * 1000;
 
     return (
-      <div className={`p-4 rounded-xl ${
-        isWarning 
-          ? 'bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/50' 
-          : 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/50'
-      }`}>
+      <div
+        className={`p-4 rounded-xl ${
+          isWarning
+            ? "bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/50"
+            : "bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/50"
+        }`}
+      >
         <div className="flex items-center gap-2 mb-3">
-          <Clock className={`h-5 w-5 ${isWarning ? 'text-red-400 animate-pulse' : 'text-blue-400'}`} />
-          <span className={`text-sm font-semibold ${isWarning ? 'text-red-400' : 'text-blue-400'}`}>
+          <Clock
+            className={`h-5 w-5 ${isWarning ? "text-red-400 animate-pulse" : "text-blue-400"}`}
+          />
+          <span
+            className={`text-sm font-semibold ${isWarning ? "text-red-400" : "text-blue-400"}`}
+          >
             {label}
           </span>
           {isWarning && (
@@ -135,27 +162,37 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
         <div className="grid grid-cols-4 gap-2">
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.days.toString().padStart(2, '0')}
+              {timeRemaining.days.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Days</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Days
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.hours.toString().padStart(2, '0')}
+              {timeRemaining.hours.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Hours</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Hours
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
             <div className="text-3xl font-black text-white tabular-nums">
-              {timeRemaining.minutes.toString().padStart(2, '0')}
+              {timeRemaining.minutes.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Mins</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Mins
+            </div>
           </div>
           <div className="text-center p-3 bg-gray-900/50 rounded-lg">
-            <div className={`text-3xl font-black tabular-nums ${isWarning ? 'text-red-400 animate-pulse' : 'text-blue-400'}`}>
-              {timeRemaining.seconds.toString().padStart(2, '0')}
+            <div
+              className={`text-3xl font-black tabular-nums ${isWarning ? "text-red-400 animate-pulse" : "text-blue-400"}`}
+            >
+              {timeRemaining.seconds.toString().padStart(2, "0")}
             </div>
-            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Secs</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">
+              Secs
+            </div>
           </div>
         </div>
       </div>
@@ -164,4 +201,3 @@ export default function LiveCountdown({ targetDate, label, type, status }: LiveC
 
   return null;
 }
-

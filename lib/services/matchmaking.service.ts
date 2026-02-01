@@ -1,18 +1,26 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import UserPresence from '@/database/models/user-presence.model';
-import { getGlobalLeaderboard, GlobalLeaderboardEntry } from '@/lib/actions/leaderboard/global-leaderboard.actions';
+import { connectToDatabase } from "@/database/mongoose";
+import UserPresence from "@/database/models/user-presence.model";
+import {
+  getGlobalLeaderboard,
+  GlobalLeaderboardEntry,
+} from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
 // Trader experience levels based on stats
-export type TraderLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master';
+export type TraderLevel =
+  | "beginner"
+  | "intermediate"
+  | "advanced"
+  | "expert"
+  | "master";
 
 export interface MatchableTrader {
   userId: string;
   email: string;
   username: string;
   profileImage?: string;
-  
+
   // Core stats for matching (directly from leaderboard)
   level: TraderLevel;
   winRate: number;
@@ -20,29 +28,29 @@ export interface MatchableTrader {
   totalPnl: number;
   totalPnlPercentage: number;
   profitFactor: number;
-  
+
   // Competition/Challenge history (directly from leaderboard)
   competitionsEntered: number;
   competitionsWon: number;
   challengesEntered: number;
   challengesWon: number;
-  
+
   // Badges (directly from leaderboard)
   totalBadges: number;
   legendaryBadges: number;
-  
+
   // Overall score (directly from leaderboard - ensures consistency!)
   overallScore: number;
-  
+
   // Title (from leaderboard)
   userTitle?: string;
   userTitleIcon?: string;
   userTitleColor?: string;
-  
+
   // Online status
   isOnline: boolean;
   acceptingChallenges: boolean;
-  
+
   // Match compatibility score (calculated during matching)
   matchScore?: number;
 }
@@ -63,103 +71,117 @@ function calculateTraderLevel(stats: {
   winRate: number;
   totalBadges: number;
 }): TraderLevel {
-  const { totalTrades, competitionsEntered, challengesEntered, winRate, totalBadges } = stats;
-  
+  const {
+    totalTrades,
+    competitionsEntered,
+    challengesEntered,
+    winRate,
+    totalBadges,
+  } = stats;
+
   // Experience score based on activity
-  const activityScore = 
-    (totalTrades * 1) +
-    (competitionsEntered * 10) +
-    (challengesEntered * 5) +
-    (totalBadges * 15);
-  
+  const activityScore =
+    totalTrades * 1 +
+    competitionsEntered * 10 +
+    challengesEntered * 5 +
+    totalBadges * 15;
+
   // Performance modifier
   const performanceModifier = winRate > 60 ? 1.3 : winRate > 50 ? 1.1 : 1.0;
   const adjustedScore = activityScore * performanceModifier;
-  
-  if (adjustedScore < 50) return 'beginner';
-  if (adjustedScore < 200) return 'intermediate';
-  if (adjustedScore < 500) return 'advanced';
-  if (adjustedScore < 1000) return 'expert';
-  return 'master';
+
+  if (adjustedScore < 50) return "beginner";
+  if (adjustedScore < 200) return "intermediate";
+  if (adjustedScore < 500) return "advanced";
+  if (adjustedScore < 1000) return "expert";
+  return "master";
 }
 
 /**
  * Calculate match compatibility score between two traders
  * Higher score = better match (more evenly matched)
  */
-function calculateMatchScore(trader1: MatchableTrader, trader2: MatchableTrader): {
+function calculateMatchScore(
+  trader1: MatchableTrader,
+  trader2: MatchableTrader,
+): {
   score: number;
   reasons: string[];
 } {
   const reasons: string[] = [];
   let totalScore = 100; // Start with perfect match
-  
+
   // Level matching (40% weight) - same level is best
   const levelOrder: Record<TraderLevel, number> = {
-    'beginner': 1,
-    'intermediate': 2,
-    'advanced': 3,
-    'expert': 4,
-    'master': 5,
+    beginner: 1,
+    intermediate: 2,
+    advanced: 3,
+    expert: 4,
+    master: 5,
   };
-  const levelDiff = Math.abs(levelOrder[trader1.level] - levelOrder[trader2.level]);
+  const levelDiff = Math.abs(
+    levelOrder[trader1.level] - levelOrder[trader2.level],
+  );
   const levelPenalty = levelDiff * 10; // 10 points per level difference
   totalScore -= levelPenalty;
-  
+
   if (levelDiff === 0) {
     reasons.push(`Same level (${trader1.level})`);
   } else if (levelDiff === 1) {
-    reasons.push('Similar experience level');
+    reasons.push("Similar experience level");
   }
-  
+
   // Win rate matching (25% weight) - similar win rates
   const winRateDiff = Math.abs(trader1.winRate - trader2.winRate);
   const winRatePenalty = Math.min(25, winRateDiff * 0.5); // Up to 25 point penalty
   totalScore -= winRatePenalty;
-  
+
   if (winRateDiff <= 5) {
-    reasons.push('Matching win rates');
+    reasons.push("Matching win rates");
   } else if (winRateDiff <= 15) {
-    reasons.push('Comparable win rates');
+    reasons.push("Comparable win rates");
   }
-  
+
   // Trade count matching (15% weight) - similar experience volume
-  const tradeRatio = Math.min(trader1.totalTrades, trader2.totalTrades) / 
-                     Math.max(trader1.totalTrades, trader2.totalTrades || 1);
+  const tradeRatio =
+    Math.min(trader1.totalTrades, trader2.totalTrades) /
+    Math.max(trader1.totalTrades, trader2.totalTrades || 1);
   const tradePenalty = (1 - tradeRatio) * 15;
   totalScore -= tradePenalty;
-  
+
   if (tradeRatio > 0.7) {
-    reasons.push('Similar trading volume');
+    reasons.push("Similar trading volume");
   }
-  
+
   // Profit factor matching (10% weight)
   const pfDiff = Math.abs(trader1.profitFactor - trader2.profitFactor);
   const pfPenalty = Math.min(10, pfDiff * 5);
   totalScore -= pfPenalty;
-  
+
   if (pfDiff <= 0.3) {
-    reasons.push('Similar profit factor');
+    reasons.push("Similar profit factor");
   }
-  
+
   // Competition experience (5% weight)
-  const compRatio = Math.min(trader1.competitionsEntered, trader2.competitionsEntered) / 
-                    Math.max(trader1.competitionsEntered, trader2.competitionsEntered || 1);
+  const compRatio =
+    Math.min(trader1.competitionsEntered, trader2.competitionsEntered) /
+    Math.max(trader1.competitionsEntered, trader2.competitionsEntered || 1);
   const compPenalty = (1 - compRatio) * 5;
   totalScore -= compPenalty;
-  
+
   // Badge collection (5% weight) - similar achievements
-  const badgeRatio = Math.min(trader1.totalBadges, trader2.totalBadges) / 
-                     Math.max(trader1.totalBadges, trader2.totalBadges || 1);
+  const badgeRatio =
+    Math.min(trader1.totalBadges, trader2.totalBadges) /
+    Math.max(trader1.totalBadges, trader2.totalBadges || 1);
   const badgePenalty = (1 - badgeRatio) * 5;
   totalScore -= badgePenalty;
-  
+
   // Bonus for both being online and accepting
   if (trader2.isOnline && trader2.acceptingChallenges) {
     totalScore += 5;
-    reasons.push('Online & ready');
+    reasons.push("Online & ready");
   }
-  
+
   return {
     score: Math.max(0, Math.min(100, totalScore)),
     reasons,
@@ -172,7 +194,7 @@ function calculateMatchScore(trader1: MatchableTrader, trader2: MatchableTrader)
  */
 function leaderboardEntryToMatchableTrader(
   entry: GlobalLeaderboardEntry,
-  presence: { isOnline: boolean; acceptingChallenges: boolean }
+  presence: { isOnline: boolean; acceptingChallenges: boolean },
 ): MatchableTrader {
   // Calculate level based on activity
   const level = calculateTraderLevel({
@@ -182,7 +204,7 @@ function leaderboardEntryToMatchableTrader(
     winRate: entry.winRate,
     totalBadges: entry.totalBadges,
   });
-  
+
   return {
     userId: entry.userId,
     email: entry.email,
@@ -214,80 +236,94 @@ function leaderboardEntryToMatchableTrader(
  * Get all matchable traders (excluding current user)
  * Now uses leaderboard data directly for consistency!
  */
-export async function getMatchableTraders(currentUserId: string): Promise<MatchableTrader[]> {
+export async function getMatchableTraders(
+  currentUserId: string,
+): Promise<MatchableTrader[]> {
   await connectToDatabase();
-  
+
   // Get leaderboard data - this has all the pre-calculated stats and scores
   const leaderboardData = await getGlobalLeaderboard();
-  
+
   // Get online status for all users
   const onlineStatuses = await UserPresence.find({}).lean();
-  const onlineMap = new Map(onlineStatuses.map(p => [p.userId, p]));
-  
+  const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
+
   // Convert leaderboard entries to matchable traders
   const traders: MatchableTrader[] = [];
-  
+
   for (const entry of leaderboardData) {
     // Skip current user
     if (entry.userId === currentUserId) continue;
-    
+
     // Get online status
     const presence = onlineMap.get(entry.userId);
-    const isOnline = presence?.status === 'online';
+    const isOnline = presence?.status === "online";
     const acceptingChallenges = presence?.acceptingChallenges ?? true;
-    
+
     // Convert to matchable trader using leaderboard data directly
-    traders.push(leaderboardEntryToMatchableTrader(entry, { isOnline, acceptingChallenges }));
+    traders.push(
+      leaderboardEntryToMatchableTrader(entry, {
+        isOnline,
+        acceptingChallenges,
+      }),
+    );
   }
-  
+
   return traders;
 }
 
 /**
  * Find the best match for a trader
  */
-export async function findBestMatch(currentUserId: string): Promise<MatchResult | null> {
+export async function findBestMatch(
+  currentUserId: string,
+): Promise<MatchResult | null> {
   await connectToDatabase();
-  
+
   // Get leaderboard data
   const leaderboardData = await getGlobalLeaderboard();
-  
+
   // Find current user in leaderboard
-  const currentUserEntry = leaderboardData.find(e => e.userId === currentUserId);
+  const currentUserEntry = leaderboardData.find(
+    (e) => e.userId === currentUserId,
+  );
   if (!currentUserEntry) {
-    console.error('Current user not found in leaderboard');
+    console.error("Current user not found in leaderboard");
     return null;
   }
-  
+
   // Get online statuses
   const onlineStatuses = await UserPresence.find({}).lean();
-  const onlineMap = new Map(onlineStatuses.map(p => [p.userId, p]));
-  
+  const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
+
   // Convert current user
   const currentUserPresence = onlineMap.get(currentUserId);
   const currentUser = leaderboardEntryToMatchableTrader(currentUserEntry, {
-    isOnline: currentUserPresence?.status === 'online',
+    isOnline: currentUserPresence?.status === "online",
     acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
   });
-  
+
   // Get all other traders
   const traders = await getMatchableTraders(currentUserId);
-  
+
   // Filter to only online and accepting challenges
-  const availableTraders = traders.filter(t => t.isOnline && t.acceptingChallenges);
-  
+  const availableTraders = traders.filter(
+    (t) => t.isOnline && t.acceptingChallenges,
+  );
+
   if (availableTraders.length === 0) {
-    console.log('No online traders, falling back to all traders');
+    console.log("No online traders, falling back to all traders");
   }
-  
-  const tradersToMatch = availableTraders.length > 0 ? availableTraders : traders;
-  
+
+  const tradersToMatch =
+    availableTraders.length > 0 ? availableTraders : traders;
+
   if (tradersToMatch.length === 0) {
     return null;
   }
-  
+
   // Calculate match scores
-  const matches: MatchResult[] = tradersToMatch.map(trader => {
+  const matches: MatchResult[] = tradersToMatch.map((trader) => {
     const { score, reasons } = calculateMatchScore(currentUser, trader);
     return {
       trader: { ...trader, matchScore: score },
@@ -295,10 +331,10 @@ export async function findBestMatch(currentUserId: string): Promise<MatchResult 
       matchReasons: reasons,
     };
   });
-  
+
   // Sort by match score (highest first)
   matches.sort((a, b) => b.matchScore - a.matchScore);
-  
+
   return matches[0] || null;
 }
 
@@ -307,36 +343,38 @@ export async function findBestMatch(currentUserId: string): Promise<MatchResult 
  */
 export async function getRankedMatches(
   currentUserId: string,
-  limit: number = 50
+  limit: number = 50,
 ): Promise<MatchResult[]> {
   await connectToDatabase();
-  
+
   // Get leaderboard data
   const leaderboardData = await getGlobalLeaderboard();
-  
+
   // Find current user in leaderboard
-  const currentUserEntry = leaderboardData.find(e => e.userId === currentUserId);
+  const currentUserEntry = leaderboardData.find(
+    (e) => e.userId === currentUserId,
+  );
   if (!currentUserEntry) {
-    console.error('Current user not found in leaderboard');
+    console.error("Current user not found in leaderboard");
     return [];
   }
-  
+
   // Get online statuses
   const onlineStatuses = await UserPresence.find({}).lean();
-  const onlineMap = new Map(onlineStatuses.map(p => [p.userId, p]));
-  
+  const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
+
   // Convert current user
   const currentUserPresence = onlineMap.get(currentUserId);
   const currentUser = leaderboardEntryToMatchableTrader(currentUserEntry, {
-    isOnline: currentUserPresence?.status === 'online',
+    isOnline: currentUserPresence?.status === "online",
     acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
   });
-  
+
   // Get all other traders
   const traders = await getMatchableTraders(currentUserId);
-  
+
   // Calculate match scores for all traders
-  const matches: MatchResult[] = traders.map(trader => {
+  const matches: MatchResult[] = traders.map((trader) => {
     const { score, reasons } = calculateMatchScore(currentUser, trader);
     return {
       trader: { ...trader, matchScore: score },
@@ -344,10 +382,10 @@ export async function getRankedMatches(
       matchReasons: reasons,
     };
   });
-  
+
   // Sort by match score (best matches first)
   matches.sort((a, b) => b.matchScore - a.matchScore);
-  
+
   return matches.slice(0, limit);
 }
 

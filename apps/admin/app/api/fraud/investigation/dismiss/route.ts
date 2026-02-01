@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import DeviceFingerprint from '@/database/models/fraud/device-fingerprint.model';
-import { getUsersByIds } from '@/lib/utils/user-lookup';
-import { FraudHistoryService } from '@/lib/services/fraud/fraud-history.service';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { FraudHistoryService } from "@/lib/services/fraud/fraud-history.service";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
     const adminUser = await verifyAdminAuth();
     if (!adminUser.isAuthenticated) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
       );
     }
 
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
 
     if (!alertId || !userIds || !Array.isArray(userIds)) {
       return NextResponse.json(
-        { success: false, error: 'Alert ID and user IDs required' },
-        { status: 400 }
+        { success: false, error: "Alert ID and user IDs required" },
+        { status: 400 },
       );
     }
 
@@ -36,37 +36,37 @@ export async function POST(request: NextRequest) {
     const updatedAlert = await FraudAlert.findByIdAndUpdate(
       alertId,
       {
-        status: 'dismissed',
+        status: "dismissed",
         resolvedAt: clearanceTimestamp,
-        resolvedBy: adminUser.adminId || adminUser.email || 'system',
-        actionTaken: 'none',
+        resolvedBy: adminUser.adminId || adminUser.email || "system",
+        actionTaken: "none",
         resolution: `Investigation dismissed - Marked as false positive. After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device).`,
         // Mark as cleared so user can trigger NEW alerts if they commit fraud again
         investigationClearedAt: clearanceTimestamp,
-        clearanceNote: `Dismissed by ${adminUser.email || 'admin'} - User cleared without restrictions`
+        clearanceNote: `Dismissed by ${adminUser.email || "admin"} - User cleared without restrictions`,
       },
-      { new: true }
+      { new: true },
     );
-    
+
     console.log(`📝 Alert ${alertId} dismissed and marked as cleared`);
     console.log(`   → Future fraud by these users will generate NEW alerts`);
 
     if (!updatedAlert) {
       return NextResponse.json(
-        { success: false, error: 'Alert not found' },
-        { status: 404 }
+        { success: false, error: "Alert not found" },
+        { status: 404 },
       );
     }
 
     // Reduce risk scores on device fingerprints
     await DeviceFingerprint.updateMany(
       { userId: { $in: userIds } },
-      { 
-        $set: { 
+      {
+        $set: {
           riskScore: 0,
-          flaggedForReview: false
-        }
-      }
+          flaggedForReview: false,
+        },
+      },
     );
 
     // Log to fraud history for each cleared user
@@ -74,13 +74,13 @@ export async function POST(request: NextRequest) {
     const adminInfo = {
       adminId: adminUser.adminId,
       adminEmail: adminUser.email,
-      adminName: adminUser.email?.split('@')[0],
+      adminName: adminUser.email?.split("@")[0],
     };
 
     for (const userId of userIds) {
       const user = usersMap.get(userId);
       if (!user) continue;
-      
+
       const userInfo = {
         userId: userId,
         email: user.email,
@@ -89,44 +89,44 @@ export async function POST(request: NextRequest) {
 
       await FraudHistoryService.logAlertDismissed(
         userInfo,
-        'Investigation dismissed - False positive',
-        'After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device). Risk scores have been reset.',
+        "Investigation dismissed - False positive",
+        "After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device). Risk scores have been reset.",
         adminInfo,
-        alertId
+        alertId,
       );
     }
 
-    console.log(`✅ Dismissed investigation for ${userIds.length} accounts (Alert: ${alertId})`);
+    console.log(
+      `✅ Dismissed investigation for ${userIds.length} accounts (Alert: ${alertId})`,
+    );
 
     // Log audit action
     try {
       await auditLogService.logSecurityAlertHandled(
         {
-          id: adminUser.adminId || 'admin',
-          email: adminUser.email || 'admin',
-          name: (adminUser.email || 'admin').split('@')[0],
-          role: 'admin',
+          id: adminUser.adminId || "admin",
+          email: adminUser.email || "admin",
+          name: (adminUser.email || "admin").split("@")[0],
+          role: "admin",
         },
         alertId,
-        'fraud_investigation',
-        'dismissed'
+        "fraud_investigation",
+        "dismissed",
       );
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
       success: true,
       message: `Investigation dismissed - ${userIds.length} account(s) cleared`,
-      data: updatedAlert
+      data: updatedAlert,
     });
-
   } catch (error) {
-    console.error('Error dismissing investigation:', error);
+    console.error("Error dismissing investigation:", error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
+      { success: false, error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
-

@@ -1,16 +1,20 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { trackDeviceFingerprint } from '@/lib/services/device-fingerprint.service';
+import { useEffect, useState } from "react";
+import { trackDeviceFingerprint } from "@/lib/services/device-fingerprint.service";
 
 /**
  * Global Fingerprint Provider
- * 
+ *
  * Tracks device fingerprints on EVERY page of the app.
  * This ensures we capture existing users who logged in before
  * the fraud detection system was implemented.
  */
-export function FingerprintProvider({ children }: { children: React.ReactNode }) {
+export function FingerprintProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [tracked, setTracked] = useState(false);
 
   useEffect(() => {
@@ -20,12 +24,12 @@ export function FingerprintProvider({ children }: { children: React.ReactNode })
     const trackFingerprint = async () => {
       try {
         const result = await trackDeviceFingerprint();
-        
+
         if (result.success) {
           setTracked(true);
         }
       } catch (error) {
-        console.error('Failed to track fingerprint:', error);
+        console.error("Failed to track fingerprint:", error);
         // Don't block the app if fingerprinting fails
       }
     };
@@ -38,4 +42,3 @@ export function FingerprintProvider({ children }: { children: React.ReactNode })
 
   return <>{children}</>;
 }
-

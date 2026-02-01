@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Search,
@@ -26,9 +26,9 @@ import {
   TrendingUp,
   Loader2,
   Trophy,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import IncidentResolutionModal from './IncidentResolutionModal';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import IncidentResolutionModal from "./IncidentResolutionModal";
 
 interface Incident {
   _id: string;
@@ -100,42 +100,46 @@ interface CompetitionOption {
 export default function IncidentsSection() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(
+    null,
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompensateModal, setShowCompensateModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [filters, setFilters] = useState({
-    status: '',
-    severity: '',
-    type: '',
+    status: "",
+    severity: "",
+    type: "",
   });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [compensations, setCompensations] = useState<CompensationForm[]>([{ userId: '', amount: 0, reason: '' }]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [compensations, setCompensations] = useState<CompensationForm[]>([
+    { userId: "", amount: 0, reason: "" },
+  ]);
   const [submitting, setSubmitting] = useState(false);
 
   // Competition selector
   const [competitions, setCompetitions] = useState<CompetitionOption[]>([]);
   const [competitionsLoading, setCompetitionsLoading] = useState(false);
-  const [competitionSearch, setCompetitionSearch] = useState('');
+  const [competitionSearch, setCompetitionSearch] = useState("");
 
   // New incident form
   const [newIncident, setNewIncident] = useState({
-    type: 'technical_error',
-    severity: 'medium',
-    title: '',
-    description: '',
-    priority: 'medium',
-    competitionId: '',
-    competitionAction: 'none' as 'none' | 'pause' | 'emergency_cancel',
+    type: "technical_error",
+    severity: "medium",
+    title: "",
+    description: "",
+    priority: "medium",
+    competitionId: "",
+    competitionAction: "none" as "none" | "pause" | "emergency_cancel",
   });
 
   const fetchIncidents = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (filters.status) params.set('status', filters.status);
-      if (filters.severity) params.set('severity', filters.severity);
-      if (filters.type) params.set('type', filters.type);
+      if (filters.status) params.set("status", filters.status);
+      if (filters.severity) params.set("severity", filters.severity);
+      if (filters.type) params.set("type", filters.type);
 
       const response = await fetch(`/api/incidents?${params.toString()}`);
       const data = await response.json();
@@ -144,8 +148,8 @@ export default function IncidentsSection() {
         setIncidents(data.incidents);
       }
     } catch (error) {
-      console.error('Error fetching incidents:', error);
-      toast.error('Failed to load incidents');
+      console.error("Error fetching incidents:", error);
+      toast.error("Failed to load incidents");
     } finally {
       setLoading(false);
     }
@@ -159,14 +163,14 @@ export default function IncidentsSection() {
   const fetchCompetitions = useCallback(async () => {
     try {
       setCompetitionsLoading(true);
-      const response = await fetch('/api/competitions');
+      const response = await fetch("/api/competitions");
       const data = await response.json();
 
       if (data.success) {
         setCompetitions(data.competitions || []);
       }
     } catch (error) {
-      console.error('Error fetching competitions:', error);
+      console.error("Error fetching competitions:", error);
     } finally {
       setCompetitionsLoading(false);
     }
@@ -174,26 +178,38 @@ export default function IncidentsSection() {
 
   // Fetch competitions when create modal opens or when viewing incident with competition
   useEffect(() => {
-    if (showCreateModal || (selectedIncident?.competitionId && competitions.length === 0)) {
+    if (
+      showCreateModal ||
+      (selectedIncident?.competitionId && competitions.length === 0)
+    ) {
       fetchCompetitions();
     }
-  }, [showCreateModal, selectedIncident?.competitionId, competitions.length, fetchCompetitions]);
+  }, [
+    showCreateModal,
+    selectedIncident?.competitionId,
+    competitions.length,
+    fetchCompetitions,
+  ]);
 
   // Filter competitions based on search
-  const filteredCompetitions = competitions.filter(comp => 
-    comp.name?.toLowerCase().includes(competitionSearch.toLowerCase()) ||
-    comp._id.includes(competitionSearch)
+  const filteredCompetitions = competitions.filter(
+    (comp) =>
+      comp.name?.toLowerCase().includes(competitionSearch.toLowerCase()) ||
+      comp._id.includes(competitionSearch),
   );
 
   const createIncident = async () => {
     if (!newIncident.title || !newIncident.description) {
-      toast.error('Title and description are required');
+      toast.error("Title and description are required");
       return;
     }
 
     // Validate competition action requirements
-    if (newIncident.competitionAction !== 'none' && !newIncident.competitionId) {
-      toast.error('Please select a competition for the selected action');
+    if (
+      newIncident.competitionAction !== "none" &&
+      !newIncident.competitionId
+    ) {
+      toast.error("Please select a competition for the selected action");
       return;
     }
 
@@ -201,81 +217,99 @@ export default function IncidentsSection() {
       setSubmitting(true);
 
       // Step 1: Take competition action if specified
-      if (newIncident.competitionId && newIncident.competitionAction !== 'none') {
-        const competition = competitions.find(c => c._id === newIncident.competitionId);
-        
-        if (newIncident.competitionAction === 'pause') {
+      if (
+        newIncident.competitionId &&
+        newIncident.competitionAction !== "none"
+      ) {
+        const competition = competitions.find(
+          (c) => c._id === newIncident.competitionId,
+        );
+
+        if (newIncident.competitionAction === "pause") {
           // Pause the competition
-          const pauseResponse = await fetch(`/api/competitions/${newIncident.competitionId}/pause`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              action: 'pause', 
-              reason: `Incident: ${newIncident.title} - ${newIncident.description}` 
-            }),
-          });
+          const pauseResponse = await fetch(
+            `/api/competitions/${newIncident.competitionId}/pause`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "pause",
+                reason: `Incident: ${newIncident.title} - ${newIncident.description}`,
+              }),
+            },
+          );
           const pauseData = await pauseResponse.json();
-          
+
           if (!pauseResponse.ok) {
-            toast.error(pauseData.error || 'Failed to pause competition');
+            toast.error(pauseData.error || "Failed to pause competition");
             setSubmitting(false);
             return;
           }
-          toast.success(`Competition "${competition?.name}" paused successfully`);
-        } else if (newIncident.competitionAction === 'emergency_cancel') {
+          toast.success(
+            `Competition "${competition?.name}" paused successfully`,
+          );
+        } else if (newIncident.competitionAction === "emergency_cancel") {
           // Emergency cancel the competition
-          const cancelResponse = await fetch(`/api/competitions/${newIncident.competitionId}/emergency-cancel`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              reason: `Incident: ${newIncident.title} - ${newIncident.description}` 
-            }),
-          });
+          const cancelResponse = await fetch(
+            `/api/competitions/${newIncident.competitionId}/emergency-cancel`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                reason: `Incident: ${newIncident.title} - ${newIncident.description}`,
+              }),
+            },
+          );
           const cancelData = await cancelResponse.json();
-          
+
           if (!cancelResponse.ok) {
-            toast.error(cancelData.error || 'Failed to emergency cancel competition');
+            toast.error(
+              cancelData.error || "Failed to emergency cancel competition",
+            );
             setSubmitting(false);
             return;
           }
-          toast.success(`Competition "${competition?.name}" emergency cancelled! ${cancelData.details?.closedPositions || 0} positions closed, ${cancelData.details?.refundedCount || 0} participants refunded.`);
+          toast.success(
+            `Competition "${competition?.name}" emergency cancelled! ${cancelData.details?.closedPositions || 0} positions closed, ${cancelData.details?.refundedCount || 0} participants refunded.`,
+          );
         }
       }
 
       // Step 2: Create the incident record
-      const response = await fetch('/api/incidents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/incidents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newIncident,
           // Add action taken to description
-          description: newIncident.competitionAction !== 'none' 
-            ? `${newIncident.description}\n\n[Action Taken: ${newIncident.competitionAction === 'pause' ? 'Competition Paused' : 'Emergency Cancel & Refund'}]`
-            : newIncident.description,
+          description:
+            newIncident.competitionAction !== "none"
+              ? `${newIncident.description}\n\n[Action Taken: ${newIncident.competitionAction === "pause" ? "Competition Paused" : "Emergency Cancel & Refund"}]`
+              : newIncident.description,
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Incident created successfully');
+        toast.success("Incident created successfully");
         setShowCreateModal(false);
         setNewIncident({
-          type: 'technical_error',
-          severity: 'medium',
-          title: '',
-          description: '',
-          priority: 'medium',
-          competitionId: '',
-          competitionAction: 'none',
+          type: "technical_error",
+          severity: "medium",
+          title: "",
+          description: "",
+          priority: "medium",
+          competitionId: "",
+          competitionAction: "none",
         });
         fetchIncidents();
       } else {
-        toast.error(data.error || 'Failed to create incident');
+        toast.error(data.error || "Failed to create incident");
       }
     } catch (error) {
-      console.error('Error creating incident:', error);
-      toast.error('Failed to create incident');
+      console.error("Error creating incident:", error);
+      toast.error("Failed to create incident");
     } finally {
       setSubmitting(false);
     }
@@ -284,8 +318,8 @@ export default function IncidentsSection() {
   const updateIncidentStatus = async (incidentId: string, status: string) => {
     try {
       const response = await fetch(`/api/incidents/${incidentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
 
@@ -299,126 +333,153 @@ export default function IncidentsSection() {
         }
       }
     } catch (error) {
-      console.error('Error updating incident:', error);
-      toast.error('Failed to update incident');
+      console.error("Error updating incident:", error);
+      toast.error("Failed to update incident");
     }
   };
 
   const issueCompensations = async () => {
     if (!selectedIncident) return;
 
-    const validCompensations = compensations.filter(c => c.userId && c.amount > 0 && c.reason);
+    const validCompensations = compensations.filter(
+      (c) => c.userId && c.amount > 0 && c.reason,
+    );
     if (validCompensations.length === 0) {
-      toast.error('Please add at least one valid compensation');
+      toast.error("Please add at least one valid compensation");
       return;
     }
 
     try {
       setSubmitting(true);
-      const response = await fetch(`/api/incidents/${selectedIncident._id}/compensate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ compensations: validCompensations }),
-      });
+      const response = await fetch(
+        `/api/incidents/${selectedIncident._id}/compensate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ compensations: validCompensations }),
+        },
+      );
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Issued ${data.successCount} compensations totaling €${data.totalCompensated.toFixed(2)}`);
+        toast.success(
+          `Issued ${data.successCount} compensations totaling €${data.totalCompensated.toFixed(2)}`,
+        );
         setShowCompensateModal(false);
-        setCompensations([{ userId: '', amount: 0, reason: '' }]);
+        setCompensations([{ userId: "", amount: 0, reason: "" }]);
         fetchIncidents();
         // Refresh selected incident
-        const incidentResponse = await fetch(`/api/incidents/${selectedIncident._id}`);
+        const incidentResponse = await fetch(
+          `/api/incidents/${selectedIncident._id}`,
+        );
         const incidentData = await incidentResponse.json();
         if (incidentData.success) {
           setSelectedIncident(incidentData.incident);
         }
       } else {
-        toast.error(data.error || 'Failed to issue compensations');
+        toast.error(data.error || "Failed to issue compensations");
       }
     } catch (error) {
-      console.error('Error issuing compensations:', error);
-      toast.error('Failed to issue compensations');
+      console.error("Error issuing compensations:", error);
+      toast.error("Failed to issue compensations");
     } finally {
       setSubmitting(false);
     }
   };
 
   const deleteIncident = async (incidentId: string) => {
-    if (!confirm('Are you sure you want to delete this incident?')) return;
+    if (!confirm("Are you sure you want to delete this incident?")) return;
 
     try {
       const response = await fetch(`/api/incidents/${incidentId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Incident deleted');
+        toast.success("Incident deleted");
         if (selectedIncident?._id === incidentId) {
           setSelectedIncident(null);
         }
         fetchIncidents();
       } else {
-        toast.error(data.error || 'Failed to delete incident');
+        toast.error(data.error || "Failed to delete incident");
       }
     } catch (error) {
-      console.error('Error deleting incident:', error);
-      toast.error('Failed to delete incident');
+      console.error("Error deleting incident:", error);
+      toast.error("Failed to delete incident");
     }
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'high': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'low': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case "critical":
+        return "bg-red-500/20 text-red-400 border-red-500/30";
+      case "high":
+        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+      case "medium":
+        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+      case "low":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+      default:
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'open': return 'bg-red-500/20 text-red-400';
-      case 'investigating': return 'bg-yellow-500/20 text-yellow-400';
-      case 'resolved': return 'bg-green-500/20 text-green-400';
-      case 'rejected': return 'bg-gray-500/20 text-gray-400';
-      case 'escalated': return 'bg-purple-500/20 text-purple-400';
-      default: return 'bg-gray-500/20 text-gray-400';
+      case "open":
+        return "bg-red-500/20 text-red-400";
+      case "investigating":
+        return "bg-yellow-500/20 text-yellow-400";
+      case "resolved":
+        return "bg-green-500/20 text-green-400";
+      case "rejected":
+        return "bg-gray-500/20 text-gray-400";
+      case "escalated":
+        return "bg-purple-500/20 text-purple-400";
+      default:
+        return "bg-gray-500/20 text-gray-400";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'open': return <AlertCircle className="h-4 w-4" />;
-      case 'investigating': return <Clock className="h-4 w-4" />;
-      case 'resolved': return <CheckCircle className="h-4 w-4" />;
-      case 'rejected': return <XCircle className="h-4 w-4" />;
-      case 'escalated': return <AlertTriangle className="h-4 w-4" />;
-      default: return <AlertCircle className="h-4 w-4" />;
+      case "open":
+        return <AlertCircle className="h-4 w-4" />;
+      case "investigating":
+        return <Clock className="h-4 w-4" />;
+      case "resolved":
+        return <CheckCircle className="h-4 w-4" />;
+      case "rejected":
+        return <XCircle className="h-4 w-4" />;
+      case "escalated":
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
     }
   };
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      price_feed_failure: 'Price Feed Failure',
-      unfair_result: 'Unfair Result',
-      technical_error: 'Technical Error',
-      user_complaint: 'User Complaint',
-      system_error: 'System Error',
-      other: 'Other',
+      price_feed_failure: "Price Feed Failure",
+      unfair_result: "Unfair Result",
+      technical_error: "Technical Error",
+      user_complaint: "User Complaint",
+      system_error: "System Error",
+      other: "Other",
     };
     return labels[type] || type;
   };
 
-  const filteredIncidents = incidents.filter(incident =>
-    searchQuery === '' ||
-    incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    incident.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    incident._id.includes(searchQuery)
+  const filteredIncidents = incidents.filter(
+    (incident) =>
+      searchQuery === "" ||
+      incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      incident.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      incident._id.includes(searchQuery),
   );
 
   return (
@@ -430,7 +491,9 @@ export default function IncidentsSection() {
             <AlertTriangle className="h-6 w-6 text-red-400" />
             Incident Management
           </h2>
-          <p className="text-gray-400 mt-1">Track and resolve competition issues, disputes, and compensations</p>
+          <p className="text-gray-400 mt-1">
+            Track and resolve competition issues, disputes, and compensations
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -466,7 +529,9 @@ export default function IncidentsSection() {
 
         <select
           value={filters.status}
-          onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, status: e.target.value }))
+          }
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
         >
           <option value="">All Status</option>
@@ -479,7 +544,9 @@ export default function IncidentsSection() {
 
         <select
           value={filters.severity}
-          onChange={(e) => setFilters(f => ({ ...f, severity: e.target.value }))}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, severity: e.target.value }))
+          }
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
         >
           <option value="">All Severity</option>
@@ -491,7 +558,7 @@ export default function IncidentsSection() {
 
         <select
           value={filters.type}
-          onChange={(e) => setFilters(f => ({ ...f, type: e.target.value }))}
+          onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
         >
           <option value="">All Types</option>
@@ -511,7 +578,9 @@ export default function IncidentsSection() {
               <AlertCircle className="h-5 w-5 text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{incidents.filter(i => i.status === 'open').length}</p>
+              <p className="text-2xl font-bold text-white">
+                {incidents.filter((i) => i.status === "open").length}
+              </p>
               <p className="text-sm text-gray-400">Open Incidents</p>
             </div>
           </div>
@@ -522,7 +591,9 @@ export default function IncidentsSection() {
               <Clock className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{incidents.filter(i => i.status === 'investigating').length}</p>
+              <p className="text-2xl font-bold text-white">
+                {incidents.filter((i) => i.status === "investigating").length}
+              </p>
               <p className="text-sm text-gray-400">Investigating</p>
             </div>
           </div>
@@ -533,7 +604,9 @@ export default function IncidentsSection() {
               <CheckCircle className="h-5 w-5 text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{incidents.filter(i => i.status === 'resolved').length}</p>
+              <p className="text-2xl font-bold text-white">
+                {incidents.filter((i) => i.status === "resolved").length}
+              </p>
               <p className="text-sm text-gray-400">Resolved</p>
             </div>
           </div>
@@ -544,7 +617,9 @@ export default function IncidentsSection() {
               <AlertTriangle className="h-5 w-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{incidents.filter(i => i.severity === 'critical').length}</p>
+              <p className="text-2xl font-bold text-white">
+                {incidents.filter((i) => i.severity === "critical").length}
+              </p>
               <p className="text-sm text-gray-400">Critical</p>
             </div>
           </div>
@@ -556,7 +631,9 @@ export default function IncidentsSection() {
         {/* Incidents List */}
         <div className="lg:col-span-2 bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
           <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-            <h3 className="font-semibold text-white">Incidents ({filteredIncidents.length})</h3>
+            <h3 className="font-semibold text-white">
+              Incidents ({filteredIncidents.length})
+            </h3>
           </div>
 
           {loading ? (
@@ -577,26 +654,42 @@ export default function IncidentsSection() {
                   onClick={() => setSelectedIncident(incident)}
                   className={cn(
                     "p-4 cursor-pointer hover:bg-gray-700/30 transition-colors",
-                    selectedIncident?._id === incident._id && "bg-gray-700/50"
+                    selectedIncident?._id === incident._id && "bg-gray-700/50",
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={cn("text-xs px-2 py-0.5 rounded-full border", getSeverityColor(incident.severity))}>
+                        <span
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full border",
+                            getSeverityColor(incident.severity),
+                          )}
+                        >
                           {incident.severity}
                         </span>
-                        <span className={cn("text-xs px-2 py-0.5 rounded-full flex items-center gap-1", getStatusColor(incident.status))}>
+                        <span
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full flex items-center gap-1",
+                            getStatusColor(incident.status),
+                          )}
+                        >
                           {getStatusIcon(incident.status)}
                           {incident.status}
                         </span>
                       </div>
-                      <h4 className="font-medium text-white truncate">{incident.title}</h4>
-                      <p className="text-sm text-gray-400 truncate">{incident.description}</p>
+                      <h4 className="font-medium text-white truncate">
+                        {incident.title}
+                      </h4>
+                      <p className="text-sm text-gray-400 truncate">
+                        {incident.description}
+                      </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         <span>{getTypeLabel(incident.type)}</span>
                         <span>•</span>
-                        <span>{new Date(incident.createdAt).toLocaleDateString()}</span>
+                        <span>
+                          {new Date(incident.createdAt).toLocaleDateString()}
+                        </span>
                         {incident.affectedUsers.length > 0 && (
                           <>
                             <span>•</span>
@@ -631,16 +724,30 @@ export default function IncidentsSection() {
             <div className="h-full flex flex-col">
               <div className="p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={cn("text-xs px-2 py-0.5 rounded-full border", getSeverityColor(selectedIncident.severity))}>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full border",
+                      getSeverityColor(selectedIncident.severity),
+                    )}
+                  >
                     {selectedIncident.severity.toUpperCase()}
                   </span>
-                  <span className={cn("text-xs px-2 py-0.5 rounded-full flex items-center gap-1", getStatusColor(selectedIncident.status))}>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full flex items-center gap-1",
+                      getStatusColor(selectedIncident.status),
+                    )}
+                  >
                     {getStatusIcon(selectedIncident.status)}
                     {selectedIncident.status}
                   </span>
                 </div>
-                <h3 className="font-semibold text-white">{selectedIncident.title}</h3>
-                <p className="text-sm text-gray-400 mt-1">{getTypeLabel(selectedIncident.type)}</p>
+                <h3 className="font-semibold text-white">
+                  {selectedIncident.title}
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  {getTypeLabel(selectedIncident.type)}
+                </p>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -652,7 +759,9 @@ export default function IncidentsSection() {
                       Linked Competition
                     </h4>
                     <p className="text-sm text-white">
-                      {competitions.find(c => c._id === selectedIncident.competitionId)?.name || 
+                      {competitions.find(
+                        (c) => c._id === selectedIncident.competitionId,
+                      )?.name ||
                         `Competition ID: ${selectedIncident.competitionId.slice(-8)}`}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
@@ -663,20 +772,31 @@ export default function IncidentsSection() {
 
                 {/* Description */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Description</h4>
-                  <p className="text-sm text-white">{selectedIncident.description}</p>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">
+                    Description
+                  </h4>
+                  <p className="text-sm text-white">
+                    {selectedIncident.description}
+                  </p>
                 </div>
 
                 {/* Affected Users */}
                 {selectedIncident.affectedUsers.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Affected Users ({selectedIncident.affectedUsers.length})</h4>
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">
+                      Affected Users ({selectedIncident.affectedUsers.length})
+                    </h4>
                     <div className="flex flex-wrap gap-1">
-                      {selectedIncident.affectedUsers.slice(0, 5).map((userId, idx) => (
-                        <span key={idx} className="text-xs bg-gray-700 px-2 py-1 rounded">
-                          {userId.slice(-8)}
-                        </span>
-                      ))}
+                      {selectedIncident.affectedUsers
+                        .slice(0, 5)
+                        .map((userId, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs bg-gray-700 px-2 py-1 rounded"
+                          >
+                            {userId.slice(-8)}
+                          </span>
+                        ))}
                       {selectedIncident.affectedUsers.length > 5 && (
                         <span className="text-xs bg-gray-700 px-2 py-1 rounded">
                           +{selectedIncident.affectedUsers.length - 5} more
@@ -687,47 +807,76 @@ export default function IncidentsSection() {
                 )}
 
                 {/* Compensations */}
-                {selectedIncident.resolution?.compensations && selectedIncident.resolution.compensations.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-                      <Gift className="h-4 w-4 text-green-400" />
-                      Compensations Issued ({selectedIncident.resolution.compensations.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {selectedIncident.resolution.compensations.map((comp, idx) => (
-                        <div key={idx} className="bg-gray-700/50 rounded-lg p-2 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-white">{comp.username || comp.userId.slice(-8)}</span>
-                            <span className="text-green-400 font-medium">€{comp.amount.toFixed(2)}</span>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-1">{comp.reason}</p>
-                        </div>
-                      ))}
+                {selectedIncident.resolution?.compensations &&
+                  selectedIncident.resolution.compensations.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                        <Gift className="h-4 w-4 text-green-400" />
+                        Compensations Issued (
+                        {selectedIncident.resolution.compensations.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedIncident.resolution.compensations.map(
+                          (comp, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-gray-700/50 rounded-lg p-2 text-sm"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-white">
+                                  {comp.username || comp.userId.slice(-8)}
+                                </span>
+                                <span className="text-green-400 font-medium">
+                                  €{comp.amount.toFixed(2)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {comp.reason}
+                              </p>
+                            </div>
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Audit Log */}
-                {selectedIncident.auditLog && selectedIncident.auditLog.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Activity Log</h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {selectedIncident.auditLog.slice().reverse().map((entry, idx) => (
-                        <div key={idx} className="text-xs border-l-2 border-gray-600 pl-2">
-                          <p className="text-gray-300">{entry.details}</p>
-                          <p className="text-gray-500">{new Date(entry.timestamp).toLocaleString()}</p>
-                        </div>
-                      ))}
+                {selectedIncident.auditLog &&
+                  selectedIncident.auditLog.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-2">
+                        Activity Log
+                      </h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {selectedIncident.auditLog
+                          .slice()
+                          .reverse()
+                          .map((entry, idx) => (
+                            <div
+                              key={idx}
+                              className="text-xs border-l-2 border-gray-600 pl-2"
+                            >
+                              <p className="text-gray-300">{entry.details}</p>
+                              <p className="text-gray-500">
+                                {new Date(entry.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Actions */}
               <div className="p-4 border-t border-gray-700 space-y-2">
-                {selectedIncident.status === 'open' && (
+                {selectedIncident.status === "open" && (
                   <Button
-                    onClick={() => updateIncidentStatus(selectedIncident._id, 'investigating')}
+                    onClick={() =>
+                      updateIncidentStatus(
+                        selectedIncident._id,
+                        "investigating",
+                      )
+                    }
                     className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900"
                     size="sm"
                   >
@@ -735,7 +884,7 @@ export default function IncidentsSection() {
                     Start Investigation
                   </Button>
                 )}
-                {selectedIncident.status === 'investigating' && (
+                {selectedIncident.status === "investigating" && (
                   <>
                     <Button
                       onClick={() => setShowResolveModal(true)}
@@ -755,7 +904,9 @@ export default function IncidentsSection() {
                       Manual Compensation
                     </Button>
                     <Button
-                      onClick={() => updateIncidentStatus(selectedIncident._id, 'resolved')}
+                      onClick={() =>
+                        updateIncidentStatus(selectedIncident._id, "resolved")
+                      }
                       variant="outline"
                       className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                       size="sm"
@@ -765,7 +916,7 @@ export default function IncidentsSection() {
                     </Button>
                   </>
                 )}
-                {selectedIncident.status !== 'resolved' && (
+                {selectedIncident.status !== "resolved" && (
                   <Button
                     onClick={() => deleteIncident(selectedIncident._id)}
                     variant="outline"
@@ -782,7 +933,9 @@ export default function IncidentsSection() {
             <div className="h-full flex items-center justify-center p-8">
               <div className="text-center">
                 <Eye className="h-12 w-12 mx-auto text-gray-600 mb-3" />
-                <p className="text-gray-400">Select an incident to view details</p>
+                <p className="text-gray-400">
+                  Select an incident to view details
+                </p>
               </div>
             </div>
           )}
@@ -794,29 +947,45 @@ export default function IncidentsSection() {
         <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
           {/* Fixed Header */}
           <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between shrink-0">
-            <h3 className="font-semibold text-white text-lg">Create New Incident</h3>
-            <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-white p-2">
+            <h3 className="font-semibold text-white text-lg">
+              Create New Incident
+            </h3>
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="text-gray-400 hover:text-white p-2"
+            >
               <XCircle className="h-6 w-6" />
             </button>
           </div>
-          
+
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-2xl mx-auto space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Title
+                </label>
                 <Input
                   value={newIncident.title}
-                  onChange={(e) => setNewIncident(n => ({ ...n, title: e.target.value }))}
+                  onChange={(e) =>
+                    setNewIncident((n) => ({ ...n, title: e.target.value }))
+                  }
                   placeholder="Brief incident title"
                   className="bg-gray-700 border-gray-600"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Description
+                </label>
                 <textarea
                   value={newIncident.description}
-                  onChange={(e) => setNewIncident(n => ({ ...n, description: e.target.value }))}
+                  onChange={(e) =>
+                    setNewIncident((n) => ({
+                      ...n,
+                      description: e.target.value,
+                    }))
+                  }
                   placeholder="Detailed description of the incident"
                   rows={3}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm"
@@ -824,13 +993,19 @@ export default function IncidentsSection() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">
+                    Type
+                  </label>
                   <select
                     value={newIncident.type}
-                    onChange={(e) => setNewIncident(n => ({ ...n, type: e.target.value }))}
+                    onChange={(e) =>
+                      setNewIncident((n) => ({ ...n, type: e.target.value }))
+                    }
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm"
                   >
-                    <option value="price_feed_failure">Price Feed Failure</option>
+                    <option value="price_feed_failure">
+                      Price Feed Failure
+                    </option>
                     <option value="unfair_result">Unfair Result</option>
                     <option value="technical_error">Technical Error</option>
                     <option value="user_complaint">User Complaint</option>
@@ -839,10 +1014,17 @@ export default function IncidentsSection() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Severity</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">
+                    Severity
+                  </label>
                   <select
                     value={newIncident.severity}
-                    onChange={(e) => setNewIncident(n => ({ ...n, severity: e.target.value }))}
+                    onChange={(e) =>
+                      setNewIncident((n) => ({
+                        ...n,
+                        severity: e.target.value,
+                      }))
+                    }
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="low">Low</option>
@@ -876,19 +1058,24 @@ export default function IncidentsSection() {
                       <button
                         type="button"
                         onClick={() => {
-                          setNewIncident(n => ({ ...n, competitionId: '' }));
-                          setCompetitionSearch('');
+                          setNewIncident((n) => ({ ...n, competitionId: "" }));
+                          setCompetitionSearch("");
                         }}
                         className={cn(
                           "w-full text-left px-3 py-2 text-sm hover:bg-gray-600/50 transition-colors",
-                          !newIncident.competitionId && "bg-blue-500/20 text-blue-400"
+                          !newIncident.competitionId &&
+                            "bg-blue-500/20 text-blue-400",
                         )}
                       >
-                        <span className="text-gray-400">No specific competition</span>
+                        <span className="text-gray-400">
+                          No specific competition
+                        </span>
                       </button>
                       {filteredCompetitions.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-gray-500">
-                          {competitionSearch ? 'No competitions found' : 'No competitions available'}
+                          {competitionSearch
+                            ? "No competitions found"
+                            : "No competitions available"}
                         </div>
                       ) : (
                         filteredCompetitions.slice(0, 10).map((comp) => (
@@ -896,28 +1083,38 @@ export default function IncidentsSection() {
                             key={comp._id}
                             type="button"
                             onClick={() => {
-                              setNewIncident(n => ({ ...n, competitionId: comp._id }));
-                              setCompetitionSearch('');
+                              setNewIncident((n) => ({
+                                ...n,
+                                competitionId: comp._id,
+                              }));
+                              setCompetitionSearch("");
                             }}
                             className={cn(
                               "w-full text-left px-3 py-2 text-sm hover:bg-gray-600/50 transition-colors border-t border-gray-600/50",
-                              newIncident.competitionId === comp._id && "bg-blue-500/20 text-blue-400"
+                              newIncident.competitionId === comp._id &&
+                                "bg-blue-500/20 text-blue-400",
                             )}
                           >
                             <div className="flex items-center justify-between">
                               <span className="font-medium">{comp.name}</span>
-                              <span className={cn(
-                                "text-xs px-2 py-0.5 rounded",
-                                comp.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                                comp.status === 'completed' ? 'bg-gray-500/20 text-gray-400' :
-                                comp.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                                'bg-red-500/20 text-red-400'
-                              )}>
+                              <span
+                                className={cn(
+                                  "text-xs px-2 py-0.5 rounded",
+                                  comp.status === "active"
+                                    ? "bg-green-500/20 text-green-400"
+                                    : comp.status === "completed"
+                                      ? "bg-gray-500/20 text-gray-400"
+                                      : comp.status === "pending"
+                                        ? "bg-yellow-500/20 text-yellow-400"
+                                        : "bg-red-500/20 text-red-400",
+                                )}
+                              >
                                 {comp.status}
                               </span>
                             </div>
                             <div className="text-xs text-gray-500 mt-0.5">
-                              {new Date(comp.startTime).toLocaleDateString()} - {new Date(comp.endTime).toLocaleDateString()}
+                              {new Date(comp.startTime).toLocaleDateString()} -{" "}
+                              {new Date(comp.endTime).toLocaleDateString()}
                             </div>
                           </button>
                         ))
@@ -927,10 +1124,21 @@ export default function IncidentsSection() {
                   {newIncident.competitionId && (
                     <div className="mt-2 flex items-center gap-2 text-sm text-blue-400 bg-blue-500/10 px-3 py-2 rounded-lg">
                       <Trophy className="h-4 w-4" />
-                      <span>Selected: {competitions.find(c => c._id === newIncident.competitionId)?.name || newIncident.competitionId}</span>
-                      <button 
+                      <span>
+                        Selected:{" "}
+                        {competitions.find(
+                          (c) => c._id === newIncident.competitionId,
+                        )?.name || newIncident.competitionId}
+                      </span>
+                      <button
                         type="button"
-                        onClick={() => setNewIncident(n => ({ ...n, competitionId: '', competitionAction: 'none' }))}
+                        onClick={() =>
+                          setNewIncident((n) => ({
+                            ...n,
+                            competitionId: "",
+                            competitionAction: "none",
+                          }))
+                        }
                         className="ml-auto text-gray-400 hover:text-white"
                       >
                         <XCircle className="h-4 w-4" />
@@ -953,13 +1161,23 @@ export default function IncidentsSection() {
                         type="radio"
                         name="competitionAction"
                         value="none"
-                        checked={newIncident.competitionAction === 'none'}
-                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'none' }))}
+                        checked={newIncident.competitionAction === "none"}
+                        onChange={() =>
+                          setNewIncident((n) => ({
+                            ...n,
+                            competitionAction: "none",
+                          }))
+                        }
                         className="text-blue-500"
                       />
                       <div>
-                        <span className="text-sm font-medium text-gray-300">Log Only</span>
-                        <p className="text-xs text-gray-500">Create incident record without affecting the competition</p>
+                        <span className="text-sm font-medium text-gray-300">
+                          Log Only
+                        </span>
+                        <p className="text-xs text-gray-500">
+                          Create incident record without affecting the
+                          competition
+                        </p>
                       </div>
                     </label>
                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer">
@@ -967,13 +1185,22 @@ export default function IncidentsSection() {
                         type="radio"
                         name="competitionAction"
                         value="pause"
-                        checked={newIncident.competitionAction === 'pause'}
-                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'pause' }))}
+                        checked={newIncident.competitionAction === "pause"}
+                        onChange={() =>
+                          setNewIncident((n) => ({
+                            ...n,
+                            competitionAction: "pause",
+                          }))
+                        }
                         className="text-yellow-500"
                       />
                       <div>
-                        <span className="text-sm font-medium text-yellow-400">⏸️ Pause Competition</span>
-                        <p className="text-xs text-gray-500">Immediately pause trading, can be resumed later</p>
+                        <span className="text-sm font-medium text-yellow-400">
+                          ⏸️ Pause Competition
+                        </span>
+                        <p className="text-xs text-gray-500">
+                          Immediately pause trading, can be resumed later
+                        </p>
                       </div>
                     </label>
                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer border border-red-500/30 bg-red-500/5">
@@ -981,21 +1208,35 @@ export default function IncidentsSection() {
                         type="radio"
                         name="competitionAction"
                         value="emergency_cancel"
-                        checked={newIncident.competitionAction === 'emergency_cancel'}
-                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'emergency_cancel' }))}
+                        checked={
+                          newIncident.competitionAction === "emergency_cancel"
+                        }
+                        onChange={() =>
+                          setNewIncident((n) => ({
+                            ...n,
+                            competitionAction: "emergency_cancel",
+                          }))
+                        }
                         className="text-red-500"
                       />
                       <div>
-                        <span className="text-sm font-medium text-red-400">🚨 Emergency Cancel & Refund</span>
-                        <p className="text-xs text-gray-500">Close all positions, refund ALL entry fees, cancel competition permanently</p>
+                        <span className="text-sm font-medium text-red-400">
+                          🚨 Emergency Cancel & Refund
+                        </span>
+                        <p className="text-xs text-gray-500">
+                          Close all positions, refund ALL entry fees, cancel
+                          competition permanently
+                        </p>
                       </div>
                     </label>
                   </div>
-                  {newIncident.competitionAction === 'emergency_cancel' && (
+                  {newIncident.competitionAction === "emergency_cancel" && (
                     <div className="mt-3 p-2 bg-red-500/20 border border-red-500/40 rounded-lg">
                       <p className="text-xs text-red-300">
-                        <strong>⚠️ Warning:</strong> This action is irreversible. All open positions will be closed at current prices, 
-                        and all participants will receive a full refund of their entry fees.
+                        <strong>⚠️ Warning:</strong> This action is
+                        irreversible. All open positions will be closed at
+                        current prices, and all participants will receive a full
+                        refund of their entry fees.
                       </p>
                     </div>
                   )}
@@ -1003,14 +1244,28 @@ export default function IncidentsSection() {
               )}
             </div>
           </div>
-          
+
           {/* Fixed Footer */}
           <div className="bg-gray-800 border-t border-gray-700 p-4 flex items-center justify-end gap-3 shrink-0">
-            <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={submitting} size="lg">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+              disabled={submitting}
+              size="lg"
+            >
               Cancel
             </Button>
-            <Button onClick={createIncident} disabled={submitting} className="bg-red-500 hover:bg-red-600" size="lg">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            <Button
+              onClick={createIncident}
+              disabled={submitting}
+              className="bg-red-500 hover:bg-red-600"
+              size="lg"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
               Create Incident
             </Button>
           </div>
@@ -1023,18 +1278,30 @@ export default function IncidentsSection() {
           <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg">
             <div className="p-4 border-b border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-white">Issue Compensation</h3>
-              <button onClick={() => setShowCompensateModal(false)} className="text-gray-400 hover:text-white">
+              <button
+                onClick={() => setShowCompensateModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
             <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
               {compensations.map((comp, index) => (
-                <div key={index} className="bg-gray-700/50 rounded-lg p-3 space-y-2">
+                <div
+                  key={index}
+                  className="bg-gray-700/50 rounded-lg p-3 space-y-2"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-300">Compensation #{index + 1}</span>
+                    <span className="text-sm font-medium text-gray-300">
+                      Compensation #{index + 1}
+                    </span>
                     {compensations.length > 1 && (
                       <button
-                        onClick={() => setCompensations(c => c.filter((_, i) => i !== index))}
+                        onClick={() =>
+                          setCompensations((c) =>
+                            c.filter((_, i) => i !== index),
+                          )
+                        }
                         className="text-red-400 hover:text-red-300"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1054,10 +1321,11 @@ export default function IncidentsSection() {
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       type="number"
-                      value={comp.amount || ''}
+                      value={comp.amount || ""}
                       onChange={(e) => {
                         const newComps = [...compensations];
-                        newComps[index].amount = parseFloat(e.target.value) || 0;
+                        newComps[index].amount =
+                          parseFloat(e.target.value) || 0;
                         setCompensations(newComps);
                       }}
                       placeholder="Amount (€)"
@@ -1079,7 +1347,12 @@ export default function IncidentsSection() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCompensations(c => [...c, { userId: '', amount: 0, reason: '' }])}
+                onClick={() =>
+                  setCompensations((c) => [
+                    ...c,
+                    { userId: "", amount: 0, reason: "" },
+                  ])
+                }
                 className="w-full border-dashed"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -1087,11 +1360,23 @@ export default function IncidentsSection() {
               </Button>
             </div>
             <div className="p-4 border-t border-gray-700 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCompensateModal(false)} disabled={submitting}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCompensateModal(false)}
+                disabled={submitting}
+              >
                 Cancel
               </Button>
-              <Button onClick={issueCompensations} disabled={submitting} className="bg-green-500 hover:bg-green-600">
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Gift className="h-4 w-4 mr-2" />}
+              <Button
+                onClick={issueCompensations}
+                disabled={submitting}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Gift className="h-4 w-4 mr-2" />
+                )}
                 Issue Compensations
               </Button>
             </div>

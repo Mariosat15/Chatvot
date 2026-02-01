@@ -1,6 +1,6 @@
 /**
  * AI Analyzer Service for Performance Simulator
- * 
+ *
  * Uses OpenAI to:
  * - Generate realistic trading patterns
  * - Analyze test results
@@ -8,14 +8,17 @@
  * - Provide recommendations
  */
 
-import OpenAI from 'openai';
-import { ISimulatorRun, IAIAnalysis } from '../../../database/models/simulator/simulator-run.model';
-import { connectToDatabase } from '../../../database/mongoose';
-import { WhiteLabel } from '../../../database/models/whitelabel.model';
+import OpenAI from "openai";
+import {
+  ISimulatorRun,
+  IAIAnalysis,
+} from "../../../database/models/simulator/simulator-run.model";
+import { connectToDatabase } from "../../../database/mongoose";
+import { WhiteLabel } from "../../../database/models/whitelabel.model";
 
 // Cache for API config
 let cachedApiKey: string | null = null;
-let cachedModel: string = 'gpt-4o-mini';
+let cachedModel: string = "gpt-4o-mini";
 let cachedEnabled: boolean = false;
 
 interface AIConfig {
@@ -37,18 +40,22 @@ async function getAIConfig(): Promise<AIConfig> {
     const settings = await WhiteLabel.findOne();
     if (settings) {
       cachedApiKey = settings.openaiApiKey || null;
-      cachedModel = settings.openaiModel || 'gpt-4o-mini';
+      cachedModel = settings.openaiModel || "gpt-4o-mini";
       cachedEnabled = settings.openaiEnabled ?? false;
-      return { apiKey: cachedApiKey, model: cachedModel, enabled: cachedEnabled };
+      return {
+        apiKey: cachedApiKey,
+        model: cachedModel,
+        enabled: cachedEnabled,
+      };
     }
-  } catch (error) {
-    console.log('ℹ️ AI config not found in database, checking environment');
+  } catch {
+    console.log("ℹ️ AI config not found in database, checking environment");
   }
 
   // Fallback to environment variables
   cachedApiKey = process.env.OPENAI_API_KEY || null;
-  cachedModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-  cachedEnabled = process.env.OPENAI_ENABLED === 'true';
+  cachedModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  cachedEnabled = process.env.OPENAI_ENABLED === "true";
   return { apiKey: cachedApiKey, model: cachedModel, enabled: cachedEnabled };
 }
 
@@ -57,17 +64,17 @@ async function getAIConfig(): Promise<AIConfig> {
  */
 async function getOpenAIClient(): Promise<OpenAI | null> {
   const config = await getAIConfig();
-  
+
   if (!config.enabled) {
-    console.log('ℹ️ AI features are disabled');
+    console.log("ℹ️ AI features are disabled");
     return null;
   }
-  
+
   if (!config.apiKey) {
-    console.log('ℹ️ No OpenAI API key configured');
+    console.log("ℹ️ No OpenAI API key configured");
     return null;
   }
-  
+
   return new OpenAI({ apiKey: config.apiKey });
 }
 
@@ -75,7 +82,11 @@ async function getOpenAIClient(): Promise<OpenAI | null> {
  * Generate realistic trading patterns using AI
  */
 export async function generateTradingPatterns(
-  type: 'deposit_amounts' | 'trade_params' | 'user_behavior' | 'market_scenario'
+  type:
+    | "deposit_amounts"
+    | "trade_params"
+    | "user_behavior"
+    | "market_scenario",
 ): Promise<Record<string, unknown>> {
   const openai = await getOpenAIClient();
   if (!openai) {
@@ -115,22 +126,26 @@ export async function generateTradingPatterns(
     const completion = await openai.chat.completions.create({
       model: config.model,
       messages: [
-        { role: 'system', content: 'You are a trading platform expert. Return only valid JSON without markdown formatting.' },
-        { role: 'user', content: prompts[type] }
+        {
+          role: "system",
+          content:
+            "You are a trading platform expert. Return only valid JSON without markdown formatting.",
+        },
+        { role: "user", content: prompts[type] },
       ],
       temperature: 0.7,
       max_tokens: 500,
     });
 
-    const response = completion.choices[0]?.message?.content || '';
+    const response = completion.choices[0]?.message?.content || "";
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
 
     return getDefaultPatterns(type);
-  } catch (error) {
-    console.log('ℹ️ AI pattern generation unavailable, using defaults');
+  } catch {
+    console.log("ℹ️ AI pattern generation unavailable, using defaults");
     return getDefaultPatterns(type);
   }
 }
@@ -149,8 +164,8 @@ function getDefaultPatterns(type: string): Record<string, unknown> {
       inactivityChance: 0.2,
     },
     market_scenario: {
-      volatility: 'normal',
-      trendDirection: 'neutral',
+      volatility: "normal",
+      trendDirection: "neutral",
       flashCrashChance: 0,
       gapOpeningChance: 0,
     },
@@ -162,14 +177,20 @@ function getDefaultPatterns(type: string): Record<string, unknown> {
 /**
  * Analyze simulation results using AI
  */
-export async function analyzeSimulationResults(run: ISimulatorRun): Promise<IAIAnalysis> {
+export async function analyzeSimulationResults(
+  run: ISimulatorRun,
+): Promise<IAIAnalysis> {
   // Prepare analysis data
   const analysisData = {
     duration: run.duration,
     totalRequests: run.metrics.totalRequests,
-    successRate: run.metrics.totalRequests > 0
-      ? ((run.metrics.successfulRequests / run.metrics.totalRequests) * 100).toFixed(2)
-      : 0,
+    successRate:
+      run.metrics.totalRequests > 0
+        ? (
+            (run.metrics.successfulRequests / run.metrics.totalRequests) *
+            100
+          ).toFixed(2)
+        : 0,
     errorRate: run.metrics.errorRate.toFixed(2),
     avgResponseTime: run.metrics.avgResponseTime.toFixed(2),
     p95ResponseTime: run.metrics.p95ResponseTime.toFixed(2),
@@ -178,11 +199,14 @@ export async function analyzeSimulationResults(run: ISimulatorRun): Promise<IAIA
     requestsPerSecond: run.metrics.requestsPerSecond.toFixed(2),
     peakCpuUsage: run.peakMetrics.maxCpuUsage.toFixed(2),
     peakMemoryUsage: run.peakMetrics.maxMemoryUsage.toFixed(2),
-    testCases: run.testCases.map(tc => ({
+    testCases: run.testCases.map((tc) => ({
       name: tc.name,
       status: tc.status,
-      successRate: tc.iterations > 0 ? ((tc.successCount / tc.iterations) * 100).toFixed(2) : 0,
-      avgResponseTime: tc.metrics?.avgResponseTime?.toFixed(2) || 'N/A',
+      successRate:
+        tc.iterations > 0
+          ? ((tc.successCount / tc.iterations) * 100).toFixed(2)
+          : 0,
+      avgResponseTime: tc.metrics?.avgResponseTime?.toFixed(2) || "N/A",
       errorMessage: tc.errorMessage,
     })),
     usersCreated: run.metrics.usersCreated,
@@ -276,14 +300,18 @@ Return ONLY valid JSON, no markdown formatting.`;
     const completion = await openai.chat.completions.create({
       model: config.model,
       messages: [
-        { role: 'system', content: 'You are a senior performance engineer. Return only valid JSON without markdown formatting.' },
-        { role: 'user', content: prompt }
+        {
+          role: "system",
+          content:
+            "You are a senior performance engineer. Return only valid JSON without markdown formatting.",
+        },
+        { role: "user", content: prompt },
       ],
       temperature: 0.3,
       max_tokens: 4000,
     });
 
-    const response = completion.choices[0]?.message?.content || '';
+    const response = completion.choices[0]?.message?.content || "";
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const analysis = JSON.parse(jsonMatch[0]) as IAIAnalysis;
@@ -292,8 +320,8 @@ Return ONLY valid JSON, no markdown formatting.`;
     }
 
     return generateBasicAnalysis(analysisData);
-  } catch (error) {
-    console.log('ℹ️ AI analysis unavailable, using basic analysis instead');
+  } catch {
+    console.log("ℹ️ AI analysis unavailable, using basic analysis instead");
     return generateBasicAnalysis(analysisData);
   }
 }
@@ -302,9 +330,9 @@ Return ONLY valid JSON, no markdown formatting.`;
  * Generate comprehensive basic analysis without AI
  */
 function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
-  const findings: IAIAnalysis['findings'] = [];
-  const bottlenecks: IAIAnalysis['bottlenecks'] = [];
-  const recommendations: IAIAnalysis['recommendations'] = [];
+  const findings: IAIAnalysis["findings"] = [];
+  const bottlenecks: IAIAnalysis["bottlenecks"] = [];
+  const recommendations: IAIAnalysis["recommendations"] = [];
   let score = 100;
 
   // Parse all metrics
@@ -317,54 +345,62 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
   const rps = parseFloat(data.requestsPerSecond as string) || 0;
   const cpuUsage = parseFloat(data.peakCpuUsage as string) || 0;
   const memUsage = parseFloat(data.peakMemoryUsage as string) || 0;
-  const totalRequests = data.totalRequests as number || 0;
-  const duration = (data.duration as number || 0) / 1000;
-  const testCases = data.testCases as Array<{ name: string; status: string; successRate: string | number; avgResponseTime: string; errorMessage?: string }> || [];
-  const usersCreated = data.usersCreated as number || 0;
-  const tradesExecuted = data.tradesExecuted as number || 0;
-  const competitionsCreated = data.competitionsCreated as number || 0;
-  const challengesCreated = data.challengesCreated as number || 0;
+  const totalRequests = (data.totalRequests as number) || 0;
+  const duration = ((data.duration as number) || 0) / 1000;
+  const testCases =
+    (data.testCases as Array<{
+      name: string;
+      status: string;
+      successRate: string | number;
+      avgResponseTime: string;
+      errorMessage?: string;
+    }>) || [];
+  const usersCreated = (data.usersCreated as number) || 0;
+  const tradesExecuted = (data.tradesExecuted as number) || 0;
+  const competitionsCreated = (data.competitionsCreated as number) || 0;
+  const challengesCreated = (data.challengesCreated as number) || 0;
 
   // ===== ERROR RATE ANALYSIS =====
   if (errorRate > 10) {
     findings.push({
-      type: 'error',
-      title: 'Critical Error Rate',
+      type: "error",
+      title: "Critical Error Rate",
       description: `Error rate of ${errorRate.toFixed(1)}% is critically high (threshold: <10%).`,
-      recommendation: 'URGENT: Review error logs, identify failing endpoints, and fix critical bugs.',
-      priority: 'high',
-      impact: 'Users will frequently encounter errors.',
+      recommendation:
+        "URGENT: Review error logs, identify failing endpoints, and fix critical bugs.",
+      priority: "high",
+      impact: "Users will frequently encounter errors.",
     });
     score -= 25;
     bottlenecks.push({
-      component: 'API Layer',
-      severity: 'critical',
+      component: "API Layer",
+      severity: "critical",
       description: `${errorRate.toFixed(1)}% of requests are failing`,
-      evidence: `${Math.round(totalRequests * errorRate / 100)} failed requests out of ${totalRequests}`,
-      suggestedFix: 'Implement proper error handling and fix underlying bugs',
-      estimatedEffort: 'Major refactor',
+      evidence: `${Math.round((totalRequests * errorRate) / 100)} failed requests out of ${totalRequests}`,
+      suggestedFix: "Implement proper error handling and fix underlying bugs",
+      estimatedEffort: "Major refactor",
     });
   } else if (errorRate > 5) {
     findings.push({
-      type: 'warning',
-      title: 'Elevated Error Rate',
+      type: "warning",
+      title: "Elevated Error Rate",
       description: `Error rate of ${errorRate.toFixed(1)}% exceeds recommended threshold of 5%.`,
-      recommendation: 'Review error patterns and implement fixes.',
-      priority: 'medium',
+      recommendation: "Review error patterns and implement fixes.",
+      priority: "medium",
     });
     score -= 12;
   } else if (errorRate > 1) {
     findings.push({
-      type: 'info',
-      title: 'Acceptable Error Rate',
+      type: "info",
+      title: "Acceptable Error Rate",
       description: `Error rate of ${errorRate.toFixed(1)}% is within acceptable range.`,
-      priority: 'low',
+      priority: "low",
     });
     score -= 3;
   } else {
     findings.push({
-      type: 'success',
-      title: 'Excellent Error Rate',
+      type: "success",
+      title: "Excellent Error Rate",
       description: `Error rate of ${errorRate.toFixed(2)}% is excellent.`,
     });
   }
@@ -372,42 +408,44 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
   // ===== RESPONSE TIME ANALYSIS =====
   if (avgResponse > 2000) {
     findings.push({
-      type: 'error',
-      title: 'Critical Response Times',
+      type: "error",
+      title: "Critical Response Times",
       description: `Average response time of ${avgResponse.toFixed(0)}ms is unacceptable for a trading platform.`,
-      recommendation: 'URGENT: Profile slow endpoints, optimize queries, implement caching.',
-      priority: 'high',
+      recommendation:
+        "URGENT: Profile slow endpoints, optimize queries, implement caching.",
+      priority: "high",
     });
     bottlenecks.push({
-      component: 'API Layer',
-      severity: 'critical',
+      component: "API Layer",
+      severity: "critical",
       description: `Average response ${avgResponse.toFixed(0)}ms, P95: ${p95Response.toFixed(0)}ms`,
       evidence: `Max response reached ${maxResponse.toFixed(0)}ms`,
-      suggestedFix: 'Add Redis caching, optimize DB queries, use connection pooling',
-      estimatedEffort: 'Major refactor',
+      suggestedFix:
+        "Add Redis caching, optimize DB queries, use connection pooling",
+      estimatedEffort: "Major refactor",
     });
     score -= 20;
   } else if (avgResponse > 1000) {
     findings.push({
-      type: 'warning',
-      title: 'Slow Response Times',
+      type: "warning",
+      title: "Slow Response Times",
       description: `Average response time of ${avgResponse.toFixed(0)}ms is above recommended threshold.`,
-      recommendation: 'Implement query optimization and caching.',
-      priority: 'medium',
+      recommendation: "Implement query optimization and caching.",
+      priority: "medium",
     });
     score -= 10;
   } else if (avgResponse > 500) {
     findings.push({
-      type: 'info',
-      title: 'Acceptable Response Times',
+      type: "info",
+      title: "Acceptable Response Times",
       description: `Average response time of ${avgResponse.toFixed(0)}ms is acceptable.`,
-      priority: 'low',
+      priority: "low",
     });
     score -= 3;
   } else {
     findings.push({
-      type: 'success',
-      title: 'Excellent Response Times',
+      type: "success",
+      title: "Excellent Response Times",
       description: `Average response time of ${avgResponse.toFixed(0)}ms is excellent.`,
     });
   }
@@ -415,33 +453,33 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
   // ===== CPU ANALYSIS =====
   if (cpuUsage > 90) {
     findings.push({
-      type: 'error',
-      title: 'CPU Saturation',
+      type: "error",
+      title: "CPU Saturation",
       description: `Peak CPU usage of ${cpuUsage.toFixed(1)}% indicates resource exhaustion.`,
-      recommendation: 'Scale horizontally or optimize algorithms.',
-      priority: 'high',
+      recommendation: "Scale horizontally or optimize algorithms.",
+      priority: "high",
     });
     bottlenecks.push({
-      component: 'CPU',
-      severity: 'critical',
+      component: "CPU",
+      severity: "critical",
       description: `Peak CPU at ${cpuUsage.toFixed(1)}%`,
-      evidence: 'CPU saturated during test',
-      suggestedFix: 'Add load balancing with multiple instances',
-      estimatedEffort: 'Medium effort',
+      evidence: "CPU saturated during test",
+      suggestedFix: "Add load balancing with multiple instances",
+      estimatedEffort: "Medium effort",
     });
     score -= 20;
   } else if (cpuUsage > 70) {
     findings.push({
-      type: 'warning',
-      title: 'High CPU Usage',
+      type: "warning",
+      title: "High CPU Usage",
       description: `Peak CPU usage of ${cpuUsage.toFixed(1)}% leaves limited headroom.`,
-      priority: 'medium',
+      priority: "medium",
     });
     score -= 8;
   } else {
     findings.push({
-      type: 'success',
-      title: 'Healthy CPU Usage',
+      type: "success",
+      title: "Healthy CPU Usage",
       description: `Peak CPU usage of ${cpuUsage.toFixed(1)}% is healthy.`,
     });
   }
@@ -449,56 +487,56 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
   // ===== MEMORY ANALYSIS =====
   if (memUsage > 90) {
     findings.push({
-      type: 'error',
-      title: 'Critical Memory Pressure',
+      type: "error",
+      title: "Critical Memory Pressure",
       description: `Peak memory usage of ${memUsage.toFixed(1)}% risks out-of-memory crashes.`,
-      recommendation: 'Increase RAM or fix memory leaks.',
-      priority: 'high',
+      recommendation: "Increase RAM or fix memory leaks.",
+      priority: "high",
     });
     bottlenecks.push({
-      component: 'Memory',
-      severity: 'critical',
+      component: "Memory",
+      severity: "critical",
       description: `Memory at ${memUsage.toFixed(1)}%`,
-      evidence: 'Memory nearly exhausted',
-      suggestedFix: 'Profile memory usage and fix leaks',
-      estimatedEffort: 'Medium effort',
+      evidence: "Memory nearly exhausted",
+      suggestedFix: "Profile memory usage and fix leaks",
+      estimatedEffort: "Medium effort",
     });
     score -= 18;
   } else if (memUsage > 70) {
     findings.push({
-      type: 'warning',
-      title: 'High Memory Usage',
+      type: "warning",
+      title: "High Memory Usage",
       description: `Peak memory usage of ${memUsage.toFixed(1)}% - limited buffer.`,
-      priority: 'medium',
+      priority: "medium",
     });
     score -= 6;
   } else {
     findings.push({
-      type: 'success',
-      title: 'Healthy Memory Usage',
+      type: "success",
+      title: "Healthy Memory Usage",
       description: `Peak memory usage of ${memUsage.toFixed(1)}% is efficient.`,
     });
   }
 
   // ===== TEST CASE ANALYSIS =====
-  const failedTests = testCases.filter(tc => tc.status === 'failed');
-  const passedTests = testCases.filter(tc => tc.status === 'passed');
+  const failedTests = testCases.filter((tc) => tc.status === "failed");
+  const passedTests = testCases.filter((tc) => tc.status === "passed");
 
   if (failedTests.length > 0) {
     findings.push({
-      type: 'error',
+      type: "error",
       title: `${failedTests.length} Test(s) Failed`,
-      description: `Failed: ${failedTests.map(t => t.name).join(', ')}`,
-      recommendation: 'Fix failing tests before deployment.',
-      priority: 'high',
+      description: `Failed: ${failedTests.map((t) => t.name).join(", ")}`,
+      recommendation: "Fix failing tests before deployment.",
+      priority: "high",
     });
     score -= failedTests.length * 4;
   }
 
   if (passedTests.length === testCases.length && testCases.length > 0) {
     findings.push({
-      type: 'success',
-      title: 'All Tests Passed',
+      type: "success",
+      title: "All Tests Passed",
       description: `All ${testCases.length} test scenarios completed successfully.`,
     });
   }
@@ -506,62 +544,68 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
   // ===== RECOMMENDATIONS =====
   if (errorRate > 5) {
     recommendations.push({
-      title: 'Implement Retry Logic',
-      description: 'Add exponential backoff retry for transient failures',
-      priority: 'high',
-      effort: 'low',
-      impact: 'Reduce failed requests by 50-70%',
+      title: "Implement Retry Logic",
+      description: "Add exponential backoff retry for transient failures",
+      priority: "high",
+      effort: "low",
+      impact: "Reduce failed requests by 50-70%",
     });
   }
 
   if (avgResponse > 500) {
     recommendations.push({
-      title: 'Implement Caching Layer',
-      description: 'Add Redis caching for frequently accessed data',
-      priority: 'high',
-      effort: 'medium',
-      impact: 'Reduce response times by 60-80%',
+      title: "Implement Caching Layer",
+      description: "Add Redis caching for frequently accessed data",
+      priority: "high",
+      effort: "medium",
+      impact: "Reduce response times by 60-80%",
     });
   }
 
   if (cpuUsage > 70 || memUsage > 70) {
     recommendations.push({
-      title: 'Set Up Auto-Scaling',
-      description: 'Configure horizontal auto-scaling',
-      priority: 'medium',
-      effort: 'medium',
-      impact: 'Handle traffic spikes automatically',
+      title: "Set Up Auto-Scaling",
+      description: "Configure horizontal auto-scaling",
+      priority: "medium",
+      effort: "medium",
+      impact: "Handle traffic spikes automatically",
     });
   }
 
   recommendations.push({
-    title: 'Implement Performance Monitoring',
-    description: 'Set up APM with alerts',
-    priority: 'medium',
-    effort: 'low',
-    impact: 'Early detection of issues',
+    title: "Implement Performance Monitoring",
+    description: "Set up APM with alerts",
+    priority: "medium",
+    effort: "low",
+    impact: "Early detection of issues",
   });
 
   // ===== PRODUCTION READINESS =====
-  let productionReadiness: 'ready' | 'needs_work' | 'not_ready' = 'ready';
+  let productionReadiness: "ready" | "needs_work" | "not_ready" = "ready";
   if (score < 60 || failedTests.length > 2 || errorRate > 10 || cpuUsage > 90) {
-    productionReadiness = 'not_ready';
-  } else if (score < 80 || failedTests.length > 0 || errorRate > 5 || cpuUsage > 70) {
-    productionReadiness = 'needs_work';
+    productionReadiness = "not_ready";
+  } else if (
+    score < 80 ||
+    failedTests.length > 0 ||
+    errorRate > 5 ||
+    cpuUsage > 70
+  ) {
+    productionReadiness = "needs_work";
   }
 
   // ===== CALCULATE GRADE =====
   let overallGrade: string;
-  if (score >= 90) overallGrade = 'A';
-  else if (score >= 80) overallGrade = 'B';
-  else if (score >= 70) overallGrade = 'C';
-  else if (score >= 60) overallGrade = 'D';
-  else overallGrade = 'F';
+  if (score >= 90) overallGrade = "A";
+  else if (score >= 80) overallGrade = "B";
+  else if (score >= 70) overallGrade = "C";
+  else if (score >= 60) overallGrade = "D";
+  else overallGrade = "F";
 
-  const summary = `Performance test completed with a score of ${Math.max(0, score)}/100 (Grade: ${overallGrade}). ` +
+  const summary =
+    `Performance test completed with a score of ${Math.max(0, score)}/100 (Grade: ${overallGrade}). ` +
     `Processed ${totalRequests.toLocaleString()} requests over ${duration.toFixed(0)} seconds at ${rps.toFixed(1)} req/sec with ${successRate}% success rate. ` +
     `Average response time: ${avgResponse.toFixed(0)}ms. Resource utilization: CPU ${cpuUsage.toFixed(1)}%, Memory ${memUsage.toFixed(1)}%. ` +
-    `${passedTests.length}/${testCases.length} tests passed. Production readiness: ${productionReadiness.replace('_', ' ').toUpperCase()}.`;
+    `${passedTests.length}/${testCases.length} tests passed. Production readiness: ${productionReadiness.replace("_", " ").toUpperCase()}.`;
 
   return {
     summary,
@@ -570,46 +614,84 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
     productionReadiness,
     scalabilityAssessment: {
       currentCapacity: `~${Math.round(rps * 0.7)} concurrent users`,
-      scalingNeeds: cpuUsage > 70 || memUsage > 70 ? 'Horizontal scaling required' : 'System has headroom for 2-3x load',
-      limitingFactor: cpuUsage > memUsage ? `CPU at ${cpuUsage.toFixed(1)}%` : avgResponse > 500 ? `Response time at ${avgResponse.toFixed(0)}ms` : 'No critical bottleneck',
+      scalingNeeds:
+        cpuUsage > 70 || memUsage > 70
+          ? "Horizontal scaling required"
+          : "System has headroom for 2-3x load",
+      limitingFactor:
+        cpuUsage > memUsage
+          ? `CPU at ${cpuUsage.toFixed(1)}%`
+          : avgResponse > 500
+            ? `Response time at ${avgResponse.toFixed(0)}ms`
+            : "No critical bottleneck",
     },
     findings,
     bottlenecks,
     responseTimeAnalysis: {
-      assessment: avgResponse < 200 ? 'excellent' : avgResponse < 500 ? 'good' : avgResponse < 1000 ? 'acceptable' : 'concerning',
+      assessment:
+        avgResponse < 200
+          ? "excellent"
+          : avgResponse < 500
+            ? "good"
+            : avgResponse < 1000
+              ? "acceptable"
+              : "concerning",
       p95Analysis: `95% of requests completed in ${p95Response.toFixed(0)}ms`,
       p99Analysis: `99% of requests completed in ${p99Response.toFixed(0)}ms`,
-      outlierConcerns: maxResponse > p99Response * 3 ? `Max response ${maxResponse.toFixed(0)}ms is concerning` : 'No significant outliers',
+      outlierConcerns:
+        maxResponse > p99Response * 3
+          ? `Max response ${maxResponse.toFixed(0)}ms is concerning`
+          : "No significant outliers",
     },
     resourceUtilization: {
-      cpuAssessment: cpuUsage < 50 ? 'Efficient' : cpuUsage < 70 ? 'Moderate' : cpuUsage < 90 ? 'High' : 'Critical',
-      memoryAssessment: memUsage < 50 ? 'Efficient' : memUsage < 70 ? 'Moderate' : memUsage < 90 ? 'High' : 'Critical',
-      databaseAssessment: avgResponse > 500 ? 'Likely bottleneck' : 'Healthy',
+      cpuAssessment:
+        cpuUsage < 50
+          ? "Efficient"
+          : cpuUsage < 70
+            ? "Moderate"
+            : cpuUsage < 90
+              ? "High"
+              : "Critical",
+      memoryAssessment:
+        memUsage < 50
+          ? "Efficient"
+          : memUsage < 70
+            ? "Moderate"
+            : memUsage < 90
+              ? "High"
+              : "Critical",
+      databaseAssessment: avgResponse > 500 ? "Likely bottleneck" : "Healthy",
       headroom: `CPU: ${(100 - cpuUsage).toFixed(1)}%, Memory: ${(100 - memUsage).toFixed(1)}%`,
     },
     recommendations: recommendations.slice(0, 8),
     riskAssessment: {
       productionRisks: [
-        ...(errorRate > 5 ? [`High error rate (${errorRate.toFixed(1)}%)`] : []),
+        ...(errorRate > 5
+          ? [`High error rate (${errorRate.toFixed(1)}%)`]
+          : []),
         ...(cpuUsage > 80 ? [`CPU at ${cpuUsage.toFixed(1)}%`] : []),
         ...(memUsage > 80 ? [`Memory at ${memUsage.toFixed(1)}%`] : []),
-        ...(avgResponse > 1000 ? [`Slow response times (${avgResponse.toFixed(0)}ms)`] : []),
-        ...(failedTests.length > 0 ? [`${failedTests.length} failed tests`] : []),
+        ...(avgResponse > 1000
+          ? [`Slow response times (${avgResponse.toFixed(0)}ms)`]
+          : []),
+        ...(failedTests.length > 0
+          ? [`${failedTests.length} failed tests`]
+          : []),
       ],
       mitigations: [
-        ...(errorRate > 5 ? ['Fix failing endpoints and add retry logic'] : []),
-        ...(cpuUsage > 80 ? ['Set up auto-scaling'] : []),
-        ...(memUsage > 80 ? ['Profile memory usage'] : []),
-        ...(avgResponse > 1000 ? ['Implement caching'] : []),
-        ...(failedTests.length > 0 ? ['Fix failing tests'] : []),
+        ...(errorRate > 5 ? ["Fix failing endpoints and add retry logic"] : []),
+        ...(cpuUsage > 80 ? ["Set up auto-scaling"] : []),
+        ...(memUsage > 80 ? ["Profile memory usage"] : []),
+        ...(avgResponse > 1000 ? ["Implement caching"] : []),
+        ...(failedTests.length > 0 ? ["Fix failing tests"] : []),
       ],
     },
     nextSteps: [
-      ...(failedTests.length > 0 ? ['1. Fix failing test scenarios'] : []),
-      ...(errorRate > 5 ? ['2. Investigate error-prone endpoints'] : []),
-      ...(avgResponse > 500 ? ['3. Implement caching'] : []),
-      ...(cpuUsage > 70 || memUsage > 70 ? ['4. Set up auto-scaling'] : []),
-      '5. Set up performance monitoring',
+      ...(failedTests.length > 0 ? ["1. Fix failing test scenarios"] : []),
+      ...(errorRate > 5 ? ["2. Investigate error-prone endpoints"] : []),
+      ...(avgResponse > 500 ? ["3. Implement caching"] : []),
+      ...(cpuUsage > 70 || memUsage > 70 ? ["4. Set up auto-scaling"] : []),
+      "5. Set up performance monitoring",
     ].filter(Boolean),
     generatedAt: new Date(),
   };
@@ -618,7 +700,9 @@ function generateBasicAnalysis(data: Record<string, unknown>): IAIAnalysis {
 /**
  * Generate smart test scenario using AI
  */
-export async function generateTestScenario(description: string): Promise<Record<string, unknown>> {
+export async function generateTestScenario(
+  description: string,
+): Promise<Record<string, unknown>> {
   const openai = await getOpenAIClient();
 
   if (!openai) {
@@ -647,22 +731,26 @@ Return a JSON configuration:
     const completion = await openai.chat.completions.create({
       model: config.model,
       messages: [
-        { role: 'system', content: 'You are a trading platform testing expert. Return only valid JSON.' },
-        { role: 'user', content: prompt }
+        {
+          role: "system",
+          content:
+            "You are a trading platform testing expert. Return only valid JSON.",
+        },
+        { role: "user", content: prompt },
       ],
       temperature: 0.7,
       max_tokens: 500,
     });
 
-    const response = completion.choices[0]?.message?.content || '';
+    const response = completion.choices[0]?.message?.content || "";
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
 
     return getDefaultScenario();
-  } catch (error) {
-    console.log('ℹ️ AI scenario generation unavailable, using defaults');
+  } catch {
+    console.log("ℹ️ AI scenario generation unavailable, using defaults");
     return getDefaultScenario();
   }
 }
@@ -671,24 +759,36 @@ Return a JSON configuration:
  * Analyze failure root cause using AI
  */
 export async function analyzeFailureRootCause(
-  errorLogs: Array<{ timestamp: Date; level: string; message: string; details?: Record<string, unknown> }>
+  errorLogs: Array<{
+    timestamp: Date;
+    level: string;
+    message: string;
+    details?: Record<string, unknown>;
+  }>,
 ): Promise<{ rootCause: string; suggestions: string[] }> {
   const openai = await getOpenAIClient();
 
   if (!openai) {
     return {
-      rootCause: 'Unable to determine root cause without AI analysis',
-      suggestions: ['Review error logs manually', 'Check database connectivity', 'Verify API endpoints'],
+      rootCause: "Unable to determine root cause without AI analysis",
+      suggestions: [
+        "Review error logs manually",
+        "Check database connectivity",
+        "Verify API endpoints",
+      ],
     };
   }
 
   try {
     const config = await getAIConfig();
     const recentErrors = errorLogs
-      .filter(log => log.level === 'error')
+      .filter((log) => log.level === "error")
       .slice(-20)
-      .map(log => `[${log.timestamp}] ${log.message}${log.details ? ` - ${JSON.stringify(log.details)}` : ''}`)
-      .join('\n');
+      .map(
+        (log) =>
+          `[${log.timestamp}] ${log.message}${log.details ? ` - ${JSON.stringify(log.details)}` : ""}`,
+      )
+      .join("\n");
 
     const prompt = `Analyze these error logs from a trading platform and identify the root cause:
 
@@ -706,28 +806,31 @@ Return analysis in JSON format:
     const completion = await openai.chat.completions.create({
       model: config.model,
       messages: [
-        { role: 'system', content: 'You are a debugging expert. Return only valid JSON.' },
-        { role: 'user', content: prompt }
+        {
+          role: "system",
+          content: "You are a debugging expert. Return only valid JSON.",
+        },
+        { role: "user", content: prompt },
       ],
       temperature: 0.3,
       max_tokens: 500,
     });
 
-    const response = completion.choices[0]?.message?.content || '';
+    const response = completion.choices[0]?.message?.content || "";
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
 
     return {
-      rootCause: 'Analysis failed - review logs manually',
-      suggestions: ['Check error patterns', 'Verify system resources'],
+      rootCause: "Analysis failed - review logs manually",
+      suggestions: ["Check error patterns", "Verify system resources"],
     };
-  } catch (error) {
-    console.log('ℹ️ AI root cause analysis unavailable');
+  } catch {
+    console.log("ℹ️ AI root cause analysis unavailable");
     return {
-      rootCause: 'AI analysis unavailable',
-      suggestions: ['Review error logs manually'],
+      rootCause: "AI analysis unavailable",
+      suggestions: ["Review error logs manually"],
     };
   }
 }
@@ -737,17 +840,17 @@ Return analysis in JSON format:
  */
 function getDefaultScenario(): Record<string, unknown> {
   return {
-    name: 'Standard Load Test',
-    description: 'Default performance test scenario',
+    name: "Standard Load Test",
+    description: "Default performance test scenario",
     virtualUsers: 50,
     duration: 300,
     rampUp: 60,
     scenarios: [
-      { type: 'user_registration', weight: 0.1 },
-      { type: 'login', weight: 0.2 },
-      { type: 'trading', weight: 0.5 },
-      { type: 'deposit', weight: 0.1 },
-      { type: 'withdrawal', weight: 0.1 },
+      { type: "user_registration", weight: 0.1 },
+      { type: "login", weight: 0.2 },
+      { type: "trading", weight: 0.5 },
+      { type: "deposit", weight: 0.1 },
+      { type: "withdrawal", weight: 0.1 },
     ],
   };
 }
@@ -757,6 +860,6 @@ function getDefaultScenario(): Record<string, unknown> {
  */
 export function clearAICache(): void {
   cachedApiKey = null;
-  cachedModel = 'gpt-4o-mini';
+  cachedModel = "gpt-4o-mini";
   cachedEnabled = false;
 }

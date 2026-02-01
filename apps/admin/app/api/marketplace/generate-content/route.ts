@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { readFile, access } from 'fs/promises';
-import { constants } from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { readFile, access } from "fs/promises";
+import { constants } from "fs";
+import path from "path";
 
 /**
  * POST /api/marketplace/generate-content
@@ -15,13 +15,13 @@ export async function POST(request: NextRequest) {
     // Verify admin authentication
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
-    const { 
-      category, 
-      imageUrl, 
+    const {
+      category,
+      imageUrl,
       // Cosmetic specific
       cosmeticType,
       // Indicator specific
@@ -37,14 +37,20 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!category) {
-      return NextResponse.json({ error: 'Category is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Category is required" },
+        { status: 400 },
+      );
     }
 
     // Check for OpenAI API key
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      console.error('❌ [AI Generate] OPENAI_API_KEY not configured');
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      console.error("❌ [AI Generate] OPENAI_API_KEY not configured");
+      return NextResponse.json(
+        { error: "OpenAI API key not configured" },
+        { status: 500 },
+      );
     }
 
     const openai = new OpenAI({ apiKey });
@@ -52,81 +58,98 @@ export async function POST(request: NextRequest) {
     console.log(`🤖 [AI Generate] Processing ${category} item`);
 
     // Build the prompt based on category
-    let systemPrompt = '';
-    let userPrompt = '';
+    let systemPrompt = "";
+    let userPrompt = "";
     let imageData: string | null = null;
 
-    if (category === 'cosmetic') {
+    if (category === "cosmetic") {
       // For cosmetics, use image analysis
       if (!imageUrl) {
-        return NextResponse.json({ error: 'Image URL is required for cosmetics' }, { status: 400 });
+        return NextResponse.json(
+          { error: "Image URL is required for cosmetics" },
+          { status: 400 },
+        );
       }
-      
+
       // Convert image to base64
       imageData = await getImageBase64(imageUrl);
       if (!imageData) {
-        return NextResponse.json({ 
-          error: 'Could not find image file. Please try uploading again.' 
-        }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: "Could not find image file. Please try uploading again.",
+          },
+          { status: 400 },
+        );
       }
 
       systemPrompt = getCosmeticPrompt(cosmeticType);
-      userPrompt = 'Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:';
-    
-    } else if (category === 'indicator') {
+      userPrompt =
+        "Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:";
+    } else if (category === "indicator") {
       systemPrompt = getIndicatorPrompt(indicatorType, defaultSettings);
-      userPrompt = `Generate compelling marketplace content for this trading indicator:\n\nIndicator Type: ${indicatorType || 'custom'}\nSettings: ${JSON.stringify(defaultSettings || {}, null, 2)}`;
-    
-    } else if (category === 'strategy') {
+      userPrompt = `Generate compelling marketplace content for this trading indicator:\n\nIndicator Type: ${indicatorType || "custom"}\nSettings: ${JSON.stringify(defaultSettings || {}, null, 2)}`;
+    } else if (category === "strategy") {
       systemPrompt = getStrategyPrompt(strategyConfig);
       userPrompt = `Generate compelling marketplace content for this trading strategy:\n\nStrategy Configuration: ${JSON.stringify(strategyConfig || {}, null, 2)}`;
-    
-    } else if (category === 'gamemaster') {
-      console.log('🎮 [AI Generate] Game Master Config received:', JSON.stringify(gameMasterConfig, null, 2));
-      console.log('🎮 [AI Generate] canCreateCompetitions value:', gameMasterConfig?.canCreateCompetitions);
+    } else if (category === "gamemaster") {
+      console.log(
+        "🎮 [AI Generate] Game Master Config received:",
+        JSON.stringify(gameMasterConfig, null, 2),
+      );
+      console.log(
+        "🎮 [AI Generate] canCreateCompetitions value:",
+        gameMasterConfig?.canCreateCompetitions,
+      );
       systemPrompt = getGameMasterPrompt(gameMasterConfig);
-      userPrompt = `Generate compelling marketplace content for this Game Master package:\n\nPackage Configuration: ${JSON.stringify(gameMasterConfig || {}, null, 2)}\n\nIMPORTANT: canCreateCompetitions is ${gameMasterConfig?.canCreateCompetitions === false ? 'DISABLED - do NOT mention competition creation' : 'ENABLED'}`;
-      console.log('🎮 [AI Generate] System prompt includes canCreateCompetitions check');
-    
+      userPrompt = `Generate compelling marketplace content for this Game Master package:\n\nPackage Configuration: ${JSON.stringify(gameMasterConfig || {}, null, 2)}\n\nIMPORTANT: canCreateCompetitions is ${gameMasterConfig?.canCreateCompetitions === false ? "DISABLED - do NOT mention competition creation" : "ENABLED"}`;
+      console.log(
+        "🎮 [AI Generate] System prompt includes canCreateCompetitions check",
+      );
     } else {
-      return NextResponse.json({ error: `Unsupported category: ${category}` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Unsupported category: ${category}` },
+        { status: 400 },
+      );
     }
 
     console.log(`🤖 [AI Generate] Calling OpenAI API for ${category}...`);
-    
+
     // Build messages array
     const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt }
+      { role: "system", content: systemPrompt },
     ];
 
-    if (imageData && category === 'cosmetic') {
+    if (imageData && category === "cosmetic") {
       messages.push({
-        role: 'user',
+        role: "user",
         content: [
-          { type: 'text', text: userPrompt },
-          { 
-            type: 'image_url', 
-            image_url: { url: imageData, detail: 'high' } 
-          }
-        ]
+          { type: "text", text: userPrompt },
+          {
+            type: "image_url",
+            image_url: { url: imageData, detail: "high" },
+          },
+        ],
       });
     } else {
-      messages.push({ role: 'user', content: userPrompt });
+      messages.push({ role: "user", content: userPrompt });
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: "gpt-4o",
       messages,
       max_tokens: 1200,
       temperature: 0.85,
     });
-    
+
     console.log(`✅ [AI Generate] OpenAI response received`);
 
     const content = response.choices[0]?.message?.content;
-    
+
     if (!content) {
-      return NextResponse.json({ error: 'Failed to generate content' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to generate content" },
+        { status: 500 },
+      );
     }
 
     console.log(`🤖 [AI Generate] Raw response:`, content);
@@ -141,14 +164,14 @@ export async function POST(request: NextRequest) {
         parsed = JSON.parse(content);
       }
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
+      console.error("Failed to parse AI response:", parseError);
       return NextResponse.json({
         success: true,
         generated: {
-          name: 'Generated Item',
+          name: "Generated Item",
           shortDescription: content.slice(0, 100),
-          fullDescription: content
-        }
+          fullDescription: content,
+        },
       });
     }
 
@@ -157,48 +180,66 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       generated: {
-        name: parsed.name || 'Generated Item',
-        shortDescription: parsed.shortDescription || parsed.tagline || '',
-        fullDescription: parsed.fullDescription || parsed.description || ''
-      }
+        name: parsed.name || "Generated Item",
+        shortDescription: parsed.shortDescription || parsed.tagline || "",
+        fullDescription: parsed.fullDescription || parsed.description || "",
+      },
     });
-
   } catch (error) {
-    console.error('❌ [AI Generate] Error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to generate content: ' + (error instanceof Error ? error.message : 'Unknown error') 
-    }, { status: 500 });
+    console.error("❌ [AI Generate] Error:", error);
+    return NextResponse.json(
+      {
+        error:
+          "Failed to generate content: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      },
+      { status: 500 },
+    );
   }
 }
 
 // Helper function to get image as base64
 async function getImageBase64(imageUrl: string): Promise<string | null> {
-  const urlPath = imageUrl.split('?')[0];
-  const filename = urlPath.split('/').pop() || '';
-  
-  let mimeType = 'image/png';
-  const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-  else if (ext === 'gif') mimeType = 'image/gif';
-  else if (ext === 'webp') mimeType = 'image/webp';
-  
+  const urlPath = imageUrl.split("?")[0];
+  const filename = urlPath.split("/").pop() || "";
+
+  let mimeType = "image/png";
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+  else if (ext === "gif") mimeType = "image/gif";
+  else if (ext === "webp") mimeType = "image/webp";
+
   const possiblePaths = [
-    path.join('/var/www/chartvolt', 'public', 'uploads', 'marketplace', filename),
-    path.join(process.cwd(), '..', '..', 'public', 'uploads', 'marketplace', filename),
-    path.join(process.cwd(), 'public', 'uploads', 'marketplace', filename),
+    path.join(
+      "/var/www/chartvolt",
+      "public",
+      "uploads",
+      "marketplace",
+      filename,
+    ),
+    path.join(
+      process.cwd(),
+      "..",
+      "..",
+      "public",
+      "uploads",
+      "marketplace",
+      filename,
+    ),
+    path.join(process.cwd(), "public", "uploads", "marketplace", filename),
   ];
-  
+
   for (const filePath of possiblePaths) {
     try {
       await access(filePath, constants.R_OK);
       const fileBuffer = await readFile(filePath);
       console.log(`✅ [AI Generate] Found image at: ${filePath}`);
-      return `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+      return `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
     } catch {
       // Try next path
     }
   }
-  
+
   return null;
 }
 
@@ -228,7 +269,7 @@ Your task is to create:
 
 *"[A memorable quote from the character about trading]"*
 
-The cosmetic type is: ${cosmeticType || 'avatar'}
+The cosmetic type is: ${cosmeticType || "avatar"}
 
 Respond in JSON format:
 {
@@ -239,17 +280,22 @@ Respond in JSON format:
 }
 
 // Prompt for trading indicators
-function getIndicatorPrompt(indicatorType?: string, settings?: Record<string, unknown>): string {
+function getIndicatorPrompt(
+  indicatorType?: string,
+  settings?: Record<string, unknown>,
+): string {
   const indicatorNames: Record<string, string> = {
-    sma: 'Simple Moving Average',
-    ema: 'Exponential Moving Average',
-    bb: 'Bollinger Bands',
-    rsi: 'Relative Strength Index',
-    macd: 'MACD',
-    support_resistance: 'Support & Resistance Levels',
+    sma: "Simple Moving Average",
+    ema: "Exponential Moving Average",
+    bb: "Bollinger Bands",
+    rsi: "Relative Strength Index",
+    macd: "MACD",
+    support_resistance: "Support & Resistance Levels",
   };
 
-  const indicatorName = indicatorType ? indicatorNames[indicatorType] || indicatorType : 'Custom Indicator';
+  const indicatorName = indicatorType
+    ? indicatorNames[indicatorType] || indicatorType
+    : "Custom Indicator";
 
   return `You are a professional trading platform content writer. Create compelling marketplace content for a trading indicator.
 
@@ -366,13 +412,13 @@ function getGameMasterPrompt(config?: Record<string, unknown>): string {
   const gmConfig = config || {};
   const canCreateCompetitions = gmConfig.canCreateCompetitions !== false;
   const canEarnFromChallenges = gmConfig.canEarnFromChallenges === true;
-  
+
   // Build the "What You Get" section based on enabled features
-  let whatYouGetSection = '';
-  
+  let whatYouGetSection = "";
+
   if (canCreateCompetitions) {
     whatYouGetSection = `
-- **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? 's' : ''} per Day** - Host engaging trading battles for your community
+- **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? "s" : ""} per Day** - Host engaging trading battles for your community
 - **Up to ${gmConfig.maxUsersPerCompetition || 30} Participants** - Perfect size for competitive events
 - **${gmConfig.referralFeePercentage || 5}% Referral Earnings** - Earn from every entry fee your referred users pay
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period`;
@@ -382,21 +428,27 @@ function getGameMasterPrompt(config?: Record<string, unknown>): string {
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period
 - **Passive Income Focus** - No competition management required`;
   }
-  
+
   if (canEarnFromChallenges) {
     whatYouGetSection += `
 - **${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}% Challenge Earnings** - Earn from 1v1 challenge referrals`;
   }
 
-  const packageType = canCreateCompetitions 
-    ? 'a full-featured Game Master subscription package that allows creating competitions AND earning from referrals'
-    : 'a referral-only Game Master package focused purely on earning from referrals (NO competition creation)';
+  const packageType = canCreateCompetitions
+    ? "a full-featured Game Master subscription package that allows creating competitions AND earning from referrals"
+    : "a referral-only Game Master package focused purely on earning from referrals (NO competition creation)";
 
   // Log for debugging
-  console.log('[getGameMasterPrompt] canCreateCompetitions:', canCreateCompetitions, 'raw value:', gmConfig.canCreateCompetitions);
-  
+  console.log(
+    "[getGameMasterPrompt] canCreateCompetitions:",
+    canCreateCompetitions,
+    "raw value:",
+    gmConfig.canCreateCompetitions,
+  );
+
   // Build strong constraint message for referral-only packages
-  const referralOnlyConstraint = !canCreateCompetitions ? `
+  const referralOnlyConstraint = !canCreateCompetitions
+    ? `
 
 ⚠️ CRITICAL CONSTRAINT - READ CAREFULLY:
 This is a REFERRAL-ONLY package. Competition creation is DISABLED.
@@ -415,21 +467,26 @@ YOU MUST ONLY focus on:
 - Earning from OTHER people's competitions (not their own)
 
 The GM with this package earns fees when their referred users participate in competitions created by others (admins or other GMs), but they CANNOT create their own competitions.
-` : '';
+`
+    : "";
 
   return `You are a professional content writer for a trading competition platform. Create compelling marketplace content for ${packageType}.
 ${referralOnlyConstraint}
-IMPORTANT: This package ${canCreateCompetitions ? 'CAN create competitions and earn from referrals' : 'CANNOT create competitions - it is REFERRAL-ONLY'}.
+IMPORTANT: This package ${canCreateCompetitions ? "CAN create competitions and earn from referrals" : "CANNOT create competitions - it is REFERRAL-ONLY"}.
 
 Package configuration:
 - Subscription Duration: ${gmConfig.subscriptionDurationDays || 30} days
 - Referral Fee Percentage: ${gmConfig.referralFeePercentage || 5}%
-${canCreateCompetitions ? `- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
-- Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}` : '- Competition Creation: DISABLED (Referral-Only Package)'}
-- Can Earn From Challenges: ${canEarnFromChallenges ? `Yes (${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}%)` : 'No'}
+${
+  canCreateCompetitions
+    ? `- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
+- Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}`
+    : "- Competition Creation: DISABLED (Referral-Only Package)"
+}
+- Can Earn From Challenges: ${canEarnFromChallenges ? `Yes (${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}%)` : "No"}
 
 Create content that:
-1. ${canCreateCompetitions ? 'Highlights both competition hosting AND referral earning potential' : 'Focuses ENTIRELY on passive referral income - DO NOT mention hosting competitions'}
+1. ${canCreateCompetitions ? "Highlights both competition hosting AND referral earning potential" : "Focuses ENTIRELY on passive referral income - DO NOT mention hosting competitions"}
 2. Explains the earning potential from referrals
 3. Makes the package feel exclusive and valuable
 4. Uses aspirational language that appeals to traders
@@ -438,31 +495,35 @@ Your task is to create:
 
 1. **Name** (2-4 words max) - ${canCreateCompetitions ? 'Tier name that conveys power (e.g., "Pro", "Elite", "Ultimate")' : 'Name that conveys passive income/influence (e.g., "Affiliate Pro", "Referral Master", "Network Builder")'}.
 
-2. **Short Description** (max 120 characters) - Compelling one-liner about the package benefits. ${!canCreateCompetitions ? 'Focus on referral earnings, NOT competitions.' : ''}
+2. **Short Description** (max 120 characters) - Compelling one-liner about the package benefits. ${!canCreateCompetitions ? "Focus on referral earnings, NOT competitions." : ""}
 
 3. **Full Description** - Use this EXACT format:
 
 # [Package Name - Aspirational Title]
 
-[Opening hook - 1 sentence about what this package enables. ${!canCreateCompetitions ? 'DO NOT mention creating competitions.' : ''}]
+[Opening hook - 1 sentence about what this package enables. ${!canCreateCompetitions ? "DO NOT mention creating competitions." : ""}]
 
 ## What You Get
 ${whatYouGetSection}
 
 ## How Referral Earnings Work
 
-[2-3 sentences explaining the passive income model - how GMs earn when their referred users join competitions${canEarnFromChallenges ? ' and challenges' : ''}]
+[2-3 sentences explaining the passive income model - how GMs earn when their referred users join competitions${canEarnFromChallenges ? " and challenges" : ""}]
 
 ## Ideal For
 
-- [Target audience 1 - ${canCreateCompetitions ? 'community builders who want to host events' : 'influencers who want passive income'}]
+- [Target audience 1 - ${canCreateCompetitions ? "community builders who want to host events" : "influencers who want passive income"}]
 - [Target audience 2]
 - [Target audience 3]
 
-${!canCreateCompetitions ? `## Note
-This is a referral-only package - perfect for influencers who want to earn from their network without the responsibility of managing competitions.` : ''}
+${
+  !canCreateCompetitions
+    ? `## Note
+This is a referral-only package - perfect for influencers who want to earn from their network without the responsibility of managing competitions.`
+    : ""
+}
 
-*"[Aspirational quote about ${canCreateCompetitions ? 'building a trading community' : 'monetizing your influence'}]"*
+*"[Aspirational quote about ${canCreateCompetitions ? "building a trading community" : "monetizing your influence"}]"*
 
 Respond in JSON format:
 {

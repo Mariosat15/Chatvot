@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { User, AlertTriangle, UserCheck } from 'lucide-react';
+import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { User, AlertTriangle, UserCheck } from "lucide-react";
 
 interface Assignment {
   employeeId: string;
@@ -19,43 +19,49 @@ interface CustomerAssignmentBadgeProps {
   className?: string;
 }
 
-export function CustomerAssignmentBadge({ 
-  assignment, 
+export function CustomerAssignmentBadge({
+  assignment,
   compact = false,
   showTooltip = true,
-  className = '',
+  className = "",
 }: CustomerAssignmentBadgeProps) {
   if (!assignment) {
     return (
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className={`bg-yellow-500/10 text-yellow-400 border-yellow-500/30 ${className}`}
-        title={showTooltip ? "This customer has not been assigned to any employee" : undefined}
+        title={
+          showTooltip
+            ? "This customer has not been assigned to any employee"
+            : undefined
+        }
       >
         <AlertTriangle className="h-3 w-3 mr-1" />
-        {compact ? 'Unassigned' : 'No Agent Assigned'}
+        {compact ? "Unassigned" : "No Agent Assigned"}
       </Badge>
     );
   }
 
-  const tooltipText = showTooltip 
+  const tooltipText = showTooltip
     ? `${assignment.employeeName}\n${assignment.employeeEmail}\nRole: ${assignment.employeeRole}\nAssigned: ${new Date(assignment.assignedAt).toLocaleDateString()}`
     : undefined;
 
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={`bg-emerald-500/10 text-emerald-400 border-emerald-500/30 ${className}`}
       title={tooltipText}
     >
       <UserCheck className="h-3 w-3 mr-1" />
-      {compact ? assignment.employeeName.split(' ')[0] : assignment.employeeName}
+      {compact
+        ? assignment.employeeName.split(" ")[0]
+        : assignment.employeeName}
     </Badge>
   );
 }
 
 // Full card version for detail views
-export function CustomerAssignmentCard({ 
+export function CustomerAssignmentCard({
   assignment,
   onTransfer,
   onUnassign,
@@ -75,7 +81,9 @@ export function CustomerAssignmentCard({
           </div>
           <div>
             <p className="font-medium text-yellow-400">No Agent Assigned</p>
-            <p className="text-sm text-gray-400">This customer needs to be assigned to an employee</p>
+            <p className="text-sm text-gray-400">
+              This customer needs to be assigned to an employee
+            </p>
           </div>
         </div>
       </div>
@@ -102,7 +110,7 @@ export function CustomerAssignmentCard({
             </div>
           </div>
         </div>
-        
+
         {canManage && (
           <div className="flex gap-2">
             {onTransfer && (

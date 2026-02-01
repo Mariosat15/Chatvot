@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import VendorSubscription from '@/database/models/vendor-subscription.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import VendorSubscription from "@/database/models/vendor-subscription.model";
 
 /**
  * POST /api/vendors/[id]/mark-paid
@@ -9,12 +9,12 @@ import VendorSubscription from '@/database/models/vendor-subscription.model';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -27,8 +27,8 @@ export async function POST(
 
     if (!vendor) {
       return NextResponse.json(
-        { success: false, error: 'Vendor not found' },
-        { status: 404 }
+        { success: false, error: "Vendor not found" },
+        { status: 404 },
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(
     const paymentRecord = {
       date: new Date(),
       amount: vendor.amount,
-      status: 'paid' as const,
+      status: "paid" as const,
       reference: reference || undefined,
     };
 
@@ -50,27 +50,27 @@ export async function POST(
 
     // Advance to next payment date based on billing cycle
     const currentDue = new Date(vendor.nextPaymentDate);
-    
+
     switch (vendor.billingCycle) {
-      case 'monthly':
+      case "monthly":
         currentDue.setMonth(currentDue.getMonth() + 1);
         break;
-      case 'quarterly':
+      case "quarterly":
         currentDue.setMonth(currentDue.getMonth() + 3);
         break;
-      case 'yearly':
+      case "yearly":
         currentDue.setFullYear(currentDue.getFullYear() + 1);
         break;
-      case 'one-time':
+      case "one-time":
         // For one-time payments, mark as inactive
         vendor.isActive = false;
         break;
     }
 
-    if (vendor.billingCycle !== 'one-time') {
+    if (vendor.billingCycle !== "one-time") {
       vendor.nextPaymentDate = currentDue;
     }
-    
+
     // Reset reminder flag for next cycle
     vendor.reminderSent = false;
 
@@ -82,10 +82,10 @@ export async function POST(
       message: `Payment marked as paid. Next payment due: ${vendor.nextPaymentDate.toLocaleDateString()}`,
     });
   } catch (error) {
-    console.error('Error marking payment:', error);
+    console.error("Error marking payment:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to mark payment' },
-      { status: 500 }
+      { success: false, error: "Failed to mark payment" },
+      { status: 500 },
     );
   }
 }

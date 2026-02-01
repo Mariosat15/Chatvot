@@ -1,12 +1,12 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 
-export type ContestType = 'competition' | 'challenge';
+export type ContestType = "competition" | "challenge";
 
 export interface ContestData {
   type: ContestType;
@@ -39,12 +39,12 @@ export interface ContestData {
  */
 export async function getContestAndParticipant(
   contestId: string,
-  userId: string
+  userId: string,
 ): Promise<ContestData | null> {
   await connectToDatabase();
 
   // Try competition first
-  const competition = await Competition.findById(contestId).lean() as any;
+  const competition = (await Competition.findById(contestId).lean()) as any;
   if (competition) {
     const participant = await CompetitionParticipant.findOne({
       competitionId: contestId,
@@ -56,7 +56,7 @@ export async function getContestAndParticipant(
     }
 
     return {
-      type: 'competition',
+      type: "competition",
       contest: competition,
       participant,
       status: competition.status,
@@ -71,12 +71,12 @@ export async function getContestAndParticipant(
       marginCallThreshold: competition.marginCallThreshold || 50,
       riskLimits: competition.riskLimits,
       startingCapital: competition.startingCapital,
-      assetClasses: competition.assetClasses || ['forex'],
+      assetClasses: competition.assetClasses || ["forex"],
     };
   }
 
   // Try challenge
-  const challenge = await Challenge.findById(contestId).lean() as any;
+  const challenge = (await Challenge.findById(contestId).lean()) as any;
   if (challenge) {
     const participant = await ChallengeParticipant.findOne({
       challengeId: contestId,
@@ -88,7 +88,7 @@ export async function getContestAndParticipant(
     }
 
     return {
-      type: 'challenge',
+      type: "challenge",
       contest: challenge,
       participant,
       status: challenge.status,
@@ -105,7 +105,7 @@ export async function getContestAndParticipant(
         enabled: false, // Challenges don't have risk limits for now
       },
       startingCapital: challenge.startingCapital,
-      assetClasses: challenge.assetClasses || ['forex'],
+      assetClasses: challenge.assetClasses || ["forex"],
     };
   }
 
@@ -119,7 +119,7 @@ export async function getContestAndParticipant(
 export async function updateParticipantStats(
   contestId: string,
   userId: string,
-  updates: Record<string, any>
+  updates: Record<string, any>,
 ): Promise<boolean> {
   await connectToDatabase();
 
@@ -127,7 +127,7 @@ export async function updateParticipantStats(
   const competitionParticipant = await CompetitionParticipant.findOneAndUpdate(
     { competitionId: contestId, userId },
     updates,
-    { new: true }
+    { new: true },
   );
 
   if (competitionParticipant) {
@@ -138,7 +138,7 @@ export async function updateParticipantStats(
   const challengeParticipant = await ChallengeParticipant.findOneAndUpdate(
     { challengeId: contestId, userId },
     updates,
-    { new: true }
+    { new: true },
   );
 
   return !!challengeParticipant;
@@ -149,7 +149,7 @@ export async function updateParticipantStats(
  */
 export async function getParticipant(
   contestId: string,
-  userId: string
+  userId: string,
 ): Promise<{ type: ContestType; participant: any } | null> {
   await connectToDatabase();
 
@@ -160,7 +160,7 @@ export async function getParticipant(
   }).lean();
 
   if (competitionParticipant) {
-    return { type: 'competition', participant: competitionParticipant };
+    return { type: "competition", participant: competitionParticipant };
   }
 
   // Try challenge participant
@@ -170,7 +170,7 @@ export async function getParticipant(
   }).lean();
 
   if (challengeParticipant) {
-    return { type: 'challenge', participant: challengeParticipant };
+    return { type: "challenge", participant: challengeParticipant };
   }
 
   return null;
@@ -180,13 +180,12 @@ export async function getParticipant(
  * Get the participant model based on contest type
  */
 export async function getParticipantModel(type: ContestType) {
-  return type === 'competition' ? CompetitionParticipant : ChallengeParticipant;
+  return type === "competition" ? CompetitionParticipant : ChallengeParticipant;
 }
 
 /**
  * Get the ID field name for the participant based on contest type
  */
 export async function getContestIdField(type: ContestType): Promise<string> {
-  return type === 'competition' ? 'competitionId' : 'challengeId';
+  return type === "competition" ? "competitionId" : "challengeId";
 }
-

@@ -1,51 +1,51 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Types of actions that can be taken on a user
-export type FraudActionType = 
-  | 'warning_issued'
-  | 'investigation_started'
-  | 'investigation_resolved'
-  | 'suspended'
-  | 'suspension_lifted'
-  | 'banned'
-  | 'ban_lifted'
-  | 'restriction_added'
-  | 'restriction_removed'
-  | 'alert_created'
-  | 'alert_dismissed'
-  | 'alert_resolved'
-  | 'evidence_added'
-  | 'manual_review'
-  | 'auto_action'
-  | 'account_locked'
-  | 'account_unlocked';
+export type FraudActionType =
+  | "warning_issued"
+  | "investigation_started"
+  | "investigation_resolved"
+  | "suspended"
+  | "suspension_lifted"
+  | "banned"
+  | "ban_lifted"
+  | "restriction_added"
+  | "restriction_removed"
+  | "alert_created"
+  | "alert_dismissed"
+  | "alert_resolved"
+  | "evidence_added"
+  | "manual_review"
+  | "auto_action"
+  | "account_locked"
+  | "account_unlocked";
 
 // Severity levels for tracking escalation
-export type ActionSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type ActionSeverity = "low" | "medium" | "high" | "critical";
 
 export interface IFraudHistory extends Document {
   // Target user information
   userId: mongoose.Types.ObjectId;
   userEmail: string;
   userName: string;
-  
+
   // Action details
   actionType: FraudActionType;
   actionSeverity: ActionSeverity;
-  
+
   // Who performed the action
   performedBy: {
-    type: 'admin' | 'system' | 'automated';
+    type: "admin" | "system" | "automated";
     adminId?: mongoose.Types.ObjectId;
     adminEmail?: string;
     adminName?: string;
   };
-  
+
   // Related records
   relatedAlertId?: mongoose.Types.ObjectId;
   relatedRestrictionId?: mongoose.Types.ObjectId;
   relatedCompetitionId?: mongoose.Types.ObjectId;
-  
+
   // Action context
   reason: string;
   details: string;
@@ -55,21 +55,21 @@ export interface IFraudHistory extends Document {
     value?: string | number;
     timestamp?: Date;
   }[];
-  
+
   // Previous state (for tracking changes)
   previousState?: {
     suspicionScore?: number;
     restrictionStatus?: string;
     accountStatus?: string;
   };
-  
+
   // New state after action
   newState?: {
     suspicionScore?: number;
     restrictionStatus?: string;
     accountStatus?: string;
   };
-  
+
   // Duration tracking (for suspensions/bans)
   duration?: {
     startDate?: Date;
@@ -77,14 +77,14 @@ export interface IFraudHistory extends Document {
     isPermanent?: boolean;
     durationDays?: number;
   };
-  
+
   // Notes from admin
   adminNotes?: string;
-  
+
   // Metadata
   ipAddress?: string;
   userAgent?: string;
-  
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -105,7 +105,7 @@ export interface LogActionParams {
   actionType: FraudActionType;
   actionSeverity: ActionSeverity;
   performedBy: {
-    type: 'admin' | 'system' | 'automated';
+    type: "admin" | "system" | "automated";
     adminId?: string;
     adminEmail?: string;
     adminName?: string;
@@ -146,7 +146,7 @@ const FraudHistorySchema = new Schema<IFraudHistory>(
   {
     userId: {
       type: Schema.Types.Mixed, // Accept both ObjectId and String (for UUIDs)
-      ref: 'User',
+      ref: "User",
       required: true,
       index: true,
     },
@@ -161,57 +161,57 @@ const FraudHistorySchema = new Schema<IFraudHistory>(
     actionType: {
       type: String,
       enum: [
-        'warning_issued',
-        'investigation_started',
-        'investigation_resolved',
-        'suspended',
-        'suspension_lifted',
-        'banned',
-        'ban_lifted',
-        'restriction_added',
-        'restriction_removed',
-        'alert_created',
-        'alert_dismissed',
-        'alert_resolved',
-        'evidence_added',
-        'manual_review',
-        'auto_action',
-        'account_locked',
-        'account_unlocked',
+        "warning_issued",
+        "investigation_started",
+        "investigation_resolved",
+        "suspended",
+        "suspension_lifted",
+        "banned",
+        "ban_lifted",
+        "restriction_added",
+        "restriction_removed",
+        "alert_created",
+        "alert_dismissed",
+        "alert_resolved",
+        "evidence_added",
+        "manual_review",
+        "auto_action",
+        "account_locked",
+        "account_unlocked",
       ],
       required: true,
       index: true,
     },
     actionSeverity: {
       type: String,
-      enum: ['low', 'medium', 'high', 'critical'],
+      enum: ["low", "medium", "high", "critical"],
       required: true,
       index: true,
     },
     performedBy: {
       type: {
         type: String,
-        enum: ['admin', 'system', 'automated'],
+        enum: ["admin", "system", "automated"],
         required: true,
       },
       adminId: {
         type: Schema.Types.ObjectId,
-        ref: 'Admin',
+        ref: "Admin",
       },
       adminEmail: String,
       adminName: String,
     },
     relatedAlertId: {
       type: Schema.Types.ObjectId,
-      ref: 'FraudAlert',
+      ref: "FraudAlert",
     },
     relatedRestrictionId: {
       type: Schema.Types.ObjectId,
-      ref: 'UserRestriction',
+      ref: "UserRestriction",
     },
     relatedCompetitionId: {
       type: Schema.Types.ObjectId,
-      ref: 'Competition',
+      ref: "Competition",
     },
     reason: {
       type: String,
@@ -221,15 +221,17 @@ const FraudHistorySchema = new Schema<IFraudHistory>(
       type: String,
       required: true,
     },
-    evidence: [{
-      type: {
-        type: String,
-        required: true,
+    evidence: [
+      {
+        type: {
+          type: String,
+          required: true,
+        },
+        description: String,
+        value: Schema.Types.Mixed,
+        timestamp: Date,
       },
-      description: String,
-      value: Schema.Types.Mixed,
-      timestamp: Date,
-    }],
+    ],
     previousState: {
       suspicionScore: Number,
       restrictionStatus: String,
@@ -252,18 +254,18 @@ const FraudHistorySchema = new Schema<IFraudHistory>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound indexes for efficient queries
 FraudHistorySchema.index({ userId: 1, createdAt: -1 });
 FraudHistorySchema.index({ actionType: 1, createdAt: -1 });
-FraudHistorySchema.index({ 'performedBy.adminId': 1, createdAt: -1 });
+FraudHistorySchema.index({ "performedBy.adminId": 1, createdAt: -1 });
 FraudHistorySchema.index({ actionSeverity: 1, createdAt: -1 });
 
 // Static method: Get user's complete fraud history
-FraudHistorySchema.statics.getUserHistory = async function(
-  userId: string
+FraudHistorySchema.statics.getUserHistory = async function (
+  userId: string,
 ): Promise<IFraudHistory[]> {
   // Try to convert to ObjectId, fallback to string match
   let query;
@@ -273,17 +275,17 @@ FraudHistorySchema.statics.getUserHistory = async function(
   } catch {
     query = { userId: userId };
   }
-  
+
   return this.find(query)
     .sort({ createdAt: -1 })
-    .populate('relatedAlertId', 'title status')
-    .populate('relatedCompetitionId', 'name')
+    .populate("relatedAlertId", "title status")
+    .populate("relatedCompetitionId", "name")
     .exec();
 };
 
 // Static method: Get action counts for a user
-FraudHistorySchema.statics.getActionCounts = async function(
-  userId: string
+FraudHistorySchema.statics.getActionCounts = async function (
+  userId: string,
 ): Promise<Record<FraudActionType, number>> {
   // Try to convert to ObjectId, fallback to string match
   let matchQuery;
@@ -293,33 +295,35 @@ FraudHistorySchema.statics.getActionCounts = async function(
   } catch {
     matchQuery = { userId: userId };
   }
-  
+
   const counts = await this.aggregate([
     { $match: matchQuery },
-    { $group: { _id: '$actionType', count: { $sum: 1 } } },
+    { $group: { _id: "$actionType", count: { $sum: 1 } } },
   ]);
-  
+
   const result: Record<string, number> = {};
   counts.forEach((item: { _id: string; count: number }) => {
     result[item._id] = item.count;
   });
-  
+
   return result;
 };
 
 // Static method: Get recent actions across all users
-FraudHistorySchema.statics.getRecentActions = async function(
-  limit: number = 50
+FraudHistorySchema.statics.getRecentActions = async function (
+  limit: number = 50,
 ): Promise<IFraudHistory[]> {
   return this.find()
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate('userId', 'email name')
+    .populate("userId", "email name")
     .exec();
 };
 
 // Helper to safely convert to ObjectId or return null
-function safeObjectId(id: string | undefined | null): mongoose.Types.ObjectId | null {
+function safeObjectId(
+  id: string | undefined | null,
+): mongoose.Types.ObjectId | null {
   if (!id) return null;
   try {
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -332,8 +336,8 @@ function safeObjectId(id: string | undefined | null): mongoose.Types.ObjectId | 
 }
 
 // Static method: Log a new action
-FraudHistorySchema.statics.logAction = async function(
-  params: LogActionParams
+FraudHistorySchema.statics.logAction = async function (
+  params: LogActionParams,
 ): Promise<IFraudHistory> {
   // Handle userId - can be ObjectId string or UUID string
   let userIdValue: mongoose.Types.ObjectId | string = params.userId;
@@ -341,7 +345,7 @@ FraudHistorySchema.statics.logAction = async function(
   if (objectId) {
     userIdValue = objectId;
   }
-  
+
   const history = new this({
     userId: userIdValue,
     userEmail: params.userEmail,
@@ -367,13 +371,12 @@ FraudHistorySchema.statics.logAction = async function(
     ipAddress: params.ipAddress,
     userAgent: params.userAgent,
   });
-  
+
   return history.save();
 };
 
 export const FraudHistory = (mongoose.models.FraudHistory ||
   mongoose.model<IFraudHistory, IFraudHistoryModel>(
-    'FraudHistory',
-    FraudHistorySchema
+    "FraudHistory",
+    FraudHistorySchema,
   )) as IFraudHistoryModel;
-

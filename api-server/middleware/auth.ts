@@ -1,11 +1,11 @@
 /**
  * Authentication Middleware for API Server
- * 
+ *
  * Verifies JWT tokens and attaches user to request.
  */
 
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
 /**
  * Safely extract Authorization header value
@@ -13,7 +13,7 @@ import jwt from 'jsonwebtoken';
  * This prevents TypeError when calling .split() on an array
  */
 function getAuthorizationHeader(req: Request): string | undefined {
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers["authorization"];
   // Handle array case (multiple Authorization headers sent)
   if (Array.isArray(authHeader)) {
     return authHeader[0]; // Use first header
@@ -26,12 +26,12 @@ function getAuthorizationHeader(req: Request): string | undefined {
  */
 function extractBearerToken(req: Request): string | null {
   const authHeader = getAuthorizationHeader(req);
-  if (!authHeader || typeof authHeader !== 'string') {
+  if (!authHeader || typeof authHeader !== "string") {
     return null;
   }
   // Expected format: "Bearer <token>"
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
     return null;
   }
   return parts[1];
@@ -42,8 +42,8 @@ function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
   if (!secret) {
     throw new Error(
-      'CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. ' +
-      'Without a secret, authentication is disabled for security.'
+      "CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. " +
+        "Without a secret, authentication is disabled for security.",
     );
   }
   return secret;
@@ -63,12 +63,12 @@ export interface AuthenticatedRequest extends Request {
 export function authenticateToken(
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const token = extractBearerToken(req);
 
   if (!token) {
-    res.status(401).json({ error: 'Authentication required' });
+    res.status(401).json({ error: "Authentication required" });
     return;
   }
 
@@ -83,14 +83,14 @@ export function authenticateToken(
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      res.status(401).json({ error: 'Token expired' });
+      res.status(401).json({ error: "Token expired" });
       return;
     }
     if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: 'Invalid token' });
+      res.status(401).json({ error: "Invalid token" });
       return;
     }
-    res.status(500).json({ error: 'Authentication failed' });
+    res.status(500).json({ error: "Authentication failed" });
   }
 }
 
@@ -100,7 +100,7 @@ export function authenticateToken(
 export function optionalAuth(
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const token = extractBearerToken(req);
 
@@ -126,9 +126,10 @@ export function optionalAuth(
 /**
  * Get user ID from session cookie (for Next.js auth compatibility)
  */
-export async function getSessionUser(sessionToken: string): Promise<{ id: string } | null> {
+export async function getSessionUser(
+  sessionToken: string,
+): Promise<{ id: string } | null> {
   // This would look up the session in the database
   // For now, we'll use JWT tokens passed in Authorization header
   return null;
 }
-

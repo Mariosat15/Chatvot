@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { motion } from 'framer-motion';
-import { Shield, Award, BadgeCheck, Newspaper, Building2 } from 'lucide-react';
-import { LandingTheme } from '@/lib/themes/landing-themes';
+import { motion } from "framer-motion";
+import { Shield, Award, BadgeCheck, Newspaper, Building2 } from "lucide-react";
+import { LandingTheme } from "@/lib/themes/landing-themes";
 
 interface TrustBadge {
   id: string;
-  type: 'security' | 'partner' | 'press' | 'award';
+  type: "security" | "partner" | "press" | "award";
   name: string;
   logo: string;
   url?: string;
@@ -33,10 +33,10 @@ const typeIcons = {
 };
 
 const typeLabels = {
-  security: 'Security Certified',
-  partner: 'Trusted Partners',
-  press: 'As Seen In',
-  award: 'Awards & Recognition',
+  security: "Security Certified",
+  partner: "Trusted Partners",
+  press: "As Seen In",
+  award: "Awards & Recognition",
 };
 
 export default function TrustBadges({
@@ -46,23 +46,26 @@ export default function TrustBadges({
   title = "Trusted By Traders Worldwide",
 }: TrustBadgesProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#00f0ff',
-    secondary: propColors?.secondary || '#ff00ff',
-    accent: propColors?.accent || '#ffd700',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#00f0ff",
+    secondary: propColors?.secondary || "#ff00ff",
+    accent: propColors?.accent || "#ffd700",
+    text: propColors?.text || "#ffffff",
   };
-  const enabledBadges = badges.filter(b => b.enabled);
-  
+  const enabledBadges = badges.filter((b) => b.enabled);
+
   if (enabledBadges.length === 0) {
     return null;
   }
 
   // Group badges by type
-  const badgesByType = enabledBadges.reduce((acc, badge) => {
-    if (!acc[badge.type]) acc[badge.type] = [];
-    acc[badge.type].push(badge);
-    return acc;
-  }, {} as Record<string, TrustBadge[]>);
+  const badgesByType = enabledBadges.reduce(
+    (acc, badge) => {
+      if (!acc[badge.type]) acc[badge.type] = [];
+      acc[badge.type].push(badge);
+      return acc;
+    },
+    {} as Record<string, TrustBadge[]>,
+  );
 
   const types = Object.keys(badgesByType) as Array<keyof typeof typeIcons>;
 
@@ -72,7 +75,7 @@ export default function TrustBadges({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       className="py-12 border-y"
-      style={{ 
+      style={{
         backgroundColor: `${effectiveColors.primary}03`,
         borderColor: `${theme?.colors?.border}`,
       }}
@@ -81,8 +84,11 @@ export default function TrustBadges({
         {/* Title */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <BadgeCheck className="h-5 w-5" style={{ color: effectiveColors.primary }} />
-            <span 
+            <BadgeCheck
+              className="h-5 w-5"
+              style={{ color: effectiveColors.primary }}
+            />
+            <span
               className="text-sm font-bold uppercase tracking-wider"
               style={{ color: theme?.colors?.textMuted }}
             >
@@ -98,7 +104,7 @@ export default function TrustBadges({
             {types.map((type, typeIndex) => {
               const Icon = typeIcons[type];
               const badgesInType = badgesByType[type];
-              
+
               return (
                 <motion.div
                   key={type}
@@ -108,18 +114,21 @@ export default function TrustBadges({
                   transition={{ delay: typeIndex * 0.1 }}
                 >
                   <div className="flex items-center justify-center gap-2 mb-4">
-                    <Icon className="h-4 w-4" style={{ color: theme?.colors?.textMuted }} />
-                    <span 
+                    <Icon
+                      className="h-4 w-4"
+                      style={{ color: theme?.colors?.textMuted }}
+                    />
+                    <span
                       className="text-xs font-medium uppercase tracking-wider"
                       style={{ color: theme?.colors?.textMuted }}
                     >
                       {typeLabels[type]}
                     </span>
                   </div>
-                  
+
                   <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
                     {badgesInType.map((badge, index) => (
-                      <BadgeItem 
+                      <BadgeItem
                         key={badge.id}
                         badge={badge}
                         theme={theme}
@@ -136,7 +145,7 @@ export default function TrustBadges({
           // Single type or mixed - show all together
           <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
             {enabledBadges.map((badge, index) => (
-              <BadgeItem 
+              <BadgeItem
                 key={badge.id}
                 badge={badge}
                 theme={theme}
@@ -151,13 +160,13 @@ export default function TrustBadges({
   );
 }
 
-function BadgeItem({ 
-  badge, 
-  theme, 
+function BadgeItem({
+  badge,
+  theme,
   effectiveColors,
   delay,
-}: { 
-  badge: TrustBadge; 
+}: {
+  badge: TrustBadge;
   theme?: LandingTheme;
   effectiveColors: {
     primary: string;
@@ -175,20 +184,20 @@ function BadgeItem({
       transition={{ delay }}
       whileHover={{ scale: 1.05 }}
       className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all cursor-pointer"
-      style={{ 
-        backgroundColor: 'transparent',
+      style={{
+        backgroundColor: "transparent",
       }}
     >
       {badge.logo ? (
-        <img 
-          src={badge.logo} 
+        <img
+          src={badge.logo}
           alt={badge.name}
           className="h-8 md:h-10 w-auto object-contain opacity-70 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
         />
       ) : (
-        <div 
+        <div
           className="h-10 px-4 flex items-center justify-center rounded-lg font-bold text-sm"
-          style={{ 
+          style={{
             backgroundColor: `${effectiveColors.primary}10`,
             color: effectiveColors.primary,
           }}
@@ -197,7 +206,7 @@ function BadgeItem({
         </div>
       )}
       {!badge.logo && (
-        <span 
+        <span
           className="text-xs font-medium"
           style={{ color: theme?.colors?.textMuted }}
         >

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import Invoice from '@/database/models/invoice.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import Invoice from "@/database/models/invoice.model";
 
 /**
  * GET /api/admin/invoices/by-transaction
@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const transactionId = searchParams.get('transactionId');
-    const userId = searchParams.get('userId');
-    const paymentId = searchParams.get('paymentId');
+    const transactionId = searchParams.get("transactionId");
+    const userId = searchParams.get("userId");
+    const paymentId = searchParams.get("paymentId");
 
     if (!transactionId && !userId && !paymentId) {
       return NextResponse.json(
-        { error: 'At least one search parameter is required' },
-        { status: 400 }
+        { error: "At least one search parameter is required" },
+        { status: 400 },
       );
     }
 
@@ -31,16 +31,16 @@ export async function GET(request: NextRequest) {
     if (paymentId) {
       invoice = await Invoice.findOne({
         $or: [
-          { 'metadata.paymentIntentId': paymentId },
-          { 'metadata.transactionId': transactionId },
-        ]
+          { "metadata.paymentIntentId": paymentId },
+          { "metadata.transactionId": transactionId },
+        ],
       }).lean();
     }
 
     // If not found, try by transaction ID in metadata
     if (!invoice && transactionId) {
       invoice = await Invoice.findOne({
-        'metadata.transactionId': transactionId,
+        "metadata.transactionId": transactionId,
       }).lean();
     }
 
@@ -49,10 +49,7 @@ export async function GET(request: NextRequest) {
     if (!invoice && userId) {
       // Get the most recent invoice for this user
       invoice = await Invoice.findOne({
-        $or: [
-          { userId: userId },
-          { 'metadata.userId': userId },
-        ]
+        $or: [{ userId: userId }, { "metadata.userId": userId }],
       })
         .sort({ createdAt: -1 })
         .lean();
@@ -62,16 +59,14 @@ export async function GET(request: NextRequest) {
       success: true,
       invoice: invoice || null,
     });
-
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching invoice by transaction:', error);
+    console.error("Error fetching invoice by transaction:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch invoice' },
-      { status: 500 }
+      { error: "Failed to fetch invoice" },
+      { status: 500 },
     );
   }
 }
-

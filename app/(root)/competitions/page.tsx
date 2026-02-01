@@ -1,17 +1,25 @@
-import { getCompetitions, isUserInCompetition } from '@/lib/actions/trading/competition.actions';
-import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
-import CompetitionsPageContent from './page-content';
+import {
+  getCompetitions,
+  isUserInCompetition,
+} from "@/lib/actions/trading/competition.actions";
+import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
+import CompetitionsPageContent from "./page-content";
 
 // Force dynamic rendering - this page uses authentication
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const CompetitionsPage = async () => {
   // Fetch all competitions on server
-  const [upcomingCompetitions, activeCompetitions, completedCompetitions, cancelledCompetitions] = await Promise.all([
-    getCompetitions({ status: 'upcoming' }),
-    getCompetitions({ status: 'active' }),
-    getCompetitions({ status: 'completed', limit: 10 }),
-    getCompetitions({ status: 'cancelled', limit: 5 }),
+  const [
+    upcomingCompetitions,
+    activeCompetitions,
+    completedCompetitions,
+    cancelledCompetitions,
+  ] = await Promise.all([
+    getCompetitions({ status: "upcoming" }),
+    getCompetitions({ status: "active" }),
+    getCompetitions({ status: "completed", limit: 10 }),
+    getCompetitions({ status: "cancelled", limit: 5 }),
   ]);
 
   // Combine all competitions
@@ -30,7 +38,7 @@ const CompetitionsPage = async () => {
     allCompetitions.map(async (comp) => ({
       id: comp._id.toString(),
       isUserIn: await isUserInCompetition(comp._id.toString()),
-    }))
+    })),
   );
 
   // Create a map for quick lookup
@@ -39,7 +47,7 @@ const CompetitionsPage = async () => {
     .map((check) => check.id);
 
   return (
-    <CompetitionsPageContent 
+    <CompetitionsPageContent
       initialCompetitions={allCompetitions}
       initialBalance={walletBalance.balance}
       userInCompetitionIds={userInCompetitionIds}

@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Award, 
-  Settings, 
-  Bell, 
-  ShoppingBag, 
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  Award,
+  Settings,
+  Bell,
+  ShoppingBag,
   Shield,
   ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+  ChevronRight,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Tab {
   id: string;
@@ -23,47 +23,47 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { 
-    id: 'overview', 
-    label: 'Overview', 
+  {
+    id: "overview",
+    label: "Overview",
     icon: <LayoutDashboard className="w-4 h-4" />,
-    color: 'text-blue-400',
-    gradient: 'from-blue-500/20 to-blue-600/10'
+    color: "text-blue-400",
+    gradient: "from-blue-500/20 to-blue-600/10",
   },
-  { 
-    id: 'badges', 
-    label: 'Badges', 
+  {
+    id: "badges",
+    label: "Badges",
     icon: <Award className="w-4 h-4" />,
-    color: 'text-purple-400',
-    gradient: 'from-purple-500/20 to-purple-600/10'
+    color: "text-purple-400",
+    gradient: "from-purple-500/20 to-purple-600/10",
   },
-  { 
-    id: 'arsenal', 
-    label: 'Arsenal', 
+  {
+    id: "arsenal",
+    label: "Arsenal",
     icon: <ShoppingBag className="w-4 h-4" />,
-    color: 'text-cyan-400',
-    gradient: 'from-cyan-500/20 to-cyan-600/10'
+    color: "text-cyan-400",
+    gradient: "from-cyan-500/20 to-cyan-600/10",
   },
-  { 
-    id: 'verification', 
-    label: 'Verification', 
+  {
+    id: "verification",
+    label: "Verification",
     icon: <Shield className="w-4 h-4" />,
-    color: 'text-green-400',
-    gradient: 'from-green-500/20 to-green-600/10'
+    color: "text-green-400",
+    gradient: "from-green-500/20 to-green-600/10",
   },
-  { 
-    id: 'notifications', 
-    label: 'Notifications', 
+  {
+    id: "notifications",
+    label: "Notifications",
     icon: <Bell className="w-4 h-4" />,
-    color: 'text-amber-400',
-    gradient: 'from-amber-500/20 to-amber-600/10'
+    color: "text-amber-400",
+    gradient: "from-amber-500/20 to-amber-600/10",
   },
-  { 
-    id: 'settings', 
-    label: 'Settings', 
+  {
+    id: "settings",
+    label: "Settings",
     icon: <Settings className="w-4 h-4" />,
-    color: 'text-gray-400',
-    gradient: 'from-gray-500/20 to-gray-600/10'
+    color: "text-gray-400",
+    gradient: "from-gray-500/20 to-gray-600/10",
   },
 ];
 
@@ -86,15 +86,15 @@ export default function ModernProfileTabs({
 }: ModernProfileTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState("overview");
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   // Handle tab from URL query param
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab && TABS.find(t => t.id === tab)) {
+    const tab = searchParams.get("tab");
+    if (tab && TABS.find((t) => t.id === tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -116,38 +116,41 @@ export default function ModernProfileTabs({
 
   useEffect(() => {
     checkScroll();
-    window.addEventListener('resize', checkScroll);
-    return () => window.removeEventListener('resize', checkScroll);
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
   }, []);
 
-  const scroll = (direction: 'left' | 'right') => {
+  const scroll = (direction: "left" | "right") => {
     if (tabsContainerRef.current) {
-      const scrollAmount = direction === 'left' ? -200 : 200;
-      tabsContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      const scrollAmount = direction === "left" ? -200 : 200;
+      tabsContainerRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: "smooth",
+      });
       setTimeout(checkScroll, 300);
     }
   };
 
   const getContent = () => {
     switch (activeTab) {
-      case 'overview':
+      case "overview":
         return overviewContent;
-      case 'badges':
+      case "badges":
         return badgesContent;
-      case 'arsenal':
+      case "arsenal":
         return arsenalContent;
-      case 'verification':
+      case "verification":
         return verificationContent;
-      case 'notifications':
+      case "notifications":
         return notificationsContent;
-      case 'settings':
+      case "settings":
         return settingsContent;
       default:
         return overviewContent;
     }
   };
 
-  const activeTabData = TABS.find(t => t.id === activeTab);
+  const activeTabData = TABS.find((t) => t.id === activeTab);
 
   return (
     <div className="w-full">
@@ -156,7 +159,7 @@ export default function ModernProfileTabs({
         {/* Scroll Buttons */}
         {canScrollLeft && (
           <button
-            onClick={() => scroll('left')}
+            onClick={() => scroll("left")}
             className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -164,7 +167,7 @@ export default function ModernProfileTabs({
         )}
         {canScrollRight && (
           <button
-            onClick={() => scroll('right')}
+            onClick={() => scroll("right")}
             className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronRight className="w-4 h-4" />
@@ -176,7 +179,7 @@ export default function ModernProfileTabs({
           ref={tabsContainerRef}
           onScroll={checkScroll}
           className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-smooth px-1 py-1 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -187,9 +190,10 @@ export default function ModernProfileTabs({
                 className={`
                   relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm 
                   transition-all duration-200 whitespace-nowrap min-w-fit
-                  ${isActive 
-                    ? `bg-gradient-to-r ${tab.gradient} ${tab.color} shadow-lg` 
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                  ${
+                    isActive
+                      ? `bg-gradient-to-r ${tab.gradient} ${tab.color} shadow-lg`
+                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
                   }
                 `}
               >
@@ -199,7 +203,7 @@ export default function ModernProfileTabs({
                   <motion.div
                     layoutId="activeTab"
                     className="absolute inset-0 rounded-xl bg-white/5 border border-white/10"
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                   />
                 )}
               </button>
@@ -223,4 +227,3 @@ export default function ModernProfileTabs({
     </div>
   );
 }
-

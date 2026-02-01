@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageCircle,
   Users,
@@ -28,11 +28,11 @@ import {
   Archive,
   AlertTriangle,
   Ticket,
-} from 'lucide-react';
-import EmojiPicker from '@/components/chat/EmojiPicker';
-import { formatDistanceToNow, format } from 'date-fns';
-import { toast } from 'sonner';
-import { useWebSocket } from '@/hooks/useWebSocket';
+} from "lucide-react";
+import EmojiPicker from "@/components/chat/EmojiPicker";
+import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface Session {
   user: {
@@ -49,7 +49,7 @@ interface MessagingClientProps {
 
 interface Conversation {
   id: string;
-  type: 'user-to-user' | 'user-to-support';
+  type: "user-to-user" | "user-to-support";
   status: string;
   // Ticket system fields
   ticketNumber?: number;
@@ -123,34 +123,44 @@ interface BlockedUser {
   name: string;
   avatar?: string;
   blockedAt: string;
-  type: 'user' | 'friend';
+  type: "user" | "friend";
 }
 
 export default function MessagingClient({ session }: MessagingClientProps) {
-  const [activeTab, setActiveTab] = useState<'chats' | 'friends' | 'requests' | 'blocked'>('chats');
+  const [activeTab, setActiveTab] = useState<
+    "chats" | "friends" | "requests" | "blocked"
+  >("chats");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [friendRequests, setFriendRequests] = useState<{ received: FriendRequest[]; sent: FriendRequest[] }>({ received: [], sent: [] });
+  const [friendRequests, setFriendRequests] = useState<{
+    received: FriendRequest[];
+    sent: FriendRequest[];
+  }>({ received: [], sent: [] });
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
-  const [messageInput, setMessageInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [messageInput, setMessageInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [unreadTotal, setUnreadTotal] = useState(0);
-  const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(null);
-  const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
+  const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(
+    null,
+  );
+  const [typingUsers, setTypingUsers] = useState<
+    Map<string, { name: string; timestamp: number }>
+  >(new Map());
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [supportTickets, setSupportTickets] = useState<Conversation[]>([]);
   const [showNewTicketConfirm, setShowNewTicketConfirm] = useState(false);
   const [friendMenuOpen, setFriendMenuOpen] = useState<string | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -160,199 +170,232 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
 
   // WebSocket for real-time messaging
-  const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
-    switch (message.type) {
-      case 'new_message':
-        if (message.data.conversationId === selectedConversation?.id) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === message.data.message.id)) {
-              return prev;
-            }
-            return [...prev, message.data.message];
-          });
-          
-          // Only scroll if user is at bottom
-          if (isUserAtBottomRef.current) {
-            setTimeout(() => scrollToBottom(), 100);
-          }
-        }
-        fetchConversations();
-        break;
-        
-      case 'typing':
-        if (message.data.conversationId === selectedConversation?.id) {
-          if (message.data.isTyping && message.data.participantId !== session.user.id) {
-            setTypingUsers(prev => {
-              const newMap = new Map(prev);
-              newMap.set(message.data.participantId, {
-                name: message.data.participantName,
-                timestamp: Date.now(),
-              });
-              return newMap;
-            });
-          } else {
-            setTypingUsers(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(message.data.participantId);
-              return newMap;
-            });
-          }
-        }
-        break;
-        
-      case 'read_receipt':
-        if (message.data.conversationId === selectedConversation?.id) {
-          setMessages(prev => prev.map(m => ({
-            ...m,
-            readBy: [...(m.readBy || []), { 
-              participantId: message.data.participantId, 
-              readAt: message.data.readAt 
-            }]
-          })));
-        }
-        break;
-        
-      case 'friend_request':
-        fetchFriendRequests();
-        break;
-        
-      case 'presence':
-        break;
-        
-      case 'chat_transferred':
-        // Handle chat transfer - update conversation state
-        if (message.data?.conversationId) {
-          const transferData = message.data;
-          // Update conversations list
-          setConversations(prev => prev.map(c => {
-            if (c.id === transferData.conversationId) {
-              return {
-                ...c,
-                assignedEmployeeName: transferData.assignedEmployeeName,
-              };
-            }
-            return c;
-          }));
-          // Update selected conversation if it's the one being transferred
-          if (selectedConversation?.id === transferData.conversationId) {
-            setSelectedConversation(prev => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                assignedEmployeeName: transferData.assignedEmployeeName,
-              };
-            });
-            // Also refresh conversation and agent data
-            fetchConversations();
-          }
-        }
-        break;
-        
-      case 'profile_updated':
-        // Handle profile update from another user - refetch friends and conversations
-        if (message.data?.userId) {
-          console.log(`🔄 Profile updated for user ${message.data.userId}, refreshing data...`);
-          
-          // Update friends list with new data
-          setFriends(prev => prev.map(friend => {
-            if (friend.friendId === message.data.userId) {
-              return {
-                ...friend,
-                friendName: message.data.name ?? friend.friendName,
-                friendAvatar: message.data.avatar ?? friend.friendAvatar,
-              };
-            }
-            return friend;
-          }));
-          
-          // Update conversations list with new participant data
-          setConversations(prev => prev.map(conv => {
-            const updatedParticipants = conv.participants.map(p => {
-              if (p.id === message.data.userId) {
-                return {
-                  ...p,
-                  name: message.data.name ?? p.name,
-                  avatar: message.data.avatar ?? p.avatar,
-                };
+  const handleWebSocketMessage = useCallback(
+    (message: { type: string; data: any }) => {
+      switch (message.type) {
+        case "new_message":
+          if (message.data.conversationId === selectedConversation?.id) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === message.data.message.id)) {
+                return prev;
               }
-              return p;
+              return [...prev, message.data.message];
             });
-            
-            // Update lastMessage sender name if applicable
-            const updatedLastMessage = conv.lastMessage?.senderId === message.data.userId
-              ? { ...conv.lastMessage, senderName: message.data.name ?? conv.lastMessage.senderName }
-              : conv.lastMessage;
-            
-            return {
-              ...conv,
-              participants: updatedParticipants,
-              lastMessage: updatedLastMessage,
-            };
-          }));
-          
-          // Update selected conversation if applicable
-          if (selectedConversation) {
-            setSelectedConversation(prev => {
-              if (!prev) return prev;
-              const updatedParticipants = prev.participants.map(p => {
-                if (p.id === message.data.userId) {
+
+            // Only scroll if user is at bottom
+            if (isUserAtBottomRef.current) {
+              setTimeout(() => scrollToBottom(), 100);
+            }
+          }
+          fetchConversations();
+          break;
+
+        case "typing":
+          if (message.data.conversationId === selectedConversation?.id) {
+            if (
+              message.data.isTyping &&
+              message.data.participantId !== session.user.id
+            ) {
+              setTypingUsers((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(message.data.participantId, {
+                  name: message.data.participantName,
+                  timestamp: Date.now(),
+                });
+                return newMap;
+              });
+            } else {
+              setTypingUsers((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(message.data.participantId);
+                return newMap;
+              });
+            }
+          }
+          break;
+
+        case "read_receipt":
+          if (message.data.conversationId === selectedConversation?.id) {
+            setMessages((prev) =>
+              prev.map((m) => ({
+                ...m,
+                readBy: [
+                  ...(m.readBy || []),
+                  {
+                    participantId: message.data.participantId,
+                    readAt: message.data.readAt,
+                  },
+                ],
+              })),
+            );
+          }
+          break;
+
+        case "friend_request":
+          fetchFriendRequests();
+          break;
+
+        case "presence":
+          break;
+
+        case "chat_transferred":
+          // Handle chat transfer - update conversation state
+          if (message.data?.conversationId) {
+            const transferData = message.data;
+            // Update conversations list
+            setConversations((prev) =>
+              prev.map((c) => {
+                if (c.id === transferData.conversationId) {
                   return {
-                    ...p,
-                    name: message.data.name ?? p.name,
-                    avatar: message.data.avatar ?? p.avatar,
+                    ...c,
+                    assignedEmployeeName: transferData.assignedEmployeeName,
                   };
                 }
-                return p;
+                return c;
+              }),
+            );
+            // Update selected conversation if it's the one being transferred
+            if (selectedConversation?.id === transferData.conversationId) {
+              setSelectedConversation((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  assignedEmployeeName: transferData.assignedEmployeeName,
+                };
               });
-              return {
-                ...prev,
-                participants: updatedParticipants,
-              };
-            });
-          }
-          
-          // Update messages in current conversation
-          setMessages(prev => prev.map(msg => {
-            if (msg.senderId === message.data.userId) {
-              return {
-                ...msg,
-                senderName: message.data.name ?? msg.senderName,
-                senderAvatar: message.data.avatar ?? msg.senderAvatar,
-              };
+              // Also refresh conversation and agent data
+              fetchConversations();
             }
-            return msg;
-          }));
-          
-          // Update friend requests
-          setFriendRequests(prev => ({
-            received: prev.received.map(req => {
-              if (req.fromUserId === message.data.userId) {
-                return {
-                  ...req,
-                  fromUserName: message.data.name ?? req.fromUserName,
-                  fromUserAvatar: message.data.avatar ?? req.fromUserAvatar,
-                };
-              }
-              return req;
-            }),
-            sent: prev.sent.map(req => {
-              if (req.toUserId === message.data.userId) {
-                return {
-                  ...req,
-                  toUserName: message.data.name ?? req.toUserName,
-                };
-              }
-              return req;
-            }),
-          }));
-        }
-        break;
-    }
-  }, [selectedConversation?.id, session.user.id]);
+          }
+          break;
 
-  const { 
-    isConnected: wsConnected, 
-    subscribe: wsSubscribe, 
+        case "profile_updated":
+          // Handle profile update from another user - refetch friends and conversations
+          if (message.data?.userId) {
+            console.log(
+              `🔄 Profile updated for user ${message.data.userId}, refreshing data...`,
+            );
+
+            // Update friends list with new data
+            setFriends((prev) =>
+              prev.map((friend) => {
+                if (friend.friendId === message.data.userId) {
+                  return {
+                    ...friend,
+                    friendName: message.data.name ?? friend.friendName,
+                    friendAvatar: message.data.avatar ?? friend.friendAvatar,
+                  };
+                }
+                return friend;
+              }),
+            );
+
+            // Update conversations list with new participant data
+            setConversations((prev) =>
+              prev.map((conv) => {
+                const updatedParticipants = conv.participants.map((p) => {
+                  if (p.id === message.data.userId) {
+                    return {
+                      id: p.id,
+                      type: p.type,
+                      isActive: p.isActive,
+                      name: message.data.name ?? p.name,
+                      avatar: message.data.avatar ?? p.avatar,
+                    };
+                  }
+                  return p;
+                });
+
+                // Update lastMessage sender name if applicable
+                const updatedLastMessage =
+                  conv.lastMessage?.senderId === message.data.userId &&
+                  conv.lastMessage
+                    ? {
+                        content: conv.lastMessage.content,
+                        senderId: conv.lastMessage.senderId,
+                        senderName:
+                          message.data.name ?? conv.lastMessage.senderName,
+                        timestamp: conv.lastMessage.timestamp,
+                      }
+                    : conv.lastMessage;
+
+                return {
+                  ...conv,
+                  participants: updatedParticipants,
+                  lastMessage: updatedLastMessage,
+                };
+              }),
+            );
+
+            // Update selected conversation if applicable
+            if (selectedConversation) {
+              setSelectedConversation((prev) => {
+                if (!prev) return prev;
+                const updatedParticipants = prev.participants.map((p) => {
+                  if (p.id === message.data.userId) {
+                    return {
+                      id: p.id,
+                      type: p.type,
+                      isActive: p.isActive,
+                      name: message.data.name ?? p.name,
+                      avatar: message.data.avatar ?? p.avatar,
+                    };
+                  }
+                  return p;
+                });
+                return {
+                  ...prev,
+                  participants: updatedParticipants,
+                };
+              });
+            }
+
+            // Update messages in current conversation
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.senderId === message.data.userId) {
+                  return {
+                    ...msg,
+                    senderName: message.data.name ?? msg.senderName,
+                    senderAvatar: message.data.avatar ?? msg.senderAvatar,
+                  };
+                }
+                return msg;
+              }),
+            );
+
+            // Update friend requests
+            setFriendRequests((prev) => ({
+              received: prev.received.map((req) => {
+                if (req.fromUserId === message.data.userId) {
+                  return {
+                    ...req,
+                    fromUserName: message.data.name ?? req.fromUserName,
+                    fromUserAvatar: message.data.avatar ?? req.fromUserAvatar,
+                  };
+                }
+                return req;
+              }),
+              sent: prev.sent.map((req) => {
+                if (req.toUserId === message.data.userId) {
+                  return {
+                    ...req,
+                    toUserName: message.data.name ?? req.toUserName,
+                  };
+                }
+                return req;
+              }),
+            }));
+          }
+          break;
+      }
+    },
+    [selectedConversation?.id, session.user.id],
+  );
+
+  const {
+    isConnected: wsConnected,
+    subscribe: wsSubscribe,
     unsubscribe: wsUnsubscribe,
     setTyping: wsSetTyping,
   } = useWebSocket({
@@ -373,7 +416,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Clear stale typing indicators
   useEffect(() => {
     const interval = setInterval(() => {
-      setTypingUsers(prev => {
+      setTypingUsers((prev) => {
         const now = Date.now();
         const newMap = new Map(prev);
         for (const [id, data] of newMap) {
@@ -391,7 +434,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = container;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
     isUserAtBottomRef.current = isAtBottom;
@@ -400,7 +443,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Scroll to bottom helper
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     isUserAtBottomRef.current = true;
     setShowScrollButton(false);
   }, []);
@@ -408,7 +451,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch assigned account manager
   const fetchAssignedAgent = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/assigned-support');
+      const response = await fetch("/api/messaging/assigned-support");
       if (response.ok) {
         const data = await response.json();
         setAssignedAgent(data.agent);
@@ -421,13 +464,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch support ticket history
   const fetchSupportTickets = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/support/history');
+      const response = await fetch("/api/messaging/support/history");
       if (response.ok) {
         const data = await response.json();
         // Map tickets to conversation format
         const tickets = data.tickets.map((t: any) => ({
           id: t.id,
-          type: 'user-to-support' as const,
+          type: "user-to-support" as const,
           status: t.status,
           ticketNumber: t.ticketNumber,
           isArchived: t.isArchived || t.isResolved,
@@ -450,11 +493,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/conversations');
+      const response = await fetch("/api/messaging/conversations");
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations);
-        setUnreadTotal(data.conversations.reduce((sum: number, c: Conversation) => sum + c.unreadCount, 0));
+        setUnreadTotal(
+          data.conversations.reduce(
+            (sum: number, c: Conversation) => sum + c.unreadCount,
+            0,
+          ),
+        );
       }
     } catch {
       // Silent fail
@@ -464,7 +512,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch friends
   const fetchFriends = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/friends');
+      const response = await fetch("/api/messaging/friends");
       if (response.ok) {
         const data = await response.json();
         setFriends(data.friends);
@@ -477,7 +525,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch friend requests
   const fetchFriendRequests = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/friends/requests');
+      const response = await fetch("/api/messaging/friends/requests");
       if (response.ok) {
         const data = await response.json();
         setFriendRequests(data);
@@ -490,7 +538,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch blocked users
   const fetchBlockedUsers = useCallback(async () => {
     try {
-      const response = await fetch('/api/messaging/blocked');
+      const response = await fetch("/api/messaging/blocked");
       if (response.ok) {
         const data = await response.json();
         setBlockedUsers(data.blockedUsers);
@@ -502,41 +550,49 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Unfriend a user
   const unfriendUser = async (friendId: string, friendName: string) => {
-    if (!confirm(`Are you sure you want to remove ${friendName} from your friends?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to remove ${friendName} from your friends?`,
+      )
+    ) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/messaging/friends/${friendId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
-      
+
       if (response.ok) {
         toast.success(`${friendName} has been removed from your friends`);
         fetchFriends();
         setFriendMenuOpen(null);
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to unfriend');
+        toast.error(data.error || "Failed to unfriend");
       }
     } catch {
-      toast.error('Network error');
+      toast.error("Network error");
     }
   };
 
   // Block a user
   const blockUser = async (userId: string, userName: string) => {
-    if (!confirm(`Are you sure you want to block ${userName}? They won't be able to send you messages or friend requests.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to block ${userName}? They won't be able to send you messages or friend requests.`,
+      )
+    ) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/messaging/friends/${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'block' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "block" }),
       });
-      
+
       if (response.ok) {
         toast.success(`${userName} has been blocked`);
         fetchFriends();
@@ -544,10 +600,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         setFriendMenuOpen(null);
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to block');
+        toast.error(data.error || "Failed to block");
       }
     } catch {
-      toast.error('Network error');
+      toast.error("Network error");
     }
   };
 
@@ -555,43 +611,50 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const unblockUser = async (userId: string, userName: string) => {
     try {
       const response = await fetch(`/api/messaging/friends/${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'unblock' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unblock" }),
       });
-      
+
       if (response.ok) {
         toast.success(`${userName} has been unblocked`);
         fetchBlockedUsers();
         fetchFriends();
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to unblock');
+        toast.error(data.error || "Failed to unblock");
       }
     } catch {
-      toast.error('Network error');
+      toast.error("Network error");
     }
   };
 
   // Fetch messages for selected conversation
-  const fetchMessages = useCallback(async (conversationId: string, isInitial: boolean = false) => {
-    try {
-      const response = await fetch(`/api/messaging/conversations/${conversationId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.messages || []);
-        
-        // Only scroll to bottom on initial conversation load, not on refresh/poll
-        if (isInitial) {
-          setTimeout(() => scrollToBottom(), 100);
+  const fetchMessages = useCallback(
+    async (conversationId: string, isInitial: boolean = false) => {
+      try {
+        const response = await fetch(
+          `/api/messaging/conversations/${conversationId}`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setMessages(data.messages || []);
+
+          // Only scroll to bottom on initial conversation load, not on refresh/poll
+          if (isInitial) {
+            setTimeout(() => scrollToBottom(), 100);
+          }
+
+          fetch(`/api/messaging/conversations/${conversationId}/read`, {
+            method: "POST",
+          });
         }
-        
-        fetch(`/api/messaging/conversations/${conversationId}/read`, { method: 'POST' });
+      } catch {
+        // Silent fail
       }
-    } catch {
-      // Silent fail
-    }
-  }, [scrollToBottom]);
+    },
+    [scrollToBottom],
+  );
 
   // Search users
   const searchUsers = useCallback(async (query: string) => {
@@ -599,10 +662,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       setSearchResults([]);
       return;
     }
-    
+
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/messaging/search/users?q=${encodeURIComponent(query)}`);
+      const response = await fetch(
+        `/api/messaging/search/users?q=${encodeURIComponent(query)}`,
+      );
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.users || []);
@@ -617,12 +682,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Send friend request
   const sendFriendRequest = async (toUserId: string) => {
     try {
-      const response = await fetch('/api/messaging/friends/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/messaging/friends/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ toUserId }),
       });
-      
+
       if (response.ok) {
         // Refresh friend requests
         fetchFriendRequests();
@@ -630,65 +695,71 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         if (searchQuery) searchUsers(searchQuery);
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to send friend request');
+        alert(data.error || "Failed to send friend request");
       }
     } catch {
-      alert('Network error');
+      alert("Network error");
     }
   };
 
   // Accept friend request
   const acceptFriendRequest = async (requestId: string) => {
     try {
-      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'accept' }),
-      });
-      
+      const response = await fetch(
+        `/api/messaging/friends/requests/${requestId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "accept" }),
+        },
+      );
+
       if (response.ok) {
         // Refresh friends and requests
         fetchFriends();
         fetchFriendRequests();
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to accept request');
+        alert(data.error || "Failed to accept request");
       }
     } catch {
-      alert('Network error');
+      alert("Network error");
     }
   };
 
   // Decline friend request
   const declineFriendRequest = async (requestId: string) => {
     try {
-      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'decline' }),
-      });
-      
+      const response = await fetch(
+        `/api/messaging/friends/requests/${requestId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "decline" }),
+        },
+      );
+
       if (response.ok) {
         // Refresh requests
         fetchFriendRequests();
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to decline request');
+        alert(data.error || "Failed to decline request");
       }
     } catch {
-      alert('Network error');
+      alert("Network error");
     }
   };
 
   // Start conversation with a friend
   const startConversationWithFriend = async (friendId: string) => {
     try {
-      const response = await fetch('/api/messaging/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/messaging/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ participantId: friendId }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         // Refresh conversations and select the new one
@@ -699,16 +770,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             id: data.conversation.id || data.conversation._id,
           };
           setSelectedConversation(conv);
-          setActiveTab('chats');
+          setActiveTab("chats");
           setShowMobileChat(true);
           fetchMessages(conv.id, true);
         }
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to start conversation');
+        alert(data.error || "Failed to start conversation");
       }
     } catch {
-      alert('Network error');
+      alert("Network error");
     }
   };
 
@@ -718,61 +789,62 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
     const messageContent = messageInput.trim();
     setIsSending(true);
-    setMessageInput('');
-    
+    setMessageInput("");
+
     try {
-      const endpoint = selectedConversation.type === 'user-to-support'
-        ? '/api/messaging/support'
-        : `/api/messaging/conversations/${selectedConversation.id}/messages`;
-      
+      const endpoint =
+        selectedConversation.type === "user-to-support"
+          ? "/api/messaging/support"
+          : `/api/messaging/conversations/${selectedConversation.id}/messages`;
+
       const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: messageContent }),
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         if (data.message) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === data.message.id)) return prev;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === data.message.id)) return prev;
             return [...prev, data.message];
           });
         }
         scrollToBottom();
-        
+
         if (data.aiResponse) {
           setTimeout(() => {
-            setMessages(prev => {
-              if (prev.some(m => m.id === data.aiResponse.id)) return prev;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === data.aiResponse.id)) return prev;
               return [...prev, data.aiResponse];
             });
             scrollToBottom();
           }, 800);
         }
-        
+
         fetchConversations();
       } else {
         setMessageInput(messageContent);
-        alert(data.error || 'Failed to send message');
+        alert(data.error || "Failed to send message");
       }
-    } catch (error) {
+    } catch (_error) {
       setMessageInput(messageContent);
-      alert('Network error');
+      alert("Network error");
     } finally {
       setIsSending(false);
     }
   };
 
   // Check if there's an active (non-archived) support conversation
-  const hasActiveTicket = supportTickets.some(t => !t.isArchived);
-  const activeTicket = supportTickets.find(t => !t.isArchived);
+  const hasActiveTicket = supportTickets.some((t) => !t.isArchived);
+  const activeTicket = supportTickets.find((t) => !t.isArchived);
 
   // Start support conversation (opens active one or creates new)
   const startSupportConversation = async () => {
     try {
-      const response = await fetch('/api/messaging/support');
+      const response = await fetch("/api/messaging/support");
       if (response.ok) {
         const data = await response.json();
         setSelectedConversation(data.conversation);
@@ -781,10 +853,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         await Promise.all([fetchConversations(), fetchSupportTickets()]);
         setTimeout(() => scrollToBottom(), 100);
       } else {
-        alert('Failed to start support conversation');
+        alert("Failed to start support conversation");
       }
-    } catch (error) {
-      alert('Error connecting to support');
+    } catch (_error) {
+      alert("Error connecting to support");
     }
   };
 
@@ -800,17 +872,17 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Create new ticket (after confirmation)
   const createNewTicket = async () => {
     setShowNewTicketConfirm(false);
-    
+
     // First, we need to resolve the current active ticket by sending it to the server
     // The server's getOrCreateSupportConversation will create a new one if current is resolved
     if (activeTicket) {
       try {
         // Mark current as needing new ticket (server will handle this)
         const response = await fetch(`/api/messaging/support/new-ticket`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           setSelectedConversation(data.conversation);
@@ -819,10 +891,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
           await Promise.all([fetchConversations(), fetchSupportTickets()]);
           setTimeout(() => scrollToBottom(), 100);
         } else {
-          alert('Failed to create new ticket');
+          alert("Failed to create new ticket");
         }
-      } catch (error) {
-        alert('Error creating new ticket');
+      } catch (_error) {
+        alert("Error creating new ticket");
       }
     }
   };
@@ -834,52 +906,63 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       if (response.ok) {
         const data = await response.json();
         // Find the ticket in our list to get any local metadata (fallback)
-        const ticket = supportTickets.find(t => t.id === ticketId);
-        
+        const ticket = supportTickets.find((t) => t.id === ticketId);
+
         // Prefer API data, fallback to local ticket data
         setSelectedConversation({
           ...data.conversation,
           ticketNumber: data.conversation.ticketNumber || ticket?.ticketNumber,
-          isArchived: data.conversation.isArchived || data.conversation.isResolved || ticket?.isArchived,
+          isArchived:
+            data.conversation.isArchived ||
+            data.conversation.isResolved ||
+            ticket?.isArchived,
           archivedAt: data.conversation.archivedAt || ticket?.archivedAt,
-          resolvedByName: data.conversation.resolvedByName || ticket?.resolvedByName,
+          resolvedByName:
+            data.conversation.resolvedByName || ticket?.resolvedByName,
         });
         setMessages(data.messages || []);
         setShowMobileChat(true);
         setTimeout(() => scrollToBottom(), 100);
       } else {
-        alert('Could not load conversation. Please try again.');
+        alert("Could not load conversation. Please try again.");
       }
     } catch {
-      alert('Error loading conversation');
+      alert("Error loading conversation");
     }
   };
 
   // Clear conversation history (messages only)
   const clearConversation = async () => {
     if (!selectedConversation) return;
-    
-    if (!confirm('Are you sure you want to clear the chat history? This action cannot be undone.')) {
+
+    if (
+      !confirm(
+        "Are you sure you want to clear the chat history? This action cannot be undone.",
+      )
+    ) {
       return;
     }
-    
+
     setIsClearing(true);
     setShowChatMenu(false);
-    
+
     try {
-      const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/clear`, {
-        method: 'POST',
-      });
-      
+      const response = await fetch(
+        `/api/messaging/conversations/${selectedConversation.id}/clear`,
+        {
+          method: "POST",
+        },
+      );
+
       if (response.ok) {
         // Refresh messages
         await fetchMessages(selectedConversation.id, true);
         await fetchConversations();
       } else {
-        alert('Failed to clear conversation');
+        alert("Failed to clear conversation");
       }
     } catch {
-      alert('Error clearing conversation');
+      alert("Error clearing conversation");
     } finally {
       setIsClearing(false);
     }
@@ -888,30 +971,37 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Delete conversation (remove from user's view entirely)
   const deleteConversation = async () => {
     if (!selectedConversation) return;
-    
-    if (!confirm('Are you sure you want to delete this conversation? It will be removed from your list.')) {
+
+    if (
+      !confirm(
+        "Are you sure you want to delete this conversation? It will be removed from your list.",
+      )
+    ) {
       return;
     }
-    
+
     setIsClearing(true);
     setShowChatMenu(false);
-    
+
     try {
-      const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/delete`, {
-        method: 'DELETE',
-      });
-      
+      const response = await fetch(
+        `/api/messaging/conversations/${selectedConversation.id}/delete`,
+        {
+          method: "DELETE",
+        },
+      );
+
       if (response.ok) {
-        toast.success('Conversation deleted');
+        toast.success("Conversation deleted");
         setSelectedConversation(null);
         setMessages([]);
         await fetchConversations();
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to delete conversation');
+        toast.error(data.error || "Failed to delete conversation");
       }
     } catch {
-      toast.error('Error deleting conversation');
+      toast.error("Error deleting conversation");
     } finally {
       setIsClearing(false);
     }
@@ -919,19 +1009,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Handle emoji selection
   const handleEmojiSelect = (emoji: string) => {
-    setMessageInput(prev => prev + emoji);
+    setMessageInput((prev) => prev + emoji);
     messageInputRef.current?.focus();
   };
 
   // Close chat menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (chatMenuRef.current && !chatMenuRef.current.contains(event.target as Node)) {
+      if (
+        chatMenuRef.current &&
+        !chatMenuRef.current.contains(event.target as Node)
+      ) {
         setShowChatMenu(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Initial data fetch
@@ -949,15 +1042,25 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchBlockedUsers, fetchAssignedAgent, fetchSupportTickets]);
+  }, [
+    fetchConversations,
+    fetchFriends,
+    fetchFriendRequests,
+    fetchBlockedUsers,
+    fetchAssignedAgent,
+    fetchSupportTickets,
+  ]);
 
   // Track selected conversation ID
   const selectedConversationIdRef = useRef<string | null>(null);
   const lastMessageFetchRef = useRef<number>(0);
-  
+
   useEffect(() => {
     const conversationId = selectedConversation?.id;
-    if (conversationId && conversationId !== selectedConversationIdRef.current) {
+    if (
+      conversationId &&
+      conversationId !== selectedConversationIdRef.current
+    ) {
       selectedConversationIdRef.current = conversationId;
       lastMessageFetchRef.current = Date.now();
       fetchMessages(conversationId, true); // Initial load - scroll to bottom
@@ -967,11 +1070,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Poll for new messages (fallback when WebSocket not connected)
   useEffect(() => {
     if (wsConnected) return;
-    
+
     const interval = setInterval(() => {
       const timeSinceLastFetch = Date.now() - lastMessageFetchRef.current;
       if (timeSinceLastFetch < 3000) return;
-      
+
       fetchConversations();
       if (selectedConversation) {
         lastMessageFetchRef.current = Date.now();
@@ -980,7 +1083,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [selectedConversation?.id, fetchConversations, fetchMessages, wsConnected]);
+  }, [
+    selectedConversation?.id,
+    fetchConversations,
+    fetchMessages,
+    wsConnected,
+  ]);
 
   // Search debounce
   useEffect(() => {
@@ -992,42 +1100,47 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Helper functions
   const getConversationName = (conv: Conversation) => {
-    if (conv.type === 'user-to-support') {
-      return conv.isAIHandled ? 'AI Support' : conv.assignedEmployeeName || 'Support';
+    if (conv.type === "user-to-support") {
+      return conv.isAIHandled
+        ? "AI Support"
+        : conv.assignedEmployeeName || "Support";
     }
-    const other = conv.participants.find(p => p.id !== session.user.id);
-    return other?.name || 'Unknown';
+    const other = conv.participants.find((p) => p.id !== session.user.id);
+    return other?.name || "Unknown";
   };
 
   const getConversationAvatar = (conv: Conversation) => {
-    if (conv.type === 'user-to-support') return null;
-    const other = conv.participants.find(p => p.id !== session.user.id);
+    if (conv.type === "user-to-support") return null;
+    const other = conv.participants.find((p) => p.id !== session.user.id);
     return other?.avatar;
   };
 
   const isOwnMessage = (msg: Message) => msg.senderId === session.user.id;
 
   const getMessageStatus = (msg: Message) => {
-    if (msg.readBy && msg.readBy.some(r => r.participantId !== session.user.id)) {
+    if (
+      msg.readBy &&
+      msg.readBy.some((r) => r.participantId !== session.user.id)
+    ) {
       return <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />;
     }
     return <Check className="w-3.5 h-3.5 text-gray-400" />;
   };
 
   const formatMessageTime = (date: string) => {
-    return format(new Date(date), 'HH:mm');
+    return format(new Date(date), "HH:mm");
   };
 
   const formatConversationTime = (date: string) => {
     const d = new Date(date);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
-    
-    if (diff < 60000) return 'now';
+
+    if (diff < 60000) return "now";
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    if (diff < 86400000) return format(d, 'HH:mm');
-    if (diff < 604800000) return format(d, 'EEE');
-    return format(d, 'dd/MM');
+    if (diff < 86400000) return format(d, "HH:mm");
+    if (diff < 604800000) return format(d, "EEE");
+    return format(d, "dd/MM");
   };
 
   if (isLoading) {
@@ -1047,7 +1160,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-[#0a0a0f]">
       {/* Sidebar */}
-      <div className={`w-full md:w-[380px] bg-[#0d0d14] border-r border-white/5 flex flex-col ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+      <div
+        className={`w-full md:w-[380px] bg-[#0d0d14] border-r border-white/5 flex flex-col ${showMobileChat ? "hidden md:flex" : "flex"}`}
+      >
         {/* Header */}
         <div className="p-5 border-b border-white/5">
           <div className="flex items-center justify-between mb-5">
@@ -1058,8 +1173,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <div>
                 <h1 className="text-lg font-bold text-white">Messages</h1>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                  {wsConnected ? 'Connected' : 'Connecting...'}
+                  <span
+                    className={`w-2 h-2 rounded-full ${wsConnected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+                  />
+                  {wsConnected ? "Connected" : "Connecting..."}
                 </div>
               </div>
             </div>
@@ -1080,7 +1197,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 <div className="relative">
                   <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
                     {assignedAgent.avatar ? (
-                      <img src={assignedAgent.avatar} alt="" className="w-14 h-14 rounded-2xl object-cover" />
+                      <img
+                        src={assignedAgent.avatar}
+                        alt=""
+                        className="w-14 h-14 rounded-2xl object-cover"
+                      />
                     ) : (
                       <UserCircle className="w-8 h-8 text-white" />
                     )}
@@ -1090,20 +1211,26 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   </div>
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">Your Account Manager</p>
-                  <p className="text-white font-semibold text-base">{assignedAgent.name}</p>
+                  <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">
+                    Your Account Manager
+                  </p>
+                  <p className="text-white font-semibold text-base">
+                    {assignedAgent.name}
+                  </p>
                   <p className="text-gray-400 text-xs">{assignedAgent.role}</p>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
                     <MessageCircle className="w-5 h-5 text-cyan-400" />
                   </div>
-                  <span className="text-[9px] text-cyan-400 font-medium">CHAT</span>
+                  <span className="text-[9px] text-cyan-400 font-medium">
+                    CHAT
+                  </span>
                 </div>
               </div>
             </button>
           )}
-          
+
           {/* Support Button (no assigned agent) */}
           {!assignedAgent && (
             <button
@@ -1123,23 +1250,23 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
           {/* Tabs */}
           <div className="flex bg-white/5 rounded-xl p-1">
-            {['chats', 'friends', 'requests', 'blocked'].map((tab) => (
+            {["chats", "friends", "requests", "blocked"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
                 className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all relative ${
-                  activeTab === tab 
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25' 
-                    : 'text-gray-400 hover:text-white'
+                  activeTab === tab
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
+                    : "text-gray-400 hover:text-white"
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                {tab === 'requests' && friendRequests.received.length > 0 && (
+                {tab === "requests" && friendRequests.received.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                     {friendRequests.received.length}
                   </span>
                 )}
-                {tab === 'blocked' && blockedUsers.length > 0 && (
+                {tab === "blocked" && blockedUsers.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-gray-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                     {blockedUsers.length}
                   </span>
@@ -1151,7 +1278,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
-          {activeTab === 'chats' && (
+          {activeTab === "chats" && (
             <>
               {/* Support Tickets Section */}
               {supportTickets.length > 0 && (
@@ -1177,17 +1304,21 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           key={ticket.id}
                           onClick={() => viewTicket(ticket.id)}
                           className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${
-                            selectedConversation?.id === ticket.id ? 'bg-white/5' : ''
-                          } ${isArchived ? 'opacity-60' : ''}`}
+                            selectedConversation?.id === ticket.id
+                              ? "bg-white/5"
+                              : ""
+                          } ${isArchived ? "opacity-60" : ""}`}
                         >
                           <div className="relative">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                              isArchived 
-                                ? 'bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30'
-                                : ticket.isAIHandled 
-                                  ? 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30'
-                                  : 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30'
-                            }`}>
+                            <div
+                              className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                                isArchived
+                                  ? "bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30"
+                                  : ticket.isAIHandled
+                                    ? "bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30"
+                                    : "bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30"
+                              }`}
+                            >
                               {isArchived ? (
                                 <Archive className="w-6 h-6 text-gray-400" />
                               ) : ticket.isAIHandled ? (
@@ -1205,15 +1336,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           <div className="flex-1 min-w-0 text-left">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className={`font-semibold truncate ${isArchived ? 'text-gray-400' : 'text-gray-300'}`}>
-                                  {ticket.assignedEmployeeName || (ticket.isAIHandled ? 'AI Support' : 'Support')}
+                                <span
+                                  className={`font-semibold truncate ${isArchived ? "text-gray-400" : "text-gray-300"}`}
+                                >
+                                  {ticket.assignedEmployeeName ||
+                                    (ticket.isAIHandled
+                                      ? "AI Support"
+                                      : "Support")}
                                 </span>
                                 {ticket.ticketNumber && (
-                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                                    isArchived
-                                      ? 'bg-gray-500/20 text-gray-500'
-                                      : 'bg-cyan-500/20 text-cyan-400'
-                                  }`}>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                      isArchived
+                                        ? "bg-gray-500/20 text-gray-500"
+                                        : "bg-cyan-500/20 text-cyan-400"
+                                    }`}
+                                  >
                                     #{ticket.ticketNumber}
                                   </span>
                                 )}
@@ -1224,11 +1362,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                 )}
                               </div>
                               <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                                {ticket.lastMessage?.timestamp && formatConversationTime(ticket.lastMessage.timestamp)}
+                                {ticket.lastMessage?.timestamp &&
+                                  formatConversationTime(
+                                    ticket.lastMessage.timestamp,
+                                  )}
                               </span>
                             </div>
-                            <p className={`text-sm truncate ${isArchived ? 'text-gray-500' : 'text-gray-400'}`}>
-                              {ticket.lastMessage?.content || 'No messages yet'}
+                            <p
+                              className={`text-sm truncate ${isArchived ? "text-gray-500" : "text-gray-400"}`}
+                            >
+                              {ticket.lastMessage?.content || "No messages yet"}
                             </p>
                           </div>
                         </button>
@@ -1237,7 +1380,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   </div>
                 </div>
               )}
-              
+
               {/* Start Support Button (when no tickets) */}
               {supportTickets.length === 0 && (
                 <div className="p-4 border-b border-white/5">
@@ -1249,8 +1392,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                       <Headphones className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-white font-semibold">Start Support Conversation</p>
-                      <p className="text-gray-400 text-sm">Get help from our team</p>
+                      <p className="text-white font-semibold">
+                        Start Support Conversation
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        Get help from our team
+                      </p>
                     </div>
                     <Plus className="w-5 h-5 text-cyan-400" />
                   </button>
@@ -1258,7 +1405,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               )}
 
               {/* Other Conversations (user-to-user) */}
-              {conversations.filter(c => c.type !== 'user-to-support').length > 0 && (
+              {conversations.filter((c) => c.type !== "user-to-support")
+                .length > 0 && (
                 <div>
                   <div className="px-4 py-3 bg-white/[0.02]">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -1266,67 +1414,86 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     </span>
                   </div>
                   <div className="divide-y divide-white/5">
-                    {conversations.filter(c => c.type !== 'user-to-support').map((conv) => (
-                      <button
-                        key={conv.id}
-                        onClick={async () => {
-                          setSelectedConversation(conv);
-                          setShowMobileChat(true);
-                          lastMessageFetchRef.current = Date.now();
-                          await fetchMessages(conv.id, true);
-                        }}
-                        className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${
-                          selectedConversation?.id === conv.id ? 'bg-white/5' : ''
-                        }`}
-                      >
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30">
-                            {getConversationAvatar(conv) ? (
-                              <img src={getConversationAvatar(conv)!} alt="" className="w-12 h-12 rounded-2xl object-cover" />
-                            ) : (
-                              <span className="text-white font-semibold text-lg">
-                                {getConversationName(conv).charAt(0)}
-                              </span>
+                    {conversations
+                      .filter((c) => c.type !== "user-to-support")
+                      .map((conv) => (
+                        <button
+                          key={conv.id}
+                          onClick={async () => {
+                            setSelectedConversation(conv);
+                            setShowMobileChat(true);
+                            lastMessageFetchRef.current = Date.now();
+                            await fetchMessages(conv.id, true);
+                          }}
+                          className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${
+                            selectedConversation?.id === conv.id
+                              ? "bg-white/5"
+                              : ""
+                          }`}
+                        >
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30">
+                              {getConversationAvatar(conv) ? (
+                                <img
+                                  src={getConversationAvatar(conv)!}
+                                  alt=""
+                                  className="w-12 h-12 rounded-2xl object-cover"
+                                />
+                              ) : (
+                                <span className="text-white font-semibold text-lg">
+                                  {getConversationName(conv).charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            {conv.unreadCount > 0 && (
+                              <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1.5">
+                                <span className="text-white text-[10px] font-bold">
+                                  {conv.unreadCount}
+                                </span>
+                              </div>
                             )}
                           </div>
-                          {conv.unreadCount > 0 && (
-                            <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1.5">
-                              <span className="text-white text-[10px] font-bold">{conv.unreadCount}</span>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between mb-1">
+                              <span
+                                className={`font-semibold truncate ${conv.unreadCount > 0 ? "text-white" : "text-gray-300"}`}
+                              >
+                                {getConversationName(conv)}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                                {conv.lastMessage?.timestamp &&
+                                  formatConversationTime(
+                                    conv.lastMessage.timestamp,
+                                  )}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`font-semibold truncate ${conv.unreadCount > 0 ? 'text-white' : 'text-gray-300'}`}>
-                              {getConversationName(conv)}
-                            </span>
-                            <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                              {conv.lastMessage?.timestamp && formatConversationTime(conv.lastMessage.timestamp)}
-                            </span>
+                            <p
+                              className={`text-sm truncate ${conv.unreadCount > 0 ? "text-gray-300" : "text-gray-500"}`}
+                            >
+                              {conv.lastMessage?.content || "No messages yet"}
+                            </p>
                           </div>
-                          <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'text-gray-300' : 'text-gray-500'}`}>
-                            {conv.lastMessage?.content || 'No messages yet'}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))}
                   </div>
                 </div>
               )}
-              
+
               {/* Empty State */}
-              {supportTickets.length === 0 && conversations.filter(c => c.type !== 'user-to-support').length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                  <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-4">
-                    <MessageCircle className="w-10 h-10 text-gray-600" />
+              {supportTickets.length === 0 &&
+                conversations.filter((c) => c.type !== "user-to-support")
+                  .length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                    <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-4">
+                      <MessageCircle className="w-10 h-10 text-gray-600" />
+                    </div>
+                    <p className="text-gray-400 mb-4">No conversations yet</p>
                   </div>
-                  <p className="text-gray-400 mb-4">No conversations yet</p>
-                </div>
-              )}
+                )}
             </>
           )}
 
-          {activeTab === 'friends' && (
+          {activeTab === "friends" && (
             <div className="p-4">
               {/* Search */}
               <div className="relative mb-4">
@@ -1339,44 +1506,74 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
                 />
               </div>
-              
+
               {/* Search Results */}
               {searchQuery.trim() && (
                 <div className="mb-4">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                    Search Results {isSearching && <span className="text-cyan-400">...</span>}
+                    Search Results{" "}
+                    {isSearching && <span className="text-cyan-400">...</span>}
                   </h3>
                   {searchResults.length === 0 && !isSearching ? (
-                    <p className="text-gray-500 text-sm text-center py-4">No users found</p>
+                    <p className="text-gray-500 text-sm text-center py-4">
+                      No users found
+                    </p>
                   ) : (
                     <div className="space-y-2">
                       {searchResults.map((user) => {
                         // Use API flags if available, otherwise check local state
-                        const isFriend = user.isFriend || friends.some(f => f.friendId === user.id);
-                        const hasPendingRequest = user.hasPendingRequest || friendRequests.sent.some(r => r.toUserId === user.id);
-                        const hasReceivedRequest = friendRequests.received.some(r => r.fromUserId === user.id);
-                        
+                        const isFriend =
+                          user.isFriend ||
+                          friends.some((f) => f.friendId === user.id);
+                        const hasPendingRequest =
+                          user.hasPendingRequest ||
+                          friendRequests.sent.some(
+                            (r) => r.toUserId === user.id,
+                          );
+                        const hasReceivedRequest = friendRequests.received.some(
+                          (r) => r.fromUserId === user.id,
+                        );
+
                         return (
-                          <div key={user.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors">
+                          <div
+                            key={user.id}
+                            className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors"
+                          >
                             <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-xl flex items-center justify-center overflow-hidden">
                               {user.image ? (
-                                <img src={user.image} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                                <img
+                                  src={user.image}
+                                  alt=""
+                                  className="w-10 h-10 rounded-xl object-cover"
+                                />
                               ) : (
-                                <span className="text-violet-400 font-medium">{user.name?.charAt(0)}</span>
+                                <span className="text-violet-400 font-medium">
+                                  {user.name?.charAt(0)}
+                                </span>
                               )}
                             </div>
                             <div className="flex-1">
-                              <p className="text-white font-medium">{user.name}</p>
+                              <p className="text-white font-medium">
+                                {user.name}
+                              </p>
                               {user.username && (
-                                <p className="text-xs text-gray-500">@{user.username}</p>
+                                <p className="text-xs text-gray-500">
+                                  @{user.username}
+                                </p>
                               )}
                             </div>
                             {isFriend ? (
-                              <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">Friends</span>
+                              <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                Friends
+                              </span>
                             ) : hasPendingRequest ? (
-                              <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg">Pending</span>
+                              <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg">
+                                Pending
+                              </span>
                             ) : hasReceivedRequest ? (
-                              <span className="text-xs text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-lg">Accept in Requests</span>
+                              <span className="text-xs text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-lg">
+                                Accept in Requests
+                              </span>
                             ) : (
                               <button
                                 onClick={() => sendFriendRequest(user.id)}
@@ -1393,7 +1590,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   )}
                 </div>
               )}
-              
+
               {/* Friends List */}
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 Your Friends ({friends.length})
@@ -1402,31 +1599,45 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 <div className="text-center py-8">
                   <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                   <p className="text-gray-500">No friends yet</p>
-                  <p className="text-gray-600 text-sm mt-1">Search for users above to add friends</p>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Search for users above to add friends
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <div 
-                      key={friend.id} 
+                    <div
+                      key={friend.id}
                       className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors relative"
                     >
-                      <div 
+                      <div
                         className="flex items-center gap-3 flex-1 cursor-pointer"
-                        onClick={() => startConversationWithFriend(friend.friendId)}
+                        onClick={() =>
+                          startConversationWithFriend(friend.friendId)
+                        }
                       >
                         <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center overflow-hidden">
                           {friend.friendAvatar ? (
-                            <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                            <img
+                              src={friend.friendAvatar}
+                              alt=""
+                              className="w-10 h-10 rounded-xl object-cover"
+                            />
                           ) : (
-                            <span className="text-cyan-400 font-medium">{friend.friendName?.charAt(0)}</span>
+                            <span className="text-cyan-400 font-medium">
+                              {friend.friendName?.charAt(0)}
+                            </span>
                           )}
                         </div>
-                        <span className="text-white font-medium flex-1">{friend.friendName}</span>
+                        <span className="text-white font-medium flex-1">
+                          {friend.friendName}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => startConversationWithFriend(friend.friendId)}
+                          onClick={() =>
+                            startConversationWithFriend(friend.friendId)
+                          }
                           className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
                           title="Send message"
                         >
@@ -1436,7 +1647,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setFriendMenuOpen(friendMenuOpen === friend.id ? null : friend.id);
+                              setFriendMenuOpen(
+                                friendMenuOpen === friend.id ? null : friend.id,
+                              );
                             }}
                             className="w-8 h-8 bg-white/5 text-gray-400 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
                             title="More options"
@@ -1454,7 +1667,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    unfriendUser(friend.friendId, friend.friendName);
+                                    unfriendUser(
+                                      friend.friendId,
+                                      friend.friendName,
+                                    );
                                   }}
                                   className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2 border-b border-white/5"
                                 >
@@ -1464,7 +1680,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    blockUser(friend.friendId, friend.friendName);
+                                    blockUser(
+                                      friend.friendId,
+                                      friend.friendName,
+                                    );
                                   }}
                                   className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
                                 >
@@ -1483,32 +1702,41 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             </div>
           )}
 
-          {activeTab === 'requests' && (
+          {activeTab === "requests" && (
             <div className="p-4">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 Received ({friendRequests.received.length})
               </h3>
               {friendRequests.received.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No pending requests</p>
+                <p className="text-gray-500 text-sm text-center py-4">
+                  No pending requests
+                </p>
               ) : (
                 <div className="space-y-2 mb-6">
                   {friendRequests.received.map((req) => (
-                    <div key={req.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                    <div
+                      key={req.id}
+                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3"
+                    >
                       <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-xl flex items-center justify-center">
-                        <span className="text-emerald-400 font-medium">{req.fromUserName?.charAt(0)}</span>
+                        <span className="text-emerald-400 font-medium">
+                          {req.fromUserName?.charAt(0)}
+                        </span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-white font-medium">{req.fromUserName}</p>
+                        <p className="text-white font-medium">
+                          {req.fromUserName}
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => acceptFriendRequest(req.id)}
                           className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
                           title="Accept friend request"
                         >
                           <Check className="w-4 h-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => declineFriendRequest(req.id)}
                           className="w-8 h-8 bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30 transition-colors"
                           title="Decline friend request"
@@ -1525,16 +1753,25 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 Sent ({friendRequests.sent.length})
               </h3>
               {friendRequests.sent.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No sent requests</p>
+                <p className="text-gray-500 text-sm text-center py-4">
+                  No sent requests
+                </p>
               ) : (
                 <div className="space-y-2">
                   {friendRequests.sent.map((req) => (
-                    <div key={req.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                    <div
+                      key={req.id}
+                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3"
+                    >
                       <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                        <span className="text-gray-400 font-medium">{req.toUserName?.charAt(0)}</span>
+                        <span className="text-gray-400 font-medium">
+                          {req.toUserName?.charAt(0)}
+                        </span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-white font-medium">{req.toUserName}</p>
+                        <p className="text-white font-medium">
+                          {req.toUserName}
+                        </p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Pending
                         </p>
@@ -1546,7 +1783,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             </div>
           )}
 
-          {activeTab === 'blocked' && (
+          {activeTab === "blocked" && (
             <div className="p-4">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 Blocked Users ({blockedUsers.length})
@@ -1555,23 +1792,39 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 <div className="text-center py-8">
                   <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                   <p className="text-gray-500">No blocked users</p>
-                  <p className="text-gray-600 text-sm mt-1">Users you block will appear here</p>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Users you block will appear here
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {blockedUsers.map((user) => (
-                    <div key={user.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                    <div
+                      key={user.id}
+                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3"
+                    >
                       <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center overflow-hidden">
                         {user.avatar ? (
-                          <img src={user.avatar} alt="" className="w-10 h-10 rounded-xl object-cover opacity-50" />
+                          <img
+                            src={user.avatar}
+                            alt=""
+                            className="w-10 h-10 rounded-xl object-cover opacity-50"
+                          />
                         ) : (
-                          <span className="text-red-400/50 font-medium">{user.name?.charAt(0)}</span>
+                          <span className="text-red-400/50 font-medium">
+                            {user.name?.charAt(0)}
+                          </span>
                         )}
                       </div>
                       <div className="flex-1">
                         <p className="text-gray-400 font-medium">{user.name}</p>
                         <p className="text-xs text-gray-600">
-                          Blocked {user.blockedAt ? formatDistanceToNow(new Date(user.blockedAt), { addSuffix: true }) : ''}
+                          Blocked{" "}
+                          {user.blockedAt
+                            ? formatDistanceToNow(new Date(user.blockedAt), {
+                                addSuffix: true,
+                              })
+                            : ""}
                         </p>
                       </div>
                       <button
@@ -1590,7 +1843,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       </div>
 
       {/* Chat Area */}
-      <div className={`flex-1 flex flex-col bg-[#08080c] ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+      <div
+        className={`flex-1 flex flex-col bg-[#08080c] ${!showMobileChat ? "hidden md:flex" : "flex"}`}
+      >
         {selectedConversation ? (
           <>
             {/* Chat Header */}
@@ -1601,16 +1856,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               >
                 <ArrowLeft className="w-5 h-5 text-gray-400" />
               </button>
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                selectedConversation.type === 'user-to-support'
-                  ? selectedConversation.isAIHandled
-                    ? 'bg-gradient-to-br from-purple-500 to-pink-600'
-                    : 'bg-gradient-to-br from-cyan-500 to-blue-600'
-                  : 'bg-gradient-to-br from-gray-500 to-gray-600'
-              }`}>
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                  selectedConversation.type === "user-to-support"
+                    ? selectedConversation.isAIHandled
+                      ? "bg-gradient-to-br from-purple-500 to-pink-600"
+                      : "bg-gradient-to-br from-cyan-500 to-blue-600"
+                    : "bg-gradient-to-br from-gray-500 to-gray-600"
+                }`}
+              >
                 {getConversationAvatar(selectedConversation) ? (
-                  <img src={getConversationAvatar(selectedConversation)!} alt="" className="w-12 h-12 rounded-2xl object-cover" />
-                ) : selectedConversation.type === 'user-to-support' ? (
+                  <img
+                    src={getConversationAvatar(selectedConversation)!}
+                    alt=""
+                    className="w-12 h-12 rounded-2xl object-cover"
+                  />
+                ) : selectedConversation.type === "user-to-support" ? (
                   selectedConversation.isAIHandled ? (
                     <Sparkles className="w-6 h-6 text-white" />
                   ) : (
@@ -1624,26 +1885,35 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-white text-lg">{getConversationName(selectedConversation)}</h2>
+                  <h2 className="font-semibold text-white text-lg">
+                    {getConversationName(selectedConversation)}
+                  </h2>
                   {selectedConversation.ticketNumber && (
-                    <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${
-                      selectedConversation.isArchived 
-                        ? 'bg-gray-500/20 text-gray-400' 
-                        : 'bg-cyan-500/20 text-cyan-400'
-                    }`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-lg font-medium ${
+                        selectedConversation.isArchived
+                          ? "bg-gray-500/20 text-gray-400"
+                          : "bg-cyan-500/20 text-cyan-400"
+                      }`}
+                    >
                       Ticket #{selectedConversation.ticketNumber}
                     </span>
                   )}
                 </div>
                 <p className="text-sm text-gray-400">
-                  {selectedConversation.isArchived 
-                    ? '✓ Resolved' + (selectedConversation.resolvedByName ? ` by ${selectedConversation.resolvedByName}` : '')
-                    : selectedConversation.type === 'user-to-support'
-                      ? selectedConversation.isAIHandled ? 'AI-Powered Support' : 'Customer Support'
-                      : 'Direct Message'}
+                  {selectedConversation.isArchived
+                    ? "✓ Resolved" +
+                      (selectedConversation.resolvedByName
+                        ? ` by ${selectedConversation.resolvedByName}`
+                        : "")
+                    : selectedConversation.type === "user-to-support"
+                      ? selectedConversation.isAIHandled
+                        ? "AI-Powered Support"
+                        : "Customer Support"
+                      : "Direct Message"}
                 </p>
               </div>
-              
+
               {/* Chat Menu */}
               <div className="relative" ref={chatMenuRef}>
                 <button
@@ -1652,7 +1922,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 >
                   <MoreVertical className="w-5 h-5 text-gray-400" />
                 </button>
-                
+
                 <AnimatePresence>
                   {showChatMenu && (
                     <motion.div
@@ -1692,12 +1962,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             </div>
 
             {/* Messages */}
-            <div 
+            <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto p-5 space-y-4"
-              style={{ 
-                background: 'radial-gradient(ellipse at top, rgba(6,182,212,0.03) 0%, transparent 50%)',
+              style={{
+                background:
+                  "radial-gradient(ellipse at top, rgba(6,182,212,0.03) 0%, transparent 50%)",
               }}
             >
               {messages.length === 0 ? (
@@ -1710,9 +1981,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               ) : (
                 messages.map((msg, index) => {
                   const isOwn = isOwnMessage(msg);
-                  const isAI = msg.senderType === 'ai';
-                  const isSystem = msg.messageType === 'system' || msg.senderType === 'system';
-                  const showAvatar = !isOwn && (index === 0 || messages[index - 1].senderId !== msg.senderId);
+                  const isAI = msg.senderType === "ai";
+                  const isSystem =
+                    msg.messageType === "system" || msg.senderType === "system";
+                  const showAvatar =
+                    !isOwn &&
+                    (index === 0 ||
+                      messages[index - 1].senderId !== msg.senderId);
 
                   if (isSystem) {
                     return (
@@ -1725,39 +2000,58 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   }
 
                   return (
-                    <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} gap-2`}>
+                    <div
+                      key={msg.id}
+                      className={`flex ${isOwn ? "justify-end" : "justify-start"} gap-2`}
+                    >
                       {!isOwn && showAvatar && (
-                        <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
-                          isAI ? 'bg-gradient-to-br from-purple-500 to-pink-600' : 'bg-gradient-to-br from-cyan-500 to-blue-600'
-                        }`}>
+                        <div
+                          className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
+                            isAI
+                              ? "bg-gradient-to-br from-purple-500 to-pink-600"
+                              : "bg-gradient-to-br from-cyan-500 to-blue-600"
+                          }`}
+                        >
                           {isAI ? (
                             <Sparkles className="w-4 h-4 text-white" />
                           ) : (
-                            <span className="text-white text-xs font-medium">{msg.senderName?.charAt(0)}</span>
+                            <span className="text-white text-xs font-medium">
+                              {msg.senderName?.charAt(0)}
+                            </span>
                           )}
                         </div>
                       )}
                       {!isOwn && !showAvatar && <div className="w-8" />}
-                      
-                      <div className={`max-w-[70%] ${isOwn ? 'order-first' : ''}`}>
+
+                      <div
+                        className={`max-w-[70%] ${isOwn ? "order-first" : ""}`}
+                      >
                         {!isOwn && showAvatar && (
                           <p className="text-xs text-gray-500 mb-1 ml-1 flex items-center gap-1">
-                            {isAI && <Sparkles className="w-3 h-3 text-purple-400" />}
+                            {isAI && (
+                              <Sparkles className="w-3 h-3 text-purple-400" />
+                            )}
                             {msg.senderName}
                           </p>
                         )}
                         <div
                           className={`px-4 py-3 ${
                             isOwn
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl rounded-br-md'
+                              ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl rounded-br-md"
                               : isAI
-                                ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white rounded-2xl rounded-bl-md border border-purple-500/20'
-                                : 'bg-white/10 text-white rounded-2xl rounded-bl-md'
+                                ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white rounded-2xl rounded-bl-md border border-purple-500/20"
+                                : "bg-white/10 text-white rounded-2xl rounded-bl-md"
                           }`}
                         >
-                          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
-                          <div className={`flex items-center justify-end gap-1.5 mt-1 ${isOwn ? 'text-white/60' : 'text-gray-500'}`}>
-                            <span className="text-[11px]">{formatMessageTime(msg.createdAt)}</span>
+                          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                            {msg.content}
+                          </p>
+                          <div
+                            className={`flex items-center justify-end gap-1.5 mt-1 ${isOwn ? "text-white/60" : "text-gray-500"}`}
+                          >
+                            <span className="text-[11px]">
+                              {formatMessageTime(msg.createdAt)}
+                            </span>
                             {isOwn && getMessageStatus(msg)}
                           </div>
                         </div>
@@ -1789,14 +2083,19 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <div className="px-5 py-2 text-sm text-gray-400 flex items-center gap-2">
                 <div className="flex gap-1">
                   {[0, 1, 2].map((i) => (
-                    <span 
+                    <span
                       key={i}
-                      className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" 
-                      style={{ animationDelay: `${i * 150}ms` }} 
+                      className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
                     />
                   ))}
                 </div>
-                <span>{Array.from(typingUsers.values()).map(u => u.name).join(', ')} is typing...</span>
+                <span>
+                  {Array.from(typingUsers.values())
+                    .map((u) => u.name)
+                    .join(", ")}{" "}
+                  is typing...
+                </span>
               </div>
             )}
 
@@ -1807,13 +2106,14 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Archive className="w-5 h-5 text-gray-400" />
-                    <p className="text-gray-400 font-medium">This ticket has been resolved</p>
+                    <p className="text-gray-400 font-medium">
+                      This ticket has been resolved
+                    </p>
                   </div>
                   <p className="text-gray-500 text-sm mb-3">
-                    {selectedConversation.resolvedByName 
+                    {selectedConversation.resolvedByName
                       ? `Resolved by ${selectedConversation.resolvedByName}`
-                      : 'This conversation is now read-only'
-                    }
+                      : "This conversation is now read-only"}
                   </p>
                   <button
                     onClick={requestNewTicket}
@@ -1839,13 +2139,17 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                         setMessageInput(e.target.value);
                         if (selectedConversation && wsConnected) {
                           wsSetTyping(selectedConversation.id, true);
-                          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                          if (typingTimeoutRef.current)
+                            clearTimeout(typingTimeoutRef.current);
                           typingTimeoutRef.current = setTimeout(() => {
-                            if (selectedConversation) wsSetTyping(selectedConversation.id, false);
+                            if (selectedConversation)
+                              wsSetTyping(selectedConversation.id, false);
                           }, 2000);
                         }
                       }}
-                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && !e.shiftKey && sendMessage()
+                      }
                       className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors pr-12"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1873,9 +2177,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <MessageCircle className="w-12 h-12 text-gray-600" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome to Messages</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Welcome to Messages
+              </h2>
               <p className="text-gray-400 max-w-md mb-6">
-                Select a conversation from the list or start chatting with our support team
+                Select a conversation from the list or start chatting with our
+                support team
               </p>
               <button
                 onClick={startSupportConversation}
@@ -1911,15 +2218,25 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   <AlertTriangle className="w-6 h-6 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Start New Conversation?</h3>
-                  <p className="text-sm text-gray-400">You have an active support ticket</p>
+                  <h3 className="text-lg font-bold text-white">
+                    Start New Conversation?
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    You have an active support ticket
+                  </p>
                 </div>
               </div>
 
               <p className="text-gray-300 mb-6">
-                Starting a new conversation will mark your current ticket 
-                {activeTicket?.ticketNumber && <span className="text-cyan-400"> #{activeTicket.ticketNumber}</span>} as 
-                <span className="text-amber-400 font-medium"> resolved</span>. 
+                Starting a new conversation will mark your current ticket
+                {activeTicket?.ticketNumber && (
+                  <span className="text-cyan-400">
+                    {" "}
+                    #{activeTicket.ticketNumber}
+                  </span>
+                )}{" "}
+                as
+                <span className="text-amber-400 font-medium"> resolved</span>.
                 You can still view it in your ticket history.
               </p>
 

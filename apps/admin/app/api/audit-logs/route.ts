@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
-import AuditLog from '@/database/models/audit-log.model';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import AuditLog from "@/database/models/audit-log.model";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * GET /api/admin/audit-logs
@@ -14,63 +14,63 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    
+
     // Parse filters
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const userId = searchParams.get('userId');
-    const userEmail = searchParams.get('userEmail');
-    const action = searchParams.get('action');
-    const category = searchParams.get('category');
-    const targetType = searchParams.get('targetType');
-    const targetId = searchParams.get('targetId');
-    const status = searchParams.get('status');
-    const search = searchParams.get('search');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const userId = searchParams.get("userId");
+    const userEmail = searchParams.get("userEmail");
+    const action = searchParams.get("action");
+    const category = searchParams.get("category");
+    const targetType = searchParams.get("targetType");
+    const targetId = searchParams.get("targetId");
+    const status = searchParams.get("status");
+    const search = searchParams.get("search");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
     // Build query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
-    
+
     if (userId) {
       query.userId = userId;
     }
-    
+
     if (userEmail) {
-      query.userEmail = { $regex: userEmail, $options: 'i' };
+      query.userEmail = { $regex: userEmail, $options: "i" };
     }
-    
-    if (action && action !== 'all') {
+
+    if (action && action !== "all") {
       query.action = action;
     }
-    
-    if (category && category !== 'all') {
+
+    if (category && category !== "all") {
       query.actionCategory = category;
     }
-    
-    if (targetType && targetType !== 'all') {
+
+    if (targetType && targetType !== "all") {
       query.targetType = targetType;
     }
-    
+
     if (targetId) {
       query.targetId = targetId;
     }
-    
-    if (status && status !== 'all') {
+
+    if (status && status !== "all") {
       query.status = status;
     }
-    
+
     if (search) {
       query.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { userName: { $regex: search, $options: 'i' } },
-        { userEmail: { $regex: search, $options: 'i' } },
-        { action: { $regex: search, $options: 'i' } },
-        { targetName: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: "i" } },
+        { userName: { $regex: search, $options: "i" } },
+        { userEmail: { $regex: search, $options: "i" } },
+        { action: { $regex: search, $options: "i" } },
+        { targetName: { $regex: search, $options: "i" } },
       ];
     }
-    
+
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) {
@@ -97,14 +97,14 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Get unique actions for filter dropdown
-    const uniqueActions = await AuditLog.distinct('action');
-    
+    const uniqueActions = await AuditLog.distinct("action");
+
     // Get statistics
     const stats = await AuditLog.aggregate([
       { $match: query },
       {
         $group: {
-          _id: '$actionCategory',
+          _id: "$actionCategory",
           count: { $sum: 1 },
         },
       },
@@ -114,9 +114,9 @@ export async function GET(request: NextRequest) {
     const uniqueUsers = await AuditLog.aggregate([
       {
         $group: {
-          _id: '$userEmail', // Group by email, not userId, to avoid duplicates
-          userName: { $last: '$userName' }, // Use latest name
-          userEmail: { $first: '$userEmail' },
+          _id: "$userEmail", // Group by email, not userId, to avoid duplicates
+          userName: { $last: "$userName" }, // Use latest name
+          userEmail: { $first: "$userEmail" },
           count: { $sum: 1 },
         },
       },
@@ -139,20 +139,23 @@ export async function GET(request: NextRequest) {
           uniqueActions,
           uniqueUsers,
         },
-        stats: stats.reduce((acc, s) => {
-          acc[s._id] = s.count;
-          return acc;
-        }, {} as Record<string, number>),
+        stats: stats.reduce(
+          (acc, s) => {
+            acc[s._id] = s.count;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching audit logs:', error);
+    console.error("Error fetching audit logs:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch audit logs' },
-      { status: 500 }
+      { error: "Failed to fetch audit logs" },
+      { status: 500 },
     );
   }
 }
@@ -165,18 +168,18 @@ export async function DELETE(request: NextRequest) {
   try {
     const admin = await getAdminSession();
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const beforeDate = searchParams.get('beforeDate');
+    const beforeDate = searchParams.get("beforeDate");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
-    let description = 'Cleared all audit logs';
-    
+    let description = "Cleared all audit logs";
+
     if (beforeDate) {
       query.createdAt = { $lt: new Date(beforeDate) };
       description = `Cleared audit logs before ${beforeDate}`;
@@ -189,11 +192,11 @@ export async function DELETE(request: NextRequest) {
       admin: {
         id: admin.id,
         email: admin.email,
-        name: admin.email.split('@')[0],
-        role: 'admin',
+        name: admin.email.split("@")[0],
+        role: "admin",
       },
-      action: 'audit_logs_cleared',
-      category: 'system',
+      action: "audit_logs_cleared",
+      category: "system",
       description,
       metadata: { deletedCount: result.deletedCount, beforeDate },
     });
@@ -203,14 +206,13 @@ export async function DELETE(request: NextRequest) {
       deletedCount: result.deletedCount,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error clearing audit logs:', error);
+    console.error("Error clearing audit logs:", error);
     return NextResponse.json(
-      { error: 'Failed to clear audit logs' },
-      { status: 500 }
+      { error: "Failed to clear audit logs" },
+      { status: 500 },
     );
   }
 }
-

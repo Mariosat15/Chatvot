@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 /**
  * POST /api/admin/verify-password
@@ -11,8 +11,8 @@ export async function POST(request: Request) {
 
     if (!password) {
       return NextResponse.json(
-        { success: false, message: 'Password is required' },
-        { status: 400 }
+        { success: false, message: "Password is required" },
+        { status: 400 },
       );
     }
 
@@ -20,16 +20,17 @@ export async function POST(request: Request) {
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (!adminPassword) {
-      console.error('❌ ADMIN_PASSWORD not set in environment variables');
+      console.error("❌ ADMIN_PASSWORD not set in environment variables");
       return NextResponse.json(
-        { success: false, message: 'Admin password not configured' },
-        { status: 500 }
+        { success: false, message: "Admin password not configured" },
+        { status: 500 },
       );
     }
 
     // Check if the password is hashed or plain text
-    const isHashed = adminPassword.startsWith('$2a$') || adminPassword.startsWith('$2b$');
-    
+    const isHashed =
+      adminPassword.startsWith("$2a$") || adminPassword.startsWith("$2b$");
+
     let isValid = false;
     if (isHashed) {
       // Compare with hashed password
@@ -41,25 +42,24 @@ export async function POST(request: Request) {
 
     if (!isValid) {
       return NextResponse.json(
-        { success: false, message: 'Invalid password' },
-        { status: 401 }
+        { success: false, message: "Invalid password" },
+        { status: 401 },
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Password verified',
+      message: "Password verified",
     });
   } catch (error) {
-    console.error('❌ Error verifying password:', error);
+    console.error("❌ Error verifying password:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to verify password',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Failed to verify password",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

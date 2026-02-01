@@ -11,6 +11,8 @@ export default [
       ".next/**",
       "out/**",
       "build/**",
+      "dist/**",
+      "**/dist/**",
       "next-env.d.ts",
       "*.config.js",
       "*.config.mjs",

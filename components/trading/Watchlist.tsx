@@ -1,45 +1,99 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { usePrices } from '@/contexts/PriceProvider';
-import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
-import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect, useMemo } from "react";
+import { usePrices } from "@/contexts/PriceProvider";
+import { useChartSymbol } from "@/contexts/ChartSymbolContext";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
+import { cn } from "@/lib/utils";
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  TrendingUp,
+  Loader2,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 // Default pairs (fallback if database is empty)
 const DEFAULT_PAIR_CATEGORIES = {
   major: {
-    label: 'Major Pairs',
-    icon: '🔷',
-    pairs: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'USD/CHF', 'NZD/USD'] as ForexSymbol[],
+    label: "Major Pairs",
+    icon: "🔷",
+    pairs: [
+      "EUR/USD",
+      "GBP/USD",
+      "USD/JPY",
+      "AUD/USD",
+      "USD/CAD",
+      "USD/CHF",
+      "NZD/USD",
+    ] as ForexSymbol[],
   },
   cross: {
-    label: 'Cross Pairs',
-    icon: '🔶',
-    pairs: ['EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'EUR/AUD', 'GBP/AUD', 'EUR/CAD', 'AUD/JPY', 'CHF/JPY', 'EUR/CHF', 'GBP/CHF', 'AUD/NZD', 'EUR/NZD', 'GBP/NZD', 'NZD/JPY', 'CAD/JPY', 'AUD/CAD', 'AUD/CHF', 'NZD/CAD'] as ForexSymbol[],
+    label: "Cross Pairs",
+    icon: "🔶",
+    pairs: [
+      "EUR/GBP",
+      "EUR/JPY",
+      "GBP/JPY",
+      "EUR/AUD",
+      "GBP/AUD",
+      "EUR/CAD",
+      "AUD/JPY",
+      "CHF/JPY",
+      "EUR/CHF",
+      "GBP/CHF",
+      "AUD/NZD",
+      "EUR/NZD",
+      "GBP/NZD",
+      "NZD/JPY",
+      "CAD/JPY",
+      "AUD/CAD",
+      "AUD/CHF",
+      "NZD/CAD",
+    ] as ForexSymbol[],
   },
   exotic: {
-    label: 'Exotic Pairs',
-    icon: '💎',
-    pairs: ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'] as ForexSymbol[],
+    label: "Exotic Pairs",
+    icon: "💎",
+    pairs: [
+      "USD/MXN",
+      "USD/ZAR",
+      "USD/TRY",
+      "USD/SEK",
+      "USD/NOK",
+    ] as ForexSymbol[],
+  },
+  custom: {
+    label: "Custom",
+    icon: "✨",
+    pairs: [] as ForexSymbol[],
   },
 };
 
 interface TradingSymbolData {
   symbol: ForexSymbol;
   name: string;
-  category: 'major' | 'cross' | 'exotic' | 'custom';
+  category: "major" | "cross" | "exotic" | "custom";
   enabled: boolean;
   icon?: string;
 }
 
 // Currency flag emojis
 const CURRENCY_FLAGS: Record<string, string> = {
-  EUR: '🇪🇺', USD: '🇺🇸', GBP: '🇬🇧', JPY: '🇯🇵', AUD: '🇦🇺',
-  CAD: '🇨🇦', CHF: '🇨🇭', NZD: '🇳🇿', MXN: '🇲🇽', ZAR: '🇿🇦',
-  TRY: '🇹🇷', SEK: '🇸🇪', NOK: '🇳🇴',
+  EUR: "🇪🇺",
+  USD: "🇺🇸",
+  GBP: "🇬🇧",
+  JPY: "🇯🇵",
+  AUD: "🇦🇺",
+  CAD: "🇨🇦",
+  CHF: "🇨🇭",
+  NZD: "🇳🇿",
+  MXN: "🇲🇽",
+  ZAR: "🇿🇦",
+  TRY: "🇹🇷",
+  SEK: "🇸🇪",
+  NOK: "🇳🇴",
 };
 
 interface WatchlistProps {
@@ -47,17 +101,22 @@ interface WatchlistProps {
   compact?: boolean;
 }
 
-export default function Watchlist({ className, compact = false }: WatchlistProps) {
+export default function Watchlist({
+  className,
+  compact = false,
+}: WatchlistProps) {
   const { prices, subscribe, unsubscribe } = usePrices();
   const { symbol: selectedSymbol, setSymbol } = useChartSymbol();
-  
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({
     major: true,
     cross: true,
     exotic: true,
     custom: true,
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingSymbols, setIsLoadingSymbols] = useState(true);
   const [pairCategories, setPairCategories] = useState(DEFAULT_PAIR_CATEGORIES);
 
@@ -65,52 +124,58 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
   useEffect(() => {
     const fetchSymbols = async () => {
       try {
-        const res = await fetch('/api/trading/symbols');
+        const res = await fetch("/api/trading/symbols");
         if (res.ok) {
           const data = await res.json();
-          
+
           // Group symbols by category
-          const grouped: Record<string, { label: string; icon: string; pairs: ForexSymbol[] }> = {
-            major: { label: 'Major Pairs', icon: '🔷', pairs: [] },
-            cross: { label: 'Cross Pairs', icon: '🔶', pairs: [] },
-            exotic: { label: 'Exotic Pairs', icon: '💎', pairs: [] },
-            custom: { label: 'Custom', icon: '✨', pairs: [] },
+          const grouped: Record<
+            string,
+            { label: string; icon: string; pairs: ForexSymbol[] }
+          > = {
+            major: { label: "Major Pairs", icon: "🔷", pairs: [] },
+            cross: { label: "Cross Pairs", icon: "🔶", pairs: [] },
+            exotic: { label: "Exotic Pairs", icon: "💎", pairs: [] },
+            custom: { label: "Custom", icon: "✨", pairs: [] },
           };
-          
+
           data.symbols.forEach((sym: TradingSymbolData) => {
             if (sym.enabled && grouped[sym.category]) {
               grouped[sym.category].pairs.push(sym.symbol);
             }
           });
-          
+
           // Only update if we have symbols
-          const totalPairs = Object.values(grouped).reduce((sum, cat) => sum + cat.pairs.length, 0);
+          const totalPairs = Object.values(grouped).reduce(
+            (sum, cat) => sum + cat.pairs.length,
+            0,
+          );
           if (totalPairs > 0) {
             setPairCategories(grouped as typeof DEFAULT_PAIR_CATEGORIES);
           }
         }
       } catch (error) {
-        console.error('Failed to fetch symbols, using defaults:', error);
+        console.error("Failed to fetch symbols, using defaults:", error);
       }
       setIsLoadingSymbols(false);
     };
-    
+
     fetchSymbols();
   }, []);
 
   // Subscribe to all enabled pairs
   useEffect(() => {
     if (isLoadingSymbols) return;
-    
-    const allPairs = Object.values(pairCategories).flatMap(cat => cat.pairs);
-    allPairs.forEach(pair => subscribe(pair));
+
+    const allPairs = Object.values(pairCategories).flatMap((cat) => cat.pairs);
+    allPairs.forEach((pair) => subscribe(pair));
     return () => {
-      allPairs.forEach(pair => unsubscribe(pair));
+      allPairs.forEach((pair) => unsubscribe(pair));
     };
   }, [subscribe, unsubscribe, pairCategories, isLoadingSymbols]);
 
   const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+    setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
   };
 
   const handleSelectSymbol = (symbol: ForexSymbol) => {
@@ -126,14 +191,17 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
       major: { ...pairCategories.major, pairs: [] },
       cross: { ...pairCategories.cross, pairs: [] },
       exotic: { ...pairCategories.exotic, pairs: [] },
-      custom: { label: 'Custom', icon: '✨', pairs: [] },
+      custom: { label: "Custom", icon: "✨", pairs: [] },
     };
 
     Object.entries(pairCategories).forEach(([key, category]) => {
       if (filtered[key as keyof typeof pairCategories]) {
-        filtered[key as keyof typeof pairCategories].pairs = category.pairs.filter(
-          pair => pair.toLowerCase().includes(query) || pair.replace('/', '').toLowerCase().includes(query)
-        );
+        filtered[key as keyof typeof pairCategories].pairs =
+          category.pairs.filter(
+            (pair) =>
+              pair.toLowerCase().includes(query) ||
+              pair.replace("/", "").toLowerCase().includes(query),
+          );
       }
     });
 
@@ -141,14 +209,14 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
   }, [searchQuery, pairCategories]);
 
   const getFlag = (symbol: ForexSymbol) => {
-    const [base] = symbol.split('/');
-    return CURRENCY_FLAGS[base] || '💱';
+    const [base] = symbol.split("/");
+    return CURRENCY_FLAGS[base] || "💱";
   };
 
   const renderPriceRow = (symbol: ForexSymbol) => {
     const quote = prices.get(symbol);
     const isSelected = selectedSymbol === symbol;
-    const isJPY = symbol.includes('JPY');
+    const isJPY = symbol.includes("JPY");
     const decimals = isJPY ? 3 : 5;
 
     return (
@@ -158,20 +226,24 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
         className={cn(
           "group grid gap-1 px-2 py-1.5 cursor-pointer transition-all duration-150 border-l-2",
           "hover:bg-gradient-to-r hover:from-[#2962ff]/10 hover:to-transparent",
-          isSelected 
-            ? "bg-gradient-to-r from-[#2962ff]/20 to-transparent border-l-[#2962ff]" 
+          isSelected
+            ? "bg-gradient-to-r from-[#2962ff]/20 to-transparent border-l-[#2962ff]"
             : "border-l-transparent hover:border-l-[#2962ff]/50",
-          compact ? "grid-cols-[1fr_auto]" : "grid-cols-[100px_1fr_1fr_1fr_60px]"
+          compact
+            ? "grid-cols-[1fr_auto]"
+            : "grid-cols-[100px_1fr_1fr_1fr_60px]",
         )}
       >
         {/* Symbol */}
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-sm">{getFlag(symbol)}</span>
-          <span className={cn(
-            "text-xs font-semibold truncate",
-            isSelected ? "text-[#2962ff]" : "text-[#d1d4dc]"
-          )}>
-            {symbol.replace('/', '')}
+          <span
+            className={cn(
+              "text-xs font-semibold truncate",
+              isSelected ? "text-[#2962ff]" : "text-[#d1d4dc]",
+            )}
+          >
+            {symbol.replace("/", "")}
           </span>
         </div>
 
@@ -193,10 +265,12 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
 
             {/* Mid (Current) */}
             <div className="text-right">
-              <span className={cn(
-                "text-[10px] font-mono font-bold",
-                isSelected ? "text-white" : "text-[#d1d4dc]"
-              )}>
+              <span
+                className={cn(
+                  "text-[10px] font-mono font-bold",
+                  isSelected ? "text-white" : "text-[#d1d4dc]",
+                )}
+              >
                 {quote.mid.toFixed(decimals)}
               </span>
             </div>
@@ -204,7 +278,9 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
             {/* Spread in pips */}
             <div className="text-right">
               <span className="text-[10px] font-mono text-[#787b86]">
-                {(quote.spread * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}
+                {(
+                  quote.spread * (symbol.includes("JPY") ? 100 : 10000)
+                ).toFixed(1)}
               </span>
             </div>
           </>
@@ -212,24 +288,32 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
 
         {compact && quote && (
           <div className="text-right">
-            <span className={cn(
-              "text-[10px] font-mono",
-              isSelected ? "text-white" : "text-[#d1d4dc]"
-            )}>
+            <span
+              className={cn(
+                "text-[10px] font-mono",
+                isSelected ? "text-white" : "text-[#d1d4dc]",
+              )}
+            >
               {quote.mid.toFixed(decimals)}
             </span>
           </div>
         )}
 
         {!quote && !compact && (
-          <div className="col-span-4 text-right text-[10px] text-[#787b86]">Loading...</div>
+          <div className="col-span-4 text-right text-[10px] text-[#787b86]">
+            Loading...
+          </div>
         )}
       </div>
     );
   };
 
-  const renderCategory = (categoryKey: string, category: typeof DEFAULT_PAIR_CATEGORIES.major) => {
-    const categoryData = filteredCategories[categoryKey as keyof typeof filteredCategories];
+  const renderCategory = (
+    categoryKey: string,
+    category: typeof DEFAULT_PAIR_CATEGORIES.major,
+  ) => {
+    const categoryData =
+      filteredCategories[categoryKey as keyof typeof filteredCategories];
     if (!categoryData) return null;
     const pairs = categoryData.pairs;
     if (pairs.length === 0) return null;
@@ -242,7 +326,11 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
           className="w-full flex items-center gap-2 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]/50 transition-colors"
         >
           <span>{category.icon}</span>
-          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {isExpanded ? (
+            <ChevronDown className="w-3 h-3" />
+          ) : (
+            <ChevronRight className="w-3 h-3" />
+          )}
           <span className="flex-1 text-left">{category.label}</span>
           <span className="px-1.5 py-0.5 bg-[#2a2e39] rounded text-[9px] font-normal">
             {pairs.length}
@@ -258,10 +346,12 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
   };
 
   return (
-    <div className={cn(
-      "bg-gradient-to-b from-[#131722] to-[#0d0f14] border border-[#2b2b43] rounded-lg overflow-hidden flex flex-col",
-      className
-    )}>
+    <div
+      className={cn(
+        "bg-gradient-to-b from-[#131722] to-[#0d0f14] border border-[#2b2b43] rounded-lg overflow-hidden flex flex-col",
+        className,
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#2b2b43] bg-[#0d0f14]">
         <div className="flex items-center gap-2">
@@ -309,10 +399,11 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
           </div>
         ) : (
           <>
-            {renderCategory('major', pairCategories.major)}
-            {renderCategory('cross', pairCategories.cross)}
-            {renderCategory('exotic', pairCategories.exotic)}
-            {pairCategories.custom?.pairs.length > 0 && renderCategory('custom', pairCategories.custom)}
+            {renderCategory("major", pairCategories.major)}
+            {renderCategory("cross", pairCategories.cross)}
+            {renderCategory("exotic", pairCategories.exotic)}
+            {pairCategories.custom?.pairs.length > 0 &&
+              renderCategory("custom", pairCategories.custom)}
           </>
         )}
       </div>

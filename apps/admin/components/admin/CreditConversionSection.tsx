@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { DollarSign, TrendingUp, TrendingDown, Info } from "lucide-react";
 
 export default function CreditConversionSection() {
   const [loading, setLoading] = useState(true);
@@ -25,8 +31,8 @@ export default function CreditConversionSection() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/credit-conversion');
-      if (!response.ok) throw new Error('Failed to fetch settings');
+      const response = await fetch("/api/credit-conversion");
+      if (!response.ok) throw new Error("Failed to fetch settings");
       const data = await response.json();
       // Use nullish coalescing (??) for numeric values that can legitimately be 0
       // (e.g., 0% withdrawal fee for free withdrawals)
@@ -37,7 +43,7 @@ export default function CreditConversionSection() {
         withdrawalFeePercentage: data.withdrawalFeePercentage ?? 2,
       });
     } catch (error) {
-      toast.error('Failed to load credit conversion settings');
+      toast.error("Failed to load credit conversion settings");
       console.error(error);
     } finally {
       setLoading(false);
@@ -47,17 +53,17 @@ export default function CreditConversionSection() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/credit-conversion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/credit-conversion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
-      if (!response.ok) throw new Error('Failed to save settings');
+      if (!response.ok) throw new Error("Failed to save settings");
 
-      toast.success('💰 Credit conversion settings updated successfully!');
+      toast.success("💰 Credit conversion settings updated successfully!");
     } catch (error) {
-      toast.error('Failed to save settings');
+      toast.error("Failed to save settings");
       console.error(error);
     } finally {
       setSaving(false);
@@ -68,11 +74,11 @@ export default function CreditConversionSection() {
     const eur10 = 10 * settings.eurToCreditsRate;
     const eur50 = 50 * settings.eurToCreditsRate;
     const eur100 = 100 * settings.eurToCreditsRate;
-    
+
     const credits1000 = 1000 / settings.eurToCreditsRate;
     const credits5000 = 5000 / settings.eurToCreditsRate;
     const credits10000 = 10000 / settings.eurToCreditsRate;
-    
+
     return { eur10, eur50, eur100, credits1000, credits5000, credits10000 };
   };
 
@@ -122,13 +128,19 @@ export default function CreditConversionSection() {
               </div>
               Conversion & Limits
             </CardTitle>
-            <CardDescription className="text-sm">Set conversion rates and minimum amounts</CardDescription>
+            <CardDescription className="text-sm">
+              Set conversion rates and minimum amounts
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* EUR to Credits Rate */}
             <div className="space-y-2">
-              <Label className="text-white font-semibold">EUR to Credits Conversion Rate</Label>
-              <p className="text-sm text-gray-400 mb-2">How many credits equal 1 EUR?</p>
+              <Label className="text-white font-semibold">
+                EUR to Credits Conversion Rate
+              </Label>
+              <p className="text-sm text-gray-400 mb-2">
+                How many credits equal 1 EUR?
+              </p>
               <Input
                 type="number"
                 min="1"
@@ -136,12 +148,16 @@ export default function CreditConversionSection() {
                 value={settings.eurToCreditsRate}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  setSettings({ ...settings, eurToCreditsRate: isNaN(value) ? 100 : value });
+                  setSettings({
+                    ...settings,
+                    eurToCreditsRate: isNaN(value) ? 100 : value,
+                  });
                 }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">
-                Example: If set to 100, then 1 EUR = {settings.eurToCreditsRate} Credits
+                Example: If set to 100, then 1 EUR = {settings.eurToCreditsRate}{" "}
+                Credits
               </p>
             </div>
 
@@ -149,14 +165,19 @@ export default function CreditConversionSection() {
 
             {/* Minimum Deposit */}
             <div className="space-y-2">
-              <Label className="text-white font-semibold">Minimum Deposit (EUR)</Label>
+              <Label className="text-white font-semibold">
+                Minimum Deposit (EUR)
+              </Label>
               <Input
                 type="number"
                 min="1"
                 value={settings.minimumDeposit}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  setSettings({ ...settings, minimumDeposit: isNaN(value) ? 10 : value });
+                  setSettings({
+                    ...settings,
+                    minimumDeposit: isNaN(value) ? 10 : value,
+                  });
                 }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
@@ -167,14 +188,19 @@ export default function CreditConversionSection() {
 
             {/* Minimum Withdrawal */}
             <div className="space-y-2">
-              <Label className="text-white font-semibold">Minimum Withdrawal (EUR)</Label>
+              <Label className="text-white font-semibold">
+                Minimum Withdrawal (EUR)
+              </Label>
               <Input
                 type="number"
                 min="1"
                 value={settings.minimumWithdrawal}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  setSettings({ ...settings, minimumWithdrawal: isNaN(value) ? 20 : value });
+                  setSettings({
+                    ...settings,
+                    minimumWithdrawal: isNaN(value) ? 20 : value,
+                  });
                 }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
@@ -185,7 +211,9 @@ export default function CreditConversionSection() {
 
             {/* Withdrawal Fee */}
             <div className="space-y-2">
-              <Label className="text-white font-semibold">Withdrawal Fee (%)</Label>
+              <Label className="text-white font-semibold">
+                Withdrawal Fee (%)
+              </Label>
               <Input
                 type="number"
                 min="0"
@@ -195,7 +223,10 @@ export default function CreditConversionSection() {
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
                   // Use isNaN check to allow 0 values (|| would treat 0 as falsy)
-                  setSettings({ ...settings, withdrawalFeePercentage: isNaN(value) ? 2 : value });
+                  setSettings({
+                    ...settings,
+                    withdrawalFeePercentage: isNaN(value) ? 2 : value,
+                  });
                 }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
@@ -209,7 +240,7 @@ export default function CreditConversionSection() {
               disabled={saving}
               className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold h-14 text-lg shadow-lg shadow-green-500/50"
             >
-              {saving ? 'Saving...' : '💾 Save Credit Settings'}
+              {saving ? "Saving..." : "💾 Save Credit Settings"}
             </Button>
           </CardContent>
         </Card>
@@ -225,23 +256,31 @@ export default function CreditConversionSection() {
                 </div>
                 Deposit Examples
               </CardTitle>
-              <CardDescription className="text-sm">What users get when they deposit</CardDescription>
+              <CardDescription className="text-sm">
+                What users get when they deposit
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
                 <span className="text-white font-semibold">€10</span>
                 <span className="text-gray-400">→</span>
-                <span className="text-green-400 font-bold">{examples.eur10.toFixed(0)} Credits</span>
+                <span className="text-green-400 font-bold">
+                  {examples.eur10.toFixed(0)} Credits
+                </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
                 <span className="text-white font-semibold">€50</span>
                 <span className="text-gray-400">→</span>
-                <span className="text-green-400 font-bold">{examples.eur50.toFixed(0)} Credits</span>
+                <span className="text-green-400 font-bold">
+                  {examples.eur50.toFixed(0)} Credits
+                </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
                 <span className="text-white font-semibold">€100</span>
                 <span className="text-gray-400">→</span>
-                <span className="text-green-400 font-bold">{examples.eur100.toFixed(0)} Credits</span>
+                <span className="text-green-400 font-bold">
+                  {examples.eur100.toFixed(0)} Credits
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -255,42 +294,80 @@ export default function CreditConversionSection() {
                 </div>
                 Withdrawal Examples
               </CardTitle>
-              <CardDescription className="text-sm">What users receive when they withdraw</CardDescription>
+              <CardDescription className="text-sm">
+                What users receive when they withdraw
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                  <span className="text-white font-semibold">1,000 Credits</span>
+                  <span className="text-white font-semibold">
+                    1,000 Credits
+                  </span>
                   <span className="text-gray-400">→</span>
-                  <span className="text-blue-400 font-bold">€{examples.credits1000.toFixed(2)}</span>
+                  <span className="text-blue-400 font-bold">
+                    €{examples.credits1000.toFixed(2)}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €{(examples.credits1000 * settings.withdrawalFeePercentage / 100).toFixed(2)} ({settings.withdrawalFeePercentage}%)
-                  • Net: €{(examples.credits1000 * (1 - settings.withdrawalFeePercentage / 100)).toFixed(2)}
+                  Fee: €
+                  {(
+                    (examples.credits1000 * settings.withdrawalFeePercentage) /
+                    100
+                  ).toFixed(2)}{" "}
+                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  {(
+                    examples.credits1000 *
+                    (1 - settings.withdrawalFeePercentage / 100)
+                  ).toFixed(2)}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                  <span className="text-white font-semibold">5,000 Credits</span>
+                  <span className="text-white font-semibold">
+                    5,000 Credits
+                  </span>
                   <span className="text-gray-400">→</span>
-                  <span className="text-blue-400 font-bold">€{examples.credits5000.toFixed(2)}</span>
+                  <span className="text-blue-400 font-bold">
+                    €{examples.credits5000.toFixed(2)}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €{(examples.credits5000 * settings.withdrawalFeePercentage / 100).toFixed(2)} ({settings.withdrawalFeePercentage}%)
-                  • Net: €{(examples.credits5000 * (1 - settings.withdrawalFeePercentage / 100)).toFixed(2)}
+                  Fee: €
+                  {(
+                    (examples.credits5000 * settings.withdrawalFeePercentage) /
+                    100
+                  ).toFixed(2)}{" "}
+                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  {(
+                    examples.credits5000 *
+                    (1 - settings.withdrawalFeePercentage / 100)
+                  ).toFixed(2)}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                  <span className="text-white font-semibold">10,000 Credits</span>
+                  <span className="text-white font-semibold">
+                    10,000 Credits
+                  </span>
                   <span className="text-gray-400">→</span>
-                  <span className="text-blue-400 font-bold">€{examples.credits10000.toFixed(2)}</span>
+                  <span className="text-blue-400 font-bold">
+                    €{examples.credits10000.toFixed(2)}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €{(examples.credits10000 * settings.withdrawalFeePercentage / 100).toFixed(2)} ({settings.withdrawalFeePercentage}%)
-                  • Net: €{(examples.credits10000 * (1 - settings.withdrawalFeePercentage / 100)).toFixed(2)}
+                  Fee: €
+                  {(
+                    (examples.credits10000 * settings.withdrawalFeePercentage) /
+                    100
+                  ).toFixed(2)}{" "}
+                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  {(
+                    examples.credits10000 *
+                    (1 - settings.withdrawalFeePercentage / 100)
+                  ).toFixed(2)}
                 </p>
               </div>
             </CardContent>
@@ -304,7 +381,9 @@ export default function CreditConversionSection() {
                   <Info className="h-5 w-5 text-purple-400" />
                 </div>
                 <div className="text-sm text-gray-300 space-y-2">
-                  <p className="font-semibold text-white text-base">Important Notes:</p>
+                  <p className="font-semibold text-white text-base">
+                    Important Notes:
+                  </p>
                   <ul className="list-disc list-inside space-y-1.5 text-sm">
                     <li>Users deposit EUR and receive Credits</li>
                     <li>Credits are used for competition entry fees</li>
@@ -321,4 +400,3 @@ export default function CreditConversionSection() {
     </div>
   );
 }
-

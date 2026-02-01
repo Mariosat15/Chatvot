@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import VendorPayment from '@/database/models/vendor-payment.model';
-import VendorSubscription from '@/database/models/vendor-subscription.model';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import VendorPayment from "@/database/models/vendor-payment.model";
+import VendorSubscription from "@/database/models/vendor-subscription.model";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * GET /api/vendor-payments
@@ -15,23 +15,23 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId');
-    const status = searchParams.get('status');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const vendorId = searchParams.get("vendorId");
+    const status = searchParams.get("status");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
     // Build query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
-    
+
     if (vendorId) {
       query.vendorId = vendorId;
     }
-    
-    if (status && status !== 'all') {
+
+    if (status && status !== "all") {
       query.status = status;
     }
-    
+
     if (startDate || endDate) {
       query.paidAt = {};
       if (startDate) query.paidAt.$gte = new Date(startDate);
@@ -46,11 +46,11 @@ export async function GET(request: NextRequest) {
 
     // Calculate totals
     const totalPaid = await VendorPayment.aggregate([
-      { $match: { status: 'paid' } },
+      { $match: { status: "paid" } },
       {
         $group: {
           _id: null,
-          total: { $sum: '$amount' },
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
@@ -58,11 +58,11 @@ export async function GET(request: NextRequest) {
 
     // Get breakdown by service type
     const byServiceType = await VendorPayment.aggregate([
-      { $match: { status: 'paid' } },
+      { $match: { status: "paid" } },
       {
         $group: {
-          _id: '$serviceType',
-          total: { $sum: '$amount' },
+          _id: "$serviceType",
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
@@ -71,11 +71,11 @@ export async function GET(request: NextRequest) {
 
     // Get breakdown by vendor
     const byVendor = await VendorPayment.aggregate([
-      { $match: { status: 'paid' } },
+      { $match: { status: "paid" } },
       {
         $group: {
-          _id: '$vendorName',
-          total: { $sum: '$amount' },
+          _id: "$vendorName",
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const monthlyTotals = await VendorPayment.aggregate([
       {
         $match: {
-          status: 'paid',
+          status: "paid",
           paidAt: {
             $gte: new Date(currentYear, 0, 1),
             $lte: new Date(currentYear, 11, 31),
@@ -97,8 +97,8 @@ export async function GET(request: NextRequest) {
       },
       {
         $group: {
-          _id: { $month: '$paidAt' },
-          total: { $sum: '$amount' },
+          _id: { $month: "$paidAt" },
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     // Get upcoming payments (vendors that need payment soon)
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    
+
     const upcomingVendors = await VendorSubscription.find({
       isActive: true,
       nextPaymentDate: { $lte: thirtyDaysFromNow },
@@ -137,10 +137,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching vendor payments:', error);
+    console.error("Error fetching vendor payments:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch vendor payments' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch vendor payments" },
+      { status: 500 },
     );
   }
 }
@@ -155,11 +155,11 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { 
-      vendorId, 
-      amount, 
-      reference, 
-      invoiceNumber, 
+    const {
+      vendorId,
+      amount,
+      reference,
+      invoiceNumber,
       notes,
       periodStart,
       periodEnd,
@@ -167,8 +167,8 @@ export async function POST(request: NextRequest) {
 
     if (!vendorId || !amount) {
       return NextResponse.json(
-        { success: false, error: 'Vendor ID and amount are required' },
-        { status: 400 }
+        { success: false, error: "Vendor ID and amount are required" },
+        { status: 400 },
       );
     }
 
@@ -176,8 +176,8 @@ export async function POST(request: NextRequest) {
     const vendor = await VendorSubscription.findById(vendorId);
     if (!vendor) {
       return NextResponse.json(
-        { success: false, error: 'Vendor not found' },
-        { status: 404 }
+        { success: false, error: "Vendor not found" },
+        { status: 404 },
       );
     }
 
@@ -187,14 +187,14 @@ export async function POST(request: NextRequest) {
       vendorName: vendor.name,
       serviceType: vendor.serviceType,
       amount,
-      currency: vendor.currency || 'EUR',
+      currency: vendor.currency || "EUR",
       periodStart: periodStart ? new Date(periodStart) : undefined,
       periodEnd: periodEnd ? new Date(periodEnd) : undefined,
       billingCycle: vendor.billingCycle,
-      status: 'paid',
+      status: "paid",
       paidAt: new Date(),
-      paidBy: admin.adminId || 'admin',
-      paidByEmail: admin.email || 'admin',
+      paidBy: admin.adminId || "admin",
+      paidByEmail: admin.email || "admin",
       reference,
       invoiceNumber,
       notes,
@@ -202,25 +202,25 @@ export async function POST(request: NextRequest) {
     });
 
     // Update the vendor's next payment date if it's a recurring subscription
-    if (vendor.billingCycle !== 'one-time') {
+    if (vendor.billingCycle !== "one-time") {
       const currentDue = new Date(vendor.nextPaymentDate);
-      
+
       switch (vendor.billingCycle) {
-        case 'monthly':
+        case "monthly":
           currentDue.setMonth(currentDue.getMonth() + 1);
           break;
-        case 'quarterly':
+        case "quarterly":
           currentDue.setMonth(currentDue.getMonth() + 3);
           break;
-        case 'yearly':
+        case "yearly":
           currentDue.setFullYear(currentDue.getFullYear() + 1);
           break;
       }
-      
+
       vendor.nextPaymentDate = currentDue;
       vendor.lastPaymentDate = new Date();
       vendor.reminderSent = false;
-      
+
       // Add to vendor's payment history
       if (!vendor.paymentHistory) {
         vendor.paymentHistory = [];
@@ -228,30 +228,32 @@ export async function POST(request: NextRequest) {
       vendor.paymentHistory.push({
         date: new Date(),
         amount,
-        status: 'paid',
+        status: "paid",
         reference: reference || undefined,
       });
-      
+
       await vendor.save();
     }
 
-    console.log(`💳 Vendor Payment recorded: €${amount} to ${vendor.name} by ${admin.email}`);
+    console.log(
+      `💳 Vendor Payment recorded: €${amount} to ${vendor.name} by ${admin.email}`,
+    );
 
     // Log audit action
     try {
       await auditLogService.logVendorPayment(
         {
-          id: admin.adminId || 'admin',
-          email: admin.email || 'admin',
-          name: (admin.email || 'admin').split('@')[0],
-          role: 'admin',
+          id: admin.adminId || "admin",
+          email: admin.email || "admin",
+          name: (admin.email || "admin").split("@")[0],
+          role: "admin",
         },
         vendor.name,
         amount,
-        reference || `VENDOR-${payment._id}`
+        reference || `VENDOR-${payment._id}`,
       );
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
@@ -260,10 +262,10 @@ export async function POST(request: NextRequest) {
       message: `Payment of €${amount.toFixed(2)} to ${vendor.name} recorded successfully`,
     });
   } catch (error) {
-    console.error('Error recording vendor payment:', error);
+    console.error("Error recording vendor payment:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to record vendor payment' },
-      { status: 500 }
+      { success: false, error: "Failed to record vendor payment" },
+      { status: 500 },
     );
   }
 }

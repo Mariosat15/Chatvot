@@ -1,28 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import KYCSession from '@/database/models/kyc-session.model';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import KYCSession from "@/database/models/kyc-session.model";
+import { getAdminSession } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
-    const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const status = searchParams.get("status");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
 
     const query: Record<string, any> = {};
 
-    if (status && status !== 'all') {
+    if (status && status !== "all") {
       query.status = status;
     }
 
@@ -38,9 +38,9 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       query.$or = [
-        { 'personData.firstName': { $regex: search, $options: 'i' } },
-        { 'personData.lastName': { $regex: search, $options: 'i' } },
-        { 'documentData.number': { $regex: search, $options: 'i' } },
+        { "personData.firstName": { $regex: search, $options: "i" } },
+        { "personData.lastName": { $regex: search, $options: "i" } },
+        { "documentData.number": { $regex: search, $options: "i" } },
         { userId: search },
         { veriffSessionId: search },
       ];
@@ -57,32 +57,34 @@ export async function GET(req: NextRequest) {
 
     // Get user details for each session
     // User info is now stored directly in the session, but fallback to lookup for older sessions
-    const mongoose = (await import('mongoose')).default;
+    const mongoose = (await import("mongoose")).default;
     const db = mongoose.connection.db;
-    
+
     const sessionsWithUsers = await Promise.all(
       sessions.map(async (session: any) => {
         // Use stored user info if available
         if (session.userEmail && session.userName) {
           return session;
         }
-        
+
         // Fallback: Try to get user info from Better Auth users collection
-        const user = await db?.collection('user').findOne({ id: session.userId });
-        
+        const user = await db
+          ?.collection("user")
+          .findOne({ id: session.userId });
+
         return {
           ...session,
-          userEmail: session.userEmail || user?.email || 'Unknown',
-          userName: session.userName || user?.name || 'Unknown',
+          userEmail: session.userEmail || user?.email || "Unknown",
+          userName: session.userName || user?.name || "Unknown",
         };
-      })
+      }),
     );
 
     // Get stats
     const stats = await KYCSession.aggregate([
       {
         $group: {
-          _id: '$status',
+          _id: "$status",
           count: { $sum: 1 },
         },
       },
@@ -98,10 +100,11 @@ export async function GET(req: NextRequest) {
 
     stats.forEach((s) => {
       statusCounts.total += s.count;
-      if (s._id === 'approved') statusCounts.approved = s.count;
-      else if (s._id === 'declined') statusCounts.declined = s.count;
-      else if (s._id === 'expired') statusCounts.expired = s.count;
-      else if (['created', 'started', 'submitted'].includes(s._id)) statusCounts.pending += s.count;
+      if (s._id === "approved") statusCounts.approved = s.count;
+      else if (s._id === "declined") statusCounts.declined = s.count;
+      else if (s._id === "expired") statusCounts.expired = s.count;
+      else if (["created", "started", "submitted"].includes(s._id))
+        statusCounts.pending += s.count;
     });
 
     return NextResponse.json({
@@ -115,8 +118,10 @@ export async function GET(req: NextRequest) {
       stats: statusCounts,
     });
   } catch (error) {
-    console.error('Error fetching KYC history:', error);
-    return NextResponse.json({ error: 'Failed to fetch KYC history' }, { status: 500 });
+    console.error("Error fetching KYC history:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch KYC history" },
+      { status: 500 },
+    );
   }
 }
-

@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, RefreshCw, LogOut, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { signOut } from '@/lib/actions/auth.actions';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Mail, RefreshCw, LogOut, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { signOut } from "@/lib/actions/auth.actions";
 
 export default function VerifyEmailRequiredPage() {
   const router = useRouter();
@@ -16,22 +22,22 @@ export default function VerifyEmailRequiredPage() {
   const handleResendEmail = async () => {
     setResending(true);
     try {
-      const response = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setResent(true);
-        toast.success('Verification email sent! Check your inbox.');
+        toast.success("Verification email sent! Check your inbox.");
       } else {
-        toast.error(data.error || 'Failed to send verification email');
+        toast.error(data.error || "Failed to send verification email");
       }
     } catch (error) {
-      console.error('Error resending verification email:', error);
-      toast.error('Failed to send verification email');
+      console.error("Error resending verification email:", error);
+      toast.error("Failed to send verification email");
     } finally {
       setResending(false);
     }
@@ -40,10 +46,10 @@ export default function VerifyEmailRequiredPage() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push('/sign-in');
+      router.push("/sign-in");
     } catch (error) {
-      console.error('Error signing out:', error);
-      router.push('/sign-in');
+      console.error("Error signing out:", error);
+      router.push("/sign-in");
     }
   };
 
@@ -61,11 +67,12 @@ export default function VerifyEmailRequiredPage() {
             Please verify your email address to access your account.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
             <p className="text-sm text-yellow-200">
-              We sent a verification link to your email address. Click the link in the email to verify your account.
+              We sent a verification link to your email address. Click the link
+              in the email to verify your account.
             </p>
           </div>
 
@@ -108,8 +115,11 @@ export default function VerifyEmailRequiredPage() {
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            Having trouble? Contact support at{' '}
-            <a href="mailto:support@chartvolt.com" className="text-yellow-500 hover:underline">
+            Having trouble? Contact support at{" "}
+            <a
+              href="mailto:support@chartvolt.com"
+              className="text-yellow-500 hover:underline"
+            >
               support@chartvolt.com
             </a>
           </p>
@@ -118,4 +128,3 @@ export default function VerifyEmailRequiredPage() {
     </div>
   );
 }
-

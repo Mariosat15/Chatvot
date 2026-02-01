@@ -1,25 +1,39 @@
 /**
  * Chartvolt WebSocket Server
- * 
+ *
  * Production-ready WebSocket server for real-time messaging
  * Runs as a separate PM2 process alongside other Chartvolt services
- * 
+ *
  * Start with: pm2 start ecosystem.config.js --only chartvolt-websocket
  */
 
-import { createServer } from 'http';
-import { WebSocket, WebSocketServer } from 'ws';
-import { verify } from 'jsonwebtoken';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import { createServer } from "http";
+import { WebSocket, WebSocketServer } from "ws";
+import { verify } from "jsonwebtoken";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
 
 // Load environment variables
-dotenv.config({ path: '../.env' });
-dotenv.config({ path: '../.env.local' });
+dotenv.config({ path: "../.env" });
+dotenv.config({ path: "../.env.local" });
 
 const PORT = process.env.WEBSOCKET_PORT || 3003;
-const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET || 'default-secret';
-const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+
+// Get JWT secret with production safety check
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET or AUTH_SECRET is required in production");
+  }
+  if (!secret) {
+    console.warn("⚠️  JWT_SECRET not set - using insecure fallback (OK for development only)");
+    return "dev-only-insecure-secret-do-not-use-in-production-32chars";
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 // ==========================================
 // Types
@@ -28,7 +42,7 @@ const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
 interface Connection {
   ws: WebSocket;
   participantId: string;
-  participantType: 'user' | 'employee';
+  participantType: "user" | "employee";
   participantName: string;
   conversationIds: Set<string>;
   subscribedSymbols: Set<string>; // Symbols this client wants price updates for
@@ -40,7 +54,7 @@ interface JWTPayload {
   id?: string;
   sub?: string;
   userId?: string;
-  type?: 'user' | 'employee';
+  type?: "user" | "employee";
   name?: string;
   email?: string;
 }
@@ -60,15 +74,15 @@ const participantConnections = new Map<string, Set<string>>(); // participantId 
 async function connectToMongoDB() {
   try {
     if (!MONGODB_URI) {
-      console.error('❌ MONGODB_URI not configured');
+      console.error("❌ MONGODB_URI not configured");
       return false;
     }
 
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    console.log("✅ Connected to MongoDB");
     return true;
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error("❌ MongoDB connection error:", error);
     return false;
   }
 }
@@ -79,116 +93,133 @@ async function connectToMongoDB() {
 
 const server = createServer(async (req, res) => {
   // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   // CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
     return;
   }
 
   // Health check endpoint
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'healthy',
-      connections: connections.size,
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-    }));
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "healthy",
+        connections: connections.size,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+      }),
+    );
     return;
   }
 
   // Stats endpoint for server monitor
-  if (req.url === '/stats') {
+  if (req.url === "/stats") {
     // Count all unique subscribed symbols across all connections
     const allSubscribedSymbols = new Set<string>();
     connections.forEach((conn) => {
-      conn.subscribedSymbols.forEach((symbol) => allSubscribedSymbols.add(symbol));
+      conn.subscribedSymbols.forEach((symbol) =>
+        allSubscribedSymbols.add(symbol),
+      );
     });
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      connections: connections.size,
-      subscribedSymbols: allSubscribedSymbols.size,
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      timestamp: Date.now(),
-    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        connections: connections.size,
+        subscribedSymbols: allSubscribedSymbols.size,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        timestamp: Date.now(),
+      }),
+    );
     return;
   }
 
   // Stats endpoint
-  if (req.url === '/stats') {
+  if (req.url === "/stats") {
     const memUsage = process.memoryUsage();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      totalConnections: connections.size,
-      uniqueParticipants: participantConnections.size,
-      activeConversations: conversationSubscribers.size,
-      presenceWatchers: presenceSubscribers.size,
-      memoryUsage: {
-        heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
-        heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
-        rssMB: Math.round(memUsage.rss / 1024 / 1024),
-      },
-      uptime: Math.round(process.uptime()),
-    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        totalConnections: connections.size,
+        uniqueParticipants: participantConnections.size,
+        activeConversations: conversationSubscribers.size,
+        presenceWatchers: presenceSubscribers.size,
+        memoryUsage: {
+          heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+          rssMB: Math.round(memUsage.rss / 1024 / 1024),
+        },
+        uptime: Math.round(process.uptime()),
+      }),
+    );
     return;
   }
 
   // ==========================================
   // Internal API endpoints (called by main app)
   // ==========================================
-  
-  if (req.method === 'POST' && req.url?.startsWith('/internal/')) {
-    let body = '';
-    
-    req.on('data', chunk => { body += chunk; });
-    
-    req.on('end', () => {
+
+  if (req.method === "POST" && req.url?.startsWith("/internal/")) {
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
       try {
         const data = JSON.parse(body);
-        const endpoint = req.url?.replace('/internal/', '');
+        const endpoint = req.url?.replace("/internal/", "");
 
         switch (endpoint) {
-          case 'message':
+          case "message":
             // Broadcast new message
             if (data.conversationId && data.message) {
               broadcastToConversation(data.conversationId, {
-                type: 'new_message',
-                data: { conversationId: data.conversationId, message: data.message },
+                type: "new_message",
+                data: {
+                  conversationId: data.conversationId,
+                  message: data.message,
+                },
               });
               console.log(`📤 Broadcast message to ${data.conversationId}`);
             }
             break;
 
-          case 'read':
+          case "read":
             // Broadcast read receipt
             if (data.conversationId) {
-              broadcastToConversation(data.conversationId, {
-                type: 'read_receipt',
-                data: {
-                  conversationId: data.conversationId,
-                  participantId: data.participantId,
-                  participantName: data.participantName,
-                  readAt: data.readAt,
+              broadcastToConversation(
+                data.conversationId,
+                {
+                  type: "read_receipt",
+                  data: {
+                    conversationId: data.conversationId,
+                    participantId: data.participantId,
+                    participantName: data.participantName,
+                    readAt: data.readAt,
+                  },
                 },
-              }, data.participantId);
+                data.participantId,
+              );
             }
             break;
 
-          case 'transfer':
+          case "transfer":
             // Broadcast transfer
             if (data.conversationId) {
               broadcastToConversation(data.conversationId, {
-                type: 'conversation_update',
+                type: "conversation_update",
                 data: {
                   conversationId: data.conversationId,
-                  type: 'transfer',
+                  type: "transfer",
                   data: {
                     newEmployeeId: data.toEmployeeId,
                     newEmployeeName: data.toEmployeeName,
@@ -197,66 +228,72 @@ const server = createServer(async (req, res) => {
               });
               // Notify the new employee
               broadcastToParticipant(data.toEmployeeId, {
-                type: 'notification',
+                type: "notification",
                 data: {
                   id: `transfer-${Date.now()}`,
-                  type: 'conversation_assigned',
-                  title: 'New Conversation',
-                  message: 'A conversation has been transferred to you',
+                  type: "conversation_assigned",
+                  title: "New Conversation",
+                  message: "A conversation has been transferred to you",
                   data: { conversationId: data.conversationId },
                 },
               });
             }
             break;
 
-          case 'typing':
+          case "typing":
             // Broadcast typing indicator
             if (data.conversationId) {
-              broadcastToConversation(data.conversationId, {
-                type: 'typing',
-                data: {
-                  conversationId: data.conversationId,
-                  participantId: data.participantId,
-                  participantName: data.participantName,
-                  isTyping: data.isTyping,
+              broadcastToConversation(
+                data.conversationId,
+                {
+                  type: "typing",
+                  data: {
+                    conversationId: data.conversationId,
+                    participantId: data.participantId,
+                    participantName: data.participantName,
+                    isTyping: data.isTyping,
+                  },
                 },
-              }, data.participantId);
+                data.participantId,
+              );
             }
             break;
 
-          case 'friend-request':
+          case "friend-request":
             // Broadcast friend request
             if (data.toUserId) {
               broadcastToParticipant(data.toUserId, {
-                type: 'friend_request',
+                type: "friend_request",
                 data: { type: data.eventType, request: data.request },
               });
             }
             break;
 
-          case 'presence':
+          case "presence":
             // Broadcast presence
             if (data.participantId) {
               broadcastPresence(data.participantId, data.status);
             }
             break;
 
-          case 'broadcast':
+          case "broadcast":
             // Generic broadcast to conversation participants
             if (data.conversationId && data.type) {
               broadcastToConversation(data.conversationId, {
                 type: data.type,
                 data: data.data || data,
               });
-              console.log(`📢 Broadcast ${data.type} to ${data.conversationId}`);
+              console.log(
+                `📢 Broadcast ${data.type} to ${data.conversationId}`,
+              );
             }
             break;
 
-          case 'chat-transferred':
+          case "chat-transferred":
             // Broadcast chat transfer event
             if (data.conversationId) {
               broadcastToConversation(data.conversationId, {
-                type: 'chat_transferred',
+                type: "chat_transferred",
                 data: {
                   conversationId: data.conversationId,
                   isChatTransferred: data.isChatTransferred ?? false,
@@ -268,19 +305,23 @@ const server = createServer(async (req, res) => {
                   chatTransferredFromName: data.chatTransferredFromName,
                 },
               });
-              console.log(`🔄 Broadcast chat_transferred to ${data.conversationId}`);
-              
+              console.log(
+                `🔄 Broadcast chat_transferred to ${data.conversationId}`,
+              );
+
               // Notify affected employees
               if (data.assignedEmployeeId) {
                 broadcastToParticipant(data.assignedEmployeeId, {
-                  type: 'notification',
+                  type: "notification",
                   data: {
                     id: `transfer-${Date.now()}`,
-                    type: 'chat_transfer',
-                    title: data.isChatTransferred ? 'Chat Transferred' : 'Chat Returned',
-                    message: data.isChatTransferred 
-                      ? 'A chat has been transferred to you'
-                      : 'A chat has been returned to you',
+                    type: "chat_transfer",
+                    title: data.isChatTransferred
+                      ? "Chat Transferred"
+                      : "Chat Returned",
+                    message: data.isChatTransferred
+                      ? "A chat has been transferred to you"
+                      : "A chat has been returned to you",
                     data: { conversationId: data.conversationId },
                   },
                 });
@@ -288,11 +329,11 @@ const server = createServer(async (req, res) => {
             }
             break;
 
-          case 'profile-updated':
+          case "profile-updated":
             // Broadcast profile update to affected users (friends and conversation participants)
             if (data.userId && data.affectedUserIds) {
               const profileUpdateEvent = {
-                type: 'profile_updated',
+                type: "profile_updated",
                 data: {
                   userId: data.userId,
                   name: data.name,
@@ -300,27 +341,35 @@ const server = createServer(async (req, res) => {
                   timestamp: new Date().toISOString(),
                 },
               };
-              
+
               // Notify all affected users (friends and conversation participants)
               for (const affectedUserId of data.affectedUserIds) {
                 broadcastToParticipant(affectedUserId, profileUpdateEvent);
               }
-              
+
               // Also notify the user themselves (for multi-tab/device sync)
               broadcastToParticipant(data.userId, profileUpdateEvent);
-              
-              console.log(`👤 Profile updated: ${data.userId} -> notified ${data.affectedUserIds.length} users`);
+
+              console.log(
+                `👤 Profile updated: ${data.userId} -> notified ${data.affectedUserIds.length} users`,
+              );
             }
             break;
 
-          case 'prices':
+          case "prices":
             // Broadcast prices AND forming candles to clients based on their subscriptions
             // Called by websocket-price-streamer every ~200ms
-            
+
             // OPTIMIZATION 1: Skip if no clients connected
             if (connections.size === 0) break;
-            
-            if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m) {
+
+            if (
+              data.prices ||
+              data.formingCandles ||
+              data.formingCandles5m ||
+              data.formingCandles15m ||
+              data.formingCandles30m
+            ) {
               const allPrices = data.prices || [];
               const allCandles1m = data.formingCandles || [];
               const allCandles5m = data.formingCandles5m || [];
@@ -334,37 +383,59 @@ const server = createServer(async (req, res) => {
               // ⭐ COMPLETED CANDLES - so clients can update their historical data
               const completedCandles = data.completedCandles || [];
               const timestamp = Date.now();
-              
+
               // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
               let cachedFullDataStr: string | null = null;
-              
+
               let clientCount = 0;
               let filteredCount = 0;
-              
+
               connections.forEach((conn) => {
                 if (conn.ws.readyState !== WebSocket.OPEN) return;
-                
+
                 try {
                   const hasSubscriptions = conn.subscribedSymbols.size > 0;
-                  
+
                   if (hasSubscriptions) {
                     // Filter to only subscribed symbols (must stringify per client)
                     const subs = conn.subscribedSymbols;
                     const eventData = {
-                      type: 'price_update',
+                      type: "price_update",
                       data: {
-                        prices: allPrices.filter((p: {symbol: string}) => subs.has(p.symbol)),
-                        formingCandles: allCandles1m.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandles5m: allCandles5m.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandles15m: allCandles15m.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandles30m: allCandles30m.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandles1h: allCandles1h.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandles4h: allCandles4h.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandlesD: allCandlesD.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandlesW: allCandlesW.filter((c: {symbol: string}) => subs.has(c.symbol)),
-                        formingCandlesM: allCandlesM.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        prices: allPrices.filter((p: { symbol: string }) =>
+                          subs.has(p.symbol),
+                        ),
+                        formingCandles: allCandles1m.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandles5m: allCandles5m.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandles15m: allCandles15m.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandles30m: allCandles30m.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandles1h: allCandles1h.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandles4h: allCandles4h.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandlesD: allCandlesD.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandlesW: allCandlesW.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
+                        formingCandlesM: allCandlesM.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
                         // ⭐ Completed candles - filter by symbol
-                        completedCandles: completedCandles.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        completedCandles: completedCandles.filter(
+                          (c: { symbol: string }) => subs.has(c.symbol),
+                        ),
                         timestamp,
                       },
                     };
@@ -374,7 +445,7 @@ const server = createServer(async (req, res) => {
                     // No subscriptions - use cached stringified data
                     if (!cachedFullDataStr) {
                       cachedFullDataStr = JSON.stringify({
-                        type: 'price_update',
+                        type: "price_update",
                         data: {
                           prices: allPrices,
                           formingCandles: allCandles1m,
@@ -399,35 +470,36 @@ const server = createServer(async (req, res) => {
                   // Ignore send errors
                 }
               });
-              
+
               // Log only ~once per minute (or when completed candles are sent)
               if (completedCandles.length > 0 || Math.random() < 0.003) {
-                const msg = completedCandles.length > 0 
-                  ? `📊 WS: ${clientCount} clients | ${completedCandles.length} COMPLETED candles sent` 
-                  : `📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`;
+                const msg =
+                  completedCandles.length > 0
+                    ? `📊 WS: ${clientCount} clients | ${completedCandles.length} COMPLETED candles sent`
+                    : `📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`;
                 console.log(msg);
               }
             }
             break;
 
-          case 'data_updated':
+          case "data_updated":
             // Broadcast data update notification to all price viewers
             // Called when: seeding completes, gap fill completes, historical download completes
             if (data.symbol && data.timeframe) {
               const updateEvent = {
-                type: 'data_updated',
+                type: "data_updated",
                 data: {
                   symbol: data.symbol,
                   timeframe: data.timeframe,
-                  reason: data.reason || 'historical_data_updated',
+                  reason: data.reason || "historical_data_updated",
                   timestamp: Date.now(),
                 },
               };
-              
+
               let notifiedCount = 0;
               connections.forEach((conn) => {
                 if (conn.ws.readyState !== WebSocket.OPEN) return;
-                
+
                 // Only notify clients subscribed to this symbol
                 if (conn.subscribedSymbols.has(data.symbol)) {
                   try {
@@ -438,8 +510,10 @@ const server = createServer(async (req, res) => {
                   }
                 }
               });
-              
-              console.log(`🔄 [Data Updated] ${data.symbol} ${data.timeframe} - notified ${notifiedCount} clients (${data.reason || 'update'})`);
+
+              console.log(
+                `🔄 [Data Updated] ${data.symbol} ${data.timeframe} - notified ${notifiedCount} clients (${data.reason || "update"})`,
+              );
             }
             break;
 
@@ -447,73 +521,82 @@ const server = createServer(async (req, res) => {
             console.warn(`Unknown internal endpoint: ${endpoint}`);
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true }));
       } catch (error) {
-        console.error('Internal API error:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal error' }));
+        console.error("Internal API error:", error);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal error" }));
       }
     });
     return;
   }
 
   res.writeHead(404);
-  res.end('Not found');
+  res.end("Not found");
 });
 
 // ==========================================
 // WebSocket Server
 // ==========================================
 
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ server, path: "/ws" });
 
-wss.on('connection', (ws, req) => {
+wss.on("connection", (ws, req) => {
   handleConnection(ws, req);
 });
 
 function handleConnection(ws: WebSocket, req: any) {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const token = url.searchParams.get('token');
-  const type = url.searchParams.get('type') as 'user' | 'employee' || 'user';
+  const url = new URL(req.url || "", `http://${req.headers.host}`);
+  const token = url.searchParams.get("token");
+  const type = (url.searchParams.get("type") as "user" | "employee") || "user";
 
   if (!token) {
-    ws.close(4001, 'Authentication required');
+    ws.close(4001, "Authentication required");
     return;
   }
 
   let participantId: string;
-  let participantType: 'user' | 'employee' = type;
-  let participantName = 'Unknown';
+  let participantType: "user" | "employee" = type;
+  let participantName = "Unknown";
 
   // Try JWT verification first, then fall back to raw ID
   try {
     const decoded = verify(token, JWT_SECRET) as JWTPayload;
-    participantId = decoded.id || decoded.sub || decoded.userId || '';
+    participantId = decoded.id || decoded.sub || decoded.userId || "";
     participantType = decoded.type || type;
-    participantName = decoded.name || decoded.email || 'Unknown';
-    
+    participantName = decoded.name || decoded.email || "Unknown";
+
     if (!participantId) {
-      throw new Error('No user ID in token');
+      throw new Error("No user ID in token");
     }
-  } catch (jwtError) {
+  } catch {
     // JWT verification failed - treat token as raw user/admin ID
     // This supports both JWT auth and simple ID-based auth
     // Accept: MongoDB ObjectIds (24 hex), or any alphanumeric string (admin IDs, session IDs)
-    if (token && token.length >= 1 && /^[a-f0-9]{24}$|^[a-zA-Z0-9@._-]+$/.test(token)) {
+    if (
+      token &&
+      token.length >= 1 &&
+      /^[a-f0-9]{24}$|^[a-zA-Z0-9@._-]+$/.test(token)
+    ) {
       // Looks like a MongoDB ObjectId, admin ID, or email
       participantId = token;
-      participantName = type === 'employee' ? 'Employee' : 'User';
-      console.log(`🔑 Using raw ID auth for ${type}: ${token.length > 10 ? token.substring(0, 10) + '...' : token}`);
+      participantName = type === "employee" ? "Employee" : "User";
+      console.log(
+        `🔑 Using raw ID auth for ${type}: ${token.length > 10 ? token.substring(0, 10) + "..." : token}`,
+      );
     } else {
-      console.error('Authentication failed: Invalid token format:', token?.substring(0, 20));
-      ws.close(4001, 'Authentication failed');
+      console.error(
+        "Authentication failed: Invalid token format:",
+        token?.substring(0, 20),
+      );
+      ws.close(4001, "Authentication failed");
       return;
     }
   }
 
   const connectionId = `${participantId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const connection: Connection = {
     ws,
     participantId,
@@ -535,35 +618,35 @@ function handleConnection(ws: WebSocket, req: any) {
   participantConnections.get(participantId)!.add(connectionId);
 
   // Setup ping/pong for connection health
-  ws.on('pong', () => {
+  ws.on("pong", () => {
     connection.isAlive = true;
     connection.lastHeartbeat = Date.now();
   });
 
   // Handle incoming messages
-  ws.on('message', (data) => {
+  ws.on("message", (data) => {
     try {
       const message = JSON.parse(data.toString());
       handleMessage(connectionId, message);
     } catch (error) {
-      console.error('Invalid message format:', error);
+      console.error("Invalid message format:", error);
     }
   });
 
   // Handle close
-  ws.on('close', () => {
+  ws.on("close", () => {
     handleDisconnect(connectionId);
   });
 
   // Handle error
-  ws.on('error', (error) => {
+  ws.on("error", (error) => {
     console.error(`WebSocket error for ${participantId}:`, error.message);
     handleDisconnect(connectionId);
   });
 
   // Send connection acknowledgment
   send(ws, {
-    type: 'connected',
+    type: "connected",
     data: {
       connectionId,
       participantId,
@@ -572,9 +655,11 @@ function handleConnection(ws: WebSocket, req: any) {
   });
 
   // Broadcast presence
-  broadcastPresence(participantId, 'online');
+  broadcastPresence(participantId, "online");
 
-  console.log(`✅ Connected: ${participantId} (${participantType}) - Total: ${connections.size}`);
+  console.log(
+    `✅ Connected: ${participantId} (${participantType}) - Total: ${connections.size}`,
+  );
 }
 
 function handleMessage(connectionId: string, message: any) {
@@ -584,16 +669,18 @@ function handleMessage(connectionId: string, message: any) {
   const { type, ...data } = message;
 
   switch (type) {
-    case 'subscribe':
+    case "subscribe":
       // Subscribe to conversation updates
       if (data.conversationId) {
         connection.conversationIds.add(data.conversationId);
         addSubscriber(data.conversationId, connectionId);
-        console.log(`📌 ${connection.participantId} subscribed to ${data.conversationId}`);
+        console.log(
+          `📌 ${connection.participantId} subscribed to ${data.conversationId}`,
+        );
       }
       break;
 
-    case 'unsubscribe':
+    case "unsubscribe":
       // Unsubscribe from conversation
       if (data.conversationId) {
         connection.conversationIds.delete(data.conversationId);
@@ -601,68 +688,78 @@ function handleMessage(connectionId: string, message: any) {
       }
       break;
 
-    case 'subscribe_symbol':
+    case "subscribe_symbol":
       // Subscribe to price updates for specific symbol(s)
       if (data.symbol) {
         connection.subscribedSymbols.add(data.symbol);
       }
       if (data.symbols && Array.isArray(data.symbols)) {
-        data.symbols.forEach((s: string) => connection.subscribedSymbols.add(s));
+        data.symbols.forEach((s: string) =>
+          connection.subscribedSymbols.add(s),
+        );
       }
       break;
 
-    case 'unsubscribe_symbol':
+    case "unsubscribe_symbol":
       // Unsubscribe from price updates
       if (data.symbol) {
         connection.subscribedSymbols.delete(data.symbol);
       }
       if (data.symbols && Array.isArray(data.symbols)) {
-        data.symbols.forEach((s: string) => connection.subscribedSymbols.delete(s));
+        data.symbols.forEach((s: string) =>
+          connection.subscribedSymbols.delete(s),
+        );
       }
       break;
 
-    case 'typing':
+    case "typing":
       // Broadcast typing indicator
       if (data.conversationId) {
-        broadcastToConversation(data.conversationId, {
-          type: 'typing',
-          data: {
-            conversationId: data.conversationId,
-            participantId: connection.participantId,
-            participantName: connection.participantName,
-            isTyping: data.isTyping !== false,
+        broadcastToConversation(
+          data.conversationId,
+          {
+            type: "typing",
+            data: {
+              conversationId: data.conversationId,
+              participantId: connection.participantId,
+              participantName: connection.participantName,
+              isTyping: data.isTyping !== false,
+            },
           },
-        }, connection.participantId);
+          connection.participantId,
+        );
       }
       break;
 
-    case 'heartbeat':
+    case "heartbeat":
       connection.lastHeartbeat = Date.now();
       connection.isAlive = true;
       send(connection.ws, {
-        type: 'heartbeat_ack',
+        type: "heartbeat_ack",
         data: { timestamp: Date.now() },
       });
       break;
 
-    case 'presence':
+    case "presence":
       // Update presence status
       if (data.status) {
         broadcastPresence(connection.participantId, data.status);
       }
       break;
 
-    case 'watch_presence':
+    case "watch_presence":
       // Subscribe to presence updates for specific participants (friends/conversation partners)
       if (data.participantIds && Array.isArray(data.participantIds)) {
         for (const targetId of data.participantIds) {
           subscribeToPresence(connectionId, targetId);
         }
-        console.log(`👁️ ${connection.participantId} watching presence of ${data.participantIds.length} users`);
+        console.log(
+          `👁️ ${connection.participantId} watching presence of ${data.participantIds.length} users`,
+        );
       }
       break;
 
-    case 'unwatch_presence':
+    case "unwatch_presence":
       // Unsubscribe from presence updates
       if (data.participantIds && Array.isArray(data.participantIds)) {
         for (const targetId of data.participantIds) {
@@ -671,11 +768,11 @@ function handleMessage(connectionId: string, message: any) {
       }
       break;
 
-    case 'message':
+    case "message":
       // Broadcast new message to conversation
       if (data.conversationId && data.message) {
         broadcastToConversation(data.conversationId, {
-          type: 'message',
+          type: "message",
           data: {
             conversationId: data.conversationId,
             message: data.message,
@@ -711,12 +808,14 @@ function handleDisconnect(connectionId: string) {
     if (participantConns.size === 0) {
       participantConnections.delete(connection.participantId);
       // Only broadcast offline if no more connections for this participant
-      broadcastPresence(connection.participantId, 'offline');
+      broadcastPresence(connection.participantId, "offline");
     }
   }
 
   connections.delete(connectionId);
-  console.log(`❌ Disconnected: ${connection.participantId} - Total: ${connections.size}`);
+  console.log(
+    `❌ Disconnected: ${connection.participantId} - Total: ${connections.size}`,
+  );
 }
 
 // ==========================================
@@ -746,14 +845,22 @@ function removeSubscriber(conversationId: string, connectionId: string) {
   }
 }
 
-function broadcastToConversation(conversationId: string, event: any, excludeParticipantId?: string) {
+function broadcastToConversation(
+  conversationId: string,
+  event: any,
+  excludeParticipantId?: string,
+) {
   const subscribers = conversationSubscribers.get(conversationId);
   if (!subscribers) return;
 
   for (const connectionId of subscribers) {
     const connection = connections.get(connectionId);
     if (connection && connection.ws.readyState === WebSocket.OPEN) {
-      if (excludeParticipantId && connection.participantId === excludeParticipantId) continue;
+      if (
+        excludeParticipantId &&
+        connection.participantId === excludeParticipantId
+      )
+        continue;
       send(connection.ws, event);
     }
   }
@@ -774,14 +881,20 @@ function broadcastToParticipant(participantId: string, event: any) {
 // Track who is interested in whose presence (friends/conversation partners only)
 const presenceSubscribers = new Map<string, Set<string>>(); // participantId -> Set of connectionIds watching them
 
-function subscribeToPresence(watcherConnectionId: string, targetParticipantId: string) {
+function subscribeToPresence(
+  watcherConnectionId: string,
+  targetParticipantId: string,
+) {
   if (!presenceSubscribers.has(targetParticipantId)) {
     presenceSubscribers.set(targetParticipantId, new Set());
   }
   presenceSubscribers.get(targetParticipantId)!.add(watcherConnectionId);
 }
 
-function unsubscribeFromPresence(watcherConnectionId: string, targetParticipantId: string) {
+function unsubscribeFromPresence(
+  watcherConnectionId: string,
+  targetParticipantId: string,
+) {
   const subs = presenceSubscribers.get(targetParticipantId);
   if (subs) {
     subs.delete(watcherConnectionId);
@@ -791,7 +904,7 @@ function unsubscribeFromPresence(watcherConnectionId: string, targetParticipantI
 
 function broadcastPresence(participantId: string, status: string) {
   const event = {
-    type: 'presence',
+    type: "presence",
     data: {
       participantId,
       status,
@@ -802,7 +915,7 @@ function broadcastPresence(participantId: string, status: string) {
   // OPTIMIZED: Only broadcast to users who are actively watching this participant
   // (users in the same conversation or friends) instead of ALL users
   const subscribers = presenceSubscribers.get(participantId);
-  
+
   if (subscribers && subscribers.size > 0) {
     for (const connectionId of subscribers) {
       const connection = connections.get(connectionId);
@@ -810,9 +923,11 @@ function broadcastPresence(participantId: string, status: string) {
         send(connection.ws, event);
       }
     }
-    console.log(`📡 Presence ${status} for ${participantId} sent to ${subscribers.size} subscribers`);
+    console.log(
+      `📡 Presence ${status} for ${participantId} sent to ${subscribers.size} subscribers`,
+    );
   }
-  
+
   // Also notify the participant themselves (for multi-device sync)
   const ownConnections = participantConnections.get(participantId);
   if (ownConnections) {
@@ -830,11 +945,11 @@ function broadcastPresence(participantId: string, status: string) {
 // ==========================================
 
 const PING_INTERVAL = 30000; // 30 seconds
-const PING_TIMEOUT = 10000; // 10 seconds to respond
+const _PING_TIMEOUT = 10000; // 10 seconds to respond
 
 setInterval(() => {
-  const now = Date.now();
-  
+  const _now = Date.now();
+
   for (const [connectionId, connection] of connections) {
     if (!connection.isAlive) {
       // Connection didn't respond to last ping
@@ -858,54 +973,70 @@ setInterval(() => {
 
 export function notifyNewMessage(conversationId: string, message: any) {
   broadcastToConversation(conversationId, {
-    type: 'message',
+    type: "message",
     data: { conversationId, message },
   });
 }
 
-export function notifyRead(conversationId: string, participantId: string, participantName: string) {
-  broadcastToConversation(conversationId, {
-    type: 'read',
-    data: {
-      conversationId,
-      participantId,
-      participantName,
-      readAt: new Date().toISOString(),
+export function notifyRead(
+  conversationId: string,
+  participantId: string,
+  participantName: string,
+) {
+  broadcastToConversation(
+    conversationId,
+    {
+      type: "read",
+      data: {
+        conversationId,
+        participantId,
+        participantName,
+        readAt: new Date().toISOString(),
+      },
     },
-  }, participantId);
+    participantId,
+  );
 }
 
-export function notifyTransfer(conversationId: string, toEmployeeId: string, toEmployeeName: string) {
+export function notifyTransfer(
+  conversationId: string,
+  toEmployeeId: string,
+  toEmployeeName: string,
+) {
   broadcastToConversation(conversationId, {
-    type: 'conversation_update',
+    type: "conversation_update",
     data: {
       conversationId,
-      type: 'transfer',
+      type: "transfer",
       data: { newEmployeeId: toEmployeeId, newEmployeeName: toEmployeeName },
     },
   });
 
   broadcastToParticipant(toEmployeeId, {
-    type: 'notification',
+    type: "notification",
     data: {
       id: `transfer-${Date.now()}`,
-      type: 'conversation_assigned',
-      title: 'New Conversation',
-      message: 'A conversation has been transferred to you',
+      type: "conversation_assigned",
+      title: "New Conversation",
+      message: "A conversation has been transferred to you",
       data: { conversationId },
     },
   });
 }
 
-export function notifyFriendRequest(toUserId: string, eventType: string, request: any) {
+export function notifyFriendRequest(
+  toUserId: string,
+  eventType: string,
+  request: any,
+) {
   broadcastToParticipant(toUserId, {
-    type: 'friend_request',
+    type: "friend_request",
     data: { type: eventType, request },
   });
 }
 
 export function getOnlineParticipants(participantIds: string[]): string[] {
-  return participantIds.filter(id => participantConnections.has(id));
+  return participantIds.filter((id) => participantConnections.has(id));
 }
 
 export function getStats() {
@@ -922,17 +1053,17 @@ export function getStats() {
 // ==========================================
 
 function shutdown() {
-  console.log('🛑 Shutting down WebSocket server...');
+  console.log("🛑 Shutting down WebSocket server...");
 
   // Close all connections gracefully
-  for (const [connectionId, connection] of connections) {
-    connection.ws.close(1001, 'Server shutting down');
+  for (const [_connectionId, connection] of connections) {
+    connection.ws.close(1001, "Server shutting down");
   }
 
   wss.close(() => {
     server.close(() => {
       mongoose.disconnect().then(() => {
-        console.log('✅ WebSocket server shut down cleanly');
+        console.log("✅ WebSocket server shut down cleanly");
         process.exit(0);
       });
     });
@@ -940,21 +1071,21 @@ function shutdown() {
 
   // Force exit after 10 seconds
   setTimeout(() => {
-    console.error('⚠️ Forced shutdown after timeout');
+    console.error("⚠️ Forced shutdown after timeout");
     process.exit(1);
   }, 10000);
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 // ==========================================
 // Start Server
 // ==========================================
 
 async function start() {
-  console.log('🚀 Starting Chartvolt WebSocket Server...');
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log("🚀 Starting Chartvolt WebSocket Server...");
+  console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
 
   // Connect to MongoDB (optional - for presence persistence)
   await connectToMongoDB();
@@ -968,4 +1099,3 @@ async function start() {
 }
 
 start().catch(console.error);
-

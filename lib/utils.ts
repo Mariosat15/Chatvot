@@ -1,5 +1,5 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 // Type definitions for news and alerts
 export interface RawNewsArticle {
@@ -17,7 +17,7 @@ export interface RawNewsArticle {
 export interface Alert {
   id: string;
   symbol: string;
-  alertType: 'upper' | 'lower';
+  alertType: "upper" | "lower";
   threshold: number;
   createdAt: Date;
   isTriggered: boolean;
@@ -35,11 +35,11 @@ export const formatTimeAgo = (timestamp: number) => {
 
   if (diffInHours > 24) {
     const days = Math.floor(diffInHours / 24);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
+    return `${days} day${days > 1 ? "s" : ""} ago`;
   } else if (diffInHours >= 1) {
-    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
   } else {
-    return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+    return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
   }
 };
 
@@ -49,7 +49,7 @@ export function delay(ms: number) {
 
 // Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999,999.99"
 export function formatMarketCapValue(marketCapUsd: number): string {
-  if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return 'N/A';
+  if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return "N/A";
 
   if (marketCapUsd >= 1e12) return `$${(marketCapUsd / 1e12).toFixed(2)}T`; // Trillions
   if (marketCapUsd >= 1e9) return `$${(marketCapUsd / 1e9).toFixed(2)}B`; // Billions
@@ -62,15 +62,15 @@ export const getDateRange = (days: number) => {
   const fromDate = new Date();
   fromDate.setDate(toDate.getDate() - days);
   return {
-    to: toDate.toISOString().split('T')[0],
-    from: fromDate.toISOString().split('T')[0],
+    to: toDate.toISOString().split("T")[0],
+    from: fromDate.toISOString().split("T")[0],
   };
 };
 
 // Get today's date range (from today to today)
 export const getTodayDateRange = () => {
   const today = new Date();
-  const todayString = today.toISOString().split('T')[0];
+  const todayString = today.toISOString().split("T")[0];
   return {
     to: todayString,
     from: todayString,
@@ -96,76 +96,76 @@ export const calculateNewsDistribution = (symbolsCount: number) => {
 
 // Check for required article fields
 export const validateArticle = (article: RawNewsArticle) =>
-    article.headline && article.summary && article.url && article.datetime;
+  article.headline && article.summary && article.url && article.datetime;
 
 // Get today's date string in YYYY-MM-DD format
-export const getTodayString = () => new Date().toISOString().split('T')[0];
+export const getTodayString = () => new Date().toISOString().split("T")[0];
 
 export const formatArticle = (
-    article: RawNewsArticle,
-    isCompanyNews: boolean,
-    symbol?: string,
-    index: number = 0
+  article: RawNewsArticle,
+  isCompanyNews: boolean,
+  symbol?: string,
+  index: number = 0,
 ) => ({
   id: isCompanyNews ? Date.now() + Math.random() : (article.id || 0) + index,
   headline: article.headline!.trim(),
   summary:
-      article.summary!.trim().substring(0, isCompanyNews ? 200 : 150) + '...',
-  source: article.source || (isCompanyNews ? 'Company News' : 'Market News'),
+    article.summary!.trim().substring(0, isCompanyNews ? 200 : 150) + "...",
+  source: article.source || (isCompanyNews ? "Company News" : "Market News"),
   url: article.url!,
   datetime: article.datetime!,
-  image: article.image || '',
-  category: isCompanyNews ? 'company' : article.category || 'general',
-  related: isCompanyNews ? symbol! : article.related || '',
+  image: article.image || "",
+  category: isCompanyNews ? "company" : article.category || "general",
+  related: isCompanyNews ? symbol! : article.related || "",
 });
 
 export const formatChangePercent = (changePercent?: number) => {
-  if (!changePercent) return '';
-  const sign = changePercent > 0 ? '+' : '';
+  if (!changePercent) return "";
+  const sign = changePercent > 0 ? "+" : "";
   return `${sign}${changePercent.toFixed(2)}%`;
 };
 
 export const getChangeColorClass = (changePercent?: number) => {
-  if (!changePercent) return 'text-gray-400';
-  return changePercent > 0 ? 'text-green-500' : 'text-red-500';
+  if (!changePercent) return "text-gray-400";
+  return changePercent > 0 ? "text-green-500" : "text-red-500";
 };
 
 export const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
   }).format(price);
 };
 
-export const formatDateToday = new Date().toLocaleDateString('en-US', {
-  weekday: 'long',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  timeZone: 'UTC',
+export const formatDateToday = new Date().toLocaleDateString("en-US", {
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC",
 });
 
-
 export const getAlertText = (alert: Alert) => {
-  const condition = alert.alertType === 'upper' ? '>' : '<';
+  const condition = alert.alertType === "upper" ? ">" : "<";
   return `Price ${condition} ${formatPrice(alert.threshold)}`;
 };
 
-export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US', {
-  weekday: 'long',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
+export const getFormattedTodayDate = () =>
+  new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 
 // Format currency with proper sign and color
 export const formatCurrency = (amount: number): string => {
-  const sign = amount >= 0 ? '+' : '';
-  return `${sign}${new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  const sign = amount >= 0 ? "+" : "";
+  return `${sign}${new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)}`;
@@ -173,12 +173,12 @@ export const formatCurrency = (amount: number): string => {
 
 // Format date to readable string
 export const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(d);
 };

@@ -1,10 +1,10 @@
 /**
  * Customer FAQ Knowledge Base
- * 
+ *
  * AUDIENCE: CUSTOMER ONLY
  * This knowledge base is ONLY for the customer support AI chatbot.
  * It contains public-facing information that is safe to share with customers.
- * 
+ *
  * DO NOT add internal company statistics, employee procedures, or admin-only information here.
  */
 

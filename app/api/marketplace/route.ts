@@ -1,10 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
-import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { seedMarketplaceItems } from '@/lib/services/marketplace-seed.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { seedMarketplaceItems } from "@/lib/services/marketplace-seed.service";
+
+// Escape special regex characters to prevent ReDoS attacks
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
  * GET /api/marketplace
@@ -13,87 +18,100 @@ import { seedMarketplaceItems } from '@/lib/services/marketplace-seed.service';
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
-    
+
     // Auto-seed if no items exist
     const existingCount = await MarketplaceItem.countDocuments();
     if (existingCount === 0) {
       await seedMarketplaceItems();
     }
-    
+
     // Check if Game Master packages exist and are published
-    const publishedGMCount = await MarketplaceItem.countDocuments({ category: 'gamemaster', isPublished: true, status: 'active' });
+    const publishedGMCount = await MarketplaceItem.countDocuments({
+      category: "gamemaster",
+      isPublished: true,
+      status: "active",
+    });
     if (publishedGMCount === 0) {
       // Check if they exist at all (might be unpublished)
-      const totalGMCount = await MarketplaceItem.countDocuments({ category: 'gamemaster' });
-      console.log(`Game Master packages: ${publishedGMCount} published, ${totalGMCount} total. Running seed to fix...`);
+      const totalGMCount = await MarketplaceItem.countDocuments({
+        category: "gamemaster",
+      });
+      console.log(
+        `Game Master packages: ${publishedGMCount} published, ${totalGMCount} total. Running seed to fix...`,
+      );
       await seedMarketplaceItems();
     }
-    
+
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
-    const featured = searchParams.get('featured');
-    const free = searchParams.get('free');
-    const search = searchParams.get('search');
-    
+    const category = searchParams.get("category");
+    const featured = searchParams.get("featured");
+    const free = searchParams.get("free");
+    const search = searchParams.get("search");
+
     // Build query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
       isPublished: true,
-      status: 'active',
+      status: "active",
     };
-    
+
     if (category) {
       query.category = category;
     }
-    
-    if (featured === 'true') {
+
+    if (featured === "true") {
       query.isFeatured = true;
     }
-    
-    if (free === 'true') {
+
+    if (free === "true") {
       query.isFree = true;
     }
-    
+
     if (search) {
+      const escapedSearch = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { shortDescription: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } },
+        { name: { $regex: escapedSearch, $options: "i" } },
+        { shortDescription: { $regex: escapedSearch, $options: "i" } },
+        { tags: { $in: [new RegExp(escapedSearch, "i")] } },
       ];
     }
-    
+
     const items = await MarketplaceItem.find(query)
       .sort({ isFeatured: -1, totalPurchases: -1, createdAt: -1 })
       .lean();
-    
+
     // Get user's purchases if authenticated
     let userPurchases: string[] = [];
     try {
       const session = await auth.api.getSession({ headers: await headers() });
       if (session?.user?.id) {
-        const purchases = await UserPurchase.find({ userId: session.user.id }).lean();
-        userPurchases = purchases.map(p => p.itemId.toString());
+        const purchases = await UserPurchase.find({
+          userId: session.user.id,
+        }).lean();
+        userPurchases = purchases.map((p) => p.itemId.toString());
       }
     } catch {
       // Not authenticated, continue without purchases
     }
-    
+
     // Add owned flag to items
-    const itemsWithOwnership = items.map(item => ({
+    const itemsWithOwnership = items.map((item) => ({
       ...item,
       owned: userPurchases.includes(item._id.toString()),
     }));
-    
+
     return NextResponse.json({
       success: true,
       items: itemsWithOwnership,
     });
   } catch (error) {
-    console.error('Error fetching marketplace items:', error);
+    console.error("Error fetching marketplace items:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
-

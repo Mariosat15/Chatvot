@@ -1,6 +1,6 @@
 /**
  * Risk Manager Service
- * 
+ *
  * Monitors margin levels and manages liquidations
  * Prevents users from losing more than their capital
  */
@@ -10,7 +10,7 @@ import {
   calculateMarginLevel,
   isMarginCall,
   shouldLiquidate,
-} from './pnl-calculator.service';
+} from "./pnl-calculator.service";
 
 // Risk thresholds
 export const RISK_THRESHOLDS = {
@@ -22,11 +22,11 @@ export const RISK_THRESHOLDS = {
 };
 
 // Margin status
-export type MarginStatus = 'safe' | 'warning' | 'danger' | 'liquidation';
+export type MarginStatus = "safe" | "warning" | "danger" | "liquidation";
 
 /**
  * Calculate margin status for a participant
- * 
+ *
  * @param currentCapital - Current capital
  * @param totalUnrealizedPnL - Sum of all unrealized P&L
  * @param totalUsedMargin - Sum of all used margin
@@ -40,7 +40,7 @@ export function getMarginStatus(
     liquidation: number;
     marginCall: number;
     warning: number;
-  }
+  },
 ): {
   status: MarginStatus;
   marginLevel: number;
@@ -59,17 +59,17 @@ export function getMarginStatus(
   let message: string;
 
   if (shouldLiquidate(marginLevel, liquidationThreshold)) {
-    status = 'liquidation';
+    status = "liquidation";
     message = `⚠️ LIQUIDATION: Margin level below ${liquidationThreshold}% - positions will be closed automatically`;
   } else if (isMarginCall(marginLevel, marginCallThreshold)) {
-    status = 'danger';
+    status = "danger";
     message = `🚨 MARGIN CALL: Margin level below ${marginCallThreshold}% - add capital or close positions to avoid liquidation`;
   } else if (marginLevel < warningThreshold) {
-    status = 'warning';
+    status = "warning";
     message = `⚠️ WARNING: Margin level below ${warningThreshold}% - consider reducing position sizes`;
   } else {
-    status = 'safe';
-    message = '✅ Margin level healthy';
+    status = "safe";
+    message = "✅ Margin level healthy";
   }
 
   return {
@@ -82,13 +82,13 @@ export function getMarginStatus(
 
 /**
  * Validate if a new order can be placed
- * 
+ *
  * Checks:
  * - Sufficient available capital
  * - Position size limits
  * - Max open positions
  * - Competition rules
- * 
+ *
  * @param availableCapital - Capital not tied in positions
  * @param marginRequired - Margin needed for new order
  * @param currentOpenPositions - Number of open positions
@@ -105,7 +105,7 @@ export function validateNewOrder(
   quantity: number,
   leverage: number,
   maxPositions: number = RISK_THRESHOLDS.MAX_OPEN_POSITIONS,
-  maxLeverage: number = RISK_THRESHOLDS.MAX_LEVERAGE
+  maxLeverage: number = RISK_THRESHOLDS.MAX_LEVERAGE,
 ): {
   valid: boolean;
   error?: string;
@@ -147,7 +147,7 @@ export function validateNewOrder(
 
 /**
  * Calculate maximum position size given available capital
- * 
+ *
  * @param availableCapital - Capital not tied in positions
  * @param entryPrice - Price to enter at
  * @param leverage - Leverage to use
@@ -156,24 +156,24 @@ export function validateNewOrder(
 export function calculateMaxPositionSize(
   availableCapital: number,
   entryPrice: number,
-  leverage: number
+  leverage: number,
 ): number {
   // Max position value with leverage
   const maxPositionValue = availableCapital * leverage;
-  
+
   // Convert to lots (1 lot = 100,000 units)
   const contractSize = 100000;
   const maxLots = maxPositionValue / (entryPrice * contractSize);
-  
+
   // Round down to 0.01 lot increments
   const maxLotsRounded = Math.floor(maxLots * 100) / 100;
-  
+
   return Math.min(maxLotsRounded, RISK_THRESHOLDS.MAX_POSITION_SIZE);
 }
 
 /**
  * Calculate recommended stop loss distance based on risk percentage
- * 
+ *
  * @param entryPrice - Entry price
  * @param side - 'long' or 'short'
  * @param riskPercentage - Percentage of capital willing to risk (e.g., 2 for 2%)
@@ -183,31 +183,30 @@ export function calculateMaxPositionSize(
  */
 export function calculateRecommendedStopLoss(
   entryPrice: number,
-  side: 'long' | 'short',
+  side: "long" | "short",
   riskPercentage: number,
   capital: number,
-  quantity: number
+  quantity: number,
 ): number {
   // Risk amount in dollars
   const riskAmount = capital * (riskPercentage / 100);
-  
+
   // Contract size
   const contractSize = 100000;
-  
+
   // Price move that would result in this risk
   const priceMove = riskAmount / (quantity * contractSize);
-  
+
   // Calculate SL price
-  const stopLoss = side === 'long'
-    ? entryPrice - priceMove
-    : entryPrice + priceMove;
-  
+  const stopLoss =
+    side === "long" ? entryPrice - priceMove : entryPrice + priceMove;
+
   return Number(stopLoss.toFixed(5));
 }
 
 /**
  * Calculate position risk as percentage of capital
- * 
+ *
  * @param entryPrice - Entry price
  * @param stopLoss - Stop loss price
  * @param quantity - Position size in lots
@@ -218,19 +217,19 @@ export function calculatePositionRisk(
   entryPrice: number,
   stopLoss: number,
   quantity: number,
-  capital: number
+  capital: number,
 ): number {
   const priceMove = Math.abs(entryPrice - stopLoss);
   const contractSize = 100000;
   const potentialLoss = priceMove * quantity * contractSize;
   const riskPercentage = (potentialLoss / capital) * 100;
-  
+
   return Number(riskPercentage.toFixed(2));
 }
 
 /**
  * Check if total risk across all positions is within acceptable limits
- * 
+ *
  * @param positions - Array of open positions with risk data
  * @param capital - Total capital
  * @param maxTotalRisk - Max total risk percentage (default 10%)
@@ -243,7 +242,7 @@ export function validateTotalRisk(
     quantity: number;
   }>,
   capital: number,
-  maxTotalRisk: number = 10
+  maxTotalRisk: number = 10,
 ): {
   valid: boolean;
   totalRisk: number;
@@ -255,7 +254,7 @@ export function validateTotalRisk(
       position.entryPrice,
       position.stopLoss,
       position.quantity,
-      capital
+      capital,
     );
     return sum + risk;
   }, 0);
@@ -276,7 +275,7 @@ export function validateTotalRisk(
 
 /**
  * Generate risk warnings based on participant status
- * 
+ *
  * @param marginStatus - Current margin status
  * @param openPositions - Number of open positions
  * @param maxPositions - Max allowed positions
@@ -285,20 +284,24 @@ export function validateTotalRisk(
 export function getRiskWarnings(
   marginStatus: MarginStatus,
   openPositions: number,
-  maxPositions: number
+  maxPositions: number,
 ): string[] {
   const warnings: string[] = [];
 
-  if (marginStatus === 'liquidation') {
-    warnings.push('⚠️ CRITICAL: Liquidation imminent! Close positions immediately');
-  } else if (marginStatus === 'danger') {
-    warnings.push('🚨 Margin call: Your positions may be liquidated');
-  } else if (marginStatus === 'warning') {
-    warnings.push('⚠️ Low margin level: Consider reducing risk');
+  if (marginStatus === "liquidation") {
+    warnings.push(
+      "⚠️ CRITICAL: Liquidation imminent! Close positions immediately",
+    );
+  } else if (marginStatus === "danger") {
+    warnings.push("🚨 Margin call: Your positions may be liquidated");
+  } else if (marginStatus === "warning") {
+    warnings.push("⚠️ Low margin level: Consider reducing risk");
   }
 
   if (openPositions >= maxPositions * 0.8) {
-    warnings.push(`📊 High position count: ${openPositions}/${maxPositions} positions open`);
+    warnings.push(
+      `📊 High position count: ${openPositions}/${maxPositions} positions open`,
+    );
   }
 
   return warnings;
@@ -314,4 +317,3 @@ export default {
   getRiskWarnings,
   RISK_THRESHOLDS,
 };
-

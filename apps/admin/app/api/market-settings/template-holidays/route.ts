@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import MarketSettings from '@/database/models/market-settings.model';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import MarketSettings from "@/database/models/market-settings.model";
 
 interface TemplateHoliday {
   name: string;
   date: string;
-  affectedAssets: ('forex' | 'crypto' | 'stocks' | 'indices' | 'commodities')[];
+  affectedAssets: ("forex" | "crypto" | "stocks" | "indices" | "commodities")[];
   isRecurring: boolean;
   isTemplate: boolean;
 }
@@ -16,25 +16,34 @@ interface TemplateHoliday {
  */
 function generateTemplateHolidays(): TemplateHoliday[] {
   const currentYear = new Date().getFullYear();
-  
+
   // Helper functions for variable dates
-  function getNthWeekdayOfMonth(year: number, month: number, weekday: number, n: number): string {
+  function getNthWeekdayOfMonth(
+    year: number,
+    month: number,
+    weekday: number,
+    n: number,
+  ): string {
     const firstDay = new Date(year, month, 1);
     const firstWeekday = firstDay.getDay();
     let dayOffset = weekday - firstWeekday;
     if (dayOffset < 0) dayOffset += 7;
     const day = 1 + dayOffset + (n - 1) * 7;
     const date = new Date(year, month, day);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   }
 
-  function getLastWeekdayOfMonth(year: number, month: number, weekday: number): string {
+  function getLastWeekdayOfMonth(
+    year: number,
+    month: number,
+    weekday: number,
+  ): string {
     const lastDay = new Date(year, month + 1, 0);
     const lastWeekday = lastDay.getDay();
     let dayOffset = lastWeekday - weekday;
     if (dayOffset < 0) dayOffset += 7;
     const date = new Date(year, month + 1, -dayOffset);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   }
 
   function getEasterDate(year: number, offset: number = 0): string {
@@ -53,7 +62,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
     const day = ((h + l - 7 * m + 114) % 31) + 1;
     const easter = new Date(year, month, day + offset);
-    return easter.toISOString().split('T')[0];
+    return easter.toISOString().split("T")[0];
   }
 
   const holidays: TemplateHoliday[] = [];
@@ -64,7 +73,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "New Year's Day",
       date: `${year}-01-01`,
-      affectedAssets: ['forex', 'stocks', 'indices'],
+      affectedAssets: ["forex", "stocks", "indices"],
       isRecurring: true,
       isTemplate: true,
     });
@@ -72,7 +81,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Christmas Day",
       date: `${year}-12-25`,
-      affectedAssets: ['forex', 'stocks', 'indices'],
+      affectedAssets: ["forex", "stocks", "indices"],
       isRecurring: true,
       isTemplate: true,
     });
@@ -80,7 +89,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Boxing Day",
       date: `${year}-12-26`,
-      affectedAssets: ['forex', 'stocks'],
+      affectedAssets: ["forex", "stocks"],
       isRecurring: true,
       isTemplate: true,
     });
@@ -88,7 +97,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Independence Day (US)",
       date: `${year}-07-04`,
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: true,
       isTemplate: true,
     });
@@ -96,7 +105,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Juneteenth (US)",
       date: `${year}-06-19`,
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: true,
       isTemplate: true,
     });
@@ -105,7 +114,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Martin Luther King Jr. Day",
       date: getNthWeekdayOfMonth(year, 0, 1, 3), // 3rd Monday of January
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: false, // Date changes each year
       isTemplate: true,
     });
@@ -113,7 +122,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Presidents Day",
       date: getNthWeekdayOfMonth(year, 1, 1, 3), // 3rd Monday of February
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -121,7 +130,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Good Friday",
       date: getEasterDate(year, -2),
-      affectedAssets: ['forex', 'stocks', 'indices'],
+      affectedAssets: ["forex", "stocks", "indices"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -129,7 +138,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Easter Monday",
       date: getEasterDate(year, 1),
-      affectedAssets: ['forex', 'stocks'],
+      affectedAssets: ["forex", "stocks"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -137,7 +146,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Memorial Day",
       date: getLastWeekdayOfMonth(year, 4, 1), // Last Monday of May
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -145,7 +154,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Labor Day",
       date: getNthWeekdayOfMonth(year, 8, 1, 1), // 1st Monday of September
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -153,7 +162,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Thanksgiving Day",
       date: getNthWeekdayOfMonth(year, 10, 4, 4), // 4th Thursday of November
-      affectedAssets: ['stocks', 'indices'],
+      affectedAssets: ["stocks", "indices"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -162,7 +171,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Early May Bank Holiday (UK)",
       date: getNthWeekdayOfMonth(year, 4, 1, 1), // 1st Monday of May
-      affectedAssets: ['stocks'],
+      affectedAssets: ["stocks"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -170,7 +179,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Spring Bank Holiday (UK)",
       date: getLastWeekdayOfMonth(year, 4, 1), // Last Monday of May
-      affectedAssets: ['stocks'],
+      affectedAssets: ["stocks"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -178,7 +187,7 @@ function generateTemplateHolidays(): TemplateHoliday[] {
     holidays.push({
       name: "Summer Bank Holiday (UK)",
       date: getLastWeekdayOfMonth(year, 7, 1), // Last Monday of August
-      affectedAssets: ['stocks'],
+      affectedAssets: ["stocks"],
       isRecurring: false,
       isTemplate: true,
     });
@@ -190,11 +199,11 @@ function generateTemplateHolidays(): TemplateHoliday[] {
 
   const seen = new Set<string>();
   return holidays
-    .filter(h => {
+    .filter((h) => {
       const holidayDate = new Date(h.date);
       return holidayDate >= today;
     })
-    .filter(h => {
+    .filter((h) => {
       const key = `${h.date}_${h.name}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -210,15 +219,19 @@ function generateTemplateHolidays(): TemplateHoliday[] {
 export async function GET() {
   try {
     const templateHolidays = generateTemplateHolidays();
-    
+
     return NextResponse.json({
       holidays: templateHolidays,
       count: templateHolidays.length,
-      description: 'Standard market holidays that can be added to your calendar'
+      description:
+        "Standard market holidays that can be added to your calendar",
     });
   } catch (error) {
-    console.error('Error generating template holidays:', error);
-    return NextResponse.json({ error: 'Failed to generate template' }, { status: 500 });
+    console.error("Error generating template holidays:", error);
+    return NextResponse.json(
+      { error: "Failed to generate template" },
+      { status: 500 },
+    );
   }
 }
 
@@ -229,19 +242,21 @@ export async function GET() {
 export async function POST() {
   try {
     await connectToDatabase();
-    
+
     let settings = await MarketSettings.findOne();
     if (!settings) {
       settings = await MarketSettings.create({});
     }
 
     // Remove existing template holidays
-    settings.holidays = settings.holidays.filter((h: { isTemplate?: boolean }) => !h.isTemplate);
-    
+    settings.holidays = settings.holidays.filter(
+      (h: { isTemplate?: boolean }) => !h.isTemplate,
+    );
+
     // Add new template holidays
     const templateHolidays = generateTemplateHolidays();
     settings.holidays.push(...templateHolidays);
-    
+
     await settings.save();
 
     return NextResponse.json({
@@ -249,11 +264,16 @@ export async function POST() {
       message: `Added ${templateHolidays.length} template holidays`,
       totalHolidays: settings.holidays.length,
       templateCount: templateHolidays.length,
-      customCount: settings.holidays.filter((h: { isTemplate?: boolean }) => !h.isTemplate).length
+      customCount: settings.holidays.filter(
+        (h: { isTemplate?: boolean }) => !h.isTemplate,
+      ).length,
     });
   } catch (error) {
-    console.error('Error populating template holidays:', error);
-    return NextResponse.json({ error: 'Failed to populate template' }, { status: 500 });
+    console.error("Error populating template holidays:", error);
+    return NextResponse.json(
+      { error: "Failed to populate template" },
+      { status: 500 },
+    );
   }
 }
 
@@ -264,26 +284,32 @@ export async function POST() {
 export async function DELETE() {
   try {
     await connectToDatabase();
-    
+
     const settings = await MarketSettings.findOne();
     if (!settings) {
-      return NextResponse.json({ success: true, message: 'No settings found' });
+      return NextResponse.json({ success: true, message: "No settings found" });
     }
 
-    const templateCount = settings.holidays.filter((h: { isTemplate?: boolean }) => h.isTemplate).length;
-    
+    const templateCount = settings.holidays.filter(
+      (h: { isTemplate?: boolean }) => h.isTemplate,
+    ).length;
+
     // Remove template holidays, keep custom ones
-    settings.holidays = settings.holidays.filter((h: { isTemplate?: boolean }) => !h.isTemplate);
+    settings.holidays = settings.holidays.filter(
+      (h: { isTemplate?: boolean }) => !h.isTemplate,
+    );
     await settings.save();
 
     return NextResponse.json({
       success: true,
       message: `Removed ${templateCount} template holidays`,
-      remainingHolidays: settings.holidays.length
+      remainingHolidays: settings.holidays.length,
     });
   } catch (error) {
-    console.error('Error clearing template holidays:', error);
-    return NextResponse.json({ error: 'Failed to clear template' }, { status: 500 });
+    console.error("Error clearing template holidays:", error);
+    return NextResponse.json(
+      { error: "Failed to clear template" },
+      { status: 500 },
+    );
   }
 }
-

@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
 import {
   Database,
   CheckCircle,
@@ -18,8 +24,8 @@ import {
   ChevronRight,
   Zap,
   Shield,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface IndexInfo {
   collection: string;
@@ -52,30 +58,34 @@ export default function DatabaseIndexesTab() {
   const [creating, setCreating] = useState(false);
   const [summary, setSummary] = useState<IndexSummary | null>(null);
   const [collections, setCollections] = useState<CollectionStatus[]>([]);
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
+    new Set(),
+  );
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   const checkIndexes = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/database/indexes');
+      const response = await fetch("/api/admin/database/indexes");
       const data = await response.json();
 
       if (data.success) {
         setSummary(data.summary);
         setCollections(data.collections);
         setLastChecked(new Date());
-        
+
         if (data.summary.totalMissing > 0) {
-          toast.warning(`${data.summary.totalMissing} missing indexes detected`);
+          toast.warning(
+            `${data.summary.totalMissing} missing indexes detected`,
+          );
         } else {
-          toast.success('All indexes are present!');
+          toast.success("All indexes are present!");
         }
       } else {
-        toast.error(data.error || 'Failed to check indexes');
+        toast.error(data.error || "Failed to check indexes");
       }
     } catch (error) {
-      toast.error('Failed to check indexes');
+      toast.error("Failed to check indexes");
       console.error(error);
     } finally {
       setLoading(false);
@@ -85,22 +95,24 @@ export default function DatabaseIndexesTab() {
   const createMissingIndexes = async () => {
     setCreating(true);
     try {
-      const response = await fetch('/api/admin/database/indexes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/admin/database/indexes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ createAll: true }),
       });
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Created ${data.summary.created} indexes, ${data.summary.existed} already existed`);
+        toast.success(
+          `Created ${data.summary.created} indexes, ${data.summary.existed} already existed`,
+        );
         // Refresh the status
         await checkIndexes();
       } else {
-        toast.error(data.error || 'Failed to create indexes');
+        toast.error(data.error || "Failed to create indexes");
       }
     } catch (error) {
-      toast.error('Failed to create indexes');
+      toast.error("Failed to create indexes");
       console.error(error);
     } finally {
       setCreating(false);
@@ -108,7 +120,7 @@ export default function DatabaseIndexesTab() {
   };
 
   const toggleCollection = (collection: string) => {
-    setExpandedCollections(prev => {
+    setExpandedCollections((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(collection)) {
         newSet.delete(collection);
@@ -124,15 +136,15 @@ export default function DatabaseIndexesTab() {
   }, []);
 
   const getHealthColor = (score: number) => {
-    if (score >= 90) return 'text-green-500';
-    if (score >= 70) return 'text-yellow-500';
-    return 'text-red-500';
+    if (score >= 90) return "text-green-500";
+    if (score >= 70) return "text-yellow-500";
+    return "text-red-500";
   };
 
   const getHealthBg = (score: number) => {
-    if (score >= 90) return 'bg-green-500/20';
-    if (score >= 70) return 'bg-yellow-500/20';
-    return 'bg-red-500/20';
+    if (score >= 90) return "bg-green-500/20";
+    if (score >= 70) return "bg-yellow-500/20";
+    return "bg-red-500/20";
   };
 
   return (
@@ -149,11 +161,7 @@ export default function DatabaseIndexesTab() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={checkIndexes}
-            disabled={loading}
-          >
+          <Button variant="outline" onClick={checkIndexes} disabled={loading}>
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -185,16 +193,23 @@ export default function DatabaseIndexesTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Health Score</p>
-                  <p className={cn("text-3xl font-bold", getHealthColor(summary.healthScore))}>
+                  <p
+                    className={cn(
+                      "text-3xl font-bold",
+                      getHealthColor(summary.healthScore),
+                    )}
+                  >
                     {summary.healthScore}%
                   </p>
                 </div>
-                <Shield className={cn("w-10 h-10", getHealthColor(summary.healthScore))} />
+                <Shield
+                  className={cn(
+                    "w-10 h-10",
+                    getHealthColor(summary.healthScore),
+                  )}
+                />
               </div>
-              <Progress 
-                value={summary.healthScore} 
-                className="mt-2 h-2"
-              />
+              <Progress value={summary.healthScore} className="mt-2 h-2" />
             </CardContent>
           </Card>
 
@@ -203,7 +218,9 @@ export default function DatabaseIndexesTab() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Required</p>
+                  <p className="text-sm text-muted-foreground">
+                    Total Required
+                  </p>
                   <p className="text-3xl font-bold">{summary.totalRequired}</p>
                 </div>
                 <Database className="w-10 h-10 text-blue-500" />
@@ -217,7 +234,9 @@ export default function DatabaseIndexesTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Existing</p>
-                  <p className="text-3xl font-bold text-green-500">{summary.totalExisting}</p>
+                  <p className="text-3xl font-bold text-green-500">
+                    {summary.totalExisting}
+                  </p>
                 </div>
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
@@ -225,17 +244,25 @@ export default function DatabaseIndexesTab() {
           </Card>
 
           {/* Missing */}
-          <Card className={cn(
-            summary.totalMissing > 0 ? "border-red-500/30 bg-red-500/5" : "border-green-500/30 bg-green-500/5"
-          )}>
+          <Card
+            className={cn(
+              summary.totalMissing > 0
+                ? "border-red-500/30 bg-red-500/5"
+                : "border-green-500/30 bg-green-500/5",
+            )}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Missing</p>
-                  <p className={cn(
-                    "text-3xl font-bold",
-                    summary.totalMissing > 0 ? "text-red-500" : "text-green-500"
-                  )}>
+                  <p
+                    className={cn(
+                      "text-3xl font-bold",
+                      summary.totalMissing > 0
+                        ? "text-red-500"
+                        : "text-green-500",
+                    )}
+                  >
                     {summary.totalMissing}
                   </p>
                 </div>
@@ -262,13 +289,16 @@ export default function DatabaseIndexesTab() {
           <ScrollArea className="h-[500px]">
             <div className="space-y-2">
               {collections.map((col) => (
-                <div key={col.collection} className="border rounded-lg overflow-hidden">
+                <div
+                  key={col.collection}
+                  className="border rounded-lg overflow-hidden"
+                >
                   {/* Collection Header */}
                   <button
                     onClick={() => toggleCollection(col.collection)}
                     className={cn(
                       "w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors",
-                      col.missing > 0 && "bg-red-500/10"
+                      col.missing > 0 && "bg-red-500/10",
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -280,11 +310,17 @@ export default function DatabaseIndexesTab() {
                       <span className="font-medium">{col.collection}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-green-500/10 text-green-500">
+                      <Badge
+                        variant="outline"
+                        className="bg-green-500/10 text-green-500"
+                      >
                         {col.existing} ✓
                       </Badge>
                       {col.missing > 0 && (
-                        <Badge variant="outline" className="bg-red-500/10 text-red-500">
+                        <Badge
+                          variant="outline"
+                          className="bg-red-500/10 text-red-500"
+                        >
                           {col.missing} missing
                         </Badge>
                       )}
@@ -299,7 +335,7 @@ export default function DatabaseIndexesTab() {
                           key={idx.name}
                           className={cn(
                             "flex items-center justify-between p-2 rounded",
-                            idx.exists ? "bg-green-500/10" : "bg-red-500/10"
+                            idx.exists ? "bg-green-500/10" : "bg-red-500/10",
                           )}
                         >
                           <div className="flex items-center gap-2">
@@ -310,10 +346,14 @@ export default function DatabaseIndexesTab() {
                             )}
                             <code className="text-sm">{idx.name}</code>
                             {idx.unique && (
-                              <Badge variant="secondary" className="text-xs">unique</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                unique
+                              </Badge>
                             )}
                             {idx.ttl && (
-                              <Badge variant="secondary" className="text-xs">TTL: {idx.ttl}s</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                TTL: {idx.ttl}s
+                              </Badge>
                             )}
                           </div>
                           <code className="text-xs text-muted-foreground">
@@ -337,14 +377,20 @@ export default function DatabaseIndexesTab() {
             <div className="flex items-start gap-4">
               <AlertTriangle className="w-8 h-8 text-yellow-500 flex-shrink-0" />
               <div>
-                <h3 className="font-semibold text-yellow-500">Performance Warning</h3>
+                <h3 className="font-semibold text-yellow-500">
+                  Performance Warning
+                </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Missing indexes can significantly impact database performance, especially during high load.
-                  Queries without proper indexes result in full collection scans, which become slower as data grows.
+                  Missing indexes can significantly impact database performance,
+                  especially during high load. Queries without proper indexes
+                  result in full collection scans, which become slower as data
+                  grows.
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  <strong>Recommendation:</strong> Click &quot;Create Missing Indexes&quot; to automatically create all required indexes.
-                  This operation runs in the background and won&apos;t block your database.
+                  <strong>Recommendation:</strong> Click &quot;Create Missing
+                  Indexes&quot; to automatically create all required indexes.
+                  This operation runs in the background and won&apos;t block
+                  your database.
                 </p>
               </div>
             </div>

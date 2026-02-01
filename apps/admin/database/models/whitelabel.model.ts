@@ -1,4 +1,4 @@
-import { Schema, model, models, type Document, type Model } from 'mongoose';
+import { Schema, model, models, type Document, type Model } from "mongoose";
 
 export interface WhiteLabelDocument extends Document {
   // App Branding
@@ -7,53 +7,53 @@ export interface WhiteLabelDocument extends Document {
   profileImage: string;
   dashboardPreview: string;
   favicon: string;
-  
+
   // General Settings
   nodeEnv: string;
   nextPublicBaseUrl: string;
-  
+
   // Email Configuration
   nodemailerEmail: string;
   nodemailerPassword: string;
-  
+
   // API Keys & URLs
   massiveApiKey: string;
   nextPublicMassiveApiKey: string;
-  
+
   // OpenAI Configuration
   openaiApiKey: string;
   openaiModel: string;
   openaiEnabled: boolean;
   openaiForEmails: boolean;
-  
+
   // Database
   mongodbUri: string;
-  
+
   // Authentication
   betterAuthSecret: string;
   betterAuthUrl: string;
-  
+
   // Admin Credentials
   adminEmail: string;
   adminPassword: string;
   adminName: string;
-  
+
   // Redis Configuration (Upstash)
   upstashRedisUrl: string;
   upstashRedisToken: string;
   redisEnabled: boolean;
   redisPriceSyncEnabled: boolean; // Enable for multi-server deployments
-  
+
   // Inngest Configuration
   inngestSigningKey: string;
   inngestEventKey: string;
-  inngestMode: 'dev' | 'cloud'; // dev = local dev server, cloud = Inngest Cloud (production)
-  
+  inngestMode: "dev" | "cloud"; // dev = local dev server, cloud = Inngest Cloud (production)
+
   // Price Feed Configuration
-  priceFeedMode: 'websocket' | 'api' | 'both'; // both = websocket primary, api fallback
+  priceFeedMode: "websocket" | "api" | "both"; // both = websocket primary, api fallback
   priceFeedWebsocketEnabled: boolean;
   priceFeedApiEnabled: boolean;
-  priceFeedPrimarySource: 'websocket' | 'api'; // when both enabled, which is primary
+  priceFeedPrimarySource: "websocket" | "api"; // when both enabled, which is primary
   priceFeedUpdateInterval: number; // ms - how often to sync to Redis
   priceFeedCacheTTL: number; // ms - how long prices are valid in cache
   priceFeedClientPollInterval: number; // ms - how often client polls for prices
@@ -61,7 +61,7 @@ export interface WhiteLabelDocument extends Document {
   priceFeedWebsocketReconnectDelay: number; // ms - base delay between reconnects
   priceFeedApiConcurrency: number; // max parallel API requests
   priceFeedFallbackEnabled: boolean; // auto-fallback to API if WebSocket fails
-  
+
   updatedAt: Date;
   createdAt: Date;
 }
@@ -69,192 +69,191 @@ export interface WhiteLabelDocument extends Document {
 const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
   {
     // App Branding
-    appLogo: { 
-      type: String, 
-      default: '/assets/images/logo.png' 
+    appLogo: {
+      type: String,
+      default: "/assets/images/logo.png",
     },
-    emailLogo: { 
-      type: String, 
-      default: '/assets/images/logo.png' 
+    emailLogo: {
+      type: String,
+      default: "/assets/images/logo.png",
     },
-    profileImage: { 
-      type: String, 
-      default: '/assets/images/PROFILE.png' 
+    profileImage: {
+      type: String,
+      default: "/assets/images/PROFILE.png",
     },
-    dashboardPreview: { 
-      type: String, 
-      default: '/assets/images/dashboard-preview.png' 
+    dashboardPreview: {
+      type: String,
+      default: "/assets/images/dashboard-preview.png",
     },
     favicon: {
       type: String,
-      default: '/favicon.ico'
+      default: "/favicon.ico",
     },
-    
+
     // General Settings
-    nodeEnv: { 
-      type: String, 
-      default: 'development' 
+    nodeEnv: {
+      type: String,
+      default: "development",
     },
-    nextPublicBaseUrl: { 
-      type: String, 
-      default: 'http://localhost:3000' 
+    nextPublicBaseUrl: {
+      type: String,
+      default: "http://localhost:3000",
     },
-    
+
     // Email Configuration
-    nodemailerEmail: { 
-      type: String, 
-      default: '' 
+    nodemailerEmail: {
+      type: String,
+      default: "",
     },
-    nodemailerPassword: { 
-      type: String, 
-      default: '' 
+    nodemailerPassword: {
+      type: String,
+      default: "",
     },
-    
+
     // API Keys & URLs
-    massiveApiKey: { 
-      type: String, 
-      default: '' 
+    massiveApiKey: {
+      type: String,
+      default: "",
     },
-    nextPublicMassiveApiKey: { 
-      type: String, 
-      default: '' 
+    nextPublicMassiveApiKey: {
+      type: String,
+      default: "",
     },
-    
+
     // OpenAI Configuration
     openaiApiKey: {
       type: String,
-      default: ''
+      default: "",
     },
     openaiModel: {
       type: String,
-      default: 'gpt-4o-mini' // Fast and cheap default
+      default: "gpt-4o-mini", // Fast and cheap default
     },
     openaiEnabled: {
       type: Boolean,
-      default: false // Disabled by default
+      default: false, // Disabled by default
     },
     openaiForEmails: {
       type: Boolean,
-      default: false // AI for email personalization disabled by default
+      default: false, // AI for email personalization disabled by default
     },
-    
+
     // Database
-    mongodbUri: { 
-      type: String, 
-      default: '' 
+    mongodbUri: {
+      type: String,
+      default: "",
     },
-    
+
     // Authentication
-    betterAuthSecret: { 
-      type: String, 
-      default: '' 
+    betterAuthSecret: {
+      type: String,
+      default: "",
     },
-    betterAuthUrl: { 
-      type: String, 
-      default: 'http://localhost:3000' 
+    betterAuthUrl: {
+      type: String,
+      default: "http://localhost:3000",
     },
-    
+
     // Admin Credentials
     adminEmail: {
       type: String,
-      default: ''
+      default: "",
     },
     adminPassword: {
       type: String,
-      default: ''
+      default: "",
     },
     adminName: {
       type: String,
-      default: 'Admin'
+      default: "Admin",
     },
-    
+
     // Redis Configuration (Upstash)
     upstashRedisUrl: {
       type: String,
-      default: ''
+      default: "",
     },
     upstashRedisToken: {
       type: String,
-      default: ''
+      default: "",
     },
     redisEnabled: {
       type: Boolean,
-      default: false
+      default: false,
     },
     redisPriceSyncEnabled: {
       type: Boolean,
-      default: false // Enable only for multi-server deployments
+      default: false, // Enable only for multi-server deployments
     },
-    
+
     // Inngest Configuration
     inngestSigningKey: {
       type: String,
-      default: ''
+      default: "",
     },
     inngestEventKey: {
       type: String,
-      default: ''
+      default: "",
     },
     inngestMode: {
       type: String,
-      enum: ['dev', 'cloud'],
-      default: 'dev' // Default to dev mode (local Inngest dev server)
+      enum: ["dev", "cloud"],
+      default: "dev", // Default to dev mode (local Inngest dev server)
     },
-    
+
     // Price Feed Configuration
     priceFeedMode: {
       type: String,
-      enum: ['websocket', 'api', 'both'],
-      default: 'both' // both = websocket primary with api fallback
+      enum: ["websocket", "api", "both"],
+      default: "both", // both = websocket primary with api fallback
     },
     priceFeedWebsocketEnabled: {
       type: Boolean,
-      default: true
+      default: true,
     },
     priceFeedApiEnabled: {
       type: Boolean,
-      default: true
+      default: true,
     },
     priceFeedPrimarySource: {
       type: String,
-      enum: ['websocket', 'api'],
-      default: 'websocket'
+      enum: ["websocket", "api"],
+      default: "websocket",
     },
     priceFeedUpdateInterval: {
       type: Number,
-      default: 2000 // 2 seconds - sync WebSocket cache to Redis
+      default: 2000, // 2 seconds - sync WebSocket cache to Redis
     },
     priceFeedCacheTTL: {
       type: Number,
-      default: 10000 // 10 seconds - how long cached prices are valid
+      default: 10000, // 10 seconds - how long cached prices are valid
     },
     priceFeedClientPollInterval: {
       type: Number,
-      default: 500 // 500ms - client polls every half second
+      default: 500, // 500ms - client polls every half second
     },
     priceFeedWebsocketReconnectAttempts: {
       type: Number,
-      default: 10
+      default: 10,
     },
     priceFeedWebsocketReconnectDelay: {
       type: Number,
-      default: 3000 // 3 seconds base delay
+      default: 3000, // 3 seconds base delay
     },
     priceFeedApiConcurrency: {
       type: Number,
-      default: 30 // fetch 30 pairs in parallel
+      default: 30, // fetch 30 pairs in parallel
     },
     priceFeedFallbackEnabled: {
       type: Boolean,
-      default: true // auto-fallback to API if WebSocket fails
+      default: true, // auto-fallback to API if WebSocket fails
     },
   },
-  { 
-    timestamps: true 
-  }
+  {
+    timestamps: true,
+  },
 );
 
 export const WhiteLabel: Model<WhiteLabelDocument> =
-  (models?.WhiteLabel as Model<WhiteLabelDocument>) || 
-  model<WhiteLabelDocument>('WhiteLabel', WhiteLabelSchema);
-
+  (models?.WhiteLabel as Model<WhiteLabelDocument>) ||
+  model<WhiteLabelDocument>("WhiteLabel", WhiteLabelSchema);

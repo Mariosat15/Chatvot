@@ -1,18 +1,18 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 
 /**
  * Unified User Stats Service
- * 
+ *
  * This service provides a SINGLE SOURCE OF TRUTH for all user statistics.
  * Both Dashboard and Profile pages MUST use this service to ensure consistency.
- * 
+ *
  * Source of Truth:
  * - Financial stats (balance, prizes, deposits, withdrawals) → CreditWallet model
  * - Trading metrics (trades, PnL, win rate) → CompetitionParticipant + ChallengeParticipant
@@ -125,7 +125,9 @@ export interface UnifiedUserStats {
  * Get unified user statistics from single sources of truth
  * This should be used by BOTH dashboard and profile pages
  */
-export async function getUnifiedUserStats(userId: string): Promise<UnifiedUserStats> {
+export async function getUnifiedUserStats(
+  userId: string,
+): Promise<UnifiedUserStats> {
   await connectToDatabase();
 
   // Parallel fetch all data from their respective sources of truth
@@ -143,7 +145,9 @@ export async function getUnifiedUserStats(userId: string): Promise<UnifiedUserSt
     // Challenge metrics source
     ChallengeParticipant.find({ userId }).lean(),
     // Challenge status/results
-    Challenge.find({ $or: [{ challengerId: userId }, { challengedId: userId }] }).lean(),
+    Challenge.find({
+      $or: [{ challengerId: userId }, { challengedId: userId }],
+    }).lean(),
     // For streaks calculation
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(500).lean(),
   ]);
@@ -152,20 +156,22 @@ export async function getUnifiedUserStats(userId: string): Promise<UnifiedUserSt
   const walletStats = buildWalletStats(wallet);
 
   // === BUILD COMPETITION STATS ===
-  const competitionStats = buildCompetitionStats(competitionParticipations as any[]);
+  const competitionStats = buildCompetitionStats(
+    competitionParticipations as any[],
+  );
 
   // === BUILD CHALLENGE STATS ===
   const challengeStats = buildChallengeStats(
     userId,
     challengeParticipations as any[],
-    challenges as any[]
+    challenges as any[],
   );
 
   // === BUILD OVERVIEW (Combined) ===
   const overview = buildOverview(
     competitionParticipations as any[],
     challengeParticipations as any[],
-    walletStats.totalPrizesWon // Use wallet as source of truth for prizes!
+    walletStats.totalPrizesWon, // Use wallet as source of truth for prizes!
   );
 
   // === CALCULATE STREAKS ===
@@ -208,14 +214,15 @@ function buildWalletStats(wallet: any) {
   const totalSpentOnCompetitions = wallet.totalSpentOnCompetitions || 0;
   const totalSpentOnChallenges = wallet.totalSpentOnChallenges || 0;
 
-  const netProfitFromCompetitions = totalWonFromCompetitions - totalSpentOnCompetitions;
-  const netProfitFromChallenges = totalWonFromChallenges - totalSpentOnChallenges;
+  const netProfitFromCompetitions =
+    totalWonFromCompetitions - totalSpentOnCompetitions;
+  const netProfitFromChallenges =
+    totalWonFromChallenges - totalSpentOnChallenges;
   const totalSpent = totalSpentOnCompetitions + totalSpentOnChallenges;
   const totalWon = totalWonFromCompetitions + totalWonFromChallenges;
 
-  const overallROI = totalSpent > 0 
-    ? ((totalWon - totalSpent) / totalSpent) * 100 
-    : 0;
+  const overallROI =
+    totalSpent > 0 ? ((totalWon - totalSpent) / totalSpent) * 100 : 0;
 
   return {
     currentBalance: wallet.creditBalance || 0,
@@ -239,8 +246,8 @@ function buildWalletStats(wallet: any) {
  * Build competition stats from CompetitionParticipant records
  */
 function buildCompetitionStats(participations: any[]) {
-  const completed = participations.filter(p => p.status === 'completed');
-  const active = participations.filter(p => p.status === 'active');
+  const completed = participations.filter((p) => p.status === "completed");
+  const active = participations.filter((p) => p.status === "active");
 
   // Aggregate metrics
   let totalCapitalTraded = 0;
@@ -248,7 +255,7 @@ function buildCompetitionStats(participations: any[]) {
   let totalTrades = 0;
   let winningTrades = 0;
   let losingTrades = 0;
-  let totalROI = 0;
+  let _totalROI = 0;
   let totalGross = 0;
   let totalLoss = 0;
 
@@ -269,7 +276,7 @@ function buildCompetitionStats(participations: any[]) {
     totalTrades += p.totalTrades || 0;
     winningTrades += p.winningTrades || 0;
     losingTrades += p.losingTrades || 0;
-    totalROI += p.pnlPercentage || 0;
+    _totalROI += p.pnlPercentage || 0;
 
     // For profit factor
     if (p.averageWin && p.winningTrades) {
@@ -284,7 +291,8 @@ function buildCompetitionStats(participations: any[]) {
     if ((p.pnl || 0) > bestPnL) bestPnL = p.pnl || 0;
     if ((p.pnlPercentage || 0) > bestROI) bestROI = p.pnlPercentage || 0;
 
-    const winRate = p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
+    const winRate =
+      p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
     if (winRate > bestWinRate) bestWinRate = winRate;
     if ((p.totalTrades || 0) > mostTrades) mostTrades = p.totalTrades || 0;
 
@@ -294,8 +302,10 @@ function buildCompetitionStats(participations: any[]) {
   }
 
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-  const profitFactor = totalLoss > 0 ? totalGross / totalLoss : (totalGross > 0 ? 9999 : 0);
-  const totalPnLPercentage = totalCapitalTraded > 0 ? (totalPnL / totalCapitalTraded) * 100 : 0;
+  const profitFactor =
+    totalLoss > 0 ? totalGross / totalLoss : totalGross > 0 ? 9999 : 0;
+  const totalPnLPercentage =
+    totalCapitalTraded > 0 ? (totalPnL / totalCapitalTraded) * 100 : 0;
 
   return {
     totalEntered: participations.length,
@@ -325,10 +335,10 @@ function buildCompetitionStats(participations: any[]) {
 function buildChallengeStats(
   userId: string,
   participations: any[],
-  challenges: any[]
+  challenges: any[],
 ) {
-  const completed = challenges.filter(c => c.status === 'completed');
-  const active = challenges.filter(c => c.status === 'active');
+  const completed = challenges.filter((c) => c.status === "completed");
+  const active = challenges.filter((c) => c.status === "active");
 
   let totalWon = 0;
   let totalLost = 0;
@@ -359,8 +369,10 @@ function buildChallengeStats(
   for (const c of completed) {
     if (c.isTie) {
       totalTied++;
-    } else if (c.winnerId !== userId && 
-               (c.challengerId === userId || c.challengedId === userId)) {
+    } else if (
+      c.winnerId !== userId &&
+      (c.challengerId === userId || c.challengedId === userId)
+    ) {
       // If user is a participant but not the winner, they lost
       // Only count if not already counted as winner in participations
       const isChallenger = c.challengerId === userId;
@@ -371,9 +383,11 @@ function buildChallengeStats(
     }
   }
 
-  const tradeWinRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+  const tradeWinRate =
+    totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
   const totalChallengeGames = totalWon + totalLost;
-  const challengeWinRate = totalChallengeGames > 0 ? (totalWon / totalChallengeGames) * 100 : 0;
+  const challengeWinRate =
+    totalChallengeGames > 0 ? (totalWon / totalChallengeGames) * 100 : 0;
 
   return {
     totalEntered: challenges.length,
@@ -400,14 +414,21 @@ function buildChallengeStats(
 function buildOverview(
   competitionParticipations: any[],
   challengeParticipations: any[],
-  totalPrizesWonFromWallet: number // Use wallet as source of truth!
+  totalPrizesWonFromWallet: number, // Use wallet as source of truth!
 ) {
-  const allParticipations = [...competitionParticipations, ...challengeParticipations];
-  
+  const allParticipations = [
+    ...competitionParticipations,
+    ...challengeParticipations,
+  ];
+
   // Count active contests
-  const activeCompetitions = competitionParticipations.filter(p => p.status === 'active');
-  const activeChallenges = challengeParticipations.filter(p => p.status === 'active');
-  
+  const activeCompetitions = competitionParticipations.filter(
+    (p) => p.status === "active",
+  );
+  const activeChallenges = challengeParticipations.filter(
+    (p) => p.status === "active",
+  );
+
   // Total capital from ACTIVE contests only
   let totalCapital = 0;
   for (const p of [...activeCompetitions, ...activeChallenges]) {
@@ -439,18 +460,21 @@ function buildOverview(
       totalGrossLosses += Math.abs(p.averageLoss) * p.losingTrades;
     }
     if (p.largestWin && p.largestWin > largestWin) largestWin = p.largestWin;
-    if (p.largestLoss && p.largestLoss < largestLoss) largestLoss = p.largestLoss;
+    if (p.largestLoss && p.largestLoss < largestLoss)
+      largestLoss = p.largestLoss;
   }
 
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-  const profitFactor = totalGrossLosses > 0 
-    ? totalGrossWins / totalGrossLosses 
-    : (totalGrossWins > 0 ? 999 : 0);
+  const profitFactor =
+    totalGrossLosses > 0
+      ? totalGrossWins / totalGrossLosses
+      : totalGrossWins > 0
+        ? 999
+        : 0;
   const averageWin = winningTrades > 0 ? totalGrossWins / winningTrades : 0;
   const averageLoss = losingTrades > 0 ? totalGrossLosses / losingTrades : 0;
-  const totalPnLPercentage = totalStartingCapital > 0 
-    ? (totalPnL / totalStartingCapital) * 100 
-    : 0;
+  const totalPnLPercentage =
+    totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
 
   return {
     totalCapital,
@@ -474,8 +498,8 @@ function buildOverview(
  * Calculate trading streaks from trade history
  */
 function calculateStreaks(trades: any[]) {
-  const sortedTrades = [...trades].sort((a, b) => 
-    new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime()
+  const sortedTrades = [...trades].sort(
+    (a, b) => new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime(),
   );
 
   let currentWinStreak = 0;
@@ -494,7 +518,8 @@ function calculateStreaks(trades: any[]) {
     } else if (pnl < 0) {
       tempLossStreak++;
       tempWinStreak = 0;
-      if (tempLossStreak > longestLossStreak) longestLossStreak = tempLossStreak;
+      if (tempLossStreak > longestLossStreak)
+        longestLossStreak = tempLossStreak;
     }
   }
 
@@ -516,7 +541,7 @@ function calculateStreaks(trades: any[]) {
   const tradingDays = new Set(
     trades
       .filter((t: any) => new Date(t.closedAt) >= startOfMonth)
-      .map((t: any) => new Date(t.closedAt).toDateString())
+      .map((t: any) => new Date(t.closedAt).toDateString()),
   );
 
   // Consecutive profitable days
@@ -527,8 +552,9 @@ function calculateStreaks(trades: any[]) {
   }
 
   let consecutiveProfitableDays = 0;
-  const sortedDays = Array.from(dayPnLMap.entries())
-    .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+  const sortedDays = Array.from(dayPnLMap.entries()).sort(
+    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime(),
+  );
 
   for (const [, pnl] of sortedDays) {
     if (pnl > 0) consecutiveProfitableDays++;
@@ -544,4 +570,3 @@ function calculateStreaks(trades: any[]) {
     consecutiveProfitableDays,
   };
 }
-

@@ -1,6 +1,6 @@
 /**
  * Admin App Instrumentation
- * 
+ *
  * Empty instrumentation file for the admin app.
  * Cache pre-warming is only needed for the main trading app.
  */

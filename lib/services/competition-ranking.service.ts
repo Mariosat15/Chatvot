@@ -22,22 +22,40 @@ export interface RankedParticipant extends ParticipantData {
   rank: number;
   isTied: boolean;
   tiedWith?: string[]; // User IDs of tied participants
-  qualificationStatus: 'qualified' | 'disqualified';
+  qualificationStatus: "qualified" | "disqualified";
   disqualificationReason?: string;
 }
 
 export interface CompetitionRules {
-  rankingMethod: 'pnl' | 'roi' | 'total_capital' | 'win_rate' | 'total_wins' | 'profit_factor';
-  tieBreaker1: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
-  tieBreaker2?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
+  rankingMethod:
+    | "pnl"
+    | "roi"
+    | "total_capital"
+    | "win_rate"
+    | "total_wins"
+    | "profit_factor";
+  tieBreaker1:
+    | "trades_count"
+    | "win_rate"
+    | "total_capital"
+    | "roi"
+    | "join_time"
+    | "split_prize";
+  tieBreaker2?:
+    | "trades_count"
+    | "win_rate"
+    | "total_capital"
+    | "roi"
+    | "join_time"
+    | "split_prize";
   minimumTrades: number;
   minimumWinRate?: number;
-  tiePrizeDistribution: 'split_equally' | 'split_weighted' | 'first_gets_all';
+  tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
   disqualifyOnLiquidation: boolean;
 }
 
 export interface RankingOptions {
-  competitionStatus?: 'upcoming' | 'active' | 'completed' | 'cancelled';
+  competitionStatus?: "upcoming" | "active" | "completed" | "cancelled";
 }
 
 /**
@@ -45,17 +63,17 @@ export interface RankingOptions {
  */
 function getRankingValue(participant: ParticipantData, method: string): number {
   switch (method) {
-    case 'pnl':
+    case "pnl":
       return participant.pnl;
-    case 'roi':
+    case "roi":
       return participant.pnlPercentage;
-    case 'total_capital':
+    case "total_capital":
       return participant.currentCapital;
-    case 'win_rate':
+    case "win_rate":
       return participant.winRate;
-    case 'total_wins':
+    case "total_wins":
       return participant.winningTrades;
-    case 'profit_factor':
+    case "profit_factor":
       // Profit Factor = Total Wins / Total Losses
       const totalWins = participant.winningTrades;
       const totalLosses = participant.losingTrades;
@@ -69,28 +87,33 @@ function getRankingValue(participant: ParticipantData, method: string): number {
 /**
  * Get tiebreaker value
  */
-function getTieBreakerValue(participant: ParticipantData, tieBreaker: string): number {
+function getTieBreakerValue(
+  participant: ParticipantData,
+  tieBreaker: string,
+): number {
   let value: number;
   switch (tieBreaker) {
-    case 'trades_count':
+    case "trades_count":
       value = -participant.totalTrades; // Negative because fewer is better (more efficient)
       break;
-    case 'win_rate':
+    case "win_rate":
       value = participant.winRate;
       break;
-    case 'total_capital':
+    case "total_capital":
       value = participant.currentCapital;
       break;
-    case 'roi':
+    case "roi":
       value = participant.pnlPercentage;
       break;
-    case 'join_time':
+    case "join_time":
       value = -new Date(participant.enteredAt).getTime(); // Negative because earlier is better
       break;
     default:
       value = 0;
   }
-  console.log(`  🔍 TieBreaker[${tieBreaker}] for ${participant.username}: totalTrades=${participant.totalTrades}, value=${value}`);
+  console.log(
+    `  🔍 TieBreaker[${tieBreaker}] for ${participant.username}: totalTrades=${participant.totalTrades}, value=${value}`,
+  );
   return value;
 }
 
@@ -101,7 +124,7 @@ function getTieBreakerValue(participant: ParticipantData, tieBreaker: string): n
 function areParticipantsTied(
   a: ParticipantData,
   b: ParticipantData,
-  rules: CompetitionRules
+  rules: CompetitionRules,
 ): boolean {
   const epsilon = 0.0001;
 
@@ -111,14 +134,14 @@ function areParticipantsTied(
   if (Math.abs(aValue - bValue) >= epsilon) return false;
 
   // Compare tiebreaker 1 (if not split_prize)
-  if (rules.tieBreaker1 && rules.tieBreaker1 !== 'split_prize') {
+  if (rules.tieBreaker1 && rules.tieBreaker1 !== "split_prize") {
     const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
     const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
     if (Math.abs(aTie1 - bTie1) >= epsilon) return false;
   }
 
   // Compare tiebreaker 2 (if exists and not split_prize)
-  if (rules.tieBreaker2 && rules.tieBreaker2 !== 'split_prize') {
+  if (rules.tieBreaker2 && rules.tieBreaker2 !== "split_prize") {
     const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
     const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
     if (Math.abs(aTie2 - bTie2) >= epsilon) return false;
@@ -136,13 +159,13 @@ function areParticipantsTied(
 function checkQualification(
   participant: ParticipantData,
   rules: CompetitionRules,
-  options?: RankingOptions
+  options?: RankingOptions,
 ): { qualified: boolean; reason?: string } {
-  const isCompleted = options?.competitionStatus === 'completed';
-  
+  const isCompleted = options?.competitionStatus === "completed";
+
   // Check liquidation (always applies)
-  if (rules.disqualifyOnLiquidation && participant.status === 'liquidated') {
-    return { qualified: false, reason: 'Liquidated' };
+  if (rules.disqualifyOnLiquidation && participant.status === "liquidated") {
+    return { qualified: false, reason: "Liquidated" };
   }
 
   // Check minimum trades - ONLY when competition is COMPLETED
@@ -155,7 +178,11 @@ function checkQualification(
   }
 
   // Check minimum win rate - ONLY when competition is COMPLETED
-  if (isCompleted && rules.minimumWinRate && participant.winRate < rules.minimumWinRate) {
+  if (
+    isCompleted &&
+    rules.minimumWinRate &&
+    participant.winRate < rules.minimumWinRate
+  ) {
     return {
       qualified: false,
       reason: `Win rate too low (${participant.winRate.toFixed(1)}% < ${rules.minimumWinRate}%)`,
@@ -172,7 +199,7 @@ function checkQualification(
 export function calculateRankings(
   participants: ParticipantData[],
   rules: CompetitionRules,
-  options?: RankingOptions
+  options?: RankingOptions,
 ): RankedParticipant[] {
   // Step 1: Check qualifications (min trades only checked when competition is completed)
   const qualifiedParticipants = participants.map((p) => {
@@ -182,97 +209,133 @@ export function calculateRankings(
       rank: 0, // Will be assigned later
       isTied: false,
       tiedWith: [] as string[], // Track tied participants
-      qualificationStatus: qualification.qualified ? 'qualified' as const : 'disqualified' as const,
+      qualificationStatus: qualification.qualified
+        ? ("qualified" as const)
+        : ("disqualified" as const),
       disqualificationReason: qualification.reason,
     };
   });
 
   // Separate qualified and disqualified
-  const qualified = qualifiedParticipants.filter((p) => p.qualificationStatus === 'qualified');
-  const disqualified = qualifiedParticipants.filter((p) => p.qualificationStatus === 'disqualified');
+  const qualified = qualifiedParticipants.filter(
+    (p) => p.qualificationStatus === "qualified",
+  );
+  const disqualified = qualifiedParticipants.filter(
+    (p) => p.qualificationStatus === "disqualified",
+  );
 
   // Step 2: Sort qualified participants
   // Use epsilon for floating point comparisons to handle precision issues
   const sortEpsilon = 0.01; // $0.01 difference is negligible for ranking purposes
-  
-  console.log(`🔄 [SORT] Sorting ${qualified.length} participants with rules:`, {
-    method: rules.rankingMethod,
-    tieBreaker1: rules.tieBreaker1,
-    tieBreaker2: rules.tieBreaker2,
-  });
-  
+
+  console.log(
+    `🔄 [SORT] Sorting ${qualified.length} participants with rules:`,
+    {
+      method: rules.rankingMethod,
+      tieBreaker1: rules.tieBreaker1,
+      tieBreaker2: rules.tieBreaker2,
+    },
+  );
+
   qualified.sort((a, b) => {
     // Primary ranking method
     const aValue = getRankingValue(a, rules.rankingMethod);
     const bValue = getRankingValue(b, rules.rankingMethod);
 
     console.log(`   🔄 Compare ${a.username} vs ${b.username}:`);
-    console.log(`      Primary (${rules.rankingMethod}): ${aValue.toFixed(4)} vs ${bValue.toFixed(4)}, diff=${Math.abs(aValue - bValue).toFixed(6)}`);
+    console.log(
+      `      Primary (${rules.rankingMethod}): ${aValue.toFixed(4)} vs ${bValue.toFixed(4)}, diff=${Math.abs(aValue - bValue).toFixed(6)}`,
+    );
 
     // Use epsilon comparison for floating point values
     if (Math.abs(aValue - bValue) >= sortEpsilon) {
       const result = bValue - aValue;
-      console.log(`      → Primary decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+      console.log(
+        `      → Primary decides: ${result > 0 ? "b wins" : "a wins"}`,
+      );
       return result; // Higher is better (descending)
     }
     console.log(`      → Primary TIED (diff < ${sortEpsilon})`);
 
     // Tie on primary! Apply tiebreaker 1
-    if (rules.tieBreaker1 !== 'split_prize') {
+    if (rules.tieBreaker1 !== "split_prize") {
       const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
       const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
 
-      console.log(`      TieBreaker1 (${rules.tieBreaker1}): ${aTie1} vs ${bTie1}`);
+      console.log(
+        `      TieBreaker1 (${rules.tieBreaker1}): ${aTie1} vs ${bTie1}`,
+      );
 
       // Use epsilon for floating-point tiebreakers (win_rate, roi)
       // Use 0.5 threshold for integer-like values (trades_count, join_time)
-      const tie1Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker1) ? 0.01 : 0.5;
+      const tie1Epsilon = ["win_rate", "roi", "total_capital"].includes(
+        rules.tieBreaker1,
+      )
+        ? 0.01
+        : 0.5;
       if (Math.abs(aTie1 - bTie1) >= tie1Epsilon) {
         const result = bTie1 - aTie1;
-        console.log(`      → TieBreaker1 decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+        console.log(
+          `      → TieBreaker1 decides: ${result > 0 ? "b wins" : "a wins"}`,
+        );
         return result; // Higher is better (for trades_count, value is negative so fewer trades wins)
       }
       console.log(`      → TieBreaker1 TIED`);
     }
 
     // Still tied! Apply tiebreaker 2
-    if (rules.tieBreaker2 && rules.tieBreaker2 !== 'split_prize') {
+    if (rules.tieBreaker2 && rules.tieBreaker2 !== "split_prize") {
       const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
       const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
 
-      console.log(`      TieBreaker2 (${rules.tieBreaker2}): ${aTie2} vs ${bTie2}`);
+      console.log(
+        `      TieBreaker2 (${rules.tieBreaker2}): ${aTie2} vs ${bTie2}`,
+      );
 
-      const tie2Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker2) ? 0.01 : 0.5;
+      const tie2Epsilon = ["win_rate", "roi", "total_capital"].includes(
+        rules.tieBreaker2,
+      )
+        ? 0.01
+        : 0.5;
       if (Math.abs(aTie2 - bTie2) >= tie2Epsilon) {
         const result = bTie2 - aTie2;
-        console.log(`      → TieBreaker2 decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+        console.log(
+          `      → TieBreaker2 decides: ${result > 0 ? "b wins" : "a wins"}`,
+        );
         return result;
       }
       console.log(`      → TieBreaker2 TIED`);
     } else {
-      console.log(`      → No TieBreaker2 defined (tieBreaker2=${rules.tieBreaker2})`);
+      console.log(
+        `      → No TieBreaker2 defined (tieBreaker2=${rules.tieBreaker2})`,
+      );
     }
 
     // Ultimate tiebreaker: join time (earlier is better)
-    const joinTimeResult = new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
-    console.log(`      → Ultimate (join_time): ${a.enteredAt} vs ${b.enteredAt}, ${joinTimeResult < 0 ? 'a wins' : 'b wins'}`);
+    const joinTimeResult =
+      new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    console.log(
+      `      → Ultimate (join_time): ${a.enteredAt} vs ${b.enteredAt}, ${joinTimeResult < 0 ? "a wins" : "b wins"}`,
+    );
     return joinTimeResult;
   });
 
   // Step 3: Assign ranks and detect TRUE ties (same across ALL criteria)
   let currentRank = 1;
   let skipCount = 0; // Track how many positions to skip after ties
-  
+
   for (let i = 0; i < qualified.length; i++) {
     const current = qualified[i];
     const currentValue = getRankingValue(current, rules.rankingMethod);
 
-    console.log(`  Ranking ${i + 1}: ${current.username} - ${rules.rankingMethod}=${currentValue.toFixed(4)}`);
+    console.log(
+      `  Ranking ${i + 1}: ${current.username} - ${rules.rankingMethod}=${currentValue.toFixed(4)}`,
+    );
 
     // Check if tied with previous (using comprehensive comparison)
     if (i > 0) {
       const previous = qualified[i - 1];
-      
+
       // Use the comprehensive tie detection that checks ALL criteria
       const isTied = areParticipantsTied(current, previous, rules);
 
@@ -295,10 +358,10 @@ export function calculateRankings(
             }
           });
         }
-        
+
         // Add current to previous's list
         previous.tiedWith.push(current.userId);
-        
+
         // Update all previously tied participants to include current
         for (let j = i - 2; j >= 0; j--) {
           if (qualified[j].rank === current.rank && qualified[j].isTied) {
@@ -348,33 +411,48 @@ export function distributePrizesWithTies(
   prizeDistribution: { rank: number; percentage: number }[],
   grossPrizePool: number, // CHANGED: Now receives GROSS prize pool
   rules: CompetitionRules,
-  platformFeePercentage: number = 0 // NEW: Platform fee to deduct from each prize
+  platformFeePercentage: number = 0, // NEW: Platform fee to deduct from each prize
 ): { userId: string; prizeAmount: number; rank: number; isTied: boolean }[] {
-  const distributions: { userId: string; prizeAmount: number; rank: number; isTied: boolean }[] = [];
+  const distributions: {
+    userId: string;
+    prizeAmount: number;
+    rank: number;
+    isTied: boolean;
+  }[] = [];
 
   // Group qualified participants by rank to handle ties
   const rankGroups: { [rank: number]: RankedParticipant[] } = {};
-  const qualifiedParticipants = rankedParticipants.filter((p) => p.qualificationStatus === 'qualified');
-  
+  const qualifiedParticipants = rankedParticipants.filter(
+    (p) => p.qualificationStatus === "qualified",
+  );
+
   qualifiedParticipants.forEach((p) => {
     if (!rankGroups[p.rank]) rankGroups[p.rank] = [];
     rankGroups[p.rank].push(p);
   });
 
   const totalQualifiedParticipants = qualifiedParticipants.length;
-  console.log(`💰 Prize distribution: ${totalQualifiedParticipants} qualified participants, ${prizeDistribution.length} prize positions`);
+  console.log(
+    `💰 Prize distribution: ${totalQualifiedParticipants} qualified participants, ${prizeDistribution.length} prize positions`,
+  );
 
   // Step 1: Calculate which prize positions are filled and which are unclaimed
   let unclaimedPercentage = 0;
-  const filledPrizePositions: { rank: number; percentage: number; winners: RankedParticipant[] }[] = [];
+  const filledPrizePositions: {
+    rank: number;
+    percentage: number;
+    winners: RankedParticipant[];
+  }[] = [];
 
   prizeDistribution.forEach((dist) => {
     const winnersAtRank = rankGroups[dist.rank] || [];
-    
+
     if (winnersAtRank.length === 0) {
       // No one at this rank - add percentage to unclaimed pool
       unclaimedPercentage += dist.percentage;
-      console.log(`  📭 Rank ${dist.rank}: No winner - ${dist.percentage}% added to unclaimed pool`);
+      console.log(
+        `  📭 Rank ${dist.rank}: No winner - ${dist.percentage}% added to unclaimed pool`,
+      );
     } else {
       // Winners exist at this rank
       filledPrizePositions.push({
@@ -382,42 +460,56 @@ export function distributePrizesWithTies(
         percentage: dist.percentage,
         winners: winnersAtRank,
       });
-      console.log(`  ✅ Rank ${dist.rank}: ${winnersAtRank.length} winner(s) - ${dist.percentage}%`);
+      console.log(
+        `  ✅ Rank ${dist.rank}: ${winnersAtRank.length} winner(s) - ${dist.percentage}%`,
+      );
     }
   });
 
-  console.log(`  📊 Unclaimed percentage to redistribute: ${unclaimedPercentage}%`);
+  console.log(
+    `  📊 Unclaimed percentage to redistribute: ${unclaimedPercentage}%`,
+  );
 
   // Step 2: Calculate bonus percentage per filled winner from unclaimed pool
   // Distribute unclaimed percentage equally among ALL actual winners
-  const totalActualWinners = filledPrizePositions.reduce((sum, pos) => sum + pos.winners.length, 0);
-  const bonusPercentagePerWinner = totalActualWinners > 0 ? unclaimedPercentage / totalActualWinners : 0;
+  const totalActualWinners = filledPrizePositions.reduce(
+    (sum, pos) => sum + pos.winners.length,
+    0,
+  );
+  const bonusPercentagePerWinner =
+    totalActualWinners > 0 ? unclaimedPercentage / totalActualWinners : 0;
 
   if (bonusPercentagePerWinner > 0) {
-    console.log(`  🎁 Bonus per winner from unclaimed: +${bonusPercentagePerWinner.toFixed(2)}% each`);
+    console.log(
+      `  🎁 Bonus per winner from unclaimed: +${bonusPercentagePerWinner.toFixed(2)}% each`,
+    );
   }
 
   // Step 3: Distribute prizes with bonus
   filledPrizePositions.forEach((pos) => {
     const winnersAtRank = pos.winners;
-    
+
     // Calculate base percentage + bonus for each winner at this rank
     const basePercentage = pos.percentage;
     const winnersCount = winnersAtRank.length;
-    
+
     // For ties at the same rank, they already split the base percentage
     // Plus each winner gets bonus from unclaimed pool
     const perWinnerBasePercentage = basePercentage / winnersCount;
-    const totalPercentagePerWinner = perWinnerBasePercentage + bonusPercentagePerWinner;
+    const totalPercentagePerWinner =
+      perWinnerBasePercentage + bonusPercentagePerWinner;
 
     if (winnersCount === 1) {
       // Single winner at this rank
-      const grossPrize = (grossPrizePool * (basePercentage + bonusPercentagePerWinner)) / 100;
+      const grossPrize =
+        (grossPrizePool * (basePercentage + bonusPercentagePerWinner)) / 100;
       const netPrize = grossPrize * (1 - platformFeePercentage);
       const prizeAmount = Math.floor(netPrize * 100) / 100;
-      
-      console.log(`  🏆 Rank ${pos.rank}: ${winnersAtRank[0].username} gets ${basePercentage}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${(basePercentage + bonusPercentagePerWinner).toFixed(2)}% (${prizeAmount} credits after ${(platformFeePercentage * 100).toFixed(1)}% fee)`);
-      
+
+      console.log(
+        `  🏆 Rank ${pos.rank}: ${winnersAtRank[0].username} gets ${basePercentage}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${(basePercentage + bonusPercentagePerWinner).toFixed(2)}% (${prizeAmount} credits after ${(platformFeePercentage * 100).toFixed(1)}% fee)`,
+      );
+
       distributions.push({
         userId: winnersAtRank[0].userId,
         prizeAmount,
@@ -426,15 +518,17 @@ export function distributePrizesWithTies(
       });
     } else {
       // Multiple winners tied at this rank
-      console.log(`  🤝 Rank ${pos.rank}: ${winnersCount} tied winners, each gets ${perWinnerBasePercentage.toFixed(2)}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${totalPercentagePerWinner.toFixed(2)}%`);
+      console.log(
+        `  🤝 Rank ${pos.rank}: ${winnersCount} tied winners, each gets ${perWinnerBasePercentage.toFixed(2)}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${totalPercentagePerWinner.toFixed(2)}%`,
+      );
 
-      if (rules.tiePrizeDistribution === 'split_equally') {
+      if (rules.tiePrizeDistribution === "split_equally") {
         // Split base percentage equally, plus each gets bonus
         winnersAtRank.forEach((winner) => {
           const grossPrize = (grossPrizePool * totalPercentagePerWinner) / 100;
           const netPrize = grossPrize * (1 - platformFeePercentage);
           const prizeAmount = Math.floor(netPrize * 100) / 100;
-          
+
           distributions.push({
             userId: winner.userId,
             prizeAmount,
@@ -442,34 +536,41 @@ export function distributePrizesWithTies(
             isTied: true,
           });
         });
-      } else if (rules.tiePrizeDistribution === 'first_gets_all') {
+      } else if (rules.tiePrizeDistribution === "first_gets_all") {
         // First person (by join time) gets all (base + all bonuses for this rank)
         const sorted = winnersAtRank.sort(
-          (a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime()
+          (a, b) =>
+            new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime(),
         );
-        const totalGroupPercentage = basePercentage + (bonusPercentagePerWinner * winnersCount);
+        const totalGroupPercentage =
+          basePercentage + bonusPercentagePerWinner * winnersCount;
         const grossPrize = (grossPrizePool * totalGroupPercentage) / 100;
         const netPrize = grossPrize * (1 - platformFeePercentage);
         const prizeAmount = Math.floor(netPrize * 100) / 100;
-        
+
         distributions.push({
           userId: sorted[0].userId,
           prizeAmount,
           rank: pos.rank,
           isTied: true,
         });
-      } else if (rules.tiePrizeDistribution === 'split_weighted') {
+      } else if (rules.tiePrizeDistribution === "split_weighted") {
         // Split based on secondary metrics (e.g., capital)
-        const totalWeight = winnersAtRank.reduce((sum, w) => sum + w.currentCapital, 0);
+        const totalWeight = winnersAtRank.reduce(
+          (sum, w) => sum + w.currentCapital,
+          0,
+        );
         // Total pool for this group: base + all bonuses
-        const totalGroupPercentage = basePercentage + (bonusPercentagePerWinner * winnersCount);
-        
+        const totalGroupPercentage =
+          basePercentage + bonusPercentagePerWinner * winnersCount;
+
         winnersAtRank.forEach((winner) => {
           const weight = winner.currentCapital / totalWeight;
-          const grossPrize = (grossPrizePool * totalGroupPercentage * weight) / 100;
+          const grossPrize =
+            (grossPrizePool * totalGroupPercentage * weight) / 100;
           const netPrize = grossPrize * (1 - platformFeePercentage);
           const prizeAmount = Math.floor(netPrize * 100) / 100;
-          
+
           distributions.push({
             userId: winner.userId,
             prizeAmount,
@@ -489,12 +590,12 @@ export function distributePrizesWithTies(
  */
 export function getRankingMethodDescription(method: string): string {
   const descriptions = {
-    pnl: 'Highest Profit/Loss (P&L)',
-    roi: 'Highest Return on Investment (ROI %)',
-    total_capital: 'Highest Total Capital',
-    win_rate: 'Highest Win Rate %',
-    total_wins: 'Most Winning Trades',
-    profit_factor: 'Best Profit Factor',
+    pnl: "Highest Profit/Loss (P&L)",
+    roi: "Highest Return on Investment (ROI %)",
+    total_capital: "Highest Total Capital",
+    win_rate: "Highest Win Rate %",
+    total_wins: "Most Winning Trades",
+    profit_factor: "Best Profit Factor",
   };
   return descriptions[method as keyof typeof descriptions] || method;
 }
@@ -504,13 +605,12 @@ export function getRankingMethodDescription(method: string): string {
  */
 export function getTieBreakerDescription(tieBreaker: string): string {
   const descriptions = {
-    trades_count: 'Fewer trades (more efficient)',
-    win_rate: 'Higher win rate',
-    total_capital: 'Higher total capital',
-    roi: 'Higher ROI %',
-    join_time: 'Who joined first',
-    split_prize: 'Split prize equally',
+    trades_count: "Fewer trades (more efficient)",
+    win_rate: "Higher win rate",
+    total_capital: "Higher total capital",
+    roi: "Higher ROI %",
+    join_time: "Who joined first",
+    split_prize: "Split prize equally",
   };
   return descriptions[tieBreaker as keyof typeof descriptions] || tieBreaker;
 }
-

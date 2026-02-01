@@ -1,21 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 /**
  * POST /api/simulator/deposit-batch
  * Batch deposit to multiple users at once (MUCH faster than individual deposits)
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
-  const isDev = process.env.NODE_ENV === 'development';
+  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
+  const isDev = process.env.NODE_ENV === "development";
 
   if (!isSimulatorMode && !isDev) {
     return NextResponse.json(
-      { success: false, error: 'Simulator mode not enabled' },
-      { status: 403 }
+      { success: false, error: "Simulator mode not enabled" },
+      { status: 403 },
     );
   }
 
@@ -25,25 +25,27 @@ export async function POST(request: NextRequest) {
 
     if (!deposits || !Array.isArray(deposits)) {
       return NextResponse.json(
-        { success: false, error: 'deposits array required' },
-        { status: 400 }
+        { success: false, error: "deposits array required" },
+        { status: 400 },
       );
     }
 
     await connectToDatabase();
 
     const userIds = deposits.map((d: { userId: string }) => d.userId);
-    
+
     // Start MongoDB transaction for atomic operations
     const mongoSession = await mongoose.startSession();
     mongoSession.startTransaction();
 
     try {
       // Fetch all wallets in one query
-      const existingWallets = await CreditWallet.find({ userId: { $in: userIds } })
+      const existingWallets = await CreditWallet.find({
+        userId: { $in: userIds },
+      })
         .session(mongoSession)
         .lean();
-      const walletMap = new Map(existingWallets.map(w => [w.userId, w]));
+      const walletMap = new Map(existingWallets.map((w) => [w.userId, w]));
 
       // Prepare bulk operations
       const walletOps: any[] = [];
@@ -62,8 +64,8 @@ export async function POST(request: NextRequest) {
           walletOps.push({
             updateOne: {
               filter: { userId },
-              update: { 
-                $inc: { creditBalance: amount, totalDeposited: amount } 
+              update: {
+                $inc: { creditBalance: amount, totalDeposited: amount },
               },
             },
           });
@@ -94,14 +96,14 @@ export async function POST(request: NextRequest) {
         // Prepare transaction document
         transactionDocs.push({
           userId,
-          transactionType: 'deposit',
+          transactionType: "deposit",
           amount,
           balanceBefore,
           balanceAfter,
-          currency: 'EUR',
+          currency: "EUR",
           exchangeRate: 1,
-          status: 'completed',
-          description: 'Simulator deposit',
+          status: "completed",
+          description: "Simulator deposit",
           processedAt: new Date(),
           metadata: { simulatorMode: true },
         });
@@ -110,10 +112,16 @@ export async function POST(request: NextRequest) {
       // Execute bulk operations atomically within transaction
       let walletResult = null;
       if (walletOps.length > 0) {
-        walletResult = await CreditWallet.bulkWrite(walletOps, { ordered: false, session: mongoSession });
+        walletResult = await CreditWallet.bulkWrite(walletOps, {
+          ordered: false,
+          session: mongoSession,
+        });
       }
       if (transactionDocs.length > 0) {
-        await WalletTransaction.insertMany(transactionDocs, { ordered: false, session: mongoSession });
+        await WalletTransaction.insertMany(transactionDocs, {
+          ordered: false,
+          session: mongoSession,
+        });
       }
 
       // Commit transaction - all operations succeed or all fail
@@ -133,11 +141,13 @@ export async function POST(request: NextRequest) {
       throw txError;
     }
   } catch (error) {
-    console.error('Simulator batch deposit error:', error);
+    console.error("Simulator batch deposit error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
     );
   }
 }
-

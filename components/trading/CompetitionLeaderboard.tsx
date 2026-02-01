@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from 'lucide-react';
+import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from "lucide-react";
 
 interface LeaderboardEntry {
   _id: string;
@@ -19,7 +19,7 @@ interface LeaderboardEntry {
   status: string;
   isTied?: boolean;
   tiedWith?: string[];
-  qualificationStatus?: 'qualified' | 'disqualified';
+  qualificationStatus?: "qualified" | "disqualified";
   disqualificationReason?: string;
 }
 
@@ -28,7 +28,7 @@ interface CompetitionLeaderboardProps {
   userParticipantId?: string;
   prizeDistribution: { rank: number; percentage: number }[];
   minimumTrades?: number;
-  competitionStatus?: 'upcoming' | 'active' | 'completed' | 'cancelled';
+  competitionStatus?: "upcoming" | "active" | "completed" | "cancelled";
 }
 
 export default function CompetitionLeaderboard({
@@ -43,14 +43,20 @@ export default function CompetitionLeaderboard({
     return prize ? prize.percentage : 0;
   };
 
-  const getRankIcon = (rank: number, isDisqualified: boolean, isTied?: boolean) => {
+  const getRankIcon = (
+    rank: number,
+    isDisqualified: boolean,
+    isTied?: boolean,
+  ) => {
     if (isDisqualified) {
       return <Ban className="h-5 w-5 text-red-500" />;
     }
-    
+
     // Add tie indicator ring for tied positions
-    const tieRingClass = isTied ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-gray-900 rounded-full' : '';
-    
+    const tieRingClass = isTied
+      ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-gray-900 rounded-full"
+      : "";
+
     switch (rank) {
       case 1:
         return (
@@ -72,7 +78,9 @@ export default function CompetitionLeaderboard({
         );
       default:
         return (
-          <span className={`w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-400 ${tieRingClass}`}>
+          <span
+            className={`w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-400 ${tieRingClass}`}
+          >
             {rank}
           </span>
         );
@@ -82,33 +90,45 @@ export default function CompetitionLeaderboard({
   // Helper to get disqualification icon
   const getDisqualificationIcon = (reason?: string) => {
     if (!reason) return <Ban className="h-3.5 w-3.5" />;
-    
+
     const lowerReason = reason.toLowerCase();
-    if (lowerReason.includes('liquidat')) return <Skull className="h-3.5 w-3.5" />;
-    if (lowerReason.includes('fraud') || lowerReason.includes('ban')) return <ShieldX className="h-3.5 w-3.5" />;
-    if (lowerReason.includes('trade')) return <AlertTriangle className="h-3.5 w-3.5" />;
+    if (lowerReason.includes("liquidat"))
+      return <Skull className="h-3.5 w-3.5" />;
+    if (lowerReason.includes("fraud") || lowerReason.includes("ban"))
+      return <ShieldX className="h-3.5 w-3.5" />;
+    if (lowerReason.includes("trade"))
+      return <AlertTriangle className="h-3.5 w-3.5" />;
     return <Ban className="h-3.5 w-3.5" />;
   };
 
   // Check if entry is disqualified (either explicitly or via status)
   // Only check minimum trades when competition is completed - don't confuse users during active competition
   const isEntryDisqualified = (entry: LeaderboardEntry) => {
-    if (entry.qualificationStatus === 'disqualified') return true;
-    if (entry.status === 'liquidated') return true;
+    if (entry.qualificationStatus === "disqualified") return true;
+    if (entry.status === "liquidated") return true;
     // Only disqualify for minimum trades when competition is COMPLETED
-    if (competitionStatus === 'completed' && minimumTrades > 0 && entry.totalTrades < minimumTrades) return true;
+    if (
+      competitionStatus === "completed" &&
+      minimumTrades > 0 &&
+      entry.totalTrades < minimumTrades
+    )
+      return true;
     return false;
   };
 
   // Get disqualification reason
   const getDisqualificationReason = (entry: LeaderboardEntry) => {
     if (entry.disqualificationReason) return entry.disqualificationReason;
-    if (entry.status === 'liquidated') return 'Liquidated';
+    if (entry.status === "liquidated") return "Liquidated";
     // Only show min trades reason when competition is completed
-    if (competitionStatus === 'completed' && minimumTrades > 0 && entry.totalTrades < minimumTrades) {
+    if (
+      competitionStatus === "completed" &&
+      minimumTrades > 0 &&
+      entry.totalTrades < minimumTrades
+    ) {
       return `Insufficient trades (${entry.totalTrades}/${minimumTrades})`;
     }
-    return 'Disqualified';
+    return "Disqualified";
   };
 
   if (leaderboard.length === 0) {
@@ -143,23 +163,29 @@ export default function CompetitionLeaderboard({
       <div className="space-y-1">
         {leaderboard.map((entry, index) => {
           const isCurrentUser = entry._id === userParticipantId;
-          const isPrizePosition = getPrizePercentage(entry.currentRank || index + 1) > 0;
-          const winRate = entry.totalTrades > 0 ? (entry.winningTrades / entry.totalTrades) * 100 : 0;
+          const isPrizePosition =
+            getPrizePercentage(entry.currentRank || index + 1) > 0;
+          const winRate =
+            entry.totalTrades > 0
+              ? (entry.winningTrades / entry.totalTrades) * 100
+              : 0;
           const profitFactor = calculateProfitFactor(entry);
           const isDisqualified = isEntryDisqualified(entry);
-          const disqualificationReason = isDisqualified ? getDisqualificationReason(entry) : '';
+          const disqualificationReason = isDisqualified
+            ? getDisqualificationReason(entry)
+            : "";
 
           return (
             <div
               key={entry._id}
               className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 p-3 md:p-4 rounded-lg transition-colors relative ${
                 isDisqualified
-                  ? 'bg-red-500/5 border border-red-500/30 opacity-70'
+                  ? "bg-red-500/5 border border-red-500/30 opacity-70"
                   : isCurrentUser
-                  ? 'bg-blue-500/10 border border-blue-500/30'
-                  : isPrizePosition
-                  ? 'bg-yellow-500/5 border border-yellow-500/20 hover:bg-yellow-500/10'
-                  : 'bg-gray-800/30 border border-transparent hover:bg-gray-800/50'
+                    ? "bg-blue-500/10 border border-blue-500/30"
+                    : isPrizePosition
+                      ? "bg-yellow-500/5 border border-yellow-500/20 hover:bg-yellow-500/10"
+                      : "bg-gray-800/30 border border-transparent hover:bg-gray-800/50"
               }`}
             >
               {/* Red strikethrough line for disqualified */}
@@ -171,23 +197,31 @@ export default function CompetitionLeaderboard({
 
               {/* Rank */}
               <div className="flex items-center flex-shrink-0">
-                {getRankIcon(entry.currentRank || index + 1, isDisqualified, entry.isTied)}
+                {getRankIcon(
+                  entry.currentRank || index + 1,
+                  isDisqualified,
+                  entry.isTied,
+                )}
               </div>
 
               {/* Trader */}
               <div className="flex flex-col justify-center min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                  <p className={`text-sm font-medium truncate ${
-                    isDisqualified 
-                      ? 'text-red-400/70 line-through' 
-                      : isCurrentUser 
-                      ? 'text-blue-400' 
-                      : 'text-gray-100'
-                  }`}>
+                  <p
+                    className={`text-sm font-medium truncate ${
+                      isDisqualified
+                        ? "text-red-400/70 line-through"
+                        : isCurrentUser
+                          ? "text-blue-400"
+                          : "text-gray-100"
+                    }`}
+                  >
                     {entry.username}
                   </p>
                   {entry.userTitle && !isDisqualified && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${entry.userTitleColor || 'text-purple-400'} bg-gray-800/80 border border-gray-700`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
+                    >
                       {entry.userTitleIcon} {entry.userTitle}
                     </span>
                   )}
@@ -200,7 +234,9 @@ export default function CompetitionLeaderboard({
                     <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400 flex-shrink-0 font-semibold flex items-center gap-1">
                       = #{entry.currentRank}
                       {entry.tiedWith && entry.tiedWith.length > 0 && (
-                        <span className="text-amber-300/70">({entry.tiedWith.length + 1} equal)</span>
+                        <span className="text-amber-300/70">
+                          ({entry.tiedWith.length + 1} equal)
+                        </span>
                       )}
                     </span>
                   )}
@@ -223,9 +259,13 @@ export default function CompetitionLeaderboard({
 
               {/* Capital */}
               <div className="flex items-center justify-end gap-1 flex-shrink-0 min-w-[100px]">
-                <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                  isDisqualified ? 'text-gray-500 line-through' : 'text-gray-100'
-                }`}>
+                <p
+                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                    isDisqualified
+                      ? "text-gray-500 line-through"
+                      : "text-gray-100"
+                  }`}
+                >
                   {entry.currentCapital.toLocaleString()}
                 </p>
                 <span className="text-xs text-gray-500 flex-shrink-0">pts</span>
@@ -235,12 +275,14 @@ export default function CompetitionLeaderboard({
               <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[80px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                    isDisqualified 
-                      ? 'text-gray-500 line-through' 
-                      : entry.pnl >= 0 ? 'text-green-500' : 'text-red-500'
+                    isDisqualified
+                      ? "text-gray-500 line-through"
+                      : entry.pnl >= 0
+                        ? "text-green-500"
+                        : "text-red-500"
                   }`}
                 >
-                  {entry.pnl >= 0 ? '+' : ''}
+                  {entry.pnl >= 0 ? "+" : ""}
                   {entry.pnl.toFixed(2)}
                 </p>
               </div>
@@ -249,21 +291,27 @@ export default function CompetitionLeaderboard({
               <div className="flex items-center justify-end flex-shrink-0 min-w-[70px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                    isDisqualified 
-                      ? 'text-gray-500 line-through' 
-                      : entry.pnlPercentage >= 0 ? 'text-green-500' : 'text-red-500'
+                    isDisqualified
+                      ? "text-gray-500 line-through"
+                      : entry.pnlPercentage >= 0
+                        ? "text-green-500"
+                        : "text-red-500"
                   }`}
                 >
-                  {entry.pnlPercentage >= 0 ? '+' : ''}
+                  {entry.pnlPercentage >= 0 ? "+" : ""}
                   {entry.pnlPercentage.toFixed(2)}%
                 </p>
               </div>
 
               {/* Win Rate */}
               <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[70px]">
-                <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                  isDisqualified ? 'text-gray-500 line-through' : 'text-gray-100'
-                }`}>
+                <p
+                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                    isDisqualified
+                      ? "text-gray-500 line-through"
+                      : "text-gray-100"
+                  }`}
+                >
                   {winRate.toFixed(1)}%
                 </p>
                 <p className="text-xs text-gray-500 whitespace-nowrap">
@@ -273,36 +321,52 @@ export default function CompetitionLeaderboard({
 
               {/* Trades */}
               <div className="flex items-center justify-end flex-shrink-0 min-w-[50px]">
-                <p className={`text-sm font-semibold tabular-nums ${
-                  isDisqualified 
-                    ? competitionStatus === 'completed' && minimumTrades > 0 && entry.totalTrades < minimumTrades 
-                      ? 'text-red-400' 
-                      : 'text-gray-500 line-through'
-                    : minimumTrades > 0 && entry.totalTrades < minimumTrades && competitionStatus === 'active'
-                      ? 'text-yellow-400'  // Warning color during active competition
-                      : 'text-gray-100'
-                }`}>
+                <p
+                  className={`text-sm font-semibold tabular-nums ${
+                    isDisqualified
+                      ? competitionStatus === "completed" &&
+                        minimumTrades > 0 &&
+                        entry.totalTrades < minimumTrades
+                        ? "text-red-400"
+                        : "text-gray-500 line-through"
+                      : minimumTrades > 0 &&
+                          entry.totalTrades < minimumTrades &&
+                          competitionStatus === "active"
+                        ? "text-yellow-400" // Warning color during active competition
+                        : "text-gray-100"
+                  }`}
+                >
                   {entry.totalTrades}
                   {minimumTrades > 0 && (
-                    <span className={`text-xs ml-0.5 ${
-                      entry.totalTrades >= minimumTrades 
-                        ? 'text-green-400' 
-                        : competitionStatus === 'completed' 
-                          ? 'text-red-400' 
-                          : 'text-yellow-400'
-                    }`}>/{minimumTrades}</span>
+                    <span
+                      className={`text-xs ml-0.5 ${
+                        entry.totalTrades >= minimumTrades
+                          ? "text-green-400"
+                          : competitionStatus === "completed"
+                            ? "text-red-400"
+                            : "text-yellow-400"
+                      }`}
+                    >
+                      /{minimumTrades}
+                    </span>
                   )}
                 </p>
               </div>
 
               {/* Profit Factor */}
               <div className="flex items-center justify-end flex-shrink-0 min-w-[60px]">
-                <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                  isDisqualified 
-                    ? 'text-gray-500 line-through' 
-                    : profitFactor >= 2 ? 'text-green-500' : profitFactor >= 1 ? 'text-yellow-500' : 'text-red-500'
-                }`}>
-                  {profitFactor === 9999 ? '∞' : profitFactor.toFixed(2)}
+                <p
+                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                    isDisqualified
+                      ? "text-gray-500 line-through"
+                      : profitFactor >= 2
+                        ? "text-green-500"
+                        : profitFactor >= 1
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                  }`}
+                >
+                  {profitFactor === 9999 ? "∞" : profitFactor.toFixed(2)}
                 </p>
               </div>
 
@@ -310,12 +374,17 @@ export default function CompetitionLeaderboard({
               {isPrizePosition && !isDisqualified && (
                 <div className="col-span-full mt-2 pt-2 border-t border-gray-700/50">
                   <p className="text-xs text-yellow-500">
-                    🏆 Prize position: {getPrizePercentage(entry.currentRank || index + 1)}% of pool
-                    {entry.isTied && entry.tiedWith && entry.tiedWith.length > 0 && (
-                      <span className="ml-2 text-amber-400">
-                        (Split with {entry.tiedWith.length} other{entry.tiedWith.length > 1 ? 's' : ''})
-                      </span>
-                    )}
+                    🏆 Prize position:{" "}
+                    {getPrizePercentage(entry.currentRank || index + 1)}% of
+                    pool
+                    {entry.isTied &&
+                      entry.tiedWith &&
+                      entry.tiedWith.length > 0 && (
+                        <span className="ml-2 text-amber-400">
+                          (Split with {entry.tiedWith.length} other
+                          {entry.tiedWith.length > 1 ? "s" : ""})
+                        </span>
+                      )}
                   </p>
                 </div>
               )}
@@ -336,4 +405,3 @@ export default function CompetitionLeaderboard({
     </div>
   );
 }
-

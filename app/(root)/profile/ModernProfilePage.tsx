@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { Suspense } from 'react';
-import ProfileHeader from '@/components/profile/ProfileHeader';
-import ModernProfileTabs from '@/components/profile/ModernProfileTabs';
-import ProfileOverviewCharts from '@/components/profile/ProfileOverviewCharts';
-import XPProgressBar from '@/components/profile/XPProgressBar';
-import BadgesDisplay from '@/components/profile/BadgesDisplay';
-import ProfileSettingsSection from '@/components/profile/ProfileSettingsSection';
-import NotificationCenter from '@/components/notifications/NotificationCenter';
-import TradingArsenalSection from '@/components/profile/TradingArsenalSection';
-import KYCVerification from '@/components/kyc/KYCVerification';
-import { Badge } from '@/lib/constants/badges';
+import { Suspense } from "react";
+import ProfileHeader from "@/components/profile/ProfileHeader";
+import ModernProfileTabs from "@/components/profile/ModernProfileTabs";
+import ProfileOverviewCharts from "@/components/profile/ProfileOverviewCharts";
+import XPProgressBar from "@/components/profile/XPProgressBar";
+import BadgesDisplay from "@/components/profile/BadgesDisplay";
+import ProfileSettingsSection from "@/components/profile/ProfileSettingsSection";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
+import TradingArsenalSection from "@/components/profile/TradingArsenalSection";
+import KYCVerification from "@/components/kyc/KYCVerification";
+import { Badge } from "@/lib/constants/badges";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ModernProfilePageProps {
@@ -100,7 +100,9 @@ export default function ModernProfilePage({
         <Suspense fallback={<TabsLoadingSkeleton />}>
           <ModernProfileTabs
             overviewContent={overviewContent}
-            badgesContent={<BadgesDisplay badges={badges} stats={badgeStats as any} />}
+            badgesContent={
+              <BadgesDisplay badges={badges} stats={badgeStats as any} />
+            }
             notificationsContent={<NotificationCenter />}
             arsenalContent={<TradingArsenalSection />}
             verificationContent={<KYCVerification />}
@@ -118,16 +120,22 @@ function TabsLoadingSkeleton() {
       {/* Tabs skeleton */}
       <div className="flex gap-2 overflow-x-auto">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-10 w-24 bg-slate-800/50 rounded-xl animate-pulse" />
+          <div
+            key={i}
+            className="h-10 w-24 bg-slate-800/50 rounded-xl animate-pulse"
+          />
         ))}
       </div>
-      
+
       {/* Content skeleton */}
       <div className="space-y-4">
         <div className="h-32 bg-slate-800/30 rounded-2xl animate-pulse" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-slate-800/30 rounded-xl animate-pulse" />
+            <div
+              key={i}
+              className="h-24 bg-slate-800/30 rounded-xl animate-pulse"
+            />
           ))}
         </div>
         <div className="h-48 bg-slate-800/30 rounded-2xl animate-pulse" />
@@ -135,4 +143,3 @@ function TabsLoadingSkeleton() {
     </div>
   );
 }
-

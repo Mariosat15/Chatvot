@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { FraudHistoryService } from '@/lib/services/fraud/fraud-history.service';
-import { getUsersByIds } from '@/lib/utils/user-lookup';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { FraudHistoryService } from "@/lib/services/fraud/fraud-history.service";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
 
 /**
  * PUT /api/admin/fraud/alerts/[id]
@@ -11,7 +11,7 @@ import { getUsersByIds } from '@/lib/utils/user-lookup';
  */
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await requireAdminAuth();
@@ -24,8 +24,8 @@ export async function PUT(
     const alert = await FraudAlert.findById(id);
     if (!alert) {
       return NextResponse.json(
-        { success: false, error: 'Alert not found' },
-        { status: 404 }
+        { success: false, error: "Alert not found" },
+        { status: 404 },
       );
     }
 
@@ -36,17 +36,19 @@ export async function PUT(
     if (resolution) alert.resolution = resolution;
     if (actionTaken) alert.actionTaken = actionTaken;
 
-    if (status === 'resolved' || status === 'dismissed') {
+    if (status === "resolved" || status === "dismissed") {
       const resolvedTimestamp = new Date();
       alert.resolvedAt = resolvedTimestamp;
-      alert.resolvedBy = auth.adminId || auth.email || 'system';
-      
+      alert.resolvedBy = auth.adminId || auth.email || "system";
+
       // IMPORTANT: If dismissed (no action taken), mark as cleared immediately
       // so users can trigger NEW alerts if they commit fraud again
-      if (status === 'dismissed') {
+      if (status === "dismissed") {
         alert.investigationClearedAt = resolvedTimestamp;
-        alert.clearanceNote = `Dismissed by ${auth.email || 'admin'} - User cleared without restrictions`;
-        console.log(`📝 Alert ${id} dismissed and marked as cleared - future fraud will generate NEW alerts`);
+        alert.clearanceNote = `Dismissed by ${auth.email || "admin"} - User cleared without restrictions`;
+        console.log(
+          `📝 Alert ${id} dismissed and marked as cleared - future fraud will generate NEW alerts`,
+        );
       }
     }
 
@@ -56,50 +58,50 @@ export async function PUT(
     const adminInfo = {
       adminId: auth.adminId,
       adminEmail: auth.email,
-      adminName: auth.email?.split('@')[0],
+      adminName: auth.email?.split("@")[0],
     };
 
     // Get all user IDs from alert
     const userIds = [
       alert.primaryUserId,
-      ...(alert.suspiciousUserIds || [])
+      ...(alert.suspiciousUserIds || []),
     ].filter((id, idx, arr) => id && arr.indexOf(id) === idx); // Remove duplicates and nulls
-    
+
     const usersMap = await getUsersByIds(userIds);
 
     for (const userId of userIds) {
       const user = usersMap.get(userId);
       if (!user) continue;
-      
+
       const userInfo = {
         userId: userId,
         email: user.email,
         name: user.name,
       };
 
-      if (status === 'investigating' && previousStatus === 'pending') {
+      if (status === "investigating" && previousStatus === "pending") {
         await FraudHistoryService.logInvestigationStarted(
           userInfo,
           alert.title,
           `Investigation started for alert: ${alert.description}`,
           adminInfo,
-          id
+          id,
         );
-      } else if (status === 'resolved') {
+      } else if (status === "resolved") {
         await FraudHistoryService.logAlertResolved(
           userInfo,
-          resolution || 'Alert resolved',
-          `Alert resolved with action: ${actionTaken || 'none'}`,
+          resolution || "Alert resolved",
+          `Alert resolved with action: ${actionTaken || "none"}`,
           adminInfo,
-          id
+          id,
         );
-      } else if (status === 'dismissed') {
+      } else if (status === "dismissed") {
         await FraudHistoryService.logAlertDismissed(
           userInfo,
-          resolution || 'Alert dismissed',
-          'Alert dismissed as false positive or acceptable use case',
+          resolution || "Alert dismissed",
+          "Alert dismissed as false positive or acceptable use case",
           adminInfo,
-          id
+          id,
         );
       }
     }
@@ -108,16 +110,16 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      alert: JSON.parse(JSON.stringify(alert))
+      alert: JSON.parse(JSON.stringify(alert)),
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error updating fraud alert:', error);
+    console.error("Error updating fraud alert:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update alert' },
-      { status: 500 }
+      { success: false, error: "Failed to update alert" },
+      { status: 500 },
     );
   }
 }
@@ -128,7 +130,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireAdminAuth();
@@ -139,8 +141,8 @@ export async function DELETE(
     const alert = await FraudAlert.findByIdAndDelete(id);
     if (!alert) {
       return NextResponse.json(
-        { success: false, error: 'Alert not found' },
-        { status: 404 }
+        { success: false, error: "Alert not found" },
+        { status: 404 },
       );
     }
 
@@ -148,17 +150,16 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Alert deleted'
+      message: "Alert deleted",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error deleting fraud alert:', error);
+    console.error("Error deleting fraud alert:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete alert' },
-      { status: 500 }
+      { success: false, error: "Failed to delete alert" },
+      { status: 500 },
     );
   }
 }
-

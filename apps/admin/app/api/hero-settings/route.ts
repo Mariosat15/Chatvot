@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import HeroSettings, { defaultThemePresets } from '@/database/models/hero-settings.model';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import HeroSettings, {
+  defaultThemePresets,
+} from "@/database/models/hero-settings.model";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 // GET - Fetch hero settings
 export async function GET() {
@@ -10,7 +12,7 @@ export async function GET() {
     // Verify admin authentication
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -20,8 +22,22 @@ export async function GET() {
     if (!settings) {
       settings = await HeroSettings.create({
         heroCTAButtons: [
-          { id: 'cta1', text: 'START TRADING', href: '/sign-up', style: 'primary', icon: 'Zap', enabled: true },
-          { id: 'cta2', text: 'VIEW COMPETITIONS', href: '/competitions', style: 'outline', icon: 'Trophy', enabled: true },
+          {
+            id: "cta1",
+            text: "START TRADING",
+            href: "/sign-up",
+            style: "primary",
+            icon: "Zap",
+            enabled: true,
+          },
+          {
+            id: "cta2",
+            text: "VIEW COMPETITIONS",
+            href: "/competitions",
+            style: "outline",
+            icon: "Trophy",
+            enabled: true,
+          },
         ],
       });
     }
@@ -32,10 +48,10 @@ export async function GET() {
       themePresets: defaultThemePresets,
     });
   } catch (error) {
-    console.error('Error fetching hero settings:', error);
+    console.error("Error fetching hero settings:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch hero settings' },
-      { status: 500 }
+      { error: "Failed to fetch hero settings" },
+      { status: 500 },
     );
   }
 }
@@ -46,7 +62,7 @@ export async function PUT(request: NextRequest) {
     // Verify admin authentication
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -63,11 +79,13 @@ export async function PUT(request: NextRequest) {
     delete updateFields._id;
     delete updateFields.createdAt;
     delete updateFields.updatedAt;
-    
+
     // Track what changed
     const changes: string[] = [];
     for (const key of Object.keys(updateFields)) {
-      if (JSON.stringify(settings.get(key)) !== JSON.stringify(updateFields[key])) {
+      if (
+        JSON.stringify(settings.get(key)) !== JSON.stringify(updateFields[key])
+      ) {
         changes.push(key);
       }
     }
@@ -76,16 +94,20 @@ export async function PUT(request: NextRequest) {
     Object.assign(settings, updateFields);
     settings.lastUpdated = new Date();
     settings.updatedBy = auth.adminId;
-    
+
     await settings.save();
 
     // Create audit log
     if (changes.length > 0) {
       await auditLogService.log({
-        admin: { id: auth.adminId, email: auth.email || 'unknown', name: auth.name },
-        action: 'UPDATE_HERO_SETTINGS',
-        category: 'settings',
-        description: `Updated hero page settings: ${changes.join(', ')}`,
+        admin: {
+          id: auth.adminId,
+          email: auth.email || "unknown",
+          name: auth.name,
+        },
+        action: "UPDATE_HERO_SETTINGS",
+        category: "settings",
+        description: `Updated hero page settings: ${changes.join(", ")}`,
         metadata: { changedFields: changes },
       });
     }
@@ -93,13 +115,13 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       settings: settings.toObject(),
-      message: 'Hero settings updated successfully',
+      message: "Hero settings updated successfully",
     });
   } catch (error) {
-    console.error('Error updating hero settings:', error);
+    console.error("Error updating hero settings:", error);
     return NextResponse.json(
-      { error: 'Failed to update hero settings' },
-      { status: 500 }
+      { error: "Failed to update hero settings" },
+      { status: 500 },
     );
   }
 }
@@ -110,7 +132,7 @@ export async function POST(request: NextRequest) {
     // Verify admin authentication
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -122,10 +144,13 @@ export async function POST(request: NextRequest) {
     }
 
     switch (action) {
-      case 'apply-theme': {
-        const theme = defaultThemePresets.find(t => t.id === themeId);
+      case "apply-theme": {
+        const theme = defaultThemePresets.find((t) => t.id === themeId);
         if (!theme) {
-          return NextResponse.json({ error: 'Theme not found' }, { status: 404 });
+          return NextResponse.json(
+            { error: "Theme not found" },
+            { status: 404 },
+          );
         }
 
         settings.activeTheme = theme.id;
@@ -134,24 +159,28 @@ export async function POST(request: NextRequest) {
           secondaryColor: theme.secondaryColor,
           accentColor: theme.accentColor,
           backgroundColor: theme.backgroundColor,
-          textColor: '#ffffff',
+          textColor: "#ffffff",
           gradientFrom: theme.gradientFrom,
           gradientTo: theme.gradientTo,
           gradientAngle: 135,
           fontFamily: theme.fontFamily,
           headingFont: theme.fontFamily,
-          buttonRadius: '0.75rem',
-          cardRadius: '1rem',
-          shadowIntensity: 'medium',
-          glowIntensity: theme.cardStyle === 'neon' ? 'intense' : 'medium',
+          buttonRadius: "0.75rem",
+          cardRadius: "1rem",
+          shadowIntensity: "medium",
+          glowIntensity: theme.cardStyle === "neon" ? "intense" : "medium",
         };
-        
+
         await settings.save();
 
         await auditLogService.log({
-          admin: { id: auth.adminId, email: auth.email || 'unknown', name: auth.name },
-          action: 'APPLY_HERO_THEME',
-          category: 'settings',
+          admin: {
+            id: auth.adminId,
+            email: auth.email || "unknown",
+            name: auth.name,
+          },
+          action: "APPLY_HERO_THEME",
+          category: "settings",
           description: `Applied theme preset: ${theme.name}`,
           metadata: { themeId: theme.id },
         });
@@ -163,7 +192,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      case 'reset-section': {
+      case "reset-section": {
         const { section } = data;
         // Reset specific section to defaults
         // Implementation depends on section
@@ -175,19 +204,19 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      case 'duplicate-settings': {
+      case "duplicate-settings": {
         // Create a backup of current settings
         const backup = settings.toObject();
         delete backup._id;
-        
+
         return NextResponse.json({
           success: true,
           backup,
-          message: 'Settings backup created',
+          message: "Settings backup created",
         });
       }
 
-      case 'restore-settings': {
+      case "restore-settings": {
         // Restore from backup
         if (data?.backup) {
           Object.assign(settings, data.backup);
@@ -197,19 +226,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           settings: settings.toObject(),
-          message: 'Settings restored from backup',
+          message: "Settings restored from backup",
         });
       }
 
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
   } catch (error) {
-    console.error('Error processing hero settings action:', error);
+    console.error("Error processing hero settings action:", error);
     return NextResponse.json(
-      { error: 'Failed to process action' },
-      { status: 500 }
+      { error: "Failed to process action" },
+      { status: 500 },
     );
   }
 }
-

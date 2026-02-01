@@ -1,17 +1,20 @@
-'use server';
+"use server";
 
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { evaluateUserBadges, getUserBadges } from '@/lib/services/badge-evaluation.service';
-import { BadgeCategory } from '@/lib/constants/badges';
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import {
+  evaluateUserBadges,
+  getUserBadges,
+} from "@/lib/services/badge-evaluation.service";
+import { BadgeCategory } from "@/lib/constants/badges";
 
 /**
  * Get all badges for the current user with earned status
  */
 export async function getMyBadges() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect('/sign-in');
+  if (!session?.user) redirect("/sign-in");
 
   const userId = session.user.id;
   return getUserBadges(userId);
@@ -22,21 +25,21 @@ export async function getMyBadges() {
  */
 export async function getMyBadgeStats() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect('/sign-in');
+  if (!session?.user) redirect("/sign-in");
 
   const badges = await getMyBadges();
-  
-  const earnedBadges = badges.filter(b => b.earned);
+
+  const earnedBadges = badges.filter((b) => b.earned);
   const totalBadges = badges.length;
   const earnedCount = earnedBadges.length;
   const percentage = (earnedCount / totalBadges) * 100;
 
   // Count by rarity
   const rarityCount = {
-    common: earnedBadges.filter(b => b.rarity === 'common').length,
-    rare: earnedBadges.filter(b => b.rarity === 'rare').length,
-    epic: earnedBadges.filter(b => b.rarity === 'epic').length,
-    legendary: earnedBadges.filter(b => b.rarity === 'legendary').length,
+    common: earnedBadges.filter((b) => b.rarity === "common").length,
+    rare: earnedBadges.filter((b) => b.rarity === "rare").length,
+    epic: earnedBadges.filter((b) => b.rarity === "epic").length,
+    legendary: earnedBadges.filter((b) => b.rarity === "legendary").length,
   };
 
   // Count by category
@@ -75,10 +78,9 @@ export async function getMyBadgeStats() {
 export async function checkMyBadges() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized");
   }
 
   const userId = session.user.id;
   return evaluateUserBadges(userId);
 }
-

@@ -1,44 +1,47 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import TradingOrder from '@/database/models/trading/trading-order.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import UserLevel from '@/database/models/user-level.model';
-import UserBadge from '@/database/models/user-badge.model';
-import UserRestriction from '@/database/models/user-restriction.model';
-import DeviceFingerprint from '@/database/models/fraud/device-fingerprint.model';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import { FraudHistory } from '@/database/models/fraud/fraud-history.model';
-import SuspicionScore from '@/database/models/fraud/suspicion-score.model';
-import PaymentFingerprint from '@/database/models/fraud/payment-fingerprint.model';
-import BehavioralSimilarity from '@/database/models/fraud/behavioral-similarity.model';
-import TradingBehaviorProfile from '@/database/models/fraud/trading-behavior-profile.model';
-import { PlatformTransaction, PlatformBalanceSnapshot } from '@/database/models/platform-financials.model';
-import VATPayment from '@/database/models/vat-payment.model';
-import Invoice from '@/database/models/invoice.model';
-import AuditLog from '@/database/models/audit-log.model';
-import Notification from '@/database/models/notification.model';
-import NotificationTemplate from '@/database/models/notification-template.model';
-import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
-import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
-import WithdrawalRequest from '@/database/models/withdrawal-request.model';
-import UserBankAccount from '@/database/models/user-bank-account.model';
-import ReconciliationLog from '@/database/models/reconciliation-log.model';
-import KYCSession from '@/database/models/kyc-session.model';
-import UserNote from '@/database/models/user-notes.model';
-import PositionEvent from '@/database/models/position-event.model';
-import UserNotificationPreferences from '@/database/models/user-notification-preferences.model';
-import UserPresence from '@/database/models/user-presence.model';
-import { resetBadgeAndXPConfigs } from '@/lib/services/badge-config-seed.service';
-import { auditLogService } from '@/lib/services/audit-log.service';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import TradingOrder from "@/database/models/trading/trading-order.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import UserLevel from "@/database/models/user-level.model";
+import UserBadge from "@/database/models/user-badge.model";
+import UserRestriction from "@/database/models/user-restriction.model";
+import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import { FraudHistory } from "@/database/models/fraud/fraud-history.model";
+import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
+import PaymentFingerprint from "@/database/models/fraud/payment-fingerprint.model";
+import BehavioralSimilarity from "@/database/models/fraud/behavioral-similarity.model";
+import TradingBehaviorProfile from "@/database/models/fraud/trading-behavior-profile.model";
+import {
+  PlatformTransaction,
+  PlatformBalanceSnapshot,
+} from "@/database/models/platform-financials.model";
+import VATPayment from "@/database/models/vat-payment.model";
+import Invoice from "@/database/models/invoice.model";
+import AuditLog from "@/database/models/audit-log.model";
+import Notification from "@/database/models/notification.model";
+import NotificationTemplate from "@/database/models/notification-template.model";
+import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
+import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
+import UserBankAccount from "@/database/models/user-bank-account.model";
+import ReconciliationLog from "@/database/models/reconciliation-log.model";
+import KYCSession from "@/database/models/kyc-session.model";
+import UserNote from "@/database/models/user-notes.model";
+import PositionEvent from "@/database/models/position-event.model";
+import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
+import UserPresence from "@/database/models/user-presence.model";
+import { resetBadgeAndXPConfigs } from "@/lib/services/badge-config-seed.service";
+import { auditLogService } from "@/lib/services/audit-log.service";
+import { getAdminSession } from "@/lib/admin/auth";
 
 /**
  * ⚠️ DANGER: Reset ALL trading data
@@ -74,7 +77,7 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All chat messages
  * - All friend requests
  * - All friendships
- * 
+ *
  * ✅ PRESERVES (will NOT delete):
  * - User accounts (the actual users in 'user' collection)
  * - WhiteLabel settings (environment variables, API keys)
@@ -84,14 +87,14 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - Dashboard layouts and preferences
  * - All settings collections (appsettings, challengesettings, etc.)
  * - KYC settings configuration (provider settings stay, session data deleted)
- * 
+ *
  * ✅ RESETS TO DEFAULTS:
  * - Badge configurations
  * - XP and level progression settings
  * - Notification templates (reseeds defaults, preserves custom)
  * - Marketplace item purchase counts
  * - KYC verification status on all wallets (reset to 'none')
- * 
+ *
  * POST /api/admin/reset-all-data
  */
 export async function POST(request: Request) {
@@ -99,48 +102,64 @@ export async function POST(request: Request) {
     const { confirmationCode } = await request.json();
 
     // Require confirmation code to prevent accidental deletion
-    if (confirmationCode !== 'RESET_ALL_DATA') {
+    if (confirmationCode !== "RESET_ALL_DATA") {
       return NextResponse.json(
         {
           success: false,
-          message: 'Invalid confirmation code. Must be exactly: RESET_ALL_DATA',
+          message: "Invalid confirmation code. Must be exactly: RESET_ALL_DATA",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     await connectToDatabase();
 
-    console.log('🚨🚨🚨 STARTING FULL DATA RESET 🚨🚨🚨');
+    console.log("🚨🚨🚨 STARTING FULL DATA RESET 🚨🚨🚨");
 
     // Get collections directly via mongoose (for collections without explicit models)
-    const sessionCollection = mongoose.connection.collection('session'); // Auth sessions (NOT account - that has credentials!)
-    const userCollection = mongoose.connection.collection('user');
-    const alertsCollection = mongoose.connection.collection('alerts');
-    const botExecutionsCollection = mongoose.connection.collection('botexecutions');
-    const nuveiPaymentOptionsCollection = mongoose.connection.collection('nuveiuserpaymentoptions');
-    const customerAssignmentsCollection = mongoose.connection.collection('customer_assignments');
-    const customerAuditTrailsCollection = mongoose.connection.collection('customer_audit_trail');
-    const assignmentSettingsCollection = mongoose.connection.collection('assignment_settings');
-    const employeeNotificationsCollection = mongoose.connection.collection('employee_notifications');
+    const sessionCollection = mongoose.connection.collection("session"); // Auth sessions (NOT account - that has credentials!)
+    const userCollection = mongoose.connection.collection("user");
+    const alertsCollection = mongoose.connection.collection("alerts");
+    const botExecutionsCollection =
+      mongoose.connection.collection("botexecutions");
+    const nuveiPaymentOptionsCollection = mongoose.connection.collection(
+      "nuveiuserpaymentoptions",
+    );
+    const customerAssignmentsCollection = mongoose.connection.collection(
+      "customer_assignments",
+    );
+    const customerAuditTrailsCollection = mongoose.connection.collection(
+      "customer_audit_trail",
+    );
+    const assignmentSettingsCollection = mongoose.connection.collection(
+      "assignment_settings",
+    );
+    const employeeNotificationsCollection = mongoose.connection.collection(
+      "employee_notifications",
+    );
     // Messaging collections
-    const conversationsCollection = mongoose.connection.collection('conversations');
-    const messagesCollection = mongoose.connection.collection('messages');
-    const friendRequestsCollection = mongoose.connection.collection('friend_requests');
-    const friendshipsCollection = mongoose.connection.collection('friendships');
+    const conversationsCollection =
+      mongoose.connection.collection("conversations");
+    const messagesCollection = mongoose.connection.collection("messages");
+    const friendRequestsCollection =
+      mongoose.connection.collection("friend_requests");
+    const friendshipsCollection = mongoose.connection.collection("friendships");
     // Additional collections to reset
-    const userProfilesCollection = mongoose.connection.collection('userprofiles');
-    const workerJobsCollection = mongoose.connection.collection('worker_jobs');
-    
+    const userProfilesCollection =
+      mongoose.connection.collection("userprofiles");
+    const workerJobsCollection = mongoose.connection.collection("worker_jobs");
+
     // Get all existing user IDs
-    const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
-    const existingUserIds = new Set(existingUsers.map(u => u._id.toString()));
-    
+    const existingUsers = await userCollection
+      .find({}, { projection: { _id: 1 } })
+      .toArray();
+    const existingUserIds = new Set(existingUsers.map((u) => u._id.toString()));
+
     // Count orphan wallets (wallets where userId doesn't exist in user collection)
     const allWallets = await CreditWallet.find({}, { userId: 1 }).lean();
     const orphanWalletIds = allWallets
-      .filter(w => !existingUserIds.has(w.userId.toString()))
-      .map(w => w._id);
+      .filter((w) => !existingUserIds.has(w.userId.toString()))
+      .map((w) => w._id);
 
     // Count documents before deletion
     const before = {
@@ -181,7 +200,8 @@ export async function POST(request: Request) {
       kycSessions: await KYCSession.countDocuments(),
       userNotes: await UserNote.countDocuments(),
       positionEvents: await PositionEvent.countDocuments(),
-      notificationPreferences: await UserNotificationPreferences.countDocuments(),
+      notificationPreferences:
+        await UserNotificationPreferences.countDocuments(),
       userPresence: await UserPresence.countDocuments(),
       customerAssignments: await customerAssignmentsCollection.countDocuments(),
       customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
@@ -195,109 +215,111 @@ export async function POST(request: Request) {
       workerJobs: await workerJobsCollection.countDocuments(),
     };
 
-    console.log('📊 Before deletion:', before);
+    console.log("📊 Before deletion:", before);
 
     // Delete all trading data
     await Competition.deleteMany({});
-    console.log('✅ Deleted all competitions');
+    console.log("✅ Deleted all competitions");
 
     await CompetitionParticipant.deleteMany({});
-    console.log('✅ Deleted all competition participants');
+    console.log("✅ Deleted all competition participants");
 
     // Delete all challenge data
     await Challenge.deleteMany({});
-    console.log('✅ Deleted all 1v1 challenges');
+    console.log("✅ Deleted all 1v1 challenges");
 
     await ChallengeParticipant.deleteMany({});
-    console.log('✅ Deleted all challenge participants');
+    console.log("✅ Deleted all challenge participants");
 
     await TradingPosition.deleteMany({});
-    console.log('✅ Deleted all positions');
+    console.log("✅ Deleted all positions");
 
     await TradeHistory.deleteMany({});
-    console.log('✅ Deleted all trade history');
+    console.log("✅ Deleted all trade history");
 
     await TradingOrder.deleteMany({});
-    console.log('✅ Deleted all orders');
+    console.log("✅ Deleted all orders");
 
     await WalletTransaction.deleteMany({});
-    console.log('✅ Deleted all wallet transactions');
+    console.log("✅ Deleted all wallet transactions");
 
     // Delete user progress data
     await UserLevel.deleteMany({});
-    console.log('✅ Deleted all user XP and levels');
+    console.log("✅ Deleted all user XP and levels");
 
     await UserBadge.deleteMany({});
-    console.log('✅ Deleted all user badges');
+    console.log("✅ Deleted all user badges");
 
     // Delete fraud detection data
     await FraudAlert.deleteMany({});
-    console.log('✅ Deleted all fraud alerts');
+    console.log("✅ Deleted all fraud alerts");
 
     await DeviceFingerprint.deleteMany({});
-    console.log('✅ Deleted all device fingerprints');
+    console.log("✅ Deleted all device fingerprints");
 
     await UserRestriction.deleteMany({});
-    console.log('✅ Deleted all user restrictions');
+    console.log("✅ Deleted all user restrictions");
 
     // Delete fraud history
     await FraudHistory.deleteMany({});
-    console.log('✅ Deleted all fraud history');
+    console.log("✅ Deleted all fraud history");
 
     // Delete suspicion scores
     await SuspicionScore.deleteMany({});
-    console.log('✅ Deleted all suspicion scores');
+    console.log("✅ Deleted all suspicion scores");
 
     // Delete payment fingerprints
     await PaymentFingerprint.deleteMany({});
-    console.log('✅ Deleted all payment fingerprints');
+    console.log("✅ Deleted all payment fingerprints");
 
     // Delete behavioral similarity
     await BehavioralSimilarity.deleteMany({});
-    console.log('✅ Deleted all behavioral similarity records');
+    console.log("✅ Deleted all behavioral similarity records");
 
     // Delete trading behavior profiles
     await TradingBehaviorProfile.deleteMany({});
-    console.log('✅ Deleted all trading behavior profiles');
+    console.log("✅ Deleted all trading behavior profiles");
 
     // Delete platform financial data (fees, unclaimed pools, etc.)
     await PlatformTransaction.deleteMany({});
-    console.log('✅ Deleted all platform transactions (fees, unclaimed pools)');
+    console.log("✅ Deleted all platform transactions (fees, unclaimed pools)");
 
     await PlatformBalanceSnapshot.deleteMany({});
-    console.log('✅ Deleted all platform balance snapshots');
+    console.log("✅ Deleted all platform balance snapshots");
 
     // Delete VAT payments
     await VATPayment.deleteMany({});
-    console.log('✅ Deleted all VAT payments');
+    console.log("✅ Deleted all VAT payments");
 
     // Delete invoices
     await Invoice.deleteMany({});
-    console.log('✅ Deleted all invoices');
+    console.log("✅ Deleted all invoices");
 
     // Delete audit logs
     await AuditLog.deleteMany({});
-    console.log('✅ Deleted all audit logs');
+    console.log("✅ Deleted all audit logs");
 
     // Delete notifications (sent notifications, NOT templates)
     await Notification.deleteMany({});
-    console.log('✅ Deleted all notifications');
+    console.log("✅ Deleted all notifications");
 
     // Delete marketplace user purchases (keeps marketplace items, just clears user purchases)
     await UserPurchase.deleteMany({});
-    console.log('✅ Deleted all marketplace user purchases');
+    console.log("✅ Deleted all marketplace user purchases");
 
     // Delete all withdrawal requests
     await WithdrawalRequest.deleteMany({});
-    console.log('✅ Deleted all withdrawal requests');
+    console.log("✅ Deleted all withdrawal requests");
 
     // Delete all user bank accounts
     await UserBankAccount.deleteMany({});
-    console.log('✅ Deleted all user bank accounts');
+    console.log("✅ Deleted all user bank accounts");
 
     // Delete all Nuvei payment options (stored UPOs)
     const nuveiDeleted = await nuveiPaymentOptionsCollection.deleteMany({});
-    console.log(`✅ Deleted ${nuveiDeleted.deletedCount} Nuvei payment options`);
+    console.log(
+      `✅ Deleted ${nuveiDeleted.deletedCount} Nuvei payment options`,
+    );
 
     // Delete all auth sessions (Better Auth 'session' collection - NOT 'account' which has credentials!)
     const authSessionsDeleted = await sessionCollection.deleteMany({});
@@ -309,57 +331,72 @@ export async function POST(request: Request) {
 
     // Delete bot executions collection data
     const botExecutionsDeleted = await botExecutionsCollection.deleteMany({});
-    console.log(`✅ Deleted ${botExecutionsDeleted.deletedCount} bot executions`);
+    console.log(
+      `✅ Deleted ${botExecutionsDeleted.deletedCount} bot executions`,
+    );
 
     // Delete reconciliation logs (audit data)
     await ReconciliationLog.deleteMany({});
-    console.log('✅ Deleted all reconciliation logs');
+    console.log("✅ Deleted all reconciliation logs");
 
     // Delete ALL KYC sessions
     await KYCSession.deleteMany({});
-    console.log('✅ Deleted all KYC sessions');
+    console.log("✅ Deleted all KYC sessions");
 
     // Delete all user notes
     await UserNote.deleteMany({});
-    console.log('✅ Deleted all user notes');
+    console.log("✅ Deleted all user notes");
 
     // Delete all position events
     await PositionEvent.deleteMany({});
-    console.log('✅ Deleted all position events');
+    console.log("✅ Deleted all position events");
 
     // Delete all user notification preferences
     await UserNotificationPreferences.deleteMany({});
-    console.log('✅ Deleted all user notification preferences');
+    console.log("✅ Deleted all user notification preferences");
 
     // Delete all user presence data
     await UserPresence.deleteMany({});
-    console.log('✅ Deleted all user presence data');
+    console.log("✅ Deleted all user presence data");
 
     // Delete all customer assignments (employee-customer relationships)
-    const customerAssignmentsDeleted = await customerAssignmentsCollection.deleteMany({});
-    console.log(`✅ Deleted ${customerAssignmentsDeleted.deletedCount} customer assignments`);
+    const customerAssignmentsDeleted =
+      await customerAssignmentsCollection.deleteMany({});
+    console.log(
+      `✅ Deleted ${customerAssignmentsDeleted.deletedCount} customer assignments`,
+    );
 
     // Delete all customer audit trails (employee actions on customers)
-    const customerAuditTrailsDeleted = await customerAuditTrailsCollection.deleteMany({});
-    console.log(`✅ Deleted ${customerAuditTrailsDeleted.deletedCount} customer audit trail entries`);
+    const customerAuditTrailsDeleted =
+      await customerAuditTrailsCollection.deleteMany({});
+    console.log(
+      `✅ Deleted ${customerAuditTrailsDeleted.deletedCount} customer audit trail entries`,
+    );
 
     // Reset assignment settings to defaults
     await assignmentSettingsCollection.deleteMany({});
-    console.log('✅ Reset assignment settings');
+    console.log("✅ Reset assignment settings");
 
     // Delete all employee notifications
-    const employeeNotificationsDeleted = await employeeNotificationsCollection.deleteMany({});
-    console.log(`✅ Deleted ${employeeNotificationsDeleted.deletedCount} employee notifications`);
+    const employeeNotificationsDeleted =
+      await employeeNotificationsCollection.deleteMany({});
+    console.log(
+      `✅ Deleted ${employeeNotificationsDeleted.deletedCount} employee notifications`,
+    );
 
     // Delete all messaging data (conversations, messages, friends)
     const conversationsDeleted = await conversationsCollection.deleteMany({});
-    console.log(`✅ Deleted ${conversationsDeleted.deletedCount} chat conversations`);
+    console.log(
+      `✅ Deleted ${conversationsDeleted.deletedCount} chat conversations`,
+    );
 
     const messagesDeleted = await messagesCollection.deleteMany({});
     console.log(`✅ Deleted ${messagesDeleted.deletedCount} chat messages`);
 
     const friendRequestsDeleted = await friendRequestsCollection.deleteMany({});
-    console.log(`✅ Deleted ${friendRequestsDeleted.deletedCount} friend requests`);
+    console.log(
+      `✅ Deleted ${friendRequestsDeleted.deletedCount} friend requests`,
+    );
 
     const friendshipsDeleted = await friendshipsCollection.deleteMany({});
     console.log(`✅ Deleted ${friendshipsDeleted.deletedCount} friendships`);
@@ -375,159 +412,197 @@ export async function POST(request: Request) {
     // ============================================
     // DELETE GAME MASTER DATA
     // ============================================
-    
+
     // Delete all GM subscriptions
-    const gmSubscriptionsCollection = mongoose.connection.collection('gamemastersubscriptions');
+    const gmSubscriptionsCollection = mongoose.connection.collection(
+      "gamemastersubscriptions",
+    );
     const gmSubsDeleted = await gmSubscriptionsCollection.deleteMany({});
     console.log(`✅ Deleted ${gmSubsDeleted.deletedCount} GM subscriptions`);
-    
+
     // Delete all user referrals
-    const userReferralsCollection = mongoose.connection.collection('userreferrals');
+    const userReferralsCollection =
+      mongoose.connection.collection("userreferrals");
     const userRefsDeleted = await userReferralsCollection.deleteMany({});
     console.log(`✅ Deleted ${userRefsDeleted.deletedCount} user referrals`);
-    
+
     // Delete all GM earnings
-    const gmEarningsCollection = mongoose.connection.collection('gamemasterearnings');
+    const gmEarningsCollection =
+      mongoose.connection.collection("gamemasterearnings");
     const gmEarningsDeleted = await gmEarningsCollection.deleteMany({});
     console.log(`✅ Deleted ${gmEarningsDeleted.deletedCount} GM earnings`);
-    
+
     // Clear referredByGameMasterId from all users
     await userCollection.updateMany(
       { referredByGameMasterId: { $exists: true } },
-      { $unset: { referredByGameMasterId: '', referredByReferralCode: '', referredAt: '' } }
+      {
+        $unset: {
+          referredByGameMasterId: "",
+          referredByReferralCode: "",
+          referredAt: "",
+        },
+      },
     );
-    console.log('✅ Cleared referral data from all users');
+    console.log("✅ Cleared referral data from all users");
 
     // ============================================
     // DELETE ADMIN OPERATIONS DATA
     // ============================================
-    
+
     // Delete all incidents
-    const incidentsCollection = mongoose.connection.collection('incidents');
+    const incidentsCollection = mongoose.connection.collection("incidents");
     const incidentsDeleted = await incidentsCollection.deleteMany({});
     console.log(`✅ Deleted ${incidentsDeleted.deletedCount} incidents`);
-    
+
     // Delete price snapshots
-    const priceSnapshotsCollection = mongoose.connection.collection('pricesnapshots');
+    const priceSnapshotsCollection =
+      mongoose.connection.collection("pricesnapshots");
     const priceSnapshotsDeleted = await priceSnapshotsCollection.deleteMany({});
-    console.log(`✅ Deleted ${priceSnapshotsDeleted.deletedCount} price snapshots`);
-    
+    console.log(
+      `✅ Deleted ${priceSnapshotsDeleted.deletedCount} price snapshots`,
+    );
+
     // Delete price health records
-    const priceHealthCollection = mongoose.connection.collection('pricehealthrecords');
+    const priceHealthCollection =
+      mongoose.connection.collection("pricehealthrecords");
     try {
       const priceHealthDeleted = await priceHealthCollection.deleteMany({});
-      console.log(`✅ Deleted ${priceHealthDeleted.deletedCount} price health records`);
+      console.log(
+        `✅ Deleted ${priceHealthDeleted.deletedCount} price health records`,
+      );
     } catch (e) {
-      console.log('⚠️ No price health records collection found');
+      console.log("⚠️ No price health records collection found");
     }
-    
+
     // Delete admin operation logs (if separate from audit logs)
-    const adminOperationsCollection = mongoose.connection.collection('adminoperations');
+    const adminOperationsCollection =
+      mongoose.connection.collection("adminoperations");
     try {
       const adminOpsDeleted = await adminOperationsCollection.deleteMany({});
-      console.log(`✅ Deleted ${adminOpsDeleted.deletedCount} admin operations`);
+      console.log(
+        `✅ Deleted ${adminOpsDeleted.deletedCount} admin operations`,
+      );
     } catch (e) {
-      console.log('⚠️ No admin operations collection found');
+      console.log("⚠️ No admin operations collection found");
     }
-    
+
     // Delete AI agent audits
-    const aiAgentAuditsCollection = mongoose.connection.collection('aiagentaudits');
+    const aiAgentAuditsCollection =
+      mongoose.connection.collection("aiagentaudits");
     try {
       const aiAuditsDeleted = await aiAgentAuditsCollection.deleteMany({});
       console.log(`✅ Deleted ${aiAuditsDeleted.deletedCount} AI agent audits`);
     } catch (e) {
-      console.log('⚠️ No AI agent audits collection found');
+      console.log("⚠️ No AI agent audits collection found");
     }
-    
+
     // Delete historical fetch status
-    const historicalFetchStatusCollection = mongoose.connection.collection('historical_fetch_status');
+    const historicalFetchStatusCollection = mongoose.connection.collection(
+      "historical_fetch_status",
+    );
     try {
-      const historicalFetchDeleted = await historicalFetchStatusCollection.deleteMany({});
-      console.log(`✅ Deleted ${historicalFetchDeleted.deletedCount} historical fetch status records`);
+      const historicalFetchDeleted =
+        await historicalFetchStatusCollection.deleteMany({});
+      console.log(
+        `✅ Deleted ${historicalFetchDeleted.deletedCount} historical fetch status records`,
+      );
     } catch (e) {
-      console.log('⚠️ No historical fetch status collection found');
+      console.log("⚠️ No historical fetch status collection found");
     }
-    
+
     // Delete price caches
-    const priceCachesCollection = mongoose.connection.collection('pricecaches');
+    const priceCachesCollection = mongoose.connection.collection("pricecaches");
     try {
       const priceCachesDeleted = await priceCachesCollection.deleteMany({});
       console.log(`✅ Deleted ${priceCachesDeleted.deletedCount} price caches`);
     } catch (e) {
-      console.log('⚠️ No price caches collection found');
+      console.log("⚠️ No price caches collection found");
     }
-    
+
     // Delete price health alerts
-    const priceHealthAlertsCollection = mongoose.connection.collection('pricehealthalerts');
+    const priceHealthAlertsCollection =
+      mongoose.connection.collection("pricehealthalerts");
     try {
-      const priceHealthAlertsDeleted = await priceHealthAlertsCollection.deleteMany({});
-      console.log(`✅ Deleted ${priceHealthAlertsDeleted.deletedCount} price health alerts`);
+      const priceHealthAlertsDeleted =
+        await priceHealthAlertsCollection.deleteMany({});
+      console.log(
+        `✅ Deleted ${priceHealthAlertsDeleted.deletedCount} price health alerts`,
+      );
     } catch (e) {
-      console.log('⚠️ No price health alerts collection found');
+      console.log("⚠️ No price health alerts collection found");
     }
-    
+
     // Delete price logs
-    const priceLogsCollection = mongoose.connection.collection('pricelogs');
+    const priceLogsCollection = mongoose.connection.collection("pricelogs");
     try {
       const priceLogsDeleted = await priceLogsCollection.deleteMany({});
       console.log(`✅ Deleted ${priceLogsDeleted.deletedCount} price logs`);
     } catch (e) {
-      console.log('⚠️ No price logs collection found');
+      console.log("⚠️ No price logs collection found");
     }
-    
+
     // Delete security logs
-    const securityLogsCollection = mongoose.connection.collection('securitylogs');
+    const securityLogsCollection =
+      mongoose.connection.collection("securitylogs");
     try {
       const securityLogsDeleted = await securityLogsCollection.deleteMany({});
-      console.log(`✅ Deleted ${securityLogsDeleted.deletedCount} security logs`);
+      console.log(
+        `✅ Deleted ${securityLogsDeleted.deletedCount} security logs`,
+      );
     } catch (e) {
-      console.log('⚠️ No security logs collection found');
+      console.log("⚠️ No security logs collection found");
     }
 
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
-      const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
-      console.log(`✅ Deleted ${orphanDeleteResult.deletedCount} orphan credit wallets`);
+      const orphanDeleteResult = await CreditWallet.deleteMany({
+        _id: { $in: orphanWalletIds },
+      });
+      console.log(
+        `✅ Deleted ${orphanDeleteResult.deletedCount} orphan credit wallets`,
+      );
     }
 
     // Reset marketplace item purchase counts
     await MarketplaceItem.updateMany({}, { $set: { totalPurchases: 0 } });
-    console.log('✅ Reset marketplace item purchase counts');
+    console.log("✅ Reset marketplace item purchase counts");
 
     // Reseed default notification templates (preserves custom templates)
     await NotificationTemplate.seedDefaults();
-    console.log('✅ Reseeded default notification templates');
+    console.log("✅ Reseeded default notification templates");
 
     // Reset all wallet balances to 0 (keep wallets, just reset all financial data)
     const walletResetResult = await CreditWallet.updateMany(
       {},
       {
         $set: {
-          creditBalance: 0,                   // Reset current balance
-          totalDeposited: 0,                  // Reset total deposits
-          totalWithdrawn: 0,                  // Reset total withdrawals
-          totalSpentOnCompetitions: 0,        // Reset competition spending
-          totalWonFromCompetitions: 0,        // Reset competition winnings (Volt Won)
-          totalSpentOnChallenges: 0,          // Reset challenge spending
-          totalWonFromChallenges: 0,          // Reset challenge winnings
-          totalSpentOnMarketplace: 0,         // Reset marketplace spending
+          creditBalance: 0, // Reset current balance
+          totalDeposited: 0, // Reset total deposits
+          totalWithdrawn: 0, // Reset total withdrawals
+          totalSpentOnCompetitions: 0, // Reset competition spending
+          totalWonFromCompetitions: 0, // Reset competition winnings (Volt Won)
+          totalSpentOnChallenges: 0, // Reset challenge spending
+          totalWonFromChallenges: 0, // Reset challenge winnings
+          totalSpentOnMarketplace: 0, // Reset marketplace spending
           // Reset KYC status fields
           kycVerified: false,
-          kycStatus: 'none',
+          kycStatus: "none",
           kycAttempts: 0,
         },
         $unset: {
-          kycVerifiedAt: '',
-          kycExpiresAt: '',
-          lastKYCSessionId: '',
+          kycVerifiedAt: "",
+          kycExpiresAt: "",
+          lastKYCSessionId: "",
         },
-      }
+      },
     );
-    console.log(`✅ Reset ${walletResetResult.modifiedCount} wallet balances to 0 (including balances, competition/challenge winnings, KYC status)`);
+    console.log(
+      `✅ Reset ${walletResetResult.modifiedCount} wallet balances to 0 (including balances, competition/challenge winnings, KYC status)`,
+    );
 
     // Reset badge and XP configurations to defaults
     await resetBadgeAndXPConfigs();
-    console.log('✅ Reset badge and XP configurations to defaults');
+    console.log("✅ Reset badge and XP configurations to defaults");
 
     // Count documents after deletion
     const after = {
@@ -568,7 +643,8 @@ export async function POST(request: Request) {
       kycSessions: await KYCSession.countDocuments(),
       userNotes: await UserNote.countDocuments(),
       positionEvents: await PositionEvent.countDocuments(),
-      notificationPreferences: await UserNotificationPreferences.countDocuments(),
+      notificationPreferences:
+        await UserNotificationPreferences.countDocuments(),
       userPresence: await UserPresence.countDocuments(),
       customerAssignments: await customerAssignmentsCollection.countDocuments(),
       customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
@@ -582,8 +658,8 @@ export async function POST(request: Request) {
       workerJobs: await workerJobsCollection.countDocuments(),
     };
 
-    console.log('📊 After deletion:', after);
-    console.log('🎉 DATA RESET COMPLETE');
+    console.log("📊 After deletion:", after);
+    console.log("🎉 DATA RESET COMPLETE");
 
     // Log this action to audit log
     try {
@@ -593,19 +669,20 @@ export async function POST(request: Request) {
           {
             id: admin.id,
             email: admin.email,
-            name: admin.email.split('@')[0],
-            role: 'admin',
+            name: admin.email.split("@")[0],
+            role: "admin",
           },
-          before
+          before,
         );
       }
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
       success: true,
-      message: 'All trading data has been reset and badge/XP configs restored to defaults',
+      message:
+        "All trading data has been reset and badge/XP configs restored to defaults",
       before,
       after,
       deleted: {
@@ -660,14 +737,14 @@ export async function POST(request: Request) {
       walletsReset: walletResetResult.modifiedCount,
     });
   } catch (error) {
-    console.error('❌ Error resetting data:', error);
+    console.error("❌ Error resetting data:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to reset data',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Failed to reset data",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

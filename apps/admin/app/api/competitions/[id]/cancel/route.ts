@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { cancelCompetitionAndRefund } from '@/lib/actions/trading/competition-cancel.actions';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { cancelCompetitionAndRefund } from "@/lib/actions/trading/competition-cancel.actions";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireAdminAuth();
@@ -17,8 +17,8 @@ export async function POST(
 
     if (!reason || !reason.trim()) {
       return NextResponse.json(
-        { error: 'Cancellation reason is required' },
-        { status: 400 }
+        { error: "Cancellation reason is required" },
+        { status: 400 },
       );
     }
 
@@ -27,16 +27,18 @@ export async function POST(
 
     if (!competition) {
       return NextResponse.json(
-        { error: 'Competition not found' },
-        { status: 404 }
+        { error: "Competition not found" },
+        { status: 404 },
       );
     }
 
     // Only allow cancelling upcoming competitions
-    if (competition.status !== 'upcoming') {
+    if (competition.status !== "upcoming") {
       return NextResponse.json(
-        { error: `Cannot cancel a competition that is ${competition.status}. Only upcoming competitions can be cancelled.` },
-        { status: 400 }
+        {
+          error: `Cannot cancel a competition that is ${competition.status}. Only upcoming competitions can be cancelled.`,
+        },
+        { status: 400 },
       );
     }
 
@@ -48,15 +50,19 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Competition cancelled and all participants refunded',
+      message: "Competition cancelled and all participants refunded",
       refundedCount: participantCount,
     });
   } catch (error) {
-    console.error('Error cancelling competition:', error);
+    console.error("Error cancelling competition:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to cancel competition' },
-      { status: 500 }
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to cancel competition",
+      },
+      { status: 500 },
     );
   }
 }
-

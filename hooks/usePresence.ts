@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState } from "react";
 
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
@@ -10,27 +10,27 @@ export function usePresence(currentPage?: string) {
 
   const sendHeartbeat = useCallback(async () => {
     try {
-      const res = await fetch('/api/user/presence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/user/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPage }),
       });
       if (res.ok) {
         setIsActive(true);
       }
     } catch (error) {
-      console.error('Failed to send heartbeat:', error);
+      console.error("Failed to send heartbeat:", error);
     }
   }, [currentPage]);
 
   const goOffline = useCallback(async () => {
     try {
-      await fetch('/api/user/presence', {
-        method: 'DELETE',
+      await fetch("/api/user/presence", {
+        method: "DELETE",
       });
       setIsActive(false);
     } catch (error) {
-      console.error('Failed to go offline:', error);
+      console.error("Failed to go offline:", error);
     }
   }, []);
 
@@ -53,14 +53,14 @@ export function usePresence(currentPage?: string) {
   // Handle visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         sendHeartbeat();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [sendHeartbeat]);
 
@@ -69,13 +69,13 @@ export function usePresence(currentPage?: string) {
     const handleUnload = () => {
       // Use sendBeacon for reliability on page close
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/user/presence?action=offline');
+        navigator.sendBeacon("/api/user/presence?action=offline");
       }
     };
 
-    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
     return () => {
-      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener("beforeunload", handleUnload);
     };
   }, []);
 
@@ -83,4 +83,3 @@ export function usePresence(currentPage?: string) {
 }
 
 export default usePresence;
-

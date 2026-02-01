@@ -1,33 +1,37 @@
 /**
  * Dynamic Knowledge Base Generator
- * 
+ *
  * Generates customer FAQ content with ACTUAL values from database settings.
  * This ensures white-label platforms get correct info (Volts, Credits, Coins, etc.)
  */
 
-import { connectToDatabase } from '@/database/mongoose';
+import { connectToDatabase } from "@/database/mongoose";
 
 // Import models - use dynamic imports for compatibility
 async function getSettings() {
   await connectToDatabase();
-  
+
   // Dynamic imports to avoid circular dependencies
-  const mongoose = await import('mongoose');
+  const mongoose = await import("mongoose");
   const db = mongoose.default.connection.db;
-  
+
   if (!db) {
-    throw new Error('Database not connected');
+    throw new Error("Database not connected");
   }
-  
+
   // Fetch app settings
-  const appSettingsDoc = await db.collection('appsettings').findOne({ _id: 'app-settings' as any });
+  const appSettingsDoc = await db
+    .collection("appsettings")
+    .findOne({ _id: "app-settings" as any });
   const appSettings: any = appSettingsDoc || {
-    currency: { code: 'EUR', symbol: '€', name: 'Euro' },
-    credits: { name: 'Credits', symbol: '⚡', valueInEUR: 1, decimals: 2 },
+    currency: { code: "EUR", symbol: "€", name: "Euro" },
+    credits: { name: "Credits", symbol: "⚡", valueInEUR: 1, decimals: 2 },
   };
-  
+
   // Fetch credit conversion settings
-  const creditSettingsDoc = await db.collection('creditconversionsettings').findOne({});
+  const creditSettingsDoc = await db
+    .collection("creditconversionsettings")
+    .findOne({});
   const creditSettings: any = creditSettingsDoc || {
     eurToCreditsRate: 100,
     minimumDeposit: 10,
@@ -35,9 +39,11 @@ async function getSettings() {
     platformWithdrawalFeePercentage: 2,
     withdrawalFeePercentage: 2,
   };
-  
+
   // Fetch trading risk settings
-  const riskSettingsDoc = await db.collection('tradingrisksettings').findOne({});
+  const riskSettingsDoc = await db
+    .collection("tradingrisksettings")
+    .findOne({});
   const riskSettings: any = riskSettingsDoc || {
     marginSafe: 200,
     marginWarning: 150,
@@ -51,27 +57,30 @@ async function getSettings() {
     maxDrawdownPercent: 50,
     dailyLossLimit: 20,
   };
-  
+
   // Fetch XP/badge settings
-  const xpConfigDoc = await db.collection('xpconfigs').findOne({});
+  const xpConfigDoc = await db.collection("xpconfigs").findOne({});
   const xpConfig: any = xpConfigDoc || {
     badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 },
   };
-  
+
   return {
     // Credits/Currency (e.g., "Volts", "Credits", "Coins")
-    creditName: appSettings?.credits?.name || 'Credits',
-    creditSymbol: appSettings?.credits?.symbol || '⚡',
-    currencyCode: appSettings?.currency?.code || 'EUR',
-    currencySymbol: appSettings?.currency?.symbol || '€',
-    currencyName: appSettings?.currency?.name || 'Euro',
-    
+    creditName: appSettings?.credits?.name || "Credits",
+    creditSymbol: appSettings?.credits?.symbol || "⚡",
+    currencyCode: appSettings?.currency?.code || "EUR",
+    currencySymbol: appSettings?.currency?.symbol || "€",
+    currencyName: appSettings?.currency?.name || "Euro",
+
     // Conversion rates
     conversionRate: creditSettings?.eurToCreditsRate || 100,
     minDeposit: creditSettings?.minimumDeposit || 10,
     minWithdrawal: creditSettings?.minimumWithdrawal || 20,
-    withdrawalFee: creditSettings?.platformWithdrawalFeePercentage || creditSettings?.withdrawalFeePercentage || 2,
-    
+    withdrawalFee:
+      creditSettings?.platformWithdrawalFeePercentage ||
+      creditSettings?.withdrawalFeePercentage ||
+      2,
+
     // Trading/Risk
     marginSafe: riskSettings?.marginSafe || 200,
     marginWarning: riskSettings?.marginWarning || 150,
@@ -84,9 +93,14 @@ async function getSettings() {
     maxPositionSize: riskSettings?.maxPositionSize || 100,
     maxDrawdown: riskSettings?.maxDrawdownPercent || 50,
     dailyLossLimit: riskSettings?.dailyLossLimit || 20,
-    
+
     // XP
-    badgeXP: xpConfig?.badgeXP || { common: 10, rare: 25, epic: 50, legendary: 100 },
+    badgeXP: xpConfig?.badgeXP || {
+      common: 10,
+      rare: 25,
+      epic: 50,
+      legendary: 100,
+    },
   };
 }
 
@@ -96,7 +110,7 @@ async function getSettings() {
  */
 export async function generateCustomerKnowledgeBase(): Promise<string> {
   const s = await getSettings();
-  
+
   return `
 # Customer Support Knowledge Base
 ## Frequently Asked Questions

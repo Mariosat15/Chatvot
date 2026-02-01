@@ -4,15 +4,15 @@
  * Automatically calculates boundaries based on the current timeframe
  */
 
-import { 
-  ISeriesPrimitive, 
-  ISeriesPrimitivePaneView, 
-  ISeriesPrimitivePaneRenderer, 
-  SeriesPrimitivePaneViewZOrder, 
+import {
+  ISeriesPrimitive,
+  ISeriesPrimitivePaneView,
+  ISeriesPrimitivePaneRenderer,
+  SeriesPrimitivePaneViewZOrder,
   Time,
   IChartApi,
   ISeriesApi,
-} from 'lightweight-charts';
+} from "lightweight-charts";
 
 // ============================================
 // TYPES
@@ -21,17 +21,17 @@ import {
 export interface PeriodSeparatorOptions {
   color: string;
   lineWidth: number;
-  lineStyle: 'solid' | 'dashed' | 'dotted';
+  lineStyle: "solid" | "dashed" | "dotted";
   opacity: number;
-  separatorType: 'auto' | 'hour' | 'day' | 'week' | 'month';
+  separatorType: "auto" | "hour" | "day" | "week" | "month";
 }
 
 export const DEFAULT_PERIOD_SEPARATOR_OPTIONS: PeriodSeparatorOptions = {
-  color: '#363a45',
+  color: "#363a45",
   lineWidth: 1,
-  lineStyle: 'dashed',
+  lineStyle: "dashed",
   opacity: 0.5,
-  separatorType: 'auto',
+  separatorType: "auto",
 };
 
 // ============================================
@@ -68,16 +68,16 @@ class PeriodSeparatorRenderer implements ISeriesPrimitivePaneRenderer {
     const { timestamps, options, timeToX, canvasHeight } = this._data;
 
     ctx.save();
-    
+
     // Set line style
     ctx.strokeStyle = options.color;
     ctx.lineWidth = options.lineWidth * hpr;
     ctx.globalAlpha = options.opacity;
-    
+
     // Set dash pattern
-    if (options.lineStyle === 'dashed') {
+    if (options.lineStyle === "dashed") {
       ctx.setLineDash([6 * hpr, 4 * hpr]);
-    } else if (options.lineStyle === 'dotted') {
+    } else if (options.lineStyle === "dotted") {
       ctx.setLineDash([2 * hpr, 2 * hpr]);
     } else {
       ctx.setLineDash([]);
@@ -113,7 +113,7 @@ class PeriodSeparatorPaneView implements ISeriesPrimitivePaneView {
   }
 
   zOrder(): SeriesPrimitivePaneViewZOrder {
-    return 'bottom'; // Draw behind candles
+    return "bottom"; // Draw behind candles
   }
 
   renderer(): ISeriesPrimitivePaneRenderer {
@@ -128,10 +128,10 @@ class PeriodSeparatorPaneView implements ISeriesPrimitivePaneView {
 
 export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
   private _chart: IChartApi | null = null;
-  private _series: ISeriesApi<'Candlestick'> | null = null;
+  private _series: ISeriesApi<"Candlestick"> | null = null;
   private _paneViews: PeriodSeparatorPaneView[] = [];
   private _options: PeriodSeparatorOptions;
-  private _timeframe: string = '1';
+  private _timeframe: string = "1";
   private _visible: boolean = true;
   private _requestUpdate?: () => void;
   private _cachedTimestamps: number[] = [];
@@ -146,10 +146,10 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
   // LIFECYCLE
   // ============================================
 
-  attach(chart: IChartApi, series: ISeriesApi<'Candlestick'>): void {
+  attach(chart: IChartApi, series: ISeriesApi<"Candlestick">): void {
     this._chart = chart;
     this._series = series;
-    
+
     // Subscribe to visible range changes
     this._chart.timeScale().subscribeVisibleTimeRangeChange(() => {
       this.updateTimestamps();
@@ -164,7 +164,7 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
   }
 
   updateAllViews(): void {
-    this._paneViews.forEach(view => view.renderer());
+    this._paneViews.forEach((view) => view.renderer());
   }
 
   paneViews(): readonly ISeriesPrimitivePaneView[] {
@@ -225,8 +225,8 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
       return;
     }
 
-    const from = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-    const to = typeof visibleRange.to === 'number' ? visibleRange.to : 0;
+    const from = typeof visibleRange.from === "number" ? visibleRange.from : 0;
+    const to = typeof visibleRange.to === "number" ? visibleRange.to : 0;
 
     // Check if we need to recalculate
     if (
@@ -244,88 +244,99 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
   private calculateSeparatorTimestamps(from: number, to: number): number[] {
     const timestamps: number[] = [];
     const separatorType = this.getSeparatorType();
-    
+
     // Extend range to catch edge separators
     const extendedFrom = from - this.getIntervalSeconds(separatorType);
     const extendedTo = to + this.getIntervalSeconds(separatorType);
-    
+
     let current = this.getNextBoundary(extendedFrom, separatorType);
-    
+
     while (current <= extendedTo) {
       if (current >= from && current <= to) {
         timestamps.push(current);
       }
       current = this.getNextBoundary(current + 1, separatorType);
     }
-    
+
     return timestamps;
   }
 
-  private getSeparatorType(): 'hour' | 'day' | 'week' | 'month' {
-    if (this._options.separatorType !== 'auto') {
-      return this._options.separatorType === 'hour' ? 'hour' :
-             this._options.separatorType === 'day' ? 'day' :
-             this._options.separatorType === 'week' ? 'week' : 'month';
+  private getSeparatorType(): "hour" | "day" | "week" | "month" {
+    if (this._options.separatorType !== "auto") {
+      return this._options.separatorType === "hour"
+        ? "hour"
+        : this._options.separatorType === "day"
+          ? "day"
+          : this._options.separatorType === "week"
+            ? "week"
+            : "month";
     }
 
     // Auto-select based on timeframe
     const tf = this._timeframe;
-    
-    if (tf === '1' || tf === '5') {
-      return 'hour'; // Hourly separators for 1m/5m
-    } else if (tf === '15' || tf === '30') {
-      return 'day'; // Daily separators for 15m/30m  
-    } else if (tf === '60' || tf === '240') {
-      return 'day'; // Daily separators for 1h/4h
-    } else if (tf === '1D' || tf === 'D') {
-      return 'week'; // Weekly separators for daily
-    } else if (tf === '1W' || tf === 'W') {
-      return 'month'; // Monthly separators for weekly
+
+    if (tf === "1" || tf === "5") {
+      return "hour"; // Hourly separators for 1m/5m
+    } else if (tf === "15" || tf === "30") {
+      return "day"; // Daily separators for 15m/30m
+    } else if (tf === "60" || tf === "240") {
+      return "day"; // Daily separators for 1h/4h
+    } else if (tf === "1D" || tf === "D") {
+      return "week"; // Weekly separators for daily
+    } else if (tf === "1W" || tf === "W") {
+      return "month"; // Monthly separators for weekly
     }
-    
-    return 'day'; // Default to daily
+
+    return "day"; // Default to daily
   }
 
-  private getIntervalSeconds(type: 'hour' | 'day' | 'week' | 'month'): number {
+  private getIntervalSeconds(type: "hour" | "day" | "week" | "month"): number {
     switch (type) {
-      case 'hour': return 3600;
-      case 'day': return 86400;
-      case 'week': return 604800;
-      case 'month': return 2592000; // ~30 days
+      case "hour":
+        return 3600;
+      case "day":
+        return 86400;
+      case "week":
+        return 604800;
+      case "month":
+        return 2592000; // ~30 days
     }
   }
 
-  private getNextBoundary(timestamp: number, type: 'hour' | 'day' | 'week' | 'month'): number {
+  private getNextBoundary(
+    timestamp: number,
+    type: "hour" | "day" | "week" | "month",
+  ): number {
     const date = new Date(timestamp * 1000);
-    
+
     switch (type) {
-      case 'hour':
+      case "hour":
         // Next hour boundary
         date.setUTCMinutes(0, 0, 0);
         if (date.getTime() / 1000 <= timestamp) {
           date.setUTCHours(date.getUTCHours() + 1);
         }
         break;
-        
-      case 'day':
+
+      case "day":
         // Next day boundary (00:00 UTC)
         date.setUTCHours(0, 0, 0, 0);
         if (date.getTime() / 1000 <= timestamp) {
           date.setUTCDate(date.getUTCDate() + 1);
         }
         break;
-        
-      case 'week':
+
+      case "week":
         // Next Monday 00:00 UTC
         date.setUTCHours(0, 0, 0, 0);
         const day = date.getUTCDay();
-        const daysUntilMonday = day === 0 ? 1 : (8 - day);
+        const daysUntilMonday = day === 0 ? 1 : 8 - day;
         if (date.getTime() / 1000 <= timestamp) {
           date.setUTCDate(date.getUTCDate() + daysUntilMonday);
         }
         break;
-        
-      case 'month':
+
+      case "month":
         // Next month 1st 00:00 UTC
         date.setUTCDate(1);
         date.setUTCHours(0, 0, 0, 0);
@@ -334,7 +345,7 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
         }
         break;
     }
-    
+
     return Math.floor(date.getTime() / 1000);
   }
 
@@ -361,7 +372,7 @@ export class PeriodSeparatorPrimitive implements ISeriesPrimitive<Time> {
 
     let canvasWidth = 800;
     let canvasHeight = 600;
-    
+
     if (this._chart) {
       try {
         const chartElement = (this._chart as any).chartElement?.();

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import mongoose, { Types } from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import mongoose, { Types } from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * DELETE /api/messaging/conversations/[conversationId]/delete
@@ -11,12 +11,12 @@ import { connectToDatabase } from '@/database/mongoose';
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
+  { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { conversationId } = await params;
@@ -25,52 +25,63 @@ export async function DELETE(
 
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     let convObjectId;
     try {
       convObjectId = new Types.ObjectId(conversationId);
     } catch {
-      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid conversation ID" },
+        { status: 400 },
+      );
     }
 
     // Verify user is a participant
-    const conversation = await db.collection('conversations').findOne({ 
+    const conversation = await db.collection("conversations").findOne({
       _id: convObjectId,
-      'participants.id': session.user.id,
+      "participants.id": session.user.id,
     });
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 },
+      );
     }
 
-    console.log(`🗑️ [Delete] User ${session.user.email} deleting conversation ${conversationId}`);
+    console.log(
+      `🗑️ [Delete] User ${session.user.email} deleting conversation ${conversationId}`,
+    );
 
     // Add user to deletedBy array (soft delete for this user)
     // This allows us to hide it from the user while preserving it for admin/audit
-    await db.collection('conversations').updateOne(
+    await db.collection("conversations").updateOne(
       { _id: convObjectId },
-      { 
-        $addToSet: { 
-          deletedByUsers: session.user.id 
+      {
+        $addToSet: {
+          deletedByUsers: session.user.id,
         },
         $set: {
           [`userDeletedAt.${session.user.id}`]: new Date(),
-        }
-      }
+        },
+      },
     );
     // Note: modifiedCount can be 0 if user is already in the array, which is fine
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Conversation deleted successfully' 
+    return NextResponse.json({
+      success: true,
+      message: "Conversation deleted successfully",
     });
   } catch (error) {
-    console.error('Error deleting conversation:', error);
+    console.error("Error deleting conversation:", error);
     return NextResponse.json(
-      { error: 'Failed to delete conversation' },
-      { status: 500 }
+      { error: "Failed to delete conversation" },
+      { status: 500 },
     );
   }
 }

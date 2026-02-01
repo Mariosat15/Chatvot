@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import VATPayment from '@/database/models/vat-payment.model';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import VATPayment from "@/database/models/vat-payment.model";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * GET /api/admin/vat
@@ -15,23 +15,23 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
     // Default to current month if no dates provided
     const now = new Date();
-    const periodStart = startDate 
-      ? new Date(startDate) 
+    const periodStart = startDate
+      ? new Date(startDate)
       : new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodEnd = endDate 
-      ? new Date(endDate) 
+    const periodEnd = endDate
+      ? new Date(endDate)
       : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
     // Get all completed deposits with VAT in the period
     const vatTransactions = await WalletTransaction.find({
-      transactionType: 'deposit',
-      status: 'completed',
-      'metadata.vatAmount': { $gt: 0 },
+      transactionType: "deposit",
+      status: "completed",
+      "metadata.vatAmount": { $gt: 0 },
       createdAt: { $gte: periodStart, $lte: periodEnd },
     }).lean();
 
@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get unpaid VAT from previous periods (not yet marked as paid)
-    const unpaidVATPeriods = await VATPayment.find({ status: 'pending' }).lean();
+    const unpaidVATPeriods = await VATPayment.find({
+      status: "pending",
+    }).lean();
     let unpaidVATFromPreviousPeriods = 0;
     for (const period of unpaidVATPeriods) {
       unpaidVATFromPreviousPeriods += period.vatAmountEUR;
@@ -56,15 +58,15 @@ export async function GET(request: NextRequest) {
     const allTimeVATAggregation = await WalletTransaction.aggregate([
       {
         $match: {
-          transactionType: 'deposit',
-          status: 'completed',
-          'metadata.vatAmount': { $gt: 0 },
+          transactionType: "deposit",
+          status: "completed",
+          "metadata.vatAmount": { $gt: 0 },
         },
       },
       {
         $group: {
           _id: null,
-          totalVAT: { $sum: '$metadata.vatAmount' },
+          totalVAT: { $sum: "$metadata.vatAmount" },
           count: { $sum: 1 },
         },
       },
@@ -74,11 +76,11 @@ export async function GET(request: NextRequest) {
 
     // Get total VAT already paid
     const paidVATAggregation = await VATPayment.aggregate([
-      { $match: { status: 'paid' } },
+      { $match: { status: "paid" } },
       {
         $group: {
           _id: null,
-          totalPaid: { $sum: '$vatAmountEUR' },
+          totalPaid: { $sum: "$vatAmountEUR" },
           count: { $sum: 1 },
         },
       },
@@ -122,10 +124,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching VAT data:', error);
+    console.error("Error fetching VAT data:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch VAT data' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch VAT data" },
+      { status: 500 },
     );
   }
 }
@@ -144,16 +146,16 @@ export async function POST(request: NextRequest) {
 
     if (!periodStart || !periodEnd || !amount) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { success: false, error: "Missing required fields" },
+        { status: 400 },
       );
     }
 
     // Count transactions in this period
     const txCount = await WalletTransaction.countDocuments({
-      transactionType: 'deposit',
-      status: 'completed',
-      'metadata.vatAmount': { $gt: 0 },
+      transactionType: "deposit",
+      status: "completed",
+      "metadata.vatAmount": { $gt: 0 },
       createdAt: { $gte: new Date(periodStart), $lte: new Date(periodEnd) },
     });
 
@@ -164,30 +166,32 @@ export async function POST(request: NextRequest) {
       vatAmount: amount,
       vatAmountEUR: amount,
       transactionCount: txCount,
-      status: 'paid',
+      status: "paid",
       paidAt: new Date(),
-      paidBy: admin.adminId || 'admin',
+      paidBy: admin.adminId || "admin",
       paidByEmail: admin.email,
       reference,
       notes,
     });
 
-    console.log(`💶 VAT Payment recorded: €${amount} for period ${periodStart} to ${periodEnd} by ${admin.email}`);
+    console.log(
+      `💶 VAT Payment recorded: €${amount} for period ${periodStart} to ${periodEnd} by ${admin.email}`,
+    );
 
     // Log audit action
     try {
       await auditLogService.logVATPayment(
         {
-          id: admin.adminId || 'admin',
-          email: admin.email || 'admin',
-          name: (admin.email || 'admin').split('@')[0],
-          role: 'admin',
+          id: admin.adminId || "admin",
+          email: admin.email || "admin",
+          name: (admin.email || "admin").split("@")[0],
+          role: "admin",
         },
         amount,
-        reference || `VAT-${periodStart}-${periodEnd}`
+        reference || `VAT-${periodStart}-${periodEnd}`,
       );
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
@@ -195,11 +199,10 @@ export async function POST(request: NextRequest) {
       payment: vatPayment,
     });
   } catch (error) {
-    console.error('Error recording VAT payment:', error);
+    console.error("Error recording VAT payment:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to record VAT payment' },
-      { status: 500 }
+      { success: false, error: "Failed to record VAT payment" },
+      { status: 500 },
     );
   }
 }
-

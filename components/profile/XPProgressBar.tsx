@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { TitleLevel } from '@/lib/constants/levels';
-import { Trophy, Zap, Target, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from "react";
+import { TitleLevel } from "@/lib/constants/levels";
+import {
+  Trophy,
+  Zap,
+  Target,
+  TrendingUp,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface XPProgressBarProps {
   currentXP: number;
@@ -13,7 +20,12 @@ interface XPProgressBarProps {
   currentDescription: string;
   currentColor: string;
   totalBadgesEarned: number;
-  badgeXPValues: { common: number; rare: number; epic: number; legendary: number };
+  badgeXPValues: {
+    common: number;
+    rare: number;
+    epic: number;
+    legendary: number;
+  };
   titleLevels: TitleLevel[];
 }
 
@@ -54,7 +66,10 @@ export default function XPProgressBar({
   if (nextLevel) {
     const xpInCurrentLevel = currentXP - levelData.minXP;
     const xpNeededForNextLevel = nextLevel.minXP - levelData.minXP;
-    progressPercent = Math.min(100, (xpInCurrentLevel / xpNeededForNextLevel) * 100);
+    progressPercent = Math.min(
+      100,
+      (xpInCurrentLevel / xpNeededForNextLevel) * 100,
+    );
     xpToNext = nextLevel.minXP - currentXP;
   }
 
@@ -70,8 +85,12 @@ export default function XPProgressBar({
             <Trophy className="h-6 w-6 text-purple-400" />
           </div>
           <div className="text-left">
-            <h2 className="text-xl font-bold text-white">Trader Level & Title</h2>
-            <p className="text-sm text-gray-400">Earn XP by collecting badges</p>
+            <h2 className="text-xl font-bold text-white">
+              Trader Level & Title
+            </h2>
+            <p className="text-sm text-gray-400">
+              Earn XP by collecting badges
+            </p>
           </div>
         </div>
 
@@ -84,13 +103,17 @@ export default function XPProgressBar({
               <p className="text-xs text-gray-400">Level {currentLevel}</p>
             </div>
           </div>
-          
+
           <div className="text-right">
             <p className="text-sm text-gray-400">Total XP</p>
-            <p className="text-xl font-bold text-purple-400 tabular-nums">{currentXP.toLocaleString()}</p>
+            <p className="text-xl font-bold text-purple-400 tabular-nums">
+              {currentXP.toLocaleString()}
+            </p>
           </div>
 
-          <div className={`p-2 rounded-lg transition-colors ${isExpanded ? 'bg-purple-500/20' : 'bg-gray-700/50'}`}>
+          <div
+            className={`p-2 rounded-lg transition-colors ${isExpanded ? "bg-purple-500/20" : "bg-gray-700/50"}`}
+          >
             {isExpanded ? (
               <ChevronUp className="h-5 w-5 text-purple-400" />
             ) : (
@@ -105,28 +128,39 @@ export default function XPProgressBar({
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
             <div className="px-6 pb-6 space-y-6">
               {/* Current Title Card */}
-              <div className={`rounded-xl p-6 bg-gradient-to-r from-purple-600/30 to-blue-600/30 border-2 border-purple-500/50 shadow-lg`}>
+              <div
+                className={`rounded-xl p-6 bg-gradient-to-r from-purple-600/30 to-blue-600/30 border-2 border-purple-500/50 shadow-lg`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="text-5xl">{levelData.icon}</div>
                     <div>
-                      <p className="text-sm text-gray-300 uppercase tracking-wide">Current Title</p>
-                      <h3 className={`text-3xl font-bold ${levelData.color}`}>{currentTitle}</h3>
-                      <p className="text-sm text-gray-400 mt-1">{levelData.description}</p>
+                      <p className="text-sm text-gray-300 uppercase tracking-wide">
+                        Current Title
+                      </p>
+                      <h3 className={`text-3xl font-bold ${levelData.color}`}>
+                        {currentTitle}
+                      </h3>
+                      <p className="text-sm text-gray-400 mt-1">
+                        {levelData.description}
+                      </p>
                       <div className="flex items-center gap-3 mt-2">
                         <div className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30">
-                          <p className="text-xs font-semibold text-purple-300">Level {currentLevel}</p>
+                          <p className="text-xs font-semibold text-purple-300">
+                            Level {currentLevel}
+                          </p>
                         </div>
                         <div className="px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30">
                           <p className="text-xs font-semibold text-blue-300">
-                            {totalBadgesEarned} {totalBadgesEarned === 1 ? 'Badge' : 'Badges'}
+                            {totalBadgesEarned}{" "}
+                            {totalBadgesEarned === 1 ? "Badge" : "Badges"}
                           </p>
                         </div>
                       </div>
@@ -141,13 +175,18 @@ export default function XPProgressBar({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-purple-400" />
-                      <p className="text-sm font-semibold text-white">Next Title:</p>
+                      <p className="text-sm font-semibold text-white">
+                        Next Title:
+                      </p>
                       <span className={`text-sm font-bold ${nextLevel.color}`}>
                         {nextLevel.icon} {nextLevel.title}
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">
-                      <span className="text-purple-400 font-semibold">{xpToNext}</span> XP needed
+                      <span className="text-purple-400 font-semibold">
+                        {xpToNext}
+                      </span>{" "}
+                      XP needed
                     </p>
                   </div>
 
@@ -158,7 +197,7 @@ export default function XPProgressBar({
                         className="h-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 relative"
                         initial={{ width: 0 }}
                         animate={{ width: `${progressPercent}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
                       >
                         <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                       </motion.div>
@@ -170,14 +209,20 @@ export default function XPProgressBar({
 
                   {/* Next Level Description */}
                   <div className="mt-4 p-4 rounded-lg bg-dark-800/50 border border-dark-600">
-                    <p className="text-xs text-gray-400">{nextLevel.description}</p>
+                    <p className="text-xs text-gray-400">
+                      {nextLevel.description}
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="text-center p-6 rounded-xl bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-2 border-yellow-500/50">
                   <div className="text-4xl mb-3">🎉</div>
-                  <h3 className="text-2xl font-bold text-yellow-400 mb-2">Maximum Level Reached!</h3>
-                  <p className="text-sm text-gray-300">You&apos;ve achieved the highest trading title!</p>
+                  <h3 className="text-2xl font-bold text-yellow-400 mb-2">
+                    Maximum Level Reached!
+                  </h3>
+                  <p className="text-sm text-gray-300">
+                    You&apos;ve achieved the highest trading title!
+                  </p>
                 </div>
               )}
 
@@ -185,7 +230,9 @@ export default function XPProgressBar({
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="h-5 w-5 text-purple-400" />
-                  <h3 className="text-lg font-bold text-white">All Title Levels</h3>
+                  <h3 className="text-lg font-bold text-white">
+                    All Title Levels
+                  </h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -199,19 +246,23 @@ export default function XPProgressBar({
                         key={level.level}
                         className={`p-4 rounded-lg border transition-all ${
                           isCurrentLevel
-                            ? 'bg-purple-500/20 border-purple-500/50 shadow-lg shadow-purple-500/20'
+                            ? "bg-purple-500/20 border-purple-500/50 shadow-lg shadow-purple-500/20"
                             : isCompleted
-                            ? 'bg-green-500/10 border-green-500/30'
-                            : 'bg-dark-800/30 border-dark-600 opacity-60'
+                              ? "bg-green-500/10 border-green-500/30"
+                              : "bg-dark-800/30 border-dark-600 opacity-60"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`text-3xl ${isLocked ? 'grayscale opacity-40' : ''}`}>
+                          <div
+                            className={`text-3xl ${isLocked ? "grayscale opacity-40" : ""}`}
+                          >
                             {level.icon}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className={`text-sm font-bold ${isLocked ? 'text-gray-500' : level.color}`}>
+                              <p
+                                className={`text-sm font-bold ${isLocked ? "text-gray-500" : level.color}`}
+                              >
                                 {level.title}
                               </p>
                               {isCurrentLevel && (
@@ -226,7 +277,8 @@ export default function XPProgressBar({
                               )}
                             </div>
                             <p className="text-xs text-gray-400 mt-1">
-                              Level {level.level} • {level.minXP.toLocaleString()}+ XP
+                              Level {level.level} •{" "}
+                              {level.minXP.toLocaleString()}+ XP
                             </p>
                           </div>
                         </div>
@@ -240,24 +292,34 @@ export default function XPProgressBar({
               <div className="p-4 rounded-lg bg-dark-800/50 border border-dark-600">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="h-5 w-5 text-yellow-400" />
-                  <h4 className="text-sm font-bold text-white">How to Earn XP</h4>
+                  <h4 className="text-sm font-bold text-white">
+                    How to Earn XP
+                  </h4>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center p-3 rounded-lg bg-dark-700/50">
                     <p className="text-gray-400 text-xs mb-1">⭐ Common</p>
-                    <p className="text-green-400 font-bold text-lg">+{badgeXPValues.common} XP</p>
+                    <p className="text-green-400 font-bold text-lg">
+                      +{badgeXPValues.common} XP
+                    </p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-dark-700/50">
                     <p className="text-gray-400 text-xs mb-1">💎 Rare</p>
-                    <p className="text-blue-400 font-bold text-lg">+{badgeXPValues.rare} XP</p>
+                    <p className="text-blue-400 font-bold text-lg">
+                      +{badgeXPValues.rare} XP
+                    </p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-dark-700/50">
                     <p className="text-gray-400 text-xs mb-1">👑 Epic</p>
-                    <p className="text-purple-400 font-bold text-lg">+{badgeXPValues.epic} XP</p>
+                    <p className="text-purple-400 font-bold text-lg">
+                      +{badgeXPValues.epic} XP
+                    </p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-dark-700/50">
                     <p className="text-gray-400 text-xs mb-1">🌟 Legendary</p>
-                    <p className="text-yellow-400 font-bold text-lg">+{badgeXPValues.legendary} XP</p>
+                    <p className="text-yellow-400 font-bold text-lg">
+                      +{badgeXPValues.legendary} XP
+                    </p>
                   </div>
                 </div>
               </div>

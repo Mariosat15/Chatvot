@@ -1,17 +1,17 @@
-import { NextRequest } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import PositionEvent from '@/database/models/position-event.model';
+import { NextRequest } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import PositionEvent from "@/database/models/position-event.model";
 
 /**
  * SSE Endpoint for Real-Time Position Events
- * 
+ *
  * Clients subscribe to this endpoint to receive instant notifications
  * when positions are closed (TP/SL), opened, or modified.
- * 
+ *
  * This replaces polling and provides < 100ms latency updates.
- * 
+ *
  * Usage:
  * const eventSource = new EventSource('/api/trading/position-events?competitionId=xxx');
  * eventSource.onmessage = (event) => { const data = JSON.parse(event.data); }
@@ -20,14 +20,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const competitionId = searchParams.get('competitionId');
-    
+    const competitionId = searchParams.get("competitionId");
+
     if (!competitionId) {
-      return new Response('Missing competitionId', { status: 400 });
+      return new Response("Missing competitionId", { status: 400 });
     }
 
     // Generate unique session ID for this connection
@@ -39,9 +39,13 @@ export async function GET(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        
+
         // Send initial connection message
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`));
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "connected", sessionId })}\n\n`,
+          ),
+        );
 
         // Keep-alive interval (every 15 seconds)
         const keepAliveInterval = setInterval(() => {
@@ -69,14 +73,14 @@ export async function GET(request: NextRequest) {
             if (events.length > 0) {
               // Mark as delivered
               await PositionEvent.updateMany(
-                { _id: { $in: events.map(e => e._id) } },
-                { $addToSet: { deliveredTo: sessionId } }
+                { _id: { $in: events.map((e) => e._id) } },
+                { $addToSet: { deliveredTo: sessionId } },
               );
 
               // Send each event
               for (const event of events as any[]) {
                 const eventData = {
-                  type: 'position_event',
+                  type: "position_event",
                   event: {
                     id: event._id.toString(),
                     positionId: event.positionId,
@@ -88,18 +92,20 @@ export async function GET(request: NextRequest) {
                     exitPrice: event.exitPrice,
                     contestType: event.contestType,
                     timestamp: event.createdAt,
-                  }
+                  },
                 };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`));
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`),
+                );
               }
             }
           } catch (error) {
-            console.error('[SSE] Error polling events:', error);
+            console.error("[SSE] Error polling events:", error);
           }
         }, 500); // Check every 500ms
 
         // Cleanup on close
-        request.signal.addEventListener('abort', () => {
+        request.signal.addEventListener("abort", () => {
           clearInterval(keepAliveInterval);
           clearInterval(pollInterval);
           controller.close();
@@ -109,15 +115,14 @@ export async function GET(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no', // Disable nginx buffering
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no", // Disable nginx buffering
       },
     });
   } catch (error) {
-    console.error('[SSE] Error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    console.error("[SSE] Error:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
-

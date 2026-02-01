@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import UserRestriction from '@/database/models/user-restriction.model';
-import bcrypt from 'bcryptjs';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import UserRestriction from "@/database/models/user-restriction.model";
+import bcrypt from "bcryptjs";
 
 /**
  * PUT /api/admin/fraud/update-restriction
@@ -21,46 +21,59 @@ export async function PUT(request: NextRequest) {
       adminPassword,
     } = await request.json();
 
-    console.log('✏️ Update restriction request:', { 
-      restrictionId, 
-      reason, 
-      hasPassword: !!adminPassword 
+    console.log("✏️ Update restriction request:", {
+      restrictionId,
+      reason,
+      hasPassword: !!adminPassword,
     });
 
     // Validate input
     if (!restrictionId) {
-      return NextResponse.json({
-        success: false,
-        message: 'Restriction ID required'
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Restriction ID required",
+        },
+        { status: 400 },
+      );
     }
 
     if (!adminPassword) {
-      return NextResponse.json({
-        success: false,
-        message: 'Admin password required'
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Admin password required",
+        },
+        { status: 400 },
+      );
     }
 
     // Verify admin password
     const envPassword = process.env.ADMIN_PASSWORD;
     if (!envPassword) {
-      return NextResponse.json({
-        success: false,
-        message: 'Admin password not configured'
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Admin password not configured",
+        },
+        { status: 500 },
+      );
     }
 
-    const isPasswordValid = envPassword.startsWith('$2a$') || envPassword.startsWith('$2b$')
-      ? await bcrypt.compare(adminPassword, envPassword)
-      : adminPassword === envPassword;
+    const isPasswordValid =
+      envPassword.startsWith("$2a$") || envPassword.startsWith("$2b$")
+        ? await bcrypt.compare(adminPassword, envPassword)
+        : adminPassword === envPassword;
 
     if (!isPasswordValid) {
-      console.error('❌ Invalid admin password');
-      return NextResponse.json({
-        success: false,
-        message: 'Invalid admin password'
-      }, { status: 401 });
+      console.error("❌ Invalid admin password");
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid admin password",
+        },
+        { status: 401 },
+      );
     }
 
     await connectToDatabase();
@@ -70,10 +83,13 @@ export async function PUT(request: NextRequest) {
 
     if (!restriction) {
       console.error(`❌ Restriction not found: ${restrictionId}`);
-      return NextResponse.json({
-        success: false,
-        message: 'Restriction not found'
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Restriction not found",
+        },
+        { status: 404 },
+      );
     }
 
     // Update fields
@@ -83,7 +99,7 @@ export async function PUT(request: NextRequest) {
     restriction.canEnterCompetitions = canEnterCompetitions;
     restriction.canDeposit = canDeposit;
     restriction.canWithdraw = canWithdraw;
-    
+
     if (expiresAt) {
       restriction.expiresAt = new Date(expiresAt);
     } else {
@@ -92,20 +108,26 @@ export async function PUT(request: NextRequest) {
 
     await restriction.save();
 
-    console.log(`✅ Updated restriction ${restrictionId} for user ${restriction.userId}`);
+    console.log(
+      `✅ Updated restriction ${restrictionId} for user ${restriction.userId}`,
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Restriction updated successfully',
+      message: "Restriction updated successfully",
       restriction,
     });
-
   } catch (error) {
-    console.error('Error updating restriction:', error);
-    return NextResponse.json({
-      success: false,
-      message: error instanceof Error ? error.message : 'Failed to update restriction'
-    }, { status: 500 });
+    console.error("Error updating restriction:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update restriction",
+      },
+      { status: 500 },
+    );
   }
 }
-

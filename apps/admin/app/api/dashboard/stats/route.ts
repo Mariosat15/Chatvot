@@ -1,22 +1,23 @@
 /**
  * Dashboard Stats API
- * 
+ *
  * Returns comprehensive statistics for the admin dashboard overview
  */
 
-import { NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import WithdrawalRequest from '@/database/models/withdrawal-request.model';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import PaymentProvider from '@/database/models/payment-provider.model';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import PaymentProvider from "@/database/models/payment-provider.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 // Get User and KYCVerification collections directly (models not available in admin app)
-const getUserCollection = () => mongoose.connection.collection('users');
-const getKYCCollection = () => mongoose.connection.collection('kycverifications');
+const getUserCollection = () => mongoose.connection.collection("users");
+const getKYCCollection = () =>
+  mongoose.connection.collection("kycverifications");
 
 interface DashboardStats {
   // User Stats
@@ -28,7 +29,7 @@ interface DashboardStats {
     verified: number;
     active: number; // logged in last 30 days
   };
-  
+
   // Deposit Stats
   deposits: {
     total: number;
@@ -39,7 +40,7 @@ interface DashboardStats {
     pendingEUR: number;
     failedToday: number;
   };
-  
+
   // Withdrawal Stats
   withdrawals: {
     total: number;
@@ -52,7 +53,7 @@ interface DashboardStats {
     processingCount: number;
     approvedCount: number;
   };
-  
+
   // KYC Stats
   kyc: {
     totalVerified: number;
@@ -60,7 +61,7 @@ interface DashboardStats {
     rejectedToday: number;
     approvedToday: number;
   };
-  
+
   // Fraud Stats
   fraud: {
     activeAlerts: number;
@@ -69,28 +70,28 @@ interface DashboardStats {
     suspendedUsers: number;
     bannedUsers: number;
   };
-  
+
   // Service Status
   services: {
-    database: 'operational' | 'degraded' | 'down';
-    webhooks: 'operational' | 'degraded' | 'down';
+    database: "operational" | "degraded" | "down";
+    webhooks: "operational" | "degraded" | "down";
     payments: {
-      stripe: 'operational' | 'degraded' | 'down' | 'not_configured';
-      nuvei: 'operational' | 'degraded' | 'down' | 'not_configured';
+      stripe: "operational" | "degraded" | "down" | "not_configured";
+      nuvei: "operational" | "degraded" | "down" | "not_configured";
     };
-    massive: 'operational' | 'degraded' | 'down' | 'not_configured';
-    redis: 'operational' | 'degraded' | 'down' | 'not_configured';
-    kyc: 'operational' | 'degraded' | 'down' | 'not_configured';
+    massive: "operational" | "degraded" | "down" | "not_configured";
+    redis: "operational" | "degraded" | "down" | "not_configured";
+    kyc: "operational" | "degraded" | "down" | "not_configured";
   };
-  
+
   // Recent Activity
   recentActivity: {
-    type: 'deposit' | 'withdrawal' | 'user' | 'kyc' | 'fraud';
+    type: "deposit" | "withdrawal" | "user" | "kyc" | "fraud";
     description: string;
     timestamp: string;
-    status?: 'success' | 'warning' | 'error';
+    status?: "success" | "warning" | "error";
   }[];
-  
+
   // Timestamp
   generatedAt: string;
 }
@@ -98,91 +99,99 @@ interface DashboardStats {
 // Helper to get date boundaries
 function getDateBoundaries() {
   const now = new Date();
-  
+
   // Start of today (midnight)
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
-  
+
   // Start of this week (Monday)
   const startOfWeek = new Date(now);
   const day = startOfWeek.getDay();
   const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
   startOfWeek.setDate(diff);
   startOfWeek.setHours(0, 0, 0, 0);
-  
+
   // Start of this month
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  
+
   // 30 days ago
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   return { now, startOfToday, startOfWeek, startOfMonth, thirtyDaysAgo };
 }
 
 // Check service status
-async function checkServiceStatus(): Promise<DashboardStats['services']> {
-  const services: DashboardStats['services'] = {
-    database: 'operational',
-    webhooks: 'operational',
+async function checkServiceStatus(): Promise<DashboardStats["services"]> {
+  const services: DashboardStats["services"] = {
+    database: "operational",
+    webhooks: "operational",
     payments: {
-      stripe: 'not_configured',
-      nuvei: 'not_configured',
+      stripe: "not_configured",
+      nuvei: "not_configured",
     },
-    massive: 'not_configured',
-    redis: 'not_configured',
-    kyc: 'not_configured',
+    massive: "not_configured",
+    redis: "not_configured",
+    kyc: "not_configured",
   };
-  
+
   try {
     // Check payment providers
     const paymentProviders = await PaymentProvider.find({ isActive: true });
     for (const provider of paymentProviders) {
-      if (provider.slug === 'stripe') {
-        services.payments.stripe = provider.testMode ? 'operational' : 'operational';
-      } else if (provider.slug === 'nuvei') {
-        services.payments.nuvei = provider.testMode ? 'operational' : 'operational';
+      if (provider.slug === "stripe") {
+        services.payments.stripe = provider.testMode
+          ? "operational"
+          : "operational";
+      } else if (provider.slug === "nuvei") {
+        services.payments.nuvei = provider.testMode
+          ? "operational"
+          : "operational";
       }
     }
-    
+
     // Also check env vars
     if (process.env.STRIPE_SECRET_KEY) {
-      services.payments.stripe = 'operational';
+      services.payments.stripe = "operational";
     }
     if (process.env.NUVEI_MERCHANT_ID && process.env.NUVEI_SECRET_KEY) {
-      services.payments.nuvei = 'operational';
+      services.payments.nuvei = "operational";
     }
-    
+
     // Check WhiteLabel settings for other services
-    const settings = await WhiteLabel.findOne().lean() as Record<string, unknown> | null;
+    const settings = (await WhiteLabel.findOne().lean()) as Record<
+      string,
+      unknown
+    > | null;
     if (settings) {
       // Massive WebSocket
       if (settings.massiveApiKey || process.env.MASSIVE_API_KEY) {
-        services.massive = 'operational';
+        services.massive = "operational";
       }
-      
+
       // Redis
       if (settings.redisEnabled || process.env.REDIS_URL) {
         try {
           // Try to ping Redis if configured
-          const redisUrl = (settings.redisUrl as string) || process.env.REDIS_URL;
+          const redisUrl =
+            (settings.redisUrl as string) || process.env.REDIS_URL;
           if (redisUrl) {
-            services.redis = 'operational';
+            services.redis = "operational";
           }
         } catch {
-          services.redis = 'down';
+          services.redis = "down";
         }
       }
-      
+
       // KYC (Veriff)
       if (settings.veriffApiKey || process.env.VERIFF_API_KEY) {
-        services.kyc = 'operational';
+        services.kyc = "operational";
       }
     }
   } catch (error) {
-    console.error('Error checking service status:', error);
+    console.error("Error checking service status:", error);
   }
-  
+
   return services;
 }
 
@@ -190,17 +199,18 @@ export async function GET() {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
-    const { startOfToday, startOfWeek, startOfMonth, thirtyDaysAgo } = getDateBoundaries();
-    
+
+    const { startOfToday, startOfWeek, startOfMonth, thirtyDaysAgo } =
+      getDateBoundaries();
+
     // Get collections for models not available in admin app
     const usersCollection = getUserCollection();
     const kycCollection = getKYCCollection();
-    
+
     // Run all queries in parallel for efficiency
     const [
       // User stats
@@ -210,13 +220,13 @@ export async function GET() {
       newUsersThisMonth,
       verifiedUsers,
       activeUsers,
-      
+
       // Deposit stats
       totalDeposits,
       depositsTodayCompleted,
       pendingDeposits,
       failedDepositsToday,
-      
+
       // Withdrawal stats
       totalWithdrawals,
       withdrawalsTodayCompleted,
@@ -224,25 +234,25 @@ export async function GET() {
       processingWithdrawals,
       approvedWithdrawals,
       failedWithdrawalsToday,
-      
+
       // KYC stats
       totalKYCVerified,
       pendingKYC,
       kycApprovedToday,
       kycRejectedToday,
-      
+
       // Fraud stats
       activeAlerts,
       highPriorityAlerts,
       alertsToday,
       suspendedUsers,
       bannedUsers,
-      
+
       // Recent activity (last 10 items)
       recentDeposits,
       recentWithdrawals,
       recentUsers,
-      
+
       // Service status
       services,
     ] = await Promise.all([
@@ -253,137 +263,229 @@ export async function GET() {
       usersCollection.countDocuments({ createdAt: { $gte: startOfMonth } }),
       usersCollection.countDocuments({ emailVerified: true }),
       usersCollection.countDocuments({ updatedAt: { $gte: thirtyDaysAgo } }),
-      
+
       // Deposit queries - use processedAt or createdAt for today's deposits
       WalletTransaction.aggregate([
-        { $match: { transactionType: 'deposit', status: 'completed' } },
-        { $group: { 
-          _id: null, 
-          count: { $sum: 1 }, 
-          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
-        } },
+        { $match: { transactionType: "deposit", status: "completed" } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: {
+              $sum: {
+                $ifNull: [
+                  "$metadata.eurAmount",
+                  { $ifNull: ["$metadata.baseAmount", 0] },
+                ],
+              },
+            },
+          },
+        },
       ]),
       WalletTransaction.aggregate([
-        { 
-          $match: { 
-            transactionType: 'deposit', 
-            status: 'completed', 
+        {
+          $match: {
+            transactionType: "deposit",
+            status: "completed",
             $or: [
               { processedAt: { $gte: startOfToday } },
-              { createdAt: { $gte: startOfToday }, processedAt: { $exists: false } }
-            ]
-          } 
+              {
+                createdAt: { $gte: startOfToday },
+                processedAt: { $exists: false },
+              },
+            ],
+          },
         },
-        { $group: { 
-          _id: null, 
-          count: { $sum: 1 }, 
-          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
-        } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: {
+              $sum: {
+                $ifNull: [
+                  "$metadata.eurAmount",
+                  { $ifNull: ["$metadata.baseAmount", 0] },
+                ],
+              },
+            },
+          },
+        },
       ]),
       WalletTransaction.aggregate([
-        { $match: { transactionType: 'deposit', status: 'pending' } },
-        { $group: { 
-          _id: null, 
-          count: { $sum: 1 }, 
-          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
-        } },
+        { $match: { transactionType: "deposit", status: "pending" } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: {
+              $sum: {
+                $ifNull: [
+                  "$metadata.eurAmount",
+                  { $ifNull: ["$metadata.baseAmount", 0] },
+                ],
+              },
+            },
+          },
+        },
       ]),
-      WalletTransaction.countDocuments({ transactionType: 'deposit', status: 'failed', updatedAt: { $gte: startOfToday } }),
-      
+      WalletTransaction.countDocuments({
+        transactionType: "deposit",
+        status: "failed",
+        updatedAt: { $gte: startOfToday },
+      }),
+
       // Withdrawal queries - include pending, approved, and processing
       WithdrawalRequest.aggregate([
-        { $match: { status: 'completed' } },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
+        { $match: { status: "completed" } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: { $sum: "$amountEUR" },
+          },
+        },
       ]),
       WithdrawalRequest.aggregate([
-        { 
-          $match: { 
-            status: 'completed', 
+        {
+          $match: {
+            status: "completed",
             $or: [
               { processedAt: { $gte: startOfToday } },
-              { updatedAt: { $gte: startOfToday }, processedAt: { $exists: false } }
-            ]
-          } 
+              {
+                updatedAt: { $gte: startOfToday },
+                processedAt: { $exists: false },
+              },
+            ],
+          },
         },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: { $sum: "$amountEUR" },
+          },
+        },
       ]),
       // Pending withdrawals - include pending, approved, and processing statuses
       WithdrawalRequest.aggregate([
-        { $match: { status: { $in: ['pending', 'approved', 'processing'] } } },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
+        { $match: { status: { $in: ["pending", "approved", "processing"] } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            total: { $sum: "$amountEUR" },
+          },
+        },
       ]),
-      WithdrawalRequest.countDocuments({ status: 'processing' }),
-      WithdrawalRequest.countDocuments({ status: 'approved' }),
-      WithdrawalRequest.countDocuments({ status: { $in: ['failed', 'rejected'] }, updatedAt: { $gte: startOfToday } }),
-      
+      WithdrawalRequest.countDocuments({ status: "processing" }),
+      WithdrawalRequest.countDocuments({ status: "approved" }),
+      WithdrawalRequest.countDocuments({
+        status: { $in: ["failed", "rejected"] },
+        updatedAt: { $gte: startOfToday },
+      }),
+
       // KYC queries (using collection directly)
-      kycCollection.countDocuments({ status: 'approved' }).catch(() => 0),
-      kycCollection.countDocuments({ status: 'pending' }).catch(() => 0),
-      kycCollection.countDocuments({ status: 'approved', updatedAt: { $gte: startOfToday } }).catch(() => 0),
-      kycCollection.countDocuments({ status: 'rejected', updatedAt: { $gte: startOfToday } }).catch(() => 0),
-      
+      kycCollection.countDocuments({ status: "approved" }).catch(() => 0),
+      kycCollection.countDocuments({ status: "pending" }).catch(() => 0),
+      kycCollection
+        .countDocuments({
+          status: "approved",
+          updatedAt: { $gte: startOfToday },
+        })
+        .catch(() => 0),
+      kycCollection
+        .countDocuments({
+          status: "rejected",
+          updatedAt: { $gte: startOfToday },
+        })
+        .catch(() => 0),
+
       // Fraud queries
-      FraudAlert.countDocuments({ status: { $in: ['pending', 'investigating'] } }).catch(() => 0),
-      FraudAlert.countDocuments({ status: { $in: ['pending', 'investigating'] }, priority: 'high' }).catch(() => 0),
-      FraudAlert.countDocuments({ createdAt: { $gte: startOfToday } }).catch(() => 0),
-      usersCollection.countDocuments({ 'restrictions.status': 'suspended' }).catch(() => 0),
-      usersCollection.countDocuments({ 'restrictions.status': 'banned' }).catch(() => 0),
-      
+      FraudAlert.countDocuments({
+        status: { $in: ["pending", "investigating"] },
+      }).catch(() => 0),
+      FraudAlert.countDocuments({
+        status: { $in: ["pending", "investigating"] },
+        priority: "high",
+      }).catch(() => 0),
+      FraudAlert.countDocuments({ createdAt: { $gte: startOfToday } }).catch(
+        () => 0,
+      ),
+      usersCollection
+        .countDocuments({ "restrictions.status": "suspended" })
+        .catch(() => 0),
+      usersCollection
+        .countDocuments({ "restrictions.status": "banned" })
+        .catch(() => 0),
+
       // Recent activity
-      WalletTransaction.find({ transactionType: 'deposit' })
+      WalletTransaction.find({ transactionType: "deposit" })
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('status metadata.eurAmount createdAt')
+        .select("status metadata.eurAmount createdAt")
         .lean(),
       WithdrawalRequest.find()
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('status amountEUR createdAt')
+        .select("status amountEUR createdAt")
         .lean(),
-      usersCollection.find()
+      usersCollection
+        .find()
         .sort({ createdAt: -1 })
         .limit(5)
         .project({ name: 1, email: 1, createdAt: 1 })
         .toArray(),
-      
+
       // Service status
       checkServiceStatus(),
     ]);
-    
+
     // Build recent activity
-    const recentActivity: DashboardStats['recentActivity'] = [];
-    
-    for (const deposit of (recentDeposits as any[])) {
+    const recentActivity: DashboardStats["recentActivity"] = [];
+
+    for (const deposit of recentDeposits as any[]) {
       recentActivity.push({
-        type: 'deposit',
-        description: `€${deposit.metadata?.eurAmount?.toFixed(2) || '0'} deposit ${deposit.status}`,
+        type: "deposit",
+        description: `€${deposit.metadata?.eurAmount?.toFixed(2) || "0"} deposit ${deposit.status}`,
         timestamp: deposit.createdAt.toISOString(),
-        status: deposit.status === 'completed' ? 'success' : deposit.status === 'failed' ? 'error' : 'warning',
+        status:
+          deposit.status === "completed"
+            ? "success"
+            : deposit.status === "failed"
+              ? "error"
+              : "warning",
       });
     }
-    
-    for (const withdrawal of (recentWithdrawals as any[])) {
+
+    for (const withdrawal of recentWithdrawals as any[]) {
       recentActivity.push({
-        type: 'withdrawal',
-        description: `€${withdrawal.amountEUR?.toFixed(2) || '0'} withdrawal ${withdrawal.status}`,
+        type: "withdrawal",
+        description: `€${withdrawal.amountEUR?.toFixed(2) || "0"} withdrawal ${withdrawal.status}`,
         timestamp: withdrawal.createdAt.toISOString(),
-        status: withdrawal.status === 'completed' ? 'success' : 
-               ['failed', 'rejected'].includes(withdrawal.status) ? 'error' : 'warning',
+        status:
+          withdrawal.status === "completed"
+            ? "success"
+            : ["failed", "rejected"].includes(withdrawal.status)
+              ? "error"
+              : "warning",
       });
     }
-    
-    for (const user of (recentUsers as any[])) {
+
+    for (const user of recentUsers as any[]) {
       recentActivity.push({
-        type: 'user',
+        type: "user",
         description: `New user: ${user.name || user.email}`,
         timestamp: user.createdAt.toISOString(),
-        status: 'success',
+        status: "success",
       });
     }
-    
+
     // Sort by timestamp
-    recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
+    recentActivity.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+
     // Build response
     const stats: DashboardStats = {
       users: {
@@ -434,11 +536,10 @@ export async function GET() {
 
     return NextResponse.json(stats);
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    console.error("Error fetching dashboard stats:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard stats' },
-      { status: 500 }
+      { error: "Failed to fetch dashboard stats" },
+      { status: 500 },
     );
   }
 }
-

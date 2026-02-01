@@ -3,8 +3,8 @@
  * Provides a way to update UI immediately while background refresh happens
  */
 
-import { useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface OptimisticUpdateOptions {
   // Delay before triggering server refresh (ms)
@@ -15,11 +15,11 @@ interface OptimisticUpdateOptions {
 
 /**
  * Hook that provides optimistic update capabilities
- * 
+ *
  * Usage:
  * ```tsx
  * const { triggerRefresh, scheduleRefresh } = useOptimisticUpdate();
- * 
+ *
  * // After successful action:
  * // 1. Update local state immediately (optimistic)
  * // 2. Schedule a delayed server refresh (non-blocking)
@@ -37,10 +37,10 @@ export function useOptimisticUpdate(options: OptimisticUpdateOptions = {}) {
    */
   const triggerRefresh = useCallback(() => {
     if (skipServerRefresh || isRefreshingRef.current) return;
-    
+
     isRefreshingRef.current = true;
     router.refresh();
-    
+
     // Reset flag after a short delay
     setTimeout(() => {
       isRefreshingRef.current = false;
@@ -51,19 +51,22 @@ export function useOptimisticUpdate(options: OptimisticUpdateOptions = {}) {
    * Schedule a delayed refresh (debounced)
    * Multiple calls within the delay window will only result in one refresh
    */
-  const scheduleRefresh = useCallback((delay?: number) => {
-    if (skipServerRefresh) return;
-    
-    // Clear any pending refresh
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+  const scheduleRefresh = useCallback(
+    (delay?: number) => {
+      if (skipServerRefresh) return;
 
-    timeoutRef.current = setTimeout(() => {
-      triggerRefresh();
-      timeoutRef.current = null;
-    }, delay ?? refreshDelay);
-  }, [refreshDelay, skipServerRefresh, triggerRefresh]);
+      // Clear any pending refresh
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        triggerRefresh();
+        timeoutRef.current = null;
+      }, delay ?? refreshDelay);
+    },
+    [refreshDelay, skipServerRefresh, triggerRefresh],
+  );
 
   /**
    * Cancel any pending refresh
@@ -88,11 +91,16 @@ export function useOptimisticUpdate(options: OptimisticUpdateOptions = {}) {
  * This allows components to communicate state changes without full page refreshes
  */
 export function dispatchTradingEvent(
-  eventType: 'positionOpened' | 'positionClosed' | 'positionUpdated' | 'orderPlaced' | 'tpslUpdated',
-  detail: Record<string, unknown>
+  eventType:
+    | "positionOpened"
+    | "positionClosed"
+    | "positionUpdated"
+    | "orderPlaced"
+    | "tpslUpdated",
+  detail: Record<string, unknown>,
 ) {
-  if (typeof window === 'undefined') return;
-  
+  if (typeof window === "undefined") return;
+
   window.dispatchEvent(new CustomEvent(eventType, { detail }));
 }
 
@@ -100,19 +108,23 @@ export function dispatchTradingEvent(
  * Subscribe to trading events
  */
 export function subscribeTradingEvent(
-  eventType: 'positionOpened' | 'positionClosed' | 'positionUpdated' | 'orderPlaced' | 'tpslUpdated',
-  callback: (detail: Record<string, unknown>) => void
+  eventType:
+    | "positionOpened"
+    | "positionClosed"
+    | "positionUpdated"
+    | "orderPlaced"
+    | "tpslUpdated",
+  callback: (detail: Record<string, unknown>) => void,
 ): () => void {
-  if (typeof window === 'undefined') return () => {};
-  
+  if (typeof window === "undefined") return () => {};
+
   const handler = (event: Event) => {
     callback((event as CustomEvent).detail);
   };
-  
+
   window.addEventListener(eventType, handler);
-  
+
   return () => {
     window.removeEventListener(eventType, handler);
   };
 }
-

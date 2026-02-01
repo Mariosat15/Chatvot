@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,11 +8,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   Swords,
   DollarSign,
@@ -22,8 +22,8 @@ import {
   Target,
   Zap,
   AlertTriangle,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ChallengeCreateDialogProps {
   open: boolean;
@@ -56,9 +56,9 @@ export default function ChallengeCreateDialog({
     entryFee: 10,
     duration: 60,
     startingCapital: 10000,
-    rankingMethod: 'pnl',
-    tieBreaker1: 'trades_count',
-    tieBreaker2: '',
+    rankingMethod: "pnl",
+    tieBreaker1: "trades_count",
+    tieBreaker2: "",
     minimumTrades: 1,
     disqualifyOnLiquidation: true, // Default: liquidated players lose
   });
@@ -70,7 +70,7 @@ export default function ChallengeCreateDialog({
     loading: boolean;
   }>({
     isOpen: true,
-    message: '',
+    message: "",
     loading: true,
   });
 
@@ -78,7 +78,7 @@ export default function ChallengeCreateDialog({
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/challenges/settings');
+        const res = await fetch("/api/challenges/settings");
         if (res.ok) {
           const data = await res.json();
           setSettings(data.settings);
@@ -90,21 +90,21 @@ export default function ChallengeCreateDialog({
           }));
         }
       } catch (error) {
-        console.error('Failed to fetch settings:', error);
+        console.error("Failed to fetch settings:", error);
       }
     };
 
     const fetchMarketStatus = async () => {
       try {
-        const res = await fetch('/api/trading/market-status');
+        const res = await fetch("/api/trading/market-status");
         if (res.ok) {
           const data = await res.json();
-          const isOpen = data.isOpen ?? data.status?.toLowerCase() === 'open';
+          const isOpen = data.isOpen ?? data.status?.toLowerCase() === "open";
           setMarketStatus({
             isOpen,
-            message: isOpen 
-              ? 'Forex market is open' 
-              : `Forex market is ${data.status || 'closed'}`,
+            message: isOpen
+              ? "Forex market is open"
+              : `Forex market is ${data.status || "closed"}`,
             loading: false,
           });
         } else {
@@ -112,31 +112,37 @@ export default function ChallengeCreateDialog({
           const now = new Date();
           const utcDay = now.getUTCDay();
           const utcHour = now.getUTCHours();
-          
+
           // Forex closed: Saturday all day, Sunday before 10pm UTC, Friday after 10pm UTC
-          const isClosed = utcDay === 6 || 
-            (utcDay === 0 && utcHour < 22) || 
+          const isClosed =
+            utcDay === 6 ||
+            (utcDay === 0 && utcHour < 22) ||
             (utcDay === 5 && utcHour >= 22);
-          
+
           setMarketStatus({
             isOpen: !isClosed,
-            message: isClosed ? 'Forex market is closed (Weekend)' : 'Forex market is open',
+            message: isClosed
+              ? "Forex market is closed (Weekend)"
+              : "Forex market is open",
             loading: false,
           });
         }
       } catch (error) {
-        console.error('Failed to fetch market status:', error);
+        console.error("Failed to fetch market status:", error);
         // Fallback on error
         const now = new Date();
         const utcDay = now.getUTCDay();
         const utcHour = now.getUTCHours();
-        const isClosed = utcDay === 6 || 
-          (utcDay === 0 && utcHour < 22) || 
+        const isClosed =
+          utcDay === 6 ||
+          (utcDay === 0 && utcHour < 22) ||
           (utcDay === 5 && utcHour >= 22);
-        
+
         setMarketStatus({
           isOpen: !isClosed,
-          message: isClosed ? 'Forex market is closed (Weekend)' : 'Forex market is open',
+          message: isClosed
+            ? "Forex market is closed (Weekend)"
+            : "Forex market is open",
           loading: false,
         });
       }
@@ -158,9 +164,9 @@ export default function ChallengeCreateDialog({
 
     setLoading(true);
     try {
-      const response = await fetch('/api/challenges', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/challenges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challengedId: challengedUser.userId,
           entryFee: formData.entryFee,
@@ -177,14 +183,16 @@ export default function ChallengeCreateDialog({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create challenge');
+        throw new Error(data.error || "Failed to create challenge");
       }
 
       toast.success(`Challenge sent to ${challengedUser.username}!`);
       onOpenChange(false);
-      router.push('/challenges');
+      router.push("/challenges");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to send challenge');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send challenge",
+      );
     } finally {
       setLoading(false);
     }
@@ -194,7 +202,11 @@ export default function ChallengeCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-orange-500/50 max-sm:border-0" fullScreenMobile size="sm">
+      <DialogContent
+        className="bg-gray-900 border-orange-500/50 max-sm:border-0"
+        fullScreenMobile
+        size="sm"
+      >
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Swords className="h-5 w-5 text-orange-500" />
@@ -218,7 +230,10 @@ export default function ChallengeCreateDialog({
               max={settings?.maxEntryFee || 1000}
               value={formData.entryFee}
               onChange={(e) =>
-                setFormData({ ...formData, entryFee: parseInt(e.target.value) || 0 })
+                setFormData({
+                  ...formData,
+                  entryFee: parseInt(e.target.value) || 0,
+                })
               }
               className="bg-gray-800 border-gray-600 text-white"
             />
@@ -239,7 +254,10 @@ export default function ChallengeCreateDialog({
               max={settings?.maxDurationMinutes || 1440}
               value={formData.duration}
               onChange={(e) =>
-                setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })
+                setFormData({
+                  ...formData,
+                  duration: parseInt(e.target.value) || 60,
+                })
               }
               className="bg-gray-800 border-gray-600 text-white"
             />
@@ -251,8 +269,8 @@ export default function ChallengeCreateDialog({
                   onClick={() => setFormData({ ...formData, duration: mins })}
                   className={`px-3 py-1 text-xs rounded-full ${
                     formData.duration === mins
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                   }`}
                 >
                   {mins < 60 ? `${mins}m` : `${mins / 60}h`}
@@ -303,7 +321,9 @@ export default function ChallengeCreateDialog({
               </select>
             </div>
             <div className="space-y-2">
-              <Label className="text-gray-300 text-sm">Tiebreaker 2 (Optional)</Label>
+              <Label className="text-gray-300 text-sm">
+                Tiebreaker 2 (Optional)
+              </Label>
               <select
                 value={formData.tieBreaker2}
                 onChange={(e) =>
@@ -334,7 +354,10 @@ export default function ChallengeCreateDialog({
               max={100}
               value={formData.minimumTrades}
               onChange={(e) =>
-                setFormData({ ...formData, minimumTrades: Math.max(1, parseInt(e.target.value) || 1) })
+                setFormData({
+                  ...formData,
+                  minimumTrades: Math.max(1, parseInt(e.target.value) || 1),
+                })
               }
               className="bg-gray-800 border-gray-600 text-white"
             />
@@ -349,10 +372,13 @@ export default function ChallengeCreateDialog({
               <Label className="text-gray-300 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-400" />
                 Disqualify on Liquidation
-                <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded">LOCKED</span>
+                <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded">
+                  LOCKED
+                </span>
               </Label>
               <p className="text-xs text-gray-500 mt-1">
-                If a player gets liquidated, they automatically lose (always enabled for 1v1 challenges)
+                If a player gets liquidated, they automatically lose (always
+                enabled for 1v1 challenges)
               </p>
             </div>
             <div
@@ -377,7 +403,9 @@ export default function ChallengeCreateDialog({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-gray-400">
                 <span>Platform Fee ({platformFee}%)</span>
-                <span className="text-red-400">-{platformFeeAmount} credits</span>
+                <span className="text-red-400">
+                  -{platformFeeAmount} credits
+                </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-700">
                 <span className="text-white font-semibold flex items-center gap-1">
@@ -397,10 +425,14 @@ export default function ChallengeCreateDialog({
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-red-400">Market Closed</p>
+                  <p className="text-sm font-semibold text-red-400">
+                    Market Closed
+                  </p>
                   <p className="text-xs text-red-300 mt-1">
-                    {marketStatus.message || 'Forex market is currently closed.'}
-                    {' '}Challenges cannot be created while the market is closed because trading is not available.
+                    {marketStatus.message ||
+                      "Forex market is currently closed."}{" "}
+                    Challenges cannot be created while the market is closed
+                    because trading is not available.
                   </p>
                 </div>
               </div>
@@ -410,8 +442,11 @@ export default function ChallengeCreateDialog({
           {/* Warning */}
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <p className="text-xs text-yellow-300">
-              ⚠️ Credits will only be deducted if {challengedUser.username} accepts the challenge.
-              Both players need at least {formData.minimumTrades} trade{formData.minimumTrades > 1 ? 's' : ''} to qualify - otherwise they get disqualified!
+              ⚠️ Credits will only be deducted if {challengedUser.username}{" "}
+              accepts the challenge. Both players need at least{" "}
+              {formData.minimumTrades} trade
+              {formData.minimumTrades > 1 ? "s" : ""} to qualify - otherwise
+              they get disqualified!
             </p>
           </div>
         </div>
@@ -446,4 +481,3 @@ export default function ChallengeCreateDialog({
     </Dialog>
   );
 }
-

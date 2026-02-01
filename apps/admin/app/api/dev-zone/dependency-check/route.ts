@@ -1,17 +1,17 @@
 /**
  * Dependency Check API
- * 
+ *
  * Checks for outdated npm dependencies and uses AI to analyze
  * potential breaking changes and compatibility issues.
  */
 
-import { NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import OpenAI from 'openai';
-import { connectToDatabase } from '@/database/mongoose';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { exec } from "child_process";
+import { promisify } from "util";
+import OpenAI from "openai";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 const execAsync = promisify(exec);
 
@@ -21,10 +21,10 @@ interface OutdatedPackage {
   wanted: string;
   latest: string;
   location: string;
-  type: 'dependencies' | 'devDependencies';
+  type: "dependencies" | "devDependencies";
   isBreaking: boolean;
   aiAnalysis?: {
-    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    riskLevel: "low" | "medium" | "high" | "critical";
     summary: string;
     breakingChanges: string[];
     recommendations: string[];
@@ -48,25 +48,29 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 /**
  * Get OpenAI configuration
  */
-async function getOpenAIConfig(): Promise<{ apiKey: string | null; model: string; enabled: boolean }> {
+async function getOpenAIConfig(): Promise<{
+  apiKey: string | null;
+  model: string;
+  enabled: boolean;
+}> {
   try {
     await connectToDatabase();
     const settings = await WhiteLabel.findOne();
     if (settings?.openaiApiKey && settings?.openaiEnabled) {
       return {
         apiKey: settings.openaiApiKey,
-        model: settings.openaiModel || 'gpt-4o-mini',
+        model: settings.openaiModel || "gpt-4o-mini",
         enabled: true,
       };
     }
   } catch (error) {
-    console.log('AI config not found in database');
+    console.log("AI config not found in database");
   }
 
   // Fallback to environment
   return {
     apiKey: process.env.OPENAI_API_KEY || null,
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     enabled: !!process.env.OPENAI_API_KEY,
   };
 }
@@ -78,7 +82,7 @@ async function getOutdatedPackages(): Promise<OutdatedPackage[]> {
   try {
     // Run npm outdated in JSON format
     // Note: npm outdated returns exit code 1 if there are outdated packages
-    const { stdout } = await execAsync('npm outdated --json', {
+    const { stdout } = await execAsync("npm outdated --json", {
       cwd: process.cwd(),
     }).catch((error) => {
       // npm outdated returns exit code 1 when packages are outdated
@@ -88,7 +92,7 @@ async function getOutdatedPackages(): Promise<OutdatedPackage[]> {
       throw error;
     });
 
-    if (!stdout || stdout.trim() === '') {
+    if (!stdout || stdout.trim() === "") {
       return [];
     }
 
@@ -105,17 +109,18 @@ async function getOutdatedPackages(): Promise<OutdatedPackage[]> {
       };
 
       // Determine if it's a major version change (breaking)
-      const currentMajor = parseInt(pkg.current?.split('.')[0] || '0');
-      const latestMajor = parseInt(pkg.latest?.split('.')[0] || '0');
+      const currentMajor = parseInt(pkg.current?.split(".")[0] || "0");
+      const latestMajor = parseInt(pkg.latest?.split(".")[0] || "0");
       const isBreaking = latestMajor > currentMajor;
 
       packages.push({
         name,
-        current: pkg.current || 'unknown',
-        wanted: pkg.wanted || 'unknown',
-        latest: pkg.latest || 'unknown',
-        location: pkg.location || '',
-        type: (pkg.type as 'dependencies' | 'devDependencies') || 'dependencies',
+        current: pkg.current || "unknown",
+        wanted: pkg.wanted || "unknown",
+        latest: pkg.latest || "unknown",
+        location: pkg.location || "",
+        type:
+          (pkg.type as "dependencies" | "devDependencies") || "dependencies",
         isBreaking,
       });
     }
@@ -128,7 +133,7 @@ async function getOutdatedPackages(): Promise<OutdatedPackage[]> {
 
     return packages;
   } catch (error) {
-    console.error('Error checking outdated packages:', error);
+    console.error("Error checking outdated packages:", error);
     return [];
   }
 }
@@ -139,15 +144,15 @@ async function getOutdatedPackages(): Promise<OutdatedPackage[]> {
 async function analyzePackageWithAI(
   openai: OpenAI,
   model: string,
-  pkg: OutdatedPackage
-): Promise<OutdatedPackage['aiAnalysis']> {
+  pkg: OutdatedPackage,
+): Promise<OutdatedPackage["aiAnalysis"]> {
   try {
     const prompt = `Analyze this npm package update for a Next.js 14+ web application:
 
 Package: ${pkg.name}
 Current Version: ${pkg.current}
 Latest Version: ${pkg.latest}
-Is Major Version Change: ${pkg.isBreaking ? 'Yes' : 'No'}
+Is Major Version Change: ${pkg.isBreaking ? "Yes" : "No"}
 
 Please provide a concise analysis in JSON format:
 {
@@ -170,11 +175,12 @@ Return ONLY the JSON, no additional text.`;
       model,
       messages: [
         {
-          role: 'system',
-          content: 'You are a senior developer expert in npm packages, JavaScript/TypeScript, and Next.js. Provide accurate, concise analysis of package updates.',
+          role: "system",
+          content:
+            "You are a senior developer expert in npm packages, JavaScript/TypeScript, and Next.js. Provide accurate, concise analysis of package updates.",
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
@@ -188,11 +194,11 @@ Return ONLY the JSON, no additional text.`;
     // Parse JSON response
     const analysis = JSON.parse(content.trim());
     return {
-      riskLevel: analysis.riskLevel || 'medium',
-      summary: analysis.summary || 'No summary available',
+      riskLevel: analysis.riskLevel || "medium",
+      summary: analysis.summary || "No summary available",
       breakingChanges: analysis.breakingChanges || [],
       recommendations: analysis.recommendations || [],
-      estimatedEffort: analysis.estimatedEffort || 'Unknown',
+      estimatedEffort: analysis.estimatedEffort || "Unknown",
     };
   } catch (error) {
     console.error(`Error analyzing ${pkg.name} with AI:`, error);
@@ -208,7 +214,7 @@ export async function GET() {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check cache
@@ -218,7 +224,7 @@ export async function GET() {
 
     // Get outdated packages
     const packages = await getOutdatedPackages();
-    
+
     // Get AI config
     const aiConfig = await getOpenAIConfig();
 
@@ -235,10 +241,10 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error checking dependencies:', error);
+    console.error("Error checking dependencies:", error);
     return NextResponse.json(
-      { error: 'Failed to check dependencies' },
-      { status: 500 }
+      { error: "Failed to check dependencies" },
+      { status: 500 },
     );
   }
 }
@@ -251,7 +257,7 @@ export async function POST(request: Request) {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -261,8 +267,11 @@ export async function POST(request: Request) {
     const aiConfig = await getOpenAIConfig();
     if (!aiConfig.enabled || !aiConfig.apiKey) {
       return NextResponse.json(
-        { error: 'AI is not configured. Please set up OpenAI in Platform Settings.' },
-        { status: 400 }
+        {
+          error:
+            "AI is not configured. Please set up OpenAI in Platform Settings.",
+        },
+        { status: 400 },
       );
     }
 
@@ -279,10 +288,14 @@ export async function POST(request: Request) {
     if (analyzeAll) {
       // Analyze all packages (limit to 10 to avoid rate limits)
       const toAnalyze = packages.slice(0, 10);
-      
+
       for (const pkg of toAnalyze) {
         if (!pkg.aiAnalysis) {
-          pkg.aiAnalysis = await analyzePackageWithAI(openai, aiConfig.model, pkg);
+          pkg.aiAnalysis = await analyzePackageWithAI(
+            openai,
+            aiConfig.model,
+            pkg,
+          );
         }
       }
 
@@ -303,8 +316,8 @@ export async function POST(request: Request) {
       const pkg = packages.find((p) => p.name === packageName);
       if (!pkg) {
         return NextResponse.json(
-          { error: 'Package not found in outdated list' },
-          { status: 404 }
+          { error: "Package not found in outdated list" },
+          { status: 404 },
         );
       }
 
@@ -312,7 +325,9 @@ export async function POST(request: Request) {
 
       // Update cache
       if (cachedResult) {
-        const idx = cachedResult.packages.findIndex((p) => p.name === packageName);
+        const idx = cachedResult.packages.findIndex(
+          (p) => p.name === packageName,
+        );
         if (idx >= 0) {
           cachedResult.packages[idx] = pkg;
         }
@@ -321,12 +336,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ package: pkg });
     }
 
-    return NextResponse.json({ error: 'Missing packageName or analyzeAll flag' }, { status: 400 });
-  } catch (error) {
-    console.error('Error analyzing package:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze package' },
-      { status: 500 }
+      { error: "Missing packageName or analyzeAll flag" },
+      { status: 400 },
+    );
+  } catch (error) {
+    console.error("Error analyzing package:", error);
+    return NextResponse.json(
+      { error: "Failed to analyze package" },
+      { status: 500 },
     );
   }
 }
@@ -339,15 +357,17 @@ export async function DELETE() {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     cachedResult = null;
     cacheTime = 0;
 
-    return NextResponse.json({ success: true, message: 'Cache cleared' });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to clear cache' }, { status: 500 });
+    return NextResponse.json({ success: true, message: "Cache cleared" });
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to clear cache" },
+      { status: 500 },
+    );
   }
 }
-

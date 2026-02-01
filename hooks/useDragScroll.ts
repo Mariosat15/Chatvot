@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect } from "react";
 
 /**
  * Hook for drag-to-scroll functionality
  * Replaces ugly scrollbars with smooth dragging
  * Supports both horizontal and vertical scrolling
  */
-export function useDragScroll<T extends HTMLElement>(options?: { 
-  direction?: 'horizontal' | 'vertical' | 'both';
+export function useDragScroll<T extends HTMLElement>(options?: {
+  direction?: "horizontal" | "vertical" | "both";
   speed?: number;
 }) {
   const ref = useRef<T>(null);
@@ -17,8 +17,8 @@ export function useDragScroll<T extends HTMLElement>(options?: {
   const startYRef = useRef(0);
   const scrollLeftRef = useRef(0);
   const scrollTopRef = useRef(0);
-  
-  const direction = options?.direction ?? 'both';
+
+  const direction = options?.direction ?? "both";
   const speed = options?.speed ?? 1.5;
 
   useEffect(() => {
@@ -31,15 +31,15 @@ export function useDragScroll<T extends HTMLElement>(options?: {
       if (target.closest('button, a, input, select, [role="button"], svg')) {
         return;
       }
-      
+
       isDraggingRef.current = true;
       startXRef.current = e.clientX;
       startYRef.current = e.clientY;
       scrollLeftRef.current = element.scrollLeft;
       scrollTopRef.current = element.scrollTop;
-      element.style.cursor = 'grabbing';
-      element.style.userSelect = 'none';
-      
+      element.style.cursor = "grabbing";
+      element.style.userSelect = "none";
+
       // Prevent text selection while dragging
       e.preventDefault();
     };
@@ -48,21 +48,21 @@ export function useDragScroll<T extends HTMLElement>(options?: {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       if (element) {
-        element.style.cursor = 'grab';
-        element.style.userSelect = '';
+        element.style.cursor = "grab";
+        element.style.userSelect = "";
       }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDraggingRef.current) return;
       e.preventDefault();
-      
-      if (direction === 'horizontal' || direction === 'both') {
+
+      if (direction === "horizontal" || direction === "both") {
         const deltaX = e.clientX - startXRef.current;
         element.scrollLeft = scrollLeftRef.current - deltaX * speed;
       }
-      
-      if (direction === 'vertical' || direction === 'both') {
+
+      if (direction === "vertical" || direction === "both") {
         const deltaY = e.clientY - startYRef.current;
         element.scrollTop = scrollTopRef.current - deltaY * speed;
       }
@@ -73,28 +73,29 @@ export function useDragScroll<T extends HTMLElement>(options?: {
     };
 
     // Set initial cursor and hide scrollbars
-    element.style.cursor = 'grab';
-    element.style.scrollbarWidth = 'none'; // Firefox
-    (element.style as CSSStyleDeclaration & { msOverflowStyle: string }).msOverflowStyle = 'none'; // IE/Edge
-    
+    element.style.cursor = "grab";
+    element.style.scrollbarWidth = "none"; // Firefox
+    (
+      element.style as CSSStyleDeclaration & { msOverflowStyle: string }
+    ).msOverflowStyle = "none"; // IE/Edge
+
     // Add class for webkit scrollbar hiding (Chrome, Safari)
-    element.classList.add('hide-scrollbar');
+    element.classList.add("hide-scrollbar");
 
     // Add event listeners
-    element.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousemove', handleMouseMove);
-    element.addEventListener('mouseleave', handleMouseLeave);
+    element.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mousemove", handleMouseMove);
+    element.addEventListener("mouseleave", handleMouseLeave);
 
     return () => {
-      element.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousemove', handleMouseMove);
-      element.removeEventListener('mouseleave', handleMouseLeave);
-      element.classList.remove('hide-scrollbar');
+      element.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove);
+      element.removeEventListener("mouseleave", handleMouseLeave);
+      element.classList.remove("hide-scrollbar");
     };
   }, [direction, speed]);
 
   return ref;
 }
-

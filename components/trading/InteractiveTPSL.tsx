@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import EditPositionModal from './EditPositionModal';
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import EditPositionModal from "./EditPositionModal";
 
-import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 
 interface Position {
   _id: string;
   symbol: ForexSymbol;
-  side: 'long' | 'short';
+  side: "long" | "short";
   quantity: number;
   entryPrice: number;
   currentPrice: number;
@@ -39,23 +39,26 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
   const isRefreshingRef = useRef(false);
 
   // Debounced refresh to prevent multiple rapid refreshes
-  const scheduleRefresh = useCallback((delay: number = 300) => {
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
-    }
-    
-    refreshTimeoutRef.current = setTimeout(() => {
-      if (!isRefreshingRef.current) {
-        isRefreshingRef.current = true;
-        router.refresh();
-        // Reset flag after a short delay to allow next refresh
-        setTimeout(() => {
-          isRefreshingRef.current = false;
-        }, 500);
+  const scheduleRefresh = useCallback(
+    (delay: number = 300) => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
       }
-      refreshTimeoutRef.current = null;
-    }, delay);
-  }, [router]);
+
+      refreshTimeoutRef.current = setTimeout(() => {
+        if (!isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          router.refresh();
+          // Reset flag after a short delay to allow next refresh
+          setTimeout(() => {
+            isRefreshingRef.current = false;
+          }, 500);
+        }
+        refreshTimeoutRef.current = null;
+      }, delay);
+    },
+    [router],
+  );
 
   // Monitor position changes - using ref to avoid triggering effect on every render
   useEffect(() => {
@@ -78,19 +81,19 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
 
     const handleTPSLUpdated = () => {
       scheduleRefresh(300);
-      toast.success('TP/SL updated!', {
-        description: 'Your changes are now visible on the chart',
+      toast.success("TP/SL updated!", {
+        description: "Your changes are now visible on the chart",
       });
     };
 
-    window.addEventListener('orderPlaced', handleOrderPlaced);
-    window.addEventListener('positionOpened', handlePositionOpened);
-    window.addEventListener('tpslUpdated', handleTPSLUpdated);
-    
+    window.addEventListener("orderPlaced", handleOrderPlaced);
+    window.addEventListener("positionOpened", handlePositionOpened);
+    window.addEventListener("tpslUpdated", handleTPSLUpdated);
+
     return () => {
-      window.removeEventListener('orderPlaced', handleOrderPlaced);
-      window.removeEventListener('positionOpened', handlePositionOpened);
-      window.removeEventListener('tpslUpdated', handleTPSLUpdated);
+      window.removeEventListener("orderPlaced", handleOrderPlaced);
+      window.removeEventListener("positionOpened", handlePositionOpened);
+      window.removeEventListener("tpslUpdated", handleTPSLUpdated);
       // Clear any pending timeouts
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
@@ -98,8 +101,8 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
     };
   }, [scheduleRefresh]);
 
-  const positionToEdit = editingPosition 
-    ? positions.find(p => p._id === editingPosition) 
+  const positionToEdit = editingPosition
+    ? positions.find((p) => p._id === editingPosition)
     : null;
 
   return (
@@ -114,27 +117,28 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
           }}
           onSuccess={(updatedData) => {
             // Trigger refresh event with updated data for immediate UI update
-            window.dispatchEvent(new CustomEvent('tpslUpdated', {
-              detail: {
-                positionId: positionToEdit._id,
-                takeProfit: updatedData.takeProfit,
-                stopLoss: updatedData.stopLoss
-              }
-            }));
+            window.dispatchEvent(
+              new CustomEvent("tpslUpdated", {
+                detail: {
+                  positionId: positionToEdit._id,
+                  takeProfit: updatedData.takeProfit,
+                  stopLoss: updatedData.stopLoss,
+                },
+              }),
+            );
           }}
           position={positionToEdit}
         />
       )}
-      
+
       {/* Hidden helper for external components to trigger edit */}
-      <div 
-        id="tpsl-edit-trigger" 
+      <div
+        id="tpsl-edit-trigger"
         data-position-id={editingPosition}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
       />
     </>
   );
 };
 
 export default InteractiveTPSL;
-

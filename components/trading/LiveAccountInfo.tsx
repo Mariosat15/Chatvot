@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { AccountInfoPanel } from './AccountInfoPanel';
-import { usePrices } from '@/contexts/PriceProvider';
-import { calculateUnrealizedPnL, type ForexSymbol } from '@/lib/services/pnl-calculator.service';
-import { useTradingMode } from './TradingInterface';
-import { executeLiquidation, backupMarginCheck } from '@/lib/actions/trading/liquidation.actions';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { AccountInfoPanel } from "./AccountInfoPanel";
+import { usePrices } from "@/contexts/PriceProvider";
+import {
+  calculateUnrealizedPnL,
+  type ForexSymbol,
+} from "@/lib/services/pnl-calculator.service";
+import { useTradingMode } from "./TradingInterface";
+import {
+  executeLiquidation,
+  backupMarginCheck,
+} from "@/lib/actions/trading/liquidation.actions";
+import { useRouter } from "next/navigation";
 
 // Default margin thresholds (will be overridden by server values)
 const DEFAULT_THRESHOLDS = {
@@ -22,7 +28,7 @@ const BACKUP_CHECK_INTERVAL = 60000; // 60 seconds - safety net backup check
 interface Position {
   _id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   quantity: number;
   entryPrice: number;
   currentPrice: number;
@@ -63,17 +69,22 @@ export function LiveAccountInfo({
   const { prices } = usePrices();
   const { mode } = useTradingMode();
   const router = useRouter();
-  
+
   // Thresholds from props or defaults
   const thresholds = marginThresholds || DEFAULT_THRESHOLDS;
-  
+
   // Live-updating state
   const [liveEquity, setLiveEquity] = useState(initialEquity);
-  const [liveUnrealizedPnl, setLiveUnrealizedPnl] = useState(initialUnrealizedPnl);
-  const [liveAvailableCapital, setLiveAvailableCapital] = useState(initialAvailableCapital);
-  
+  const [liveUnrealizedPnl, setLiveUnrealizedPnl] =
+    useState(initialUnrealizedPnl);
+  const [liveAvailableCapital, setLiveAvailableCapital] = useState(
+    initialAvailableCapital,
+  );
+
   // Liquidation state management
-  const [liquidationState, setLiquidationState] = useState<'idle' | 'pending' | 'executing' | 'completed'>('idle');
+  const [liquidationState, setLiquidationState] = useState<
+    "idle" | "pending" | "executing" | "completed"
+  >("idle");
   const liquidationRequestedRef = useRef(false); // Prevents duplicate requests
   const lastBackupCheckRef = useRef<number>(0);
   const backupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -82,9 +93,9 @@ export function LiveAccountInfo({
   const calculatedData = useMemo(() => {
     // No positions = infinite margin (safe)
     if (initialPositions.length === 0) {
-      return { 
-        totalUnrealizedPnl: 0, 
-        newEquity: initialBalance, 
+      return {
+        totalUnrealizedPnl: 0,
+        newEquity: initialBalance,
         newAvailableCapital: initialBalance - initialUsedMargin,
         marginLevel: Infinity,
         isBelowLiquidation: false,
@@ -105,13 +116,14 @@ export function LiveAccountInfo({
       }
 
       // Use correct price based on position side (bid for longs, ask for shorts)
-      const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+      const marketPrice =
+        position.side === "long" ? currentPrice.bid : currentPrice.ask;
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
-        position.symbol as ForexSymbol
+        position.symbol as ForexSymbol,
       );
 
       totalUnrealizedPnl += pnl;
@@ -119,26 +131,32 @@ export function LiveAccountInfo({
 
     const newEquity = initialBalance + totalUnrealizedPnl;
     const newAvailableCapital = Math.max(0, newEquity - initialUsedMargin);
-    
+
     // FORMULA: Margin Level = (Equity / Used Margin) * 100
-    const marginLevel = initialUsedMargin > 0 
-      ? (newEquity / initialUsedMargin) * 100 
-      : Infinity;
-    
+    const marginLevel =
+      initialUsedMargin > 0 ? (newEquity / initialUsedMargin) * 100 : Infinity;
+
     // Check thresholds
     const isBelowLiquidation = marginLevel < thresholds.LIQUIDATION;
     const isBelowMarginCall = marginLevel < thresholds.MARGIN_CALL;
 
-    return { 
-      totalUnrealizedPnl, 
-      newEquity, 
-      newAvailableCapital, 
+    return {
+      totalUnrealizedPnl,
+      newEquity,
+      newAvailableCapital,
       marginLevel,
       isBelowLiquidation,
       isBelowMarginCall,
       hasAllPrices,
     };
-  }, [prices, initialPositions, initialBalance, initialUsedMargin, thresholds.LIQUIDATION, thresholds.MARGIN_CALL]);
+  }, [
+    prices,
+    initialPositions,
+    initialBalance,
+    initialUsedMargin,
+    thresholds.LIQUIDATION,
+    thresholds.MARGIN_CALL,
+  ]);
 
   // Update display state when calculations change
   useEffect(() => {
@@ -151,7 +169,7 @@ export function LiveAccountInfo({
   // When local calculation shows margin below liquidation threshold, execute immediately
   const triggerLiquidation = useCallback(async () => {
     // Guard: Prevent duplicate requests
-    if (liquidationRequestedRef.current || liquidationState !== 'idle') {
+    if (liquidationRequestedRef.current || liquidationState !== "idle") {
       return;
     }
 
@@ -162,32 +180,45 @@ export function LiveAccountInfo({
 
     // Mark as requested to prevent duplicates
     liquidationRequestedRef.current = true;
-    setLiquidationState('pending');
+    setLiquidationState("pending");
 
     try {
-      setLiquidationState('executing');
-      
+      setLiquidationState("executing");
+
       // Call server to validate and execute liquidation
-      const result = await executeLiquidation(competitionId, calculatedData.marginLevel);
-      
+      const result = await executeLiquidation(
+        competitionId,
+        calculatedData.marginLevel,
+      );
+
       if (result.liquidated) {
-        setLiquidationState('completed');
+        setLiquidationState("completed");
         // Refresh to show updated positions
         router.refresh();
       } else {
         // Server rejected liquidation (margin was okay server-side)
-        setLiquidationState('idle');
+        setLiquidationState("idle");
         liquidationRequestedRef.current = false;
       }
     } catch {
-      setLiquidationState('idle');
+      setLiquidationState("idle");
       liquidationRequestedRef.current = false;
     }
-  }, [competitionId, calculatedData.marginLevel, initialPositions.length, liquidationState, router]);
+  }, [
+    competitionId,
+    calculatedData.marginLevel,
+    initialPositions.length,
+    liquidationState,
+    router,
+  ]);
 
   // TRIGGER: When margin drops below liquidation threshold
   useEffect(() => {
-    if (calculatedData.isBelowLiquidation && liquidationState === 'idle' && !liquidationRequestedRef.current) {
+    if (
+      calculatedData.isBelowLiquidation &&
+      liquidationState === "idle" &&
+      !liquidationRequestedRef.current
+    ) {
       triggerLiquidation();
     }
   }, [calculatedData.isBelowLiquidation, liquidationState, triggerLiquidation]);
@@ -199,8 +230,9 @@ export function LiveAccountInfo({
 
     const runBackupCheck = async () => {
       // Don't run if already liquidating
-      if (liquidationState !== 'idle' || liquidationRequestedRef.current) return;
-      
+      if (liquidationState !== "idle" || liquidationRequestedRef.current)
+        return;
+
       const now = Date.now();
       // Throttle to prevent excessive calls
       if (now - lastBackupCheckRef.current < BACKUP_CHECK_INTERVAL) return;
@@ -208,7 +240,7 @@ export function LiveAccountInfo({
 
       try {
         const result = await backupMarginCheck(competitionId);
-        
+
         if (result.needsLiquidation && !liquidationRequestedRef.current) {
           triggerLiquidation();
         }
@@ -221,7 +253,10 @@ export function LiveAccountInfo({
     const timeoutId = setTimeout(runBackupCheck, 5000);
 
     // Then run every 60 seconds
-    backupIntervalRef.current = setInterval(runBackupCheck, BACKUP_CHECK_INTERVAL);
+    backupIntervalRef.current = setInterval(
+      runBackupCheck,
+      BACKUP_CHECK_INTERVAL,
+    );
 
     return () => {
       clearTimeout(timeoutId);
@@ -229,13 +264,18 @@ export function LiveAccountInfo({
         clearInterval(backupIntervalRef.current);
       }
     };
-  }, [competitionId, initialPositions.length, liquidationState, triggerLiquidation]);
+  }, [
+    competitionId,
+    initialPositions.length,
+    liquidationState,
+    triggerLiquidation,
+  ]);
 
   // Reset liquidation state when positions change (after liquidation completes)
   useEffect(() => {
-    if (initialPositions.length === 0 && liquidationState === 'completed') {
+    if (initialPositions.length === 0 && liquidationState === "completed") {
       // All positions closed, reset state for next time
-      setLiquidationState('idle');
+      setLiquidationState("idle");
       liquidationRequestedRef.current = false;
     }
   }, [initialPositions.length, liquidationState]);

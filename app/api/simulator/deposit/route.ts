@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 /**
  * POST /api/simulator/deposit
@@ -10,13 +10,13 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
  */
 export async function POST(request: NextRequest) {
   // Only allow in development or with simulator mode header
-  const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
-  const isDev = process.env.NODE_ENV === 'development';
+  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
+  const isDev = process.env.NODE_ENV === "development";
 
   if (!isSimulatorMode && !isDev) {
     return NextResponse.json(
-      { success: false, error: 'Simulator mode not enabled' },
-      { status: 403 }
+      { success: false, error: "Simulator mode not enabled" },
+      { status: 403 },
     );
   }
 
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
 
     if (!userId || amount === undefined) {
       return NextResponse.json(
-        { success: false, error: 'userId and amount are required' },
-        { status: 400 }
+        { success: false, error: "userId and amount are required" },
+        { status: 400 },
       );
     }
 
@@ -41,21 +41,26 @@ export async function POST(request: NextRequest) {
       // Find or create wallet
       let wallet = await CreditWallet.findOne({ userId }).session(mongoSession);
       const balanceBefore = wallet?.creditBalance || 0;
-      
+
       if (!wallet) {
-        [wallet] = await CreditWallet.create([{
-          userId,
-          creditBalance: 0,
-          totalDeposited: 0,
-          totalWithdrawn: 0,
-          totalSpentOnCompetitions: 0,
-          totalWonFromCompetitions: 0,
-          totalSpentOnChallenges: 0,
-          totalWonFromChallenges: 0,
-          isActive: true,
-          kycVerified: false,
-          withdrawalEnabled: false,
-        }], { session: mongoSession });
+        [wallet] = await CreditWallet.create(
+          [
+            {
+              userId,
+              creditBalance: 0,
+              totalDeposited: 0,
+              totalWithdrawn: 0,
+              totalSpentOnCompetitions: 0,
+              totalWonFromCompetitions: 0,
+              totalSpentOnChallenges: 0,
+              totalWonFromChallenges: 0,
+              isActive: true,
+              kycVerified: false,
+              withdrawalEnabled: false,
+            },
+          ],
+          { session: mongoSession },
+        );
       }
 
       // Add credits
@@ -64,36 +69,49 @@ export async function POST(request: NextRequest) {
       await wallet.save({ session: mongoSession });
 
       // Create transaction record
-      const [transaction] = await WalletTransaction.create([{
-        userId,
-        transactionType: 'deposit',
-        amount,
-        balanceBefore,
-        balanceAfter: wallet.creditBalance,
-        currency: 'EUR',
-        exchangeRate: 1,
-        status: 'completed',
-        description: 'Simulator deposit',
-        processedAt: new Date(),
-        metadata: {
-          simulatorMode: true,
-        },
-      }], { session: mongoSession });
+      const [transaction] = await WalletTransaction.create(
+        [
+          {
+            userId,
+            transactionType: "deposit",
+            amount,
+            balanceBefore,
+            balanceAfter: wallet.creditBalance,
+            currency: "EUR",
+            exchangeRate: 1,
+            status: "completed",
+            description: "Simulator deposit",
+            processedAt: new Date(),
+            metadata: {
+              simulatorMode: true,
+            },
+          },
+        ],
+        { session: mongoSession },
+      );
 
       // Commit transaction
       await mongoSession.commitTransaction();
       mongoSession.endSession();
 
       // Trigger badge evaluation after deposit
-      console.log(`🏅 Triggering badge evaluation for user ${userId} after simulator deposit...`);
+      console.log(
+        `🏅 Triggering badge evaluation for user ${userId} after simulator deposit...`,
+      );
       try {
-        const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+        const { evaluateUserBadges } =
+          await import("@/lib/services/badge-evaluation.service");
         const result = await evaluateUserBadges(userId);
         if (result.newBadges.length > 0) {
-          console.log(`🏅 User earned ${result.newBadges.length} new badges after simulator deposit`);
+          console.log(
+            `🏅 User earned ${result.newBadges.length} new badges after simulator deposit`,
+          );
         }
       } catch (badgeError) {
-        console.error('❌ Error evaluating badges after simulator deposit:', badgeError);
+        console.error(
+          "❌ Error evaluating badges after simulator deposit:",
+          badgeError,
+        );
       }
 
       return NextResponse.json({
@@ -109,10 +127,13 @@ export async function POST(request: NextRequest) {
       throw txError;
     }
   } catch (error) {
-    console.error('Simulator deposit error:', error);
+    console.error("Simulator deposit error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
     );
   }
 }

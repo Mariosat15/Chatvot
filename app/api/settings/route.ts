@@ -1,33 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import AppSettings from '@/database/models/app-settings.model';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import AppSettings from "@/database/models/app-settings.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 // Disable Next.js caching for this route
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // GET - Fetch app settings (public endpoint)
 export async function GET() {
   try {
     await connectToDatabase();
-    
-    let settings = await AppSettings.findById('app-settings');
-    
+
+    let settings = await AppSettings.findById("app-settings");
+
     // Create default settings if none exist
     if (!settings) {
       settings = await AppSettings.create({
-        _id: 'app-settings',
+        _id: "app-settings",
         currency: {
-          code: 'EUR',
-          symbol: '€',
-          name: 'Euro',
+          code: "EUR",
+          symbol: "€",
+          name: "Euro",
           exchangeRateToEUR: 1.0,
         },
         credits: {
-          name: 'Volt Credits',
-          symbol: '⚡',
-          icon: 'zap',
+          name: "Volt Credits",
+          symbol: "⚡",
+          icon: "zap",
           valueInEUR: 1.0,
           showEUREquivalent: true,
           decimals: 2,
@@ -38,47 +38,56 @@ export async function GET() {
           withdrawalFeePercentage: 2,
         },
         branding: {
-          primaryColor: '#EAB308',
-          accentColor: '#F59E0B',
+          primaryColor: "#EAB308",
+          accentColor: "#F59E0B",
         },
       });
     }
-    
+
     // Also fetch WhiteLabel settings for branding assets (no cache)
     const whiteLabel = await WhiteLabel.findOne().lean();
-    
-    console.log('[Settings API] WhiteLabel appLogo from DB:', whiteLabel?.appLogo);
-    
+
+    console.log(
+      "[Settings API] WhiteLabel appLogo from DB:",
+      whiteLabel?.appLogo,
+    );
+
     // Merge branding assets into settings
     const mergedSettings = {
       ...JSON.parse(JSON.stringify(settings)),
       branding: {
         ...JSON.parse(JSON.stringify(settings)).branding,
-        appLogo: whiteLabel?.appLogo || '/assets/images/logo.png',
-        emailLogo: whiteLabel?.emailLogo || '/assets/images/logo.png',
-        favicon: whiteLabel?.favicon || '/favicon.ico',
-        profileImage: whiteLabel?.profileImage || '/assets/images/PROFILE.png',
-      }
+        appLogo: whiteLabel?.appLogo || "/assets/images/logo.png",
+        emailLogo: whiteLabel?.emailLogo || "/assets/images/logo.png",
+        favicon: whiteLabel?.favicon || "/favicon.ico",
+        profileImage: whiteLabel?.profileImage || "/assets/images/PROFILE.png",
+      },
     };
-    
-    console.log('[Settings API] Returning appLogo:', mergedSettings.branding.appLogo);
-    
-    return NextResponse.json({
-      success: true,
-      settings: mergedSettings,
-    }, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching app settings:', error);
+
+    console.log(
+      "[Settings API] Returning appLogo:",
+      mergedSettings.branding.appLogo,
+    );
+
     return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
+      {
+        success: true,
+        settings: mergedSettings,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    );
+  } catch (error) {
+    console.error("Error fetching app settings:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch settings" },
+      { status: 500 },
     );
   }
 }
-

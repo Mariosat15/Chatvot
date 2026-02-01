@@ -1,12 +1,26 @@
-import { connectToDatabase } from '@/database/mongoose';
-import MarketSettings, { IMarketSettings, IMarketHoliday } from '@/database/models/market-settings.model';
-import { getMarketStatusFromAPI, isForexMarketOpen as isForexMarketOpenAPI } from './real-forex-prices.service';
+import { connectToDatabase } from "@/database/mongoose";
+import MarketSettings, {
+  IMarketSettings,
+  IMarketHoliday,
+} from "@/database/models/market-settings.model";
+import {
+  getMarketStatusFromAPI,
+  isForexMarketOpen as isForexMarketOpenAPI,
+} from "./real-forex-prices.service";
 
-type AssetClass = 'forex' | 'crypto' | 'stocks' | 'indices' | 'commodities';
-type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+type AssetClass = "forex" | "crypto" | "stocks" | "indices" | "commodities";
+type DayOfWeek =
+  | "sunday"
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday";
 
 // Cache for settings - short duration for fast updates
-let settingsCache: { settings: IMarketSettings; timestamp: number } | null = null;
+let settingsCache: { settings: IMarketSettings; timestamp: number } | null =
+  null;
 const SETTINGS_CACHE_DURATION = 10 * 1000; // 10 seconds for quick updates
 
 /**
@@ -14,7 +28,10 @@ const SETTINGS_CACHE_DURATION = 10 * 1000; // 10 seconds for quick updates
  */
 async function getMarketSettings(): Promise<IMarketSettings | null> {
   // Check cache
-  if (settingsCache && (Date.now() - settingsCache.timestamp) < SETTINGS_CACHE_DURATION) {
+  if (
+    settingsCache &&
+    Date.now() - settingsCache.timestamp < SETTINGS_CACHE_DURATION
+  ) {
     return settingsCache.settings;
   }
 
@@ -24,11 +41,11 @@ async function getMarketSettings(): Promise<IMarketSettings | null> {
     if (!settings) {
       settings = await MarketSettings.create({});
     }
-    
+
     settingsCache = { settings, timestamp: Date.now() };
     return settings;
   } catch (error) {
-    console.error('Error fetching market settings:', error);
+    console.error("Error fetching market settings:", error);
     return null;
   }
 }
@@ -37,7 +54,15 @@ async function getMarketSettings(): Promise<IMarketSettings | null> {
  * Get current day of week in UTC
  */
 function getCurrentDayUTC(): DayOfWeek {
-  const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const days: DayOfWeek[] = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
   return days[new Date().getUTCDay()];
 }
 
@@ -46,15 +71,19 @@ function getCurrentDayUTC(): DayOfWeek {
  */
 function getCurrentTimeUTC(): string {
   const now = new Date();
-  const hours = now.getUTCHours().toString().padStart(2, '0');
-  const minutes = now.getUTCMinutes().toString().padStart(2, '0');
+  const hours = now.getUTCHours().toString().padStart(2, "0");
+  const minutes = now.getUTCMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
 }
 
 /**
  * Check if current time is within a time range
  */
-function isWithinTimeRange(currentTime: string, openTime: string, closeTime: string): boolean {
+function isWithinTimeRange(
+  currentTime: string,
+  openTime: string,
+  closeTime: string,
+): boolean {
   // Handle overnight ranges (e.g., 22:00 to 02:00)
   if (closeTime < openTime) {
     return currentTime >= openTime || currentTime <= closeTime;
@@ -66,14 +95,18 @@ function isWithinTimeRange(currentTime: string, openTime: string, closeTime: str
  * Check if today is a holiday for the given asset class
  * In manual mode, only custom holidays are checked (template holidays ignored)
  */
-function isTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass, mode: 'automatic' | 'manual' = 'automatic'): boolean {
+function isTodayHoliday(
+  holidays: IMarketHoliday[],
+  assetClass: AssetClass,
+  mode: "automatic" | "manual" = "automatic",
+): boolean {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+  const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
   const todayMonthDay = todayStr.slice(5); // MM-DD for recurring check
 
   for (const holiday of holidays) {
     // In manual mode, skip template holidays - only use custom holidays
-    if (mode === 'manual' && (holiday as { isTemplate?: boolean }).isTemplate) {
+    if (mode === "manual" && (holiday as { isTemplate?: boolean }).isTemplate) {
       continue;
     }
 
@@ -103,22 +136,22 @@ function isTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass, mode
  * Check if market is open for a specific asset class
  * Uses admin-configured settings (automatic API or manual schedules)
  */
-export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
+export async function isMarketOpen(assetClass: AssetClass = "forex"): Promise<{
   isOpen: boolean;
   reason?: string;
   isHoliday?: boolean;
   holidayName?: string;
 }> {
   const settings = await getMarketSettings();
-  
+
   // Fallback if no settings
   if (!settings) {
-    console.warn('[Market Hours] No market settings found, using API fallback');
+    console.warn("[Market Hours] No market settings found, using API fallback");
     const apiOpen = await isForexMarketOpenAPI();
     return { isOpen: apiOpen };
   }
 
-  console.log('[Market Hours] isMarketOpen check:', {
+  console.log("[Market Hours] isMarketOpen check:", {
     assetClass,
     mode: settings.mode,
     blockTradingOnHolidays: settings.blockTradingOnHolidays,
@@ -127,9 +160,13 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
 
   // Check holidays first (applies to both modes, but respects mode for template vs custom)
   if (settings.blockTradingOnHolidays) {
-    const holiday = getTodayHoliday(settings.holidays, assetClass, settings.mode);
+    const holiday = getTodayHoliday(
+      settings.holidays,
+      assetClass,
+      settings.mode,
+    );
     if (holiday) {
-      console.log('[Market Hours] Holiday blocking market:', holiday.name);
+      console.log("[Market Hours] Holiday blocking market:", holiday.name);
       return {
         isOpen: false,
         reason: `Market closed for ${holiday.name}`,
@@ -140,49 +177,52 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
   }
 
   // Automatic mode - use Massive.com API
-  if (settings.mode === 'automatic') {
-    console.log('[Market Hours] Using AUTOMATIC mode (Massive.com API)');
+  if (settings.mode === "automatic") {
+    console.log("[Market Hours] Using AUTOMATIC mode (Massive.com API)");
     try {
       const status = await getMarketStatusFromAPI();
-      console.log('[Market Hours] API response:', {
+      console.log("[Market Hours] API response:", {
         isOpen: status.isOpen,
         status: status.status,
         serverTime: status.serverTime,
       });
       return {
         isOpen: status.isOpen,
-        reason: status.isOpen ? undefined : 'Market is currently closed',
+        reason: status.isOpen ? undefined : "Market is currently closed",
       };
     } catch (error) {
-      console.error('[Market Hours] API failed:', error);
+      console.error("[Market Hours] API failed:", error);
       // If API fails and fallback is enabled, use manual settings
       if (settings.automaticSettings.fallbackToManual) {
-        console.log('[Market Hours] Falling back to manual settings');
+        console.log("[Market Hours] Falling back to manual settings");
         return checkManualSchedule(settings, assetClass);
       }
-      
+
       // Otherwise, return closed as a safety measure
       return {
         isOpen: false,
-        reason: 'Unable to determine market status',
+        reason: "Unable to determine market status",
       };
     }
   }
 
   // Manual mode - use configured schedules
-  console.log('[Market Hours] Using MANUAL mode');
+  console.log("[Market Hours] Using MANUAL mode");
   return checkManualSchedule(settings, assetClass);
 }
 
 /**
  * Check market status using manual schedule settings
  */
-function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass): {
+function checkManualSchedule(
+  settings: IMarketSettings,
+  assetClass: AssetClass,
+): {
   isOpen: boolean;
   reason?: string;
 } {
   const schedule = settings.assetSchedules[assetClass];
-  
+
   // Check if asset class is enabled
   if (!schedule || !schedule.enabled) {
     console.log(`[Market Hours] ${assetClass} trading is disabled in settings`);
@@ -197,7 +237,7 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
   const currentTime = getCurrentTimeUTC();
   const daySchedule = schedule[currentDay];
 
-  console.log('[Market Hours] Manual schedule check:', {
+  console.log("[Market Hours] Manual schedule check:", {
     assetClass,
     currentDay,
     currentTime,
@@ -216,7 +256,9 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
   }
 
   // Check if within trading hours
-  if (!isWithinTimeRange(currentTime, daySchedule.openTime, daySchedule.closeTime)) {
+  if (
+    !isWithinTimeRange(currentTime, daySchedule.openTime, daySchedule.closeTime)
+  ) {
     console.log(`[Market Hours] Outside trading hours for ${currentDay}`);
     return {
       isOpen: false,
@@ -224,7 +266,7 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
     };
   }
 
-  console.log('[Market Hours] Market is OPEN');
+  console.log("[Market Hours] Market is OPEN");
   return { isOpen: true };
 }
 
@@ -232,14 +274,18 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
  * Get today's holiday if any
  * In manual mode, only returns custom holidays (template holidays ignored)
  */
-function getTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass, mode: 'automatic' | 'manual' = 'automatic'): IMarketHoliday | null {
+function getTodayHoliday(
+  holidays: IMarketHoliday[],
+  assetClass: AssetClass,
+  mode: "automatic" | "manual" = "automatic",
+): IMarketHoliday | null {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split("T")[0];
   const todayMonthDay = todayStr.slice(5);
 
   for (const holiday of holidays) {
     // In manual mode, skip template holidays - only use custom holidays
-    if (mode === 'manual' && (holiday as { isTemplate?: boolean }).isTemplate) {
+    if (mode === "manual" && (holiday as { isTemplate?: boolean }).isTemplate) {
       continue;
     }
 
@@ -270,27 +316,27 @@ export async function canJoinCompetition(): Promise<{
   reason?: string;
 }> {
   const settings = await getMarketSettings();
-  
+
   if (!settings) {
-    console.log('[Market Hours] No settings found, allowing competition join');
+    console.log("[Market Hours] No settings found, allowing competition join");
     return { canJoin: true };
   }
 
-  console.log('[Market Hours] Checking competition join:', {
+  console.log("[Market Hours] Checking competition join:", {
     mode: settings.mode,
     blockCompetitionsOnHolidays: settings.blockCompetitionsOnHolidays,
   });
 
   // Check if blocking is enabled
   if (!settings.blockCompetitionsOnHolidays) {
-    console.log('[Market Hours] Competition blocking is disabled, allowing');
+    console.log("[Market Hours] Competition blocking is disabled, allowing");
     return { canJoin: true };
   }
 
   // Check for holidays first (respects mode for template vs custom)
-  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
+  const holiday = getTodayHoliday(settings.holidays, "forex", settings.mode);
   if (holiday) {
-    console.log('[Market Hours] Holiday detected:', holiday.name);
+    console.log("[Market Hours] Holiday detected:", holiday.name);
     return {
       canJoin: false,
       reason: `Competition entry blocked due to market holiday: ${holiday.name}`,
@@ -298,13 +344,15 @@ export async function canJoinCompetition(): Promise<{
   }
 
   // Check market status (respects mode: automatic vs manual)
-  const marketStatus = await isMarketOpen('forex');
-  console.log('[Market Hours] Market status:', marketStatus);
-  
+  const marketStatus = await isMarketOpen("forex");
+  console.log("[Market Hours] Market status:", marketStatus);
+
   if (!marketStatus.isOpen) {
     return {
       canJoin: false,
-      reason: marketStatus.reason || 'Market is closed. Competition entry is not available.',
+      reason:
+        marketStatus.reason ||
+        "Market is closed. Competition entry is not available.",
     };
   }
 
@@ -319,27 +367,27 @@ export async function canJoinChallenge(): Promise<{
   reason?: string;
 }> {
   const settings = await getMarketSettings();
-  
+
   if (!settings) {
-    console.log('[Market Hours] No settings found, allowing challenge');
+    console.log("[Market Hours] No settings found, allowing challenge");
     return { canJoin: true };
   }
 
-  console.log('[Market Hours] Checking challenge:', {
+  console.log("[Market Hours] Checking challenge:", {
     mode: settings.mode,
     blockChallengesOnHolidays: settings.blockChallengesOnHolidays,
   });
 
   // Check if blocking is enabled
   if (!settings.blockChallengesOnHolidays) {
-    console.log('[Market Hours] Challenge blocking is disabled, allowing');
+    console.log("[Market Hours] Challenge blocking is disabled, allowing");
     return { canJoin: true };
   }
 
   // Check for holidays first (respects mode for template vs custom)
-  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
+  const holiday = getTodayHoliday(settings.holidays, "forex", settings.mode);
   if (holiday) {
-    console.log('[Market Hours] Holiday detected:', holiday.name);
+    console.log("[Market Hours] Holiday detected:", holiday.name);
     return {
       canJoin: false,
       reason: `Challenge blocked due to market holiday: ${holiday.name}`,
@@ -347,13 +395,15 @@ export async function canJoinChallenge(): Promise<{
   }
 
   // Check market status (respects mode: automatic vs manual)
-  const marketStatus = await isMarketOpen('forex');
-  console.log('[Market Hours] Market status:', marketStatus);
-  
+  const marketStatus = await isMarketOpen("forex");
+  console.log("[Market Hours] Market status:", marketStatus);
+
   if (!marketStatus.isOpen) {
     return {
       canJoin: false,
-      reason: marketStatus.reason || 'Market is closed. Challenges are not available.',
+      reason:
+        marketStatus.reason ||
+        "Market is closed. Challenges are not available.",
     };
   }
 
@@ -363,18 +413,20 @@ export async function canJoinChallenge(): Promise<{
 /**
  * Get upcoming holidays for display
  */
-export async function getUpcomingHolidays(assetClass?: AssetClass): Promise<IMarketHoliday[]> {
+export async function getUpcomingHolidays(
+  assetClass?: AssetClass,
+): Promise<IMarketHoliday[]> {
   const settings = await getMarketSettings();
-  
+
   if (!settings) {
     return [];
   }
 
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split("T")[0];
 
   return settings.holidays
-    .filter(h => {
+    .filter((h) => {
       // Filter by asset class if specified
       if (assetClass && !h.affectedAssets.includes(assetClass)) {
         return false;
@@ -404,13 +456,13 @@ export async function shouldShowHolidayWarning(): Promise<{
   holiday?: IMarketHoliday;
 }> {
   const settings = await getMarketSettings();
-  
+
   if (!settings || !settings.showHolidayWarning) {
     return { show: false };
   }
 
   // Respects mode for template vs custom holidays
-  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
+  const holiday = getTodayHoliday(settings.holidays, "forex", settings.mode);
   return {
     show: !!holiday,
     holiday: holiday || undefined,
@@ -423,4 +475,3 @@ export async function shouldShowHolidayWarning(): Promise<{
 export function clearMarketSettingsCache(): void {
   settingsCache = null;
 }
-

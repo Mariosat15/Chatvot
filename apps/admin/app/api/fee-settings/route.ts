@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
-import { connectToDatabase } from '@/database/mongoose';
-import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextRequest, NextResponse } from "next/server";
+import { jwtVerify } from "jose";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || 'admin-secret-key-change-in-production'
+  process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
 );
 
 async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get('admin_token')?.value;
+  const token = request.cookies.get("admin_token")?.value;
 
   if (!token) {
     return null;
@@ -28,32 +28,37 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await verifyAdminToken(request);
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     const settings = await CreditConversionSettings.getSingleton();
 
     return NextResponse.json({
       success: true,
       settings: {
         // Platform fees (what we charge users)
-        platformDepositFeePercentage: settings.platformDepositFeePercentage ?? 2,
-        platformWithdrawalFeePercentage: settings.platformWithdrawalFeePercentage ?? settings.withdrawalFeePercentage ?? 2,
-        
+        platformDepositFeePercentage:
+          settings.platformDepositFeePercentage ?? 2,
+        platformWithdrawalFeePercentage:
+          settings.platformWithdrawalFeePercentage ??
+          settings.withdrawalFeePercentage ??
+          2,
+
         // Bank fees (what providers charge us)
         bankDepositFeePercentage: settings.bankDepositFeePercentage ?? 2.9,
-        bankDepositFeeFixed: settings.bankDepositFeeFixed ?? 0.30,
-        bankWithdrawalFeePercentage: settings.bankWithdrawalFeePercentage ?? 0.25,
+        bankDepositFeeFixed: settings.bankDepositFeeFixed ?? 0.3,
+        bankWithdrawalFeePercentage:
+          settings.bankWithdrawalFeePercentage ?? 0.25,
         bankWithdrawalFeeFixed: settings.bankWithdrawalFeeFixed ?? 0.25,
       },
     });
   } catch (error) {
-    console.error('Error fetching fee settings:', error);
+    console.error("Error fetching fee settings:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch fee settings' },
-      { status: 500 }
+      { error: "Failed to fetch fee settings" },
+      { status: 500 },
     );
   }
 }
@@ -63,44 +68,51 @@ export async function PUT(request: NextRequest) {
   try {
     const admin = await verifyAdminToken(request);
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     const body = await request.json();
-    
-    console.log('📥 Received fee settings update:', body);
-    
+
+    console.log("📥 Received fee settings update:", body);
+
     // Parse and validate inputs with defaults
-    const platformDepositFeePercentage = parseFloat(body.platformDepositFeePercentage) || 0;
-    const platformWithdrawalFeePercentage = parseFloat(body.platformWithdrawalFeePercentage) || 0;
-    const bankDepositFeePercentage = parseFloat(body.bankDepositFeePercentage) || 0;
+    const platformDepositFeePercentage =
+      parseFloat(body.platformDepositFeePercentage) || 0;
+    const platformWithdrawalFeePercentage =
+      parseFloat(body.platformWithdrawalFeePercentage) || 0;
+    const bankDepositFeePercentage =
+      parseFloat(body.bankDepositFeePercentage) || 0;
     const bankDepositFeeFixed = parseFloat(body.bankDepositFeeFixed) || 0;
-    const bankWithdrawalFeePercentage = parseFloat(body.bankWithdrawalFeePercentage) || 0;
+    const bankWithdrawalFeePercentage =
+      parseFloat(body.bankWithdrawalFeePercentage) || 0;
     const bankWithdrawalFeeFixed = parseFloat(body.bankWithdrawalFeeFixed) || 0;
 
     // Validate percentages are within bounds
     if (platformDepositFeePercentage < 0 || platformDepositFeePercentage > 50) {
       return NextResponse.json(
-        { error: 'Platform deposit fee must be between 0% and 50%' },
-        { status: 400 }
+        { error: "Platform deposit fee must be between 0% and 50%" },
+        { status: 400 },
       );
     }
-    
-    if (platformWithdrawalFeePercentage < 0 || platformWithdrawalFeePercentage > 50) {
+
+    if (
+      platformWithdrawalFeePercentage < 0 ||
+      platformWithdrawalFeePercentage > 50
+    ) {
       return NextResponse.json(
-        { error: 'Platform withdrawal fee must be between 0% and 50%' },
-        { status: 400 }
+        { error: "Platform withdrawal fee must be between 0% and 50%" },
+        { status: 400 },
       );
     }
 
     // First ensure the document exists
     await CreditConversionSettings.getSingleton();
-    
+
     // Update only fee-related settings (limits/conversion are managed in Currency settings)
     const settings = await CreditConversionSettings.findByIdAndUpdate(
-      'global-credit-conversion',
+      "global-credit-conversion",
       {
         $set: {
           platformDepositFeePercentage,
@@ -112,16 +124,16 @@ export async function PUT(request: NextRequest) {
           // Keep legacy field in sync
           withdrawalFeePercentage: platformWithdrawalFeePercentage,
           lastUpdated: new Date(),
-          updatedBy: admin.email as string || 'admin',
+          updatedBy: (admin.email as string) || "admin",
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!settings) {
       return NextResponse.json(
-        { error: 'Failed to update fee settings - document not found' },
-        { status: 500 }
+        { error: "Failed to update fee settings - document not found" },
+        { status: 500 },
       );
     }
 
@@ -136,29 +148,30 @@ export async function PUT(request: NextRequest) {
     try {
       await auditLogService.logSettingsUpdated(
         {
-          id: admin.adminId as string || 'admin',
-          email: admin.email as string || 'admin',
-          name: (admin.email as string || 'admin').split('@')[0],
-          role: 'admin',
+          id: (admin.adminId as string) || "admin",
+          email: (admin.email as string) || "admin",
+          name: ((admin.email as string) || "admin").split("@")[0],
+          role: "admin",
         },
-        'Fee Settings',
+        "Fee Settings",
         undefined,
         {
           platformDepositFeePercentage,
           platformWithdrawalFeePercentage,
           bankDepositFeePercentage,
           bankWithdrawalFeePercentage,
-        }
+        },
       );
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
       success: true,
       settings: {
         platformDepositFeePercentage: settings.platformDepositFeePercentage,
-        platformWithdrawalFeePercentage: settings.platformWithdrawalFeePercentage,
+        platformWithdrawalFeePercentage:
+          settings.platformWithdrawalFeePercentage,
         bankDepositFeePercentage: settings.bankDepositFeePercentage,
         bankDepositFeeFixed: settings.bankDepositFeeFixed,
         bankWithdrawalFeePercentage: settings.bankWithdrawalFeePercentage,
@@ -166,11 +179,10 @@ export async function PUT(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error updating fee settings:', error);
+    console.error("Error updating fee settings:", error);
     return NextResponse.json(
-      { error: 'Failed to update fee settings' },
-      { status: 500 }
+      { error: "Failed to update fee settings" },
+      { status: 500 },
     );
   }
 }
-

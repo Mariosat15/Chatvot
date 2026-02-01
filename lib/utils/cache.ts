@@ -1,9 +1,9 @@
 /**
  * In-Memory LRU Cache
- * 
+ *
  * A simple, fast, and FREE alternative to Redis for caching frequently accessed data.
  * No external dependencies, no network latency, just pure in-memory speed.
- * 
+ *
  * Trade-offs vs Redis:
  * - ✅ Free (no cost at any scale)
  * - ✅ Faster (~0.1ms vs ~5-20ms for Redis)
@@ -43,7 +43,7 @@ class LRUCache<T> {
    */
   get(key: string): T | undefined {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       return undefined;
@@ -61,7 +61,7 @@ class LRUCache<T> {
     entry.accessCount++;
     entry.lastAccess = Date.now();
     this.stats.hits++;
-    
+
     return entry.value;
   }
 
@@ -80,7 +80,7 @@ class LRUCache<T> {
       accessCount: 1,
       lastAccess: Date.now(),
     });
-    
+
     this.stats.size = this.cache.size;
   }
 
@@ -91,7 +91,7 @@ class LRUCache<T> {
   async getOrSet(
     key: string,
     factory: () => Promise<T>,
-    ttlMs?: number
+    ttlMs?: number,
   ): Promise<T> {
     const cached = this.get(key);
     if (cached !== undefined) {
@@ -116,16 +116,16 @@ class LRUCache<T> {
    * Delete all keys matching a pattern
    */
   deletePattern(pattern: string | RegExp): number {
-    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
+    const regex = typeof pattern === "string" ? new RegExp(pattern) : pattern;
     let deleted = 0;
-    
+
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
         this.cache.delete(key);
         deleted++;
       }
     }
-    
+
     this.stats.size = this.cache.size;
     return deleted;
   }
@@ -143,7 +143,8 @@ class LRUCache<T> {
    */
   getStats(): CacheStats & { hitRate: string } {
     const total = this.stats.hits + this.stats.misses;
-    const hitRate = total > 0 ? ((this.stats.hits / total) * 100).toFixed(1) + '%' : '0%';
+    const hitRate =
+      total > 0 ? ((this.stats.hits / total) * 100).toFixed(1) + "%" : "0%";
     return { ...this.stats, hitRate };
   }
 
@@ -172,14 +173,14 @@ class LRUCache<T> {
   cleanup(): number {
     const now = Date.now();
     let cleaned = 0;
-    
+
     for (const [key, entry] of this.cache) {
       if (now > entry.expiresAt) {
         this.cache.delete(key);
         cleaned++;
       }
     }
-    
+
     this.stats.size = this.cache.size;
     return cleaned;
   }
@@ -266,7 +267,7 @@ export function clearAllCaches(): void {
 // =============================================================================
 
 // Clean up expired entries every 60 seconds
-if (typeof setInterval !== 'undefined') {
+if (typeof setInterval !== "undefined") {
   setInterval(() => {
     userCache.cleanup();
     competitionCache.cleanup();
@@ -276,4 +277,3 @@ if (typeof setInterval !== 'undefined') {
 }
 
 export { LRUCache };
-

@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 export interface IPaymentProviderCredential {
   key: string;
@@ -44,7 +44,7 @@ const PaymentProviderSchema = new Schema<IPaymentProvider>(
     },
     logo: {
       type: String,
-      default: '',
+      default: "",
     },
     isActive: {
       type: Boolean,
@@ -61,14 +61,14 @@ const PaymentProviderSchema = new Schema<IPaymentProvider>(
     credentials: [
       {
         key: { type: String, required: true },
-        value: { type: String, default: '' },
+        value: { type: String, default: "" },
         isSecret: { type: Boolean, default: true },
-        description: { type: String, default: '' },
+        description: { type: String, default: "" },
       },
     ],
     webhookUrl: {
       type: String,
-      default: '',
+      default: "",
     },
     testMode: {
       type: Boolean,
@@ -87,7 +87,7 @@ const PaymentProviderSchema = new Schema<IPaymentProvider>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index only (slug index is already created by unique: true)
@@ -95,7 +95,6 @@ PaymentProviderSchema.index({ isActive: 1, priority: -1 });
 
 const PaymentProvider =
   models?.PaymentProvider ||
-  model<IPaymentProvider>('PaymentProvider', PaymentProviderSchema);
+  model<IPaymentProvider>("PaymentProvider", PaymentProviderSchema);
 
 export default PaymentProvider;
-

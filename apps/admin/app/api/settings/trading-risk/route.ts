@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '@/database/mongoose';
-import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { connectToDatabase } from "@/database/mongoose";
+import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = getAdminJwtSecret();
 
 async function verifyAdminToken(request: NextRequest) {
   try {
-    const token = request.cookies.get('admin_token')?.value;
+    const token = request.cookies.get("admin_token")?.value;
     if (!token) return null;
 
     const payload = jwt.verify(token, JWT_SECRET) as { email: string };
@@ -22,13 +23,13 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await verifyAdminToken(request);
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
-    let settings = await TradingRiskSettings.findById('trading-risk-settings');
-    
+
+    let settings = await TradingRiskSettings.findById("trading-risk-settings");
+
     if (!settings) {
       // Return defaults if no settings exist
       return NextResponse.json({
@@ -48,17 +49,16 @@ export async function GET(request: NextRequest) {
         },
       });
     }
-    
+
     return NextResponse.json({
       success: true,
       settings: JSON.parse(JSON.stringify(settings)),
     });
   } catch (error) {
-    console.error('Error fetching trading risk settings:', error);
+    console.error("Error fetching trading risk settings:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch trading risk settings' },
-      { status: 500 }
+      { error: "Failed to fetch trading risk settings" },
+      { status: 500 },
     );
   }
 }
-

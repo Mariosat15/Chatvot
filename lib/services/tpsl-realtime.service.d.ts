@@ -16,12 +16,16 @@
  * - No database queries on hot path (uses cache)
  * - Positions are refreshed periodically and on-demand
  */
-import { ForexSymbol } from './pnl-calculator.service';
+import { ForexSymbol } from "./pnl-calculator.service";
 /**
  * Check TP/SL for a symbol when price updates
  * Called from WebSocket price handler - must be FAST!
  */
-export declare function checkTPSLForSymbol(symbol: ForexSymbol, bid: number, ask: number): Promise<void>;
+export declare function checkTPSLForSymbol(
+  symbol: ForexSymbol,
+  bid: number,
+  ask: number,
+): Promise<void>;
 /**
  * Refresh the positions cache from database
  * Called periodically and on-demand
@@ -31,14 +35,24 @@ export declare function refreshPositionsCache(): Promise<void>;
  * Add or update a position in the cache
  * Called when a new position is opened or TP/SL is modified
  */
-export declare function updatePositionInCache(positionId: string, symbol: string, side: 'long' | 'short', takeProfit: number | null, stopLoss: number | null, entryPrice: number, quantity: number, userId: string, competitionId: string): void;
+export declare function updatePositionInCache(
+  positionId: string,
+  symbol: string,
+  side: "long" | "short",
+  takeProfit: number | null,
+  stopLoss: number | null,
+  entryPrice: number,
+  quantity: number,
+  userId: string,
+  competitionId: string,
+): void;
 /**
  * Get cache statistics
  */
 export declare function getTPSLCacheStats(): {
-    totalPositions: number;
-    symbols: number;
-    lastRefresh: number;
+  totalPositions: number;
+  symbols: number;
+  lastRefresh: number;
 };
 /**
  * Initialize the cache (call on startup)

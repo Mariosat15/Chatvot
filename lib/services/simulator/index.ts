@@ -4,7 +4,7 @@ export {
   getSimulationStatus,
   isSimulationRunning,
   getActiveRunId,
-} from './simulator.service';
+} from "./simulator.service";
 
 export {
   generateTradingPatterns,
@@ -12,5 +12,4 @@ export {
   generateTestScenario,
   analyzeFailureRootCause,
   clearAICache,
-} from './ai-analyzer.service';
-
+} from "./ai-analyzer.service";

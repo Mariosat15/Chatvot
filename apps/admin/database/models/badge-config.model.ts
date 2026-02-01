@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IBadgeConfig extends Document {
   id: string;
@@ -6,7 +6,7 @@ export interface IBadgeConfig extends Document {
   description: string;
   category: string;
   icon: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  rarity: "common" | "rare" | "epic" | "legendary";
   condition: {
     type: string;
     value?: number;
@@ -39,27 +39,27 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       type: String,
       required: true,
       enum: [
-        'Competition',
-        'Volume',
-        'Profit',
-        'Risk',
-        'Speed',
-        'Consistency',
-        'Strategy',
-        'Social',
-        'Legendary',
+        "Competition",
+        "Volume",
+        "Profit",
+        "Risk",
+        "Speed",
+        "Consistency",
+        "Strategy",
+        "Social",
+        "Legendary",
       ],
     },
     icon: {
       type: String,
       required: true,
-      default: '🏆',
+      default: "🏆",
     },
     rarity: {
       type: String,
       required: true,
-      enum: ['common', 'rare', 'epic', 'legendary'],
-      default: 'common',
+      enum: ["common", "rare", "epic", "legendary"],
+      default: "common",
     },
     condition: {
       type: {
@@ -78,12 +78,12 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Create or get the model
 const BadgeConfig: Model<IBadgeConfig> =
-  mongoose.models.BadgeConfig || mongoose.model<IBadgeConfig>('BadgeConfig', BadgeConfigSchema);
+  mongoose.models.BadgeConfig ||
+  mongoose.model<IBadgeConfig>("BadgeConfig", BadgeConfigSchema);
 
 export default BadgeConfig;
-

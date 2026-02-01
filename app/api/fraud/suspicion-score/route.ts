@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
-import { SuspicionScoringService } from '@/lib/services/fraud/suspicion-scoring.service';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
+import { NextResponse } from "next/server";
+import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.service";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
 
 /**
  * GET /api/fraud/suspicion-score
@@ -15,80 +15,88 @@ export async function GET(request: Request) {
   try {
     // Check auth
     const session = await auth.api.getSession({
-      headers: await headers()
+      headers: await headers(),
     });
 
     if (!session?.user) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const riskLevel = searchParams.get('riskLevel');
-    const highRisk = searchParams.get('highRisk');
-    const stats = searchParams.get('stats');
+    const userId = searchParams.get("userId");
+    const riskLevel = searchParams.get("riskLevel");
+    const highRisk = searchParams.get("highRisk");
+    const stats = searchParams.get("stats");
 
     // Get statistics
-    if (stats === 'true') {
+    if (stats === "true") {
       const statistics = await SuspicionScoringService.getStatistics();
       return NextResponse.json({
         success: true,
-        stats: statistics
+        stats: statistics,
       });
     }
 
     // Get specific user score
     if (userId) {
       const score = await SuspicionScoringService.getScore(userId);
-      
+
       if (!score) {
-        return NextResponse.json({
-          success: false,
-          message: 'Score not found for this user'
-        }, { status: 404 });
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Score not found for this user",
+          },
+          { status: 404 },
+        );
       }
 
       return NextResponse.json({
         success: true,
-        score
+        score,
       });
     }
 
     // Get high-risk users
-    if (highRisk === 'true') {
+    if (highRisk === "true") {
       const scores = await SuspicionScoringService.getHighRiskUsers();
       return NextResponse.json({
         success: true,
         scores,
-        count: scores.length
+        count: scores.length,
       });
     }
 
     // Get users by risk level
-    if (riskLevel && ['low', 'medium', 'high', 'critical'].includes(riskLevel)) {
+    if (
+      riskLevel &&
+      ["low", "medium", "high", "critical"].includes(riskLevel)
+    ) {
       const scores = await SuspicionScoringService.getUsersByRiskLevel(
-        riskLevel as 'low' | 'medium' | 'high' | 'critical'
+        riskLevel as "low" | "medium" | "high" | "critical",
       );
       return NextResponse.json({
         success: true,
         scores,
-        count: scores.length
+        count: scores.length,
       });
     }
 
-    return NextResponse.json({
-      success: false,
-      message: 'Invalid query parameters'
-    }, { status: 400 });
-
-  } catch (error) {
-    console.error('Error fetching suspicion scores:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to fetch scores' },
-      { status: 500 }
+      {
+        success: false,
+        message: "Invalid query parameters",
+      },
+      { status: 400 },
+    );
+  } catch (error) {
+    console.error("Error fetching suspicion scores:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to fetch scores" },
+      { status: 500 },
     );
   }
 }
@@ -101,13 +109,13 @@ export async function POST(request: Request) {
   try {
     // Check auth
     const session = await auth.api.getSession({
-      headers: await headers()
+      headers: await headers(),
     });
 
     if (!session?.user) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
@@ -115,29 +123,31 @@ export async function POST(request: Request) {
     const { userId, method, points, evidence } = body;
 
     if (!userId || !method || !points || !evidence) {
-      return NextResponse.json({
-        success: false,
-        message: 'Missing required fields'
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Missing required fields",
+        },
+        { status: 400 },
+      );
     }
 
     const score = await SuspicionScoringService.updateScore(userId, {
       method,
       percentage: points, // Use points as percentage
-      evidence
+      evidence,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Score updated successfully',
-      score
+      message: "Score updated successfully",
+      score,
     });
-
   } catch (error) {
-    console.error('Error updating suspicion score:', error);
+    console.error("Error updating suspicion score:", error);
     return NextResponse.json(
-      { success: false, message: 'Failed to update score' },
-      { status: 500 }
+      { success: false, message: "Failed to update score" },
+      { status: 500 },
     );
   }
 }
@@ -150,40 +160,41 @@ export async function DELETE(request: Request) {
   try {
     // Check auth
     const session = await auth.api.getSession({
-      headers: await headers()
+      headers: await headers(),
     });
 
     if (!session?.user) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const userId = searchParams.get("userId");
 
     if (!userId) {
-      return NextResponse.json({
-        success: false,
-        message: 'User ID required'
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "User ID required",
+        },
+        { status: 400 },
+      );
     }
 
     const score = await SuspicionScoringService.resetScore(userId);
 
     return NextResponse.json({
       success: true,
-      message: 'Score reset successfully',
-      score
+      message: "Score reset successfully",
+      score,
     });
-
   } catch (error) {
-    console.error('Error resetting suspicion score:', error);
+    console.error("Error resetting suspicion score:", error);
     return NextResponse.json(
-      { success: false, message: 'Failed to reset score' },
-      { status: 500 }
+      { success: false, message: "Failed to reset score" },
+      { status: 500 },
     );
   }
 }
-

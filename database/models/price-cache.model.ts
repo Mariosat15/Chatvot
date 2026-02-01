@@ -1,11 +1,11 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 /**
  * Price Cache Model
- * 
+ *
  * Stores latest forex prices from WebSocket for sharing between WEB and WORKER.
  * WEB writes prices here, WORKER reads them for TP/SL checks.
- * 
+ *
  * Architecture:
  * - Single WebSocket connection in WEB app
  * - Prices written to MongoDB on each update
@@ -53,7 +53,7 @@ const PriceCacheSchema = new Schema<IPriceCache>(
   },
   {
     timestamps: { createdAt: false, updatedAt: true },
-  }
+  },
 );
 
 // TTL index - auto-remove prices older than 5 minutes (stale data cleanup)
@@ -64,10 +64,10 @@ PriceCacheSchema.statics.updatePrice = async function (
   symbol: string,
   bid: number,
   ask: number,
-  timestamp: number
+  timestamp: number,
 ): Promise<void> {
   const spread = ask - bid;
-  
+
   await this.updateOne(
     { symbol },
     {
@@ -79,17 +79,20 @@ PriceCacheSchema.statics.updatePrice = async function (
         updatedAt: new Date(),
       },
     },
-    { upsert: true }
+    { upsert: true },
   );
 };
 
 // Static method to get price for a symbol
-PriceCacheSchema.statics.getPrice = async function (
-  symbol: string
-): Promise<{ bid: number; ask: number; spread: number; timestamp: number } | null> {
+PriceCacheSchema.statics.getPrice = async function (symbol: string): Promise<{
+  bid: number;
+  ask: number;
+  spread: number;
+  timestamp: number;
+} | null> {
   const price = await this.findOne({ symbol }).lean();
   if (!price) return null;
-  
+
   return {
     bid: price.bid,
     ask: price.ask,
@@ -104,7 +107,7 @@ PriceCacheSchema.statics.getAllPrices = async function (): Promise<
 > {
   const prices = await this.find({}).lean();
   const priceMap = new Map();
-  
+
   for (const price of prices) {
     priceMap.set(price.symbol, {
       bid: price.bid,
@@ -113,16 +116,21 @@ PriceCacheSchema.statics.getAllPrices = async function (): Promise<
       timestamp: price.timestamp,
     });
   }
-  
+
   return priceMap;
 };
 
 // Static method to bulk update prices (more efficient for multiple symbols)
 PriceCacheSchema.statics.bulkUpdatePrices = async function (
-  prices: Array<{ symbol: string; bid: number; ask: number; timestamp: number }>
+  prices: Array<{
+    symbol: string;
+    bid: number;
+    ask: number;
+    timestamp: number;
+  }>,
 ): Promise<void> {
   if (prices.length === 0) return;
-  
+
   const bulkOps = prices.map((price) => ({
     updateOne: {
       filter: { symbol: price.symbol },
@@ -138,20 +146,39 @@ PriceCacheSchema.statics.bulkUpdatePrices = async function (
       upsert: true,
     },
   }));
-  
+
   await this.bulkWrite(bulkOps, { ordered: false });
 };
 
 // Interface for static methods
 interface IPriceCacheModel extends Model<IPriceCache> {
-  updatePrice(symbol: string, bid: number, ask: number, timestamp: number): Promise<void>;
-  getPrice(symbol: string): Promise<{ bid: number; ask: number; spread: number; timestamp: number } | null>;
-  getAllPrices(): Promise<Map<string, { bid: number; ask: number; spread: number; timestamp: number }>>;
-  bulkUpdatePrices(prices: Array<{ symbol: string; bid: number; ask: number; timestamp: number }>): Promise<void>;
+  updatePrice(
+    symbol: string,
+    bid: number,
+    ask: number,
+    timestamp: number,
+  ): Promise<void>;
+  getPrice(symbol: string): Promise<{
+    bid: number;
+    ask: number;
+    spread: number;
+    timestamp: number;
+  } | null>;
+  getAllPrices(): Promise<
+    Map<string, { bid: number; ask: number; spread: number; timestamp: number }>
+  >;
+  bulkUpdatePrices(
+    prices: Array<{
+      symbol: string;
+      bid: number;
+      ask: number;
+      timestamp: number;
+    }>,
+  ): Promise<void>;
 }
 
-const PriceCache = (mongoose.models.PriceCache as IPriceCacheModel) ||
-  mongoose.model<IPriceCache, IPriceCacheModel>('PriceCache', PriceCacheSchema);
+const PriceCache =
+  (mongoose.models.PriceCache as IPriceCacheModel) ||
+  mongoose.model<IPriceCache, IPriceCacheModel>("PriceCache", PriceCacheSchema);
 
 export default PriceCache;
-

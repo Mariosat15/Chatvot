@@ -1,7 +1,7 @@
-import { Trophy, ArrowLeft, Sparkles } from 'lucide-react';
-import CompetitionCreatorForm from '@/components/admin/CompetitionCreatorForm';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Trophy, ArrowLeft, Sparkles } from "lucide-react";
+import CompetitionCreatorForm from "@/components/admin/CompetitionCreatorForm";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 const CreateCompetitionPage = () => {
   return (
@@ -9,10 +9,14 @@ const CreateCompetitionPage = () => {
       {/* Enhanced Header */}
       <div className="border-b border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-300">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-gray-300"
+                >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Admin
                 </Button>
@@ -49,4 +53,3 @@ const CreateCompetitionPage = () => {
 };
 
 export default CreateCompetitionPage;
-

@@ -1,10 +1,10 @@
-import AuditLog, { IAuditLog } from '@/database/models/audit-log.model';
-import { connectToDatabase } from '@/database/mongoose';
-import { headers } from 'next/headers';
-import { adminEventsService } from './admin-events.service';
+import AuditLog, { IAuditLog } from "@/database/models/audit-log.model";
+import { connectToDatabase } from "@/database/mongoose";
+import { headers } from "next/headers";
+import { adminEventsService } from "./admin-events.service";
 
-type ActionCategory = IAuditLog['actionCategory'];
-type TargetType = IAuditLog['targetType'];
+type ActionCategory = IAuditLog["actionCategory"];
+type TargetType = IAuditLog["targetType"];
 
 interface AdminInfo {
   id: string;
@@ -15,78 +15,78 @@ interface AdminInfo {
 
 // Map action categories to admin sections for real-time updates
 const categoryToSection: Record<string, string> = {
-  user_management: 'users',
-  financial: 'financial',
-  competition: 'competitions',
-  settings: 'settings',
-  content: 'hero-page',
-  security: 'fraud',
-  system: 'overview',
-  data: 'database',
-  other: 'overview',
+  user_management: "users",
+  financial: "financial",
+  competition: "competitions",
+  settings: "settings",
+  content: "hero-page",
+  security: "fraud",
+  system: "overview",
+  data: "database",
+  other: "overview",
 };
 
 // Map specific actions to more precise sections
 const actionToSection: Record<string, string> = {
   // Users
-  user_created: 'users',
-  user_updated: 'users',
-  user_deleted: 'users',
-  user_suspended: 'users',
-  user_unsuspended: 'users',
-  user_restricted: 'users',
+  user_created: "users",
+  user_updated: "users",
+  user_deleted: "users",
+  user_suspended: "users",
+  user_unsuspended: "users",
+  user_restricted: "users",
   // Employees
-  employee_created: 'employees',
-  employee_updated: 'employees',
-  employee_deleted: 'employees',
-  employee_suspended: 'employees',
-  employee_unsuspended: 'employees',
-  employee_password_reset: 'employees',
-  employee_role_changed: 'employees',
-  employee_force_logout: 'employees',
+  employee_created: "employees",
+  employee_updated: "employees",
+  employee_deleted: "employees",
+  employee_suspended: "employees",
+  employee_unsuspended: "employees",
+  employee_password_reset: "employees",
+  employee_role_changed: "employees",
+  employee_force_logout: "employees",
   // KYC
-  kyc_verified: 'kyc-history',
-  kyc_rejected: 'kyc-history',
-  kyc_reset: 'kyc-history',
-  kyc_settings_updated: 'kyc-settings',
+  kyc_verified: "kyc-history",
+  kyc_rejected: "kyc-history",
+  kyc_reset: "kyc-history",
+  kyc_settings_updated: "kyc-settings",
   // Withdrawals
-  withdrawal_approved: 'pending-withdrawals',
-  withdrawal_rejected: 'pending-withdrawals',
-  withdrawal_completed: 'pending-withdrawals',
-  withdrawal_settings_updated: 'withdrawals',
+  withdrawal_approved: "pending-withdrawals",
+  withdrawal_rejected: "pending-withdrawals",
+  withdrawal_completed: "pending-withdrawals",
+  withdrawal_settings_updated: "withdrawals",
   // Fraud
-  fraud_alert_updated: 'fraud',
-  fraud_alert_dismissed: 'fraud',
-  fraud_settings_updated: 'fraud',
-  user_banned: 'fraud',
+  fraud_alert_updated: "fraud",
+  fraud_alert_dismissed: "fraud",
+  fraud_settings_updated: "fraud",
+  user_banned: "fraud",
   // Badges
-  badge_created: 'badges',
-  badge_updated: 'badges',
-  badge_deleted: 'badges',
-  badge_awarded: 'badges',
+  badge_created: "badges",
+  badge_updated: "badges",
+  badge_deleted: "badges",
+  badge_awarded: "badges",
   // Competitions
-  competition_created: 'competitions',
-  competition_updated: 'competitions',
-  competition_deleted: 'competitions',
-  competition_finalized: 'competitions',
+  competition_created: "competitions",
+  competition_updated: "competitions",
+  competition_deleted: "competitions",
+  competition_finalized: "competitions",
   // Challenges
-  challenge_updated: 'challenges',
+  challenge_updated: "challenges",
   // Settings
-  settings_updated: 'settings',
-  trading_risk_updated: 'trading',
-  fee_settings_updated: 'fees',
-  payment_provider_updated: 'payment-providers',
+  settings_updated: "settings",
+  trading_risk_updated: "trading",
+  fee_settings_updated: "fees",
+  payment_provider_updated: "payment-providers",
   // Symbols
-  symbol_created: 'symbols',
-  symbol_updated: 'symbols',
-  symbol_deleted: 'symbols',
+  symbol_created: "symbols",
+  symbol_updated: "symbols",
+  symbol_deleted: "symbols",
   // Incidents
-  incident_created: 'incidents',
-  incident_updated: 'incidents',
-  incident_status_changed: 'incidents',
-  incident_resolved: 'incidents',
-  incident_compensation_issued: 'incidents',
-  incident_deleted: 'incidents',
+  incident_created: "incidents",
+  incident_updated: "incidents",
+  incident_status_changed: "incidents",
+  incident_resolved: "incidents",
+  incident_compensation_issued: "incidents",
+  incident_deleted: "incidents",
 };
 
 interface LogActionParams {
@@ -100,7 +100,7 @@ interface LogActionParams {
   metadata?: Record<string, unknown>;
   previousValue?: unknown;
   newValue?: unknown;
-  status?: 'success' | 'failed' | 'pending';
+  status?: "success" | "failed" | "pending";
   errorMessage?: string;
 }
 
@@ -115,26 +115,31 @@ export const auditLogService = {
   async log(params: LogActionParams): Promise<void> {
     try {
       await connectToDatabase();
-      
+
       // Get request info from headers (if available)
       let ipAddress: string | undefined;
       let userAgent: string | undefined;
       let requestPath: string | undefined;
-      
+
       try {
         const headersList = await headers();
-        ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || undefined;
-        userAgent = headersList.get('user-agent') || undefined;
-        requestPath = headersList.get('x-invoke-path') || undefined;
+        ipAddress =
+          headersList.get("x-forwarded-for") ||
+          headersList.get("x-real-ip") ||
+          undefined;
+        userAgent = headersList.get("user-agent") || undefined;
+        requestPath = headersList.get("x-invoke-path") || undefined;
       } catch {
         // Headers not available (e.g., in non-request context)
       }
 
       await AuditLog.logAction({
-        userId: params.admin.id || 'unknown',
-        userName: params.admin.name || (params.admin.email ? params.admin.email.split('@')[0] : 'Admin'),
-        userEmail: params.admin.email || 'unknown@admin',
-        userRole: params.admin.role || 'admin',
+        userId: params.admin.id || "unknown",
+        userName:
+          params.admin.name ||
+          (params.admin.email ? params.admin.email.split("@")[0] : "Admin"),
+        userEmail: params.admin.email || "unknown@admin",
+        userRole: params.admin.role || "admin",
         action: params.action,
         actionCategory: params.category,
         description: params.description,
@@ -147,7 +152,7 @@ export const auditLogService = {
         ipAddress,
         userAgent,
         requestPath,
-        status: params.status || 'success',
+        status: params.status || "success",
         errorMessage: params.errorMessage,
       });
 
@@ -155,11 +160,14 @@ export const auditLogService = {
       // This enables live data sync across all admin sessions
       try {
         // Use action-specific section first, then fall back to category
-        const section = actionToSection[params.action] || categoryToSection[params.category] || 'overview';
+        const section =
+          actionToSection[params.action] ||
+          categoryToSection[params.category] ||
+          "overview";
         adminEventsService.broadcast({
           type: params.action as any,
           section,
-          action: 'update',
+          action: "update",
           data: {
             targetId: params.targetId,
             targetName: params.targetName,
@@ -172,82 +180,111 @@ export const auditLogService = {
         // SSE broadcast failure should not break the flow
       }
     } catch (error) {
-      console.error('Failed to log audit action:', error);
+      console.error("Failed to log audit action:", error);
       // Don't throw - audit logging should not break the main flow
     }
   },
 
   // ==================== USER MANAGEMENT ====================
-  
-  async logUserCreated(admin: AdminInfo, userId: string, userEmail: string, userName: string): Promise<void> {
+
+  async logUserCreated(
+    admin: AdminInfo,
+    userId: string,
+    userEmail: string,
+    userName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_created',
-      category: 'user_management',
+      action: "user_created",
+      category: "user_management",
       description: `Created new user: ${userName} (${userEmail})`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
     });
   },
 
-  async logUserUpdated(admin: AdminInfo, userId: string, userName: string, changes: Record<string, any>): Promise<void> {
+  async logUserUpdated(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    changes: Record<string, any>,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_updated',
-      category: 'user_management',
+      action: "user_updated",
+      category: "user_management",
       description: `Updated user: ${userName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
       metadata: { changes },
     });
   },
 
-  async logUserDeleted(admin: AdminInfo, userId: string, userName: string, userEmail: string): Promise<void> {
+  async logUserDeleted(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    userEmail: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_deleted',
-      category: 'user_management',
+      action: "user_deleted",
+      category: "user_management",
       description: `Deleted user: ${userName} (${userEmail})`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
     });
   },
 
-  async logUserBanned(admin: AdminInfo, userId: string, userName: string, reason?: string): Promise<void> {
+  async logUserBanned(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_banned',
-      category: 'user_management',
-      description: `Banned user: ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'user',
+      action: "user_banned",
+      category: "user_management",
+      description: `Banned user: ${userName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "user",
       targetId: userId,
       targetName: userName,
       metadata: { reason },
     });
   },
 
-  async logUserUnbanned(admin: AdminInfo, userId: string, userName: string): Promise<void> {
+  async logUserUnbanned(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_unbanned',
-      category: 'user_management',
+      action: "user_unbanned",
+      category: "user_management",
       description: `Unbanned user: ${userName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
     });
   },
 
-  async logUserRestricted(admin: AdminInfo, userId: string, userName: string, restrictions: string[]): Promise<void> {
+  async logUserRestricted(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    restrictions: string[],
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'user_restricted',
-      category: 'user_management',
+      action: "user_restricted",
+      category: "user_management",
       description: `Applied restrictions to user: ${userName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
       metadata: { restrictions },
@@ -256,147 +293,220 @@ export const auditLogService = {
 
   // ==================== FINANCIAL ====================
 
-  async logWithdrawalApproved(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number): Promise<void> {
+  async logWithdrawalApproved(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_approved',
-      category: 'financial',
+      action: "withdrawal_approved",
+      category: "financial",
       description: `Approved withdrawal of €${amountEUR.toFixed(2)} for ${userName}`,
-      targetType: 'transaction',
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, userId },
     });
   },
 
-  async logWithdrawalRejected(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
+  async logWithdrawalRejected(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_rejected',
-      category: 'financial',
-      description: `Rejected withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'transaction',
+      action: "withdrawal_rejected",
+      category: "financial",
+      description: `Rejected withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, userId, reason },
     });
   },
 
-  async logWithdrawalProcessing(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number): Promise<void> {
+  async logWithdrawalProcessing(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_processing',
-      category: 'financial',
+      action: "withdrawal_processing",
+      category: "financial",
       description: `Started processing withdrawal of €${amountEUR.toFixed(2)} for ${userName}`,
-      targetType: 'transaction',
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, userId },
     });
   },
 
-  async logWithdrawalCompleted(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, netAmountEUR: number, payoutMethod: string): Promise<void> {
+  async logWithdrawalCompleted(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+    netAmountEUR: number,
+    payoutMethod: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_completed',
-      category: 'financial',
+      action: "withdrawal_completed",
+      category: "financial",
       description: `Completed withdrawal of €${amountEUR.toFixed(2)} (net €${netAmountEUR.toFixed(2)}) for ${userName} via ${payoutMethod}`,
-      targetType: 'transaction',
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, netAmountEUR, userId, payoutMethod },
     });
   },
 
-  async logWithdrawalFailed(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
+  async logWithdrawalFailed(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_failed',
-      category: 'financial',
-      description: `Withdrawal of €${amountEUR.toFixed(2)} failed for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'transaction',
+      action: "withdrawal_failed",
+      category: "financial",
+      description: `Withdrawal of €${amountEUR.toFixed(2)} failed for ${userName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, userId, reason },
-      status: 'failed',
+      status: "failed",
     });
   },
 
-  async logWithdrawalCancelled(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
+  async logWithdrawalCancelled(
+    admin: AdminInfo,
+    withdrawalId: string,
+    userId: string,
+    userName: string,
+    amountEUR: number,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'withdrawal_cancelled',
-      category: 'financial',
-      description: `Cancelled withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'transaction',
+      action: "withdrawal_cancelled",
+      category: "financial",
+      description: `Cancelled withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "transaction",
       targetId: withdrawalId,
       targetName: userName,
       metadata: { amountEUR, userId, reason },
     });
   },
 
-  async logAdminWithdrawal(admin: AdminInfo, amount: number, amountEUR: number, bankInfo: string): Promise<void> {
+  async logAdminWithdrawal(
+    admin: AdminInfo,
+    amount: number,
+    amountEUR: number,
+    bankInfo: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'admin_withdrawal',
-      category: 'financial',
+      action: "admin_withdrawal",
+      category: "financial",
       description: `Recorded admin withdrawal: €${amountEUR.toFixed(2)} to ${bankInfo}`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { amount, amountEUR, bankInfo },
     });
   },
 
-  async logVATPayment(admin: AdminInfo, amount: number, reference: string): Promise<void> {
+  async logVATPayment(
+    admin: AdminInfo,
+    amount: number,
+    reference: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'vat_payment',
-      category: 'financial',
+      action: "vat_payment",
+      category: "financial",
       description: `Recorded VAT payment: €${amount.toFixed(2)} (Ref: ${reference})`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { amount, reference },
     });
   },
 
-  async logVendorPayment(admin: AdminInfo, vendorName: string, amount: number, reference: string): Promise<void> {
+  async logVendorPayment(
+    admin: AdminInfo,
+    vendorName: string,
+    amount: number,
+    reference: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'vendor_payment',
-      category: 'financial',
+      action: "vendor_payment",
+      category: "financial",
       description: `Recorded vendor payment to ${vendorName}: €${amount.toFixed(2)} (Ref: ${reference})`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { vendorName, amount, reference },
     });
   },
 
-  async logAdminBalanceAdd(admin: AdminInfo, amount: number, source: string, reference: string): Promise<void> {
+  async logAdminBalanceAdd(
+    admin: AdminInfo,
+    amount: number,
+    source: string,
+    reference: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'admin_balance_add',
-      category: 'financial',
+      action: "admin_balance_add",
+      category: "financial",
       description: `Added €${amount.toFixed(2)} to operating funds from ${source} (Ref: ${reference})`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { amount, source, reference },
     });
   },
 
-  async logCustomExpense(admin: AdminInfo, amount: number, category: string, vendor: string, reference: string): Promise<void> {
+  async logCustomExpense(
+    admin: AdminInfo,
+    amount: number,
+    category: string,
+    vendor: string,
+    reference: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'custom_expense',
-      category: 'financial',
-      description: `Recorded expense of €${amount.toFixed(2)} for ${category}${vendor !== 'N/A' ? ` to ${vendor}` : ''} (Ref: ${reference})`,
-      targetType: 'system',
+      action: "custom_expense",
+      category: "financial",
+      description: `Recorded expense of €${amount.toFixed(2)} for ${category}${vendor !== "N/A" ? ` to ${vendor}` : ""} (Ref: ${reference})`,
+      targetType: "system",
       metadata: { amount, category, vendor, reference },
     });
   },
 
-  async logCreditsAdjusted(admin: AdminInfo, userId: string, userName: string, previousBalance: number, newBalance: number, reason: string): Promise<void> {
+  async logCreditsAdjusted(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    previousBalance: number,
+    newBalance: number,
+    reason: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'credits_adjusted',
-      category: 'financial',
+      action: "credits_adjusted",
+      category: "financial",
       description: `Adjusted credits for ${userName}: ${previousBalance} → ${newBalance}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
       previousValue: previousBalance,
@@ -407,50 +517,68 @@ export const auditLogService = {
 
   // ==================== COMPETITION ====================
 
-  async logCompetitionCreated(admin: AdminInfo, competitionId: string, competitionName: string): Promise<void> {
+  async logCompetitionCreated(
+    admin: AdminInfo,
+    competitionId: string,
+    competitionName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'competition_created',
-      category: 'competition',
+      action: "competition_created",
+      category: "competition",
       description: `Created competition: ${competitionName}`,
-      targetType: 'competition',
+      targetType: "competition",
       targetId: competitionId,
       targetName: competitionName,
     });
   },
 
-  async logCompetitionUpdated(admin: AdminInfo, competitionId: string, competitionName: string, changes: Record<string, any>): Promise<void> {
+  async logCompetitionUpdated(
+    admin: AdminInfo,
+    competitionId: string,
+    competitionName: string,
+    changes: Record<string, any>,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'competition_updated',
-      category: 'competition',
+      action: "competition_updated",
+      category: "competition",
       description: `Updated competition: ${competitionName}`,
-      targetType: 'competition',
+      targetType: "competition",
       targetId: competitionId,
       targetName: competitionName,
       metadata: { changes },
     });
   },
 
-  async logCompetitionDeleted(admin: AdminInfo, competitionId: string, competitionName: string): Promise<void> {
+  async logCompetitionDeleted(
+    admin: AdminInfo,
+    competitionId: string,
+    competitionName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'competition_deleted',
-      category: 'competition',
+      action: "competition_deleted",
+      category: "competition",
       description: `Deleted competition: ${competitionName}`,
-      targetType: 'competition',
+      targetType: "competition",
       targetId: competitionId,
       targetName: competitionName,
     });
   },
 
-  async logCompetitionCancelled(admin: AdminInfo, competitionId: string, competitionName: string, reason?: string): Promise<void> {
+  async logCompetitionCancelled(
+    admin: AdminInfo,
+    competitionId: string,
+    competitionName: string,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'competition_cancelled',
-      category: 'competition',
-      description: `Cancelled competition: ${competitionName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'competition',
+      action: "competition_cancelled",
+      category: "competition",
+      description: `Cancelled competition: ${competitionName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "competition",
       targetId: competitionId,
       targetName: competitionName,
       metadata: { reason },
@@ -459,26 +587,39 @@ export const auditLogService = {
 
   // ==================== INCIDENTS ====================
 
-  async logIncidentCreated(admin: AdminInfo, incidentId: string, title: string, type: string, severity: string, competitionId?: string): Promise<void> {
+  async logIncidentCreated(
+    admin: AdminInfo,
+    incidentId: string,
+    title: string,
+    type: string,
+    severity: string,
+    competitionId?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'incident_created',
-      category: 'security',
+      action: "incident_created",
+      category: "security",
       description: `Created incident: ${title} (${type}, ${severity})`,
-      targetType: 'other',
+      targetType: "other",
       targetId: incidentId,
       targetName: title,
       metadata: { type, severity, competitionId },
     });
   },
 
-  async logIncidentStatusChanged(admin: AdminInfo, incidentId: string, title: string, previousStatus: string, newStatus: string): Promise<void> {
+  async logIncidentStatusChanged(
+    admin: AdminInfo,
+    incidentId: string,
+    title: string,
+    previousStatus: string,
+    newStatus: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'incident_status_changed',
-      category: 'security',
+      action: "incident_status_changed",
+      category: "security",
       description: `Changed incident status: ${title} (${previousStatus} → ${newStatus})`,
-      targetType: 'other',
+      targetType: "other",
       targetId: incidentId,
       targetName: title,
       previousValue: previousStatus,
@@ -487,49 +628,53 @@ export const auditLogService = {
   },
 
   async logIncidentResolved(
-    admin: AdminInfo, 
-    incidentId: string, 
-    title: string, 
-    resolutionType: string, 
-    totalCompensation: number, 
-    usersCompensated: number
+    admin: AdminInfo,
+    incidentId: string,
+    title: string,
+    resolutionType: string,
+    totalCompensation: number,
+    usersCompensated: number,
   ): Promise<void> {
     await this.log({
       admin,
-      action: 'incident_resolved',
-      category: 'financial',
+      action: "incident_resolved",
+      category: "financial",
       description: `Resolved incident: ${title} with ${resolutionType}. Compensated ${usersCompensated} users with €${totalCompensation.toFixed(2)}`,
-      targetType: 'other',
+      targetType: "other",
       targetId: incidentId,
       targetName: title,
-      metadata: { 
-        resolutionType, 
-        totalCompensation, 
+      metadata: {
+        resolutionType,
+        totalCompensation,
         usersCompensated,
       },
     });
   },
 
   async logIncidentCompensationIssued(
-    admin: AdminInfo, 
-    incidentId: string, 
-    title: string, 
-    totalAmount: number, 
+    admin: AdminInfo,
+    incidentId: string,
+    title: string,
+    totalAmount: number,
     usersCompensated: number,
-    compensationDetails: Array<{ userId: string; username?: string; amount: number }>
+    compensationDetails: Array<{
+      userId: string;
+      username?: string;
+      amount: number;
+    }>,
   ): Promise<void> {
     await this.log({
       admin,
-      action: 'incident_compensation_issued',
-      category: 'financial',
+      action: "incident_compensation_issued",
+      category: "financial",
       description: `Issued compensation for incident: ${title}. Total: €${totalAmount.toFixed(2)} to ${usersCompensated} user(s)`,
-      targetType: 'other',
+      targetType: "other",
       targetId: incidentId,
       targetName: title,
-      metadata: { 
-        totalAmount, 
+      metadata: {
+        totalAmount,
         usersCompensated,
-        compensationDetails: compensationDetails.map(c => ({
+        compensationDetails: compensationDetails.map((c) => ({
           userId: c.userId,
           username: c.username,
           amount: c.amount,
@@ -538,13 +683,17 @@ export const auditLogService = {
     });
   },
 
-  async logIncidentDeleted(admin: AdminInfo, incidentId: string, title: string): Promise<void> {
+  async logIncidentDeleted(
+    admin: AdminInfo,
+    incidentId: string,
+    title: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'incident_deleted',
-      category: 'security',
+      action: "incident_deleted",
+      category: "security",
       description: `Deleted incident: ${title}`,
-      targetType: 'other',
+      targetType: "other",
       targetId: incidentId,
       targetName: title,
     });
@@ -552,51 +701,69 @@ export const auditLogService = {
 
   // ==================== SETTINGS ====================
 
-  async logSettingsUpdated(admin: AdminInfo, settingName: string, previousValue?: unknown, newValue?: unknown): Promise<void> {
+  async logSettingsUpdated(
+    admin: AdminInfo,
+    settingName: string,
+    previousValue?: unknown,
+    newValue?: unknown,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'settings_updated',
-      category: 'settings',
+      action: "settings_updated",
+      category: "settings",
       description: `Updated settings: ${settingName}`,
-      targetType: 'settings',
+      targetType: "settings",
       targetName: settingName,
       previousValue,
       newValue,
     });
   },
 
-  async logFeeConfigUpdated(admin: AdminInfo, feeType: string, previousValue: number, newValue: number): Promise<void> {
+  async logFeeConfigUpdated(
+    admin: AdminInfo,
+    feeType: string,
+    previousValue: number,
+    newValue: number,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'fee_config_updated',
-      category: 'settings',
+      action: "fee_config_updated",
+      category: "settings",
       description: `Updated ${feeType}: ${previousValue}% → ${newValue}%`,
-      targetType: 'settings',
+      targetType: "settings",
       targetName: feeType,
       previousValue,
       newValue,
     });
   },
 
-  async logPaymentProviderUpdated(admin: AdminInfo, providerName: string, enabled: boolean): Promise<void> {
+  async logPaymentProviderUpdated(
+    admin: AdminInfo,
+    providerName: string,
+    enabled: boolean,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'payment_provider_updated',
-      category: 'settings',
-      description: `${enabled ? 'Enabled' : 'Disabled'} payment provider: ${providerName}`,
-      targetType: 'settings',
+      action: "payment_provider_updated",
+      category: "settings",
+      description: `${enabled ? "Enabled" : "Disabled"} payment provider: ${providerName}`,
+      targetType: "settings",
       targetName: providerName,
       metadata: { enabled },
     });
   },
 
-  async logPaymentProviderCreated(admin: AdminInfo, providerId: string, providerName: string): Promise<void> {
+  async logPaymentProviderCreated(
+    admin: AdminInfo,
+    providerId: string,
+    providerName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'payment_provider_created',
-      category: 'settings',
+      action: "payment_provider_created",
+      category: "settings",
       description: `Created payment provider: ${providerName}`,
-      targetType: 'settings',
+      targetType: "settings",
       targetId: providerId,
       targetName: providerName,
     });
@@ -605,70 +772,84 @@ export const auditLogService = {
   async logEmailConfigUpdated(admin: AdminInfo): Promise<void> {
     await this.log({
       admin,
-      action: 'email_config_updated',
-      category: 'settings',
-      description: 'Updated email configuration',
-      targetType: 'settings',
-      targetName: 'email_config',
+      action: "email_config_updated",
+      category: "settings",
+      description: "Updated email configuration",
+      targetType: "settings",
+      targetName: "email_config",
     });
   },
 
   async logInvoiceSettingsUpdated(admin: AdminInfo): Promise<void> {
     await this.log({
       admin,
-      action: 'invoice_settings_updated',
-      category: 'settings',
-      description: 'Updated invoice settings',
-      targetType: 'settings',
-      targetName: 'invoice_settings',
+      action: "invoice_settings_updated",
+      category: "settings",
+      description: "Updated invoice settings",
+      targetType: "settings",
+      targetName: "invoice_settings",
     });
   },
 
   async logCompanySettingsUpdated(admin: AdminInfo): Promise<void> {
     await this.log({
       admin,
-      action: 'company_settings_updated',
-      category: 'settings',
-      description: 'Updated company settings',
-      targetType: 'settings',
-      targetName: 'company_settings',
+      action: "company_settings_updated",
+      category: "settings",
+      description: "Updated company settings",
+      targetType: "settings",
+      targetName: "company_settings",
     });
   },
 
   // ==================== SECURITY ====================
 
-  async logFraudInvestigationStarted(admin: AdminInfo, userId: string, userName: string): Promise<void> {
+  async logFraudInvestigationStarted(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'fraud_investigation_started',
-      category: 'security',
+      action: "fraud_investigation_started",
+      category: "security",
       description: `Started fraud investigation for user: ${userName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
     });
   },
 
-  async logFraudInvestigationCompleted(admin: AdminInfo, userId: string, userName: string, verdict: string): Promise<void> {
+  async logFraudInvestigationCompleted(
+    admin: AdminInfo,
+    userId: string,
+    userName: string,
+    verdict: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'fraud_investigation_completed',
-      category: 'security',
+      action: "fraud_investigation_completed",
+      category: "security",
       description: `Completed fraud investigation for ${userName}: ${verdict}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: userId,
       targetName: userName,
       metadata: { verdict },
     });
   },
 
-  async logSecurityAlertHandled(admin: AdminInfo, alertId: string, alertType: string, action: string): Promise<void> {
+  async logSecurityAlertHandled(
+    admin: AdminInfo,
+    alertId: string,
+    alertType: string,
+    action: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'security_alert_handled',
-      category: 'security',
+      action: "security_alert_handled",
+      category: "security",
       description: `Handled ${alertType} alert: ${action}`,
-      targetType: 'system',
+      targetType: "system",
       targetId: alertId,
       metadata: { alertType, action },
     });
@@ -676,124 +857,171 @@ export const auditLogService = {
 
   // ==================== DATA ====================
 
-  async logDatabaseReset(admin: AdminInfo, deletedCounts: Record<string, number>): Promise<void> {
+  async logDatabaseReset(
+    admin: AdminInfo,
+    deletedCounts: Record<string, number>,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'database_reset',
-      category: 'data',
-      description: 'Reset all database data',
-      targetType: 'system',
+      action: "database_reset",
+      category: "data",
+      description: "Reset all database data",
+      targetType: "system",
       metadata: { deletedCounts },
     });
   },
 
-  async logDataExported(admin: AdminInfo, exportType: string, recordCount: number): Promise<void> {
+  async logDataExported(
+    admin: AdminInfo,
+    exportType: string,
+    recordCount: number,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'data_exported',
-      category: 'data',
+      action: "data_exported",
+      category: "data",
       description: `Exported ${recordCount} ${exportType} records`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { exportType, recordCount },
     });
   },
 
-  async logInvoicesExported(admin: AdminInfo, count: number, dateRange: { start: string; end: string }, format: string): Promise<void> {
+  async logInvoicesExported(
+    admin: AdminInfo,
+    count: number,
+    dateRange: { start: string; end: string },
+    format: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'invoices_exported',
-      category: 'data',
+      action: "invoices_exported",
+      category: "data",
       description: `Exported ${count} invoices (${dateRange.start} to ${dateRange.end}) as ${format.toUpperCase()}`,
-      targetType: 'system',
+      targetType: "system",
       metadata: { count, dateRange, format },
     });
   },
 
   // ==================== EMPLOYEE MANAGEMENT ====================
 
-  async logEmployeeCreated(admin: AdminInfo, employeeId: string, employeeEmail: string, employeeName: string, role: string): Promise<void> {
+  async logEmployeeCreated(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeEmail: string,
+    employeeName: string,
+    role: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_created',
-      category: 'system',
+      action: "employee_created",
+      category: "system",
       description: `Created employee: ${employeeName} (${employeeEmail}) with role: ${role}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
       metadata: { employeeEmail, role },
     });
   },
 
-  async logEmployeeUpdated(admin: AdminInfo, employeeId: string, employeeName: string, changes: Record<string, any>): Promise<void> {
+  async logEmployeeUpdated(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+    changes: Record<string, any>,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_updated',
-      category: 'system',
+      action: "employee_updated",
+      category: "system",
       description: `Updated employee: ${employeeName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
       metadata: { changes },
     });
   },
 
-  async logEmployeeDeleted(admin: AdminInfo, employeeId: string, employeeName: string, employeeEmail: string): Promise<void> {
+  async logEmployeeDeleted(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+    employeeEmail: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_deleted',
-      category: 'system',
+      action: "employee_deleted",
+      category: "system",
       description: `Deleted employee: ${employeeName} (${employeeEmail})`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
       metadata: { employeeEmail },
     });
   },
 
-  async logEmployeeSuspended(admin: AdminInfo, employeeId: string, employeeName: string, reason?: string): Promise<void> {
+  async logEmployeeSuspended(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+    reason?: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_suspended',
-      category: 'system',
-      description: `Suspended employee: ${employeeName}${reason ? ` - Reason: ${reason}` : ''}`,
-      targetType: 'user',
+      action: "employee_suspended",
+      category: "system",
+      description: `Suspended employee: ${employeeName}${reason ? ` - Reason: ${reason}` : ""}`,
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
       metadata: { reason },
     });
   },
 
-  async logEmployeeUnsuspended(admin: AdminInfo, employeeId: string, employeeName: string): Promise<void> {
+  async logEmployeeUnsuspended(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_unsuspended',
-      category: 'system',
+      action: "employee_unsuspended",
+      category: "system",
       description: `Unsuspended employee: ${employeeName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
     });
   },
 
-  async logEmployeePasswordReset(admin: AdminInfo, employeeId: string, employeeName: string): Promise<void> {
+  async logEmployeePasswordReset(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_password_reset',
-      category: 'system',
+      action: "employee_password_reset",
+      category: "system",
       description: `Reset password for employee: ${employeeName}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
     });
   },
 
-  async logEmployeeRoleChanged(admin: AdminInfo, employeeId: string, employeeName: string, previousRole: string, newRole: string): Promise<void> {
+  async logEmployeeRoleChanged(
+    admin: AdminInfo,
+    employeeId: string,
+    employeeName: string,
+    previousRole: string,
+    newRole: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'employee_role_changed',
-      category: 'system',
+      action: "employee_role_changed",
+      category: "system",
       description: `Changed role for ${employeeName}: ${previousRole} → ${newRole}`,
-      targetType: 'user',
+      targetType: "user",
       targetId: employeeId,
       targetName: employeeName,
       previousValue: previousRole,
@@ -801,37 +1029,49 @@ export const auditLogService = {
     });
   },
 
-  async logRoleTemplateCreated(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+  async logRoleTemplateCreated(
+    admin: AdminInfo,
+    templateId: string,
+    templateName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'role_template_created',
-      category: 'system',
+      action: "role_template_created",
+      category: "system",
       description: `Created role template: ${templateName}`,
-      targetType: 'settings',
+      targetType: "settings",
       targetId: templateId,
       targetName: templateName,
     });
   },
 
-  async logRoleTemplateUpdated(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+  async logRoleTemplateUpdated(
+    admin: AdminInfo,
+    templateId: string,
+    templateName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'role_template_updated',
-      category: 'system',
+      action: "role_template_updated",
+      category: "system",
       description: `Updated role template: ${templateName}`,
-      targetType: 'settings',
+      targetType: "settings",
       targetId: templateId,
       targetName: templateName,
     });
   },
 
-  async logRoleTemplateDeleted(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+  async logRoleTemplateDeleted(
+    admin: AdminInfo,
+    templateId: string,
+    templateName: string,
+  ): Promise<void> {
     await this.log({
       admin,
-      action: 'role_template_deleted',
-      category: 'system',
+      action: "role_template_deleted",
+      category: "system",
       description: `Deleted role template: ${templateName}`,
-      targetType: 'settings',
+      targetType: "settings",
       targetId: templateId,
       targetName: templateName,
     });
@@ -842,34 +1082,38 @@ export const auditLogService = {
   async logAdminLogin(admin: AdminInfo): Promise<void> {
     await this.log({
       admin,
-      action: 'admin_login',
-      category: 'system',
+      action: "admin_login",
+      category: "system",
       description: `Admin logged in: ${admin.email}`,
-      targetType: 'system',
+      targetType: "system",
     });
   },
 
   async logAdminLogout(admin: AdminInfo): Promise<void> {
     await this.log({
       admin,
-      action: 'admin_logout',
-      category: 'system',
+      action: "admin_logout",
+      category: "system",
       description: `Admin logged out: ${admin.email}`,
-      targetType: 'system',
+      targetType: "system",
     });
   },
 
-  async logSystemAction(admin: AdminInfo, action: string, description: string, metadata?: Record<string, any>): Promise<void> {
+  async logSystemAction(
+    admin: AdminInfo,
+    action: string,
+    description: string,
+    metadata?: Record<string, any>,
+  ): Promise<void> {
     await this.log({
       admin,
       action,
-      category: 'system',
+      category: "system",
       description,
-      targetType: 'system',
+      targetType: "system",
       metadata,
     });
   },
 };
 
 export default auditLogService;
-

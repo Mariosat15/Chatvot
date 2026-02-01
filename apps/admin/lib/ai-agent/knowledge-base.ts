@@ -1,6 +1,6 @@
 /**
  * ChartVolt Platform Knowledge Base
- * 
+ *
  * Comprehensive documentation for the AI Agent to answer admin questions
  * about how the system works.
  */
@@ -532,15 +532,24 @@ Check provider dashboard, run reconciliation, check webhook logs.
  * Quick answers for common questions
  */
 export const QUICK_ANSWERS: Record<string, string> = {
-  'how to change vat': 'Go to Admin Panel → Settings → Company Settings. The VAT rate is in the tax configuration section. Default is 19%.',
-  'how to create competition': 'Go to Admin Panel → Competitions → Create New. Fill in name, entry fee, starting capital, timing, and prize distribution.',
-  'how winner evaluated': 'Winners are automatically evaluated when competition ends: P&L calculated → Check disqualifications → Rank by method (PnL/ROI) → Apply tie breakers → Distribute prizes.',
-  'what are challenges': '1v1 Challenges are direct head-to-head trading battles between two users. They stake credits, trade for a set duration, and the higher P&L wins.',
-  'how withdrawal works': 'User requests withdrawal → System checks requirements (KYC, balance, limits) → Automatic mode processes immediately or Manual mode waits for admin approval.',
-  'how to process withdrawal': 'Admin Panel → Withdrawals → Pending → Select the withdrawal → Click Approve (sends money) or Reject (returns credits to user).',
-  'how badges work': 'Users earn badges for achievements (wins, milestones, profits). Each badge has a rarity (Common/Rare/Epic/Legendary) that determines XP reward. Badges are evaluated automatically.',
-  'how fraud detection works': 'System tracks device fingerprints, payment methods, VPN usage, and behavior patterns. Users get risk scores. Alerts created for suspicious activity. Admins review and take action.',
-  'how to ban user': 'Admin Panel → Users → Find User → Restrictions → Add Login Block restriction with permanent duration, or use Fraud Alerts → Ban action.',
-  'what is margin call': 'When user equity drops to margin call level (default 100%), they get a warning. At liquidation level (default 50%), positions are auto-closed. Configure in Trading Risk Settings.',
+  "how to change vat":
+    "Go to Admin Panel → Settings → Company Settings. The VAT rate is in the tax configuration section. Default is 19%.",
+  "how to create competition":
+    "Go to Admin Panel → Competitions → Create New. Fill in name, entry fee, starting capital, timing, and prize distribution.",
+  "how winner evaluated":
+    "Winners are automatically evaluated when competition ends: P&L calculated → Check disqualifications → Rank by method (PnL/ROI) → Apply tie breakers → Distribute prizes.",
+  "what are challenges":
+    "1v1 Challenges are direct head-to-head trading battles between two users. They stake credits, trade for a set duration, and the higher P&L wins.",
+  "how withdrawal works":
+    "User requests withdrawal → System checks requirements (KYC, balance, limits) → Automatic mode processes immediately or Manual mode waits for admin approval.",
+  "how to process withdrawal":
+    "Admin Panel → Withdrawals → Pending → Select the withdrawal → Click Approve (sends money) or Reject (returns credits to user).",
+  "how badges work":
+    "Users earn badges for achievements (wins, milestones, profits). Each badge has a rarity (Common/Rare/Epic/Legendary) that determines XP reward. Badges are evaluated automatically.",
+  "how fraud detection works":
+    "System tracks device fingerprints, payment methods, VPN usage, and behavior patterns. Users get risk scores. Alerts created for suspicious activity. Admins review and take action.",
+  "how to ban user":
+    "Admin Panel → Users → Find User → Restrictions → Add Login Block restriction with permanent duration, or use Fraud Alerts → Ban action.",
+  "what is margin call":
+    "When user equity drops to margin call level (default 100%), they get a warning. At liquidation level (default 50%), positions are auto-closed. Configure in Trading Risk Settings.",
 };
-

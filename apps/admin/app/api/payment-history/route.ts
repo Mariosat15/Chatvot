@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
+
+// Escape special regex characters to prevent ReDoS attacks
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
  * GET /api/payment-history
@@ -13,48 +18,48 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    
+
     // Pagination
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
-    
+
     // Filters
-    const status = searchParams.get('status') || 'all';
-    const paymentMethod = searchParams.get('paymentMethod') || 'all';
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
-    const minAmount = searchParams.get('minAmount');
-    const maxAmount = searchParams.get('maxAmount');
-    const search = searchParams.get('search');
-    const provider = searchParams.get('provider') || 'all';
+    const status = searchParams.get("status") || "all";
+    const paymentMethod = searchParams.get("paymentMethod") || "all";
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const minAmount = searchParams.get("minAmount");
+    const maxAmount = searchParams.get("maxAmount");
+    const search = searchParams.get("search");
+    const provider = searchParams.get("provider") || "all";
 
     // Build query
     const query: any = {
-      transactionType: 'deposit',
+      transactionType: "deposit",
     };
 
     // Status filter
-    if (status !== 'all') {
-      if (status.includes(',')) {
-        query.status = { $in: status.split(',') };
+    if (status !== "all") {
+      if (status.includes(",")) {
+        query.status = { $in: status.split(",") };
       } else {
         query.status = status;
       }
     }
 
     // Payment method filter
-    if (paymentMethod !== 'all') {
+    if (paymentMethod !== "all") {
       query.paymentMethod = paymentMethod;
     }
 
     // Provider filter (check both new field and metadata for backwards compatibility)
     // Store provider conditions to combine with search later
     let providerConditions: any[] | null = null;
-    if (provider !== 'all') {
+    if (provider !== "all") {
       providerConditions = [
         { provider },
-        { 'metadata.paymentProvider': provider },
+        { "metadata.paymentProvider": provider },
       ];
     }
 
@@ -83,52 +88,50 @@ export async function GET(request: NextRequest) {
     }
 
     // Get database connection for Better Auth users
-    const mongoose = await import('mongoose');
+    const mongoose = await import("mongoose");
     const db = mongoose.default.connection.db;
-    
+
     if (!db) {
-      throw new Error('Database connection not found');
+      throw new Error("Database connection not found");
     }
 
     // If searching, first find matching users
     let userIds: string[] | null = null;
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      const matchingUsers = await db.collection('user').find({
-        $or: [
-          { email: searchRegex },
-          { name: searchRegex },
-        ],
-      }).toArray();
-      
+      const escapedSearch = escapeRegex(search);
+      const searchRegex = new RegExp(escapedSearch, "i");
+      const matchingUsers = await db
+        .collection("user")
+        .find({
+          $or: [{ email: searchRegex }, { name: searchRegex }],
+        })
+        .toArray();
+
       userIds = matchingUsers.map((u: any) => u.id || u._id?.toString());
-      
+
       // Build search conditions - search by user, transaction IDs, and payment refs
       const searchConditions: any[] = [
         { userId: { $in: userIds } },
         { paymentIntentId: searchRegex },
         { paymentId: searchRegex },
         { providerTransactionId: searchRegex },
-        { 'metadata.orderId': searchRegex },
-        { 'metadata.clientUniqueId': searchRegex },
+        { "metadata.orderId": searchRegex },
+        { "metadata.clientUniqueId": searchRegex },
       ];
-      
+
       // Try to search by _id if it looks like a MongoDB ObjectId
       if (search.match(/^[0-9a-fA-F]{24}$/)) {
-        const { ObjectId } = await import('mongodb');
+        const { ObjectId } = await import("mongodb");
         try {
           searchConditions.push({ _id: new ObjectId(search) });
         } catch {
           // Invalid ObjectId, skip
         }
       }
-      
+
       // Combine search with provider filter if both exist
       if (providerConditions) {
-        query.$and = [
-          { $or: providerConditions },
-          { $or: searchConditions },
-        ];
+        query.$and = [{ $or: providerConditions }, { $or: searchConditions }];
       } else {
         query.$or = searchConditions;
       }
@@ -149,30 +152,35 @@ export async function GET(request: NextRequest) {
 
     // Get stats for all deposits
     const statsAggregation = await WalletTransaction.aggregate([
-      { $match: { transactionType: 'deposit' } },
+      { $match: { transactionType: "deposit" } },
       {
         $group: {
-          _id: '$status',
+          _id: "$status",
           count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' },
-          totalEUR: { 
-            $sum: { 
+          totalAmount: { $sum: "$amount" },
+          totalEUR: {
+            $sum: {
               $cond: [
-                { $ne: ['$metadata.totalCharged', null] },
-                '$metadata.totalCharged',
-                { $cond: [
-                  { $ne: ['$metadata.eurAmount', null] },
-                  '$metadata.eurAmount',
-                  '$amount'
-                ]}
-              ]
-            }
+                { $ne: ["$metadata.totalCharged", null] },
+                "$metadata.totalCharged",
+                {
+                  $cond: [
+                    { $ne: ["$metadata.eurAmount", null] },
+                    "$metadata.eurAmount",
+                    "$amount",
+                  ],
+                },
+              ],
+            },
           },
         },
       },
     ]);
 
-    const stats: Record<string, { count: number; totalAmount: number; totalEUR: number }> = {
+    const stats: Record<
+      string,
+      { count: number; totalAmount: number; totalEUR: number }
+    > = {
       pending: { count: 0, totalAmount: 0, totalEUR: 0 },
       completed: { count: 0, totalAmount: 0, totalEUR: 0 },
       failed: { count: 0, totalAmount: 0, totalEUR: 0 },
@@ -193,63 +201,74 @@ export async function GET(request: NextRequest) {
     const paymentsWithUserDetails = await Promise.all(
       payments.map(async (payment: any) => {
         try {
-          let user = await db.collection('user').findOne({ id: payment.userId });
-          
+          let user = await db
+            .collection("user")
+            .findOne({ id: payment.userId });
+
           if (!user) {
             try {
-              const { ObjectId } = await import('mongodb');
-              user = await db.collection('user').findOne({ _id: new ObjectId(payment.userId) });
+              const { ObjectId } = await import("mongodb");
+              user = await db
+                .collection("user")
+                .findOne({ _id: new ObjectId(payment.userId) });
             } catch {
               // Not a valid ObjectId, skip
             }
           }
-          
+
           if (!user) {
-            user = await db.collection('user').findOne({ _id: payment.userId });
+            user = await db.collection("user").findOne({ _id: payment.userId });
           }
-          
+
           return {
             ...payment,
-            user: user ? {
-              id: user.id || user._id?.toString(),
-              name: user.name || 'User',
-              email: user.email || 'No email',
-              image: user.image || null,
-            } : {
-              id: payment.userId,
-              name: 'Unknown User',
-              email: 'No email available',
-              image: null,
-            },
+            user: user
+              ? {
+                  id: user.id || user._id?.toString(),
+                  name: user.name || "User",
+                  email: user.email || "No email",
+                  image: user.image || null,
+                }
+              : {
+                  id: payment.userId,
+                  name: "Unknown User",
+                  email: "No email available",
+                  image: null,
+                },
           };
         } catch {
           return {
             ...payment,
             user: {
               id: payment.userId,
-              name: 'Unknown User',
-              email: 'Error loading',
+              name: "Unknown User",
+              email: "Error loading",
               image: null,
             },
           };
         }
-      })
+      }),
     );
 
     // Get unique payment providers for filter dropdown (from both new and old fields)
-    const providersFromField = await WalletTransaction.distinct('provider', {
-      transactionType: 'deposit',
+    const providersFromField = await WalletTransaction.distinct("provider", {
+      transactionType: "deposit",
       provider: { $exists: true, $ne: null },
     });
-    const providersFromMetadata = await WalletTransaction.distinct('metadata.paymentProvider', {
-      transactionType: 'deposit',
-      'metadata.paymentProvider': { $exists: true, $ne: null },
-    });
-    const providers = [...new Set([...providersFromField, ...providersFromMetadata])];
+    const providersFromMetadata = await WalletTransaction.distinct(
+      "metadata.paymentProvider",
+      {
+        transactionType: "deposit",
+        "metadata.paymentProvider": { $exists: true, $ne: null },
+      },
+    );
+    const providers = [
+      ...new Set([...providersFromField, ...providersFromMetadata]),
+    ];
 
     // Get unique payment methods for filter dropdown
-    const paymentMethods = await WalletTransaction.distinct('paymentMethod', {
-      transactionType: 'deposit',
+    const paymentMethods = await WalletTransaction.distinct("paymentMethod", {
+      transactionType: "deposit",
       paymentMethod: { $exists: true, $ne: null },
     });
 
@@ -267,14 +286,13 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('❌ Error fetching payment history:', error);
+    console.error("❌ Error fetching payment history:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch payment history' },
-      { status: 500 }
+      { error: "Failed to fetch payment history" },
+      { status: 500 },
     );
   }
 }
-

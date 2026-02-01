@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Shield, TrendingUp, Users, Clock } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { AlertTriangle, Shield, TrendingUp, Users, Clock } from "lucide-react";
 
 interface ScoreBreakdown {
-  percentage?: number;  // Model stores 'percentage'
-  points?: number;      // Backward compatibility
+  percentage?: number; // Model stores 'percentage'
+  points?: number; // Backward compatibility
   evidence?: string;
   lastDetected?: string;
 }
@@ -15,7 +21,7 @@ interface ScoreBreakdown {
 interface SuspicionScoreData {
   userId: string;
   totalScore: number;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  riskLevel: "low" | "medium" | "high" | "critical";
   lastUpdated: string;
   scoreBreakdown: {
     deviceMatch: ScoreBreakdown;
@@ -53,65 +59,127 @@ interface Props {
 export default function SuspicionScoreCard({ score }: Props) {
   const getRiskColor = (level: string) => {
     switch (level) {
-      case 'critical': return 'bg-red-500/20 text-red-500 border-red-500/30';
-      case 'high': return 'bg-orange-500/20 text-orange-500 border-orange-500/30';
-      case 'medium': return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
-      case 'low': return 'bg-green-500/20 text-green-500 border-green-500/30';
-      default: return 'bg-gray-500/20 text-gray-500 border-gray-500/30';
+      case "critical":
+        return "bg-red-500/20 text-red-500 border-red-500/30";
+      case "high":
+        return "bg-orange-500/20 text-orange-500 border-orange-500/30";
+      case "medium":
+        return "bg-yellow-500/20 text-yellow-500 border-yellow-500/30";
+      case "low":
+        return "bg-green-500/20 text-green-500 border-green-500/30";
+      default:
+        return "bg-gray-500/20 text-gray-500 border-gray-500/30";
     }
   };
-  
+
   const getScoreColor = (score: number) => {
-    if (score >= 70) return 'text-red-500';
-    if (score >= 50) return 'text-orange-500';
-    if (score >= 30) return 'text-yellow-500';
-    return 'text-green-500';
+    if (score >= 70) return "text-red-500";
+    if (score >= 50) return "text-orange-500";
+    if (score >= 30) return "text-yellow-500";
+    return "text-green-500";
   };
 
   const getRiskIcon = (level: string) => {
     switch (level) {
-      case 'critical': return '🔴';
-      case 'high': return '🟠';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
-      default: return '⚪';
+      case "critical":
+        return "🔴";
+      case "high":
+        return "🟠";
+      case "medium":
+        return "🟡";
+      case "low":
+        return "🟢";
+      default:
+        return "⚪";
     }
   };
 
   const getProgressColor = (score: number) => {
-    if (score >= 70) return 'bg-red-500';
-    if (score >= 50) return 'bg-orange-500';
-    if (score >= 30) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (score >= 70) return "bg-red-500";
+    if (score >= 50) return "bg-orange-500";
+    if (score >= 30) return "bg-yellow-500";
+    return "bg-green-500";
   };
 
   const detectionMethods = [
-    { key: 'kycDuplicate', label: 'Duplicate KYC', maxPercentage: 50, icon: '🪪' },
-    { key: 'deviceMatch', label: 'Device Match', maxPercentage: 40, icon: '📱' },
-    { key: 'ipBrowserMatch', label: 'IP + Browser', maxPercentage: 35, icon: '🌐' },
-    { key: 'mirrorTrading', label: 'Mirror Trading', maxPercentage: 35, icon: '🪞' },
-    { key: 'ipMatch', label: 'IP Match', maxPercentage: 30, icon: '🔗' },
-    { key: 'samePayment', label: 'Payment Method', maxPercentage: 30, icon: '💳' },
-    { key: 'tradingSimilarity', label: 'Trading Similarity', maxPercentage: 30, icon: '📈' },
-    { key: 'coordinatedEntry', label: 'Coordinated Entry', maxPercentage: 25, icon: '🎯' },
-    { key: 'rapidCreation', label: 'Rapid Creation', maxPercentage: 20, icon: '⚡' },
-    { key: 'sameCity', label: 'Same Location', maxPercentage: 15, icon: '📍' },
-    { key: 'deviceSwitching', label: 'Device Switching', maxPercentage: 15, icon: '🔄' },
-    { key: 'timezoneLanguage', label: 'Timezone/Language', maxPercentage: 10, icon: '🌍' }
+    {
+      key: "kycDuplicate",
+      label: "Duplicate KYC",
+      maxPercentage: 50,
+      icon: "🪪",
+    },
+    {
+      key: "deviceMatch",
+      label: "Device Match",
+      maxPercentage: 40,
+      icon: "📱",
+    },
+    {
+      key: "ipBrowserMatch",
+      label: "IP + Browser",
+      maxPercentage: 35,
+      icon: "🌐",
+    },
+    {
+      key: "mirrorTrading",
+      label: "Mirror Trading",
+      maxPercentage: 35,
+      icon: "🪞",
+    },
+    { key: "ipMatch", label: "IP Match", maxPercentage: 30, icon: "🔗" },
+    {
+      key: "samePayment",
+      label: "Payment Method",
+      maxPercentage: 30,
+      icon: "💳",
+    },
+    {
+      key: "tradingSimilarity",
+      label: "Trading Similarity",
+      maxPercentage: 30,
+      icon: "📈",
+    },
+    {
+      key: "coordinatedEntry",
+      label: "Coordinated Entry",
+      maxPercentage: 25,
+      icon: "🎯",
+    },
+    {
+      key: "rapidCreation",
+      label: "Rapid Creation",
+      maxPercentage: 20,
+      icon: "⚡",
+    },
+    { key: "sameCity", label: "Same Location", maxPercentage: 15, icon: "📍" },
+    {
+      key: "deviceSwitching",
+      label: "Device Switching",
+      maxPercentage: 15,
+      icon: "🔄",
+    },
+    {
+      key: "timezoneLanguage",
+      label: "Timezone/Language",
+      maxPercentage: 10,
+      icon: "🌍",
+    },
   ];
 
   const activeDetections = detectionMethods
-    .map(method => {
-      const breakdown = score.scoreBreakdown[method.key as keyof typeof score.scoreBreakdown];
+    .map((method) => {
+      const breakdown =
+        score.scoreBreakdown[method.key as keyof typeof score.scoreBreakdown];
       // The model stores 'percentage', not 'points'
-      const detectionPercentage = breakdown?.percentage || breakdown?.points || 0;
+      const detectionPercentage =
+        breakdown?.percentage || breakdown?.points || 0;
       return {
         ...method,
         ...breakdown,
         percentage: detectionPercentage,
       };
     })
-    .filter(method => method.percentage > 0)
+    .filter((method) => method.percentage > 0)
     .sort((a, b) => b.percentage - a.percentage);
 
   const recentHistory = [...(score.scoreHistory || [])].reverse().slice(0, 5);
@@ -126,7 +194,10 @@ export default function SuspicionScoreCard({ score }: Props) {
             Fraud Detection Score
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            User: <span className="font-mono text-gray-300">{score.userId.substring(0, 16)}...</span>
+            User:{" "}
+            <span className="font-mono text-gray-300">
+              {score.userId.substring(0, 16)}...
+            </span>
           </p>
         </div>
         <Badge className={`${getRiskColor(score.riskLevel)} text-lg px-4 py-2`}>
@@ -141,7 +212,9 @@ export default function SuspicionScoreCard({ score }: Props) {
           <Card className="bg-gray-900 border-gray-700">
             <CardContent className="p-8">
               <div className="text-center">
-                <p className="text-sm text-gray-400 mb-4">OVERALL FRAUD SCORE</p>
+                <p className="text-sm text-gray-400 mb-4">
+                  OVERALL FRAUD SCORE
+                </p>
                 <div className="relative inline-block">
                   <svg className="w-40 h-40 transform -rotate-90">
                     {/* Background circle */}
@@ -166,18 +239,23 @@ export default function SuspicionScoreCard({ score }: Props) {
                       className={getProgressColor(score.totalScore)}
                       strokeDasharray={`${2 * Math.PI * 70}`}
                       strokeDashoffset={`${2 * Math.PI * 70 * (1 - score.totalScore / 100)}`}
-                      style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
+                      style={{ transition: "stroke-dashoffset 1s ease-in-out" }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={`text-5xl font-bold ${getScoreColor(score.totalScore)}`}>
+                    <span
+                      className={`text-5xl font-bold ${getScoreColor(score.totalScore)}`}
+                    >
                       {score.totalScore}
                     </span>
-                    <span className="text-lg text-gray-500 font-semibold">%</span>
+                    <span className="text-lg text-gray-500 font-semibold">
+                      %
+                    </span>
                   </div>
                 </div>
                 <p className="mt-6 text-sm text-gray-400">
-                  Last updated:<br/>
+                  Last updated:
+                  <br />
                   {new Date(score.lastUpdated).toLocaleString()}
                 </p>
               </div>
@@ -187,7 +265,9 @@ export default function SuspicionScoreCard({ score }: Props) {
           {/* Risk Thresholds */}
           <Card className="bg-gray-900 border-gray-700">
             <CardContent className="p-6">
-              <p className="text-sm font-semibold text-gray-300 mb-4">Risk Thresholds</p>
+              <p className="text-sm font-semibold text-gray-300 mb-4">
+                Risk Thresholds
+              </p>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-sm">
@@ -226,13 +306,17 @@ export default function SuspicionScoreCard({ score }: Props) {
                 <AlertTriangle className="h-5 w-5 text-orange-500" />
                 Detection Methods
                 {activeDetections.length > 0 && (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 ml-2">
+                  <Badge
+                    variant="outline"
+                    className="border-orange-500/30 text-orange-400 ml-2"
+                  >
                     {activeDetections.length} Active
                   </Badge>
                 )}
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Individual fraud indicators and their contribution to overall score
+                Individual fraud indicators and their contribution to overall
+                score
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -249,31 +333,37 @@ export default function SuspicionScoreCard({ score }: Props) {
                           <span className="text-xl">{detection.icon}</span>
                           {detection.label}
                         </span>
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={`${getProgressColor(detection.percentage)} border-none text-sm px-2 py-1`}
                         >
                           {detection.percentage}%
                         </Badge>
                       </div>
-                      
+
                       {/* Progress Bar */}
                       <div className="mb-3">
                         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                           <span>Contribution</span>
-                          <span>{detection.percentage}% of {detection.maxPercentage}% max</span>
+                          <span>
+                            {detection.percentage}% of {detection.maxPercentage}
+                            % max
+                          </span>
                         </div>
-                        <Progress 
-                          value={(detection.percentage / detection.maxPercentage) * 100}
+                        <Progress
+                          value={
+                            (detection.percentage / detection.maxPercentage) *
+                            100
+                          }
                           className="h-2"
                         />
                       </div>
-                      
+
                       {/* Evidence */}
                       <p className="text-xs text-gray-400 mb-2 line-clamp-2">
                         {detection.evidence}
                       </p>
-                      
+
                       {/* Timestamp */}
                       {detection.lastDetected && (
                         <p className="text-xs text-gray-600 flex items-center gap-1">
@@ -287,8 +377,12 @@ export default function SuspicionScoreCard({ score }: Props) {
               ) : (
                 <div className="text-center py-12">
                   <Shield className="h-16 w-16 text-green-500/30 mx-auto mb-4" />
-                  <p className="text-lg text-gray-400 font-medium">No Fraud Detected</p>
-                  <p className="text-sm text-gray-600 mt-2">This account appears to be clean</p>
+                  <p className="text-lg text-gray-400 font-medium">
+                    No Fraud Detected
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    This account appears to be clean
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -305,7 +399,10 @@ export default function SuspicionScoreCard({ score }: Props) {
               <CardTitle className="text-gray-100 flex items-center gap-2">
                 <Users className="h-5 w-5 text-yellow-500" />
                 Linked Suspicious Accounts
-                <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 ml-2">
+                <Badge
+                  variant="outline"
+                  className="border-yellow-500/30 text-yellow-400 ml-2"
+                >
                   {score.linkedAccounts.length}
                 </Badge>
               </CardTitle>
@@ -324,7 +421,10 @@ export default function SuspicionScoreCard({ score }: Props) {
                       <span className="font-mono text-sm text-gray-300">
                         #{idx + 1} {account.userId.substring(0, 20)}...
                       </span>
-                      <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-400">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-blue-500/30 text-blue-400"
+                      >
                         {Math.round(account.confidence * 100)}%
                       </Badge>
                     </div>
@@ -348,7 +448,10 @@ export default function SuspicionScoreCard({ score }: Props) {
               <CardTitle className="text-gray-100 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-blue-500" />
                 Score History
-                <Badge variant="outline" className="border-blue-500/30 text-blue-400 ml-2">
+                <Badge
+                  variant="outline"
+                  className="border-blue-500/30 text-blue-400 ml-2"
+                >
                   {recentHistory.length} Recent
                 </Badge>
               </CardTitle>
@@ -367,17 +470,24 @@ export default function SuspicionScoreCard({ score }: Props) {
                       <span className="text-xs text-gray-400">
                         {new Date(entry.timestamp).toLocaleString()}
                       </span>
-                      <Badge 
-                        variant="outline" 
-                        className={entry.delta > 0 ? 'border-red-500/30 text-red-400' : 'border-green-500/30 text-green-400'}
+                      <Badge
+                        variant="outline"
+                        className={
+                          entry.delta > 0
+                            ? "border-red-500/30 text-red-400"
+                            : "border-green-500/30 text-green-400"
+                        }
                       >
-                        {entry.delta > 0 ? '+' : ''}{entry.delta}%
+                        {entry.delta > 0 ? "+" : ""}
+                        {entry.delta}%
                       </Badge>
                     </div>
                     <p className="text-sm text-gray-300 mb-1">{entry.reason}</p>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-600">{entry.triggeredBy}</span>
-                      <span className={`font-semibold ${getScoreColor(entry.score)}`}>
+                      <span
+                        className={`font-semibold ${getScoreColor(entry.score)}`}
+                      >
                         Score: {entry.score}%
                       </span>
                     </div>
@@ -391,4 +501,3 @@ export default function SuspicionScoreCard({ score }: Props) {
     </div>
   );
 }
-

@@ -1,8 +1,8 @@
-'use server';
+"use server";
 
-import { Redis } from '@upstash/redis';
-import { connectToDatabase } from '@/database/mongoose';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { Redis } from "@upstash/redis";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 // Singleton Redis instance
 let redisInstance: Redis | null = null;
@@ -23,7 +23,7 @@ export async function getRedisConfig(): Promise<RedisConfig | null> {
   try {
     await connectToDatabase();
     const settings = await WhiteLabel.findOne();
-    
+
     if (!settings?.upstashRedisUrl || !settings?.upstashRedisToken) {
       return null;
     }
@@ -34,7 +34,7 @@ export async function getRedisConfig(): Promise<RedisConfig | null> {
       enabled: settings.redisEnabled ?? false,
     };
   } catch (error) {
-    console.error('Error getting Redis config:', error);
+    console.error("Error getting Redis config:", error);
     return null;
   }
 }
@@ -47,19 +47,19 @@ export async function getRedis(): Promise<Redis | null> {
   const now = Date.now();
 
   // If we already have a Redis instance and config is fresh, return it
-  if (redisInstance && (now - lastConfigCheck) < CONFIG_CHECK_INTERVAL) {
+  if (redisInstance && now - lastConfigCheck < CONFIG_CHECK_INTERVAL) {
     return redisInstance;
   }
 
   // If Redis was disabled and config is fresh, return null immediately
-  if (redisDisabled && (now - lastConfigCheck) < CONFIG_CHECK_INTERVAL) {
+  if (redisDisabled && now - lastConfigCheck < CONFIG_CHECK_INTERVAL) {
     return null;
   }
 
   // Need to check config (either first time or config expired)
   const config = await getRedisConfig();
   lastConfigCheck = now;
-  
+
   if (!config || !config.enabled) {
     redisInstance = null;
     redisDisabled = true;
@@ -68,7 +68,7 @@ export async function getRedis(): Promise<Redis | null> {
 
   // Redis is enabled, create instance
   redisDisabled = false;
-  
+
   try {
     redisInstance = new Redis({
       url: config.url,
@@ -76,7 +76,7 @@ export async function getRedis(): Promise<Redis | null> {
     });
     return redisInstance;
   } catch (error) {
-    console.error('Failed to create Redis instance:', error);
+    console.error("Failed to create Redis instance:", error);
     redisInstance = null;
     return null;
   }
@@ -85,7 +85,10 @@ export async function getRedis(): Promise<Redis | null> {
 /**
  * Test Redis connection
  */
-export async function testRedisConnection(url: string, token: string): Promise<{
+export async function testRedisConnection(
+  url: string,
+  token: string,
+): Promise<{
   success: boolean;
   message: string;
   latency?: number;
@@ -93,15 +96,15 @@ export async function testRedisConnection(url: string, token: string): Promise<{
   try {
     const redis = new Redis({ url, token });
     const start = Date.now();
-    
+
     // Test basic operations
-    await redis.set('test:connection', 'ok', { ex: 10 });
-    const result = await redis.get('test:connection');
-    await redis.del('test:connection');
-    
+    await redis.set("test:connection", "ok", { ex: 10 });
+    const result = await redis.get("test:connection");
+    await redis.del("test:connection");
+
     const latency = Date.now() - start;
 
-    if (result === 'ok') {
+    if (result === "ok") {
       return {
         success: true,
         message: `Connection successful! Latency: ${latency}ms`,
@@ -111,12 +114,12 @@ export async function testRedisConnection(url: string, token: string): Promise<{
 
     return {
       success: false,
-      message: 'Connection established but read/write test failed',
+      message: "Connection established but read/write test failed",
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -125,7 +128,7 @@ export async function testRedisConnection(url: string, token: string): Promise<{
 // PRICE CACHE FUNCTIONS
 // ============================================
 
-const PRICE_KEY_PREFIX = 'price:';
+const PRICE_KEY_PREFIX = "price:";
 const PRICE_TTL = 10; // 10 seconds
 
 export interface CachedPrice {
@@ -138,19 +141,20 @@ export interface CachedPrice {
 /**
  * Set price in Redis cache
  */
-export async function setPrice(symbol: string, price: CachedPrice): Promise<boolean> {
+export async function setPrice(
+  symbol: string,
+  price: CachedPrice,
+): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
 
   try {
-    await redis.set(
-      `${PRICE_KEY_PREFIX}${symbol}`,
-      JSON.stringify(price),
-      { ex: PRICE_TTL }
-    );
+    await redis.set(`${PRICE_KEY_PREFIX}${symbol}`, JSON.stringify(price), {
+      ex: PRICE_TTL,
+    });
     return true;
   } catch (error) {
     console.error(`Failed to set price for ${symbol}:`, error);
@@ -161,28 +165,28 @@ export async function setPrice(symbol: string, price: CachedPrice): Promise<bool
 /**
  * Set multiple prices in Redis cache (pipeline for performance)
  */
-export async function setPrices(prices: Map<string, CachedPrice>): Promise<boolean> {
+export async function setPrices(
+  prices: Map<string, CachedPrice>,
+): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
 
   try {
     const pipeline = redis.pipeline();
-    
+
     prices.forEach((price, symbol) => {
-      pipeline.set(
-        `${PRICE_KEY_PREFIX}${symbol}`,
-        JSON.stringify(price),
-        { ex: PRICE_TTL }
-      );
+      pipeline.set(`${PRICE_KEY_PREFIX}${symbol}`, JSON.stringify(price), {
+        ex: PRICE_TTL,
+      });
     });
 
     await pipeline.exec();
     return true;
   } catch (error) {
-    console.error('Failed to set prices:', error);
+    console.error("Failed to set prices:", error);
     return false;
   }
 }
@@ -192,14 +196,14 @@ export async function setPrices(prices: Map<string, CachedPrice>): Promise<boole
  */
 export async function getPrice(symbol: string): Promise<CachedPrice | null> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return null;
   }
 
   try {
     const data = await redis.get<string>(`${PRICE_KEY_PREFIX}${symbol}`);
-    
+
     if (!data) {
       return null;
     }
@@ -214,16 +218,18 @@ export async function getPrice(symbol: string): Promise<CachedPrice | null> {
 /**
  * Get multiple prices from Redis cache
  */
-export async function getPrices(symbols: string[]): Promise<Map<string, CachedPrice>> {
+export async function getPrices(
+  symbols: string[],
+): Promise<Map<string, CachedPrice>> {
   const redis = await getRedis();
   const result = new Map<string, CachedPrice>();
-  
+
   if (!redis) {
     return result;
   }
 
   try {
-    const keys = symbols.map(s => `${PRICE_KEY_PREFIX}${s}`);
+    const keys = symbols.map((s) => `${PRICE_KEY_PREFIX}${s}`);
     const values = await redis.mget<string[]>(...keys);
 
     values.forEach((value, index) => {
@@ -236,7 +242,7 @@ export async function getPrices(symbols: string[]): Promise<Map<string, CachedPr
       }
     });
   } catch (error) {
-    console.error('Failed to get prices:', error);
+    console.error("Failed to get prices:", error);
   }
 
   return result;
@@ -248,7 +254,7 @@ export async function getPrices(symbols: string[]): Promise<Map<string, CachedPr
 export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
   const redis = await getRedis();
   const result = new Map<string, CachedPrice>();
-  
+
   if (!redis) {
     return result;
   }
@@ -256,7 +262,7 @@ export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
   try {
     // Get all price keys
     const keys = await redis.keys(`${PRICE_KEY_PREFIX}*`);
-    
+
     if (keys.length === 0) {
       return result;
     }
@@ -266,7 +272,7 @@ export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
     keys.forEach((key, index) => {
       if (values[index]) {
         try {
-          const symbol = key.replace(PRICE_KEY_PREFIX, '');
+          const symbol = key.replace(PRICE_KEY_PREFIX, "");
           result.set(symbol, JSON.parse(values[index]));
         } catch {
           // Skip invalid JSON
@@ -274,7 +280,7 @@ export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
       }
     });
   } catch (error) {
-    console.error('Failed to get all prices:', error);
+    console.error("Failed to get all prices:", error);
   }
 
   return result;
@@ -284,14 +290,14 @@ export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
 // TRADE QUEUE FUNCTIONS
 // ============================================
 
-const TRADE_QUEUE_KEY = 'queue:trades';
-const TRADE_QUEUE_PROCESSING = 'queue:trades:processing';
+const TRADE_QUEUE_KEY = "queue:trades";
+const TRADE_QUEUE_PROCESSING = "queue:trades:processing";
 
 export interface QueuedTrade {
   id: string;
   userId: string;
   positionId: string;
-  action: 'close' | 'open' | 'modify';
+  action: "close" | "open" | "modify";
   data: Record<string, unknown>;
   timestamp: number;
   retries: number;
@@ -300,9 +306,11 @@ export interface QueuedTrade {
 /**
  * Add trade to queue
  */
-export async function queueTrade(trade: Omit<QueuedTrade, 'timestamp' | 'retries'>): Promise<boolean> {
+export async function queueTrade(
+  trade: Omit<QueuedTrade, "timestamp" | "retries">,
+): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
@@ -317,7 +325,7 @@ export async function queueTrade(trade: Omit<QueuedTrade, 'timestamp' | 'retries
     await redis.lpush(TRADE_QUEUE_KEY, JSON.stringify(queuedTrade));
     return true;
   } catch (error) {
-    console.error('Failed to queue trade:', error);
+    console.error("Failed to queue trade:", error);
     return false;
   }
 }
@@ -327,7 +335,7 @@ export async function queueTrade(trade: Omit<QueuedTrade, 'timestamp' | 'retries
  */
 export async function dequeueTradeForProcessing(): Promise<QueuedTrade | null> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return null;
   }
@@ -335,17 +343,17 @@ export async function dequeueTradeForProcessing(): Promise<QueuedTrade | null> {
   try {
     // Pop from end of queue
     const data = await redis.rpop<string>(TRADE_QUEUE_KEY);
-    
+
     if (!data) {
       return null;
     }
 
     // Add to processing list
     await redis.lpush(TRADE_QUEUE_PROCESSING, data);
-    
+
     return JSON.parse(data);
   } catch (error) {
-    console.error('Failed to dequeue trade:', error);
+    console.error("Failed to dequeue trade:", error);
     return null;
   }
 }
@@ -353,9 +361,11 @@ export async function dequeueTradeForProcessing(): Promise<QueuedTrade | null> {
 /**
  * Mark trade as completed (remove from processing)
  */
-export async function completeQueuedTrade(trade: QueuedTrade): Promise<boolean> {
+export async function completeQueuedTrade(
+  trade: QueuedTrade,
+): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
@@ -364,7 +374,7 @@ export async function completeQueuedTrade(trade: QueuedTrade): Promise<boolean> 
     await redis.lrem(TRADE_QUEUE_PROCESSING, 1, JSON.stringify(trade));
     return true;
   } catch (error) {
-    console.error('Failed to complete queued trade:', error);
+    console.error("Failed to complete queued trade:", error);
     return false;
   }
 }
@@ -374,7 +384,7 @@ export async function completeQueuedTrade(trade: QueuedTrade): Promise<boolean> 
  */
 export async function requeueFailedTrade(trade: QueuedTrade): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
@@ -392,12 +402,12 @@ export async function requeueFailedTrade(trade: QueuedTrade): Promise<boolean> {
       await redis.lpush(TRADE_QUEUE_KEY, JSON.stringify(updatedTrade));
     } else {
       // Max retries reached - log and discard
-      console.error('Trade exceeded max retries:', trade);
+      console.error("Trade exceeded max retries:", trade);
     }
 
     return true;
   } catch (error) {
-    console.error('Failed to requeue trade:', error);
+    console.error("Failed to requeue trade:", error);
     return false;
   }
 }
@@ -410,7 +420,7 @@ export async function getQueueStats(): Promise<{
   processing: number;
 } | null> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return null;
   }
@@ -423,7 +433,7 @@ export async function getQueueStats(): Promise<{
 
     return { pending, processing };
   } catch (error) {
-    console.error('Failed to get queue stats:', error);
+    console.error("Failed to get queue stats:", error);
     return null;
   }
 }
@@ -432,7 +442,7 @@ export async function getQueueStats(): Promise<{
 // RATE LIMITING FUNCTIONS
 // ============================================
 
-const RATE_LIMIT_PREFIX = 'ratelimit:';
+const RATE_LIMIT_PREFIX = "ratelimit:";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -446,10 +456,10 @@ export interface RateLimitResult {
 export async function checkRateLimit(
   key: string,
   limit: number,
-  windowSeconds: number
+  windowSeconds: number,
 ): Promise<RateLimitResult> {
   const redis = await getRedis();
-  
+
   // If Redis is not available, allow the request
   if (!redis) {
     return { allowed: true, remaining: limit - 1, resetIn: windowSeconds };
@@ -461,9 +471,9 @@ export async function checkRateLimit(
     const multi = redis.multi();
     multi.incr(fullKey);
     multi.ttl(fullKey);
-    
+
     const results = await multi.exec();
-    
+
     const count = results[0] as number;
     let ttl = results[1] as number;
 
@@ -482,7 +492,7 @@ export async function checkRateLimit(
       resetIn: ttl,
     };
   } catch (error) {
-    console.error('Rate limit check failed:', error);
+    console.error("Rate limit check failed:", error);
     // On error, allow the request
     return { allowed: true, remaining: limit - 1, resetIn: windowSeconds };
   }
@@ -499,7 +509,7 @@ export async function getCacheStats(): Promise<{
   queueProcessing: number;
 } | null> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return {
       connected: false,
@@ -523,7 +533,7 @@ export async function getCacheStats(): Promise<{
       queueProcessing: processing,
     };
   } catch (error) {
-    console.error('Failed to get cache stats:', error);
+    console.error("Failed to get cache stats:", error);
     return null;
   }
 }
@@ -533,21 +543,21 @@ export async function getCacheStats(): Promise<{
  */
 export async function clearPriceCache(): Promise<boolean> {
   const redis = await getRedis();
-  
+
   if (!redis) {
     return false;
   }
 
   try {
     const keys = await redis.keys(`${PRICE_KEY_PREFIX}*`);
-    
+
     if (keys.length > 0) {
       await redis.del(...keys);
     }
 
     return true;
   } catch (error) {
-    console.error('Failed to clear price cache:', error);
+    console.error("Failed to clear price cache:", error);
     return false;
   }
 }
@@ -560,4 +570,3 @@ export async function reconnectRedis(): Promise<void> {
   redisDisabled = false;
   lastConfigCheck = 0;
 }
-

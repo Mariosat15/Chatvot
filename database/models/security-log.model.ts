@@ -1,4 +1,4 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema } from "mongoose";
 
 /**
  * Security Log Model
@@ -11,30 +11,37 @@ export interface ISecurityLog extends Document {
   userEmail?: string;
   ipAddress: string;
   userAgent?: string;
-  
+
   // Endpoint Info
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   endpoint: string;
-  category: 'deposit' | 'withdrawal' | 'auth' | 'admin' | 'wallet' | 'kyc' | 'other';
-  
+  category:
+    | "deposit"
+    | "withdrawal"
+    | "auth"
+    | "admin"
+    | "wallet"
+    | "kyc"
+    | "other";
+
   // Request Details (sanitized - no sensitive data)
   requestBody?: Record<string, unknown>;
   queryParams?: Record<string, string>;
-  
+
   // Response Info
   statusCode: number;
   responseTime: number; // milliseconds
   success: boolean;
   errorMessage?: string;
-  
+
   // Rate Limiting
   rateLimitRemaining?: number;
   rateLimitExceeded: boolean;
-  
+
   // Security Flags
   suspicious: boolean;
   suspiciousReasons?: string[];
-  
+
   // Metadata
   createdAt: Date;
 }
@@ -73,11 +80,11 @@ const SecurityLogSchema = new Schema<ISecurityLog>(
       index: true,
     },
     userAgent: String,
-    
+
     // Endpoint Info
     method: {
       type: String,
-      enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+      enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       required: true,
     },
     endpoint: {
@@ -87,15 +94,23 @@ const SecurityLogSchema = new Schema<ISecurityLog>(
     },
     category: {
       type: String,
-      enum: ['deposit', 'withdrawal', 'auth', 'admin', 'wallet', 'kyc', 'other'],
-      default: 'other',
+      enum: [
+        "deposit",
+        "withdrawal",
+        "auth",
+        "admin",
+        "wallet",
+        "kyc",
+        "other",
+      ],
+      default: "other",
       index: true,
     },
-    
+
     // Request Details
     requestBody: Schema.Types.Mixed,
     queryParams: Schema.Types.Mixed,
-    
+
     // Response Info
     statusCode: {
       type: Number,
@@ -112,7 +127,7 @@ const SecurityLogSchema = new Schema<ISecurityLog>(
       index: true,
     },
     errorMessage: String,
-    
+
     // Rate Limiting
     rateLimitRemaining: Number,
     rateLimitExceeded: {
@@ -120,7 +135,7 @@ const SecurityLogSchema = new Schema<ISecurityLog>(
       default: false,
       index: true,
     },
-    
+
     // Security Flags
     suspicious: {
       type: Boolean,
@@ -131,7 +146,7 @@ const SecurityLogSchema = new Schema<ISecurityLog>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for time-based queries
@@ -143,18 +158,23 @@ SecurityLogSchema.index({ category: 1, createdAt: -1 });
 SecurityLogSchema.index({ suspicious: 1, createdAt: -1 });
 
 // TTL index - automatically delete logs older than 90 days
-SecurityLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+SecurityLogSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60 },
+);
 
 // Static method to log a request
-SecurityLogSchema.statics.logRequest = async function (data: Partial<ISecurityLog>): Promise<ISecurityLog> {
+SecurityLogSchema.statics.logRequest = async function (
+  data: Partial<ISecurityLog>,
+): Promise<ISecurityLog> {
   // Detect suspicious activity
   const suspiciousReasons: string[] = [];
-  
+
   // Check for rate limit exceeded
   if (data.rateLimitExceeded) {
-    suspiciousReasons.push('Rate limit exceeded');
+    suspiciousReasons.push("Rate limit exceeded");
   }
-  
+
   // Check for multiple failed requests
   if (data.statusCode && data.statusCode >= 400) {
     // Check recent failures from same IP
@@ -163,23 +183,29 @@ SecurityLogSchema.statics.logRequest = async function (data: Partial<ISecurityLo
       success: false,
       createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) }, // Last 5 minutes
     });
-    
+
     if (recentFailures >= 5) {
-      suspiciousReasons.push(`Multiple failures from IP (${recentFailures} in 5 min)`);
+      suspiciousReasons.push(
+        `Multiple failures from IP (${recentFailures} in 5 min)`,
+      );
     }
   }
-  
+
   // Check for unusual user agents
   if (data.userAgent) {
     const ua = data.userAgent.toLowerCase();
-    if (ua.includes('curl') || ua.includes('python') || ua.includes('postman')) {
-      suspiciousReasons.push('Non-browser user agent');
+    if (
+      ua.includes("curl") ||
+      ua.includes("python") ||
+      ua.includes("postman")
+    ) {
+      suspiciousReasons.push("Non-browser user agent");
     }
   }
-  
+
   // Mark as suspicious if any reasons found
   const suspicious = suspiciousReasons.length > 0;
-  
+
   return this.create({
     ...data,
     suspicious,
@@ -196,11 +222,11 @@ SecurityLogSchema.statics.getRecentLogs = async function (options: {
   skip?: number;
 }): Promise<ISecurityLog[]> {
   const query: Record<string, unknown> = {};
-  
+
   if (options.userId) query.userId = options.userId;
   if (options.category) query.category = options.category;
   if (options.suspicious !== undefined) query.suspicious = options.suspicious;
-  
+
   return this.find(query)
     .sort({ createdAt: -1 })
     .skip(options.skip || 0)
@@ -209,7 +235,9 @@ SecurityLogSchema.statics.getRecentLogs = async function (options: {
 };
 
 // Static method to get suspicious activity
-SecurityLogSchema.statics.getSuspiciousActivity = async function (hours = 24): Promise<ISecurityLog[]> {
+SecurityLogSchema.statics.getSuspiciousActivity = async function (
+  hours = 24,
+): Promise<ISecurityLog[]> {
   return this.find({
     suspicious: true,
     createdAt: { $gte: new Date(Date.now() - hours * 60 * 60 * 1000) },
@@ -229,7 +257,7 @@ SecurityLogSchema.statics.getLogStats = async function (hours = 24): Promise<{
   byEndpoint: Record<string, number>;
 }> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-  
+
   const [totals, byCategory, byEndpoint] = await Promise.all([
     this.aggregate([
       { $match: { createdAt: { $gte: since } } },
@@ -237,41 +265,47 @@ SecurityLogSchema.statics.getLogStats = async function (hours = 24): Promise<{
         $group: {
           _id: null,
           totalRequests: { $sum: 1 },
-          failedRequests: { $sum: { $cond: ['$success', 0, 1] } },
-          rateLimitExceeded: { $sum: { $cond: ['$rateLimitExceeded', 1, 0] } },
-          suspiciousRequests: { $sum: { $cond: ['$suspicious', 1, 0] } },
+          failedRequests: { $sum: { $cond: ["$success", 0, 1] } },
+          rateLimitExceeded: { $sum: { $cond: ["$rateLimitExceeded", 1, 0] } },
+          suspiciousRequests: { $sum: { $cond: ["$suspicious", 1, 0] } },
         },
       },
     ]),
     this.aggregate([
       { $match: { createdAt: { $gte: since } } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
     ]),
     this.aggregate([
       { $match: { createdAt: { $gte: since } } },
-      { $group: { _id: '$endpoint', count: { $sum: 1 } } },
+      { $group: { _id: "$endpoint", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 20 },
     ]),
   ]);
-  
+
   const stats = totals[0] || {
     totalRequests: 0,
     failedRequests: 0,
     rateLimitExceeded: 0,
     suspiciousRequests: 0,
   };
-  
+
   return {
     ...stats,
-    byCategory: Object.fromEntries(byCategory.map((c: { _id: string; count: number }) => [c._id, c.count])),
-    byEndpoint: Object.fromEntries(byEndpoint.map((e: { _id: string; count: number }) => [e._id, e.count])),
+    byCategory: Object.fromEntries(
+      byCategory.map((c: { _id: string; count: number }) => [c._id, c.count]),
+    ),
+    byEndpoint: Object.fromEntries(
+      byEndpoint.map((e: { _id: string; count: number }) => [e._id, e.count]),
+    ),
   };
 };
 
 const SecurityLog =
   (mongoose.models?.SecurityLog as unknown as ISecurityLogModel) ||
-  mongoose.model<ISecurityLog, ISecurityLogModel>('SecurityLog', SecurityLogSchema);
+  mongoose.model<ISecurityLog, ISecurityLogModel>(
+    "SecurityLog",
+    SecurityLogSchema,
+  );
 
 export default SecurityLog;
-

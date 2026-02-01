@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 export async function GET() {
   try {
@@ -15,20 +15,21 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      appLogo: settings.appLogo || '/assets/images/logo.png',
-      emailLogo: settings.emailLogo || '/assets/images/logo.png',
-      profileImage: settings.profileImage || '/assets/images/PROFILE.png',
-      dashboardPreview: settings.dashboardPreview || '/assets/images/dashboard-preview.png',
-      favicon: settings.favicon || '/favicon.ico',
+      appLogo: settings.appLogo || "/assets/images/logo.png",
+      emailLogo: settings.emailLogo || "/assets/images/logo.png",
+      profileImage: settings.profileImage || "/assets/images/PROFILE.png",
+      dashboardPreview:
+        settings.dashboardPreview || "/assets/images/dashboard-preview.png",
+      favicon: settings.favicon || "/favicon.ico",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Get images error:', error);
+    console.error("Get images error:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch images' },
-      { status: 500 }
+      { error: "Failed to fetch images" },
+      { status: 500 },
     );
   }
 }
@@ -39,7 +40,8 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { appLogo, emailLogo, profileImage, dashboardPreview, favicon } = body;
+    const { appLogo, emailLogo, profileImage, dashboardPreview, favicon } =
+      body;
 
     let settings = await WhiteLabel.findOne();
     if (!settings) {
@@ -49,24 +51,24 @@ export async function PUT(request: NextRequest) {
     if (appLogo !== undefined) settings.appLogo = appLogo;
     if (emailLogo !== undefined) settings.emailLogo = emailLogo;
     if (profileImage !== undefined) settings.profileImage = profileImage;
-    if (dashboardPreview !== undefined) settings.dashboardPreview = dashboardPreview;
+    if (dashboardPreview !== undefined)
+      settings.dashboardPreview = dashboardPreview;
     if (favicon !== undefined) settings.favicon = favicon;
 
     await settings.save();
 
     return NextResponse.json({
       success: true,
-      message: 'Image configuration saved',
+      message: "Image configuration saved",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Update images error:', error);
+    console.error("Update images error:", error);
     return NextResponse.json(
-      { error: 'Failed to update images' },
-      { status: 500 }
+      { error: "Failed to update images" },
+      { status: 500 },
     );
   }
 }
-

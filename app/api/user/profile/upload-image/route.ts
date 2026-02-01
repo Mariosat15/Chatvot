@@ -1,15 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import { ObjectId } from 'mongodb';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { syncUserProfile } from '@/lib/services/profile-sync.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import { ObjectId } from "mongodb";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
+import { syncUserProfile } from "@/lib/services/profile-sync.service";
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
 
 /**
  * Helper to build query filter for user
@@ -17,12 +23,12 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'im
 function buildUserQuery(userId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queries: any[] = [{ id: userId }];
-  
+
   if (ObjectId.isValid(userId)) {
     queries.push({ _id: new ObjectId(userId) });
   }
   queries.push({ _id: userId });
-  
+
   return { $or: queries };
 }
 
@@ -33,41 +39,44 @@ function buildUserQuery(userId: string) {
 export async function POST(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const formData = await req.formData();
-    const file = formData.get('image') as File | null;
+    const file = formData.get("image") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
+      return NextResponse.json(
+        { error: "No image file provided" },
+        { status: 400 },
+      );
     }
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF' },
-        { status: 400 }
+        { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF" },
+        { status: 400 },
       );
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size: 5MB' },
-        { status: 400 }
+        { error: "File too large. Maximum size: 5MB" },
+        { status: 400 },
       );
     }
 
     // Create uploads directory if it doesn't exist
     // Try multiple possible locations for production compatibility
     const possibleDirs = [
-      path.join(process.cwd(), 'public', 'uploads', 'profiles'),
-      path.join('/var/www/chartvolt', 'public', 'uploads', 'profiles'),
+      path.join(process.cwd(), "public", "uploads", "profiles"),
+      path.join("/var/www/chartvolt", "public", "uploads", "profiles"),
     ];
-    
+
     // Use the first directory that we can create successfully
     let uploadsDir = possibleDirs[0];
     for (const dir of possibleDirs) {
@@ -79,12 +88,12 @@ export async function POST(req: NextRequest) {
         console.warn(`Could not create directory ${dir}:`, err);
       }
     }
-    
+
     // Ensure the directory exists
     await mkdir(uploadsDir, { recursive: true });
 
     // Generate unique filename
-    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileExt = file.name.split(".").pop() || "jpg";
     const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
     const filePath = path.join(uploadsDir, fileName);
 
@@ -99,22 +108,27 @@ export async function POST(req: NextRequest) {
     // Update user in database
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
     }
 
-    await db.collection('user').findOneAndUpdate(
-      buildUserQuery(session.user.id),
-      { 
-        $set: { 
+    await db
+      .collection("user")
+      .findOneAndUpdate(buildUserQuery(session.user.id), {
+        $set: {
           profileImage: profileImageUrl,
-          updatedAt: new Date() 
-        } 
-      }
-    );
+          updatedAt: new Date(),
+        },
+      });
 
-    console.log(`✅ Profile image uploaded for user: ${session.user.email}`, profileImageUrl);
+    console.log(
+      `✅ Profile image uploaded for user: ${session.user.email}`,
+      profileImageUrl,
+    );
 
     // Sync profile image to messaging (friends, conversations, messages)
     try {
@@ -123,17 +137,19 @@ export async function POST(req: NextRequest) {
         avatar: profileImageUrl,
       });
     } catch (syncError) {
-      console.error('Error syncing profile image to messaging:', syncError);
+      console.error("Error syncing profile image to messaging:", syncError);
       // Don't fail the request if sync fails
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      profileImage: profileImageUrl 
+      profileImage: profileImageUrl,
     });
   } catch (error) {
-    console.error('Error uploading profile image:', error);
-    return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+    console.error("Error uploading profile image:", error);
+    return NextResponse.json(
+      { error: "Failed to upload image" },
+      { status: 500 },
+    );
   }
 }
-

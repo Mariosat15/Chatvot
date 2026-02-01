@@ -1,10 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Play, Eye, TrendingUp, TrendingDown, Trophy, BarChart3, Clock, RefreshCw } from 'lucide-react';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  Play,
+  Eye,
+  TrendingUp,
+  TrendingDown,
+  Trophy,
+  BarChart3,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface UserParticipant {
   _id: string;
@@ -21,7 +30,7 @@ interface CompetitionStatusWrapperProps {
   competitionId: string;
   startTime: string;
   endTime: string;
-  initialStatus: 'upcoming' | 'active' | 'completed';
+  initialStatus: "upcoming" | "active" | "completed";
   isUserIn: boolean;
   userParticipant: UserParticipant | null;
 }
@@ -44,14 +53,14 @@ export default function CompetitionStatusWrapper({
       const start = new Date(startTime);
       const end = new Date(endTime);
 
-      let newStatus: 'upcoming' | 'active' | 'completed' = 'upcoming';
-      
+      let newStatus: "upcoming" | "active" | "completed" = "upcoming";
+
       if (now >= end) {
-        newStatus = 'completed';
+        newStatus = "completed";
       } else if (now >= start) {
-        newStatus = 'active';
+        newStatus = "active";
       } else {
-        newStatus = 'upcoming';
+        newStatus = "upcoming";
         setTimeToStart(start.getTime() - now.getTime());
       }
 
@@ -72,8 +81,10 @@ export default function CompetitionStatusWrapper({
 
     // Use adaptive interval: 1 second when close to starting, otherwise 10 seconds
     const isCloseToStart = timeUntilStart > 0 && timeUntilStart < 60000; // Within 1 minute
-    const intervalTime = isCloseToStart ? PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE : PERFORMANCE_INTERVALS.COMPETITION_STATUS;
-    
+    const intervalTime = isCloseToStart
+      ? PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE
+      : PERFORMANCE_INTERVALS.COMPETITION_STATUS;
+
     const interval = setInterval(checkStatus, intervalTime);
 
     return () => clearInterval(interval);
@@ -84,19 +95,21 @@ export default function CompetitionStatusWrapper({
     return null;
   }
 
-  const isActive = status === 'active';
-  const isCompleted = status === 'completed';
-  const isUpcoming = status === 'upcoming';
+  const isActive = status === "active";
+  const isCompleted = status === "completed";
+  const isUpcoming = status === "upcoming";
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${
-      isCompleted 
-        ? 'from-purple-500/10 to-gray-800/50 border-purple-500/30' 
-        : 'from-blue-500/10 to-gray-800/50 border-blue-500/30'
-    } border p-6 transition-all duration-500 ${isTransitioning ? 'scale-[0.98] opacity-80' : ''}`}>
+    <div
+      className={`rounded-xl bg-gradient-to-br ${
+        isCompleted
+          ? "from-purple-500/10 to-gray-800/50 border-purple-500/30"
+          : "from-blue-500/10 to-gray-800/50 border-blue-500/30"
+      } border p-6 transition-all duration-500 ${isTransitioning ? "scale-[0.98] opacity-80" : ""}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-100">
-          {isCompleted ? '🏁 Your Final Results' : 'Your Performance'}
+          {isCompleted ? "🏁 Your Final Results" : "Your Performance"}
         </h3>
         <div className="flex items-center gap-2">
           {isActive && (
@@ -118,23 +131,27 @@ export default function CompetitionStatusWrapper({
             </span>
           )}
           <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-sm font-medium">
-            Rank #{userParticipant.currentRank || '—'}
+            Rank #{userParticipant.currentRank || "—"}
           </span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <p className="text-xs text-gray-500">{isCompleted ? 'Final Capital' : 'Current Capital'}</p>
+          <p className="text-xs text-gray-500">
+            {isCompleted ? "Final Capital" : "Current Capital"}
+          </p>
           <p className="text-xl font-bold text-gray-100">
             ${userParticipant.currentCapital.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">{isCompleted ? 'Final P&L' : 'P&L'}</p>
+          <p className="text-xs text-gray-500">
+            {isCompleted ? "Final P&L" : "P&L"}
+          </p>
           <p
             className={`text-xl font-bold flex items-center gap-1 ${
-              userParticipant.pnl >= 0 ? 'text-green-500' : 'text-red-500'
+              userParticipant.pnl >= 0 ? "text-green-500" : "text-red-500"
             }`}
           >
             {userParticipant.pnl >= 0 ? (
@@ -142,18 +159,20 @@ export default function CompetitionStatusWrapper({
             ) : (
               <TrendingDown className="h-4 w-4" />
             )}
-            {userParticipant.pnl >= 0 ? '+' : ''}
-            ${userParticipant.pnl.toFixed(2)}
+            {userParticipant.pnl >= 0 ? "+" : ""}$
+            {userParticipant.pnl.toFixed(2)}
           </p>
         </div>
         <div>
           <p className="text-xs text-gray-500">ROI</p>
           <p
             className={`text-xl font-bold ${
-              userParticipant.pnlPercentage >= 0 ? 'text-green-500' : 'text-red-500'
+              userParticipant.pnlPercentage >= 0
+                ? "text-green-500"
+                : "text-red-500"
             }`}
           >
-            {userParticipant.pnlPercentage >= 0 ? '+' : ''}
+            {userParticipant.pnlPercentage >= 0 ? "+" : ""}
             {userParticipant.pnlPercentage.toFixed(2)}%
           </p>
         </div>
@@ -172,7 +191,8 @@ export default function CompetitionStatusWrapper({
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-center">
             <p className="text-amber-400 text-sm font-medium flex items-center justify-center gap-2">
               <Clock className="h-4 w-4 animate-pulse" />
-              Competition hasn&apos;t started yet. Trading button will appear when it begins!
+              Competition hasn&apos;t started yet. Trading button will appear
+              when it begins!
             </p>
           </div>
         )}
@@ -190,15 +210,24 @@ export default function CompetitionStatusWrapper({
         {/* Completed - View Results Button */}
         {isCompleted && (
           <div className="space-y-3">
-            <Link href={`/competitions/${competitionId}/results`} className="block">
+            <Link
+              href={`/competitions/${competitionId}/results`}
+              className="block"
+            >
               <Button className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-3 text-lg shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02]">
                 <BarChart3 className="h-5 w-5 mr-2" />
                 View Trading Results
               </Button>
             </Link>
-            
-            <Link href={`/competitions/${competitionId}/trade?viewOnly=true`} className="block">
-              <Button variant="outline" className="w-full border-purple-500/50 text-purple-400 hover:bg-purple-500/10">
+
+            <Link
+              href={`/competitions/${competitionId}/trade?viewOnly=true`}
+              className="block"
+            >
+              <Button
+                variant="outline"
+                className="w-full border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+              >
                 <Eye className="h-4 w-4 mr-2" />
                 Review Charts & Trade History
               </Button>
@@ -219,4 +248,3 @@ export default function CompetitionStatusWrapper({
     </div>
   );
 }
-

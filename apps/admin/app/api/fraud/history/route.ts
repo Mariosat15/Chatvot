@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { FraudHistory, FraudActionType, ActionSeverity } from '@/database/models/fraud/fraud-history.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import {
+  FraudHistory,
+  FraudActionType,
+  ActionSeverity,
+} from "@/database/models/fraud/fraud-history.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 // GET - Fetch fraud history with filters
 export async function GET(request: NextRequest) {
@@ -10,17 +14,17 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    
+
     // Parse query parameters
-    const userId = searchParams.get('userId');
-    const actionType = searchParams.get('actionType') as FraudActionType | null;
-    const severity = searchParams.get('severity') as ActionSeverity | null;
-    const performedByType = searchParams.get('performedByType');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const search = searchParams.get('search');
+    const userId = searchParams.get("userId");
+    const actionType = searchParams.get("actionType") as FraudActionType | null;
+    const severity = searchParams.get("severity") as ActionSeverity | null;
+    const performedByType = searchParams.get("performedByType");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const search = searchParams.get("search");
 
     // Build query
     const query: Record<string, unknown> = {};
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (performedByType) {
-      query['performedBy.type'] = performedByType;
+      query["performedBy.type"] = performedByType;
     }
 
     if (startDate || endDate) {
@@ -53,23 +57,23 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       query.$or = [
-        { userEmail: { $regex: search, $options: 'i' } },
-        { userName: { $regex: search, $options: 'i' } },
-        { reason: { $regex: search, $options: 'i' } },
-        { details: { $regex: search, $options: 'i' } },
+        { userEmail: { $regex: search, $options: "i" } },
+        { userName: { $regex: search, $options: "i" } },
+        { reason: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
       ];
     }
 
     // Execute query with pagination
     const skip = (page - 1) * limit;
-    
+
     const [history, total] = await Promise.all([
       FraudHistory.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('relatedAlertId', 'title status')
-        .populate('relatedCompetitionId', 'name')
+        .populate("relatedAlertId", "title status")
+        .populate("relatedCompetitionId", "name")
         .lean(),
       FraudHistory.countDocuments(query),
     ]);
@@ -82,33 +86,33 @@ export async function GET(request: NextRequest) {
           _id: null,
           totalActions: { $sum: 1 },
           warnings: {
-            $sum: { $cond: [{ $eq: ['$actionType', 'warning_issued'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$actionType", "warning_issued"] }, 1, 0] },
           },
           suspensions: {
-            $sum: { $cond: [{ $eq: ['$actionType', 'suspended'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$actionType", "suspended"] }, 1, 0] },
           },
           bans: {
-            $sum: { $cond: [{ $eq: ['$actionType', 'banned'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$actionType", "banned"] }, 1, 0] },
           },
           lifts: {
             $sum: {
               $cond: [
-                { $in: ['$actionType', ['suspension_lifted', 'ban_lifted']] },
+                { $in: ["$actionType", ["suspension_lifted", "ban_lifted"]] },
                 1,
                 0,
               ],
             },
           },
           criticalActions: {
-            $sum: { $cond: [{ $eq: ['$actionSeverity', 'critical'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$actionSeverity", "critical"] }, 1, 0] },
           },
           autoActions: {
             $sum: {
-              $cond: [{ $eq: ['$performedBy.type', 'automated'] }, 1, 0],
+              $cond: [{ $eq: ["$performedBy.type", "automated"] }, 1, 0],
             },
           },
           adminActions: {
-            $sum: { $cond: [{ $eq: ['$performedBy.type', 'admin'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$performedBy.type", "admin"] }, 1, 0] },
           },
         },
       },
@@ -137,10 +141,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching fraud history:', error);
+    console.error("Error fetching fraud history:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch fraud history' },
-      { status: 500 }
+      { error: "Failed to fetch fraud history" },
+      { status: 500 },
     );
   }
 }
@@ -167,10 +171,17 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!userId || !userEmail || !userName || !actionType || !reason || !details) {
+    if (
+      !userId ||
+      !userEmail ||
+      !userName ||
+      !actionType ||
+      !reason ||
+      !details
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: "Missing required fields" },
+        { status: 400 },
       );
     }
 
@@ -179,12 +190,12 @@ export async function POST(request: NextRequest) {
       userEmail,
       userName,
       actionType,
-      actionSeverity: actionSeverity || 'medium',
+      actionSeverity: actionSeverity || "medium",
       performedBy: {
-        type: 'admin',
+        type: "admin",
         adminId: auth.adminId,
         adminEmail: auth.email,
-        adminName: auth.email?.split('@')[0] || 'Admin',
+        adminName: auth.email?.split("@")[0] || "Admin",
       },
       reason,
       details,
@@ -199,11 +210,10 @@ export async function POST(request: NextRequest) {
       data: historyEntry,
     });
   } catch (error) {
-    console.error('Error adding fraud history entry:', error);
+    console.error("Error adding fraud history entry:", error);
     return NextResponse.json(
-      { error: 'Failed to add history entry' },
-      { status: 500 }
+      { error: "Failed to add history entry" },
+      { status: 500 },
     );
   }
 }
-

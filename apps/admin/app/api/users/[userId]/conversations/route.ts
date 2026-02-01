@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verify } from 'jsonwebtoken';
-import mongoose, { Types } from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verify } from "jsonwebtoken";
+import mongoose, { Types } from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
+const JWT_SECRET = getAdminJwtSecret();
 
 /**
  * GET /api/users/[userId]/conversations
@@ -12,51 +13,55 @@ const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
+    const token = cookieStore.get("admin_token")?.value;
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     verify(token, JWT_SECRET);
 
     const { userId } = await params;
     const { searchParams } = new URL(request.url);
-    
-    const status = searchParams.get('status') || 'all'; // all, active, resolved
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+
+    const status = searchParams.get("status") || "all"; // all, active, resolved
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
 
     await connectToDatabase();
 
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     // Build query - only show support conversations (not user-to-user direct messages)
     // Admins/employees should NOT see customer-to-customer private conversations
     const query: any = {
-      'participants.id': userId,
-      'participants.type': 'user',
-      type: 'user-to-support', // Only show support tickets, not DMs between customers
+      "participants.id": userId,
+      "participants.type": "user",
+      type: "user-to-support", // Only show support tickets, not DMs between customers
     };
 
-    if (status === 'resolved') {
+    if (status === "resolved") {
       query.isResolved = true;
-    } else if (status === 'active') {
+    } else if (status === "active") {
       query.isResolved = { $ne: true };
     }
 
     // Get total count
-    const total = await db.collection('conversations').countDocuments(query);
+    const total = await db.collection("conversations").countDocuments(query);
 
     // Get conversations with pagination
-    const conversations = await db.collection('conversations')
+    const conversations = await db
+      .collection("conversations")
       .find(query)
       .sort({ lastActivityAt: -1 })
       .skip((page - 1) * limit)
@@ -66,7 +71,7 @@ export async function GET(
     // Get message counts and last messages for each conversation
     const conversationsWithDetails = await Promise.all(
       conversations.map(async (conv) => {
-        const messageCount = await db.collection('messages').countDocuments({
+        const messageCount = await db.collection("messages").countDocuments({
           conversationId: conv._id,
           isDeleted: { $ne: true },
         });
@@ -76,7 +81,7 @@ export async function GET(
 
         // Get employee names involved
         const employeeParticipants = (conv.participants || [])
-          .filter((p: any) => p.type === 'employee')
+          .filter((p: any) => p.type === "employee")
           .map((p: any) => ({
             id: p.id,
             name: p.name,
@@ -107,33 +112,33 @@ export async function GET(
           createdAt: conv.createdAt,
           lastActivityAt: conv.lastActivityAt,
         };
-      })
+      }),
     );
 
     // Get summary stats - only support conversations
     const stats = {
-      total: await db.collection('conversations').countDocuments({
-        'participants.id': userId,
-        'participants.type': 'user',
-        type: 'user-to-support',
+      total: await db.collection("conversations").countDocuments({
+        "participants.id": userId,
+        "participants.type": "user",
+        type: "user-to-support",
       }),
-      resolved: await db.collection('conversations').countDocuments({
-        'participants.id': userId,
-        'participants.type': 'user',
-        type: 'user-to-support',
+      resolved: await db.collection("conversations").countDocuments({
+        "participants.id": userId,
+        "participants.type": "user",
+        type: "user-to-support",
         isResolved: true,
       }),
-      active: await db.collection('conversations').countDocuments({
-        'participants.id': userId,
-        'participants.type': 'user',
-        type: 'user-to-support',
+      active: await db.collection("conversations").countDocuments({
+        "participants.id": userId,
+        "participants.type": "user",
+        type: "user-to-support",
         isResolved: { $ne: true },
       }),
-      withTransfers: await db.collection('conversations').countDocuments({
-        'participants.id': userId,
-        'participants.type': 'user',
-        type: 'user-to-support',
-        'metadata.transferHistory.0': { $exists: true },
+      withTransfers: await db.collection("conversations").countDocuments({
+        "participants.id": userId,
+        "participants.type": "user",
+        type: "user-to-support",
+        "metadata.transferHistory.0": { $exists: true },
       }),
     };
 
@@ -146,10 +151,10 @@ export async function GET(
       stats,
     });
   } catch (error) {
-    console.error('Error fetching user conversations:', error);
+    console.error("Error fetching user conversations:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch conversations' },
-      { status: 500 }
+      { error: "Failed to fetch conversations" },
+      { status: 500 },
     );
   }
 }

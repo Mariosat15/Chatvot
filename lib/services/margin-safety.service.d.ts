@@ -6,17 +6,17 @@
  * Use server actions to load thresholds from database
  */
 export declare const DEFAULT_MARGIN_THRESHOLDS: {
-    LIQUIDATION: number;
-    MARGIN_CALL: number;
-    WARNING: number;
-    SAFE: number;
+  LIQUIDATION: number;
+  MARGIN_CALL: number;
+  WARNING: number;
+  SAFE: number;
 };
 export type MarginThresholds = typeof DEFAULT_MARGIN_THRESHOLDS;
 export declare const MARGIN_THRESHOLDS: {
-    LIQUIDATION: number;
-    MARGIN_CALL: number;
-    WARNING: number;
-    SAFE: number;
+  LIQUIDATION: number;
+  MARGIN_CALL: number;
+  WARNING: number;
+  SAFE: number;
 };
 /**
  * Calculate maximum safe amount for a new trade
@@ -37,10 +37,17 @@ export declare const MARGIN_THRESHOLDS: {
  * @param thresholds - Optional margin thresholds (uses cached or default if not provided)
  * @returns Maximum safe amount to use for a new trade
  */
-export declare function calculateMaxSafeTradeAmount(equity: number, existingUsedMargin: number, availableCapital: number, leverage: number, targetMarginLevel?: number, thresholds?: typeof DEFAULT_MARGIN_THRESHOLDS): {
-    maxSafeAmount: number;
-    reason: 'safe' | 'margin_limit' | 'capital_limit';
-    projectedMarginLevel: number;
+export declare function calculateMaxSafeTradeAmount(
+  equity: number,
+  existingUsedMargin: number,
+  availableCapital: number,
+  leverage: number,
+  targetMarginLevel?: number,
+  thresholds?: typeof DEFAULT_MARGIN_THRESHOLDS,
+): {
+  maxSafeAmount: number;
+  reason: "safe" | "margin_limit" | "capital_limit";
+  projectedMarginLevel: number;
 };
 /**
  * Calculate what margin level would be after placing a trade
@@ -50,7 +57,11 @@ export declare function calculateMaxSafeTradeAmount(equity: number, existingUsed
  * @param newMarginRequired - Margin needed for new trade
  * @returns Projected margin level after trade
  */
-export declare function calculateProjectedMarginLevel(equity: number, existingUsedMargin: number, newMarginRequired: number): number;
+export declare function calculateProjectedMarginLevel(
+  equity: number,
+  existingUsedMargin: number,
+  newMarginRequired: number,
+): number;
 /**
  * Get margin safety status and message
  *
@@ -59,9 +70,13 @@ export declare function calculateProjectedMarginLevel(equity: number, existingUs
  * @param thresholds - Optional margin thresholds (uses cached or default if not provided)
  * @returns Status and user-friendly message
  */
-export declare function getMarginSafetyMessage(marginLevel: number, mode?: 'professional' | 'game', thresholds?: typeof DEFAULT_MARGIN_THRESHOLDS): {
-    status: 'safe' | 'warning' | 'danger' | 'critical';
-    message: string;
-    canTrade: boolean;
+export declare function getMarginSafetyMessage(
+  marginLevel: number,
+  mode?: "professional" | "game",
+  thresholds?: typeof DEFAULT_MARGIN_THRESHOLDS,
+): {
+  status: "safe" | "warning" | "danger" | "critical";
+  message: string;
+  canTrade: boolean;
 };
 //# sourceMappingURL=margin-safety.service.d.ts.map

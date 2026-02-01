@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Smile, Search } from 'lucide-react';
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Smile, Search } from "lucide-react";
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
@@ -10,42 +10,242 @@ interface EmojiPickerProps {
 
 const EMOJI_CATEGORIES = [
   {
-    name: 'Smileys',
-    emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐']
+    name: "Smileys",
+    emojis: [
+      "😀",
+      "😃",
+      "😄",
+      "😁",
+      "😅",
+      "😂",
+      "🤣",
+      "😊",
+      "😇",
+      "🙂",
+      "🙃",
+      "😉",
+      "😌",
+      "😍",
+      "🥰",
+      "😘",
+      "😗",
+      "😙",
+      "😚",
+      "😋",
+      "😛",
+      "😜",
+      "🤪",
+      "😝",
+      "🤑",
+      "🤗",
+      "🤭",
+      "🤫",
+      "🤔",
+      "🤐",
+      "🤨",
+      "😐",
+      "😑",
+      "😶",
+      "😏",
+      "😒",
+      "🙄",
+      "😬",
+      "🤥",
+      "😌",
+      "😔",
+      "😪",
+      "🤤",
+      "😴",
+      "😷",
+      "🤒",
+      "🤕",
+      "🤢",
+      "🤮",
+      "🤧",
+      "🥵",
+      "🥶",
+      "🥴",
+      "😵",
+      "🤯",
+      "🤠",
+      "🥳",
+      "😎",
+      "🤓",
+      "🧐",
+    ],
   },
   {
-    name: 'Gestures',
-    emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪']
+    name: "Gestures",
+    emojis: [
+      "👋",
+      "🤚",
+      "🖐",
+      "✋",
+      "🖖",
+      "👌",
+      "🤌",
+      "🤏",
+      "✌️",
+      "🤞",
+      "🤟",
+      "🤘",
+      "🤙",
+      "👈",
+      "👉",
+      "👆",
+      "🖕",
+      "👇",
+      "☝️",
+      "👍",
+      "👎",
+      "✊",
+      "👊",
+      "🤛",
+      "🤜",
+      "👏",
+      "🙌",
+      "👐",
+      "🤲",
+      "🤝",
+      "🙏",
+      "✍️",
+      "💪",
+    ],
   },
   {
-    name: 'Hearts',
-    emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟']
+    name: "Hearts",
+    emojis: [
+      "❤️",
+      "🧡",
+      "💛",
+      "💚",
+      "💙",
+      "💜",
+      "🖤",
+      "🤍",
+      "🤎",
+      "💔",
+      "❣️",
+      "💕",
+      "💞",
+      "💓",
+      "💗",
+      "💖",
+      "💘",
+      "💝",
+      "💟",
+    ],
   },
   {
-    name: 'Objects',
-    emojis: ['💼', '📁', '📂', '📅', '📆', '📊', '📈', '📉', '📋', '📌', '📍', '📎', '🖇', '📏', '📐', '✂️', '🔒', '🔓', '🔑', '🔨', '⚙️', '💡', '💰', '💵', '💸', '💳', '🏦', '📱', '💻', '🖥', '⌨️', '🖱', '🖨', '📷', '🎥', '📺', '📻', '🎧', '🎤']
+    name: "Objects",
+    emojis: [
+      "💼",
+      "📁",
+      "📂",
+      "📅",
+      "📆",
+      "📊",
+      "📈",
+      "📉",
+      "📋",
+      "📌",
+      "📍",
+      "📎",
+      "🖇",
+      "📏",
+      "📐",
+      "✂️",
+      "🔒",
+      "🔓",
+      "🔑",
+      "🔨",
+      "⚙️",
+      "💡",
+      "💰",
+      "💵",
+      "💸",
+      "💳",
+      "🏦",
+      "📱",
+      "💻",
+      "🖥",
+      "⌨️",
+      "🖱",
+      "🖨",
+      "📷",
+      "🎥",
+      "📺",
+      "📻",
+      "🎧",
+      "🎤",
+    ],
   },
   {
-    name: 'Symbols',
-    emojis: ['✅', '❌', '❓', '❗', '💯', '🔥', '⭐', '🌟', '✨', '⚡', '💥', '💫', '🎯', '🏆', '🥇', '🥈', '🥉', '🎖', '🏅', '🔔', '🔕', '📢', '📣', '💬', '💭', '🗯', '♠️', '♣️', '♥️', '♦️', '🎲', '🎯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤']
-  }
+    name: "Symbols",
+    emojis: [
+      "✅",
+      "❌",
+      "❓",
+      "❗",
+      "💯",
+      "🔥",
+      "⭐",
+      "🌟",
+      "✨",
+      "⚡",
+      "💥",
+      "💫",
+      "🎯",
+      "🏆",
+      "🥇",
+      "🥈",
+      "🥉",
+      "🎖",
+      "🏅",
+      "🔔",
+      "🔕",
+      "📢",
+      "📣",
+      "💬",
+      "💭",
+      "🗯",
+      "♠️",
+      "♣️",
+      "♥️",
+      "♦️",
+      "🎲",
+      "🎯",
+      "🔴",
+      "🟠",
+      "🟡",
+      "🟢",
+      "🔵",
+      "🟣",
+      "⚫",
+      "⚪",
+      "🟤",
+    ],
+  },
 ];
 
 export default function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleEmojiClick = (emoji: string) => {
@@ -54,7 +254,7 @@ export default function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
   };
 
   const filteredEmojis = searchQuery
-    ? EMOJI_CATEGORIES.flatMap(cat => cat.emojis)
+    ? EMOJI_CATEGORIES.flatMap((cat) => cat.emojis)
     : EMOJI_CATEGORIES[activeCategory].emojis;
 
   return (
@@ -99,7 +299,9 @@ export default function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
                     key={cat.name}
                     onClick={() => setActiveCategory(index)}
                     className={`flex-1 py-2 text-lg transition-colors ${
-                      activeCategory === index ? 'bg-white/10' : 'hover:bg-white/5'
+                      activeCategory === index
+                        ? "bg-white/10"
+                        : "hover:bg-white/5"
                     }`}
                     title={cat.name}
                   >

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import PaymentProvider from '@/database/models/payment-provider.model';
-import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import PaymentProvider from "@/database/models/payment-provider.model";
+import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * GET /api/admin/payment-providers
@@ -15,20 +15,23 @@ export async function GET() {
     await requireAdminAuth();
     await connectToDatabase();
 
-    const providers = await PaymentProvider.find().sort({ priority: -1, name: 1 });
+    const providers = await PaymentProvider.find().sort({
+      priority: -1,
+      name: 1,
+    });
 
     return NextResponse.json({
       success: true,
       providers,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Get payment providers error:', error);
+    console.error("Get payment providers error:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch payment providers' },
-      { status: 500 }
+      { error: "Failed to fetch payment providers" },
+      { status: 500 },
     );
   }
 }
@@ -58,8 +61,8 @@ export async function POST(request: Request) {
     // Validate required fields
     if (!name || !slug || !displayName) {
       return NextResponse.json(
-        { error: 'Name, slug, and display name are required' },
-        { status: 400 }
+        { error: "Name, slug, and display name are required" },
+        { status: 400 },
       );
     }
 
@@ -67,8 +70,8 @@ export async function POST(request: Request) {
     const existing = await PaymentProvider.findOne({ slug });
     if (existing) {
       return NextResponse.json(
-        { error: 'A provider with this slug already exists' },
-        { status: 400 }
+        { error: "A provider with this slug already exists" },
+        { status: 400 },
       );
     }
 
@@ -77,12 +80,12 @@ export async function POST(request: Request) {
       name,
       slug,
       displayName,
-      logo: logo || '',
+      logo: logo || "",
       isActive: false,
       isBuiltIn: false,
       saveToEnv: saveToEnv !== undefined ? saveToEnv : true,
       credentials: credentials || [],
-      webhookUrl: webhookUrl || '',
+      webhookUrl: webhookUrl || "",
       testMode: testMode !== undefined ? testMode : true,
       processingFee: processingFee !== undefined ? processingFee : 0,
       priority: 0,
@@ -101,30 +104,30 @@ export async function POST(request: Request) {
           {
             id: admin.id,
             email: admin.email,
-            name: admin.email.split('@')[0],
-            role: 'admin',
+            name: admin.email.split("@")[0],
+            role: "admin",
           },
           provider._id.toString(),
-          displayName
+          displayName,
         );
       }
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Payment provider created successfully',
+      message: "Payment provider created successfully",
       provider,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Create payment provider error:', error);
+    console.error("Create payment provider error:", error);
     return NextResponse.json(
-      { error: 'Failed to create payment provider' },
-      { status: 500 }
+      { error: "Failed to create payment provider" },
+      { status: 500 },
     );
   }
 }
@@ -134,101 +137,136 @@ export async function POST(request: Request) {
  */
 async function updateEnvFile() {
   try {
-    const envPath = path.join(process.cwd(), '.env');
-    console.log('📍 .env path:', envPath);
-    
+    const envPath = path.join(process.cwd(), ".env");
+    console.log("📍 .env path:", envPath);
+
     // Read existing .env content
-    let existingContent = '';
+    let existingContent = "";
     try {
-      existingContent = await fs.readFile(envPath, 'utf-8');
-      console.log('📖 Read existing .env file, length:', existingContent.length);
+      existingContent = await fs.readFile(envPath, "utf-8");
+      console.log(
+        "📖 Read existing .env file, length:",
+        existingContent.length,
+      );
     } catch (error) {
-      console.log('⚠️ .env file does not exist, will create new one');
+      console.log("⚠️ .env file does not exist, will create new one");
     }
 
     // Get all providers that should be saved to .env
     const providers = await PaymentProvider.find({ saveToEnv: true });
-    console.log('🔍 Found', providers.length, 'providers to save to .env:', providers.map(p => p.slug));
+    console.log(
+      "🔍 Found",
+      providers.length,
+      "providers to save to .env:",
+      providers.map((p) => p.slug),
+    );
 
     // Build payment providers section
     const providerLines: string[] = [];
-    providerLines.push('');
-    providerLines.push('# ============================================');
-    providerLines.push('# PAYMENT PROVIDERS');
-    providerLines.push('# Auto-generated by Admin Panel');
-    providerLines.push('# ============================================');
+    providerLines.push("");
+    providerLines.push("# ============================================");
+    providerLines.push("# PAYMENT PROVIDERS");
+    providerLines.push("# Auto-generated by Admin Panel");
+    providerLines.push("# ============================================");
 
     for (const provider of providers) {
-      providerLines.push('');
+      providerLines.push("");
       providerLines.push(`# ${provider.displayName}`);
-      console.log(`  📝 Processing provider: ${provider.displayName} (${provider.credentials.length} credentials)`);
-      
+      console.log(
+        `  📝 Processing provider: ${provider.displayName} (${provider.credentials.length} credentials)`,
+      );
+
       for (const cred of provider.credentials) {
         const envKey = `${provider.slug.toUpperCase()}_${cred.key.toUpperCase()}`;
-        const maskedValue = cred.isSecret ? '[HIDDEN]' : cred.value;
+        const maskedValue = cred.isSecret ? "[HIDDEN]" : cred.value;
         console.log(`    - ${envKey}=${maskedValue}`);
-        providerLines.push(`${envKey}=${cred.value || ''}`);
+        providerLines.push(`${envKey}=${cred.value || ""}`);
       }
 
       if (provider.webhookUrl) {
-        console.log(`    - ${provider.slug.toUpperCase()}_WEBHOOK_URL=${provider.webhookUrl}`);
-        providerLines.push(`${provider.slug.toUpperCase()}_WEBHOOK_URL=${provider.webhookUrl}`);
+        console.log(
+          `    - ${provider.slug.toUpperCase()}_WEBHOOK_URL=${provider.webhookUrl}`,
+        );
+        providerLines.push(
+          `${provider.slug.toUpperCase()}_WEBHOOK_URL=${provider.webhookUrl}`,
+        );
       }
-      
-      console.log(`    - ${provider.slug.toUpperCase()}_TEST_MODE=${provider.testMode}`);
-      console.log(`    - ${provider.slug.toUpperCase()}_ACTIVE=${provider.isActive}`);
-      providerLines.push(`${provider.slug.toUpperCase()}_TEST_MODE=${provider.testMode}`);
-      providerLines.push(`${provider.slug.toUpperCase()}_ACTIVE=${provider.isActive}`);
+
+      console.log(
+        `    - ${provider.slug.toUpperCase()}_TEST_MODE=${provider.testMode}`,
+      );
+      console.log(
+        `    - ${provider.slug.toUpperCase()}_ACTIVE=${provider.isActive}`,
+      );
+      providerLines.push(
+        `${provider.slug.toUpperCase()}_TEST_MODE=${provider.testMode}`,
+      );
+      providerLines.push(
+        `${provider.slug.toUpperCase()}_ACTIVE=${provider.isActive}`,
+      );
     }
 
     // Remove old payment providers section if exists
     let newContent = existingContent;
-    
+
     // Find the start of payment providers section
-    const startMarker = '# ============================================';
-    const sectionHeader = '# PAYMENT PROVIDERS';
-    const searchPattern = startMarker + '\n' + sectionHeader;
+    const startMarker = "# ============================================";
+    const sectionHeader = "# PAYMENT PROVIDERS";
+    const searchPattern = startMarker + "\n" + sectionHeader;
     const startIndex = existingContent.indexOf(searchPattern);
-    
-    console.log('🔍 Looking for payment providers section...');
-    console.log('   Search pattern found at index:', startIndex);
-    
+
+    console.log("🔍 Looking for payment providers section...");
+    console.log("   Search pattern found at index:", startIndex);
+
     if (startIndex !== -1) {
       // Find the end marker (next occurrence of # ==== that's NOT our start marker)
-      const afterStart = startIndex + startMarker.length + sectionHeader.length + 2;
-      const nextSectionIndex = existingContent.indexOf('\n' + startMarker, afterStart);
-      
-      console.log('   Next section marker at index:', nextSectionIndex);
-      
+      const afterStart =
+        startIndex + startMarker.length + sectionHeader.length + 2;
+      const nextSectionIndex = existingContent.indexOf(
+        "\n" + startMarker,
+        afterStart,
+      );
+
+      console.log("   Next section marker at index:", nextSectionIndex);
+
       if (nextSectionIndex !== -1) {
         // Remove from start marker to just before the next section
         const before = existingContent.slice(0, startIndex);
         const after = existingContent.slice(nextSectionIndex + 1);
         newContent = before + after;
-        console.log('   ✂️ Removed section between', startIndex, 'and', nextSectionIndex);
+        console.log(
+          "   ✂️ Removed section between",
+          startIndex,
+          "and",
+          nextSectionIndex,
+        );
       } else {
         // No next section found, remove from start marker to end of file
-        newContent = existingContent.slice(0, startIndex).trimEnd() + '\n';
-        console.log('   ✂️ Removed section from', startIndex, 'to end of file');
+        newContent = existingContent.slice(0, startIndex).trimEnd() + "\n";
+        console.log("   ✂️ Removed section from", startIndex, "to end of file");
       }
     } else {
-      console.log('   ℹ️ No existing payment providers section found');
+      console.log("   ℹ️ No existing payment providers section found");
     }
 
     // Append new payment providers section
     const beforeLength = newContent.length;
-    newContent = newContent.trimEnd() + '\n' + providerLines.join('\n') + '\n';
-    console.log('   ➕ Added new section,', providerLines.length, 'lines');
-    console.log('   📊 Content length: before =', beforeLength, ', after =', newContent.length);
+    newContent = newContent.trimEnd() + "\n" + providerLines.join("\n") + "\n";
+    console.log("   ➕ Added new section,", providerLines.length, "lines");
+    console.log(
+      "   📊 Content length: before =",
+      beforeLength,
+      ", after =",
+      newContent.length,
+    );
 
     // Write to .env file
-    console.log('💾 Writing to .env file...');
-    await fs.writeFile(envPath, newContent, 'utf-8');
-    console.log('✅ Updated .env file with payment provider credentials');
-    console.log('📄 Final .env file size:', newContent.length, 'bytes');
+    console.log("💾 Writing to .env file...");
+    await fs.writeFile(envPath, newContent, "utf-8");
+    console.log("✅ Updated .env file with payment provider credentials");
+    console.log("📄 Final .env file size:", newContent.length, "bytes");
   } catch (error) {
-    console.error('❌ Error updating .env file:', error);
+    console.error("❌ Error updating .env file:", error);
     throw error;
   }
 }
-

@@ -1,40 +1,40 @@
-import { NextResponse } from 'next/server';
-import { getPaymentProviderCredentials } from '@/lib/services/settings.service';
-import { connectToDatabase } from '@/database/mongoose';
-import PaymentProvider from '@/database/models/payment-provider.model';
-import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
-import InvoiceSettings from '@/database/models/invoice-settings.model';
-import CompanySettings from '@/database/models/company-settings.model';
-import KYCSettings from '@/database/models/kyc-settings.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { isEUCountry } from '@/lib/utils/country-vat';
-import { ObjectId } from 'mongodb';
-import { isPaddleConfigured, getPaddleConfig } from '@/lib/paddle/config';
-import { nuveiService, NUVEI_SDK_URL } from '@/lib/services/nuvei.service';
+import { NextResponse } from "next/server";
+import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
+import { connectToDatabase } from "@/database/mongoose";
+import PaymentProvider from "@/database/models/payment-provider.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import InvoiceSettings from "@/database/models/invoice-settings.model";
+import CompanySettings from "@/database/models/company-settings.model";
+import KYCSettings from "@/database/models/kyc-settings.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { isEUCountry } from "@/lib/utils/country-vat";
+import { ObjectId } from "mongodb";
+import { isPaddleConfigured, getPaddleConfig } from "@/lib/paddle/config";
+import { nuveiService, NUVEI_SDK_URL } from "@/lib/services/nuvei.service";
 
 /**
  * Helper to find user by various ID formats
  */
 async function findUserById(db: any, userId: string) {
   // Try by 'id' field first (better-auth uses this)
-  let user = await db.collection('user').findOne({ id: userId });
-  
+  let user = await db.collection("user").findOne({ id: userId });
+
   // If not found, try by '_id' as ObjectId
   if (!user && ObjectId.isValid(userId)) {
     try {
-      user = await db.collection('user').findOne({ _id: new ObjectId(userId) });
+      user = await db.collection("user").findOne({ _id: new ObjectId(userId) });
     } catch {
       // Not a valid ObjectId
     }
   }
-  
+
   // If still not found, try by '_id' as string
   if (!user) {
-    user = await db.collection('user').findOne({ _id: userId });
+    user = await db.collection("user").findOne({ _id: userId });
   }
-  
+
   return user;
 }
 
@@ -45,7 +45,7 @@ async function findUserById(db: any, userId: string) {
 export async function GET() {
   try {
     await connectToDatabase();
-    
+
     // Get centralized fee settings
     const feeSettings = await CreditConversionSettings.getSingleton();
     const platformDepositFee = feeSettings.platformDepositFeePercentage || 0;
@@ -63,7 +63,7 @@ export async function GET() {
     // Get user's country to determine if VAT applies
     let userCountry: string | null = null;
     let vatApplicable = false;
-    
+
     try {
       const session = await auth.api.getSession({ headers: await headers() });
       if (session?.user?.id) {
@@ -73,11 +73,13 @@ export async function GET() {
         if (db) {
           const user = await findUserById(db, session.user.id);
           userCountry = user?.country || null;
-          console.log(`💳 Payment config - User ${session.user.id} country: ${userCountry}`);
+          console.log(
+            `💳 Payment config - User ${session.user.id} country: ${userCountry}`,
+          );
         }
       }
     } catch (e) {
-      console.error('Error getting user country:', e);
+      console.error("Error getting user country:", e);
       // User not logged in, that's okay
     }
 
@@ -89,14 +91,17 @@ export async function GET() {
     // Summary: VAT applies ONLY when BOTH user AND company are in the EU
     const userIsInEU = isEUCountry(userCountry);
     vatApplicable = vatEnabled && userIsInEU && companyIsInEU;
-    
-    console.log(`💳 Payment config - VAT enabled: ${vatEnabled}, User country: ${userCountry} (EU: ${userIsInEU}), Company country: ${companyCountry} (EU: ${companyIsInEU}), VAT applicable: ${vatApplicable}`);
+
+    console.log(
+      `💳 Payment config - VAT enabled: ${vatEnabled}, User country: ${userCountry} (EU: ${userIsInEU}), Company country: ${companyCountry} (EU: ${companyIsInEU}), VAT applicable: ${vatApplicable}`,
+    );
 
     // Check KYC requirements for deposits
     const kycSettings = await KYCSettings.findOne();
-    const kycRequiredForDeposit = kycSettings?.enabled && kycSettings?.requiredForDeposit;
+    const kycRequiredForDeposit =
+      kycSettings?.enabled && kycSettings?.requiredForDeposit;
     let userKycVerified = false;
-    
+
     try {
       const session = await auth.api.getSession({ headers: await headers() });
       if (session?.user?.id) {
@@ -106,18 +111,27 @@ export async function GET() {
     } catch (e) {
       // User not logged in or wallet not found
     }
-    
+
     const kycBlocksDeposit = kycRequiredForDeposit && !userKycVerified;
-    console.log(`💳 Payment config - KYC required for deposit: ${kycRequiredForDeposit}, User KYC verified: ${userKycVerified}, Blocks deposit: ${kycBlocksDeposit}`);
+    console.log(
+      `💳 Payment config - KYC required for deposit: ${kycRequiredForDeposit}, User KYC verified: ${userKycVerified}, Blocks deposit: ${kycBlocksDeposit}`,
+    );
 
     // Check Stripe availability
     let stripeAvailable = false;
     let stripeConfig: any = null;
     try {
-      const stripeProvider = await PaymentProvider.findOne({ slug: 'stripe', isActive: true });
+      const stripeProvider = await PaymentProvider.findOne({
+        slug: "stripe",
+        isActive: true,
+      });
       if (stripeProvider) {
-        stripeConfig = await getPaymentProviderCredentials('stripe');
-        stripeAvailable = !!(stripeConfig && ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key));
+        stripeConfig = await getPaymentProviderCredentials("stripe");
+        stripeAvailable = !!(
+          stripeConfig &&
+          ((stripeConfig as any).publishable_key ||
+            (stripeConfig as any).public_key)
+        );
       }
     } catch (e) {
       // Stripe not configured
@@ -141,24 +155,25 @@ export async function GET() {
     try {
       nuveiConfig = await nuveiService.getClientConfig();
       nuveiAvailable = nuveiConfig?.enabled || false;
-      console.log('💳 Nuvei config check:', { nuveiConfig, nuveiAvailable });
+      console.log("💳 Nuvei config check:", { nuveiConfig, nuveiAvailable });
     } catch (e) {
-      console.error('💳 Nuvei config error:', e);
+      console.error("💳 Nuvei config error:", e);
       // Nuvei not configured
     }
 
     // Check if ANY provider is available
-    const anyProviderConfigured = stripeAvailable || paddleAvailable || nuveiAvailable;
-    
-    console.log('💳 Payment providers available:', { 
-      stripeAvailable, 
-      paddleAvailable, 
+    const anyProviderConfigured =
+      stripeAvailable || paddleAvailable || nuveiAvailable;
+
+    console.log("💳 Payment providers available:", {
+      stripeAvailable,
+      paddleAvailable,
       nuveiAvailable,
-      anyProviderConfigured 
+      anyProviderConfigured,
     });
 
     if (!anyProviderConfigured) {
-      console.log('💳 No payment providers configured');
+      console.log("💳 No payment providers configured");
       return NextResponse.json({
         configured: false,
         provider: null,
@@ -167,13 +182,13 @@ export async function GET() {
     }
 
     // Determine primary provider (first available)
-    let primaryProvider = 'stripe';
+    let primaryProvider = "stripe";
     if (stripeAvailable) {
-      primaryProvider = 'stripe';
+      primaryProvider = "stripe";
     } else if (nuveiAvailable) {
-      primaryProvider = 'nuvei';
+      primaryProvider = "nuvei";
     } else if (paddleAvailable) {
-      primaryProvider = 'paddle';
+      primaryProvider = "paddle";
     }
 
     // Return available payment providers
@@ -181,7 +196,11 @@ export async function GET() {
       configured: true,
       // Primary provider
       provider: primaryProvider,
-      publishableKey: stripeConfig ? ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '') : '',
+      publishableKey: stripeConfig
+        ? (stripeConfig as any).publishable_key ||
+          (stripeConfig as any).public_key ||
+          ""
+        : "",
       testMode: stripeConfig?.testMode || false,
       processingFee: platformDepositFee, // From centralized Fee Settings
       // VAT info
@@ -196,13 +215,17 @@ export async function GET() {
       providers: {
         stripe: {
           available: stripeAvailable,
-          publishableKey: stripeConfig ? ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '') : '',
+          publishableKey: stripeConfig
+            ? (stripeConfig as any).publishable_key ||
+              (stripeConfig as any).public_key ||
+              ""
+            : "",
           testMode: stripeConfig?.testMode || false,
         },
         paddle: {
           available: paddleAvailable,
           clientToken: paddleConfig?.publicKey || null,
-          environment: paddleConfig?.environment || 'sandbox',
+          environment: paddleConfig?.environment || "sandbox",
           vendorId: paddleConfig?.vendorId || null,
         },
         nuvei: {
@@ -215,7 +238,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching payment config:', error);
+    console.error("Error fetching payment config:", error);
     return NextResponse.json({
       configured: false,
       provider: null,
@@ -223,4 +246,3 @@ export async function GET() {
     });
   }
 }
-

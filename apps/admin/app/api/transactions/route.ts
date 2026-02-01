@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import WithdrawalRequest from '@/database/models/withdrawal-request.model';
-import { PlatformTransaction } from '@/database/models/platform-financials.model';
-import VATPayment from '@/database/models/vat-payment.model';
-import VendorPayment from '@/database/models/vendor-payment.model';
-import { getUsersByIds } from '@/lib/utils/user-lookup';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
+import { PlatformTransaction } from "@/database/models/platform-financials.model";
+import VATPayment from "@/database/models/vat-payment.model";
+import VendorPayment from "@/database/models/vendor-payment.model";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
 
 /**
  * GET /api/admin/transactions
@@ -18,58 +18,58 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    
+
     // Parse filters
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const type = searchParams.get('type'); // transaction type filter
-    const status = searchParams.get('status'); // status filter
-    const userId = searchParams.get('userId'); // specific user filter
-    const competitionId = searchParams.get('competitionId'); // competition filter
-    const search = searchParams.get('search'); // search by ID, description
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const minAmount = searchParams.get('minAmount');
-    const maxAmount = searchParams.get('maxAmount');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const type = searchParams.get("type"); // transaction type filter
+    const status = searchParams.get("status"); // status filter
+    const userId = searchParams.get("userId"); // specific user filter
+    const competitionId = searchParams.get("competitionId"); // competition filter
+    const search = searchParams.get("search"); // search by ID, description
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const minAmount = searchParams.get("minAmount");
+    const maxAmount = searchParams.get("maxAmount");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     // Build query
     const query: any = {};
-    
-    if (type && type !== 'all') {
+
+    if (type && type !== "all") {
       query.transactionType = type;
     }
-    
-    if (status && status !== 'all') {
+
+    if (status && status !== "all") {
       query.status = status;
     }
-    
+
     if (userId) {
       query.userId = userId;
     }
-    
+
     if (competitionId) {
       query.competitionId = competitionId;
     }
-    
+
     if (search) {
       // Don't use regex on _id (ObjectId) - only search text fields
       query.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { userId: { $regex: search, $options: 'i' } },
-        { 'metadata.paymentIntentId': { $regex: search, $options: 'i' } },
-        { 'userInfo.name': { $regex: search, $options: 'i' } },
-        { 'userInfo.email': { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: "i" } },
+        { userId: { $regex: search, $options: "i" } },
+        { "metadata.paymentIntentId": { $regex: search, $options: "i" } },
+        { "userInfo.name": { $regex: search, $options: "i" } },
+        { "userInfo.email": { $regex: search, $options: "i" } },
       ];
     }
-    
+
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
-    
+
     if (minAmount || maxAmount) {
       query.amount = {};
       if (minAmount) query.amount.$gte = parseFloat(minAmount);
@@ -81,34 +81,49 @@ export async function GET(request: NextRequest) {
 
     // Build sort object
     const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
     // Check if we should include admin/platform transactions
-    const includeAdminTx = type === 'all' || type === 'admin_withdrawal' || type === 'vat_payment' || 
-                           type === 'platform_fee' || type === 'unclaimed_pool' || type === 'deposit_fee' || 
-                           type === 'withdrawal_fee' || type === 'admin_balance_add' || type === 'custom_expense' ||
-                           type === 'vendor_payment' || !type;
+    const includeAdminTx =
+      type === "all" ||
+      type === "admin_withdrawal" ||
+      type === "vat_payment" ||
+      type === "platform_fee" ||
+      type === "unclaimed_pool" ||
+      type === "deposit_fee" ||
+      type === "withdrawal_fee" ||
+      type === "admin_balance_add" ||
+      type === "custom_expense" ||
+      type === "vendor_payment" ||
+      !type;
 
     // OPTIMIZATION: Limit max records to prevent memory issues
     // For very large result sets, use date filters to narrow down
     const maxRecords = 1000; // Safety limit
-    
+
     const [walletTransactions, walletTotal] = await Promise.all([
-      WalletTransaction.find(query)
-        .sort(sort)
-        .limit(maxRecords)
-        .lean(),
+      WalletTransaction.find(query).sort(sort).limit(maxRecords).lean(),
       WalletTransaction.countDocuments(query),
     ]);
 
     // Also fetch platform transactions (admin withdrawals, fees, unclaimed pools)
     let platformTransactions: any[] = [];
     let vatPayments: any[] = [];
-    
+
     if (includeAdminTx) {
       const platformQuery: any = {};
-      if (type && type !== 'all') {
-        if (['admin_withdrawal', 'platform_fee', 'unclaimed_pool', 'deposit_fee', 'withdrawal_fee', 'admin_balance_add', 'custom_expense'].includes(type)) {
+      if (type && type !== "all") {
+        if (
+          [
+            "admin_withdrawal",
+            "platform_fee",
+            "unclaimed_pool",
+            "deposit_fee",
+            "withdrawal_fee",
+            "admin_balance_add",
+            "custom_expense",
+          ].includes(type)
+        ) {
           platformQuery.transactionType = type;
         }
       }
@@ -117,15 +132,15 @@ export async function GET(request: NextRequest) {
         if (startDate) platformQuery.createdAt.$gte = new Date(startDate);
         if (endDate) platformQuery.createdAt.$lte = new Date(endDate);
       }
-      
+
       platformTransactions = await PlatformTransaction.find(platformQuery)
         .sort(sort)
         .limit(maxRecords)
         .lean();
-      
+
       // Fetch VAT payments if type is 'all' or 'vat_payment'
-      if (type === 'all' || type === 'vat_payment' || !type) {
-        const vatQuery: any = { status: 'paid' };
+      if (type === "all" || type === "vat_payment" || !type) {
+        const vatQuery: any = { status: "paid" };
         if (startDate || endDate) {
           vatQuery.paidAt = {};
           if (startDate) vatQuery.paidAt.$gte = new Date(startDate);
@@ -140,8 +155,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch vendor payments if type is 'all' or 'vendor_payment'
     let vendorPayments: any[] = [];
-    if (type === 'all' || type === 'vendor_payment' || !type) {
-      const vendorQuery: any = { status: 'paid' };
+    if (type === "all" || type === "vendor_payment" || !type) {
+      const vendorQuery: any = { status: "paid" };
       if (startDate || endDate) {
         vendorQuery.paidAt = {};
         if (startDate) vendorQuery.paidAt.$gte = new Date(startDate);
@@ -154,39 +169,71 @@ export async function GET(request: NextRequest) {
     }
 
     // Get unique user IDs to fetch user info
-    const userIds = [...new Set(walletTransactions.map(t => t.userId).filter(id => id !== 'platform'))];
+    const userIds = [
+      ...new Set(
+        walletTransactions
+          .map((t) => t.userId)
+          .filter((id) => id !== "platform"),
+      ),
+    ];
     const usersMap = await getUsersByIds(userIds);
 
     // Get withdrawal request IDs for enriching withdrawal transactions
-    const withdrawalTxs = walletTransactions.filter(t => t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId);
-    const withdrawalRequestIds = withdrawalTxs.map(t => t.metadata?.withdrawalRequestId).filter(Boolean);
-    
+    const withdrawalTxs = walletTransactions.filter(
+      (t) =>
+        t.transactionType === "withdrawal" && t.metadata?.withdrawalRequestId,
+    );
+    const withdrawalRequestIds = withdrawalTxs
+      .map((t) => t.metadata?.withdrawalRequestId)
+      .filter(Boolean);
+
     // Fetch withdrawal requests to get fee details
-    const withdrawalRequests = withdrawalRequestIds.length > 0 
-      ? await WithdrawalRequest.find({ _id: { $in: withdrawalRequestIds } }).lean()
-      : [];
-    const withdrawalRequestMap = new Map(withdrawalRequests.map(w => [w._id.toString(), w]));
+    const withdrawalRequests =
+      withdrawalRequestIds.length > 0
+        ? await WithdrawalRequest.find({
+            _id: { $in: withdrawalRequestIds },
+          }).lean()
+        : [];
+    const withdrawalRequestMap = new Map(
+      withdrawalRequests.map((w) => [w._id.toString(), w]),
+    );
 
     // Enrich wallet transactions with user info and withdrawal details
-    const enrichedWalletTransactions = walletTransactions.map(t => {
+    const enrichedWalletTransactions = walletTransactions.map((t) => {
       const enriched: any = {
         ...t,
-        source: 'wallet' as const,
-        userInfo: t.userId === 'platform' 
-          ? { id: 'platform', name: 'Platform', email: 'system' }
-          : usersMap.get(t.userId) || { id: t.userId, name: 'Unknown', email: 'Unknown' },
+        source: "wallet" as const,
+        userInfo:
+          t.userId === "platform"
+            ? { id: "platform", name: "Platform", email: "system" }
+            : usersMap.get(t.userId) || {
+                id: t.userId,
+                name: "Unknown",
+                email: "Unknown",
+              },
       };
-      
+
       // Enrich withdrawal transactions with fee details from WithdrawalRequest
-      if (t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId) {
-        const withdrawalReq = withdrawalRequestMap.get(t.metadata.withdrawalRequestId.toString());
+      if (
+        t.transactionType === "withdrawal" &&
+        t.metadata?.withdrawalRequestId
+      ) {
+        const withdrawalReq = withdrawalRequestMap.get(
+          t.metadata.withdrawalRequestId.toString(),
+        );
         if (withdrawalReq) {
           // Update status from withdrawal request (source of truth)
-          if (withdrawalReq.status === 'completed') enriched.status = 'completed';
-          else if (withdrawalReq.status === 'rejected' || withdrawalReq.status === 'failed') enriched.status = 'failed';
-          else if (withdrawalReq.status === 'cancelled') enriched.status = 'cancelled';
-          else enriched.status = 'pending';
-          
+          if (withdrawalReq.status === "completed")
+            enriched.status = "completed";
+          else if (
+            withdrawalReq.status === "rejected" ||
+            withdrawalReq.status === "failed"
+          )
+            enriched.status = "failed";
+          else if (withdrawalReq.status === "cancelled")
+            enriched.status = "cancelled";
+          else enriched.status = "pending";
+
           // Add fee details to metadata
           enriched.metadata = {
             ...enriched.metadata,
@@ -198,22 +245,22 @@ export async function GET(request: NextRequest) {
           };
         }
       }
-      
+
       return enriched;
     });
 
     // Format platform transactions
-    const enrichedPlatformTransactions = platformTransactions.map(t => ({
+    const enrichedPlatformTransactions = platformTransactions.map((t) => ({
       _id: t._id,
-      userId: 'admin',
+      userId: "admin",
       transactionType: t.transactionType,
       amount: t.amount,
       amountEUR: t.amountEUR,
-      status: 'completed',
+      status: "completed",
       description: t.description,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
-      source: 'platform' as const,
+      source: "platform" as const,
       metadata: {
         bankDetails: t.bankDetails,
         feeDetails: t.feeDetails,
@@ -224,25 +271,25 @@ export async function GET(request: NextRequest) {
         processedBy: t.processedBy,
         processedByEmail: t.processedByEmail,
       },
-      userInfo: { 
-        id: 'admin', 
-        name: t.processedByEmail || 'Admin', 
-        email: t.processedByEmail || 'admin@system' 
+      userInfo: {
+        id: "admin",
+        name: t.processedByEmail || "Admin",
+        email: t.processedByEmail || "admin@system",
       },
     }));
 
     // Format VAT payments
-    const enrichedVatPayments = vatPayments.map(v => ({
+    const enrichedVatPayments = vatPayments.map((v) => ({
       _id: v._id,
-      userId: 'admin',
-      transactionType: 'vat_payment',
+      userId: "admin",
+      transactionType: "vat_payment",
       amount: -v.vatAmountEUR, // Negative because it's money going out
       amountEUR: v.vatAmountEUR,
-      status: 'completed',
+      status: "completed",
       description: `VAT Payment for ${new Date(v.periodStart).toLocaleDateString()} - ${new Date(v.periodEnd).toLocaleDateString()}`,
       createdAt: v.paidAt || v.createdAt,
       updatedAt: v.updatedAt,
-      source: 'vat' as const,
+      source: "vat" as const,
       metadata: {
         periodStart: v.periodStart,
         periodEnd: v.periodEnd,
@@ -250,25 +297,25 @@ export async function GET(request: NextRequest) {
         reference: v.reference,
         paidByEmail: v.paidByEmail,
       },
-      userInfo: { 
-        id: 'admin', 
-        name: v.paidByEmail || 'Admin', 
-        email: v.paidByEmail || 'admin@system' 
+      userInfo: {
+        id: "admin",
+        name: v.paidByEmail || "Admin",
+        email: v.paidByEmail || "admin@system",
       },
     }));
 
     // Format Vendor payments
-    const enrichedVendorPayments = vendorPayments.map(v => ({
+    const enrichedVendorPayments = vendorPayments.map((v) => ({
       _id: v._id,
-      userId: 'admin',
-      transactionType: 'vendor_payment',
+      userId: "admin",
+      transactionType: "vendor_payment",
       amount: -v.amount, // Negative because it's money going out
       amountEUR: v.amount,
-      status: 'completed',
+      status: "completed",
       description: `Vendor Payment to ${v.vendorName} (${v.serviceType})`,
       createdAt: v.paidAt || v.createdAt,
       updatedAt: v.updatedAt,
-      source: 'vendor' as const,
+      source: "vendor" as const,
       metadata: {
         vendorId: v.vendorId,
         vendorName: v.vendorName,
@@ -278,10 +325,10 @@ export async function GET(request: NextRequest) {
         paidByEmail: v.paidByEmail,
         billingCycle: v.billingCycle,
       },
-      userInfo: { 
-        id: 'admin', 
-        name: v.paidByEmail || 'Admin', 
-        email: v.paidByEmail || 'admin@system' 
+      userInfo: {
+        id: "admin",
+        name: v.paidByEmail || "Admin",
+        email: v.paidByEmail || "admin@system",
       },
     }));
 
@@ -294,7 +341,7 @@ export async function GET(request: NextRequest) {
     ].sort((a, b) => {
       const dateA = new Date((a as any).createdAt).getTime();
       const dateB = new Date((b as any).createdAt).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
 
     // Apply pagination to combined results
@@ -307,11 +354,15 @@ export async function GET(request: NextRequest) {
       { $match: query },
       {
         $group: {
-          _id: '$transactionType',
+          _id: "$transactionType",
           count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' },
-          positiveAmount: { $sum: { $cond: [{ $gt: ['$amount', 0] }, '$amount', 0] } },
-          negativeAmount: { $sum: { $cond: [{ $lt: ['$amount', 0] }, '$amount', 0] } },
+          totalAmount: { $sum: "$amount" },
+          positiveAmount: {
+            $sum: { $cond: [{ $gt: ["$amount", 0] }, "$amount", 0] },
+          },
+          negativeAmount: {
+            $sum: { $cond: [{ $lt: ["$amount", 0] }, "$amount", 0] },
+          },
         },
       },
     ]);
@@ -321,7 +372,7 @@ export async function GET(request: NextRequest) {
       { $match: query },
       {
         $group: {
-          _id: '$status',
+          _id: "$status",
           count: { $sum: 1 },
         },
       },
@@ -339,30 +390,36 @@ export async function GET(request: NextRequest) {
           hasMore: page * limit < total,
         },
         stats: {
-          byType: stats.reduce((acc, s) => {
-            acc[s._id] = {
-              count: s.count,
-              totalAmount: s.totalAmount,
-              positiveAmount: s.positiveAmount,
-              negativeAmount: s.negativeAmount,
-            };
-            return acc;
-          }, {} as Record<string, any>),
-          byStatus: statusBreakdown.reduce((acc, s) => {
-            acc[s._id] = s.count;
-            return acc;
-          }, {} as Record<string, number>),
+          byType: stats.reduce(
+            (acc, s) => {
+              acc[s._id] = {
+                count: s.count,
+                totalAmount: s.totalAmount,
+                positiveAmount: s.positiveAmount,
+                negativeAmount: s.negativeAmount,
+              };
+              return acc;
+            },
+            {} as Record<string, any>,
+          ),
+          byStatus: statusBreakdown.reduce(
+            (acc, s) => {
+              acc[s._id] = s.count;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ),
         },
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching transactions:', error);
+    console.error("Error fetching transactions:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch transactions' },
-      { status: 500 }
+      { error: "Failed to fetch transactions" },
+      { status: 500 },
     );
   }
 }
@@ -376,31 +433,31 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
 
     const { transactionId } = await request.json();
-    
+
     if (!transactionId) {
       return NextResponse.json(
-        { error: 'Transaction ID is required' },
-        { status: 400 }
+        { error: "Transaction ID is required" },
+        { status: 400 },
       );
     }
 
     const transaction = await WalletTransaction.findById(transactionId).lean();
-    
+
     if (!transaction) {
       return NextResponse.json(
-        { error: 'Transaction not found' },
-        { status: 404 }
+        { error: "Transaction not found" },
+        { status: 404 },
       );
     }
 
     // Get user info
     const txUserId = (transaction as any).userId;
-    let userInfo = { id: txUserId, name: 'Unknown', email: 'Unknown' };
-    if (txUserId !== 'platform') {
+    let userInfo = { id: txUserId, name: "Unknown", email: "Unknown" };
+    if (txUserId !== "platform") {
       const usersMap = await getUsersByIds([txUserId]);
       userInfo = usersMap.get(txUserId) || userInfo;
     } else {
-      userInfo = { id: 'platform', name: 'Platform', email: 'system' };
+      userInfo = { id: "platform", name: "Platform", email: "system" };
     }
 
     return NextResponse.json({
@@ -413,14 +470,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching transaction:', error);
+    console.error("Error fetching transaction:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch transaction' },
-      { status: 500 }
+      { error: "Failed to fetch transaction" },
+      { status: 500 },
     );
   }
 }
-

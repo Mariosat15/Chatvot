@@ -1,27 +1,27 @@
-import mongoose, { Schema, Document, Types } from 'mongoose';
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface ICustomerAssignment extends Document {
   customerId: string;
   customerEmail: string;
   customerName: string;
-  
+
   // Current assignment
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
   employeeRole: string;
-  
+
   // Assignment metadata
   assignedAt: Date;
   assignedBy: {
-    type: 'auto' | 'admin' | 'self' | 'transfer' | 'reassign';
+    type: "auto" | "admin" | "self" | "transfer" | "reassign";
     adminId?: string;
     adminEmail?: string;
     adminName?: string;
     reason?: string;
     strategy?: string;
   };
-  
+
   // Previous assignment (for transfer tracking)
   previousEmployee?: {
     employeeId: string;
@@ -31,10 +31,10 @@ export interface ICustomerAssignment extends Document {
     assignedAt: Date;
     unassignedAt: Date;
   };
-  
+
   isActive: boolean;
   notes?: string;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,7 +55,7 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
       type: String,
       required: true,
     },
-    
+
     // Current assignment
     employeeId: {
       type: String,
@@ -75,7 +75,7 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
       type: String,
       required: true,
     },
-    
+
     // Assignment metadata
     assignedAt: {
       type: Date,
@@ -84,7 +84,7 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
     assignedBy: {
       type: {
         type: String,
-        enum: ['auto', 'admin', 'self', 'transfer', 'reassign'],
+        enum: ["auto", "admin", "self", "transfer", "reassign"],
         required: true,
       },
       adminId: String,
@@ -93,7 +93,7 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
       reason: String,
       strategy: String,
     },
-    
+
     // Previous assignment
     previousEmployee: {
       employeeId: String,
@@ -103,7 +103,7 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
       assignedAt: Date,
       unassignedAt: Date,
     },
-    
+
     isActive: {
       type: Boolean,
       default: true,
@@ -112,8 +112,8 @@ const CustomerAssignmentSchema = new Schema<ICustomerAssignment>(
   },
   {
     timestamps: true,
-    collection: 'customer_assignments',
-  }
+    collection: "customer_assignments",
+  },
 );
 
 // Compound indexes
@@ -122,39 +122,52 @@ CustomerAssignmentSchema.index({ employeeId: 1, isActive: 1 });
 CustomerAssignmentSchema.index({ customerEmail: 1 });
 
 // Static methods
-CustomerAssignmentSchema.statics.findByCustomer = function(customerId: string) {
+CustomerAssignmentSchema.statics.findByCustomer = function (
+  customerId: string,
+) {
   return this.findOne({ customerId, isActive: true });
 };
 
-CustomerAssignmentSchema.statics.findByEmployee = function(employeeId: string) {
+CustomerAssignmentSchema.statics.findByEmployee = function (
+  employeeId: string,
+) {
   return this.find({ employeeId, isActive: true });
 };
 
-CustomerAssignmentSchema.statics.countByEmployee = function(employeeId: string) {
+CustomerAssignmentSchema.statics.countByEmployee = function (
+  employeeId: string,
+) {
   return this.countDocuments({ employeeId, isActive: true });
 };
 
-CustomerAssignmentSchema.statics.getUnassignedCustomers = async function(userModel: any) {
-  const assignedCustomerIds = await this.distinct('customerId', { isActive: true });
+CustomerAssignmentSchema.statics.getUnassignedCustomers = async function (
+  userModel: any,
+) {
+  const assignedCustomerIds = await this.distinct("customerId", {
+    isActive: true,
+  });
   return userModel.find({ _id: { $nin: assignedCustomerIds } });
 };
 
 // Prevent duplicate assignments
-CustomerAssignmentSchema.pre('save', async function(next) {
+CustomerAssignmentSchema.pre("save", async function (next) {
   if (this.isNew) {
     const existing = await (this.constructor as any).findOne({
       customerId: this.customerId,
       isActive: true,
     });
     if (existing) {
-      throw new Error('Customer already has an active assignment');
+      throw new Error("Customer already has an active assignment");
     }
   }
   next();
 });
 
-export const CustomerAssignment = mongoose.models.CustomerAssignment || 
-  mongoose.model<ICustomerAssignment>('CustomerAssignment', CustomerAssignmentSchema);
+export const CustomerAssignment =
+  mongoose.models.CustomerAssignment ||
+  mongoose.model<ICustomerAssignment>(
+    "CustomerAssignment",
+    CustomerAssignmentSchema,
+  );
 
 export default CustomerAssignment;
-

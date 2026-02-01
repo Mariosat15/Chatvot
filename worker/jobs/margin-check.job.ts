@@ -1,33 +1,37 @@
 /**
  * Margin Check Job
- * 
+ *
  * Runs periodically to check all users' margins and liquidate if needed.
  * This is a BACKUP to the client-side real-time checks.
- * 
+ *
  * Benefits:
  * - Catches users who disconnect before liquidation
  * - Ensures no one escapes margin call
  * - Runs independently of user actions
  */
 
-import mongoose from 'mongoose';
-import { connectToDatabase } from '../config/database';
+import { connectToDatabase } from "../config/database";
 
 // Import models directly
-import CompetitionParticipant from '../../database/models/trading/competition-participant.model';
-import TradingPosition from '../../database/models/trading/trading-position.model';
-import Competition from '../../database/models/trading/competition.model';
+import CompetitionParticipant from "../../database/models/trading/competition-participant.model";
+import TradingPosition from "../../database/models/trading/trading-position.model";
+import Competition from "../../database/models/trading/competition.model";
 
 // Import services directly
-import { fetchRealForexPrices } from '../../lib/services/real-forex-prices.service';
-import { calculateUnrealizedPnL, ForexSymbol } from '../../lib/services/pnl-calculator.service';
-import { getMarginStatus } from '../../lib/services/risk-manager.service';
-import { closePositionAutomatic } from '../../lib/actions/trading/position.actions';
+import { fetchRealForexPrices } from "../../lib/services/real-forex-prices.service";
+import {
+  calculateUnrealizedPnL,
+  ForexSymbol,
+} from "../../lib/services/pnl-calculator.service";
+import { getMarginStatus } from "../../lib/services/risk-manager.service";
+import { closePositionAutomatic } from "../../lib/actions/trading/position.actions";
 
 // Get risk settings dynamically (might not exist)
 async function getRiskSettings() {
   try {
-    const TradingRiskSettings = (await import('../../database/models/trading-risk-settings.model')).default;
+    const TradingRiskSettings = (
+      await import("../../database/models/trading-risk-settings.model")
+    ).default;
     return await TradingRiskSettings.findOne();
   } catch {
     return null;
@@ -69,13 +73,13 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
     }
 
     // Get all active competitions
-    const activeCompetitions = await Competition.find({ status: 'active' });
-    const activeCompetitionIds = activeCompetitions.map(c => c._id);
+    const activeCompetitions = await Competition.find({ status: "active" });
+    const activeCompetitionIds = activeCompetitions.map((c) => c._id);
 
     // Get all participants with open positions in active competitions
     const participantsWithPositions = await CompetitionParticipant.find({
       competitionId: { $in: activeCompetitionIds },
-      status: 'active',
+      status: "active",
       currentOpenPositions: { $gt: 0 },
     });
 
@@ -90,12 +94,12 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
     for (const participant of participantsWithPositions) {
       const positions = await TradingPosition.find({
         participantId: participant._id,
-        status: 'open',
+        status: "open",
       });
 
       if (positions.length > 0) {
         participantPositions.set(participant._id.toString(), positions);
-        positions.forEach(p => allSymbols.add(p.symbol as ForexSymbol));
+        positions.forEach((p) => allSymbols.add(p.symbol as ForexSymbol));
       }
     }
 
@@ -117,13 +121,14 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
           const currentPrice = pricesMap.get(position.symbol);
           if (!currentPrice) continue;
 
-          const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+          const marketPrice =
+            position.side === "long" ? currentPrice.bid : currentPrice.ask;
           const unrealizedPnl = calculateUnrealizedPnL(
             position.side,
             position.entryPrice,
             marketPrice,
             position.quantity,
-            position.symbol
+            position.symbol,
           );
 
           totalUnrealizedPnl += unrealizedPnl;
@@ -138,11 +143,11 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
             liquidation: liquidationThreshold,
             marginCall: marginCallThreshold,
             warning: warningThreshold,
-          }
+          },
         );
 
         // Liquidate if needed
-        if (marginStatus.status === 'liquidation') {
+        if (marginStatus.status === "liquidation") {
           result.liquidatedUsers++;
 
           // Close all positions for this user
@@ -151,11 +156,18 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
               const currentPrice = pricesMap.get(position.symbol);
               if (!currentPrice) continue;
 
-              const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
-              await closePositionAutomatic(position._id.toString(), marketPrice, 'margin_call');
+              const marketPrice =
+                position.side === "long" ? currentPrice.bid : currentPrice.ask;
+              await closePositionAutomatic(
+                position._id.toString(),
+                marketPrice,
+                "margin_call",
+              );
               result.liquidatedPositions++;
             } catch (posError) {
-              result.errors.push(`Failed to close position ${position._id}: ${posError}`);
+              result.errors.push(
+                `Failed to close position ${position._id}: ${posError}`,
+              );
             }
           }
 
@@ -163,20 +175,23 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
           // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
           await CompetitionParticipant.findByIdAndUpdate(participant._id, {
             $set: {
-              status: 'liquidated',
+              status: "liquidated",
               liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
               currentOpenPositions: 0,
             },
           });
-          console.log(`   📝 Participant ${participant.userId} marked as 'liquidated' for disqualification tracking`);
+          console.log(
+            `   📝 Participant ${participant.userId} marked as 'liquidated' for disqualification tracking`,
+          );
 
           // Send liquidation notification
           try {
-            const { sendNotification } = await import('../../lib/services/notification.service');
+            const { sendNotification } =
+              await import("../../lib/services/notification.service");
             await sendNotification({
               userId: participant.userId,
-              type: 'liquidation',
-              metadata: { symbol: 'All positions' },
+              type: "liquidation",
+              metadata: { symbol: "All positions" },
             });
           } catch {
             // Notification failure is not critical
@@ -184,26 +199,36 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
 
           // Send disqualification notification if competition has disqualifyOnLiquidation enabled
           try {
-            const competition = await Competition.findById(participant.competitionId).lean();
+            const competition = await Competition.findById(
+              participant.competitionId,
+            ).lean();
             if ((competition as any)?.rules?.disqualifyOnLiquidation) {
-              const { sendNotification } = await import('../../lib/services/notification.service');
+              const { sendNotification } =
+                await import("../../lib/services/notification.service");
               await sendNotification({
                 userId: participant.userId,
-                type: 'competition_disqualified',
+                type: "competition_disqualified",
                 metadata: {
                   competitionId: participant.competitionId,
                   competitionName: (competition as any).name,
                   reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
                 },
               });
-              console.log(`   🔔 Sent disqualification notification to ${participant.userId}`);
+              console.log(
+                `   🔔 Sent disqualification notification to ${participant.userId}`,
+              );
             }
           } catch (notifError) {
-            console.error(`   ❌ Failed to send disqualification notification:`, notifError);
+            console.error(
+              `   ❌ Failed to send disqualification notification:`,
+              notifError,
+            );
           }
         }
       } catch (participantError) {
-        result.errors.push(`Error processing participant ${participant._id}: ${participantError}`);
+        result.errors.push(
+          `Error processing participant ${participant._id}: ${participantError}`,
+        );
       }
     }
 
@@ -215,4 +240,3 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
 }
 
 export default runMarginCheck;
-

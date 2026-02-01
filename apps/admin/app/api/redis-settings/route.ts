@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
-import { reconnectRedis } from '@/lib/services/redis.service';
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { reconnectRedis } from "@/lib/services/redis.service";
 
 // Default price feed settings
 const DEFAULT_PRICE_FEED = {
-  priceFeedMode: 'both' as const,
+  priceFeedMode: "both" as const,
   priceFeedWebsocketEnabled: true,
   priceFeedApiEnabled: true,
-  priceFeedPrimarySource: 'websocket' as const,
+  priceFeedPrimarySource: "websocket" as const,
   priceFeedUpdateInterval: 2000,
   priceFeedCacheTTL: 10000,
   priceFeedClientPollInterval: 500,
@@ -23,7 +23,7 @@ export async function GET() {
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -32,14 +32,14 @@ export async function GET() {
     if (!settings) {
       return NextResponse.json({
         // Redis settings
-        upstashRedisUrl: '',
-        upstashRedisToken: '',
+        upstashRedisUrl: "",
+        upstashRedisToken: "",
         redisEnabled: false,
         redisPriceSyncEnabled: false,
         // Inngest settings
-        inngestSigningKey: '',
-        inngestEventKey: '',
-        inngestMode: 'dev',
+        inngestSigningKey: "",
+        inngestEventKey: "",
+        inngestMode: "dev",
         // Price feed settings
         ...DEFAULT_PRICE_FEED,
       });
@@ -47,32 +47,50 @@ export async function GET() {
 
     return NextResponse.json({
       // Redis settings
-      upstashRedisUrl: settings.upstashRedisUrl || '',
-      upstashRedisToken: settings.upstashRedisToken || '',
+      upstashRedisUrl: settings.upstashRedisUrl || "",
+      upstashRedisToken: settings.upstashRedisToken || "",
       redisEnabled: settings.redisEnabled || false,
       redisPriceSyncEnabled: settings.redisPriceSyncEnabled || false,
       // Inngest settings
-      inngestSigningKey: settings.inngestSigningKey || '',
-      inngestEventKey: settings.inngestEventKey || '',
-      inngestMode: settings.inngestMode || 'dev',
+      inngestSigningKey: settings.inngestSigningKey || "",
+      inngestEventKey: settings.inngestEventKey || "",
+      inngestMode: settings.inngestMode || "dev",
       // Price feed settings
       priceFeedMode: settings.priceFeedMode || DEFAULT_PRICE_FEED.priceFeedMode,
-      priceFeedWebsocketEnabled: settings.priceFeedWebsocketEnabled ?? DEFAULT_PRICE_FEED.priceFeedWebsocketEnabled,
-      priceFeedApiEnabled: settings.priceFeedApiEnabled ?? DEFAULT_PRICE_FEED.priceFeedApiEnabled,
-      priceFeedPrimarySource: settings.priceFeedPrimarySource || DEFAULT_PRICE_FEED.priceFeedPrimarySource,
-      priceFeedUpdateInterval: settings.priceFeedUpdateInterval || DEFAULT_PRICE_FEED.priceFeedUpdateInterval,
-      priceFeedCacheTTL: settings.priceFeedCacheTTL || DEFAULT_PRICE_FEED.priceFeedCacheTTL,
-      priceFeedClientPollInterval: settings.priceFeedClientPollInterval || DEFAULT_PRICE_FEED.priceFeedClientPollInterval,
-      priceFeedWebsocketReconnectAttempts: settings.priceFeedWebsocketReconnectAttempts || DEFAULT_PRICE_FEED.priceFeedWebsocketReconnectAttempts,
-      priceFeedWebsocketReconnectDelay: settings.priceFeedWebsocketReconnectDelay || DEFAULT_PRICE_FEED.priceFeedWebsocketReconnectDelay,
-      priceFeedApiConcurrency: settings.priceFeedApiConcurrency || DEFAULT_PRICE_FEED.priceFeedApiConcurrency,
-      priceFeedFallbackEnabled: settings.priceFeedFallbackEnabled ?? DEFAULT_PRICE_FEED.priceFeedFallbackEnabled,
+      priceFeedWebsocketEnabled:
+        settings.priceFeedWebsocketEnabled ??
+        DEFAULT_PRICE_FEED.priceFeedWebsocketEnabled,
+      priceFeedApiEnabled:
+        settings.priceFeedApiEnabled ?? DEFAULT_PRICE_FEED.priceFeedApiEnabled,
+      priceFeedPrimarySource:
+        settings.priceFeedPrimarySource ||
+        DEFAULT_PRICE_FEED.priceFeedPrimarySource,
+      priceFeedUpdateInterval:
+        settings.priceFeedUpdateInterval ||
+        DEFAULT_PRICE_FEED.priceFeedUpdateInterval,
+      priceFeedCacheTTL:
+        settings.priceFeedCacheTTL || DEFAULT_PRICE_FEED.priceFeedCacheTTL,
+      priceFeedClientPollInterval:
+        settings.priceFeedClientPollInterval ||
+        DEFAULT_PRICE_FEED.priceFeedClientPollInterval,
+      priceFeedWebsocketReconnectAttempts:
+        settings.priceFeedWebsocketReconnectAttempts ||
+        DEFAULT_PRICE_FEED.priceFeedWebsocketReconnectAttempts,
+      priceFeedWebsocketReconnectDelay:
+        settings.priceFeedWebsocketReconnectDelay ||
+        DEFAULT_PRICE_FEED.priceFeedWebsocketReconnectDelay,
+      priceFeedApiConcurrency:
+        settings.priceFeedApiConcurrency ||
+        DEFAULT_PRICE_FEED.priceFeedApiConcurrency,
+      priceFeedFallbackEnabled:
+        settings.priceFeedFallbackEnabled ??
+        DEFAULT_PRICE_FEED.priceFeedFallbackEnabled,
     });
   } catch (error) {
-    console.error('Failed to fetch Redis settings:', error);
+    console.error("Failed to fetch Redis settings:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
+      { error: "Failed to fetch settings" },
+      { status: 500 },
     );
   }
 }
@@ -81,7 +99,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -117,29 +135,31 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           // Redis settings
-          upstashRedisUrl: upstashRedisUrl || '',
-          upstashRedisToken: upstashRedisToken || '',
+          upstashRedisUrl: upstashRedisUrl || "",
+          upstashRedisToken: upstashRedisToken || "",
           redisEnabled: redisEnabled || false,
           redisPriceSyncEnabled: redisPriceSyncEnabled || false,
           // Inngest settings
-          inngestSigningKey: inngestSigningKey || '',
-          inngestEventKey: inngestEventKey || '',
-          inngestMode: inngestMode || 'dev',
+          inngestSigningKey: inngestSigningKey || "",
+          inngestEventKey: inngestEventKey || "",
+          inngestMode: inngestMode || "dev",
           // Price feed settings
-          priceFeedMode: priceFeedMode || 'both',
+          priceFeedMode: priceFeedMode || "both",
           priceFeedWebsocketEnabled: priceFeedWebsocketEnabled ?? true,
           priceFeedApiEnabled: priceFeedApiEnabled ?? true,
-          priceFeedPrimarySource: priceFeedPrimarySource || 'websocket',
+          priceFeedPrimarySource: priceFeedPrimarySource || "websocket",
           priceFeedUpdateInterval: priceFeedUpdateInterval || 2000,
           priceFeedCacheTTL: priceFeedCacheTTL || 10000,
           priceFeedClientPollInterval: priceFeedClientPollInterval || 500,
-          priceFeedWebsocketReconnectAttempts: priceFeedWebsocketReconnectAttempts || 10,
-          priceFeedWebsocketReconnectDelay: priceFeedWebsocketReconnectDelay || 3000,
+          priceFeedWebsocketReconnectAttempts:
+            priceFeedWebsocketReconnectAttempts || 10,
+          priceFeedWebsocketReconnectDelay:
+            priceFeedWebsocketReconnectDelay || 3000,
           priceFeedApiConcurrency: priceFeedApiConcurrency || 30,
           priceFeedFallbackEnabled: priceFeedFallbackEnabled ?? true,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     // Force Redis to reconnect with new credentials
@@ -147,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Settings saved successfully',
+      message: "Settings saved successfully",
       settings: {
         upstashRedisUrl: settings.upstashRedisUrl,
         redisEnabled: settings.redisEnabled,
@@ -157,11 +177,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to save Redis settings:', error);
+    console.error("Failed to save Redis settings:", error);
     return NextResponse.json(
-      { error: 'Failed to save settings' },
-      { status: 500 }
+      { error: "Failed to save settings" },
+      { status: 500 },
     );
   }
 }
-

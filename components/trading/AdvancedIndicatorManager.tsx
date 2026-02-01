@@ -1,20 +1,38 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Slider } from '@/components/ui/slider';
-import { Activity, X, Search, TrendingUp, BarChart3, Settings, Palette, Layers, Check, Trash2, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
+import {
+  Activity,
+  X,
+  Search,
+  TrendingUp,
+  BarChart3,
+  Settings,
+  Palette,
+  Layers,
+  Check,
+  Trash2,
+  ChevronRight,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface CustomIndicator {
   id: string;
   type: string;
   name: string;
-  displayType: 'overlay' | 'oscillator';
+  displayType: "overlay" | "oscillator";
   enabled: boolean;
   color: string;
   lineWidth: number;
@@ -22,7 +40,7 @@ export interface CustomIndicator {
   parameters: Record<string, number>;
   opacity?: number;
   customLabel?: string;
-  priceSource?: 'close' | 'open' | 'high' | 'low' | 'hl2' | 'hlc3' | 'ohlc4';
+  priceSource?: "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
   offset?: number;
   precision?: number;
   showLabel?: boolean;
@@ -52,44 +70,151 @@ export interface CustomIndicator {
 
 export const INDICATOR_TEMPLATES = {
   // Moving Averages
-  sma: { name: 'Simple Moving Average', shortName: 'SMA', displayType: 'overlay' as const, defaultParams: { period: 20 }, paramLabels: { period: 'Period' } },
-  ema: { name: 'Exponential Moving Average', shortName: 'EMA', displayType: 'overlay' as const, defaultParams: { period: 12 }, paramLabels: { period: 'Period' } },
-  wma: { name: 'Weighted Moving Average', shortName: 'WMA', displayType: 'overlay' as const, defaultParams: { period: 20 }, paramLabels: { period: 'Period' } },
-  
+  sma: {
+    name: "Simple Moving Average",
+    shortName: "SMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  ema: {
+    name: "Exponential Moving Average",
+    shortName: "EMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 12 },
+    paramLabels: { period: "Period" },
+  },
+  wma: {
+    name: "Weighted Moving Average",
+    shortName: "WMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+
   // Bands
-  bb: { name: 'Bollinger Bands', shortName: 'BB', displayType: 'overlay' as const, defaultParams: { period: 20, stdDev: 2 }, paramLabels: { period: 'Period', stdDev: 'Std Dev' } },
-  keltner: { name: 'Keltner Channels', shortName: 'KC', displayType: 'overlay' as const, defaultParams: { period: 20, multiplier: 2 }, paramLabels: { period: 'Period', multiplier: 'Multiplier' } },
-  
+  bb: {
+    name: "Bollinger Bands",
+    shortName: "BB",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20, stdDev: 2 },
+    paramLabels: { period: "Period", stdDev: "Std Dev" },
+  },
+  keltner: {
+    name: "Keltner Channels",
+    shortName: "KC",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20, multiplier: 2 },
+    paramLabels: { period: "Period", multiplier: "Multiplier" },
+  },
+
   // Oscillators
-  rsi: { name: 'Relative Strength Index', shortName: 'RSI', displayType: 'oscillator' as const, defaultParams: { period: 14 }, paramLabels: { period: 'Period' } },
-  macd: { name: 'MACD', shortName: 'MACD', displayType: 'oscillator' as const, defaultParams: { fast: 12, slow: 26, signal: 9 }, paramLabels: { fast: 'Fast', slow: 'Slow', signal: 'Signal' } },
-  stoch: { name: 'Stochastic', shortName: 'Stoch', displayType: 'oscillator' as const, defaultParams: { kPeriod: 14, dPeriod: 3 }, paramLabels: { kPeriod: '%K', dPeriod: '%D' } },
-  williamsR: { name: 'Williams %R', shortName: 'W%R', displayType: 'oscillator' as const, defaultParams: { period: 14 }, paramLabels: { period: 'Period' } },
-  cci: { name: 'Commodity Channel Index', shortName: 'CCI', displayType: 'oscillator' as const, defaultParams: { period: 20 }, paramLabels: { period: 'Period' } },
-  mfi: { name: 'Money Flow Index', shortName: 'MFI', displayType: 'oscillator' as const, defaultParams: { period: 14 }, paramLabels: { period: 'Period' } },
-  adx: { name: 'Average Directional Index', shortName: 'ADX', displayType: 'oscillator' as const, defaultParams: { period: 14 }, paramLabels: { period: 'Period' } },
-  
+  rsi: {
+    name: "Relative Strength Index",
+    shortName: "RSI",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+  macd: {
+    name: "MACD",
+    shortName: "MACD",
+    displayType: "oscillator" as const,
+    defaultParams: { fast: 12, slow: 26, signal: 9 },
+    paramLabels: { fast: "Fast", slow: "Slow", signal: "Signal" },
+  },
+  stoch: {
+    name: "Stochastic",
+    shortName: "Stoch",
+    displayType: "oscillator" as const,
+    defaultParams: { kPeriod: 14, dPeriod: 3 },
+    paramLabels: { kPeriod: "%K", dPeriod: "%D" },
+  },
+  williamsR: {
+    name: "Williams %R",
+    shortName: "W%R",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+  cci: {
+    name: "Commodity Channel Index",
+    shortName: "CCI",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  mfi: {
+    name: "Money Flow Index",
+    shortName: "MFI",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+  adx: {
+    name: "Average Directional Index",
+    shortName: "ADX",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+
   // Other
-  vwap: { name: 'VWAP', shortName: 'VWAP', displayType: 'overlay' as const, defaultParams: {}, paramLabels: {} },
-  atr: { name: 'Average True Range', shortName: 'ATR', displayType: 'oscillator' as const, defaultParams: { period: 14 }, paramLabels: { period: 'Period' } },
-  sar: { name: 'Parabolic SAR', shortName: 'SAR', displayType: 'overlay' as const, defaultParams: { acceleration: 0.02, maximum: 0.2 }, paramLabels: { acceleration: 'Acceleration', maximum: 'Maximum' } },
-  pivots: { name: 'Pivot Points', shortName: 'Pivots', displayType: 'overlay' as const, defaultParams: {}, paramLabels: {} },
+  vwap: {
+    name: "VWAP",
+    shortName: "VWAP",
+    displayType: "overlay" as const,
+    defaultParams: {},
+    paramLabels: {},
+  },
+  atr: {
+    name: "Average True Range",
+    shortName: "ATR",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+  sar: {
+    name: "Parabolic SAR",
+    shortName: "SAR",
+    displayType: "overlay" as const,
+    defaultParams: { acceleration: 0.02, maximum: 0.2 },
+    paramLabels: { acceleration: "Acceleration", maximum: "Maximum" },
+  },
+  pivots: {
+    name: "Pivot Points",
+    shortName: "Pivots",
+    displayType: "overlay" as const,
+    defaultParams: {},
+    paramLabels: {},
+  },
 };
 
-const DEFAULT_COLORS = ['#2962ff', '#f23645', '#00e676', '#ff6d00', '#9c27b0', '#fdd835', '#00bcd4', '#ff4081', '#8bc34a', '#ff9800'];
+const DEFAULT_COLORS = [
+  "#2962ff",
+  "#f23645",
+  "#00e676",
+  "#ff6d00",
+  "#9c27b0",
+  "#fdd835",
+  "#00bcd4",
+  "#ff4081",
+  "#8bc34a",
+  "#ff9800",
+];
 
 // Categories for left sidebar
 const CATEGORIES = [
-  { id: 'technicals', name: 'Technicals', icon: TrendingUp },
-  { id: 'oscillators', name: 'Oscillators', icon: Activity },
-  { id: 'volume', name: 'Volume', icon: BarChart3 },
+  { id: "technicals", name: "Technicals", icon: TrendingUp },
+  { id: "oscillators", name: "Oscillators", icon: Activity },
+  { id: "volume", name: "Volume", icon: BarChart3 },
 ];
 
 // Group indicators by category
 const INDICATOR_GROUPS = {
-  technicals: ['sma', 'ema', 'wma', 'bb', 'keltner', 'vwap', 'sar', 'pivots'],
-  oscillators: ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'adx', 'atr'],
-  volume: ['mfi'],
+  technicals: ["sma", "ema", "wma", "bb", "keltner", "vwap", "sar", "pivots"],
+  oscillators: ["rsi", "macd", "stoch", "williamsR", "cci", "adx", "atr"],
+  volume: ["mfi"],
 };
 
 interface AdvancedIndicatorManagerProps {
@@ -101,14 +226,18 @@ interface AdvancedIndicatorManagerProps {
 export default function AdvancedIndicatorManager({
   indicators,
   onIndicatorsChange,
-  portalContainer
+  portalContainer,
 }: AdvancedIndicatorManagerProps) {
   const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('technicals');
-  const [selectedIndicator, setSelectedIndicator] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'indicators' | 'active'>('indicators');
-  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("technicals");
+  const [selectedIndicator, setSelectedIndicator] = useState<string | null>(
+    null,
+  );
+  const [activeTab, setActiveTab] = useState<"indicators" | "active">(
+    "indicators",
+  );
+
   // Dragging state
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -119,31 +248,34 @@ export default function AdvancedIndicatorManager({
   useEffect(() => {
     if (open) {
       setPosition({ x: 0, y: 0 });
-      setSearchQuery('');
+      setSearchQuery("");
       setSelectedIndicator(null);
     }
   }, [open]);
 
   // Handle dragging
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.dialog-header')) {
-      setIsDragging(true);
-      dragStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        posX: position.x,
-        posY: position.y
-      };
-      e.preventDefault();
-    }
-  }, [position]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest(".dialog-header")) {
+        setIsDragging(true);
+        dragStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          posX: position.x,
+          posY: position.y,
+        };
+        e.preventDefault();
+      }
+    },
+    [position],
+  );
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
         setPosition({
           x: dragStartRef.current.posX + (e.clientX - dragStartRef.current.x),
-          y: dragStartRef.current.posY + (e.clientY - dragStartRef.current.y)
+          y: dragStartRef.current.posY + (e.clientY - dragStartRef.current.y),
         });
       }
     };
@@ -151,27 +283,34 @@ export default function AdvancedIndicatorManager({
     const handleMouseUp = () => setIsDragging(false);
 
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging]);
 
   // Filter indicators based on search and category
-  const filteredIndicators = Object.entries(INDICATOR_TEMPLATES).filter(([key, template]) => {
-    const matchesSearch = searchQuery === '' || 
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.shortName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = INDICATOR_GROUPS[selectedCategory as keyof typeof INDICATOR_GROUPS]?.includes(key);
-    return matchesSearch && (searchQuery !== '' || matchesCategory);
-  });
+  const filteredIndicators = Object.entries(INDICATOR_TEMPLATES).filter(
+    ([key, template]) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        template.shortName.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory =
+        INDICATOR_GROUPS[
+          selectedCategory as keyof typeof INDICATOR_GROUPS
+        ]?.includes(key);
+      return matchesSearch && (searchQuery !== "" || matchesCategory);
+    },
+  );
 
   const addIndicator = (type: string) => {
-    const template = INDICATOR_TEMPLATES[type as keyof typeof INDICATOR_TEMPLATES];
+    const template =
+      INDICATOR_TEMPLATES[type as keyof typeof INDICATOR_TEMPLATES];
     if (!template) return;
 
     const colorIndex = indicators.length % DEFAULT_COLORS.length;
@@ -186,47 +325,69 @@ export default function AdvancedIndicatorManager({
       lineStyle: 0,
       parameters: { ...template.defaultParams },
       opacity: 100,
-      priceSource: 'close',
+      priceSource: "close",
       offset: 0,
       precision: 5,
       showLabel: true,
       colors: {
-        upper: '#f23645',
+        upper: "#f23645",
         middle: DEFAULT_COLORS[colorIndex],
-        lower: '#00e676',
-        signal: '#f23645',
-        histogram: '#26a69a',
-        positive: '#26a69a',
-        negative: '#ef5350'
+        lower: "#00e676",
+        signal: "#f23645",
+        histogram: "#26a69a",
+        positive: "#26a69a",
+        negative: "#ef5350",
       },
-      levels: type === 'rsi' || type === 'mfi' ? { overbought: 70, oversold: 30 } :
-              type === 'williamsR' ? { overbought: -20, oversold: -80 } :
-              type === 'cci' ? { overbought: 100, oversold: -100 } :
-              type === 'adx' ? { threshold: 25 } : undefined,
-      visibility: { main: true, signal: true, histogram: true, upper: true, middle: true, lower: true }
+      levels:
+        type === "rsi" || type === "mfi"
+          ? { overbought: 70, oversold: 30 }
+          : type === "williamsR"
+            ? { overbought: -20, oversold: -80 }
+            : type === "cci"
+              ? { overbought: 100, oversold: -100 }
+              : type === "adx"
+                ? { threshold: 25 }
+                : undefined,
+      visibility: {
+        main: true,
+        signal: true,
+        histogram: true,
+        upper: true,
+        middle: true,
+        lower: true,
+      },
     };
 
     onIndicatorsChange([...indicators, newIndicator]);
     setSelectedIndicator(newIndicator.id);
-    setActiveTab('active');
+    setActiveTab("active");
   };
 
   const removeIndicator = (id: string) => {
-    onIndicatorsChange(indicators.filter(ind => ind.id !== id));
+    onIndicatorsChange(indicators.filter((ind) => ind.id !== id));
     if (selectedIndicator === id) setSelectedIndicator(null);
   };
 
   const toggleIndicator = (id: string) => {
-    onIndicatorsChange(indicators.map(ind => ind.id === id ? { ...ind, enabled: !ind.enabled } : ind));
+    onIndicatorsChange(
+      indicators.map((ind) =>
+        ind.id === id ? { ...ind, enabled: !ind.enabled } : ind,
+      ),
+    );
   };
 
   const updateIndicator = (id: string, updates: Partial<CustomIndicator>) => {
-    onIndicatorsChange(indicators.map(ind => ind.id === id ? { ...ind, ...updates } : ind));
+    onIndicatorsChange(
+      indicators.map((ind) => (ind.id === id ? { ...ind, ...updates } : ind)),
+    );
   };
 
-  const isIndicatorAdded = (type: string) => indicators.some(ind => ind.type === type);
-  const enabledCount = indicators.filter(ind => ind.enabled).length;
-  const selectedIndicatorData = selectedIndicator ? indicators.find(ind => ind.id === selectedIndicator) : null;
+  const isIndicatorAdded = (type: string) =>
+    indicators.some((ind) => ind.type === type);
+  const enabledCount = indicators.filter((ind) => ind.enabled).length;
+  const selectedIndicatorData = selectedIndicator
+    ? indicators.find((ind) => ind.id === selectedIndicator)
+    : null;
 
   return (
     <>
@@ -236,7 +397,7 @@ export default function AdvancedIndicatorManager({
         variant="ghost"
         onClick={() => setOpen(true)}
         className="hover:bg-[#2a2e39] relative h-[34px] w-[34px] p-0 text-[#787b86]"
-        title={`Indicators${enabledCount > 0 ? ` (${enabledCount} active)` : ''}`}
+        title={`Indicators${enabledCount > 0 ? ` (${enabledCount} active)` : ""}`}
       >
         <Activity className="h-[18px] w-[18px]" />
         {enabledCount > 0 && (
@@ -248,7 +409,7 @@ export default function AdvancedIndicatorManager({
 
       {/* Modal Backdrop */}
       {open && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-[9998]"
           onClick={() => setOpen(false)}
         />
@@ -260,19 +421,21 @@ export default function AdvancedIndicatorManager({
           ref={dialogRef}
           className="fixed z-[9999] bg-[#1e222d] border border-[#363a45] rounded-lg shadow-2xl overflow-hidden"
           style={{
-            left: '50%',
-            top: '50%',
+            left: "50%",
+            top: "50%",
             transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
-            width: '720px',
-            maxWidth: '90vw',
-            height: '560px',
-            maxHeight: '85vh',
+            width: "720px",
+            maxWidth: "90vw",
+            height: "560px",
+            maxHeight: "85vh",
           }}
           onMouseDown={handleMouseDown}
         >
           {/* Header - Draggable */}
           <div className="dialog-header flex items-center justify-between px-5 py-3 border-b border-[#363a45] cursor-move select-none bg-[#1e222d]">
-            <h2 className="text-[15px] font-medium text-white">Indicators, metrics, and strategies</h2>
+            <h2 className="text-[15px] font-medium text-white">
+              Indicators, metrics, and strategies
+            </h2>
             <button
               onClick={() => setOpen(false)}
               className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#363a45] text-[#787B86] hover:text-white transition-colors"
@@ -298,18 +461,23 @@ export default function AdvancedIndicatorManager({
           <div className="flex h-[calc(100%-108px)]">
             {/* Left Sidebar - Categories */}
             <div className="w-[180px] border-r border-[#363a45] py-2 overflow-y-auto">
-              <div className="px-3 py-1.5 text-[11px] font-semibold text-[#787B86] uppercase tracking-wider">Built-in</div>
-              {CATEGORIES.map(cat => {
+              <div className="px-3 py-1.5 text-[11px] font-semibold text-[#787B86] uppercase tracking-wider">
+                Built-in
+              </div>
+              {CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.id); setSearchQuery(''); }}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      setSearchQuery("");
+                    }}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors",
                       selectedCategory === cat.id
                         ? "bg-[#2962FF]/20 text-white"
-                        : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                        : "text-[#d1d4dc] hover:bg-[#2a2e39]",
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -325,12 +493,12 @@ export default function AdvancedIndicatorManager({
                     Active ({indicators.length})
                   </div>
                   <button
-                    onClick={() => setActiveTab('active')}
+                    onClick={() => setActiveTab("active")}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors",
-                      activeTab === 'active'
+                      activeTab === "active"
                         ? "bg-[#2962FF]/20 text-white"
-                        : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                        : "text-[#d1d4dc] hover:bg-[#2a2e39]",
                     )}
                   >
                     <Check className="h-4 w-4" />
@@ -342,16 +510,18 @@ export default function AdvancedIndicatorManager({
 
             {/* Right Content - Indicator List or Settings */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {activeTab === 'active' && selectedIndicatorData ? (
+              {activeTab === "active" && selectedIndicatorData ? (
                 // Indicator Settings Panel
                 <IndicatorSettingsPanel
                   indicator={selectedIndicatorData}
-                  onUpdate={(updates) => updateIndicator(selectedIndicatorData.id, updates)}
+                  onUpdate={(updates) =>
+                    updateIndicator(selectedIndicatorData.id, updates)
+                  }
                   onRemove={() => removeIndicator(selectedIndicatorData.id)}
                   onBack={() => setSelectedIndicator(null)}
                   portalContainer={portalContainer}
                 />
-              ) : activeTab === 'active' ? (
+              ) : activeTab === "active" ? (
                 // Active Indicators List
                 <div className="flex-1 overflow-y-auto">
                   <div className="px-4 py-2 text-[11px] font-semibold text-[#787B86] uppercase tracking-wider border-b border-[#363a45]">
@@ -364,30 +534,46 @@ export default function AdvancedIndicatorManager({
                     </div>
                   ) : (
                     <div className="divide-y divide-[#363a45]/50">
-                      {indicators.map(ind => (
+                      {indicators.map((ind) => (
                         <div
                           key={ind.id}
                           className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#2a2e39] cursor-pointer group"
                           onClick={() => setSelectedIndicator(ind.id)}
                         >
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggleIndicator(ind.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleIndicator(ind.id);
+                            }}
                             className={cn(
                               "w-4 h-4 rounded border flex items-center justify-center transition-colors",
-                              ind.enabled 
-                                ? "bg-[#2962FF] border-[#2962FF]" 
-                                : "border-[#787B86] hover:border-[#d1d4dc]"
+                              ind.enabled
+                                ? "bg-[#2962FF] border-[#2962FF]"
+                                : "border-[#787B86] hover:border-[#d1d4dc]",
                             )}
                           >
-                            {ind.enabled && <Check className="h-3 w-3 text-white" />}
+                            {ind.enabled && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
                           </button>
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ind.color }} />
-                          <span className={cn("flex-1 text-[13px]", ind.enabled ? "text-[#d1d4dc]" : "text-[#787B86]")}>
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: ind.color }}
+                          />
+                          <span
+                            className={cn(
+                              "flex-1 text-[13px]",
+                              ind.enabled ? "text-[#d1d4dc]" : "text-[#787B86]",
+                            )}
+                          >
                             {ind.name}
                           </span>
                           <ChevronRight className="h-4 w-4 text-[#787B86] opacity-0 group-hover:opacity-100 transition-opacity" />
                           <button
-                            onClick={(e) => { e.stopPropagation(); removeIndicator(ind.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeIndicator(ind.id);
+                            }}
                             className="p-1 rounded hover:bg-[#F23645]/20 text-[#787B86] hover:text-[#F23645] opacity-0 group-hover:opacity-100 transition-all"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -412,12 +598,14 @@ export default function AdvancedIndicatorManager({
                           onClick={() => !added && addIndicator(key)}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
-                            added 
-                              ? "bg-[#2962FF]/10 text-[#2962FF]" 
-                              : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                            added
+                              ? "bg-[#2962FF]/10 text-[#2962FF]"
+                              : "text-[#d1d4dc] hover:bg-[#2a2e39]",
                           )}
                         >
-                          <span className="flex-1 text-[13px]">{template.name}</span>
+                          <span className="flex-1 text-[13px]">
+                            {template.name}
+                          </span>
                           {added && <Check className="h-4 w-4" />}
                         </button>
                       );
@@ -445,7 +633,7 @@ function IndicatorSettingsPanel({
   onUpdate,
   onRemove,
   onBack,
-  portalContainer
+  portalContainer,
 }: {
   indicator: CustomIndicator;
   onUpdate: (updates: Partial<CustomIndicator>) => void;
@@ -453,17 +641,26 @@ function IndicatorSettingsPanel({
   onBack: () => void;
   portalContainer?: HTMLElement | null;
 }) {
-  const template = INDICATOR_TEMPLATES[indicator.type as keyof typeof INDICATOR_TEMPLATES];
+  const template =
+    INDICATOR_TEMPLATES[indicator.type as keyof typeof INDICATOR_TEMPLATES];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[#363a45]">
-        <button onClick={onBack} className="p-1 rounded hover:bg-[#2a2e39] text-[#787B86]">
+        <button
+          onClick={onBack}
+          className="p-1 rounded hover:bg-[#2a2e39] text-[#787B86]"
+        >
           <ChevronRight className="h-4 w-4 rotate-180" />
         </button>
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: indicator.color }} />
-        <span className="flex-1 text-[14px] font-medium text-white">{indicator.name}</span>
+        <div
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: indicator.color }}
+        />
+        <span className="flex-1 text-[14px] font-medium text-white">
+          {indicator.name}
+        </span>
         <button
           onClick={onRemove}
           className="p-1.5 rounded hover:bg-[#F23645]/20 text-[#787B86] hover:text-[#F23645] transition-colors"
@@ -473,62 +670,105 @@ function IndicatorSettingsPanel({
       </div>
 
       {/* Settings Tabs */}
-      <Tabs defaultValue="inputs" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs
+        defaultValue="inputs"
+        className="flex-1 flex flex-col overflow-hidden"
+      >
         <TabsList className="grid grid-cols-3 bg-[#131722] rounded-none border-b border-[#363a45] p-0 h-10">
-          <TabsTrigger value="inputs" className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white">
+          <TabsTrigger
+            value="inputs"
+            className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white"
+          >
             Inputs
           </TabsTrigger>
-          <TabsTrigger value="style" className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white">
+          <TabsTrigger
+            value="style"
+            className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white"
+          >
             Style
           </TabsTrigger>
-          <TabsTrigger value="visibility" className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white">
+          <TabsTrigger
+            value="visibility"
+            className="text-[12px] rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#2962FF] data-[state=active]:text-white"
+          >
             Visibility
           </TabsTrigger>
         </TabsList>
 
         {/* Inputs Tab */}
-        <TabsContent value="inputs" className="flex-1 overflow-y-auto p-4 space-y-4">
+        <TabsContent
+          value="inputs"
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+        >
           {Object.keys(indicator.parameters).length > 0 ? (
             Object.entries(indicator.parameters).map(([key, value]) => (
               <div key={key} className="space-y-1.5">
                 <Label className="text-[12px] text-[#787B86]">
-                  {(template?.paramLabels as Record<string, string>)?.[key] || key}
+                  {(template?.paramLabels as Record<string, string>)?.[key] ||
+                    key}
                 </Label>
                 <Input
                   type="number"
                   value={value}
-                  onChange={(e) => onUpdate({ parameters: { ...indicator.parameters, [key]: Number(e.target.value) } })}
+                  onChange={(e) =>
+                    onUpdate({
+                      parameters: {
+                        ...indicator.parameters,
+                        [key]: Number(e.target.value),
+                      },
+                    })
+                  }
                   step="0.01"
                   className="h-8 bg-[#131722] border-[#363a45] text-white"
                 />
               </div>
             ))
           ) : (
-            <p className="text-[13px] text-[#787B86]">No adjustable parameters</p>
+            <p className="text-[13px] text-[#787B86]">
+              No adjustable parameters
+            </p>
           )}
 
           {/* Price Source */}
           <div className="space-y-1.5 pt-2 border-t border-[#363a45]">
             <Label className="text-[12px] text-[#787B86]">Source</Label>
             <Select
-              value={indicator.priceSource || 'close'}
-              onValueChange={(value) => onUpdate({ priceSource: value as 'close' | 'open' | 'high' | 'low' })}
+              value={indicator.priceSource || "close"}
+              onValueChange={(value) =>
+                onUpdate({
+                  priceSource: value as "close" | "open" | "high" | "low",
+                })
+              }
             >
               <SelectTrigger className="h-8 bg-[#131722] border-[#363a45] text-white">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#1e222d] border-[#363a45]" container={portalContainer}>
-                <SelectItem value="close" className="text-white">Close</SelectItem>
-                <SelectItem value="open" className="text-white">Open</SelectItem>
-                <SelectItem value="high" className="text-white">High</SelectItem>
-                <SelectItem value="low" className="text-white">Low</SelectItem>
+              <SelectContent
+                className="bg-[#1e222d] border-[#363a45]"
+                container={portalContainer}
+              >
+                <SelectItem value="close" className="text-white">
+                  Close
+                </SelectItem>
+                <SelectItem value="open" className="text-white">
+                  Open
+                </SelectItem>
+                <SelectItem value="high" className="text-white">
+                  High
+                </SelectItem>
+                <SelectItem value="low" className="text-white">
+                  Low
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
         </TabsContent>
 
         {/* Style Tab */}
-        <TabsContent value="style" className="flex-1 overflow-y-auto p-4 space-y-4">
+        <TabsContent
+          value="style"
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+        >
           {/* Main Color */}
           <div className="space-y-1.5">
             <Label className="text-[12px] text-[#787B86]">Color</Label>
@@ -549,7 +789,9 @@ function IndicatorSettingsPanel({
 
           {/* Line Width */}
           <div className="space-y-1.5">
-            <Label className="text-[12px] text-[#787B86]">Line Width: {indicator.lineWidth}</Label>
+            <Label className="text-[12px] text-[#787B86]">
+              Line Width: {indicator.lineWidth}
+            </Label>
             <Slider
               value={[indicator.lineWidth]}
               onValueChange={(value) => onUpdate({ lineWidth: value[0] })}
@@ -561,7 +803,9 @@ function IndicatorSettingsPanel({
 
           {/* Opacity */}
           <div className="space-y-1.5">
-            <Label className="text-[12px] text-[#787B86]">Opacity: {indicator.opacity || 100}%</Label>
+            <Label className="text-[12px] text-[#787B86]">
+              Opacity: {indicator.opacity || 100}%
+            </Label>
             <Slider
               value={[indicator.opacity || 100]}
               onValueChange={(value) => onUpdate({ opacity: value[0] })}
@@ -572,17 +816,30 @@ function IndicatorSettingsPanel({
           </div>
 
           {/* Multi-color for bands */}
-          {(indicator.type === 'bb' || indicator.type === 'keltner') && (
+          {(indicator.type === "bb" || indicator.type === "keltner") && (
             <div className="space-y-3 pt-2 border-t border-[#363a45]">
               <Label className="text-[12px] text-[#787B86]">Band Colors</Label>
               <div className="grid grid-cols-3 gap-2">
-                {['upper', 'middle', 'lower'].map(band => (
+                {["upper", "middle", "lower"].map((band) => (
                   <div key={band} className="space-y-1">
-                    <span className="text-[10px] text-[#787B86] capitalize">{band}</span>
+                    <span className="text-[10px] text-[#787B86] capitalize">
+                      {band}
+                    </span>
                     <input
                       type="color"
-                      value={indicator.colors?.[band as keyof typeof indicator.colors] || indicator.color}
-                      onChange={(e) => onUpdate({ colors: { ...indicator.colors, [band]: e.target.value } })}
+                      value={
+                        indicator.colors?.[
+                          band as keyof typeof indicator.colors
+                        ] || indicator.color
+                      }
+                      onChange={(e) =>
+                        onUpdate({
+                          colors: {
+                            ...indicator.colors,
+                            [band]: e.target.value,
+                          },
+                        })
+                      }
                       className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
                     />
                   </div>
@@ -592,7 +849,7 @@ function IndicatorSettingsPanel({
           )}
 
           {/* MACD Colors */}
-          {indicator.type === 'macd' && (
+          {indicator.type === "macd" && (
             <div className="space-y-3 pt-2 border-t border-[#363a45]">
               <Label className="text-[12px] text-[#787B86]">MACD Colors</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -600,8 +857,12 @@ function IndicatorSettingsPanel({
                   <span className="text-[10px] text-[#787B86]">Signal</span>
                   <input
                     type="color"
-                    value={indicator.colors?.signal || '#f23645'}
-                    onChange={(e) => onUpdate({ colors: { ...indicator.colors, signal: e.target.value } })}
+                    value={indicator.colors?.signal || "#f23645"}
+                    onChange={(e) =>
+                      onUpdate({
+                        colors: { ...indicator.colors, signal: e.target.value },
+                      })
+                    }
                     className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
                   />
                 </div>
@@ -609,8 +870,15 @@ function IndicatorSettingsPanel({
                   <span className="text-[10px] text-[#787B86]">Positive</span>
                   <input
                     type="color"
-                    value={indicator.colors?.positive || '#26a69a'}
-                    onChange={(e) => onUpdate({ colors: { ...indicator.colors, positive: e.target.value } })}
+                    value={indicator.colors?.positive || "#26a69a"}
+                    onChange={(e) =>
+                      onUpdate({
+                        colors: {
+                          ...indicator.colors,
+                          positive: e.target.value,
+                        },
+                      })
+                    }
                     className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
                   />
                 </div>
@@ -618,8 +886,15 @@ function IndicatorSettingsPanel({
                   <span className="text-[10px] text-[#787B86]">Negative</span>
                   <input
                     type="color"
-                    value={indicator.colors?.negative || '#ef5350'}
-                    onChange={(e) => onUpdate({ colors: { ...indicator.colors, negative: e.target.value } })}
+                    value={indicator.colors?.negative || "#ef5350"}
+                    onChange={(e) =>
+                      onUpdate({
+                        colors: {
+                          ...indicator.colors,
+                          negative: e.target.value,
+                        },
+                      })
+                    }
                     className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
                   />
                 </div>
@@ -629,20 +904,25 @@ function IndicatorSettingsPanel({
         </TabsContent>
 
         {/* Visibility Tab */}
-        <TabsContent value="visibility" className="flex-1 overflow-y-auto p-4 space-y-4">
+        <TabsContent
+          value="visibility"
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+        >
           <div className="flex items-center justify-between">
             <Label className="text-[13px] text-[#d1d4dc]">Show Indicator</Label>
             <button
               onClick={() => onUpdate({ enabled: !indicator.enabled })}
               className={cn(
                 "w-10 h-5 rounded-full transition-colors",
-                indicator.enabled ? "bg-[#2962FF]" : "bg-[#363a45]"
+                indicator.enabled ? "bg-[#2962FF]" : "bg-[#363a45]",
               )}
             >
-              <div className={cn(
-                "w-4 h-4 rounded-full bg-white transition-transform",
-                indicator.enabled ? "translate-x-5" : "translate-x-0.5"
-              )} />
+              <div
+                className={cn(
+                  "w-4 h-4 rounded-full bg-white transition-transform",
+                  indicator.enabled ? "translate-x-5" : "translate-x-0.5",
+                )}
+              />
             </button>
           </div>
 
@@ -652,57 +932,113 @@ function IndicatorSettingsPanel({
               onClick={() => onUpdate({ showLabel: !indicator.showLabel })}
               className={cn(
                 "w-10 h-5 rounded-full transition-colors",
-                indicator.showLabel !== false ? "bg-[#2962FF]" : "bg-[#363a45]"
+                indicator.showLabel !== false ? "bg-[#2962FF]" : "bg-[#363a45]",
               )}
             >
-              <div className={cn(
-                "w-4 h-4 rounded-full bg-white transition-transform",
-                indicator.showLabel !== false ? "translate-x-5" : "translate-x-0.5"
-              )} />
+              <div
+                className={cn(
+                  "w-4 h-4 rounded-full bg-white transition-transform",
+                  indicator.showLabel !== false
+                    ? "translate-x-5"
+                    : "translate-x-0.5",
+                )}
+              />
             </button>
           </div>
 
           {/* Component visibility for multi-component indicators */}
-          {(indicator.type === 'bb' || indicator.type === 'keltner') && (
+          {(indicator.type === "bb" || indicator.type === "keltner") && (
             <div className="space-y-2 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">Band Visibility</Label>
-              {['upper', 'middle', 'lower'].map(band => (
+              <Label className="text-[12px] text-[#787B86]">
+                Band Visibility
+              </Label>
+              {["upper", "middle", "lower"].map((band) => (
                 <div key={band} className="flex items-center justify-between">
-                  <span className="text-[13px] text-[#d1d4dc] capitalize">{band} Band</span>
+                  <span className="text-[13px] text-[#d1d4dc] capitalize">
+                    {band} Band
+                  </span>
                   <button
-                    onClick={() => onUpdate({ visibility: { ...indicator.visibility, [band]: !(indicator.visibility?.[band as keyof typeof indicator.visibility] !== false) } })}
+                    onClick={() =>
+                      onUpdate({
+                        visibility: {
+                          ...indicator.visibility,
+                          [band]: !(
+                            indicator.visibility?.[
+                              band as keyof typeof indicator.visibility
+                            ] !== false
+                          ),
+                        },
+                      })
+                    }
                     className={cn(
                       "w-10 h-5 rounded-full transition-colors",
-                      indicator.visibility?.[band as keyof typeof indicator.visibility] !== false ? "bg-[#2962FF]" : "bg-[#363a45]"
+                      indicator.visibility?.[
+                        band as keyof typeof indicator.visibility
+                      ] !== false
+                        ? "bg-[#2962FF]"
+                        : "bg-[#363a45]",
                     )}
                   >
-                    <div className={cn(
-                      "w-4 h-4 rounded-full bg-white transition-transform",
-                      indicator.visibility?.[band as keyof typeof indicator.visibility] !== false ? "translate-x-5" : "translate-x-0.5"
-                    )} />
+                    <div
+                      className={cn(
+                        "w-4 h-4 rounded-full bg-white transition-transform",
+                        indicator.visibility?.[
+                          band as keyof typeof indicator.visibility
+                        ] !== false
+                          ? "translate-x-5"
+                          : "translate-x-0.5",
+                      )}
+                    />
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          {indicator.type === 'macd' && (
+          {indicator.type === "macd" && (
             <div className="space-y-2 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">Component Visibility</Label>
-              {[{ key: 'main', label: 'MACD Line' }, { key: 'signal', label: 'Signal Line' }, { key: 'histogram', label: 'Histogram' }].map(({ key, label }) => (
+              <Label className="text-[12px] text-[#787B86]">
+                Component Visibility
+              </Label>
+              {[
+                { key: "main", label: "MACD Line" },
+                { key: "signal", label: "Signal Line" },
+                { key: "histogram", label: "Histogram" },
+              ].map(({ key, label }) => (
                 <div key={key} className="flex items-center justify-between">
                   <span className="text-[13px] text-[#d1d4dc]">{label}</span>
                   <button
-                    onClick={() => onUpdate({ visibility: { ...indicator.visibility, [key]: !(indicator.visibility?.[key as keyof typeof indicator.visibility] !== false) } })}
+                    onClick={() =>
+                      onUpdate({
+                        visibility: {
+                          ...indicator.visibility,
+                          [key]: !(
+                            indicator.visibility?.[
+                              key as keyof typeof indicator.visibility
+                            ] !== false
+                          ),
+                        },
+                      })
+                    }
                     className={cn(
                       "w-10 h-5 rounded-full transition-colors",
-                      indicator.visibility?.[key as keyof typeof indicator.visibility] !== false ? "bg-[#2962FF]" : "bg-[#363a45]"
+                      indicator.visibility?.[
+                        key as keyof typeof indicator.visibility
+                      ] !== false
+                        ? "bg-[#2962FF]"
+                        : "bg-[#363a45]",
                     )}
                   >
-                    <div className={cn(
-                      "w-4 h-4 rounded-full bg-white transition-transform",
-                      indicator.visibility?.[key as keyof typeof indicator.visibility] !== false ? "translate-x-5" : "translate-x-0.5"
-                    )} />
+                    <div
+                      className={cn(
+                        "w-4 h-4 rounded-full bg-white transition-transform",
+                        indicator.visibility?.[
+                          key as keyof typeof indicator.visibility
+                        ] !== false
+                          ? "translate-x-5"
+                          : "translate-x-0.5",
+                      )}
+                    />
                   </button>
                 </div>
               ))}

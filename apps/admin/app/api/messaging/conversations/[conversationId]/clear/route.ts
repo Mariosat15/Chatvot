@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verify } from 'jsonwebtoken';
-import mongoose, { Types } from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verify } from "jsonwebtoken";
+import mongoose, { Types } from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
+const JWT_SECRET = getAdminJwtSecret();
 
 /**
  * POST /api/messaging/conversations/[conversationId]/clear
@@ -12,14 +13,14 @@ const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
+  { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
+    const token = cookieStore.get("admin_token")?.value;
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const decoded = verify(token, JWT_SECRET) as {
@@ -34,45 +35,58 @@ export async function POST(
 
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     let convObjectId;
     try {
       convObjectId = new Types.ObjectId(conversationId);
     } catch {
-      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid conversation ID" },
+        { status: 400 },
+      );
     }
 
-    const conversation = await db.collection('conversations').findOne({ _id: convObjectId });
+    const conversation = await db
+      .collection("conversations")
+      .findOne({ _id: convObjectId });
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 },
+      );
     }
 
-    console.log(`🗑️ [Clear] Clearing conversation ${conversationId} by ${decoded.email}`);
+    console.log(
+      `🗑️ [Clear] Clearing conversation ${conversationId} by ${decoded.email}`,
+    );
 
     // Soft delete all messages in this conversation
-    const result = await db.collection('messages').updateMany(
+    const result = await db.collection("messages").updateMany(
       { conversationId: convObjectId },
-      { 
-        $set: { 
+      {
+        $set: {
           isDeleted: true,
           deletedAt: new Date(),
           deletedBy: decoded.adminId,
-        } 
-      }
+        },
+      },
     );
 
     // Add system message about clearing
     const systemMessage = {
       conversationId: convObjectId,
-      senderId: 'system',
-      senderType: 'system',
-      senderName: 'System',
-      messageType: 'system',
+      senderId: "system",
+      senderType: "system",
+      senderName: "System",
+      messageType: "system",
       content: `🗑️ Chat history cleared by ${decoded.name || decoded.email}`,
-      status: 'sent',
+      status: "sent",
       readBy: [],
       deliveredTo: [],
       isDeleted: false,
@@ -80,40 +94,42 @@ export async function POST(
       updatedAt: new Date(),
     };
 
-    await db.collection('messages').insertOne(systemMessage);
+    await db.collection("messages").insertOne(systemMessage);
 
     // Update conversation
-    await db.collection('conversations').updateOne(
+    await db.collection("conversations").updateOne(
       { _id: convObjectId },
       {
         $set: {
           lastMessage: {
-            content: 'Chat history cleared',
-            senderId: 'system',
-            senderName: 'System',
-            senderType: 'system',
+            content: "Chat history cleared",
+            senderId: "system",
+            senderName: "System",
+            senderType: "system",
             timestamp: new Date(),
           },
           lastActivityAt: new Date(),
           // Reset AI counter
           lastResolvedAt: new Date(),
         },
-      }
+      },
     );
 
     // Log to customer audit trail if user-to-support conversation
-    if (conversation.type === 'user-to-support') {
-      const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+    if (conversation.type === "user-to-support") {
+      const userParticipant = conversation.participants?.find(
+        (p: any) => p.type === "user",
+      );
       if (userParticipant?.id) {
-        await db.collection('customer_audit_trails').insertOne({
+        await db.collection("customer_audit_trails").insertOne({
           customerId: userParticipant.id,
-          action: 'chat_cleared',
-          category: 'messaging',
+          action: "chat_cleared",
+          category: "messaging",
           performedBy: {
             id: decoded.adminId,
             email: decoded.email,
             name: decoded.name || decoded.email,
-            type: 'employee',
+            type: "employee",
           },
           details: {
             conversationId,
@@ -127,33 +143,34 @@ export async function POST(
 
     // Notify via WebSocket
     try {
-      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
+      const wsInternalUrl =
+        process.env.WS_INTERNAL_URL || "http://localhost:3003";
       await fetch(`${wsInternalUrl}/internal/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
           message: {
-            id: 'clear-' + Date.now(),
+            id: "clear-" + Date.now(),
             ...systemMessage,
             createdAt: systemMessage.createdAt.toISOString(),
           },
         }),
       });
     } catch (wsError) {
-      console.warn('WebSocket notification failed:', wsError);
+      console.warn("WebSocket notification failed:", wsError);
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       messagesCleared: result.modifiedCount,
-      message: 'Chat history cleared successfully' 
+      message: "Chat history cleared successfully",
     });
   } catch (error) {
-    console.error('Error clearing conversation:', error);
+    console.error("Error clearing conversation:", error);
     return NextResponse.json(
-      { error: 'Failed to clear conversation' },
-      { status: 500 }
+      { error: "Failed to clear conversation" },
+      { status: 500 },
     );
   }
 }

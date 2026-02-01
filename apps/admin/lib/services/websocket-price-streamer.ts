@@ -1,18 +1,18 @@
 /**
  * WebSocket Price Streamer for Massive.com
- * 
+ *
  * Documentation:
  * - https://massive.com/docs/websocket/quickstart
  * - https://massive.com/docs/websocket/forex/quotes
  * - https://massive.com/docs/websocket/forex/aggregates-per-second
- * 
+ *
  * Benefits:
  * - Real-time price updates (sub-second latency)
  * - Single connection for all forex pairs
  * - Reduces API calls to zero after connection
  */
 
-import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
+import { ForexSymbol, FOREX_PAIRS } from "./pnl-calculator.service";
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -21,7 +21,7 @@ export interface StreamingPriceQuote {
   mid: number;
   spread: number;
   timestamp: number;
-  source: 'websocket' | 'rest' | 'cache' | 'fallback';
+  source: "websocket" | "rest" | "cache" | "fallback";
 }
 
 // Global price cache
@@ -33,7 +33,7 @@ let lastUpdateTime = 0;
 const dynamicSpreadCache = new Map<ForexSymbol, number>();
 
 // WebSocket state
-let ws: import('ws').WebSocket | null = null;
+let ws: import("ws").WebSocket | null = null;
 let isConnecting = false;
 let isAuthenticated = false;
 let isSubscribed = false;
@@ -43,7 +43,7 @@ let heartbeatTimer: NodeJS.Timeout | null = null;
 
 // Configuration
 const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
-const WS_URL = 'wss://socket.massive.com/forex'; // Real-time
+const WS_URL = "wss://socket.massive.com/forex"; // Real-time
 // const WS_URL = 'wss://delayed.massive.com/forex'; // 15-min delayed (if needed)
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_BASE_DELAY_MS = 3000;
@@ -51,17 +51,39 @@ const HEARTBEAT_INTERVAL_MS = 30000;
 
 // Symbol mapping: Our format (EUR/USD) -> Massive format (EURUSD)
 const SYMBOL_TO_MASSIVE: Record<string, string> = {
-  'EUR/USD': 'EURUSD', 'GBP/USD': 'GBPUSD', 'USD/JPY': 'USDJPY',
-  'USD/CHF': 'USDCHF', 'AUD/USD': 'AUDUSD', 'USD/CAD': 'USDCAD',
-  'NZD/USD': 'NZDUSD', 'EUR/GBP': 'EURGBP', 'EUR/JPY': 'EURJPY',
-  'EUR/CHF': 'EURCHF', 'EUR/AUD': 'EURAUD', 'EUR/CAD': 'EURCAD',
-  'EUR/NZD': 'EURNZD', 'GBP/JPY': 'GBPJPY', 'GBP/CHF': 'GBPCHF',
-  'GBP/AUD': 'GBPAUD', 'GBP/CAD': 'GBPCAD', 'GBP/NZD': 'GBPNZD',
-  'AUD/JPY': 'AUDJPY', 'AUD/CHF': 'AUDCHF', 'AUD/CAD': 'AUDCAD',
-  'AUD/NZD': 'AUDNZD', 'CAD/JPY': 'CADJPY', 'CAD/CHF': 'CADCHF',
-  'CHF/JPY': 'CHFJPY', 'NZD/JPY': 'NZDJPY', 'NZD/CHF': 'NZDCHF',
-  'NZD/CAD': 'NZDCAD', 'USD/MXN': 'USDMXN', 'USD/ZAR': 'USDZAR',
-  'USD/TRY': 'USDTRY', 'USD/SEK': 'USDSEK', 'USD/NOK': 'USDNOK',
+  "EUR/USD": "EURUSD",
+  "GBP/USD": "GBPUSD",
+  "USD/JPY": "USDJPY",
+  "USD/CHF": "USDCHF",
+  "AUD/USD": "AUDUSD",
+  "USD/CAD": "USDCAD",
+  "NZD/USD": "NZDUSD",
+  "EUR/GBP": "EURGBP",
+  "EUR/JPY": "EURJPY",
+  "EUR/CHF": "EURCHF",
+  "EUR/AUD": "EURAUD",
+  "EUR/CAD": "EURCAD",
+  "EUR/NZD": "EURNZD",
+  "GBP/JPY": "GBPJPY",
+  "GBP/CHF": "GBPCHF",
+  "GBP/AUD": "GBPAUD",
+  "GBP/CAD": "GBPCAD",
+  "GBP/NZD": "GBPNZD",
+  "AUD/JPY": "AUDJPY",
+  "AUD/CHF": "AUDCHF",
+  "AUD/CAD": "AUDCAD",
+  "AUD/NZD": "AUDNZD",
+  "CAD/JPY": "CADJPY",
+  "CAD/CHF": "CADCHF",
+  "CHF/JPY": "CHFJPY",
+  "NZD/JPY": "NZDJPY",
+  "NZD/CHF": "NZDCHF",
+  "NZD/CAD": "NZDCAD",
+  "USD/MXN": "USDMXN",
+  "USD/ZAR": "USDZAR",
+  "USD/TRY": "USDTRY",
+  "USD/SEK": "USDSEK",
+  "USD/NOK": "USDNOK",
 };
 
 // Reverse mapping: Massive format -> Our format
@@ -75,18 +97,18 @@ for (const [symbol, massive] of Object.entries(SYMBOL_TO_MASSIVE)) {
  */
 export async function initializeWebSocket(): Promise<void> {
   // Only run on server
-  if (typeof window !== 'undefined') {
-    console.warn('⚠️ WebSocket streamer only runs on server');
+  if (typeof window !== "undefined") {
+    console.warn("⚠️ WebSocket streamer only runs on server");
     return;
   }
 
   if (!MASSIVE_API_KEY) {
-    console.error('❌ MASSIVE_API_KEY not set - WebSocket disabled');
+    console.error("❌ MASSIVE_API_KEY not set - WebSocket disabled");
     return;
   }
 
   if (ws || isConnecting) {
-    console.log('🔄 WebSocket already connected or connecting');
+    console.log("🔄 WebSocket already connected or connecting");
     return;
   }
 
@@ -100,52 +122,51 @@ async function connectWebSocket(): Promise<void> {
   if (isConnecting) return;
   isConnecting = true;
 
-  console.log('🔌 Connecting to Massive.com WebSocket...');
+  console.log("🔌 Connecting to Massive.com WebSocket...");
 
   try {
     // Dynamic import ws module (only on server)
-    const WebSocket = (await import('ws')).default;
-    
+    const WebSocket = (await import("ws")).default;
+
     ws = new WebSocket(WS_URL);
 
-    ws.on('open', () => {
-      console.log('✅ WebSocket connected');
+    ws.on("open", () => {
+      console.log("✅ WebSocket connected");
       isConnecting = false;
       reconnectAttempts = 0;
-      
+
       // Start heartbeat to keep connection alive
       startHeartbeat();
-      
+
       // Server sends a welcome message first, then we authenticate
     });
 
-    ws.on('message', (data: Buffer) => {
+    ws.on("message", (data: Buffer) => {
       try {
         const message = data.toString();
         handleMessage(message);
       } catch (err) {
-        console.error('❌ Error handling message:', err);
+        console.error("❌ Error handling message:", err);
       }
     });
 
-    ws.on('error', (error: Error) => {
-      console.error('❌ WebSocket error:', error.message);
+    ws.on("error", (error: Error) => {
+      console.error("❌ WebSocket error:", error.message);
     });
 
-    ws.on('close', (code: number, reason: Buffer) => {
-      const reasonStr = reason.toString() || 'No reason';
+    ws.on("close", (code: number, reason: Buffer) => {
+      const reasonStr = reason.toString() || "No reason";
       console.log(`🔌 WebSocket closed: ${code} - ${reasonStr}`);
-      
+
       cleanup();
       scheduleReconnect();
     });
 
-    ws.on('ping', () => {
+    ws.on("ping", () => {
       ws?.pong();
     });
-
   } catch (error) {
-    console.error('❌ Failed to create WebSocket:', error);
+    console.error("❌ Failed to create WebSocket:", error);
     isConnecting = false;
     scheduleReconnect();
   }
@@ -157,7 +178,8 @@ async function connectWebSocket(): Promise<void> {
 function startHeartbeat(): void {
   stopHeartbeat();
   heartbeatTimer = setInterval(() => {
-    if (ws && ws.readyState === 1) { // OPEN
+    if (ws && ws.readyState === 1) {
+      // OPEN
       ws.ping();
     }
   }, HEARTBEAT_INTERVAL_MS);
@@ -179,14 +201,16 @@ function stopHeartbeat(): void {
 function authenticate(): void {
   if (!ws || ws.readyState !== 1) return;
 
-  console.log('🔐 Authenticating...');
-  
+  console.log("🔐 Authenticating...");
+
   // Send auth message
   // Format: {"action":"auth","params":"YOUR_API_KEY"}
-  ws.send(JSON.stringify({
-    action: 'auth',
-    params: MASSIVE_API_KEY,
-  }));
+  ws.send(
+    JSON.stringify({
+      action: "auth",
+      params: MASSIVE_API_KEY,
+    }),
+  );
 }
 
 /**
@@ -195,17 +219,19 @@ function authenticate(): void {
 function subscribeToFeeds(): void {
   if (!ws || ws.readyState !== 1 || !isAuthenticated) return;
 
-  console.log('📊 Subscribing to forex feeds...');
-  
+  console.log("📊 Subscribing to forex feeds...");
+
   // Subscribe to:
   // - C.* = All forex quotes (bid/ask)
   // - CAS.* = All forex second aggregates (OHLC per second)
   // Format: {"action":"subscribe","params":"C.*,CAS.*"}
-  
-  ws.send(JSON.stringify({
-    action: 'subscribe',
-    params: 'C.*,CAS.*', // All forex quotes and second aggregates
-  }));
+
+  ws.send(
+    JSON.stringify({
+      action: "subscribe",
+      params: "C.*,CAS.*", // All forex quotes and second aggregates
+    }),
+  );
 }
 
 /**
@@ -222,53 +248,56 @@ function handleMessage(data: string): void {
       const eventType = msg.ev || msg.status;
 
       switch (eventType) {
-        case 'status':
+        case "status":
           handleStatusMessage(msg);
           break;
-        case 'connected':
+        case "connected":
           // Initial connection message - now authenticate
-          console.log('📡 Received connected status');
+          console.log("📡 Received connected status");
           authenticate();
           break;
-        case 'C':
+        case "C":
           // Forex Quote: {"ev":"C","p":"EUR-USD","x":1,"a":1.0510,"b":1.0509,"t":1234567890}
           handleQuoteMessage(msg);
           break;
-        case 'CA':
+        case "CA":
           // Forex Aggregate (minute): {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505}
           handleAggregateMessage(msg);
           break;
-        case 'CAS':
+        case "CAS":
           // Forex Aggregate (second): same format as CA but per second
           handleAggregateMessage(msg);
           break;
-        case 'auth_success':
-          console.log('✅ Authentication successful');
+        case "auth_success":
+          console.log("✅ Authentication successful");
           isAuthenticated = true;
           subscribeToFeeds();
           break;
-        case 'auth_failed':
-          console.error('❌ Authentication failed:', msg.message);
+        case "auth_failed":
+          console.error("❌ Authentication failed:", msg.message);
           ws?.close();
           break;
         default:
           // Check if it's a status update
-          if (msg.status === 'auth_success') {
-            console.log('✅ Authentication successful');
+          if (msg.status === "auth_success") {
+            console.log("✅ Authentication successful");
             isAuthenticated = true;
             subscribeToFeeds();
-          } else if (msg.status === 'success' && msg.message?.includes('subscribed')) {
-            console.log('✅ Subscribed to feeds:', msg.message);
+          } else if (
+            msg.status === "success" &&
+            msg.message?.includes("subscribed")
+          ) {
+            console.log("✅ Subscribed to feeds:", msg.message);
             isSubscribed = true;
           } else if (msg.message) {
-            console.log('📨 Server message:', msg.message);
+            console.log("📨 Server message:", msg.message);
           }
       }
     }
   } catch (error) {
     // Sometimes Massive sends non-JSON status messages
-    if (data.includes('connected')) {
-      console.log('📡 Connected to Massive.com');
+    if (data.includes("connected")) {
+      console.log("📡 Connected to Massive.com");
       authenticate();
     }
   }
@@ -277,21 +306,25 @@ function handleMessage(data: string): void {
 /**
  * Handle status messages
  */
-function handleStatusMessage(msg: { status?: string; message?: string; ev?: string }): void {
+function handleStatusMessage(msg: {
+  status?: string;
+  message?: string;
+  ev?: string;
+}): void {
   const status = msg.status || msg.ev;
-  
-  if (status === 'auth_success') {
-    console.log('✅ Authenticated with Massive.com');
+
+  if (status === "auth_success") {
+    console.log("✅ Authenticated with Massive.com");
     isAuthenticated = true;
     subscribeToFeeds();
-  } else if (status === 'auth_failed') {
-    console.error('❌ Auth failed:', msg.message);
+  } else if (status === "auth_failed") {
+    console.error("❌ Auth failed:", msg.message);
     ws?.close();
-  } else if (status === 'connected') {
-    console.log('📡 Connected, authenticating...');
+  } else if (status === "connected") {
+    console.log("📡 Connected, authenticating...");
     authenticate();
-  } else if (msg.message?.includes('subscribed')) {
-    console.log('✅ Subscription confirmed');
+  } else if (msg.message?.includes("subscribed")) {
+    console.log("✅ Subscription confirmed");
     isSubscribed = true;
   }
 }
@@ -303,19 +336,19 @@ function handleStatusMessage(msg: { status?: string; message?: string; ev?: stri
  */
 function handleQuoteMessage(msg: {
   ev: string;
-  p?: string;      // pair like "EUR-USD"
-  pair?: string;   // pair like "EURUSD"
-  a?: number;      // ask
-  b?: number;      // bid
-  t?: number;      // timestamp (milliseconds)
-  x?: number;      // exchange
+  p?: string; // pair like "EUR-USD"
+  pair?: string; // pair like "EURUSD"
+  a?: number; // ask
+  b?: number; // bid
+  t?: number; // timestamp (milliseconds)
+  x?: number; // exchange
 }): void {
   // Get symbol - handle different formats
-  let symbolKey = msg.p || msg.pair || '';
-  
+  let symbolKey = msg.p || msg.pair || "";
+
   // Handle different formats: "EUR-USD", "EUR/USD", "EURUSD"
-  symbolKey = symbolKey.replace('-', '').replace('/', '').toUpperCase();
-  
+  symbolKey = symbolKey.replace("-", "").replace("/", "").toUpperCase();
+
   const symbol = MASSIVE_TO_SYMBOL[symbolKey];
   if (!symbol) {
     // Unknown symbol, skip
@@ -324,12 +357,14 @@ function handleQuoteMessage(msg: {
 
   const bid = msg.b;
   const ask = msg.a;
-  
+
   if (bid === undefined || ask === undefined) return;
 
   // CRITICAL: Validate bid < ask (reject invalid data)
   if (bid >= ask) {
-    console.warn(`⚠️ Invalid quote for ${symbol}: bid (${bid}) >= ask (${ask}) - skipping`);
+    console.warn(
+      `⚠️ Invalid quote for ${symbol}: bid (${bid}) >= ask (${ask}) - skipping`,
+    );
     return;
   }
 
@@ -373,7 +408,7 @@ function handleQuoteMessage(msg: {
     mid: safeMid,
     spread: roundedSpread,
     timestamp: msg.t || Date.now(),
-    source: 'websocket',
+    source: "websocket",
   };
 
   priceCache.set(symbol, quote);
@@ -388,17 +423,17 @@ function handleAggregateMessage(msg: {
   ev: string;
   pair?: string;
   p?: string;
-  o?: number;      // open
-  h?: number;      // high
-  l?: number;      // low
-  c?: number;      // close
-  v?: number;      // volume
-  s?: number;      // start timestamp
-  e?: number;      // end timestamp
+  o?: number; // open
+  h?: number; // high
+  l?: number; // low
+  c?: number; // close
+  v?: number; // volume
+  s?: number; // start timestamp
+  e?: number; // end timestamp
 }): void {
-  let symbolKey = msg.pair || msg.p || '';
-  symbolKey = symbolKey.replace('-', '').replace('/', '').toUpperCase();
-  
+  let symbolKey = msg.pair || msg.p || "";
+  symbolKey = symbolKey.replace("-", "").replace("/", "").toUpperCase();
+
   const symbol = MASSIVE_TO_SYMBOL[symbolKey];
   if (!symbol || msg.c === undefined) return;
 
@@ -424,7 +459,7 @@ function handleAggregateMessage(msg: {
     mid: safeMid,
     spread: roundedSpread,
     timestamp: msg.e || msg.s || Date.now(),
-    source: 'websocket',
+    source: "websocket",
   };
 
   // Only update if we don't have a more recent quote
@@ -446,19 +481,27 @@ function getTypicalSpread(symbol: ForexSymbol): number {
   if (cachedSpread && cachedSpread > 0) {
     return cachedSpread;
   }
-  
+
   // Second: Use smart default based on pair type (only until we get real data)
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) {
     return 0.0002; // Conservative default for unknown pairs
   }
-  
+
   const pip = pairConfig.pip;
-  
+
   // Determine pair type and use reasonable defaults
-  const majorPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'];
-  const exoticPairs = ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'];
-  
+  const majorPairs = [
+    "EUR/USD",
+    "GBP/USD",
+    "USD/JPY",
+    "USD/CHF",
+    "AUD/USD",
+    "USD/CAD",
+    "NZD/USD",
+  ];
+  const exoticPairs = ["USD/MXN", "USD/ZAR", "USD/TRY", "USD/SEK", "USD/NOK"];
+
   let defaultPips: number;
   if (majorPairs.includes(symbol)) {
     defaultPips = 1.5; // Major pairs: ~1.5 pips
@@ -467,7 +510,7 @@ function getTypicalSpread(symbol: ForexSymbol): number {
   } else {
     defaultPips = 3; // Cross pairs: ~3 pips
   }
-  
+
   return defaultPips * pip;
 }
 
@@ -489,14 +532,16 @@ function scheduleReconnect(): void {
   if (reconnectTimer) return;
 
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('❌ Max reconnect attempts reached');
+    console.error("❌ Max reconnect attempts reached");
     return;
   }
 
   reconnectAttempts++;
   const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, reconnectAttempts - 1);
 
-  console.log(`🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+  console.log(
+    `🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+  );
 
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -516,7 +561,7 @@ function normalizeQuote(quote: StreamingPriceQuote): StreamingPriceQuote {
   const mid = (quote.bid + quote.ask) / 2;
   const spread = quote.ask - quote.bid;
   const safeMid = Math.max(quote.bid, Math.min(quote.ask, mid));
-  
+
   return {
     ...quote,
     mid: Number(safeMid.toFixed(5)),
@@ -527,7 +572,9 @@ function normalizeQuote(quote: StreamingPriceQuote): StreamingPriceQuote {
 /**
  * Get cached price for a symbol (normalized)
  */
-export function getCachedPrice(symbol: ForexSymbol): StreamingPriceQuote | null {
+export function getCachedPrice(
+  symbol: ForexSymbol,
+): StreamingPriceQuote | null {
   const cached = priceCache.get(symbol);
   return cached ? normalizeQuote(cached) : null;
 }
@@ -546,7 +593,9 @@ export function getAllCachedPrices(): Map<ForexSymbol, StreamingPriceQuote> {
 /**
  * Get multiple cached prices (normalized)
  */
-export function getCachedPrices(symbols: ForexSymbol[]): Map<ForexSymbol, StreamingPriceQuote> {
+export function getCachedPrices(
+  symbols: ForexSymbol[],
+): Map<ForexSymbol, StreamingPriceQuote> {
   const result = new Map<ForexSymbol, StreamingPriceQuote>();
   for (const symbol of symbols) {
     const cached = priceCache.get(symbol);
@@ -588,11 +637,18 @@ export function getConnectionStatus(): {
 /**
  * Update cache from REST API (fallback)
  */
-export function updateCacheFromRest(symbol: ForexSymbol, quote: Omit<StreamingPriceQuote, 'source'>): void {
+export function updateCacheFromRest(
+  symbol: ForexSymbol,
+  quote: Omit<StreamingPriceQuote, "source">,
+): void {
   // Only update if WebSocket hasn't provided a more recent price
   const existing = priceCache.get(symbol);
-  if (!existing || existing.source !== 'websocket' || existing.timestamp < quote.timestamp) {
-    priceCache.set(symbol, { ...quote, source: 'rest' });
+  if (
+    !existing ||
+    existing.source !== "websocket" ||
+    existing.timestamp < quote.timestamp
+  ) {
+    priceCache.set(symbol, { ...quote, source: "rest" });
     lastUpdateTime = Date.now();
   }
 }
@@ -610,7 +666,7 @@ export function closeWebSocket(): void {
 
   if (ws) {
     try {
-      ws.close(1000, 'Client closing');
+      ws.close(1000, "Client closing");
     } catch {
       // Ignore close errors
     }
@@ -618,7 +674,7 @@ export function closeWebSocket(): void {
   }
 
   cleanup();
-  console.log('🔌 WebSocket closed');
+  console.log("🔌 WebSocket closed");
 }
 
 /**

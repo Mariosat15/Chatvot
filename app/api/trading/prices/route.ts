@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchRealForexPrices, isMarketOpenSync } from '@/lib/services/real-forex-prices.service';
-import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchRealForexPrices,
+  isMarketOpenSync,
+} from "@/lib/services/real-forex-prices.service";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 
 // Cache market status for 30 seconds (don't check on every request)
 let cachedMarketOpen = true;
-let cachedMarketStatus = '🟢 Market Open';
+let cachedMarketStatus = "🟢 Market Open";
 let lastMarketCheck = 0;
 const MARKET_CHECK_INTERVAL = 30000; // 30 seconds
 
@@ -18,26 +21,29 @@ let tpslCacheInitialized = false;
 async function ensureTPSLCacheInitialized(): Promise<void> {
   if (tpslCacheInitialized) return;
   tpslCacheInitialized = true;
-  
+
   try {
-    const { initializeTPSLCache } = await import('@/lib/services/tpsl-realtime.service');
+    const { initializeTPSLCache } =
+      await import("@/lib/services/tpsl-realtime.service");
     await initializeTPSLCache();
-    console.log('✅ [PRICES API] TP/SL cache initialized');
+    console.log("✅ [PRICES API] TP/SL cache initialized");
   } catch (error) {
-    console.error('⚠️ [PRICES API] Failed to initialize TP/SL cache:', error);
+    console.error("⚠️ [PRICES API] Failed to initialize TP/SL cache:", error);
     tpslCacheInitialized = false; // Retry next time
   }
 }
 
 function getMarketStatus(): { marketOpen: boolean; status: string } {
   const now = Date.now();
-  
+
   if (now - lastMarketCheck > MARKET_CHECK_INTERVAL) {
     cachedMarketOpen = isMarketOpenSync();
-    cachedMarketStatus = cachedMarketOpen ? '🟢 Market Open' : '🔴 Market Closed';
+    cachedMarketStatus = cachedMarketOpen
+      ? "🟢 Market Open"
+      : "🔴 Market Closed";
     lastMarketCheck = now;
   }
-  
+
   return { marketOpen: cachedMarketOpen, status: cachedMarketStatus };
 }
 
@@ -49,18 +55,18 @@ export async function POST(request: NextRequest) {
       body = await request.json();
     } catch {
       // Return empty prices if body is invalid (e.g., aborted request)
-      return NextResponse.json({ 
+      return NextResponse.json({
         prices: [],
         marketOpen: cachedMarketOpen,
         status: cachedMarketStatus,
         timestamp: Date.now(),
       });
     }
-    
+
     const { symbols } = body || {};
 
     if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         prices: [],
         marketOpen: cachedMarketOpen,
         status: cachedMarketStatus,
@@ -73,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // Get prices from Redis cache (instant) or Massive.com API (fallback)
     const pricesMap = await fetchRealForexPrices(symbols as ForexSymbol[]);
-    
+
     // Convert Map to array for JSON response
     const prices = Array.from(pricesMap.values());
 
@@ -85,39 +91,45 @@ export async function POST(request: NextRequest) {
       if (now - lastCheck >= TPSL_CHECK_INTERVAL) {
         lastTPSLCheck.set(price.symbol, now);
         // Fire and forget - don't await
-        import('@/lib/services/tpsl-realtime.service')
-          .then(({ checkTPSLForSymbol }) => 
-            checkTPSLForSymbol(price.symbol as ForexSymbol, price.bid, price.ask)
+        import("@/lib/services/tpsl-realtime.service")
+          .then(({ checkTPSLForSymbol }) =>
+            checkTPSLForSymbol(
+              price.symbol as ForexSymbol,
+              price.bid,
+              price.ask,
+            ),
           )
-          .catch(() => {/* ignore errors */});
+          .catch(() => {
+            /* ignore errors */
+          });
       }
     }
 
     // Get cached market status (fast, no API call)
     const { marketOpen, status } = getMarketStatus();
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       prices,
       marketOpen,
       status,
       timestamp: Date.now(),
     });
   } catch (error) {
-    console.error('Error fetching prices:', error);
+    console.error("Error fetching prices:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch prices' },
-      { status: 500 }
+      { error: "Failed to fetch prices" },
+      { status: 500 },
     );
   }
 }
 
 export async function GET() {
   const { marketOpen, status } = getMarketStatus();
-  
+
   return NextResponse.json({
     marketOpen,
     status,
-    message: 'Use POST /api/trading/prices with { symbols: [...] } to fetch prices',
+    message:
+      "Use POST /api/trading/prices with { symbols: [...] } to fetch prices",
   });
 }
-

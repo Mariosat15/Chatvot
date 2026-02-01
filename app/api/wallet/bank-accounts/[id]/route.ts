@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import UserBankAccount from '@/database/models/user-bank-account.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import UserBankAccount from "@/database/models/user-bank-account.model";
 
 /**
  * GET /api/wallet/bank-accounts/[id]
@@ -10,12 +10,12 @@ import UserBankAccount from '@/database/models/user-bank-account.model';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -28,8 +28,8 @@ export async function GET(
 
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
@@ -58,10 +58,10 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching bank account:', error);
+    console.error("Error fetching bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch bank account" },
+      { status: 500 },
     );
   }
 }
@@ -72,24 +72,24 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    const { 
-      accountHolderName, 
-      bankName, 
-      country, 
-      iban, 
-      swiftBic, 
-      nickname, 
-      setAsDefault 
+    const {
+      accountHolderName,
+      bankName,
+      country,
+      iban,
+      swiftBic,
+      nickname,
+      setAsDefault,
     } = body;
 
     await connectToDatabase();
@@ -102,8 +102,8 @@ export async function PATCH(
 
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
@@ -124,14 +124,14 @@ export async function PATCH(
 
     // Update IBAN (if provided)
     if (iban !== undefined && iban.trim()) {
-      const cleanIban = iban.replace(/\s/g, '').toUpperCase();
+      const cleanIban = iban.replace(/\s/g, "").toUpperCase();
       if (cleanIban.length >= 15 && cleanIban.length <= 34) {
         account.iban = cleanIban;
         account.ibanLast4 = cleanIban.slice(-4);
       } else {
         return NextResponse.json(
-          { success: false, error: 'Invalid IBAN format' },
-          { status: 400 }
+          { success: false, error: "Invalid IBAN format" },
+          { status: 400 },
         );
       }
     }
@@ -151,7 +151,7 @@ export async function PATCH(
       // Unset other defaults first
       await UserBankAccount.updateMany(
         { userId: session.user.id, _id: { $ne: id } },
-        { isDefault: false }
+        { isDefault: false },
       );
       account.isDefault = true;
     } else if (setAsDefault === false && account.isDefault) {
@@ -175,7 +175,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: 'Bank account updated successfully',
+      message: "Bank account updated successfully",
       account: {
         id: account._id,
         accountHolderName: account.accountHolderName,
@@ -188,10 +188,10 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error('Error updating bank account:', error);
+    console.error("Error updating bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to update bank account" },
+      { status: 500 },
     );
   }
 }
@@ -202,12 +202,12 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -220,23 +220,28 @@ export async function DELETE(
 
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
     // Check if there are pending withdrawals using this account
-    const WithdrawalRequest = (await import('@/database/models/withdrawal-request.model')).default;
+    const WithdrawalRequest = (
+      await import("@/database/models/withdrawal-request.model")
+    ).default;
     const pendingWithdrawals = await WithdrawalRequest.countDocuments({
       userId: session.user.id,
-      'bankDetails.iban': account.iban,
-      status: { $in: ['pending', 'approved', 'processing'] },
+      "bankDetails.iban": account.iban,
+      status: { $in: ["pending", "approved", "processing"] },
     });
 
     if (pendingWithdrawals > 0) {
       return NextResponse.json(
-        { success: false, error: 'Cannot remove bank account with pending withdrawals' },
-        { status: 400 }
+        {
+          success: false,
+          error: "Cannot remove bank account with pending withdrawals",
+        },
+        { status: 400 },
       );
     }
 
@@ -262,14 +267,13 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Bank account removed',
+      message: "Bank account removed",
     });
   } catch (error) {
-    console.error('Error removing bank account:', error);
+    console.error("Error removing bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to remove bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to remove bank account" },
+      { status: 500 },
     );
   }
 }
-

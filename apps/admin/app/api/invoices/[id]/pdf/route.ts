@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import Invoice from '@/database/models/invoice.model';
-import { InvoiceService } from '@/lib/services/invoice.service';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import Invoice from "@/database/models/invoice.model";
+import { InvoiceService } from "@/lib/services/invoice.service";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/invoices/[id]/pdf
@@ -10,23 +10,23 @@ import { requireAdminAuth } from '@/lib/admin/auth';
  */
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
 
     const { id } = await params;
-    
+
     const invoice = await Invoice.findById(id);
-    
+
     if (!invoice) {
-      return new NextResponse('Invoice not found', { status: 404 });
+      return new NextResponse("Invoice not found", { status: 404 });
     }
-    
+
     // Generate HTML for PDF/print
     const html = await InvoiceService.generateInvoiceHTML(invoice);
-    
+
     // Wrap HTML with print-friendly styles and auto-print script
     const printableHtml = `
 <!DOCTYPE html>
@@ -79,21 +79,20 @@ export async function GET(
 </body>
 </html>
     `;
-    
+
     return new NextResponse(printableHtml, {
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="invoice-${invoice.invoiceNumber}.html"`,
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `inline; filename="invoice-${invoice.invoiceNumber}.html"`,
       },
     });
   } catch (error) {
-    console.error('Error generating invoice PDF:', error);
-    
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return new NextResponse('Unauthorized', { status: 401 });
+    console.error("Error generating invoice PDF:", error);
+
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
-    
-    return new NextResponse('Failed to generate invoice', { status: 500 });
+
+    return new NextResponse("Failed to generate invoice", { status: 500 });
   }
 }
-

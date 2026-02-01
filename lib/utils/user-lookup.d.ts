@@ -1,14 +1,14 @@
 export interface UserInfo {
-    id: string;
-    email: string;
-    name: string;
-    profileImage?: string;
-    bio?: string;
-    role?: string;
-    country?: string;
-    address?: string;
-    city?: string;
-    postalCode?: string;
+  id: string;
+  email: string;
+  name: string;
+  profileImage?: string;
+  bio?: string;
+  role?: string;
+  country?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
 }
 /**
  * Get user information from better-auth user collection by userId
@@ -28,5 +28,7 @@ export declare function getAllUsers(): Promise<UserInfo[]>;
  * Get multiple users by their IDs
  * Returns a Map keyed by the original userIds passed in
  */
-export declare function getUsersByIds(userIds: string[]): Promise<Map<string, UserInfo>>;
+export declare function getUsersByIds(
+  userIds: string[],
+): Promise<Map<string, UserInfo>>;
 //# sourceMappingURL=user-lookup.d.ts.map

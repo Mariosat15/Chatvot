@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import AdminBankAccount from '@/database/models/admin-bank-account.model';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import AdminBankAccount from "@/database/models/admin-bank-account.model";
+import { getAdminSession } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin-bank-accounts/[id]
@@ -9,23 +9,23 @@ import { getAdminSession } from '@/lib/admin/auth';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     await connectToDatabase();
-    
+
     const account = await AdminBankAccount.findById(id);
-    
+
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
@@ -34,10 +34,10 @@ export async function GET(
       account,
     });
   } catch (error) {
-    console.error('Error fetching bank account:', error);
+    console.error("Error fetching bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch bank account" },
+      { status: 500 },
     );
   }
 }
@@ -48,17 +48,17 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     await connectToDatabase();
-    
+
     const body = await request.json();
     const {
       accountName,
@@ -79,7 +79,7 @@ export async function PUT(
     if (isDefault) {
       await AdminBankAccount.updateMany(
         { _id: { $ne: id } },
-        { isDefault: false }
+        { isDefault: false },
       );
     }
 
@@ -99,26 +99,26 @@ export async function PUT(
         isActive,
         notes,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
     return NextResponse.json({
       success: true,
       account,
-      message: 'Bank account updated successfully',
+      message: "Bank account updated successfully",
     });
   } catch (error) {
-    console.error('Error updating bank account:', error);
+    console.error("Error updating bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to update bank account" },
+      { status: 500 },
     );
   }
 }
@@ -129,27 +129,27 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     await connectToDatabase();
-    
+
     const account = await AdminBankAccount.findByIdAndUpdate(
       id,
       { isActive: false },
-      { new: true }
+      { new: true },
     );
 
     if (!account) {
       return NextResponse.json(
-        { success: false, error: 'Bank account not found' },
-        { status: 404 }
+        { success: false, error: "Bank account not found" },
+        { status: 404 },
       );
     }
 
@@ -164,14 +164,13 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Bank account deleted successfully',
+      message: "Bank account deleted successfully",
     });
   } catch (error) {
-    console.error('Error deleting bank account:', error);
+    console.error("Error deleting bank account:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete bank account' },
-      { status: 500 }
+      { success: false, error: "Failed to delete bank account" },
+      { status: 500 },
     );
   }
 }
-

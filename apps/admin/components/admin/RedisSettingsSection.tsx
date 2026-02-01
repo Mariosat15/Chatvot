@@ -1,20 +1,26 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Database, 
-  Zap, 
-  Shield, 
-  Activity, 
-  RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Database,
+  Zap,
+  Shield,
+  Activity,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
   Clock,
   AlertTriangle,
   ExternalLink,
@@ -34,14 +40,10 @@ import {
   RotateCcw,
   Layers,
   ArrowDown,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/ui/alert';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+} from "lucide-react";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface RedisSettings {
   upstashRedisUrl: string;
@@ -50,12 +52,12 @@ interface RedisSettings {
   redisPriceSyncEnabled: boolean; // Enable for multi-server deployments
   inngestSigningKey: string;
   inngestEventKey: string;
-  inngestMode: 'dev' | 'cloud';
+  inngestMode: "dev" | "cloud";
   // Price Feed Settings
-  priceFeedMode: 'websocket' | 'api' | 'both';
+  priceFeedMode: "websocket" | "api" | "both";
   priceFeedWebsocketEnabled: boolean;
   priceFeedApiEnabled: boolean;
-  priceFeedPrimarySource: 'websocket' | 'api';
+  priceFeedPrimarySource: "websocket" | "api";
   priceFeedUpdateInterval: number;
   priceFeedCacheTTL: number;
   priceFeedClientPollInterval: number;
@@ -84,18 +86,18 @@ interface WebSocketStatus {
 
 export default function RedisSettingsSection() {
   const [settings, setSettings] = useState<RedisSettings>({
-    upstashRedisUrl: '',
-    upstashRedisToken: '',
+    upstashRedisUrl: "",
+    upstashRedisToken: "",
     redisEnabled: false,
     redisPriceSyncEnabled: false,
-    inngestSigningKey: '',
-    inngestEventKey: '',
-    inngestMode: 'dev',
+    inngestSigningKey: "",
+    inngestEventKey: "",
+    inngestMode: "dev",
     // Price Feed defaults
-    priceFeedMode: 'both',
+    priceFeedMode: "both",
     priceFeedWebsocketEnabled: true,
     priceFeedApiEnabled: true,
-    priceFeedPrimarySource: 'websocket',
+    priceFeedPrimarySource: "websocket",
     priceFeedUpdateInterval: 2000,
     priceFeedCacheTTL: 10000,
     priceFeedClientPollInterval: 500,
@@ -108,7 +110,11 @@ export default function RedisSettingsSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string; latency?: number } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    latency?: number;
+  } | null>(null);
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus | null>(null);
@@ -121,7 +127,10 @@ export default function RedisSettingsSection() {
   useEffect(() => {
     if (settings.redisEnabled) {
       fetchCacheStats();
-      const interval = setInterval(fetchCacheStats, PERFORMANCE_INTERVALS.REDIS_STATS);
+      const interval = setInterval(
+        fetchCacheStats,
+        PERFORMANCE_INTERVALS.REDIS_STATS,
+      );
       return () => clearInterval(interval);
     }
   }, [settings.redisEnabled]);
@@ -130,41 +139,46 @@ export default function RedisSettingsSection() {
   useEffect(() => {
     if (settings.priceFeedWebsocketEnabled) {
       fetchWebSocketStatus();
-      const interval = setInterval(fetchWebSocketStatus, PERFORMANCE_INTERVALS.WEBSOCKET_STATUS);
+      const interval = setInterval(
+        fetchWebSocketStatus,
+        PERFORMANCE_INTERVALS.WEBSOCKET_STATUS,
+      );
       return () => clearInterval(interval);
     }
   }, [settings.priceFeedWebsocketEnabled]);
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/redis-settings');
+      const response = await fetch("/api/redis-settings");
       if (response.ok) {
         const data = await response.json();
         setSettings({
-          upstashRedisUrl: data.upstashRedisUrl || '',
-          upstashRedisToken: data.upstashRedisToken || '',
+          upstashRedisUrl: data.upstashRedisUrl || "",
+          upstashRedisToken: data.upstashRedisToken || "",
           redisEnabled: data.redisEnabled || false,
           redisPriceSyncEnabled: data.redisPriceSyncEnabled ?? false, // Enable for multi-server deployments
-          inngestSigningKey: data.inngestSigningKey || '',
-          inngestEventKey: data.inngestEventKey || '',
-          inngestMode: data.inngestMode || 'dev',
+          inngestSigningKey: data.inngestSigningKey || "",
+          inngestEventKey: data.inngestEventKey || "",
+          inngestMode: data.inngestMode || "dev",
           // Price Feed settings
-          priceFeedMode: data.priceFeedMode || 'both',
+          priceFeedMode: data.priceFeedMode || "both",
           priceFeedWebsocketEnabled: data.priceFeedWebsocketEnabled ?? true,
           priceFeedApiEnabled: data.priceFeedApiEnabled ?? true,
-          priceFeedPrimarySource: data.priceFeedPrimarySource || 'websocket',
+          priceFeedPrimarySource: data.priceFeedPrimarySource || "websocket",
           priceFeedUpdateInterval: data.priceFeedUpdateInterval || 2000,
           priceFeedCacheTTL: data.priceFeedCacheTTL || 10000,
           priceFeedClientPollInterval: data.priceFeedClientPollInterval || 500,
-          priceFeedWebsocketReconnectAttempts: data.priceFeedWebsocketReconnectAttempts || 10,
-          priceFeedWebsocketReconnectDelay: data.priceFeedWebsocketReconnectDelay || 3000,
+          priceFeedWebsocketReconnectAttempts:
+            data.priceFeedWebsocketReconnectAttempts || 10,
+          priceFeedWebsocketReconnectDelay:
+            data.priceFeedWebsocketReconnectDelay || 3000,
           priceFeedApiConcurrency: data.priceFeedApiConcurrency || 30,
           priceFeedFallbackEnabled: data.priceFeedFallbackEnabled ?? true,
         });
       }
     } catch (error) {
-      console.error('Failed to fetch settings:', error);
-      toast.error('Failed to load Redis settings');
+      console.error("Failed to fetch settings:", error);
+      toast.error("Failed to load Redis settings");
     } finally {
       setLoading(false);
     }
@@ -173,13 +187,13 @@ export default function RedisSettingsSection() {
   const fetchCacheStats = async () => {
     setLoadingStats(true);
     try {
-      const response = await fetch('/api/redis-settings/stats');
+      const response = await fetch("/api/redis-settings/stats");
       if (response.ok) {
         const data = await response.json();
         setCacheStats(data);
       }
     } catch (error) {
-      console.error('Failed to fetch cache stats:', error);
+      console.error("Failed to fetch cache stats:", error);
     } finally {
       setLoadingStats(false);
     }
@@ -188,13 +202,13 @@ export default function RedisSettingsSection() {
   const fetchWebSocketStatus = async () => {
     setLoadingWsStatus(true);
     try {
-      const response = await fetch('/api/redis-settings/websocket-status');
+      const response = await fetch("/api/redis-settings/websocket-status");
       if (response.ok) {
         const data = await response.json();
         setWsStatus(data);
       }
     } catch (error) {
-      console.error('Failed to fetch WebSocket status:', error);
+      console.error("Failed to fetch WebSocket status:", error);
     } finally {
       setLoadingWsStatus(false);
     }
@@ -202,41 +216,41 @@ export default function RedisSettingsSection() {
 
   const handleResetWebSocket = async () => {
     try {
-      const response = await fetch('/api/redis-settings/websocket-reset', {
-        method: 'POST',
+      const response = await fetch("/api/redis-settings/websocket-reset", {
+        method: "POST",
       });
       if (response.ok) {
-        toast.success('WebSocket connection reset initiated');
+        toast.success("WebSocket connection reset initiated");
         setTimeout(fetchWebSocketStatus, 3000);
       } else {
-        toast.error('Failed to reset WebSocket');
+        toast.error("Failed to reset WebSocket");
       }
     } catch (error) {
-      toast.error('Failed to reset WebSocket');
+      toast.error("Failed to reset WebSocket");
     }
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/redis-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/redis-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       if (response.ok) {
-        toast.success('Redis settings saved successfully');
+        toast.success("Redis settings saved successfully");
         if (settings.redisEnabled) {
           fetchCacheStats();
         }
       } else {
         const error = await response.json();
-        toast.error(error.message || 'Failed to save settings');
+        toast.error(error.message || "Failed to save settings");
       }
     } catch (error) {
-      console.error('Failed to save settings:', error);
-      toast.error('Failed to save settings');
+      console.error("Failed to save settings:", error);
+      toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -244,7 +258,7 @@ export default function RedisSettingsSection() {
 
   const handleTestConnection = async () => {
     if (!settings.upstashRedisUrl || !settings.upstashRedisToken) {
-      toast.error('Please enter Redis URL and Token first');
+      toast.error("Please enter Redis URL and Token first");
       return;
     }
 
@@ -252,9 +266,9 @@ export default function RedisSettingsSection() {
     setTestResult(null);
 
     try {
-      const response = await fetch('/api/redis-settings/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/redis-settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: settings.upstashRedisUrl,
           token: settings.upstashRedisToken,
@@ -265,35 +279,35 @@ export default function RedisSettingsSection() {
       setTestResult(result);
 
       if (result.success) {
-        toast.success('Connection successful!');
+        toast.success("Connection successful!");
       } else {
-        toast.error(result.message || 'Connection failed');
+        toast.error(result.message || "Connection failed");
       }
     } catch (error) {
-      console.error('Connection test failed:', error);
-      setTestResult({ success: false, message: 'Failed to test connection' });
-      toast.error('Failed to test connection');
+      console.error("Connection test failed:", error);
+      setTestResult({ success: false, message: "Failed to test connection" });
+      toast.error("Failed to test connection");
     } finally {
       setTesting(false);
     }
   };
 
   const handleClearCache = async () => {
-    if (!confirm('Are you sure you want to clear the price cache?')) return;
+    if (!confirm("Are you sure you want to clear the price cache?")) return;
 
     try {
-      const response = await fetch('/api/redis-settings/clear-cache', {
-        method: 'POST',
+      const response = await fetch("/api/redis-settings/clear-cache", {
+        method: "POST",
       });
 
       if (response.ok) {
-        toast.success('Cache cleared successfully');
+        toast.success("Cache cleared successfully");
         fetchCacheStats();
       } else {
-        toast.error('Failed to clear cache');
+        toast.error("Failed to clear cache");
       }
     } catch (error) {
-      toast.error('Failed to clear cache');
+      toast.error("Failed to clear cache");
     }
   };
 
@@ -315,7 +329,8 @@ export default function RedisSettingsSection() {
             Redis Cache Settings
           </h2>
           <p className="text-gray-400 mt-1">
-            Configure Upstash Redis for high-performance price caching and trade queues
+            Configure Upstash Redis for high-performance price caching and trade
+            queues
           </p>
         </div>
         <a
@@ -335,10 +350,22 @@ export default function RedisSettingsSection() {
         <AlertTitle className="text-red-400">Why Redis?</AlertTitle>
         <AlertDescription className="text-gray-300">
           <ul className="mt-2 space-y-1 text-sm">
-            <li>• <strong>99% fewer API calls</strong> - One background job updates prices, all users read from cache</li>
-            <li>• <strong>Sub-millisecond latency</strong> - Instant price lookups for 100K+ concurrent users</li>
-            <li>• <strong>Guaranteed trade execution</strong> - Trade queue ensures no trades are lost</li>
-            <li>• <strong>Rate limiting</strong> - Prevent abuse and protect your APIs</li>
+            <li>
+              • <strong>99% fewer API calls</strong> - One background job
+              updates prices, all users read from cache
+            </li>
+            <li>
+              • <strong>Sub-millisecond latency</strong> - Instant price lookups
+              for 100K+ concurrent users
+            </li>
+            <li>
+              • <strong>Guaranteed trade execution</strong> - Trade queue
+              ensures no trades are lost
+            </li>
+            <li>
+              • <strong>Rate limiting</strong> - Prevent abuse and protect your
+              APIs
+            </li>
           </ul>
         </AlertDescription>
       </Alert>
@@ -352,16 +379,16 @@ export default function RedisSettingsSection() {
               Upstash Redis Credentials
             </CardTitle>
             <CardDescription>
-              Get these from your{' '}
-              <a 
-                href="https://console.upstash.com" 
-                target="_blank" 
+              Get these from your{" "}
+              <a
+                href="https://console.upstash.com"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:underline"
               >
                 Upstash Console
-              </a>
-              {' '}→ Your Database → REST API section
+              </a>{" "}
+              → Your Database → REST API section
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -374,13 +401,18 @@ export default function RedisSettingsSection() {
                 type="text"
                 placeholder="https://xyz-12345.upstash.io"
                 value={settings.upstashRedisUrl}
-                onChange={(e) => setSettings({ ...settings, upstashRedisUrl: e.target.value })}
+                onChange={(e) =>
+                  setSettings({ ...settings, upstashRedisUrl: e.target.value })
+                }
                 className="bg-gray-900 border-gray-700 text-white"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="redis-token" className="text-gray-300 flex items-center justify-between">
+              <Label
+                htmlFor="redis-token"
+                className="text-gray-300 flex items-center justify-between"
+              >
                 <span>UPSTASH_REDIS_REST_TOKEN</span>
                 <Button
                   type="button"
@@ -389,16 +421,25 @@ export default function RedisSettingsSection() {
                   onClick={() => setShowTokens(!showTokens)}
                   className="h-6 text-xs text-gray-400 hover:text-white"
                 >
-                  {showTokens ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
-                  {showTokens ? 'Hide' : 'Show'}
+                  {showTokens ? (
+                    <EyeOff className="h-3 w-3 mr-1" />
+                  ) : (
+                    <Eye className="h-3 w-3 mr-1" />
+                  )}
+                  {showTokens ? "Hide" : "Show"}
                 </Button>
               </Label>
               <Input
                 id="redis-token"
-                type={showTokens ? 'text' : 'password'}
+                type={showTokens ? "text" : "password"}
                 placeholder="AXxxxxxxxxxxxxxxxxxxxxxx"
                 value={settings.upstashRedisToken}
-                onChange={(e) => setSettings({ ...settings, upstashRedisToken: e.target.value })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    upstashRedisToken: e.target.value,
+                  })
+                }
                 className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
               />
             </div>
@@ -408,7 +449,11 @@ export default function RedisSettingsSection() {
               <div className="flex items-center gap-3">
                 <Button
                   onClick={handleTestConnection}
-                  disabled={testing || !settings.upstashRedisUrl || !settings.upstashRedisToken}
+                  disabled={
+                    testing ||
+                    !settings.upstashRedisUrl ||
+                    !settings.upstashRedisToken
+                  }
                   variant="outline"
                   className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                 >
@@ -426,7 +471,9 @@ export default function RedisSettingsSection() {
                 </Button>
 
                 {testResult && (
-                  <div className={`flex items-center gap-2 text-sm ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                  <div
+                    className={`flex items-center gap-2 text-sm ${testResult.success ? "text-green-400" : "text-red-400"}`}
+                  >
                     {testResult.success ? (
                       <>
                         <CheckCircle2 className="h-4 w-4" />
@@ -451,35 +498,48 @@ export default function RedisSettingsSection() {
                     Enable Redis Cache
                   </Label>
                   <p className="text-xs text-gray-500 mt-1">
-                    When disabled, falls back to in-memory cache (not recommended for production)
+                    When disabled, falls back to in-memory cache (not
+                    recommended for production)
                   </p>
                 </div>
                 <Switch
                   id="redis-enabled"
                   checked={settings.redisEnabled}
-                  onCheckedChange={(checked) => setSettings({ ...settings, redisEnabled: checked })}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, redisEnabled: checked })
+                  }
                 />
               </div>
-              
+
               {/* Multi-Server Price Sync */}
               {settings.redisEnabled && (
                 <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
                   <div>
-                    <Label htmlFor="redis-price-sync" className="text-white flex items-center gap-2">
+                    <Label
+                      htmlFor="redis-price-sync"
+                      className="text-white flex items-center gap-2"
+                    >
                       <Layers className="h-4 w-4 text-blue-400" />
                       Multi-Server Price Sync
                     </Label>
                     <p className="text-xs text-gray-400 mt-1">
-                      Sync WebSocket prices to Redis for multiple server deployments
+                      Sync WebSocket prices to Redis for multiple server
+                      deployments
                     </p>
                     <p className="text-xs text-yellow-500 mt-1">
-                      ⚠️ Only enable if running 2+ app servers behind a load balancer
+                      ⚠️ Only enable if running 2+ app servers behind a load
+                      balancer
                     </p>
                   </div>
                   <Switch
                     id="redis-price-sync"
                     checked={settings.redisPriceSyncEnabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, redisPriceSyncEnabled: checked })}
+                    onCheckedChange={(checked) =>
+                      setSettings({
+                        ...settings,
+                        redisPriceSyncEnabled: checked,
+                      })
+                    }
                   />
                 </div>
               )}
@@ -496,9 +556,7 @@ export default function RedisSettingsSection() {
                   <Gauge className="h-5 w-5 text-yellow-400" />
                   Cache Status
                 </CardTitle>
-                <CardDescription>
-                  Real-time cache statistics
-                </CardDescription>
+                <CardDescription>Real-time cache statistics</CardDescription>
               </div>
               <Button
                 variant="ghost"
@@ -507,7 +565,9 @@ export default function RedisSettingsSection() {
                 disabled={loadingStats || !settings.redisEnabled}
                 className="text-gray-400 hover:text-white"
               >
-                <RefreshCw className={`h-4 w-4 ${loadingStats ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 ${loadingStats ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </CardHeader>
@@ -515,7 +575,9 @@ export default function RedisSettingsSection() {
             {!settings.redisEnabled ? (
               <div className="flex flex-col items-center justify-center py-8 text-gray-500">
                 <AlertTriangle className="h-12 w-12 mb-3 text-yellow-500/50" />
-                <p className="text-center">Enable Redis to see cache statistics</p>
+                <p className="text-center">
+                  Enable Redis to see cache statistics
+                </p>
               </div>
             ) : cacheStats ? (
               <div className="space-y-4">
@@ -526,10 +588,14 @@ export default function RedisSettingsSection() {
                     <span className="text-gray-300">Connection</span>
                   </div>
                   <Badge
-                    variant={cacheStats.connected ? 'default' : 'destructive'}
-                    className={cacheStats.connected ? 'bg-green-500/20 text-green-400' : ''}
+                    variant={cacheStats.connected ? "default" : "destructive"}
+                    className={
+                      cacheStats.connected
+                        ? "bg-green-500/20 text-green-400"
+                        : ""
+                    }
                   >
-                    {cacheStats.connected ? 'Connected' : 'Disconnected'}
+                    {cacheStats.connected ? "Connected" : "Disconnected"}
                   </Badge>
                 </div>
 
@@ -552,10 +618,16 @@ export default function RedisSettingsSection() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-400">
-                      Pending: <span className="text-yellow-400">{cacheStats.queuePending}</span>
+                      Pending:{" "}
+                      <span className="text-yellow-400">
+                        {cacheStats.queuePending}
+                      </span>
                     </span>
                     <span className="text-sm text-gray-400">
-                      Processing: <span className="text-blue-400">{cacheStats.queueProcessing}</span>
+                      Processing:{" "}
+                      <span className="text-blue-400">
+                        {cacheStats.queueProcessing}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -602,14 +674,19 @@ export default function RedisSettingsSection() {
             Inngest Configuration (Background Jobs)
           </CardTitle>
           <CardDescription>
-            Inngest handles background tasks like price updates, margin monitoring, and competition status updates.
+            Inngest handles background tasks like price updates, margin
+            monitoring, and competition status updates.
             <br />
-            <span className="text-green-400">• Local dev:</span> Run <code className="bg-gray-900 px-1 rounded">npx inngest-cli@latest dev</code> - no keys needed!
+            <span className="text-green-400">• Local dev:</span> Run{" "}
+            <code className="bg-gray-900 px-1 rounded">
+              npx inngest-cli@latest dev
+            </code>{" "}
+            - no keys needed!
             <br />
-            <span className="text-blue-400">• Production:</span> Get keys from{' '}
-            <a 
-              href="https://app.inngest.com" 
-              target="_blank" 
+            <span className="text-blue-400">• Production:</span> Get keys from{" "}
+            <a
+              href="https://app.inngest.com"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:underline"
             >
@@ -624,35 +701,44 @@ export default function RedisSettingsSection() {
               <div>
                 <Label className="text-white font-medium">Inngest Mode</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                  {settings.inngestMode === 'dev' 
-                    ? '🔧 Dev Mode: Using local inngest-cli dev server' 
-                    : '☁️ Cloud Mode: Using Inngest Cloud (requires keys)'}
+                  {settings.inngestMode === "dev"
+                    ? "🔧 Dev Mode: Using local inngest-cli dev server"
+                    : "☁️ Cloud Mode: Using Inngest Cloud (requires keys)"}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-sm ${settings.inngestMode === 'dev' ? 'text-green-400' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${settings.inngestMode === "dev" ? "text-green-400" : "text-gray-500"}`}
+                >
                   Dev
                 </span>
                 <Switch
-                  checked={settings.inngestMode === 'cloud'}
-                  onCheckedChange={(checked) => 
-                    setSettings({ ...settings, inngestMode: checked ? 'cloud' : 'dev' })
+                  checked={settings.inngestMode === "cloud"}
+                  onCheckedChange={(checked) =>
+                    setSettings({
+                      ...settings,
+                      inngestMode: checked ? "cloud" : "dev",
+                    })
                   }
                 />
-                <span className={`text-sm ${settings.inngestMode === 'cloud' ? 'text-blue-400' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${settings.inngestMode === "cloud" ? "text-blue-400" : "text-gray-500"}`}
+                >
                   Cloud
                 </span>
               </div>
             </div>
-            
-            {settings.inngestMode === 'cloud' && !settings.inngestSigningKey && (
-              <Alert className="mt-3 bg-yellow-500/10 border-yellow-500/30">
-                <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                <AlertDescription className="text-yellow-200 text-sm">
-                  Cloud mode requires Signing Key and Event Key from app.inngest.com
-                </AlertDescription>
-              </Alert>
-            )}
+
+            {settings.inngestMode === "cloud" &&
+              !settings.inngestSigningKey && (
+                <Alert className="mt-3 bg-yellow-500/10 border-yellow-500/30">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-yellow-200 text-sm">
+                    Cloud mode requires Signing Key and Event Key from
+                    app.inngest.com
+                  </AlertDescription>
+                </Alert>
+              )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -662,12 +748,17 @@ export default function RedisSettingsSection() {
               </Label>
               <Input
                 id="inngest-signing"
-                type={showTokens ? 'text' : 'password'}
+                type={showTokens ? "text" : "password"}
                 placeholder="signkey-prod-xxxxxxxx"
                 value={settings.inngestSigningKey}
-                onChange={(e) => setSettings({ ...settings, inngestSigningKey: e.target.value })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    inngestSigningKey: e.target.value,
+                  })
+                }
                 className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
-                disabled={settings.inngestMode === 'dev'}
+                disabled={settings.inngestMode === "dev"}
               />
             </div>
 
@@ -677,35 +768,50 @@ export default function RedisSettingsSection() {
               </Label>
               <Input
                 id="inngest-event"
-                type={showTokens ? 'text' : 'password'}
+                type={showTokens ? "text" : "password"}
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 value={settings.inngestEventKey}
-                onChange={(e) => setSettings({ ...settings, inngestEventKey: e.target.value })}
+                onChange={(e) =>
+                  setSettings({ ...settings, inngestEventKey: e.target.value })
+                }
                 className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
-                disabled={settings.inngestMode === 'dev'}
+                disabled={settings.inngestMode === "dev"}
               />
             </div>
           </div>
 
-          {settings.inngestMode === 'dev' ? (
+          {settings.inngestMode === "dev" ? (
             <Alert className="bg-green-500/10 border-green-500/30">
               <Server className="h-4 w-4 text-green-400" />
               <AlertDescription className="text-gray-300 text-sm">
-                <strong>Dev Mode Active:</strong> Using local Inngest dev server.
+                <strong>Dev Mode Active:</strong> Using local Inngest dev
+                server.
                 <br />
-                Run <code className="bg-gray-900 px-1 rounded">npx inngest-cli@latest dev</code> and open <code className="bg-gray-900 px-1 rounded">localhost:8288</code>
+                Run{" "}
+                <code className="bg-gray-900 px-1 rounded">
+                  npx inngest-cli@latest dev
+                </code>{" "}
+                and open{" "}
+                <code className="bg-gray-900 px-1 rounded">localhost:8288</code>
               </AlertDescription>
             </Alert>
           ) : (
             <Alert className="bg-blue-500/10 border-blue-500/30">
               <Zap className="h-4 w-4 text-blue-400" />
               <AlertDescription className="text-gray-300 text-sm">
-                <strong>Cloud Mode Active:</strong> Using Inngest Cloud for production.
+                <strong>Cloud Mode Active:</strong> Using Inngest Cloud for
+                production.
                 <br />
-                Your functions will run on Inngest&apos;s infrastructure with automatic retries and monitoring.
+                Your functions will run on Inngest&apos;s infrastructure with
+                automatic retries and monitoring.
                 <br />
-                View dashboard at{' '}
-                <a href="https://app.inngest.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                View dashboard at{" "}
+                <a
+                  href="https://app.inngest.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline"
+                >
                   app.inngest.com
                 </a>
               </AlertDescription>
@@ -723,7 +829,8 @@ export default function RedisSettingsSection() {
           </CardTitle>
           <CardDescription>
             Configure how real-time forex prices are fetched from Massive.com.
-            WebSocket provides faster updates (~10-50ms), while REST API is more reliable.
+            WebSocket provides faster updates (~10-50ms), while REST API is more
+            reliable.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -731,59 +838,99 @@ export default function RedisSettingsSection() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               type="button"
-              onClick={() => setSettings({ ...settings, priceFeedMode: 'websocket', priceFeedWebsocketEnabled: true, priceFeedApiEnabled: false })}
+              onClick={() =>
+                setSettings({
+                  ...settings,
+                  priceFeedMode: "websocket",
+                  priceFeedWebsocketEnabled: true,
+                  priceFeedApiEnabled: false,
+                })
+              }
               className={`p-4 rounded-lg border-2 transition-all ${
-                settings.priceFeedMode === 'websocket' 
-                  ? 'border-cyan-500 bg-cyan-500/10' 
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                settings.priceFeedMode === "websocket"
+                  ? "border-cyan-500 bg-cyan-500/10"
+                  : "border-gray-700 bg-gray-900/50 hover:border-gray-600"
               }`}
             >
-              <Wifi className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === 'websocket' ? 'text-cyan-400' : 'text-gray-500'}`} />
-              <h4 className={`font-semibold ${settings.priceFeedMode === 'websocket' ? 'text-cyan-400' : 'text-white'}`}>
+              <Wifi
+                className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === "websocket" ? "text-cyan-400" : "text-gray-500"}`}
+              />
+              <h4
+                className={`font-semibold ${settings.priceFeedMode === "websocket" ? "text-cyan-400" : "text-white"}`}
+              >
                 WebSocket Only
               </h4>
               <p className="text-xs text-gray-400 mt-1">
                 Real-time streaming (~10-50ms)
               </p>
-              <Badge className="mt-2 bg-cyan-500/20 text-cyan-400">Fastest</Badge>
+              <Badge className="mt-2 bg-cyan-500/20 text-cyan-400">
+                Fastest
+              </Badge>
             </button>
 
             <button
               type="button"
-              onClick={() => setSettings({ ...settings, priceFeedMode: 'api', priceFeedWebsocketEnabled: false, priceFeedApiEnabled: true })}
+              onClick={() =>
+                setSettings({
+                  ...settings,
+                  priceFeedMode: "api",
+                  priceFeedWebsocketEnabled: false,
+                  priceFeedApiEnabled: true,
+                })
+              }
               className={`p-4 rounded-lg border-2 transition-all ${
-                settings.priceFeedMode === 'api' 
-                  ? 'border-orange-500 bg-orange-500/10' 
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                settings.priceFeedMode === "api"
+                  ? "border-orange-500 bg-orange-500/10"
+                  : "border-gray-700 bg-gray-900/50 hover:border-gray-600"
               }`}
             >
-              <Radio className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === 'api' ? 'text-orange-400' : 'text-gray-500'}`} />
-              <h4 className={`font-semibold ${settings.priceFeedMode === 'api' ? 'text-orange-400' : 'text-white'}`}>
+              <Radio
+                className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === "api" ? "text-orange-400" : "text-gray-500"}`}
+              />
+              <h4
+                className={`font-semibold ${settings.priceFeedMode === "api" ? "text-orange-400" : "text-white"}`}
+              >
                 REST API Only
               </h4>
               <p className="text-xs text-gray-400 mt-1">
                 Polling-based (~200-500ms)
               </p>
-              <Badge className="mt-2 bg-orange-500/20 text-orange-400">Reliable</Badge>
+              <Badge className="mt-2 bg-orange-500/20 text-orange-400">
+                Reliable
+              </Badge>
             </button>
 
             <button
               type="button"
-              onClick={() => setSettings({ ...settings, priceFeedMode: 'both', priceFeedWebsocketEnabled: true, priceFeedApiEnabled: true, priceFeedFallbackEnabled: true })}
+              onClick={() =>
+                setSettings({
+                  ...settings,
+                  priceFeedMode: "both",
+                  priceFeedWebsocketEnabled: true,
+                  priceFeedApiEnabled: true,
+                  priceFeedFallbackEnabled: true,
+                })
+              }
               className={`p-4 rounded-lg border-2 transition-all ${
-                settings.priceFeedMode === 'both' 
-                  ? 'border-green-500 bg-green-500/10' 
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                settings.priceFeedMode === "both"
+                  ? "border-green-500 bg-green-500/10"
+                  : "border-gray-700 bg-gray-900/50 hover:border-gray-600"
               }`}
             >
-              <Layers className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === 'both' ? 'text-green-400' : 'text-gray-500'}`} />
-              <h4 className={`font-semibold ${settings.priceFeedMode === 'both' ? 'text-green-400' : 'text-white'}`}>
+              <Layers
+                className={`h-8 w-8 mx-auto mb-2 ${settings.priceFeedMode === "both" ? "text-green-400" : "text-gray-500"}`}
+              />
+              <h4
+                className={`font-semibold ${settings.priceFeedMode === "both" ? "text-green-400" : "text-white"}`}
+              >
                 Both (Recommended)
               </h4>
               <p className="text-xs text-gray-400 mt-1">
                 WebSocket primary, API fallback
               </p>
-              <Badge className="mt-2 bg-green-500/20 text-green-400">Best</Badge>
+              <Badge className="mt-2 bg-green-500/20 text-green-400">
+                Best
+              </Badge>
             </button>
           </div>
 
@@ -803,7 +950,9 @@ export default function RedisSettingsSection() {
                     disabled={loadingWsStatus}
                     className="text-gray-400 hover:text-white"
                   >
-                    <RefreshCw className={`h-4 w-4 ${loadingWsStatus ? 'animate-spin' : ''}`} />
+                    <RefreshCw
+                      className={`h-4 w-4 ${loadingWsStatus ? "animate-spin" : ""}`}
+                    />
                   </Button>
                   <Button
                     variant="outline"
@@ -816,7 +965,7 @@ export default function RedisSettingsSection() {
                   </Button>
                 </div>
               </div>
-              
+
               {wsStatus ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="p-3 bg-gray-800 rounded-lg">
@@ -827,8 +976,12 @@ export default function RedisSettingsSection() {
                       ) : (
                         <XCircle className="h-4 w-4 text-red-400" />
                       )}
-                      <span className={wsStatus.connected ? 'text-green-400' : 'text-red-400'}>
-                        {wsStatus.connected ? 'Connected' : 'Disconnected'}
+                      <span
+                        className={
+                          wsStatus.connected ? "text-green-400" : "text-red-400"
+                        }
+                      >
+                        {wsStatus.connected ? "Connected" : "Disconnected"}
                       </span>
                     </div>
                   </div>
@@ -840,8 +993,14 @@ export default function RedisSettingsSection() {
                       ) : (
                         <XCircle className="h-4 w-4 text-yellow-400" />
                       )}
-                      <span className={wsStatus.authenticated ? 'text-green-400' : 'text-yellow-400'}>
-                        {wsStatus.authenticated ? 'Yes' : 'No'}
+                      <span
+                        className={
+                          wsStatus.authenticated
+                            ? "text-green-400"
+                            : "text-yellow-400"
+                        }
+                      >
+                        {wsStatus.authenticated ? "Yes" : "No"}
                       </span>
                     </div>
                   </div>
@@ -853,8 +1012,14 @@ export default function RedisSettingsSection() {
                       ) : (
                         <XCircle className="h-4 w-4 text-yellow-400" />
                       )}
-                      <span className={wsStatus.subscribed ? 'text-green-400' : 'text-yellow-400'}>
-                        {wsStatus.subscribed ? 'Yes' : 'No'}
+                      <span
+                        className={
+                          wsStatus.subscribed
+                            ? "text-green-400"
+                            : "text-yellow-400"
+                        }
+                      >
+                        {wsStatus.subscribed ? "Yes" : "No"}
                       </span>
                     </div>
                   </div>
@@ -875,7 +1040,7 @@ export default function RedisSettingsSection() {
           )}
 
           {/* Primary Source (when both enabled) */}
-          {settings.priceFeedMode === 'both' && (
+          {settings.priceFeedMode === "both" && (
             <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
               <div>
                 <Label className="text-white">Primary Source</Label>
@@ -884,16 +1049,23 @@ export default function RedisSettingsSection() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-sm ${settings.priceFeedPrimarySource === 'websocket' ? 'text-cyan-400' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${settings.priceFeedPrimarySource === "websocket" ? "text-cyan-400" : "text-gray-500"}`}
+                >
                   WebSocket
                 </span>
                 <Switch
-                  checked={settings.priceFeedPrimarySource === 'api'}
-                  onCheckedChange={(checked) => 
-                    setSettings({ ...settings, priceFeedPrimarySource: checked ? 'api' : 'websocket' })
+                  checked={settings.priceFeedPrimarySource === "api"}
+                  onCheckedChange={(checked) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedPrimarySource: checked ? "api" : "websocket",
+                    })
                   }
                 />
-                <span className={`text-sm ${settings.priceFeedPrimarySource === 'api' ? 'text-orange-400' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${settings.priceFeedPrimarySource === "api" ? "text-orange-400" : "text-gray-500"}`}
+                >
                   API
                 </span>
               </div>
@@ -901,7 +1073,7 @@ export default function RedisSettingsSection() {
           )}
 
           {/* Auto Fallback */}
-          {settings.priceFeedMode === 'both' && (
+          {settings.priceFeedMode === "both" && (
             <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
               <div>
                 <Label className="text-white flex items-center gap-2">
@@ -914,8 +1086,11 @@ export default function RedisSettingsSection() {
               </div>
               <Switch
                 checked={settings.priceFeedFallbackEnabled}
-                onCheckedChange={(checked) => 
-                  setSettings({ ...settings, priceFeedFallbackEnabled: checked })
+                onCheckedChange={(checked) =>
+                  setSettings({
+                    ...settings,
+                    priceFeedFallbackEnabled: checked,
+                  })
                 }
               />
             </div>
@@ -927,7 +1102,7 @@ export default function RedisSettingsSection() {
               <Settings2 className="h-4 w-4 text-gray-400" />
               Advanced Settings
             </h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-gray-300 flex items-center gap-2">
@@ -937,12 +1112,20 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedClientPollInterval}
-                  onChange={(e) => setSettings({ ...settings, priceFeedClientPollInterval: parseInt(e.target.value) || 500 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedClientPollInterval:
+                        parseInt(e.target.value) || 500,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={100}
                   max={5000}
                 />
-                <p className="text-xs text-gray-500">How often client requests prices</p>
+                <p className="text-xs text-gray-500">
+                  How often client requests prices
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -953,12 +1136,19 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedUpdateInterval}
-                  onChange={(e) => setSettings({ ...settings, priceFeedUpdateInterval: parseInt(e.target.value) || 2000 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedUpdateInterval: parseInt(e.target.value) || 2000,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={500}
                   max={10000}
                 />
-                <p className="text-xs text-gray-500">How often to sync to Redis</p>
+                <p className="text-xs text-gray-500">
+                  How often to sync to Redis
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -969,12 +1159,19 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedCacheTTL}
-                  onChange={(e) => setSettings({ ...settings, priceFeedCacheTTL: parseInt(e.target.value) || 10000 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedCacheTTL: parseInt(e.target.value) || 10000,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={1000}
                   max={60000}
                 />
-                <p className="text-xs text-gray-500">How long prices are considered valid</p>
+                <p className="text-xs text-gray-500">
+                  How long prices are considered valid
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -985,12 +1182,20 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedWebsocketReconnectAttempts}
-                  onChange={(e) => setSettings({ ...settings, priceFeedWebsocketReconnectAttempts: parseInt(e.target.value) || 10 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedWebsocketReconnectAttempts:
+                        parseInt(e.target.value) || 10,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={1}
                   max={50}
                 />
-                <p className="text-xs text-gray-500">Max reconnection attempts</p>
+                <p className="text-xs text-gray-500">
+                  Max reconnection attempts
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -1001,12 +1206,20 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedWebsocketReconnectDelay}
-                  onChange={(e) => setSettings({ ...settings, priceFeedWebsocketReconnectDelay: parseInt(e.target.value) || 3000 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedWebsocketReconnectDelay:
+                        parseInt(e.target.value) || 3000,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={1000}
                   max={30000}
                 />
-                <p className="text-xs text-gray-500">Base delay between retries</p>
+                <p className="text-xs text-gray-500">
+                  Base delay between retries
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -1017,7 +1230,12 @@ export default function RedisSettingsSection() {
                 <Input
                   type="number"
                   value={settings.priceFeedApiConcurrency}
-                  onChange={(e) => setSettings({ ...settings, priceFeedApiConcurrency: parseInt(e.target.value) || 30 })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      priceFeedApiConcurrency: parseInt(e.target.value) || 30,
+                    })
+                  }
                   className="bg-gray-900 border-gray-700 text-white"
                   min={1}
                   max={50}
@@ -1052,4 +1270,3 @@ export default function RedisSettingsSection() {
     </div>
   );
 }
-

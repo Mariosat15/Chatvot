@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { ReactNode } from 'react';
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
 
 interface SectionWrapperProps {
   id?: string;
@@ -26,11 +26,11 @@ export default function SectionWrapper({
   const content = (
     <section
       id={id}
-      className={cn('relative py-20 md:py-28 overflow-hidden', className)}
+      className={cn("relative py-20 md:py-28 overflow-hidden", className)}
       style={backgroundStyle}
     >
       {overlay && (
-        <div 
+        <div
           className="absolute inset-0 pointer-events-none"
           style={{ background: overlayColor }}
         />
@@ -47,8 +47,8 @@ export default function SectionWrapper({
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-100px' }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
     >
       {content}
     </motion.div>

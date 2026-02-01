@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   Image,
   RefreshCw,
@@ -19,8 +25,8 @@ import {
   TrendingDown,
   FileImage,
   AlertTriangle,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ImageInfo {
   filename: string;
@@ -71,17 +77,17 @@ export default function ImageOptimizerSection() {
   const [progress, setProgress] = useState(0);
 
   const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const scanImages = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/dev-zone/optimize-images');
+      const response = await fetch("/api/dev-zone/optimize-images");
       const data = await response.json();
 
       if (data.success) {
@@ -90,33 +96,36 @@ export default function ImageOptimizerSection() {
         setDirectories(data.directories || []);
         setSelectedImages(new Set());
         setResults([]);
-        
+
         if (data.stats.needsOptimization > 0) {
-          toast.info(`Found ${data.stats.needsOptimization} images that can be optimized across ${data.stats.directoriesScanned || 1} directories`);
+          toast.info(
+            `Found ${data.stats.needsOptimization} images that can be optimized across ${data.stats.directoriesScanned || 1} directories`,
+          );
         } else if (data.stats.totalImages > 0) {
-          toast.success('All images are already optimized!');
+          toast.success("All images are already optimized!");
         } else {
-          toast.info('No images found in any directory');
+          toast.info("No images found in any directory");
         }
       } else {
-        toast.error(data.error || 'Failed to scan images');
+        toast.error(data.error || "Failed to scan images");
       }
     } catch (error) {
-      toast.error('Failed to scan images');
+      toast.error("Failed to scan images");
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const optimizeImages = async (mode: 'all' | 'selected') => {
+  const optimizeImages = async (mode: "all" | "selected") => {
     // Build selected images array with full info
-    const selectedImagesList = mode === 'selected' 
-      ? images.filter(img => selectedImages.has(img.fullPath))
-      : [];
-    
-    if (mode === 'selected' && selectedImagesList.length === 0) {
-      toast.error('No images selected');
+    const selectedImagesList =
+      mode === "selected"
+        ? images.filter((img) => selectedImages.has(img.fullPath))
+        : [];
+
+    if (mode === "selected" && selectedImagesList.length === 0) {
+      toast.error("No images selected");
       return;
     }
 
@@ -125,12 +134,12 @@ export default function ImageOptimizerSection() {
     setResults([]);
 
     try {
-      const response = await fetch('/api/dev-zone/optimize-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          mode, 
-          images: selectedImagesList.map(img => ({
+      const response = await fetch("/api/dev-zone/optimize-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          images: selectedImagesList.map((img) => ({
             filename: img.filename,
             fullPath: img.fullPath,
             directory: img.directory,
@@ -145,15 +154,17 @@ export default function ImageOptimizerSection() {
       if (data.success) {
         setResults(data.results);
         setProgress(100);
-        toast.success(`Optimized ${data.successful} images, saved ${data.totalSavedFormatted}`);
-        
+        toast.success(
+          `Optimized ${data.successful} images, saved ${data.totalSavedFormatted}`,
+        );
+
         // Refresh the scan
         await scanImages();
       } else {
-        toast.error(data.error || 'Optimization failed');
+        toast.error(data.error || "Optimization failed");
       }
     } catch (error) {
-      toast.error('Optimization failed');
+      toast.error("Optimization failed");
       console.error(error);
     } finally {
       setOptimizing(false);
@@ -161,10 +172,12 @@ export default function ImageOptimizerSection() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedImages.size === images.filter(i => i.canOptimize).length) {
+    if (selectedImages.size === images.filter((i) => i.canOptimize).length) {
       setSelectedImages(new Set());
     } else {
-      setSelectedImages(new Set(images.filter(i => i.canOptimize).map(i => i.fullPath)));
+      setSelectedImages(
+        new Set(images.filter((i) => i.canOptimize).map((i) => i.fullPath)),
+      );
     }
   };
 
@@ -229,24 +242,36 @@ export default function ImageOptimizerSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Size</p>
-                  <p className="text-3xl font-bold">{stats.totalSizeFormatted}</p>
+                  <p className="text-3xl font-bold">
+                    {stats.totalSizeFormatted}
+                  </p>
                 </div>
                 <HardDrive className="w-10 h-10 text-yellow-500" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className={cn(
-            stats.needsOptimization > 0 ? "border-orange-500/30 bg-orange-500/5" : "border-green-500/30 bg-green-500/5"
-          )}>
+          <Card
+            className={cn(
+              stats.needsOptimization > 0
+                ? "border-orange-500/30 bg-orange-500/5"
+                : "border-green-500/30 bg-green-500/5",
+            )}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Needs Optimization</p>
-                  <p className={cn(
-                    "text-3xl font-bold",
-                    stats.needsOptimization > 0 ? "text-orange-500" : "text-green-500"
-                  )}>
+                  <p className="text-sm text-muted-foreground">
+                    Needs Optimization
+                  </p>
+                  <p
+                    className={cn(
+                      "text-3xl font-bold",
+                      stats.needsOptimization > 0
+                        ? "text-orange-500"
+                        : "text-green-500",
+                    )}
+                  >
                     {stats.needsOptimization}
                   </p>
                 </div>
@@ -263,8 +288,12 @@ export default function ImageOptimizerSection() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Potential Savings</p>
-                  <p className="text-3xl font-bold text-green-500">{stats.potentialSavings}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Potential Savings
+                  </p>
+                  <p className="text-3xl font-bold text-green-500">
+                    {stats.potentialSavings}
+                  </p>
                 </div>
                 <TrendingDown className="w-10 h-10 text-green-500" />
               </div>
@@ -277,12 +306,17 @@ export default function ImageOptimizerSection() {
       {directories.length > 0 && (
         <Card className="bg-muted/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">📁 Scanned Directories</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              📁 Scanned Directories
+            </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
               {directories.map((dir, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-sm"
+                >
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">
                       {dir.label}
@@ -291,7 +325,9 @@ export default function ImageOptimizerSection() {
                       {dir.path}
                     </code>
                   </div>
-                  <span className="text-muted-foreground">{dir.imageCount} images</span>
+                  <span className="text-muted-foreground">
+                    {dir.imageCount} images
+                  </span>
                 </div>
               ))}
             </div>
@@ -303,7 +339,7 @@ export default function ImageOptimizerSection() {
       {stats && stats.needsOptimization > 0 && (
         <div className="flex gap-4">
           <Button
-            onClick={() => optimizeImages('all')}
+            onClick={() => optimizeImages("all")}
             disabled={optimizing || loading}
             className="bg-purple-600 hover:bg-purple-700"
           >
@@ -314,10 +350,10 @@ export default function ImageOptimizerSection() {
             )}
             Optimize All ({stats.needsOptimization})
           </Button>
-          
+
           {selectedImages.size > 0 && (
             <Button
-              onClick={() => optimizeImages('selected')}
+              onClick={() => optimizeImages("selected")}
               disabled={optimizing || loading}
               variant="outline"
             >
@@ -356,7 +392,7 @@ export default function ImageOptimizerSection() {
                     key={i}
                     className={cn(
                       "flex items-center justify-between p-2 rounded",
-                      result.success ? "bg-green-500/10" : "bg-red-500/10"
+                      result.success ? "bg-green-500/10" : "bg-red-500/10",
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -369,8 +405,12 @@ export default function ImageOptimizerSection() {
                     </div>
                     {result.success && (
                       <div className="text-sm text-muted-foreground">
-                        {formatBytes(result.originalSize)} → {formatBytes(result.newSize)}
-                        <Badge variant="secondary" className="ml-2 text-green-500">
+                        {formatBytes(result.originalSize)} →{" "}
+                        {formatBytes(result.newSize)}
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 text-green-500"
+                        >
                           -{result.savedPercent.toFixed(0)}%
                         </Badge>
                       </div>
@@ -390,11 +430,16 @@ export default function ImageOptimizerSection() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Images</CardTitle>
-                <CardDescription>Largest images first (top 100 from all directories)</CardDescription>
+                <CardDescription>
+                  Largest images first (top 100 from all directories)
+                </CardDescription>
               </div>
-              {images.some(i => i.canOptimize) && (
+              {images.some((i) => i.canOptimize) && (
                 <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                  {selectedImages.size === images.filter(i => i.canOptimize).length ? 'Deselect All' : 'Select All'}
+                  {selectedImages.size ===
+                  images.filter((i) => i.canOptimize).length
+                    ? "Deselect All"
+                    : "Select All"}
                 </Button>
               )}
             </div>
@@ -407,9 +452,11 @@ export default function ImageOptimizerSection() {
                     key={img.fullPath}
                     className={cn(
                       "flex items-center justify-between p-3 rounded border",
-                      img.isOptimized ? "bg-green-500/5 border-green-500/20" : 
-                      img.canOptimize ? "bg-orange-500/5 border-orange-500/20" : 
-                      "bg-muted/30"
+                      img.isOptimized
+                        ? "bg-green-500/5 border-green-500/20"
+                        : img.canOptimize
+                          ? "bg-orange-500/5 border-orange-500/20"
+                          : "bg-muted/30",
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -420,9 +467,14 @@ export default function ImageOptimizerSection() {
                         />
                       )}
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{img.filename}</p>
+                        <p className="font-medium text-sm truncate">
+                          {img.filename}
+                        </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1 py-0"
+                          >
                             {img.directoryLabel}
                           </Badge>
                           <span>Type: {img.imageType}</span>
@@ -430,12 +482,16 @@ export default function ImageOptimizerSection() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={cn(
-                        "font-mono text-sm",
-                        img.size > 500 * 1024 ? "text-red-500" :
-                        img.size > 100 * 1024 ? "text-orange-500" :
-                        "text-green-500"
-                      )}>
+                      <span
+                        className={cn(
+                          "font-mono text-sm",
+                          img.size > 500 * 1024
+                            ? "text-red-500"
+                            : img.size > 100 * 1024
+                              ? "text-orange-500"
+                              : "text-green-500",
+                        )}
+                      >
                         {formatBytes(img.size)}
                       </span>
                       {img.isOptimized && (

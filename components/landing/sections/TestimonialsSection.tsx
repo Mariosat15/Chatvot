@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Star, Quote } from 'lucide-react';
-import { LandingTheme } from '@/lib/themes/landing-themes';
-import SectionWrapper from './SectionWrapper';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Star, Quote } from "lucide-react";
+import { LandingTheme } from "@/lib/themes/landing-themes";
+import SectionWrapper from "./SectionWrapper";
 
 interface Testimonial {
   id: string;
@@ -40,39 +40,39 @@ export default function TestimonialsSection({
   subtitle = "Real Stories from Real Winners",
 }: TestimonialsSectionProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#00f0ff',
-    secondary: propColors?.secondary || '#ff00ff',
-    accent: propColors?.accent || '#ffd700',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#00f0ff",
+    secondary: propColors?.secondary || "#ff00ff",
+    accent: propColors?.accent || "#ffd700",
+    text: propColors?.text || "#ffffff",
   };
-  const effectiveHeadingFont = propFont || 'inherit';
+  const effectiveHeadingFont = propFont || "inherit";
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
 
   const enabledTestimonials = testimonials
-    .filter(t => t.enabled)
+    .filter((t) => t.enabled)
     .sort((a, b) => a.order - b.order);
 
   useEffect(() => {
     if (!autoPlay || enabledTestimonials.length <= 1) return;
-    
+
     const timer = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % enabledTestimonials.length);
+      setCurrentIndex((prev) => (prev + 1) % enabledTestimonials.length);
     }, 5000);
-    
+
     return () => clearInterval(timer);
   }, [autoPlay, enabledTestimonials.length]);
 
   const handlePrev = () => {
     setAutoPlay(false);
-    setCurrentIndex(prev => 
-      prev === 0 ? enabledTestimonials.length - 1 : prev - 1
+    setCurrentIndex((prev) =>
+      prev === 0 ? enabledTestimonials.length - 1 : prev - 1,
     );
   };
 
   const handleNext = () => {
     setAutoPlay(false);
-    setCurrentIndex(prev => (prev + 1) % enabledTestimonials.length);
+    setCurrentIndex((prev) => (prev + 1) % enabledTestimonials.length);
   };
 
   if (enabledTestimonials.length === 0) {
@@ -89,9 +89,9 @@ export default function TestimonialsSection({
       }}
     >
       <div className="text-center max-w-3xl mx-auto mb-12">
-        <div 
+        <div
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-          style={{ 
+          style={{
             backgroundColor: `${effectiveColors.accent}15`,
             border: `1px solid ${effectiveColors.accent}30`,
             color: effectiveColors.accent,
@@ -100,10 +100,13 @@ export default function TestimonialsSection({
           <Quote className="h-4 w-4" />
           {subtitle}
         </div>
-        
-        <h2 
+
+        <h2
           className="text-4xl md:text-5xl font-black"
-          style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+          style={{
+            color: effectiveColors.text,
+            fontFamily: effectiveHeadingFont,
+          }}
         >
           {title}
         </h2>
@@ -119,14 +122,14 @@ export default function TestimonialsSection({
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
             className="relative p-8 md:p-12 rounded-3xl"
-            style={{ 
+            style={{
               backgroundColor: theme?.colors?.backgroundCard,
               border: `1px solid ${theme?.colors?.border}`,
               boxShadow: `0 20px 50px ${effectiveColors.primary}10`,
             }}
           >
             {/* Quote decoration */}
-            <div 
+            <div
               className="absolute top-4 left-6 text-6xl opacity-20"
               style={{ color: effectiveColors.primary }}
             >
@@ -141,15 +144,21 @@ export default function TestimonialsSection({
                   <Star
                     key={i}
                     className="h-6 w-6"
-                    fill={i < currentTestimonial.rating ? '#FFD700' : 'transparent'}
-                    stroke={i < currentTestimonial.rating ? '#FFD700' : theme?.colors?.textMuted}
+                    fill={
+                      i < currentTestimonial.rating ? "#FFD700" : "transparent"
+                    }
+                    stroke={
+                      i < currentTestimonial.rating
+                        ? "#FFD700"
+                        : theme?.colors?.textMuted
+                    }
                     strokeWidth={1.5}
                   />
                 ))}
               </div>
 
               {/* Quote */}
-              <blockquote 
+              <blockquote
                 className="text-xl md:text-2xl font-medium mb-8 leading-relaxed"
                 style={{ color: effectiveColors.text }}
               >
@@ -158,28 +167,34 @@ export default function TestimonialsSection({
 
               {/* Author */}
               <div className="flex items-center justify-center gap-4">
-                <div 
+                <div
                   className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-2xl"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.secondary}30)`,
                     border: `2px solid ${effectiveColors.primary}40`,
                   }}
                 >
                   {currentTestimonial.avatar ? (
-                    <img 
-                      src={currentTestimonial.avatar} 
+                    <img
+                      src={currentTestimonial.avatar}
                       alt={currentTestimonial.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    '👤'
+                    "👤"
                   )}
                 </div>
                 <div className="text-left">
-                  <h4 className="font-bold text-lg" style={{ color: effectiveColors.text }}>
+                  <h4
+                    className="font-bold text-lg"
+                    style={{ color: effectiveColors.text }}
+                  >
                     {currentTestimonial.name}
                   </h4>
-                  <p className="text-sm" style={{ color: theme?.colors?.textMuted }}>
+                  <p
+                    className="text-sm"
+                    style={{ color: theme?.colors?.textMuted }}
+                  >
                     {currentTestimonial.role}
                   </p>
                 </div>
@@ -194,7 +209,7 @@ export default function TestimonialsSection({
             <button
               onClick={handlePrev}
               className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 md:-translate-x-12 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all hover:scale-110"
-              style={{ 
+              style={{
                 backgroundColor: theme?.colors?.backgroundCard,
                 border: `1px solid ${theme?.colors?.border}`,
                 color: effectiveColors.primary,
@@ -205,7 +220,7 @@ export default function TestimonialsSection({
             <button
               onClick={handleNext}
               className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 md:translate-x-12 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all hover:scale-110"
-              style={{ 
+              style={{
                 backgroundColor: theme?.colors?.backgroundCard,
                 border: `1px solid ${theme?.colors?.border}`,
                 color: effectiveColors.primary,
@@ -228,11 +243,12 @@ export default function TestimonialsSection({
                 setCurrentIndex(index);
               }}
               className="w-3 h-3 rounded-full transition-all"
-              style={{ 
-                backgroundColor: index === currentIndex 
-                  ? effectiveColors.primary 
-                  : `${effectiveColors.primary}30`,
-                transform: index === currentIndex ? 'scale(1.2)' : 'scale(1)',
+              style={{
+                backgroundColor:
+                  index === currentIndex
+                    ? effectiveColors.primary
+                    : `${effectiveColors.primary}30`,
+                transform: index === currentIndex ? "scale(1.2)" : "scale(1)",
               }}
             />
           ))}
@@ -254,29 +270,37 @@ export default function TestimonialsSection({
                 setCurrentIndex(index);
               }}
               className="p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.02]"
-              style={{ 
-                backgroundColor: index === currentIndex 
-                  ? `${effectiveColors.primary}15`
-                  : theme?.colors?.backgroundCard,
+              style={{
+                backgroundColor:
+                  index === currentIndex
+                    ? `${effectiveColors.primary}15`
+                    : theme?.colors?.backgroundCard,
                 border: `1px solid ${index === currentIndex ? effectiveColors.primary : theme?.colors?.border}`,
               }}
             >
               <div className="flex items-center gap-3 mb-2">
-                <div 
+                <div
                   className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-sm"
                   style={{ backgroundColor: `${effectiveColors.primary}20` }}
                 >
                   {testimonial.avatar ? (
-                    <img src={testimonial.avatar} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={testimonial.avatar}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    '👤'
+                    "👤"
                   )}
                 </div>
-                <span className="font-bold text-sm" style={{ color: effectiveColors.text }}>
+                <span
+                  className="font-bold text-sm"
+                  style={{ color: effectiveColors.text }}
+                >
                   {testimonial.name}
                 </span>
               </div>
-              <p 
+              <p
                 className="text-xs line-clamp-2"
                 style={{ color: theme?.colors?.textMuted }}
               >

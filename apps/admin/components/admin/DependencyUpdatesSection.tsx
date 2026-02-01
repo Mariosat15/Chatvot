@@ -1,15 +1,31 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCcw, Package, AlertTriangle, CheckCircle2, Sparkles, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  RefreshCcw,
+  Package,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface AIAnalysis {
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  riskLevel: "low" | "medium" | "high" | "critical";
   summary: string;
   breakingChanges: string[];
   recommendations: string[];
@@ -22,7 +38,7 @@ interface OutdatedPackage {
   wanted: string;
   latest: string;
   location: string;
-  type: 'dependencies' | 'devDependencies';
+  type: "dependencies" | "devDependencies";
   isBreaking: boolean;
   aiAnalysis?: AIAnalysis;
 }
@@ -35,13 +51,17 @@ interface DependencyCheckResult {
 }
 
 const riskColors = {
-  low: 'bg-green-500/20 text-green-400 border-green-500/30',
-  medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
+  low: "bg-green-500/20 text-green-400 border-green-500/30",
+  medium: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  high: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  critical: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
-function PackageCard({ pkg, onAnalyze, analyzing }: {
+function PackageCard({
+  pkg,
+  onAnalyze,
+  analyzing,
+}: {
   pkg: OutdatedPackage;
   onAnalyze: (name: string) => void;
   analyzing: string | null;
@@ -50,28 +70,38 @@ function PackageCard({ pkg, onAnalyze, analyzing }: {
   const isAnalyzing = analyzing === pkg.name;
 
   return (
-    <div className={cn(
-      'border rounded-lg p-4 transition-all',
-      pkg.isBreaking
-        ? 'border-red-500/30 bg-red-500/5'
-        : 'border-gray-700 bg-gray-800/50'
-    )}>
+    <div
+      className={cn(
+        "border rounded-lg p-4 transition-all",
+        pkg.isBreaking
+          ? "border-red-500/30 bg-red-500/5"
+          : "border-gray-700 bg-gray-800/50",
+      )}
+    >
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Package className={cn(
-            'h-5 w-5',
-            pkg.isBreaking ? 'text-red-400' : 'text-blue-400'
-          )} />
+          <Package
+            className={cn(
+              "h-5 w-5",
+              pkg.isBreaking ? "text-red-400" : "text-blue-400",
+            )}
+          />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-white">{pkg.name}</span>
               {pkg.isBreaking && (
-                <Badge variant="outline" className="border-red-500/50 text-red-400 text-xs">
+                <Badge
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 text-xs"
+                >
                   Breaking
                 </Badge>
               )}
-              <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
+              <Badge
+                variant="outline"
+                className="border-gray-600 text-gray-400 text-xs"
+              >
                 {pkg.type}
               </Badge>
             </div>
@@ -82,10 +112,12 @@ function PackageCard({ pkg, onAnalyze, analyzing }: {
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {pkg.aiAnalysis && (
-            <Badge className={cn('text-xs', riskColors[pkg.aiAnalysis.riskLevel])}>
+            <Badge
+              className={cn("text-xs", riskColors[pkg.aiAnalysis.riskLevel])}
+            >
               {pkg.aiAnalysis.riskLevel.toUpperCase()} Risk
             </Badge>
           )}
@@ -95,7 +127,11 @@ function PackageCard({ pkg, onAnalyze, analyzing }: {
             onClick={() => setExpanded(!expanded)}
             className="text-gray-400"
           >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -107,8 +143,12 @@ function PackageCard({ pkg, onAnalyze, analyzing }: {
             <div className="space-y-4">
               {/* Summary */}
               <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-1">Summary</h4>
-                <p className="text-sm text-gray-400">{pkg.aiAnalysis.summary}</p>
+                <h4 className="text-sm font-medium text-gray-300 mb-1">
+                  Summary
+                </h4>
+                <p className="text-sm text-gray-400">
+                  {pkg.aiAnalysis.summary}
+                </p>
               </div>
 
               {/* Breaking Changes */}
@@ -150,12 +190,16 @@ function PackageCard({ pkg, onAnalyze, analyzing }: {
               {/* Estimated Effort */}
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-gray-500">Estimated effort:</span>
-                <span className="text-gray-300">{pkg.aiAnalysis.estimatedEffort}</span>
+                <span className="text-gray-300">
+                  {pkg.aiAnalysis.estimatedEffort}
+                </span>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">No AI analysis available yet.</p>
+              <p className="text-sm text-gray-500">
+                No AI analysis available yet.
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -202,21 +246,21 @@ export default function DependencyUpdatesSection() {
   const [data, setData] = useState<DependencyCheckResult | null>(null);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analyzingAll, setAnalyzingAll] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'breaking' | 'safe'>('all');
+  const [filter, setFilter] = useState<"all" | "breaking" | "safe">("all");
 
   const fetchDependencies = async (clearCache = false) => {
     try {
       if (clearCache) {
-        await fetch('/api/dev-zone/dependency-check', { method: 'DELETE' });
+        await fetch("/api/dev-zone/dependency-check", { method: "DELETE" });
       }
 
-      const response = await fetch('/api/dev-zone/dependency-check');
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch("/api/dev-zone/dependency-check");
+      if (!response.ok) throw new Error("Failed to fetch");
       const result = await response.json();
       setData(result);
     } catch (error) {
-      console.error('Error fetching dependencies:', error);
-      toast.error('Failed to check dependencies');
+      console.error("Error fetching dependencies:", error);
+      toast.error("Failed to check dependencies");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -235,15 +279,15 @@ export default function DependencyUpdatesSection() {
   const handleAnalyzePackage = async (packageName: string) => {
     setAnalyzing(packageName);
     try {
-      const response = await fetch('/api/dev-zone/dependency-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/dev-zone/dependency-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageName }),
       });
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to analyze');
+        throw new Error(err.error || "Failed to analyze");
       }
 
       const result = await response.json();
@@ -251,14 +295,16 @@ export default function DependencyUpdatesSection() {
         setData({
           ...data,
           packages: data.packages.map((p) =>
-            p.name === packageName ? result.package : p
+            p.name === packageName ? result.package : p,
           ),
         });
       }
       toast.success(`Analyzed ${packageName}`);
     } catch (error) {
-      console.error('Error analyzing package:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to analyze package');
+      console.error("Error analyzing package:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to analyze package",
+      );
     } finally {
       setAnalyzing(null);
     }
@@ -267,33 +313,36 @@ export default function DependencyUpdatesSection() {
   const handleAnalyzeAll = async () => {
     setAnalyzingAll(true);
     try {
-      const response = await fetch('/api/dev-zone/dependency-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/dev-zone/dependency-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ analyzeAll: true }),
       });
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to analyze');
+        throw new Error(err.error || "Failed to analyze");
       }
 
       const result = await response.json();
       setData(result);
-      toast.success('Analyzed packages with AI');
+      toast.success("Analyzed packages with AI");
     } catch (error) {
-      console.error('Error analyzing all:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to analyze packages');
+      console.error("Error analyzing all:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to analyze packages",
+      );
     } finally {
       setAnalyzingAll(false);
     }
   };
 
-  const filteredPackages = data?.packages.filter((pkg) => {
-    if (filter === 'breaking') return pkg.isBreaking;
-    if (filter === 'safe') return !pkg.isBreaking;
-    return true;
-  }) || [];
+  const filteredPackages =
+    data?.packages.filter((pkg) => {
+      if (filter === "breaking") return pkg.isBreaking;
+      if (filter === "safe") return !pkg.isBreaking;
+      return true;
+    }) || [];
 
   const breakingCount = data?.packages.filter((p) => p.isBreaking).length || 0;
   const safeCount = data?.packages.filter((p) => !p.isBreaking).length || 0;
@@ -368,15 +417,21 @@ export default function DependencyUpdatesSection() {
           {/* Summary Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-white">{data?.totalOutdated || 0}</div>
+              <div className="text-3xl font-bold text-white">
+                {data?.totalOutdated || 0}
+              </div>
               <div className="text-sm text-gray-400">Total Outdated</div>
             </div>
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-red-400">{breakingCount}</div>
+              <div className="text-3xl font-bold text-red-400">
+                {breakingCount}
+              </div>
               <div className="text-sm text-red-400">Breaking Changes</div>
             </div>
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-green-400">{safeCount}</div>
+              <div className="text-3xl font-bold text-green-400">
+                {safeCount}
+              </div>
               <div className="text-sm text-green-400">Safe Updates</div>
             </div>
           </div>
@@ -387,7 +442,8 @@ export default function DependencyUpdatesSection() {
               <div className="flex items-center gap-2 text-yellow-400">
                 <AlertTriangle className="h-4 w-4" />
                 <span className="text-sm">
-                  AI analysis is not available. Configure OpenAI in Platform Settings to enable.
+                  AI analysis is not available. Configure OpenAI in Platform
+                  Settings to enable.
                 </span>
               </div>
             </div>
@@ -406,26 +462,26 @@ export default function DependencyUpdatesSection() {
       {data && data.packages.length > 0 && (
         <div className="flex gap-2">
           <Button
-            variant={filter === 'all' ? 'default' : 'outline'}
+            variant={filter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter('all')}
-            className={filter === 'all' ? 'bg-blue-600' : 'border-gray-600'}
+            onClick={() => setFilter("all")}
+            className={filter === "all" ? "bg-blue-600" : "border-gray-600"}
           >
             All ({data.totalOutdated})
           </Button>
           <Button
-            variant={filter === 'breaking' ? 'default' : 'outline'}
+            variant={filter === "breaking" ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter('breaking')}
-            className={filter === 'breaking' ? 'bg-red-600' : 'border-gray-600'}
+            onClick={() => setFilter("breaking")}
+            className={filter === "breaking" ? "bg-red-600" : "border-gray-600"}
           >
             Breaking ({breakingCount})
           </Button>
           <Button
-            variant={filter === 'safe' ? 'default' : 'outline'}
+            variant={filter === "safe" ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter('safe')}
-            className={filter === 'safe' ? 'bg-green-600' : 'border-gray-600'}
+            onClick={() => setFilter("safe")}
+            className={filter === "safe" ? "bg-green-600" : "border-gray-600"}
           >
             Safe ({safeCount})
           </Button>
@@ -449,8 +505,12 @@ export default function DependencyUpdatesSection() {
           <CardContent className="py-8">
             <div className="flex flex-col items-center justify-center gap-2 text-green-400">
               <CheckCircle2 className="h-12 w-12" />
-              <h3 className="text-lg font-semibold">All packages are up to date!</h3>
-              <p className="text-sm text-green-400/70">No outdated dependencies found.</p>
+              <h3 className="text-lg font-semibold">
+                All packages are up to date!
+              </h3>
+              <p className="text-sm text-green-400/70">
+                No outdated dependencies found.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -464,4 +524,3 @@ export default function DependencyUpdatesSection() {
     </div>
   );
 }
-

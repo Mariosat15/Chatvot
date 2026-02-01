@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-  Users, 
-  Search, 
+import { useState, useEffect, useMemo } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Users,
+  Search,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -30,10 +30,10 @@ import {
   UserPlus,
   AlertTriangle,
   Crown,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import UserFullDetailPanel from './UserFullDetailPanel';
-import { CustomerAssignmentBadge } from './CustomerAssignmentBadge';
+} from "lucide-react";
+import { toast } from "sonner";
+import UserFullDetailPanel from "./UserFullDetailPanel";
+import { CustomerAssignmentBadge } from "./CustomerAssignmentBadge";
 import {
   Select,
   SelectContent,
@@ -45,12 +45,24 @@ import { Badge } from "@/components/ui/badge";
 
 // Valid user roles
 const USER_ROLES = [
-  { value: 'trader', label: 'Trader', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-  { value: 'affiliate', label: 'Affiliate', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  { value: 'gamemaster', label: 'Gamemaster', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  {
+    value: "trader",
+    label: "Trader",
+    color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  },
+  {
+    value: "affiliate",
+    label: "Affiliate",
+    color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  },
+  {
+    value: "gamemaster",
+    label: "Gamemaster",
+    color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  },
 ] as const;
 
-type UserRole = typeof USER_ROLES[number]['value'];
+type UserRole = (typeof USER_ROLES)[number]["value"];
 
 export interface Assignment {
   employeeId: string;
@@ -64,7 +76,7 @@ export interface Assignment {
 export interface GameMasterData {
   isGameMaster: boolean;
   subscriptionId?: string;
-  status?: 'active' | 'expired' | 'suspended' | 'cancelled';
+  status?: "active" | "expired" | "suspended" | "cancelled";
   packageName?: string;
   referralCode?: string;
   startDate?: string;
@@ -138,8 +150,16 @@ export interface UserData {
   phone?: string;
 }
 
-type SortField = 'name' | 'email' | 'balance' | 'netProfit' | 'createdAt' | 'competitions' | 'challenges' | 'online';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "name"
+  | "email"
+  | "balance"
+  | "netProfit"
+  | "createdAt"
+  | "competitions"
+  | "challenges"
+  | "online";
+type SortDirection = "asc" | "desc";
 
 interface UsersSectionProps {
   initialUserId?: string;
@@ -148,32 +168,38 @@ interface UsersSectionProps {
 export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const router = useRouter();
   const pathname = usePathname();
-  
+
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  
+
   // Sorting
-  const [sortField, setSortField] = useState<SortField>('createdAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
   // Filters
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [emailVerifiedFilter, setEmailVerifiedFilter] = useState<string>('all');
-  const [assignmentFilter, setAssignmentFilter] = useState<string>('all');
-  const [onlineFilter, setOnlineFilter] = useState<string>('all');
-  
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [emailVerifiedFilter, setEmailVerifiedFilter] = useState<string>("all");
+  const [assignmentFilter, setAssignmentFilter] = useState<string>("all");
+  const [onlineFilter, setOnlineFilter] = useState<string>("all");
+
   // Assignments data
-  const [assignments, setAssignments] = useState<Map<string, Assignment>>(new Map());
-  const [employees, setEmployees] = useState<{ _id: string; name: string; email: string }[]>([]);
-  
+  const [assignments, setAssignments] = useState<Map<string, Assignment>>(
+    new Map(),
+  );
+  const [employees, setEmployees] = useState<
+    { _id: string; name: string; email: string }[]
+  >([]);
+
   // Online status data
-  const [onlineStatus, setOnlineStatus] = useState<Map<string, { isOnline: boolean; lastSeen?: string }>>(new Map());
-  
+  const [onlineStatus, setOnlineStatus] = useState<
+    Map<string, { isOnline: boolean; lastSeen?: string }>
+  >(new Map());
+
   // Detail panel state
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
@@ -183,7 +209,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     fetchAssignments();
     fetchEmployees();
     fetchOnlineStatus();
-    
+
     // Refresh online status every 30 seconds
     const onlineInterval = setInterval(fetchOnlineStatus, 30000);
     return () => clearInterval(onlineInterval);
@@ -192,7 +218,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   // Handle initial user ID to open specific user
   useEffect(() => {
     if (initialUserId && users.length > 0 && !detailPanelOpen) {
-      const targetUser = users.find(u => u.id === initialUserId);
+      const targetUser = users.find((u) => u.id === initialUserId);
       if (targetUser) {
         setSelectedUser(targetUser);
         setDetailPanelOpen(true);
@@ -202,7 +228,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       }
     }
   }, [initialUserId, users]);
-  
+
   const fetchUserById = async (userId: string) => {
     try {
       const response = await fetch(`/api/users?userId=${userId}`);
@@ -214,24 +240,24 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
         }
       }
     } catch (error) {
-      console.error('Error fetching user by ID:', error);
+      console.error("Error fetching user by ID:", error);
     }
   };
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch("/api/users");
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users);
         toast.success(`Loaded ${data.total} users`);
       } else {
-        toast.error('Failed to fetch users');
+        toast.error("Failed to fetch users");
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Error loading users');
+      console.error("Error fetching users:", error);
+      toast.error("Error loading users");
     } finally {
       setLoading(false);
     }
@@ -239,7 +265,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
 
   const fetchAssignments = async () => {
     try {
-      const response = await fetch('/api/customer-assignments?limit=10000');
+      const response = await fetch("/api/customer-assignments?limit=10000");
       if (response.ok) {
         const data = await response.json();
         const assignmentMap = new Map<string, Assignment>();
@@ -255,44 +281,49 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
         setAssignments(assignmentMap);
       }
     } catch (error) {
-      console.error('Error fetching assignments:', error);
+      console.error("Error fetching assignments:", error);
     }
   };
 
   const fetchEmployees = async () => {
     try {
-      const response = await fetch('/api/employees');
+      const response = await fetch("/api/employees");
       if (response.ok) {
         const data = await response.json();
         setEmployees(data.employees || []);
       }
     } catch (error) {
-      console.error('Error fetching employees:', error);
+      console.error("Error fetching employees:", error);
     }
   };
 
   const fetchOnlineStatus = async () => {
     try {
-      const response = await fetch('/api/users/presence');
+      const response = await fetch("/api/users/presence");
       if (response.ok) {
         const data = await response.json();
-        const statusMap = new Map<string, { isOnline: boolean; lastSeen?: string }>();
-        (data.presences || []).forEach((p: { participantId: string; status: string; lastSeen?: string }) => {
-          statusMap.set(p.participantId, {
-            isOnline: p.status !== 'offline',
-            lastSeen: p.lastSeen,
-          });
-        });
+        const statusMap = new Map<
+          string,
+          { isOnline: boolean; lastSeen?: string }
+        >();
+        (data.presences || []).forEach(
+          (p: { participantId: string; status: string; lastSeen?: string }) => {
+            statusMap.set(p.participantId, {
+              isOnline: p.status !== "offline",
+              lastSeen: p.lastSeen,
+            });
+          },
+        );
         setOnlineStatus(statusMap);
       }
     } catch (error) {
-      console.error('Error fetching online status:', error);
+      console.error("Error fetching online status:", error);
     }
   };
 
   // Enrich users with assignment data and online status
   const enrichedUsers = useMemo(() => {
-    return users.map(user => {
+    return users.map((user) => {
       const presence = onlineStatus.get(user.id);
       return {
         ...user,
@@ -306,7 +337,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   // Filter and sort users
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...enrichedUsers];
-    
+
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -315,83 +346,97 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
           user.name.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
           user.id.toLowerCase().includes(query) ||
-          user.assignment?.employeeName?.toLowerCase().includes(query)
+          user.assignment?.employeeName?.toLowerCase().includes(query),
       );
     }
-    
+
     // Apply role filter
-    if (roleFilter !== 'all') {
+    if (roleFilter !== "all") {
       result = result.filter((user) => user.role === roleFilter);
     }
-    
+
     // Apply email verified filter
-    if (emailVerifiedFilter !== 'all') {
-      result = result.filter((user) => 
-        emailVerifiedFilter === 'verified' ? user.emailVerified : !user.emailVerified
+    if (emailVerifiedFilter !== "all") {
+      result = result.filter((user) =>
+        emailVerifiedFilter === "verified"
+          ? user.emailVerified
+          : !user.emailVerified,
       );
     }
-    
+
     // Apply assignment filter
-    if (assignmentFilter !== 'all') {
-      if (assignmentFilter === 'assigned') {
+    if (assignmentFilter !== "all") {
+      if (assignmentFilter === "assigned") {
         result = result.filter((user) => user.assignment !== null);
-      } else if (assignmentFilter === 'unassigned') {
+      } else if (assignmentFilter === "unassigned") {
         result = result.filter((user) => user.assignment === null);
       } else {
         // Filter by specific employee ID
-        result = result.filter((user) => user.assignment?.employeeId === assignmentFilter);
+        result = result.filter(
+          (user) => user.assignment?.employeeId === assignmentFilter,
+        );
       }
     }
-    
+
     // Apply online filter
-    if (onlineFilter !== 'all') {
-      result = result.filter((user) => 
-        onlineFilter === 'online' ? user.isOnline : !user.isOnline
+    if (onlineFilter !== "all") {
+      result = result.filter((user) =>
+        onlineFilter === "online" ? user.isOnline : !user.isOnline,
       );
     }
-    
+
     // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
+        case "name":
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'email':
+        case "email":
           comparison = a.email.localeCompare(b.email);
           break;
-        case 'balance':
+        case "balance":
           comparison = a.wallet.balance - b.wallet.balance;
           break;
-        case 'netProfit':
+        case "netProfit":
           comparison = a.wallet.netProfit - b.wallet.netProfit;
           break;
-        case 'createdAt':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "createdAt":
+          comparison =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           break;
-        case 'competitions':
+        case "competitions":
           comparison = a.competitions.total - b.competitions.total;
           break;
-        case 'challenges':
+        case "challenges":
           comparison = (a.challenges?.total || 0) - (b.challenges?.total || 0);
           break;
-        case 'online':
+        case "online":
           // Online users first when sorting descending
           comparison = (a.isOnline ? 1 : 0) - (b.isOnline ? 1 : 0);
           break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
-    
+
     // Sort unassigned first if enabled (can be controlled by settings)
     result.sort((a, b) => {
       if (!a.assignment && b.assignment) return -1;
       if (a.assignment && !b.assignment) return 1;
       return 0;
     });
-    
+
     return result;
-  }, [enrichedUsers, searchQuery, roleFilter, emailVerifiedFilter, assignmentFilter, onlineFilter, sortField, sortDirection]);
+  }, [
+    enrichedUsers,
+    searchQuery,
+    roleFilter,
+    emailVerifiedFilter,
+    assignmentFilter,
+    onlineFilter,
+    sortField,
+    sortDirection,
+  ]);
 
   // Paginated users
   const paginatedUsers = useMemo(() => {
@@ -404,18 +449,18 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -424,27 +469,38 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     setDetailPanelOpen(true);
   };
 
-  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+  const SortableHeader = ({
+    field,
+    children,
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+  }) => (
     <button
       onClick={() => handleSort(field)}
       className="flex items-center gap-1 hover:text-cyan-400 transition-colors group"
     >
       {children}
-      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-cyan-400' : 'text-gray-600 group-hover:text-gray-400'}`} />
+      <ArrowUpDown
+        className={`h-3 w-3 ${sortField === field ? "text-cyan-400" : "text-gray-600 group-hover:text-gray-400"}`}
+      />
     </button>
   );
 
   // Stats calculations
-  const stats = useMemo(() => ({
-    totalUsers: users.length,
-    totalTraders: users.filter(u => u.role === 'trader').length,
-    verifiedEmails: users.filter(u => u.emailVerified).length,
-    totalBalance: users.reduce((sum, u) => sum + u.wallet.balance, 0),
-    assignedUsers: assignments.size,
-    unassignedUsers: users.length - assignments.size,
-    onlineUsers: enrichedUsers.filter(u => u.isOnline).length,
-    offlineUsers: enrichedUsers.filter(u => !u.isOnline).length,
-  }), [users, assignments, enrichedUsers]);
+  const stats = useMemo(
+    () => ({
+      totalUsers: users.length,
+      totalTraders: users.filter((u) => u.role === "trader").length,
+      verifiedEmails: users.filter((u) => u.emailVerified).length,
+      totalBalance: users.reduce((sum, u) => sum + u.wallet.balance, 0),
+      assignedUsers: assignments.size,
+      unassignedUsers: users.length - assignments.size,
+      onlineUsers: enrichedUsers.filter((u) => u.isOnline).length,
+      offlineUsers: enrichedUsers.filter((u) => !u.isOnline).length,
+    }),
+    [users, assignments, enrichedUsers],
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -460,7 +516,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white">User Management</h2>
+                <h2 className="text-2xl font-bold text-white">
+                  User Management
+                </h2>
                 <p className="text-cyan-100 text-sm flex items-center gap-2 flex-wrap">
                   <span>{stats.totalUsers} users</span>
                   <span>•</span>
@@ -477,7 +535,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={() => {/* Export functionality */}}
+                onClick={() => {
+                  /* Export functionality */
+                }}
                 variant="outline"
                 className="bg-white/10 hover:bg-white/20 text-white border-white/30"
               >
@@ -489,7 +549,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                 disabled={loading}
                 className="bg-white hover:bg-gray-100 text-cyan-600 font-bold shadow-xl h-10 px-5 transition-all hover:scale-105"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             </div>
@@ -515,11 +577,17 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               />
             </div>
           </div>
-          
+
           {/* Role Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400" />
-            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setCurrentPage(1); }}>
+            <Select
+              value={roleFilter}
+              onValueChange={(v) => {
+                setRoleFilter(v);
+                setCurrentPage(1);
+              }}
+            >
               <SelectTrigger className="w-[140px] bg-gray-900 border-gray-700">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
@@ -531,9 +599,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               </SelectContent>
             </Select>
           </div>
-          
+
           {/* Email Verified Filter */}
-          <Select value={emailVerifiedFilter} onValueChange={(v) => { setEmailVerifiedFilter(v); setCurrentPage(1); }}>
+          <Select
+            value={emailVerifiedFilter}
+            onValueChange={(v) => {
+              setEmailVerifiedFilter(v);
+              setCurrentPage(1);
+            }}
+          >
             <SelectTrigger className="w-[160px] bg-gray-900 border-gray-700">
               <SelectValue placeholder="Email Status" />
             </SelectTrigger>
@@ -543,9 +617,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               <SelectItem value="unverified">Unverified</SelectItem>
             </SelectContent>
           </Select>
-          
+
           {/* Assignment Filter */}
-          <Select value={assignmentFilter} onValueChange={(v) => { setAssignmentFilter(v); setCurrentPage(1); }}>
+          <Select
+            value={assignmentFilter}
+            onValueChange={(v) => {
+              setAssignmentFilter(v);
+              setCurrentPage(1);
+            }}
+          >
             <SelectTrigger className="w-[180px] bg-gray-900 border-gray-700">
               <UserCheck className="h-4 w-4 mr-2 text-gray-400" />
               <SelectValue placeholder="Assignment" />
@@ -578,9 +658,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               )}
             </SelectContent>
           </Select>
-          
+
           {/* Online Status Filter */}
-          <Select value={onlineFilter} onValueChange={(v) => { setOnlineFilter(v); setCurrentPage(1); }}>
+          <Select
+            value={onlineFilter}
+            onValueChange={(v) => {
+              setOnlineFilter(v);
+              setCurrentPage(1);
+            }}
+          >
             <SelectTrigger className="w-[140px] bg-gray-900 border-gray-700">
               <SelectValue placeholder="Online Status" />
             </SelectTrigger>
@@ -600,9 +686,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               </SelectItem>
             </SelectContent>
           </Select>
-          
+
           {/* Page Size */}
-          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setCurrentPage(1);
+            }}
+          >
             <SelectTrigger className="w-[100px] bg-gray-900 border-gray-700">
               <SelectValue />
             </SelectTrigger>
@@ -613,7 +705,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               <SelectItem value="100">100</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <span className="text-sm text-gray-400">
             Showing {paginatedUsers.length} of {filteredAndSortedUsers.length}
           </span>
@@ -630,7 +722,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
           <div className="flex flex-col items-center justify-center h-64">
             <Users className="h-12 w-12 text-gray-600 mb-4" />
             <p className="text-gray-400">
-              {searchQuery ? 'No users found matching your search' : 'No users found'}
+              {searchQuery
+                ? "No users found matching your search"
+                : "No users found"}
             </p>
           </div>
         ) : (
@@ -651,7 +745,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                     <SortableHeader field="balance">Balance</SortableHeader>
                   </th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <SortableHeader field="netProfit">Net Profit</SortableHeader>
+                    <SortableHeader field="netProfit">
+                      Net Profit
+                    </SortableHeader>
                   </th>
                   <th className="text-center p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <SortableHeader field="competitions">Comp.</SortableHeader>
@@ -672,65 +768,97 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               </thead>
               <tbody className="divide-y divide-gray-700/50">
                 {paginatedUsers.map((user) => {
-                  const roleConfig = USER_ROLES.find(r => r.value === user.role) || USER_ROLES[0];
-                  
+                  const roleConfig =
+                    USER_ROLES.find((r) => r.value === user.role) ||
+                    USER_ROLES[0];
+
                   return (
-                    <tr 
-                      key={user.id} 
+                    <tr
+                      key={user.id}
                       className="hover:bg-gray-700/30 transition-colors cursor-pointer"
                       onClick={() => openUserDetail(user)}
                     >
                       {/* User Info */}
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
-                            user.isAdmin 
-                              ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' 
-                              : 'bg-gradient-to-br from-cyan-500 to-cyan-600'
-                          }`}>
-                            {user.isAdmin ? <Shield className="h-5 w-5" /> : user.name[0]?.toUpperCase() || 'U'}
+                          <div
+                            className={`h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
+                              user.isAdmin
+                                ? "bg-gradient-to-br from-yellow-500 to-yellow-600"
+                                : "bg-gradient-to-br from-cyan-500 to-cyan-600"
+                            }`}
+                          >
+                            {user.isAdmin ? (
+                              <Shield className="h-5 w-5" />
+                            ) : (
+                              user.name[0]?.toUpperCase() || "U"
+                            )}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-gray-100 truncate">{user.name}</p>
-                              <Badge className={`${roleConfig.color} text-xs border`}>
+                              <p className="font-medium text-gray-100 truncate">
+                                {user.name}
+                              </p>
+                              <Badge
+                                className={`${roleConfig.color} text-xs border`}
+                              >
                                 {roleConfig.label}
                               </Badge>
                               {user.gameMaster?.isGameMaster && (
-                                <Badge className={`text-xs border flex items-center gap-1 ${
-                                  user.gameMaster.status === 'active' && !user.gameMaster.isPaused
-                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
-                                    : user.gameMaster.isPaused
-                                    ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                                    : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                                }`}>
+                                <Badge
+                                  className={`text-xs border flex items-center gap-1 ${
+                                    user.gameMaster.status === "active" &&
+                                    !user.gameMaster.isPaused
+                                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                                      : user.gameMaster.isPaused
+                                        ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                                        : "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                                  }`}
+                                >
                                   <Crown className="h-3 w-3" />
-                                  GM {user.gameMaster.status === 'active' && !user.gameMaster.isPaused ? '' : `(${user.gameMaster.isPaused ? 'paused' : user.gameMaster.status})`}
+                                  GM{" "}
+                                  {user.gameMaster.status === "active" &&
+                                  !user.gameMaster.isPaused
+                                    ? ""
+                                    : `(${user.gameMaster.isPaused ? "paused" : user.gameMaster.status})`}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {user.email}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      
+
                       {/* Online Status */}
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center">
                           {user.isOnline ? (
                             <div className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></span>
-                              <span className="text-xs text-green-400 font-medium">Online</span>
+                              <span className="text-xs text-green-400 font-medium">
+                                Online
+                              </span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5" title={user.lastSeen ? `Last seen: ${new Date(user.lastSeen).toLocaleString()}` : 'Never seen'}>
+                            <div
+                              className="flex items-center gap-1.5"
+                              title={
+                                user.lastSeen
+                                  ? `Last seen: ${new Date(user.lastSeen).toLocaleString()}`
+                                  : "Never seen"
+                              }
+                            >
                               <span className="w-2.5 h-2.5 bg-gray-500 rounded-full"></span>
-                              <span className="text-xs text-gray-500 font-medium">Offline</span>
+                              <span className="text-xs text-gray-500 font-medium">
+                                Offline
+                              </span>
                             </div>
                           )}
                         </div>
                       </td>
-                      
+
                       {/* Email Status */}
                       <td className="p-4">
                         <div className="flex items-center gap-2">
@@ -747,7 +875,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                           )}
                         </div>
                       </td>
-                      
+
                       {/* Balance */}
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -757,60 +885,75 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                           </span>
                         </div>
                       </td>
-                      
+
                       {/* Net Profit */}
                       <td className="p-4 text-right">
-                        <div className={`flex items-center justify-end gap-1 ${
-                          user.wallet.netProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
+                        <div
+                          className={`flex items-center justify-end gap-1 ${
+                            user.wallet.netProfit >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
                           {user.wallet.netProfit >= 0 ? (
                             <TrendingUp className="h-4 w-4" />
                           ) : (
                             <TrendingDown className="h-4 w-4" />
                           )}
                           <span className="font-mono font-semibold">
-                            {user.wallet.netProfit >= 0 ? '+' : ''}{user.wallet.netProfit.toFixed(2)}
+                            {user.wallet.netProfit >= 0 ? "+" : ""}
+                            {user.wallet.netProfit.toFixed(2)}
                           </span>
                         </div>
                       </td>
-                      
+
                       {/* Competitions */}
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Trophy className="h-4 w-4 text-blue-400" />
-                          <span className="text-gray-300">{user.competitions.total}</span>
+                          <span className="text-gray-300">
+                            {user.competitions.total}
+                          </span>
                           {user.competitions.active > 0 && (
-                            <span className="text-xs text-green-400">({user.competitions.active})</span>
+                            <span className="text-xs text-green-400">
+                              ({user.competitions.active})
+                            </span>
                           )}
                         </div>
                       </td>
-                      
+
                       {/* Challenges */}
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Swords className="h-4 w-4 text-orange-400" />
-                          <span className="text-gray-300">{user.challenges?.total || 0}</span>
+                          <span className="text-gray-300">
+                            {user.challenges?.total || 0}
+                          </span>
                           <span className="text-xs text-gray-500">
-                            ({user.challenges?.won || 0}W/{user.challenges?.lost || 0}L)
+                            ({user.challenges?.won || 0}W/
+                            {user.challenges?.lost || 0}L)
                           </span>
                         </div>
                       </td>
-                      
+
                       {/* Assignment */}
                       <td className="p-4">
-                        <CustomerAssignmentBadge 
-                          assignment={user.assignment} 
+                        <CustomerAssignmentBadge
+                          assignment={user.assignment}
                           compact={true}
                         />
                       </td>
-                      
+
                       {/* Joined Date */}
                       <td className="p-4 text-gray-400 text-sm">
                         {formatDate(user.createdAt)}
                       </td>
-                      
+
                       {/* Actions */}
-                      <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="p-4 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           size="sm"
                           onClick={() => openUserDetail(user)}
@@ -848,13 +991,13 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="bg-gray-800 border-gray-700 hover:bg-gray-700"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            
+
             {/* Page numbers */}
             <div className="flex gap-1 mx-2">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -868,16 +1011,17 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <Button
                     key={pageNum}
                     variant={currentPage === pageNum ? "default" : "outline"}
                     size="sm"
                     onClick={() => setCurrentPage(pageNum)}
-                    className={currentPage === pageNum 
-                      ? "bg-cyan-500 text-white" 
-                      : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+                    className={
+                      currentPage === pageNum
+                        ? "bg-cyan-500 text-white"
+                        : "bg-gray-800 border-gray-700 hover:bg-gray-700"
                     }
                   >
                     {pageNum}
@@ -885,11 +1029,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                 );
               })}
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="bg-gray-800 border-gray-700 hover:bg-gray-700"
             >

@@ -1,28 +1,34 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -30,17 +36,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { 
-  Users, 
-  UserPlus, 
-  Shield, 
-  Mail, 
-  Key, 
-  Eye, 
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import {
+  Users,
+  UserPlus,
+  Shield,
+  Mail,
+  Key,
+  Eye,
   EyeOff,
   Trash2,
   Edit,
@@ -63,8 +69,8 @@ import {
   LogOut,
   Lock,
   Unlock,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -75,7 +81,7 @@ interface Employee {
   allowedSections?: string[];
   isSuperAdmin: boolean;
   isOnline: boolean;
-  status?: 'active' | 'disabled';
+  status?: "active" | "disabled";
   lastLogin?: string;
   lastActivity?: string;
   createdAt: string;
@@ -109,102 +115,139 @@ interface EmailTemplate {
 
 const SECTION_LABELS: Record<string, string> = {
   // Dashboard
-  'overview': 'Overview',
+  overview: "Overview",
   // Content
-  'hero-page': 'Hero Page',
-  'marketplace': 'Marketplace',
+  "hero-page": "Hero Page",
+  marketplace: "Marketplace",
   // Trading
-  'competitions': 'Competitions',
-  'challenges': '1v1 Challenges',
-  'trading-history': 'Trading History',
-  'analytics': 'Analytics',
-  'market': 'Market Hours',
-  'symbols': 'Trading Symbols',
-  'market-data': 'Market Data',
+  competitions: "Competitions",
+  challenges: "1v1 Challenges",
+  "trading-history": "Trading History",
+  analytics: "Analytics",
+  market: "Market Hours",
+  symbols: "Trading Symbols",
+  "market-data": "Market Data",
   // User Management
-  'users': 'Users',
-  'badges': 'Badges & XP',
-  'customer-assignment': 'Customer Assignment',
+  users: "Users",
+  badges: "Badges & XP",
+  "customer-assignment": "Customer Assignment",
   // Finance
-  'financial': 'Financial Dashboard',
-  'payments': 'Pending Payments',
-  'failed-deposits': 'Failed Deposits',
-  'withdrawals': 'Withdrawal Settings',
-  'pending-withdrawals': 'Pending Withdrawals',
+  financial: "Financial Dashboard",
+  payments: "Pending Payments",
+  "failed-deposits": "Failed Deposits",
+  withdrawals: "Withdrawal Settings",
+  "pending-withdrawals": "Pending Withdrawals",
   // Security
-  'kyc-settings': 'KYC Settings',
-  'kyc-history': 'KYC History',
-  'fraud': 'Fraud Detection',
+  "kyc-settings": "KYC Settings",
+  "kyc-history": "KYC History",
+  fraud: "Fraud Detection",
   // Operations
-  'price-health': 'Price Feed Health',
-  'incidents': 'Incident Management',
+  "price-health": "Price Feed Health",
+  incidents: "Incident Management",
   // Messaging
-  'messaging': 'Support Center',
-  'messaging-settings': 'Messaging Settings',
+  messaging: "Support Center",
+  "messaging-settings": "Messaging Settings",
   // Help
-  'wiki': 'Documentation',
+  wiki: "Documentation",
   // Game Master
-  'gamemaster-dashboard': 'GM Dashboard',
-  'gamemaster-management': 'Manage Game Masters',
+  "gamemaster-dashboard": "GM Dashboard",
+  "gamemaster-management": "Manage Game Masters",
   // AI & Automation
-  'ai-agent': 'AI Agent',
-  'ai-knowledge': 'AI Database',
+  "ai-agent": "AI Agent",
+  "ai-knowledge": "AI Database",
   // Settings
-  'settings': 'Settings',
-  'credentials': 'Credentials',
-  'environment': 'Environment',
-  'branding': 'Branding',
-  'company': 'Company',
-  'invoices': 'Invoices',
-  'email-templates': 'Email Templates',
-  'notifications': 'Notifications',
-  'trading-risk': 'Trading Risk',
-  'currency': 'Currency',
-  'fees': 'Fees',
-  'payment-providers': 'Payment Providers',
-  'database': 'Database',
-  'audit-logs': 'Audit Logs',
+  settings: "Settings",
+  credentials: "Credentials",
+  environment: "Environment",
+  branding: "Branding",
+  company: "Company",
+  invoices: "Invoices",
+  "email-templates": "Email Templates",
+  notifications: "Notifications",
+  "trading-risk": "Trading Risk",
+  currency: "Currency",
+  fees: "Fees",
+  "payment-providers": "Payment Providers",
+  database: "Database",
+  "audit-logs": "Audit Logs",
   // Dev Zone
-  'dev-zone-menu': 'Dev Zone',
-  'server-monitor': 'Server Monitor',
-  'redis': 'Redis Cache',
-  'dev-settings': 'Test',
-  'performance-simulator': 'Performance Simulator',
-  'image-optimizer': 'Image Optimizer',
-  'dependency-updates': 'Dependency Updates',
+  "dev-zone-menu": "Dev Zone",
+  "server-monitor": "Server Monitor",
+  redis: "Redis Cache",
+  "dev-settings": "Test",
+  "performance-simulator": "Performance Simulator",
+  "image-optimizer": "Image Optimizer",
+  "dependency-updates": "Dependency Updates",
   // Admin
-  'employees': 'Employees',
+  employees: "Employees",
   // My Account
-  'profile': 'My Profile',
+  profile: "My Profile",
 };
 
 const SECTION_GROUPS = {
-  'Dashboard': ['overview'],
-  'Content': ['hero-page', 'marketplace'],
-  'Trading': ['competitions', 'challenges', 'trading-history', 'analytics', 'market', 'symbols', 'market-data'],
-  'User Management': ['users', 'badges', 'customer-assignment'],
-  'Finance': ['financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals'],
-  'Security': ['kyc-settings', 'kyc-history', 'fraud'],
-  'Operations': ['price-health', 'incidents'],
-  'Messaging': ['messaging', 'messaging-settings'],
-  'Help': ['wiki'],
-  'Game Master': ['gamemaster-dashboard', 'gamemaster-management'],
-  'AI & Automation': ['ai-agent', 'ai-knowledge'],
-  'Settings': ['settings', 'credentials', 'environment', 'branding', 'company', 'invoices', 'email-templates', 'notifications', 'trading-risk', 'currency', 'fees', 'payment-providers', 'database', 'audit-logs'],
-  'Dev Zone': ['dev-zone-menu', 'server-monitor', 'redis', 'dev-settings', 'performance-simulator', 'image-optimizer', 'dependency-updates'],
-  'Admin': ['employees'],
-  'My Account': ['profile'],
+  Dashboard: ["overview"],
+  Content: ["hero-page", "marketplace"],
+  Trading: [
+    "competitions",
+    "challenges",
+    "trading-history",
+    "analytics",
+    "market",
+    "symbols",
+    "market-data",
+  ],
+  "User Management": ["users", "badges", "customer-assignment"],
+  Finance: [
+    "financial",
+    "payments",
+    "failed-deposits",
+    "withdrawals",
+    "pending-withdrawals",
+  ],
+  Security: ["kyc-settings", "kyc-history", "fraud"],
+  Operations: ["price-health", "incidents"],
+  Messaging: ["messaging", "messaging-settings"],
+  Help: ["wiki"],
+  "Game Master": ["gamemaster-dashboard", "gamemaster-management"],
+  "AI & Automation": ["ai-agent", "ai-knowledge"],
+  Settings: [
+    "settings",
+    "credentials",
+    "environment",
+    "branding",
+    "company",
+    "invoices",
+    "email-templates",
+    "notifications",
+    "trading-risk",
+    "currency",
+    "fees",
+    "payment-providers",
+    "database",
+    "audit-logs",
+  ],
+  "Dev Zone": [
+    "dev-zone-menu",
+    "server-monitor",
+    "redis",
+    "dev-settings",
+    "performance-simulator",
+    "image-optimizer",
+    "dependency-updates",
+  ],
+  Admin: ["employees"],
+  "My Account": ["profile"],
 };
 
 const ROLE_ICONS: Record<string, React.ReactNode> = {
-  'Super Admin': <Crown className="h-4 w-4 text-yellow-400" />,
-  'Full Admin': <Shield className="h-4 w-4 text-purple-400" />,
-  'Backoffice': <Briefcase className="h-4 w-4 text-blue-400" />,
-  'Financial Officer': <DollarSign className="h-4 w-4 text-emerald-400" />,
-  'Compliance Officer': <Scale className="h-4 w-4 text-orange-400" />,
-  'Support Agent': <HeadphonesIcon className="h-4 w-4 text-cyan-400" />,
-  'Content Manager': <FileText className="h-4 w-4 text-pink-400" />,
-  'Custom': <User className="h-4 w-4 text-gray-400" />,
+  "Super Admin": <Crown className="h-4 w-4 text-yellow-400" />,
+  "Full Admin": <Shield className="h-4 w-4 text-purple-400" />,
+  Backoffice: <Briefcase className="h-4 w-4 text-blue-400" />,
+  "Financial Officer": <DollarSign className="h-4 w-4 text-emerald-400" />,
+  "Compliance Officer": <Scale className="h-4 w-4 text-orange-400" />,
+  "Support Agent": <HeadphonesIcon className="h-4 w-4 text-cyan-400" />,
+  "Content Manager": <FileText className="h-4 w-4 text-pink-400" />,
+  Custom: <User className="h-4 w-4 text-gray-400" />,
 };
 
 export default function EmployeesSection() {
@@ -213,7 +256,7 @@ export default function EmployeesSection() {
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [availableSections, setAvailableSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('employees');
+  const [activeTab, setActiveTab] = useState("employees");
   const [accessError, setAccessError] = useState<string | null>(null);
   const [needsUpgrade, setNeedsUpgrade] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
@@ -221,49 +264,55 @@ export default function EmployeesSection() {
   // Create employee dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
-    name: '',
-    email: '',
-    roleTemplateId: '',
+    name: "",
+    email: "",
+    roleTemplateId: "",
     customSections: [] as string[],
-    password: '',
+    password: "",
     autoGeneratePassword: true,
     sendEmail: true,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [creating, setCreating] = useState(false);
 
   // Edit employee dialog
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editForm, setEditForm] = useState({
-    name: '',
-    email: '',
-    roleTemplateId: '',
+    name: "",
+    email: "",
+    roleTemplateId: "",
     customSections: [] as string[],
   });
 
   // Delete confirmation
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(
+    null,
+  );
 
   // Reset password dialog
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
-  const [resetPasswordEmployee, setResetPasswordEmployee] = useState<Employee | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [resetPasswordEmployee, setResetPasswordEmployee] =
+    useState<Employee | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   // Role template dialog
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<RoleTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<RoleTemplate | null>(
+    null,
+  );
   const [templateForm, setTemplateForm] = useState({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
     allowedSections: [] as string[],
   });
 
   // Email template dialog
   const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false);
-  const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null);
+  const [editingEmailTemplate, setEditingEmailTemplate] =
+    useState<EmailTemplate | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -273,33 +322,33 @@ export default function EmployeesSection() {
     try {
       setLoading(true);
       setAccessError(null);
-      
+
       // First check super admin status
-      const statusResponse = await fetch('/api/employees/upgrade-super-admin');
+      const statusResponse = await fetch("/api/employees/upgrade-super-admin");
       const statusData = await statusResponse.json();
-      
+
       if (statusData.needsUpgrade) {
         setNeedsUpgrade(true);
         setLoading(false);
         return;
       }
-      
+
       if (!statusData.currentAdmin?.isSuperAdmin) {
-        setAccessError('Only super admins can access employee management.');
+        setAccessError("Only super admins can access employee management.");
         setLoading(false);
         return;
       }
-      
+
       // Initialize templates first
-      await fetch('/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'init_templates' }),
+      await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "init_templates" }),
       });
 
-      const response = await fetch('/api/employees');
+      const response = await fetch("/api/employees");
       const data = await response.json();
-      
+
       if (data.success) {
         setEmployees(data.employees || []);
         setRoleTemplates(data.roleTemplates || []);
@@ -309,8 +358,8 @@ export default function EmployeesSection() {
         setAccessError(data.error);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load employees');
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load employees");
     } finally {
       setLoading(false);
     }
@@ -319,22 +368,22 @@ export default function EmployeesSection() {
   const handleUpgradeToSuperAdmin = async () => {
     try {
       setUpgrading(true);
-      const response = await fetch('/api/employees/upgrade-super-admin', {
-        method: 'POST',
+      const response = await fetch("/api/employees/upgrade-super-admin", {
+        method: "POST",
       });
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success(data.message);
         setNeedsUpgrade(false);
         // Reload the page to get fresh session
         window.location.reload();
       } else {
-        toast.error(data.error || 'Failed to upgrade');
+        toast.error(data.error || "Failed to upgrade");
       }
     } catch (error) {
-      console.error('Error upgrading:', error);
-      toast.error('Failed to upgrade to super admin');
+      console.error("Error upgrading:", error);
+      toast.error("Failed to upgrade to super admin");
     } finally {
       setUpgrading(false);
     }
@@ -342,52 +391,60 @@ export default function EmployeesSection() {
 
   const handleCreateEmployee = async () => {
     if (!newEmployee.name || !newEmployee.email) {
-      toast.error('Name and email are required');
+      toast.error("Name and email are required");
       return;
     }
 
     try {
       setCreating(true);
-      const response = await fetch('/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'create',
+          action: "create",
           name: newEmployee.name,
           email: newEmployee.email,
           roleTemplateId: newEmployee.roleTemplateId || undefined,
-          customSections: !newEmployee.roleTemplateId ? newEmployee.customSections : undefined,
-          password: newEmployee.autoGeneratePassword ? undefined : newEmployee.password,
+          customSections: !newEmployee.roleTemplateId
+            ? newEmployee.customSections
+            : undefined,
+          password: newEmployee.autoGeneratePassword
+            ? undefined
+            : newEmployee.password,
           sendEmail: newEmployee.sendEmail,
         }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success(data.emailSent ? 'Employee created and credentials sent!' : 'Employee created successfully');
-        
+        toast.success(
+          data.emailSent
+            ? "Employee created and credentials sent!"
+            : "Employee created successfully",
+        );
+
         if (data.generatedPassword) {
           setGeneratedPassword(data.generatedPassword);
         }
-        
+
         setShowCreateDialog(false);
         setNewEmployee({
-          name: '',
-          email: '',
-          roleTemplateId: '',
+          name: "",
+          email: "",
+          roleTemplateId: "",
           customSections: [],
-          password: '',
+          password: "",
           autoGeneratePassword: true,
           sendEmail: true,
         });
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to create employee');
+        toast.error(data.error || "Failed to create employee");
       }
     } catch (error) {
-      console.error('Error creating employee:', error);
-      toast.error('Failed to create employee');
+      console.error("Error creating employee:", error);
+      toast.error("Failed to create employee");
     } finally {
       setCreating(false);
     }
@@ -398,29 +455,31 @@ export default function EmployeesSection() {
 
     try {
       const response = await fetch(`/api/employees/${editingEmployee.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editForm.name,
           email: editForm.email,
           roleTemplateId: editForm.roleTemplateId || undefined,
-          customSections: !editForm.roleTemplateId ? editForm.customSections : undefined,
+          customSections: !editForm.roleTemplateId
+            ? editForm.customSections
+            : undefined,
         }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Employee updated successfully');
+        toast.success("Employee updated successfully");
         setShowEditDialog(false);
         setEditingEmployee(null);
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to update employee');
+        toast.error(data.error || "Failed to update employee");
       }
     } catch (error) {
-      console.error('Error updating employee:', error);
-      toast.error('Failed to update employee');
+      console.error("Error updating employee:", error);
+      toast.error("Failed to update employee");
     }
   };
 
@@ -429,22 +488,22 @@ export default function EmployeesSection() {
 
     try {
       const response = await fetch(`/api/employees/${deletingEmployee.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Employee deleted successfully');
+        toast.success("Employee deleted successfully");
         setShowDeleteDialog(false);
         setDeletingEmployee(null);
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to delete employee');
+        toast.error(data.error || "Failed to delete employee");
       }
     } catch (error) {
-      console.error('Error deleting employee:', error);
-      toast.error('Failed to delete employee');
+      console.error("Error deleting employee:", error);
+      toast.error("Failed to delete employee");
     }
   };
 
@@ -452,49 +511,54 @@ export default function EmployeesSection() {
     if (!resetPasswordEmployee || !newPassword) return;
 
     try {
-      const response = await fetch(`/api/employees/${resetPasswordEmployee.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'reset_password',
-          password: newPassword,
-        }),
-      });
+      const response = await fetch(
+        `/api/employees/${resetPasswordEmployee.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reset_password",
+            password: newPassword,
+          }),
+        },
+      );
 
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Password reset successfully');
+        toast.success("Password reset successfully");
         setShowResetPasswordDialog(false);
         setResetPasswordEmployee(null);
-        setNewPassword('');
+        setNewPassword("");
       } else {
-        toast.error(data.error || 'Failed to reset password');
+        toast.error(data.error || "Failed to reset password");
       }
     } catch (error) {
-      console.error('Error resetting password:', error);
-      toast.error('Failed to reset password');
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password");
     }
   };
 
   const handleSuspendToggle = async (employee: Employee) => {
-    const action = employee.status === 'disabled' ? 'unsuspend' : 'suspend';
-    const actionLabel = action === 'suspend' ? 'Suspend' : 'Unsuspend';
+    const action = employee.status === "disabled" ? "unsuspend" : "suspend";
+    const actionLabel = action === "suspend" ? "Suspend" : "Unsuspend";
 
     try {
       const response = await fetch(`/api/employees/${employee.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success(`Employee ${actionLabel.toLowerCase()}ed successfully`);
         fetchData();
       } else {
-        toast.error(data.error || `Failed to ${actionLabel.toLowerCase()} employee`);
+        toast.error(
+          data.error || `Failed to ${actionLabel.toLowerCase()} employee`,
+        );
       }
     } catch (error) {
       console.error(`Error ${actionLabel.toLowerCase()}ing employee:`, error);
@@ -505,93 +569,97 @@ export default function EmployeesSection() {
   const handleToggleLockout = async (employee: Employee) => {
     try {
       const response = await fetch(`/api/employees/${employee.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toggle_lockout' }),
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_lockout" }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         if (data.isLockedOut) {
-          toast.success(`${employee.name} has been locked out and cannot log in`);
+          toast.success(
+            `${employee.name} has been locked out and cannot log in`,
+          );
         } else {
           toast.success(`${employee.name} can now log in again`);
         }
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to toggle lockout');
+        toast.error(data.error || "Failed to toggle lockout");
       }
     } catch (error) {
-      console.error('Error toggling lockout:', error);
-      toast.error('Failed to toggle lockout');
+      console.error("Error toggling lockout:", error);
+      toast.error("Failed to toggle lockout");
     }
   };
 
   const handleSendCredentials = async (employee: Employee) => {
     try {
-      const response = await fetch('/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'send_credentials',
+          action: "send_credentials",
           employeeId: employee.id,
         }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         if (data.emailSent) {
-          toast.success('Credentials sent to ' + employee.email);
+          toast.success("Credentials sent to " + employee.email);
         } else {
           // Email failed but password was reset
-          toast.warning(data.message || 'Email could not be sent');
+          toast.warning(data.message || "Email could not be sent");
           if (data.generatedPassword) {
             setGeneratedPassword(data.generatedPassword);
           }
         }
       } else {
-        toast.error(data.error || 'Failed to send credentials');
+        toast.error(data.error || "Failed to send credentials");
       }
     } catch (error) {
-      console.error('Error sending credentials:', error);
-      toast.error('Failed to send credentials');
+      console.error("Error sending credentials:", error);
+      toast.error("Failed to send credentials");
     }
   };
 
   const handleSaveTemplate = async () => {
     if (!templateForm.name) {
-      toast.error('Template name is required');
+      toast.error("Template name is required");
       return;
     }
 
     try {
-      const method = editingTemplate ? 'PUT' : 'POST';
-      const body = editingTemplate 
+      const method = editingTemplate ? "PUT" : "POST";
+      const body = editingTemplate
         ? { ...templateForm, id: editingTemplate.id }
         : templateForm;
 
-      const response = await fetch('/api/employees/role-templates', {
+      const response = await fetch("/api/employees/role-templates", {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success(editingTemplate ? 'Template updated' : 'Template created');
+        toast.success(
+          editingTemplate ? "Template updated" : "Template created",
+        );
         setShowTemplateDialog(false);
         setEditingTemplate(null);
-        setTemplateForm({ name: '', description: '', allowedSections: [] });
+        setTemplateForm({ name: "", description: "", allowedSections: [] });
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to save template');
+        toast.error(data.error || "Failed to save template");
       }
     } catch (error) {
-      console.error('Error saving template:', error);
-      toast.error('Failed to save template');
+      console.error("Error saving template:", error);
+      toast.error("Failed to save template");
     }
   };
 
@@ -600,7 +668,7 @@ export default function EmployeesSection() {
     setEditForm({
       name: employee.name,
       email: employee.email,
-      roleTemplateId: employee.roleTemplateId || '',
+      roleTemplateId: employee.roleTemplateId || "",
       customSections: employee.allowedSections || [],
     });
     setShowEditDialog(true);
@@ -616,19 +684,19 @@ export default function EmployeesSection() {
       });
     } else {
       setEditingTemplate(null);
-      setTemplateForm({ name: '', description: '', allowedSections: [] });
+      setTemplateForm({ name: "", description: "", allowedSections: [] });
     }
     setShowTemplateDialog(true);
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Never';
+    if (!dateString) return "Never";
     return new Date(dateString).toLocaleString();
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
+    toast.success("Copied to clipboard");
   };
 
   if (loading) {
@@ -648,11 +716,12 @@ export default function EmployeesSection() {
             <Crown className="h-12 w-12 text-yellow-400 mx-auto mb-2" />
             <CardTitle className="text-white">Become Super Admin</CardTitle>
             <CardDescription className="text-gray-400">
-              No super admin exists yet. As the first admin, you can upgrade yourself to Super Admin to manage employees.
+              No super admin exists yet. As the first admin, you can upgrade
+              yourself to Super Admin to manage employees.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button 
+            <Button
               onClick={handleUpgradeToSuperAdmin}
               disabled={upgrading}
               className="bg-yellow-600 hover:bg-yellow-700"
@@ -710,7 +779,10 @@ export default function EmployeesSection() {
             Manage admin team members, roles, and permissions
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="bg-purple-600 hover:bg-purple-700">
+        <Button
+          onClick={() => setShowCreateDialog(true)}
+          className="bg-purple-600 hover:bg-purple-700"
+        >
           <UserPlus className="h-4 w-4 mr-2" />
           Add Employee
         </Button>
@@ -725,7 +797,9 @@ export default function EmployeesSection() {
                 <Users className="h-5 w-5 text-purple-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{employees.length}</p>
+                <p className="text-2xl font-bold text-white">
+                  {employees.length}
+                </p>
                 <p className="text-sm text-gray-400">Total Employees</p>
               </div>
             </div>
@@ -739,7 +813,7 @@ export default function EmployeesSection() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {employees.filter(e => e.isOnline).length}
+                  {employees.filter((e) => e.isOnline).length}
                 </p>
                 <p className="text-sm text-gray-400">Online Now</p>
               </div>
@@ -754,7 +828,7 @@ export default function EmployeesSection() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {employees.filter(e => e.isSuperAdmin).length}
+                  {employees.filter((e) => e.isSuperAdmin).length}
                 </p>
                 <p className="text-sm text-gray-400">Super Admins</p>
               </div>
@@ -768,7 +842,9 @@ export default function EmployeesSection() {
                 <Shield className="h-5 w-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{roleTemplates.length}</p>
+                <p className="text-2xl font-bold text-white">
+                  {roleTemplates.length}
+                </p>
                 <p className="text-sm text-gray-400">Role Templates</p>
               </div>
             </div>
@@ -777,17 +853,30 @@ export default function EmployeesSection() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList className="bg-gray-800/50 border border-gray-700">
-          <TabsTrigger value="employees" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger
+            value="employees"
+            className="data-[state=active]:bg-purple-600"
+          >
             <Users className="h-4 w-4 mr-2" />
             Employees
           </TabsTrigger>
-          <TabsTrigger value="roles" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger
+            value="roles"
+            className="data-[state=active]:bg-purple-600"
+          >
             <Shield className="h-4 w-4 mr-2" />
             Role Templates
           </TabsTrigger>
-          <TabsTrigger value="email-templates" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger
+            value="email-templates"
+            className="data-[state=active]:bg-purple-600"
+          >
             <Mail className="h-4 w-4 mr-2" />
             Email Templates
           </TabsTrigger>
@@ -805,7 +894,9 @@ export default function EmployeesSection() {
                     <TableHead className="text-gray-400">Status</TableHead>
                     <TableHead className="text-gray-400">Last Login</TableHead>
                     <TableHead className="text-gray-400">Sections</TableHead>
-                    <TableHead className="text-gray-400 text-right">Actions</TableHead>
+                    <TableHead className="text-gray-400 text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -813,10 +904,14 @@ export default function EmployeesSection() {
                     <TableRow key={employee.id} className="border-gray-700">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-full flex items-center justify-center",
-                            employee.isSuperAdmin ? "bg-yellow-500/20" : "bg-purple-500/20"
-                          )}>
+                          <div
+                            className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center",
+                              employee.isSuperAdmin
+                                ? "bg-yellow-500/20"
+                                : "bg-purple-500/20",
+                            )}
+                          >
                             {employee.isSuperAdmin ? (
                               <Crown className="h-5 w-5 text-yellow-400" />
                             ) : (
@@ -824,15 +919,23 @@ export default function EmployeesSection() {
                             )}
                           </div>
                           <div>
-                            <p className="font-medium text-white">{employee.name}</p>
-                            <p className="text-sm text-gray-400">{employee.email}</p>
+                            <p className="font-medium text-white">
+                              {employee.name}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              {employee.email}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {ROLE_ICONS[employee.role || 'Custom'] || <User className="h-4 w-4 text-gray-400" />}
-                          <span className="text-gray-300">{employee.role || 'Custom'}</span>
+                          {ROLE_ICONS[employee.role || "Custom"] || (
+                            <User className="h-4 w-4 text-gray-400" />
+                          )}
+                          <span className="text-gray-300">
+                            {employee.role || "Custom"}
+                          </span>
                           {employee.isSuperAdmin && (
                             <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
                               Super
@@ -844,7 +947,7 @@ export default function EmployeesSection() {
                         <div className="flex flex-col gap-1">
                           {/* Account Status */}
                           <div className="flex items-center gap-2">
-                            {employee.status === 'disabled' ? (
+                            {employee.status === "disabled" ? (
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
                                 <Ban className="h-3 w-3 mr-1" />
                                 Suspended
@@ -861,19 +964,29 @@ export default function EmployeesSection() {
                             {employee.isLockedOut ? (
                               <>
                                 <Lock className="h-3 w-3 text-red-400" />
-                                <span className="text-xs text-red-400">Locked Out</span>
+                                <span className="text-xs text-red-400">
+                                  Locked Out
+                                </span>
                               </>
                             ) : (
                               <>
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  employee.isOnline ? "bg-green-500" : "bg-gray-500"
-                                )} />
-                                <span className={cn(
-                                  "text-xs",
-                                  employee.isOnline ? "text-green-400" : "text-gray-500"
-                                )}>
-                                  {employee.isOnline ? 'Online' : 'Offline'}
+                                <div
+                                  className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    employee.isOnline
+                                      ? "bg-green-500"
+                                      : "bg-gray-500",
+                                  )}
+                                />
+                                <span
+                                  className={cn(
+                                    "text-xs",
+                                    employee.isOnline
+                                      ? "text-green-400"
+                                      : "text-gray-500",
+                                  )}
+                                >
+                                  {employee.isOnline ? "Online" : "Offline"}
                                 </span>
                               </>
                             )}
@@ -884,8 +997,14 @@ export default function EmployeesSection() {
                         {formatDate(employee.lastLogin)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="border-gray-600 text-gray-400">
-                          {employee.isSuperAdmin ? 'All' : (employee.allowedSections?.length || 0)} sections
+                        <Badge
+                          variant="outline"
+                          className="border-gray-600 text-gray-400"
+                        >
+                          {employee.isSuperAdmin
+                            ? "All"
+                            : employee.allowedSections?.length || 0}{" "}
+                          sections
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -920,9 +1039,13 @@ export default function EmployeesSection() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                               {/* Lockout Toggle */}
-                              <div 
+                              <div
                                 className="flex items-center gap-1.5 px-2"
-                                title={employee.isLockedOut ? "Employee is locked out - Click to allow login" : "Click to lock out employee"}
+                                title={
+                                  employee.isLockedOut
+                                    ? "Employee is locked out - Click to allow login"
+                                    : "Click to lock out employee"
+                                }
                               >
                                 {employee.isLockedOut ? (
                                   <Lock className="h-3.5 w-3.5 text-red-400" />
@@ -931,18 +1054,28 @@ export default function EmployeesSection() {
                                 )}
                                 <Switch
                                   checked={employee.isLockedOut || false}
-                                  onCheckedChange={() => handleToggleLockout(employee)}
+                                  onCheckedChange={() =>
+                                    handleToggleLockout(employee)
+                                  }
                                   className="data-[state=checked]:bg-red-600"
                                 />
                               </div>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={employee.status === 'disabled' ? "text-green-400 hover:text-green-300" : "text-orange-400 hover:text-orange-300"}
+                                className={
+                                  employee.status === "disabled"
+                                    ? "text-green-400 hover:text-green-300"
+                                    : "text-orange-400 hover:text-orange-300"
+                                }
                                 onClick={() => handleSuspendToggle(employee)}
-                                title={employee.status === 'disabled' ? 'Unsuspend employee' : 'Suspend employee'}
+                                title={
+                                  employee.status === "disabled"
+                                    ? "Unsuspend employee"
+                                    : "Suspend employee"
+                                }
                               >
-                                {employee.status === 'disabled' ? (
+                                {employee.status === "disabled" ? (
                                   <UserCheck className="h-4 w-4" />
                                 ) : (
                                   <Ban className="h-4 w-4" />
@@ -963,7 +1096,9 @@ export default function EmployeesSection() {
                             </>
                           )}
                           {employee.isSuperAdmin && (
-                            <span className="text-xs text-gray-500 italic">Protected</span>
+                            <span className="text-xs text-gray-500 italic">
+                              Protected
+                            </span>
                           )}
                         </div>
                       </TableCell>
@@ -971,8 +1106,12 @@ export default function EmployeesSection() {
                   ))}
                   {employees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-400">
-                        No employees yet. Click &quot;Add Employee&quot; to create one.
+                      <TableCell
+                        colSpan={6}
+                        className="text-center py-8 text-gray-400"
+                      >
+                        No employees yet. Click &quot;Add Employee&quot; to
+                        create one.
                       </TableCell>
                     </TableRow>
                   )}
@@ -986,18 +1125,26 @@ export default function EmployeesSection() {
         <TabsContent value="roles">
           <div className="space-y-4">
             <div className="flex justify-end">
-              <Button onClick={() => openTemplateDialog()} className="bg-purple-600 hover:bg-purple-700">
+              <Button
+                onClick={() => openTemplateDialog()}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
                 <Shield className="h-4 w-4 mr-2" />
                 Create Template
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {roleTemplates.map((template) => (
-                <Card key={template.id} className="bg-gray-800/50 border-gray-700">
+                <Card
+                  key={template.id}
+                  className="bg-gray-800/50 border-gray-700"
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg text-white flex items-center gap-2">
-                        {ROLE_ICONS[template.name] || <Shield className="h-5 w-5 text-purple-400" />}
+                        {ROLE_ICONS[template.name] || (
+                          <Shield className="h-5 w-5 text-purple-400" />
+                        )}
                         {template.name}
                       </CardTitle>
                       {template.isDefault && (
@@ -1017,17 +1164,22 @@ export default function EmployeesSection() {
                           Access to {template.allowedSections.length} sections
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          {template.allowedSections.slice(0, 5).map((section) => (
-                            <Badge 
-                              key={section} 
-                              variant="outline" 
+                          {template.allowedSections
+                            .slice(0, 5)
+                            .map((section) => (
+                              <Badge
+                                key={section}
+                                variant="outline"
+                                className="text-xs border-gray-600 text-gray-400"
+                              >
+                                {SECTION_LABELS[section] || section}
+                              </Badge>
+                            ))}
+                          {template.allowedSections.length > 5 && (
+                            <Badge
+                              variant="outline"
                               className="text-xs border-gray-600 text-gray-400"
                             >
-                              {SECTION_LABELS[section] || section}
-                            </Badge>
-                          ))}
-                          {template.allowedSections.length > 5 && (
-                            <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
                               +{template.allowedSections.length - 5} more
                             </Badge>
                           )}
@@ -1055,17 +1207,28 @@ export default function EmployeesSection() {
         <TabsContent value="email-templates">
           <div className="space-y-4">
             {emailTemplates.map((template) => (
-              <Card key={template.id} className="bg-gray-800/50 border-gray-700">
+              <Card
+                key={template.id}
+                className="bg-gray-800/50 border-gray-700"
+              >
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-lg text-white">{template.name}</CardTitle>
+                      <CardTitle className="text-lg text-white">
+                        {template.name}
+                      </CardTitle>
                       <CardDescription className="text-gray-400">
                         Template ID: {template.templateId}
                       </CardDescription>
                     </div>
-                    <Badge className={template.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
-                      {template.isActive ? 'Active' : 'Inactive'}
+                    <Badge
+                      className={
+                        template.isActive
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-gray-500/20 text-gray-400"
+                      }
+                    >
+                      {template.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -1076,10 +1239,16 @@ export default function EmployeesSection() {
                       <p className="text-white">{template.subject}</p>
                     </div>
                     <div>
-                      <Label className="text-gray-400">Available Variables</Label>
+                      <Label className="text-gray-400">
+                        Available Variables
+                      </Label>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {template.variables.map((v) => (
-                          <Badge key={v} variant="outline" className="text-xs border-purple-500/30 text-purple-400">
+                          <Badge
+                            key={v}
+                            variant="outline"
+                            className="text-xs border-purple-500/30 text-purple-400"
+                          >
                             {`{{${v}}}`}
                           </Badge>
                         ))}
@@ -1121,7 +1290,9 @@ export default function EmployeesSection() {
                 <Label className="text-gray-300">Name *</Label>
                 <Input
                   value={newEmployee.name}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewEmployee({ ...newEmployee, name: e.target.value })
+                  }
                   placeholder="John Doe"
                   className="bg-gray-800 border-gray-700 text-white"
                 />
@@ -1131,7 +1302,9 @@ export default function EmployeesSection() {
                 <Input
                   type="email"
                   value={newEmployee.email}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                  onChange={(e) =>
+                    setNewEmployee({ ...newEmployee, email: e.target.value })
+                  }
                   placeholder="john@company.com"
                   className="bg-gray-800 border-gray-700 text-white"
                 />
@@ -1142,7 +1315,12 @@ export default function EmployeesSection() {
               <Label className="text-gray-300">Role Template</Label>
               <Select
                 value={newEmployee.roleTemplateId || "custom"}
-                onValueChange={(value) => setNewEmployee({ ...newEmployee, roleTemplateId: value === "custom" ? "" : value })}
+                onValueChange={(value) =>
+                  setNewEmployee({
+                    ...newEmployee,
+                    roleTemplateId: value === "custom" ? "" : value,
+                  })
+                }
               >
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select a role template or use custom permissions" />
@@ -1151,7 +1329,8 @@ export default function EmployeesSection() {
                   <SelectItem value="custom">Custom Permissions</SelectItem>
                   {roleTemplates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
-                      {template.name} - {template.allowedSections.length} sections
+                      {template.name} - {template.allowedSections.length}{" "}
+                      sections
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1167,24 +1346,37 @@ export default function EmployeesSection() {
                       <p className="font-medium text-gray-300 mb-2">{group}</p>
                       <div className="grid grid-cols-2 gap-2">
                         {sections.map((section) => (
-                          <label key={section} className="flex items-center gap-2 cursor-pointer">
+                          <label
+                            key={section}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
                             <Checkbox
-                              checked={newEmployee.customSections.includes(section)}
+                              checked={newEmployee.customSections.includes(
+                                section,
+                              )}
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setNewEmployee({
                                     ...newEmployee,
-                                    customSections: [...newEmployee.customSections, section],
+                                    customSections: [
+                                      ...newEmployee.customSections,
+                                      section,
+                                    ],
                                   });
                                 } else {
                                   setNewEmployee({
                                     ...newEmployee,
-                                    customSections: newEmployee.customSections.filter((s) => s !== section),
+                                    customSections:
+                                      newEmployee.customSections.filter(
+                                        (s) => s !== section,
+                                      ),
                                   });
                                 }
                               }}
                             />
-                            <span className="text-sm text-gray-400">{SECTION_LABELS[section] || section}</span>
+                            <span className="text-sm text-gray-400">
+                              {SECTION_LABELS[section] || section}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -1199,11 +1391,17 @@ export default function EmployeesSection() {
                 <Checkbox
                   id="autoPassword"
                   checked={newEmployee.autoGeneratePassword}
-                  onCheckedChange={(checked) => 
-                    setNewEmployee({ ...newEmployee, autoGeneratePassword: checked as boolean })
+                  onCheckedChange={(checked) =>
+                    setNewEmployee({
+                      ...newEmployee,
+                      autoGeneratePassword: checked as boolean,
+                    })
                   }
                 />
-                <Label htmlFor="autoPassword" className="text-gray-300 cursor-pointer">
+                <Label
+                  htmlFor="autoPassword"
+                  className="text-gray-300 cursor-pointer"
+                >
                   Auto-generate password
                 </Label>
               </div>
@@ -1213,9 +1411,14 @@ export default function EmployeesSection() {
                   <Label className="text-gray-300">Password</Label>
                   <div className="relative">
                     <Input
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       value={newEmployee.password}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })}
+                      onChange={(e) =>
+                        setNewEmployee({
+                          ...newEmployee,
+                          password: e.target.value,
+                        })
+                      }
                       placeholder="Enter password (min 8 characters)"
                       className="bg-gray-800 border-gray-700 text-white pr-10"
                     />
@@ -1226,7 +1429,11 @@ export default function EmployeesSection() {
                       className="absolute right-1 top-1/2 -translate-y-1/2"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -1236,11 +1443,17 @@ export default function EmployeesSection() {
                 <Checkbox
                   id="sendEmail"
                   checked={newEmployee.sendEmail}
-                  onCheckedChange={(checked) => 
-                    setNewEmployee({ ...newEmployee, sendEmail: checked as boolean })
+                  onCheckedChange={(checked) =>
+                    setNewEmployee({
+                      ...newEmployee,
+                      sendEmail: checked as boolean,
+                    })
                   }
                 />
-                <Label htmlFor="sendEmail" className="text-gray-300 cursor-pointer">
+                <Label
+                  htmlFor="sendEmail"
+                  className="text-gray-300 cursor-pointer"
+                >
                   Send credentials via email
                 </Label>
               </div>
@@ -1250,8 +1463,8 @@ export default function EmployeesSection() {
             <Button variant="ghost" onClick={() => setShowCreateDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleCreateEmployee} 
+            <Button
+              onClick={handleCreateEmployee}
               disabled={creating}
               className="bg-purple-600 hover:bg-purple-700"
             >
@@ -1286,7 +1499,9 @@ export default function EmployeesSection() {
                 <Label className="text-gray-300">Name</Label>
                 <Input
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
                   className="bg-gray-800 border-gray-700 text-white"
                 />
               </div>
@@ -1295,7 +1510,9 @@ export default function EmployeesSection() {
                 <Input
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
                   className="bg-gray-800 border-gray-700 text-white"
                 />
               </div>
@@ -1305,7 +1522,12 @@ export default function EmployeesSection() {
               <Label className="text-gray-300">Role Template</Label>
               <Select
                 value={editForm.roleTemplateId || "custom"}
-                onValueChange={(value) => setEditForm({ ...editForm, roleTemplateId: value === "custom" ? "" : value })}
+                onValueChange={(value) =>
+                  setEditForm({
+                    ...editForm,
+                    roleTemplateId: value === "custom" ? "" : value,
+                  })
+                }
               >
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select a role template" />
@@ -1330,24 +1552,37 @@ export default function EmployeesSection() {
                       <p className="font-medium text-gray-300 mb-2">{group}</p>
                       <div className="grid grid-cols-2 gap-2">
                         {sections.map((section) => (
-                          <label key={section} className="flex items-center gap-2 cursor-pointer">
+                          <label
+                            key={section}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
                             <Checkbox
-                              checked={editForm.customSections.includes(section)}
+                              checked={editForm.customSections.includes(
+                                section,
+                              )}
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setEditForm({
                                     ...editForm,
-                                    customSections: [...editForm.customSections, section],
+                                    customSections: [
+                                      ...editForm.customSections,
+                                      section,
+                                    ],
                                   });
                                 } else {
                                   setEditForm({
                                     ...editForm,
-                                    customSections: editForm.customSections.filter((s) => s !== section),
+                                    customSections:
+                                      editForm.customSections.filter(
+                                        (s) => s !== section,
+                                      ),
                                   });
                                 }
                               }}
                             />
-                            <span className="text-sm text-gray-400">{SECTION_LABELS[section] || section}</span>
+                            <span className="text-sm text-gray-400">
+                              {SECTION_LABELS[section] || section}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -1361,7 +1596,10 @@ export default function EmployeesSection() {
             <Button variant="ghost" onClick={() => setShowEditDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateEmployee} className="bg-purple-600 hover:bg-purple-700">
+            <Button
+              onClick={handleUpdateEmployee}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
               Save Changes
             </Button>
           </DialogFooter>
@@ -1374,14 +1612,18 @@ export default function EmployeesSection() {
           <DialogHeader>
             <DialogTitle className="text-white">Delete Employee</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Are you sure you want to delete {deletingEmployee?.name}? This action cannot be undone.
+              Are you sure you want to delete {deletingEmployee?.name}? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleDeleteEmployee} className="bg-red-600 hover:bg-red-700">
+            <Button
+              onClick={handleDeleteEmployee}
+              className="bg-red-600 hover:bg-red-700"
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -1390,7 +1632,10 @@ export default function EmployeesSection() {
       </Dialog>
 
       {/* Reset Password Dialog */}
-      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+      <Dialog
+        open={showResetPasswordDialog}
+        onOpenChange={setShowResetPasswordDialog}
+      >
         <DialogContent className="bg-gray-900 border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-white">Reset Password</DialogTitle>
@@ -1403,7 +1648,7 @@ export default function EmployeesSection() {
               <Label className="text-gray-300">New Password</Label>
               <div className="relative">
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password (min 8 characters)"
@@ -1416,19 +1661,29 @@ export default function EmployeesSection() {
                   className="absolute right-1 top-1/2 -translate-y-1/2"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => {
-              setShowResetPasswordDialog(false);
-              setNewPassword('');
-            }}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowResetPasswordDialog(false);
+                setNewPassword("");
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleResetPassword} className="bg-purple-600 hover:bg-purple-700">
+            <Button
+              onClick={handleResetPassword}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
               <Key className="h-4 w-4 mr-2" />
               Reset Password
             </Button>
@@ -1441,7 +1696,7 @@ export default function EmployeesSection() {
         <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">
-              {editingTemplate ? 'Edit Role Template' : 'Create Role Template'}
+              {editingTemplate ? "Edit Role Template" : "Create Role Template"}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
               Define which sections this role can access.
@@ -1452,7 +1707,9 @@ export default function EmployeesSection() {
               <Label className="text-gray-300">Template Name</Label>
               <Input
                 value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, name: e.target.value })
+                }
                 placeholder="e.g., Marketing Team"
                 className="bg-gray-800 border-gray-700 text-white"
                 disabled={editingTemplate?.isDefault}
@@ -1462,7 +1719,12 @@ export default function EmployeesSection() {
               <Label className="text-gray-300">Description</Label>
               <Textarea
                 value={templateForm.description}
-                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({
+                    ...templateForm,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Brief description of this role..."
                 className="bg-gray-800 border-gray-700 text-white"
               />
@@ -1475,24 +1737,37 @@ export default function EmployeesSection() {
                     <p className="font-medium text-gray-300 mb-2">{group}</p>
                     <div className="grid grid-cols-2 gap-2">
                       {sections.map((section) => (
-                        <label key={section} className="flex items-center gap-2 cursor-pointer">
+                        <label
+                          key={section}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
                           <Checkbox
-                            checked={templateForm.allowedSections.includes(section)}
+                            checked={templateForm.allowedSections.includes(
+                              section,
+                            )}
                             onCheckedChange={(checked) => {
                               if (checked) {
                                 setTemplateForm({
                                   ...templateForm,
-                                  allowedSections: [...templateForm.allowedSections, section],
+                                  allowedSections: [
+                                    ...templateForm.allowedSections,
+                                    section,
+                                  ],
                                 });
                               } else {
                                 setTemplateForm({
                                   ...templateForm,
-                                  allowedSections: templateForm.allowedSections.filter((s) => s !== section),
+                                  allowedSections:
+                                    templateForm.allowedSections.filter(
+                                      (s) => s !== section,
+                                    ),
                                 });
                               }
                             }}
                           />
-                          <span className="text-sm text-gray-400">{SECTION_LABELS[section] || section}</span>
+                          <span className="text-sm text-gray-400">
+                            {SECTION_LABELS[section] || section}
+                          </span>
                         </label>
                       ))}
                     </div>
@@ -1502,12 +1777,18 @@ export default function EmployeesSection() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowTemplateDialog(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => setShowTemplateDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveTemplate} className="bg-purple-600 hover:bg-purple-700">
+            <Button
+              onClick={handleSaveTemplate}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
               <Shield className="h-4 w-4 mr-2" />
-              {editingTemplate ? 'Update Template' : 'Create Template'}
+              {editingTemplate ? "Update Template" : "Create Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1515,7 +1796,10 @@ export default function EmployeesSection() {
 
       {/* Generated Password Display */}
       {generatedPassword && (
-        <Dialog open={!!generatedPassword} onOpenChange={() => setGeneratedPassword('')}>
+        <Dialog
+          open={!!generatedPassword}
+          onOpenChange={() => setGeneratedPassword("")}
+        >
           <DialogContent className="bg-gray-900 border-gray-700">
             <DialogHeader>
               <DialogTitle className="text-white">Employee Created</DialogTitle>
@@ -1525,7 +1809,9 @@ export default function EmployeesSection() {
             </DialogHeader>
             <div className="py-4">
               <div className="flex items-center gap-2 p-3 bg-gray-800 rounded-lg">
-                <code className="text-green-400 font-mono flex-1">{generatedPassword}</code>
+                <code className="text-green-400 font-mono flex-1">
+                  {generatedPassword}
+                </code>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1539,7 +1825,10 @@ export default function EmployeesSection() {
               </p>
             </div>
             <DialogFooter>
-              <Button onClick={() => setGeneratedPassword('')} className="bg-purple-600 hover:bg-purple-700">
+              <Button
+                onClick={() => setGeneratedPassword("")}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
                 Done
               </Button>
             </DialogFooter>
@@ -1549,4 +1838,3 @@ export default function EmployeesSection() {
     </div>
   );
 }
-

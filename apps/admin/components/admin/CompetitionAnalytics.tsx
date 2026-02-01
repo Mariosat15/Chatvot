@@ -1,10 +1,23 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "sonner";
 import {
   Trophy,
   DollarSign,
@@ -25,9 +38,9 @@ import {
   Target,
   Clock,
   Slash,
-} from 'lucide-react';
-import { creditsToEUR } from '@/lib/utils/credit-conversion';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
+} from "lucide-react";
+import { creditsToEUR } from "@/lib/utils/credit-conversion";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface Winner {
   userId: string;
@@ -56,7 +69,7 @@ interface RefundDetail {
 interface CompetitionAnalytic {
   _id: string;
   name: string;
-  status: 'completed' | 'cancelled';
+  status: "completed" | "cancelled";
   cancellationReason?: string;
   startTime: string;
   endTime: string;
@@ -176,13 +189,15 @@ export default function CompetitionAnalytics() {
   });
   const [conversionRate, setConversionRate] = useState(100);
   const [expandedComp, setExpandedComp] = useState<string | null>(null);
-  const [expandedChallenge, setExpandedChallenge] = useState<string | null>(null);
+  const [expandedChallenge, setExpandedChallenge] = useState<string | null>(
+    null,
+  );
 
   // Get dynamic currency settings
-  const creditName = settings?.credits?.name || 'Credits';
-  const creditSymbol = settings?.credits?.symbol || '⚡';
-  const currencySymbol = settings?.currency?.symbol || '€';
-  const currencyCode = settings?.currency?.code || 'EUR';
+  const creditName = settings?.credits?.name || "Credits";
+  const creditSymbol = settings?.credits?.symbol || "⚡";
+  const currencySymbol = settings?.currency?.symbol || "€";
+  const currencyCode = settings?.currency?.code || "EUR";
 
   useEffect(() => {
     fetchData();
@@ -191,29 +206,31 @@ export default function CompetitionAnalytics() {
   const fetchData = async () => {
     setRefreshing(true);
     try {
-      const response = await fetch('/api/competition-analytics');
-      if (!response.ok) throw new Error('Failed to fetch data');
+      const response = await fetch("/api/competition-analytics");
+      if (!response.ok) throw new Error("Failed to fetch data");
 
       const result = await response.json();
       setCompetitions(result.data.competitions);
       setOverallStats(result.data.overallStats);
       setChallenges(result.data.challenges || []);
-      setChallengeStats(result.data.challengeStats || {
-        totalChallenges: 0,
-        completedChallenges: 0,
-        declinedChallenges: 0,
-        expiredChallenges: 0,
-        tieChallenges: 0,
-        bothDisqualifiedChallenges: 0,
-        totalChallengePrizePools: 0,
-        totalChallengePlatformFees: 0,
-        totalChallengeWinnersPaid: 0,
-        totalChallengeUnclaimedPools: 0,
-        averageChallengeEntryFee: 0,
-      });
+      setChallengeStats(
+        result.data.challengeStats || {
+          totalChallenges: 0,
+          completedChallenges: 0,
+          declinedChallenges: 0,
+          expiredChallenges: 0,
+          tieChallenges: 0,
+          bothDisqualifiedChallenges: 0,
+          totalChallengePrizePools: 0,
+          totalChallengePlatformFees: 0,
+          totalChallengeWinnersPaid: 0,
+          totalChallengeUnclaimedPools: 0,
+          averageChallengeEntryFee: 0,
+        },
+      );
       setConversionRate(result.data.conversionRate);
     } catch (error) {
-      toast.error('Failed to load competition analytics');
+      toast.error("Failed to load competition analytics");
       console.error(error);
     } finally {
       setLoading(false);
@@ -222,7 +239,7 @@ export default function CompetitionAnalytics() {
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === 'completed') {
+    if (status === "completed") {
       return (
         <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 text-xs font-medium flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
@@ -242,7 +259,9 @@ export default function CompetitionAnalytics() {
     return (
       <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl p-12">
         <div className="flex items-center justify-center">
-          <div className="text-cyan-400 text-lg">Loading competition analytics...</div>
+          <div className="text-cyan-400 text-lg">
+            Loading competition analytics...
+          </div>
         </div>
       </div>
     );
@@ -275,7 +294,9 @@ export default function CompetitionAnalytics() {
               disabled={refreshing}
               className="bg-white/10 hover:bg-white/20 border border-white/30 text-white backdrop-blur-sm"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
@@ -294,10 +315,16 @@ export default function CompetitionAnalytics() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-white">{overallStats.totalCompetitions}</div>
+            <div className="text-3xl font-bold text-white">
+              {overallStats.totalCompetitions}
+            </div>
             <div className="flex items-center gap-3 mt-2 text-xs">
-              <span className="text-green-400">{overallStats.completedCompetitions} completed</span>
-              <span className="text-red-400">{overallStats.cancelledCompetitions} cancelled</span>
+              <span className="text-green-400">
+                {overallStats.completedCompetitions} completed
+              </span>
+              <span className="text-red-400">
+                {overallStats.cancelledCompetitions} cancelled
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -316,7 +343,11 @@ export default function CompetitionAnalytics() {
               {creditSymbol} {overallStats.totalPrizePools.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(overallStats.totalPrizePools, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                overallStats.totalPrizePools,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -335,7 +366,11 @@ export default function CompetitionAnalytics() {
               {creditSymbol} {overallStats.totalPlatformFees.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(overallStats.totalPlatformFees, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                overallStats.totalPlatformFees,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -354,7 +389,11 @@ export default function CompetitionAnalytics() {
               {creditSymbol} {overallStats.totalWinnersPaid.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(overallStats.totalWinnersPaid, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                overallStats.totalWinnersPaid,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -432,9 +471,7 @@ export default function CompetitionAnalytics() {
             <div className="text-3xl font-bold text-white tabular-nums">
               {overallStats.averageParticipantsPerComp.toFixed(1)}
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              per competition
-            </p>
+            <p className="text-xs text-gray-400 mt-1">per competition</p>
           </CardContent>
         </Card>
       </div>
@@ -448,26 +485,34 @@ export default function CompetitionAnalytics() {
             </div>
             Competition Financial Details
           </CardTitle>
-          <CardDescription className="text-sm">Expand each competition to see winner distributions, disqualifications, and refunds</CardDescription>
+          <CardDescription className="text-sm">
+            Expand each competition to see winner distributions,
+            disqualifications, and refunds
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             {competitions.map((comp) => {
               const isExpanded = expandedComp === comp._id;
-              const isCancelled = comp.status === 'cancelled';
-              
+              const isCancelled = comp.status === "cancelled";
+
               return (
-                <div key={comp._id} className={`border rounded-lg overflow-hidden ${
-                  isCancelled ? 'border-red-500/30' : 'border-gray-700'
-                }`}>
+                <div
+                  key={comp._id}
+                  className={`border rounded-lg overflow-hidden ${
+                    isCancelled ? "border-red-500/30" : "border-gray-700"
+                  }`}
+                >
                   {/* Competition Summary Row */}
                   <div
                     className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
-                      isCancelled 
-                        ? 'bg-red-900/20 hover:bg-red-900/30' 
-                        : 'bg-gray-900/50 hover:bg-gray-900'
+                      isCancelled
+                        ? "bg-red-900/20 hover:bg-red-900/30"
+                        : "bg-gray-900/50 hover:bg-gray-900"
                     }`}
-                    onClick={() => setExpandedComp(isExpanded ? null : comp._id)}
+                    onClick={() =>
+                      setExpandedComp(isExpanded ? null : comp._id)
+                    }
                   >
                     <div className="flex items-center gap-4 flex-1">
                       <Button
@@ -488,8 +533,12 @@ export default function CompetitionAnalytics() {
 
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <Trophy className={`h-4 w-4 ${isCancelled ? 'text-red-500' : 'text-yellow-500'}`} />
-                          <span className="font-semibold text-white">{comp.name}</span>
+                          <Trophy
+                            className={`h-4 w-4 ${isCancelled ? "text-red-500" : "text-yellow-500"}`}
+                          />
+                          <span className="font-semibold text-white">
+                            {comp.name}
+                          </span>
                           {getStatusBadge(comp.status)}
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
@@ -501,7 +550,10 @@ export default function CompetitionAnalytics() {
                             <Users className="h-3 w-3" />
                             {comp.participants} participants
                           </span>
-                          <span>{currencySymbol}{comp.entryFee} entry fee</span>
+                          <span>
+                            {currencySymbol}
+                            {comp.entryFee} entry fee
+                          </span>
                           {comp.disqualifiedCount > 0 && (
                             <span className="text-red-400 flex items-center gap-1">
                               <Ban className="h-3 w-3" />
@@ -516,7 +568,8 @@ export default function CompetitionAnalytics() {
                         {isCancelled ? (
                           <>
                             <div className="text-sm font-semibold text-red-400">
-                              Refunded: {creditSymbol} {comp.totalRefunds.toLocaleString()}
+                              Refunded: {creditSymbol}{" "}
+                              {comp.totalRefunds.toLocaleString()}
                             </div>
                             <div className="text-xs text-gray-500">
                               {comp.refundsCount} refunds
@@ -524,12 +577,17 @@ export default function CompetitionAnalytics() {
                           </>
                         ) : (
                           <>
-                        <div className="text-sm font-semibold text-gray-300">
-                              Prize Pool: {creditSymbol} {comp.prizePool.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ≈ {currencySymbol}{creditsToEUR(comp.prizePool, conversionRate).toFixed(2)}
-                        </div>
+                            <div className="text-sm font-semibold text-gray-300">
+                              Prize Pool: {creditSymbol}{" "}
+                              {comp.prizePool.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ≈ {currencySymbol}
+                              {creditsToEUR(
+                                comp.prizePool,
+                                conversionRate,
+                              ).toFixed(2)}
+                            </div>
                           </>
                         )}
                       </div>
@@ -547,12 +605,13 @@ export default function CompetitionAnalytics() {
                           </>
                         ) : (
                           <>
-                        <div className="text-sm font-semibold text-yellow-400">
-                          Platform: +{creditSymbol} {comp.platformFeeEarned.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ({comp.platformFeePercentage}% fee)
-                        </div>
+                            <div className="text-sm font-semibold text-yellow-400">
+                              Platform: +{creditSymbol}{" "}
+                              {comp.platformFeeEarned.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ({comp.platformFeePercentage}% fee)
+                            </div>
                           </>
                         )}
                       </div>
@@ -561,43 +620,61 @@ export default function CompetitionAnalytics() {
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className={`border-t p-4 space-y-4 ${
-                      isCancelled ? 'border-red-500/30 bg-red-900/10' : 'border-gray-700 bg-gray-900/30'
-                    }`}>
-                      
+                    <div
+                      className={`border-t p-4 space-y-4 ${
+                        isCancelled
+                          ? "border-red-500/30 bg-red-900/10"
+                          : "border-gray-700 bg-gray-900/30"
+                      }`}
+                    >
                       {/* Financial Summary */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Total Collected</div>
+                          <div className="text-xs text-gray-500">
+                            Total Collected
+                          </div>
                           <div className="text-lg font-bold text-white">
-                            {creditSymbol} {comp.totalCollected.toLocaleString()}
+                            {creditSymbol}{" "}
+                            {comp.totalCollected.toLocaleString()}
                           </div>
                         </div>
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Winners Paid</div>
+                          <div className="text-xs text-gray-500">
+                            Winners Paid
+                          </div>
                           <div className="text-lg font-bold text-green-400">
-                            {creditSymbol} {comp.totalWinnersPaid.toLocaleString()}
+                            {creditSymbol}{" "}
+                            {comp.totalWinnersPaid.toLocaleString()}
                           </div>
                         </div>
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Platform Earned</div>
+                          <div className="text-xs text-gray-500">
+                            Platform Earned
+                          </div>
                           <div className="text-lg font-bold text-yellow-400">
-                            {creditSymbol} {comp.platformFeeEarned.toLocaleString()}
+                            {creditSymbol}{" "}
+                            {comp.platformFeeEarned.toLocaleString()}
                           </div>
                         </div>
                         {comp.unclaimedPool > 0 && (
                           <div className="bg-orange-900/20 rounded-lg p-3 border border-orange-500/30">
-                            <div className="text-xs text-orange-400">Unclaimed Pool</div>
+                            <div className="text-xs text-orange-400">
+                              Unclaimed Pool
+                            </div>
                             <div className="text-lg font-bold text-orange-400">
-                              {creditSymbol} {comp.unclaimedPool.toLocaleString()}
+                              {creditSymbol}{" "}
+                              {comp.unclaimedPool.toLocaleString()}
                             </div>
                           </div>
                         )}
                         {isCancelled && (
                           <div className="bg-red-900/20 rounded-lg p-3 border border-red-500/30">
-                            <div className="text-xs text-red-400">Total Refunded</div>
+                            <div className="text-xs text-red-400">
+                              Total Refunded
+                            </div>
                             <div className="text-lg font-bold text-red-400">
-                              {creditSymbol} {comp.totalRefunds.toLocaleString()}
+                              {creditSymbol}{" "}
+                              {comp.totalRefunds.toLocaleString()}
                             </div>
                           </div>
                         )}
@@ -610,61 +687,100 @@ export default function CompetitionAnalytics() {
                             <AlertTriangle className="h-4 w-4" />
                             Cancellation Reason
                           </div>
-                          <p className="text-gray-300">{comp.cancellationReason}</p>
+                          <p className="text-gray-300">
+                            {comp.cancellationReason}
+                          </p>
                         </div>
                       )}
 
                       {/* Winners Section */}
                       {comp.winners.length > 0 && (
                         <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Award className="h-4 w-4 text-yellow-500" />
-                        <span className="text-sm font-semibold text-gray-300">
-                          Prize Distribution ({comp.winnersCount} winners)
-                        </span>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="border-gray-700">
-                            <TableHead className="text-gray-400">Rank</TableHead>
-                                <TableHead className="text-gray-400">User</TableHead>
-                            <TableHead className="text-gray-400">Final P&L</TableHead>
-                            <TableHead className="text-gray-400">Prize %</TableHead>
-                            <TableHead className="text-gray-400">Prize Amount</TableHead>
-                            <TableHead className="text-gray-400">{currencyCode} Value</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {comp.winners
-                            .sort((a, b) => a.rank - b.rank)
-                            .map((winner) => (
-                              <TableRow key={winner.userId + winner.rank} className="border-gray-700">
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {winner.rank === 1 && <span className="text-2xl">🥇</span>}
-                                    {winner.rank === 2 && <span className="text-2xl">🥈</span>}
-                                    {winner.rank === 3 && <span className="text-2xl">🥉</span>}
-                                    <span className="font-semibold text-white">#{winner.rank}</span>
-                                  </div>
-                                </TableCell>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Award className="h-4 w-4 text-yellow-500" />
+                            <span className="text-sm font-semibold text-gray-300">
+                              Prize Distribution ({comp.winnersCount} winners)
+                            </span>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-gray-700">
+                                <TableHead className="text-gray-400">
+                                  Rank
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  User
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Final P&L
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Prize %
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Prize Amount
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  {currencyCode} Value
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {comp.winners
+                                .sort((a, b) => a.rank - b.rank)
+                                .map((winner) => (
+                                  <TableRow
+                                    key={winner.userId + winner.rank}
+                                    className="border-gray-700"
+                                  >
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        {winner.rank === 1 && (
+                                          <span className="text-2xl">🥇</span>
+                                        )}
+                                        {winner.rank === 2 && (
+                                          <span className="text-2xl">🥈</span>
+                                        )}
+                                        {winner.rank === 3 && (
+                                          <span className="text-2xl">🥉</span>
+                                        )}
+                                        <span className="font-semibold text-white">
+                                          #{winner.rank}
+                                        </span>
+                                      </div>
+                                    </TableCell>
                                     <TableCell className="text-gray-300">
                                       {winner.displayName}
-                                </TableCell>
-                                <TableCell className={winner.finalPnl >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                  {winner.finalPnl >= 0 ? '+' : ''}
-                                  {creditSymbol} {winner.finalPnl.toFixed(2)}
-                                </TableCell>
-                                <TableCell className="text-gray-400">{winner.percentage}%</TableCell>
-                                <TableCell className="font-semibold text-green-400 tabular-nums">
-                                  {creditSymbol} {winner.amount.toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-gray-500">
-                                  {currencySymbol}{creditsToEUR(winner.amount, conversionRate).toFixed(2)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                                    </TableCell>
+                                    <TableCell
+                                      className={
+                                        winner.finalPnl >= 0
+                                          ? "text-green-400"
+                                          : "text-red-400"
+                                      }
+                                    >
+                                      {winner.finalPnl >= 0 ? "+" : ""}
+                                      {creditSymbol}{" "}
+                                      {winner.finalPnl.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-gray-400">
+                                      {winner.percentage}%
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-green-400 tabular-nums">
+                                      {creditSymbol}{" "}
+                                      {winner.amount.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-gray-500">
+                                      {currencySymbol}
+                                      {creditsToEUR(
+                                        winner.amount,
+                                        conversionRate,
+                                      ).toFixed(2)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
                         </div>
                       )}
 
@@ -674,25 +790,41 @@ export default function CompetitionAnalytics() {
                           <div className="flex items-center gap-2 mb-3">
                             <Ban className="h-4 w-4 text-red-500" />
                             <span className="text-sm font-semibold text-gray-300">
-                              Disqualified Participants ({comp.disqualifiedCount})
+                              Disqualified Participants (
+                              {comp.disqualifiedCount})
                             </span>
                           </div>
                           <Table>
                             <TableHeader>
                               <TableRow className="border-gray-700">
-                                <TableHead className="text-gray-400">User</TableHead>
-                                <TableHead className="text-gray-400">Final P&L</TableHead>
-                                <TableHead className="text-gray-400">Reason</TableHead>
+                                <TableHead className="text-gray-400">
+                                  User
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Final P&L
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Reason
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {comp.disqualifiedDetails.map((dq) => (
-                                <TableRow key={dq.userId} className="border-gray-700">
+                                <TableRow
+                                  key={dq.userId}
+                                  className="border-gray-700"
+                                >
                                   <TableCell className="text-gray-300">
                                     {dq.displayName}
                                   </TableCell>
-                                  <TableCell className={dq.finalPnl >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                    {dq.finalPnl >= 0 ? '+' : ''}
+                                  <TableCell
+                                    className={
+                                      dq.finalPnl >= 0
+                                        ? "text-green-400"
+                                        : "text-red-400"
+                                    }
+                                  >
+                                    {dq.finalPnl >= 0 ? "+" : ""}
                                     {creditSymbol} {dq.finalPnl.toFixed(2)}
                                   </TableCell>
                                   <TableCell className="text-red-400 text-sm">
@@ -702,12 +834,18 @@ export default function CompetitionAnalytics() {
                               ))}
                             </TableBody>
                           </Table>
-                          
+
                           {/* Unclaimed Pool Info */}
                           {comp.unclaimedPool > 0 && (
                             <div className="mt-3 p-3 bg-orange-900/20 border border-orange-500/30 rounded-lg">
                               <p className="text-sm text-orange-300">
-                                💰 <strong>{creditSymbol} {comp.unclaimedPool.toLocaleString()}</strong> from disqualified users' share went to the platform's unclaimed pool.
+                                💰{" "}
+                                <strong>
+                                  {creditSymbol}{" "}
+                                  {comp.unclaimedPool.toLocaleString()}
+                                </strong>{" "}
+                                from disqualified users' share went to the
+                                platform's unclaimed pool.
                               </p>
                             </div>
                           )}
@@ -726,19 +864,29 @@ export default function CompetitionAnalytics() {
                           <Table>
                             <TableHeader>
                               <TableRow className="border-gray-700">
-                                <TableHead className="text-gray-400">User</TableHead>
-                                <TableHead className="text-gray-400">Amount</TableHead>
-                                <TableHead className="text-gray-400">Date</TableHead>
+                                <TableHead className="text-gray-400">
+                                  User
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Amount
+                                </TableHead>
+                                <TableHead className="text-gray-400">
+                                  Date
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {comp.refundDetails.map((refund, idx) => (
-                                <TableRow key={refund.userId + idx} className="border-gray-700">
+                                <TableRow
+                                  key={refund.userId + idx}
+                                  className="border-gray-700"
+                                >
                                   <TableCell className="text-gray-300">
                                     {refund.displayName}
                                   </TableCell>
                                   <TableCell className="font-semibold text-red-400 tabular-nums">
-                                    {creditSymbol} {refund.amount.toLocaleString()}
+                                    {creditSymbol}{" "}
+                                    {refund.amount.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-gray-500">
                                     {new Date(refund.date).toLocaleDateString()}
@@ -753,19 +901,35 @@ export default function CompetitionAnalytics() {
                       {/* Summary Footer */}
                       <div className="mt-4 pt-4 border-t border-gray-700 flex flex-wrap items-center justify-between gap-4 text-sm">
                         <div className="text-gray-400">
-                          Total Distributed: <span className="font-semibold text-green-400">{creditSymbol} {comp.totalWinnersPaid.toLocaleString()}</span>
+                          Total Distributed:{" "}
+                          <span className="font-semibold text-green-400">
+                            {creditSymbol}{" "}
+                            {comp.totalWinnersPaid.toLocaleString()}
+                          </span>
                         </div>
                         <div className="text-gray-400">
-                          Platform Revenue: <span className="font-semibold text-yellow-400">{creditSymbol} {comp.platformFeeEarned.toLocaleString()}</span>
+                          Platform Revenue:{" "}
+                          <span className="font-semibold text-yellow-400">
+                            {creditSymbol}{" "}
+                            {comp.platformFeeEarned.toLocaleString()}
+                          </span>
                         </div>
                         {comp.unclaimedPool > 0 && (
                           <div className="text-gray-400">
-                            Unclaimed: <span className="font-semibold text-orange-400">{creditSymbol} {comp.unclaimedPool.toLocaleString()}</span>
+                            Unclaimed:{" "}
+                            <span className="font-semibold text-orange-400">
+                              {creditSymbol}{" "}
+                              {comp.unclaimedPool.toLocaleString()}
+                            </span>
                           </div>
                         )}
                         {comp.totalRefunds > 0 && (
                           <div className="text-gray-400">
-                            Refunded: <span className="font-semibold text-red-400">{creditSymbol} {comp.totalRefunds.toLocaleString()}</span>
+                            Refunded:{" "}
+                            <span className="font-semibold text-red-400">
+                              {creditSymbol}{" "}
+                              {comp.totalRefunds.toLocaleString()}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -819,11 +983,19 @@ export default function CompetitionAnalytics() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-white">{challengeStats.totalChallenges}</div>
+            <div className="text-3xl font-bold text-white">
+              {challengeStats.totalChallenges}
+            </div>
             <div className="flex items-center gap-3 mt-2 text-xs">
-              <span className="text-green-400">{challengeStats.completedChallenges} completed</span>
-              <span className="text-gray-400">{challengeStats.declinedChallenges} declined</span>
-              <span className="text-red-400">{challengeStats.expiredChallenges} expired</span>
+              <span className="text-green-400">
+                {challengeStats.completedChallenges} completed
+              </span>
+              <span className="text-gray-400">
+                {challengeStats.declinedChallenges} declined
+              </span>
+              <span className="text-red-400">
+                {challengeStats.expiredChallenges} expired
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -839,10 +1011,15 @@ export default function CompetitionAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white tabular-nums">
-              {creditSymbol} {challengeStats.totalChallengePrizePools.toLocaleString()}
+              {creditSymbol}{" "}
+              {challengeStats.totalChallengePrizePools.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(challengeStats.totalChallengePrizePools, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                challengeStats.totalChallengePrizePools,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -858,10 +1035,15 @@ export default function CompetitionAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-400 tabular-nums">
-              {creditSymbol} {challengeStats.totalChallengePlatformFees.toLocaleString()}
+              {creditSymbol}{" "}
+              {challengeStats.totalChallengePlatformFees.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(challengeStats.totalChallengePlatformFees, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                challengeStats.totalChallengePlatformFees,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -877,10 +1059,15 @@ export default function CompetitionAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-400 tabular-nums">
-              {creditSymbol} {challengeStats.totalChallengeWinnersPaid.toLocaleString()}
+              {creditSymbol}{" "}
+              {challengeStats.totalChallengeWinnersPaid.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              ≈ {currencySymbol}{creditsToEUR(challengeStats.totalChallengeWinnersPaid, conversionRate).toFixed(2)}
+              ≈ {currencySymbol}
+              {creditsToEUR(
+                challengeStats.totalChallengeWinnersPaid,
+                conversionRate,
+              ).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -920,9 +1107,7 @@ export default function CompetitionAnalytics() {
             <div className="text-3xl font-bold text-red-400 tabular-nums">
               {challengeStats.bothDisqualifiedChallenges}
             </div>
-            <p className="text-sm text-gray-400 mt-2">
-              Platform kept the pool
-            </p>
+            <p className="text-sm text-gray-400 mt-2">Platform kept the pool</p>
           </CardContent>
         </Card>
 
@@ -937,11 +1122,10 @@ export default function CompetitionAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-400 tabular-nums">
-              {creditSymbol} {challengeStats.totalChallengeUnclaimedPools.toLocaleString()}
+              {creditSymbol}{" "}
+              {challengeStats.totalChallengeUnclaimedPools.toLocaleString()}
             </div>
-            <p className="text-sm text-gray-400 mt-2">
-              From both-disqualified
-            </p>
+            <p className="text-sm text-gray-400 mt-2">From both-disqualified</p>
           </CardContent>
         </Card>
 
@@ -956,11 +1140,10 @@ export default function CompetitionAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white tabular-nums">
-              {creditSymbol} {challengeStats.averageChallengeEntryFee.toFixed(0)}
+              {creditSymbol}{" "}
+              {challengeStats.averageChallengeEntryFee.toFixed(0)}
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              per player
-            </p>
+            <p className="text-xs text-gray-400 mt-1">per player</p>
           </CardContent>
         </Card>
       </div>
@@ -974,30 +1157,41 @@ export default function CompetitionAnalytics() {
             </div>
             Challenge Details
           </CardTitle>
-          <CardDescription className="text-sm">Expand each challenge to see player stats and outcomes</CardDescription>
+          <CardDescription className="text-sm">
+            Expand each challenge to see player stats and outcomes
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             {challenges.map((challenge) => {
               const isExpanded = expandedChallenge === challenge._id;
-              const isCompleted = challenge.status === 'completed';
+              const isCompleted = challenge.status === "completed";
               const isTie = challenge.isTie;
               const bothDisqualified = challenge.bothDisqualified;
 
               return (
-                <div key={challenge._id} className={`border rounded-lg overflow-hidden ${
-                  bothDisqualified ? 'border-red-500/30' : isTie ? 'border-purple-500/30' : 'border-gray-700'
-                }`}>
+                <div
+                  key={challenge._id}
+                  className={`border rounded-lg overflow-hidden ${
+                    bothDisqualified
+                      ? "border-red-500/30"
+                      : isTie
+                        ? "border-purple-500/30"
+                        : "border-gray-700"
+                  }`}
+                >
                   {/* Challenge Summary Row */}
                   <div
                     className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
-                      bothDisqualified 
-                        ? 'bg-red-900/20 hover:bg-red-900/30' 
+                      bothDisqualified
+                        ? "bg-red-900/20 hover:bg-red-900/30"
                         : isTie
-                        ? 'bg-purple-900/20 hover:bg-purple-900/30'
-                        : 'bg-gray-900/50 hover:bg-gray-900'
+                          ? "bg-purple-900/20 hover:bg-purple-900/30"
+                          : "bg-gray-900/50 hover:bg-gray-900"
                     }`}
-                    onClick={() => setExpandedChallenge(isExpanded ? null : challenge._id)}
+                    onClick={() =>
+                      setExpandedChallenge(isExpanded ? null : challenge._id)
+                    }
                   >
                     <div className="flex items-center gap-4 flex-1">
                       <Button
@@ -1006,7 +1200,9 @@ export default function CompetitionAnalytics() {
                         className="p-0 h-6 w-6"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setExpandedChallenge(isExpanded ? null : challenge._id);
+                          setExpandedChallenge(
+                            isExpanded ? null : challenge._id,
+                          );
                         }}
                       >
                         {isExpanded ? (
@@ -1018,9 +1214,12 @@ export default function CompetitionAnalytics() {
 
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <Swords className={`h-4 w-4 ${bothDisqualified ? 'text-red-500' : isTie ? 'text-purple-500' : 'text-orange-500'}`} />
+                          <Swords
+                            className={`h-4 w-4 ${bothDisqualified ? "text-red-500" : isTie ? "text-purple-500" : "text-orange-500"}`}
+                          />
                           <span className="font-semibold text-white">
-                            {challenge.challengerName || 'Player 1'} vs {challenge.challengedName || 'Player 2'}
+                            {challenge.challengerName || "Player 1"} vs{" "}
+                            {challenge.challengedName || "Player 2"}
                           </span>
                           {/* Status Badge */}
                           {isCompleted && !isTie && !bothDisqualified && (
@@ -1041,12 +1240,12 @@ export default function CompetitionAnalytics() {
                               Both Disqualified
                             </span>
                           )}
-                          {challenge.status === 'declined' && (
+                          {challenge.status === "declined" && (
                             <span className="px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30 text-xs font-medium">
                               Declined
                             </span>
                           )}
-                          {challenge.status === 'expired' && (
+                          {challenge.status === "expired" && (
                             <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs font-medium flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               Expired
@@ -1056,9 +1255,14 @@ export default function CompetitionAnalytics() {
                         <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(challenge.endTime || challenge.createdAt).toLocaleDateString()}
+                            {new Date(
+                              challenge.endTime || challenge.createdAt,
+                            ).toLocaleDateString()}
                           </span>
-                          <span>{creditSymbol}{challenge.entryFee} entry (each)</span>
+                          <span>
+                            {creditSymbol}
+                            {challenge.entryFee} entry (each)
+                          </span>
                           <span>{challenge.duration} min</span>
                         </div>
                       </div>
@@ -1066,10 +1270,15 @@ export default function CompetitionAnalytics() {
                       {/* Prize Pool */}
                       <div className="text-right">
                         <div className="text-sm font-semibold text-gray-300">
-                          Prize: {creditSymbol} {challenge.prizePool?.toLocaleString() || 0}
+                          Prize: {creditSymbol}{" "}
+                          {challenge.prizePool?.toLocaleString() || 0}
                         </div>
                         <div className="text-xs text-gray-500">
-                          ≈ {currencySymbol}{creditsToEUR(challenge.prizePool || 0, conversionRate).toFixed(2)}
+                          ≈ {currencySymbol}
+                          {creditsToEUR(
+                            challenge.prizePool || 0,
+                            conversionRate,
+                          ).toFixed(2)}
                         </div>
                       </div>
 
@@ -1078,13 +1287,18 @@ export default function CompetitionAnalytics() {
                         {isCompleted ? (
                           <>
                             <div className="text-sm font-semibold text-yellow-400">
-                              Platform: +{creditSymbol} {challenge.platformFeeAmount?.toLocaleString() || 0}
+                              Platform: +{creditSymbol}{" "}
+                              {challenge.platformFeeAmount?.toLocaleString() ||
+                                0}
                             </div>
-                            {bothDisqualified && challenge.unclaimedPool > 0 && (
-                              <div className="text-xs text-orange-400">
-                                +{creditSymbol} {challenge.unclaimedPool?.toLocaleString()} unclaimed
-                              </div>
-                            )}
+                            {bothDisqualified &&
+                              challenge.unclaimedPool > 0 && (
+                                <div className="text-xs text-orange-400">
+                                  +{creditSymbol}{" "}
+                                  {challenge.unclaimedPool?.toLocaleString()}{" "}
+                                  unclaimed
+                                </div>
+                              )}
                           </>
                         ) : (
                           <div className="text-sm font-semibold text-gray-500">
@@ -1097,34 +1311,52 @@ export default function CompetitionAnalytics() {
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className={`border-t p-4 space-y-4 ${
-                      bothDisqualified ? 'border-red-500/30 bg-red-900/10' : isTie ? 'border-purple-500/30 bg-purple-900/10' : 'border-gray-700 bg-gray-900/30'
-                    }`}>
+                    <div
+                      className={`border-t p-4 space-y-4 ${
+                        bothDisqualified
+                          ? "border-red-500/30 bg-red-900/10"
+                          : isTie
+                            ? "border-purple-500/30 bg-purple-900/10"
+                            : "border-gray-700 bg-gray-900/30"
+                      }`}
+                    >
                       {/* Financial Summary */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Total Entry Fees</div>
+                          <div className="text-xs text-gray-500">
+                            Total Entry Fees
+                          </div>
                           <div className="text-lg font-bold text-white">
-                            {creditSymbol} {((challenge.entryFee || 0) * 2).toLocaleString()}
+                            {creditSymbol}{" "}
+                            {((challenge.entryFee || 0) * 2).toLocaleString()}
                           </div>
                         </div>
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Winner Prize</div>
+                          <div className="text-xs text-gray-500">
+                            Winner Prize
+                          </div>
                           <div className="text-lg font-bold text-green-400">
-                            {creditSymbol} {challenge.winnerPrize?.toLocaleString() || 0}
+                            {creditSymbol}{" "}
+                            {challenge.winnerPrize?.toLocaleString() || 0}
                           </div>
                         </div>
                         <div className="bg-gray-800/50 rounded-lg p-3">
-                          <div className="text-xs text-gray-500">Platform Earned</div>
+                          <div className="text-xs text-gray-500">
+                            Platform Earned
+                          </div>
                           <div className="text-lg font-bold text-yellow-400">
-                            {creditSymbol} {challenge.platformFeeAmount?.toLocaleString() || 0}
+                            {creditSymbol}{" "}
+                            {challenge.platformFeeAmount?.toLocaleString() || 0}
                           </div>
                         </div>
                         {challenge.unclaimedPool > 0 && (
                           <div className="bg-orange-900/20 rounded-lg p-3 border border-orange-500/30">
-                            <div className="text-xs text-orange-400">Unclaimed Pool</div>
+                            <div className="text-xs text-orange-400">
+                              Unclaimed Pool
+                            </div>
                             <div className="text-lg font-bold text-orange-400">
-                              {creditSymbol} {challenge.unclaimedPool?.toLocaleString()}
+                              {creditSymbol}{" "}
+                              {challenge.unclaimedPool?.toLocaleString()}
                             </div>
                           </div>
                         )}
@@ -1134,15 +1366,20 @@ export default function CompetitionAnalytics() {
                       {isCompleted && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Challenger */}
-                          <div className={`rounded-lg p-4 ${
-                            challenge.winnerId === challenge.challengerStats?.toString()
-                              ? 'bg-green-900/20 border border-green-500/30'
-                              : challenge.challengerStats?.isDisqualified
-                              ? 'bg-red-900/20 border border-red-500/30'
-                              : 'bg-gray-800/50'
-                          }`}>
+                          <div
+                            className={`rounded-lg p-4 ${
+                              challenge.winnerId ===
+                              challenge.challengerStats?.toString()
+                                ? "bg-green-900/20 border border-green-500/30"
+                                : challenge.challengerStats?.isDisqualified
+                                  ? "bg-red-900/20 border border-red-500/30"
+                                  : "bg-gray-800/50"
+                            }`}
+                          >
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-white">{challenge.challengerName || 'Challenger'}</span>
+                              <span className="font-semibold text-white">
+                                {challenge.challengerName || "Challenger"}
+                              </span>
                               {challenge.challengerStats?.isDisqualified && (
                                 <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
                                   Disqualified
@@ -1152,28 +1389,48 @@ export default function CompetitionAnalytics() {
                             <div className="space-y-1 text-sm">
                               <div className="flex justify-between">
                                 <span className="text-gray-400">Trades:</span>
-                                <span className="text-white">{challenge.challengerStats?.totalTrades || 0}</span>
+                                <span className="text-white">
+                                  {challenge.challengerStats?.totalTrades || 0}
+                                </span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-gray-400">P&L:</span>
-                                <span className={challenge.challengerStats?.totalPnL && challenge.challengerStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                  {challenge.challengerStats?.totalPnL && challenge.challengerStats.totalPnL >= 0 ? '+' : ''}
-                                  {creditSymbol} {(challenge.challengerStats?.totalPnL || 0).toFixed(2)}
+                                <span
+                                  className={
+                                    challenge.challengerStats?.totalPnL &&
+                                    challenge.challengerStats.totalPnL >= 0
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }
+                                >
+                                  {challenge.challengerStats?.totalPnL &&
+                                  challenge.challengerStats.totalPnL >= 0
+                                    ? "+"
+                                    : ""}
+                                  {creditSymbol}{" "}
+                                  {(
+                                    challenge.challengerStats?.totalPnL || 0
+                                  ).toFixed(2)}
                                 </span>
                               </div>
                             </div>
                           </div>
 
                           {/* Challenged */}
-                          <div className={`rounded-lg p-4 ${
-                            challenge.winnerId === challenge.challengedStats?.toString()
-                              ? 'bg-green-900/20 border border-green-500/30'
-                              : challenge.challengedStats?.isDisqualified
-                              ? 'bg-red-900/20 border border-red-500/30'
-                              : 'bg-gray-800/50'
-                          }`}>
+                          <div
+                            className={`rounded-lg p-4 ${
+                              challenge.winnerId ===
+                              challenge.challengedStats?.toString()
+                                ? "bg-green-900/20 border border-green-500/30"
+                                : challenge.challengedStats?.isDisqualified
+                                  ? "bg-red-900/20 border border-red-500/30"
+                                  : "bg-gray-800/50"
+                            }`}
+                          >
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-white">{challenge.challengedName || 'Challenged'}</span>
+                              <span className="font-semibold text-white">
+                                {challenge.challengedName || "Challenged"}
+                              </span>
                               {challenge.challengedStats?.isDisqualified && (
                                 <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
                                   Disqualified
@@ -1183,13 +1440,28 @@ export default function CompetitionAnalytics() {
                             <div className="space-y-1 text-sm">
                               <div className="flex justify-between">
                                 <span className="text-gray-400">Trades:</span>
-                                <span className="text-white">{challenge.challengedStats?.totalTrades || 0}</span>
+                                <span className="text-white">
+                                  {challenge.challengedStats?.totalTrades || 0}
+                                </span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-gray-400">P&L:</span>
-                                <span className={challenge.challengedStats?.totalPnL && challenge.challengedStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                  {challenge.challengedStats?.totalPnL && challenge.challengedStats.totalPnL >= 0 ? '+' : ''}
-                                  {creditSymbol} {(challenge.challengedStats?.totalPnL || 0).toFixed(2)}
+                                <span
+                                  className={
+                                    challenge.challengedStats?.totalPnL &&
+                                    challenge.challengedStats.totalPnL >= 0
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }
+                                >
+                                  {challenge.challengedStats?.totalPnL &&
+                                  challenge.challengedStats.totalPnL >= 0
+                                    ? "+"
+                                    : ""}
+                                  {creditSymbol}{" "}
+                                  {(
+                                    challenge.challengedStats?.totalPnL || 0
+                                  ).toFixed(2)}
                                 </span>
                               </div>
                             </div>
@@ -1205,8 +1477,13 @@ export default function CompetitionAnalytics() {
                             Both Players Disqualified
                           </div>
                           <p className="text-gray-300">
-                            Neither player met the minimum trade requirements. The prize pool of{' '}
-                            <strong>{creditSymbol} {challenge.unclaimedPool?.toLocaleString()}</strong> was added to the platform's unclaimed pool.
+                            Neither player met the minimum trade requirements.
+                            The prize pool of{" "}
+                            <strong>
+                              {creditSymbol}{" "}
+                              {challenge.unclaimedPool?.toLocaleString()}
+                            </strong>{" "}
+                            was added to the platform's unclaimed pool.
                           </p>
                         </div>
                       )}

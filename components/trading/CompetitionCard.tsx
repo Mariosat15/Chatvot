@@ -1,28 +1,47 @@
-'use client';
+"use client";
 
-import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2, Gauge } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useState, useEffect, useMemo } from 'react';
-import { enterCompetition } from '@/lib/actions/trading/competition.actions';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { DifficultyBadge } from '@/components/ui/difficulty-badge';
-import { calculateCompetitionDifficulty } from '@/lib/utils/competition-difficulty';
+import {
+  Trophy,
+  Users,
+  Clock,
+  Calendar,
+  CheckCircle,
+  Zap,
+  Target,
+  Flame,
+  Crown,
+  Sparkles,
+  Timer,
+  ChevronRight,
+  Swords,
+  Gamepad2,
+  Gauge,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useState, useEffect, useMemo } from "react";
+import { enterCompetition } from "@/lib/actions/trading/competition.actions";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { DifficultyBadge } from "@/components/ui/difficulty-badge";
+import {
+  calculateCompetitionDifficulty,
+  DifficultyAnalysis,
+} from "@/lib/utils/competition-difficulty";
 
 // Level names mapping
 const LEVEL_NAMES: Record<number, { emoji: string; name: string }> = {
-  1: { emoji: '🌱', name: 'Novice Trader' },
-  2: { emoji: '📚', name: 'Apprentice Trader' },
-  3: { emoji: '⚔️', name: 'Skilled Trader' },
-  4: { emoji: '🎯', name: 'Expert Trader' },
-  5: { emoji: '💎', name: 'Elite Trader' },
-  6: { emoji: '👑', name: 'Master Trader' },
-  7: { emoji: '🔥', name: 'Grand Master' },
-  8: { emoji: '⚡', name: 'Trading Champion' },
-  9: { emoji: '🌟', name: 'Market Legend' },
-  10: { emoji: '👑', name: 'Trading God' },
+  1: { emoji: "🌱", name: "Novice Trader" },
+  2: { emoji: "📚", name: "Apprentice Trader" },
+  3: { emoji: "⚔️", name: "Skilled Trader" },
+  4: { emoji: "🎯", name: "Expert Trader" },
+  5: { emoji: "💎", name: "Elite Trader" },
+  6: { emoji: "👑", name: "Master Trader" },
+  7: { emoji: "🔥", name: "Grand Master" },
+  8: { emoji: "⚡", name: "Trading Champion" },
+  9: { emoji: "🌟", name: "Market Legend" },
+  10: { emoji: "👑", name: "Trading God" },
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -32,56 +51,74 @@ interface CompetitionCardProps {
   userBalance: number;
   isCompleted?: boolean;
   isUserIn?: boolean;
-  viewMode?: 'card' | 'list';
+  viewMode?: "card" | "list";
 }
 
 // Competition type images and colors
-const COMPETITION_THEMES: Record<string, { gradient: string; glow: string; icon: string; bgPattern: string }> = {
+const COMPETITION_THEMES: Record<
+  string,
+  { gradient: string; glow: string; icon: string; bgPattern: string }
+> = {
   pnl: {
-    gradient: 'from-emerald-600 via-green-500 to-teal-400',
-    glow: 'shadow-emerald-500/50',
-    icon: '💰',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-900/40 via-gray-900 to-gray-900',
+    gradient: "from-emerald-600 via-green-500 to-teal-400",
+    glow: "shadow-emerald-500/50",
+    icon: "💰",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-900/40 via-gray-900 to-gray-900",
   },
   roi: {
-    gradient: 'from-blue-600 via-cyan-500 to-sky-400',
-    glow: 'shadow-blue-500/50',
-    icon: '📈',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/40 via-gray-900 to-gray-900',
+    gradient: "from-blue-600 via-cyan-500 to-sky-400",
+    glow: "shadow-blue-500/50",
+    icon: "📈",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/40 via-gray-900 to-gray-900",
   },
   total_capital: {
-    gradient: 'from-purple-600 via-violet-500 to-fuchsia-400',
-    glow: 'shadow-purple-500/50',
-    icon: '💎',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/40 via-gray-900 to-gray-900',
+    gradient: "from-purple-600 via-violet-500 to-fuchsia-400",
+    glow: "shadow-purple-500/50",
+    icon: "💎",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/40 via-gray-900 to-gray-900",
   },
   win_rate: {
-    gradient: 'from-amber-600 via-yellow-500 to-orange-400',
-    glow: 'shadow-amber-500/50',
-    icon: '🎯',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-900/40 via-gray-900 to-gray-900',
+    gradient: "from-amber-600 via-yellow-500 to-orange-400",
+    glow: "shadow-amber-500/50",
+    icon: "🎯",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-900/40 via-gray-900 to-gray-900",
   },
   total_wins: {
-    gradient: 'from-red-600 via-rose-500 to-pink-400',
-    glow: 'shadow-red-500/50',
-    icon: '🏆',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900',
+    gradient: "from-red-600 via-rose-500 to-pink-400",
+    glow: "shadow-red-500/50",
+    icon: "🏆",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900",
   },
   profit_factor: {
-    gradient: 'from-indigo-600 via-blue-500 to-cyan-400',
-    glow: 'shadow-indigo-500/50',
-    icon: '⚡',
-    bgPattern: 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/40 via-gray-900 to-gray-900',
+    gradient: "from-indigo-600 via-blue-500 to-cyan-400",
+    glow: "shadow-indigo-500/50",
+    icon: "⚡",
+    bgPattern:
+      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/40 via-gray-900 to-gray-900",
   },
 };
 
-const RANKING_DESCRIPTIONS: Record<string, { name: string; description: string }> = {
-  pnl: { name: 'Profit & Loss', description: 'Highest absolute profit wins' },
-  roi: { name: 'Return on Investment', description: 'Best % return wins' },
-  total_capital: { name: 'Total Capital', description: 'Highest final balance wins' },
-  win_rate: { name: 'Win Rate', description: 'Best win percentage wins' },
-  total_wins: { name: 'Total Wins', description: 'Most winning trades wins' },
-  profit_factor: { name: 'Profit Factor', description: 'Best profit/loss ratio wins' },
+const RANKING_DESCRIPTIONS: Record<
+  string,
+  { name: string; description: string }
+> = {
+  pnl: { name: "Profit & Loss", description: "Highest absolute profit wins" },
+  roi: { name: "Return on Investment", description: "Best % return wins" },
+  total_capital: {
+    name: "Total Capital",
+    description: "Highest final balance wins",
+  },
+  win_rate: { name: "Win Rate", description: "Best win percentage wins" },
+  total_wins: { name: "Total Wins", description: "Most winning trades wins" },
+  profit_factor: {
+    name: "Profit Factor",
+    description: "Best profit/loss ratio wins",
+  },
 };
 
 export default function CompetitionCard({
@@ -89,30 +126,32 @@ export default function CompetitionCard({
   userBalance,
   isCompleted = false,
   isUserIn = false,
-  viewMode = 'card',
+  viewMode = "card",
 }: CompetitionCardProps) {
   const [entering, setEntering] = useState(false);
-  const [liveCountdown, setLiveCountdown] = useState('');
+  const [liveCountdown, setLiveCountdown] = useState("");
   const router = useRouter();
   const { formatCredits, settings } = useAppSettings();
 
-  const canAfford = userBalance >= (competition.entryFee || competition.entryFeeCredits || 0);
+  const canAfford =
+    userBalance >= (competition.entryFee || competition.entryFeeCredits || 0);
   const isFull = competition.currentParticipants >= competition.maxParticipants;
-  const isActive = competition.status === 'active';
-  const isUpcoming = competition.status === 'upcoming';
-  const isCancelled = competition.status === 'cancelled';
+  const isActive = competition.status === "active";
+  const isUpcoming = competition.status === "upcoming";
+  const isCancelled = competition.status === "cancelled";
 
-  const rankingMethod = competition.rules?.rankingMethod || 'pnl';
+  const rankingMethod = competition.rules?.rankingMethod || "pnl";
   const theme = COMPETITION_THEMES[rankingMethod] || COMPETITION_THEMES.pnl;
-  const rankingInfo = RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
+  const rankingInfo =
+    RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
   // Fetch platform risk settings for actual leverage
   const [platformLeverage, setPlatformLeverage] = useState<number>(100);
-  
+
   useEffect(() => {
     const fetchRiskSettings = async () => {
       try {
-        const res = await fetch('/api/trading/risk-settings');
+        const res = await fetch("/api/trading/risk-settings");
         if (res.ok) {
           const data = await res.json();
           if (data.settings?.maxLeverage) {
@@ -120,7 +159,7 @@ export default function CompetitionCard({
           }
         }
       } catch (err) {
-        console.error('Failed to fetch risk settings:', err);
+        console.error("Failed to fetch risk settings:", err);
       }
     };
     fetchRiskSettings();
@@ -131,32 +170,51 @@ export default function CompetitionCard({
 
   const difficulty = useMemo(() => {
     // Check if competition has manual difficulty setting
-    if (competition.difficulty?.mode === 'manual' && competition.difficulty?.manualLevel) {
+    if (
+      competition.difficulty?.mode === "manual" &&
+      competition.difficulty?.manualLevel
+    ) {
       // Map old manual levels to new trader-based levels
-      const levelMap: Record<string, { level: string; score: number; emoji: string }> = {
-        'beginner': { level: 'Novice', score: 10, emoji: '🌱' },
-        'intermediate': { level: 'Skilled', score: 30, emoji: '⚔️' },
-        'advanced': { level: 'Elite', score: 50, emoji: '💎' },
-        'expert': { level: 'Grand Master', score: 70, emoji: '🔥' },
-        'extreme': { level: 'Trading God', score: 95, emoji: '👑' },
+      const levelMap: Record<
+        string,
+        { level: string; score: number; emoji: string }
+      > = {
+        beginner: { level: "Novice", score: 10, emoji: "🌱" },
+        intermediate: { level: "Skilled", score: 30, emoji: "⚔️" },
+        advanced: { level: "Elite", score: 50, emoji: "💎" },
+        expert: { level: "Grand Master", score: 70, emoji: "🔥" },
+        extreme: { level: "Trading God", score: 95, emoji: "👑" },
       };
-      const mapped = levelMap[competition.difficulty.manualLevel] || { level: 'Skilled', score: 30, emoji: '⚔️' };
+      const mapped = levelMap[competition.difficulty.manualLevel] || {
+        level: "Skilled",
+        score: 30,
+        emoji: "⚔️",
+      };
       return {
         level: mapped.level,
         score: mapped.score,
         emoji: mapped.emoji,
-        factors: [{ factor: 'Manually Set', impact: 'high' as const, score: mapped.score }],
+        factors: [
+          {
+            factor: "Manually Set",
+            impact: "high" as const,
+            score: mapped.score,
+          },
+        ],
       };
     }
-    
+
     // Auto-calculate difficulty using the correct leverage field
     const start = new Date(competition.startTime);
     const end = new Date(competition.endTime);
     const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    
+
     return calculateCompetitionDifficulty({
       entryFeeCredits: competition.entryFee || competition.entryFeeCredits || 0,
-      startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
+      startingCapital:
+        competition.startingCapital ||
+        competition.startingTradingPoints ||
+        10000,
       leverageAllowed: maxLeverage,
       maxParticipants: competition.maxParticipants,
       participantCount: competition.currentParticipants,
@@ -173,7 +231,7 @@ export default function CompetitionCard({
     const start = new Date(competition.startTime);
     const diff = start.getTime() - now.getTime();
 
-    if (diff < 0) return 'Started';
+    if (diff < 0) return "Started";
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -199,7 +257,7 @@ export default function CompetitionCard({
     const start = new Date(competition.startTime);
     const end = new Date(competition.endTime);
     const diff = end.getTime() - start.getTime();
-    
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -208,23 +266,27 @@ export default function CompetitionCard({
     if (days > 0) parts.push(`${days}d`);
     if (hours > 0) parts.push(`${hours}h`);
     if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
-    
-    return parts.join(' ');
+
+    return parts.join(" ");
   };
 
-  const getPrizePool = () => competition.prizePool || competition.prizePoolCredits || 0;
-  const getEntryFee = () => competition.entryFee || competition.entryFeeCredits || 0;
+  const getPrizePool = () =>
+    competition.prizePool || competition.prizePoolCredits || 0;
+  const getEntryFee = () =>
+    competition.entryFee || competition.entryFeeCredits || 0;
 
   const handleEnter = async () => {
     if (!canAfford || isFull) return;
     setEntering(true);
     try {
       await enterCompetition(competition._id);
-      toast.success('Successfully entered competition!');
+      toast.success("Successfully entered competition!");
       router.push(`/competitions/${competition._id}`);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to enter competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to enter competition",
+      );
       setEntering(false);
     }
   };
@@ -232,24 +294,37 @@ export default function CompetitionCard({
   // Format date helper
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // LIST VIEW
-  if (viewMode === 'list') {
+  if (viewMode === "list") {
     return (
       <Link href={`/competitions/${competition._id}`}>
-        <div className={`group relative overflow-hidden rounded-xl ${theme.bgPattern} border border-gray-700/50 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:${theme.glow}`}>
+        <div
+          className={`group relative overflow-hidden rounded-xl ${theme.bgPattern} border border-gray-700/50 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:${theme.glow}`}
+        >
           <div className="flex flex-col">
             {/* Main Row */}
             <div className="flex items-center gap-4 p-4">
               {/* Icon */}
-              <div className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}>
+              <div
+                className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}
+              >
                 {theme.icon}
               </div>
 
@@ -282,13 +357,20 @@ export default function CompetitionCard({
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-400">
                   <span className="flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}></span>
+                    <span
+                      className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}
+                    ></span>
                     {rankingInfo.name}
                   </span>
-                  <DifficultyBadge difficulty={difficulty} size="sm" showTooltip={true} />
+                  <DifficultyBadge
+                    difficulty={difficulty as DifficultyAnalysis | undefined}
+                    size="sm"
+                    showTooltip={true}
+                  />
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {competition.currentParticipants}/{competition.maxParticipants}
+                    {competition.currentParticipants}/
+                    {competition.maxParticipants}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -300,25 +382,33 @@ export default function CompetitionCard({
               {/* Dates */}
               <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
                 <div className="text-xs text-gray-500 mb-0.5">Start</div>
-                <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.startTime)}</div>
+                <div className="text-sm font-medium text-gray-300">
+                  {formatDateTime(competition.startTime)}
+                </div>
               </div>
               <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
                 <div className="text-xs text-gray-500 mb-0.5">End</div>
-                <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.endTime)}</div>
+                <div className="text-sm font-medium text-gray-300">
+                  {formatDateTime(competition.endTime)}
+                </div>
               </div>
 
               {/* Prize */}
               <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
                 <div className="flex items-center gap-1 text-yellow-500">
                   <Trophy className="h-4 w-4" />
-                  <span className="text-xl font-black">{getPrizePool().toFixed(0)}</span>
+                  <span className="text-xl font-black">
+                    {getPrizePool().toFixed(0)}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500">Prize Pool</p>
               </div>
 
               {/* Entry Fee */}
               <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
-                <div className="text-lg font-bold text-gray-100">{getEntryFee()}</div>
+                <div className="text-lg font-bold text-gray-100">
+                  {getEntryFee()}
+                </div>
                 <p className="text-xs text-gray-500">Entry</p>
               </div>
 
@@ -326,7 +416,9 @@ export default function CompetitionCard({
               <div className="flex-shrink-0 w-24 text-center">
                 {isUpcoming && (
                   <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                    <p className="text-xs text-yellow-400 font-mono font-bold">{liveCountdown}</p>
+                    <p className="text-xs text-yellow-400 font-mono font-bold">
+                      {liveCountdown}
+                    </p>
                   </div>
                 )}
                 {isActive && (
@@ -356,7 +448,12 @@ export default function CompetitionCard({
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
                 <Target className="h-3 w-3 text-purple-400" />
                 <span className="text-[10px] text-purple-300 font-medium">
-                  ${(competition.startingCapital || competition.startingTradingPoints || 10000).toLocaleString()}
+                  $
+                  {(
+                    competition.startingCapital ||
+                    competition.startingTradingPoints ||
+                    10000
+                  ).toLocaleString()}
                 </span>
               </div>
 
@@ -369,14 +466,15 @@ export default function CompetitionCard({
               </div>
 
               {/* Minimum Trades */}
-              {competition.rules?.minimumTrades && competition.rules.minimumTrades > 1 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                  <Swords className="h-3 w-3 text-cyan-400" />
-                  <span className="text-[10px] text-cyan-300 font-medium">
-                    Min {competition.rules.minimumTrades} trades
-                  </span>
-                </div>
-              )}
+              {competition.rules?.minimumTrades &&
+                competition.rules.minimumTrades > 1 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                    <Swords className="h-3 w-3 text-cyan-400" />
+                    <span className="text-[10px] text-cyan-300 font-medium">
+                      Min {competition.rules.minimumTrades} trades
+                    </span>
+                  </div>
+                )}
 
               {/* Liquidation Risk */}
               {competition.rules?.disqualifyOnLiquidation && (
@@ -415,7 +513,8 @@ export default function CompetitionCard({
                     key={asset}
                     className="px-2 py-0.5 rounded bg-gray-800/80 text-[10px] font-bold text-gray-400 uppercase border border-gray-700/50"
                   >
-                    {asset === 'forex' && '💱'} {asset === 'crypto' && '₿'} {asset === 'stocks' && '📊'} {asset}
+                    {asset === "forex" && "💱"} {asset === "crypto" && "₿"}{" "}
+                    {asset === "stocks" && "📊"} {asset}
                   </span>
                 ))}
               </div>
@@ -428,36 +527,41 @@ export default function CompetitionCard({
 
   // CARD VIEW (Default)
   return (
-    <div className={`group relative overflow-hidden rounded-2xl ${isCancelled ? 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900' : theme.bgPattern} border ${isCancelled ? 'border-red-700/50 hover:border-red-500/50' : 'border-gray-700/50 hover:border-yellow-500/50'} transition-all duration-500 hover:shadow-2xl ${isCancelled ? 'hover:shadow-red-500/50' : `hover:${theme.glow}`} hover:-translate-y-2`}>
+    <div
+      className={`group relative overflow-hidden rounded-2xl ${isCancelled ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900" : theme.bgPattern} border ${isCancelled ? "border-red-700/50 hover:border-red-500/50" : "border-gray-700/50 hover:border-yellow-500/50"} transition-all duration-500 hover:shadow-2xl ${isCancelled ? "hover:shadow-red-500/50" : `hover:${theme.glow}`} hover:-translate-y-2`}
+    >
       {/* Animated Background Effects */}
       <div className="absolute inset-0 opacity-30">
-        <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-br ${isCancelled ? 'from-red-600 via-red-500 to-red-400' : theme.gradient} rounded-full blur-3xl -translate-y-32 translate-x-32 group-hover:scale-150 transition-transform duration-700`}></div>
-        <div className={`absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr ${isCancelled ? 'from-red-600 via-red-500 to-red-400' : theme.gradient} rounded-full blur-3xl translate-y-24 -translate-x-24 group-hover:scale-150 transition-transform duration-700`}></div>
+        <div
+          className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-br ${isCancelled ? "from-red-600 via-red-500 to-red-400" : theme.gradient} rounded-full blur-3xl -translate-y-32 translate-x-32 group-hover:scale-150 transition-transform duration-700`}
+        ></div>
+        <div
+          className={`absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr ${isCancelled ? "from-red-600 via-red-500 to-red-400" : theme.gradient} rounded-full blur-3xl translate-y-24 -translate-x-24 group-hover:scale-150 transition-transform duration-700`}
+        ></div>
       </div>
-
 
       {/* Large Diagonal Watermark for Status */}
       {(isCompleted || isCancelled || isActive) && (
         <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
-          <div 
+          <div
             className={`font-black tracking-wider uppercase select-none ${
-              isCompleted 
-                ? 'text-5xl md:text-6xl text-green-500/30' 
+              isCompleted
+                ? "text-5xl md:text-6xl text-green-500/30"
                 : isCancelled
-                ? 'text-5xl md:text-6xl text-red-500/30'
-                : 'text-4xl md:text-5xl text-blue-500/25'
+                  ? "text-5xl md:text-6xl text-red-500/30"
+                  : "text-4xl md:text-5xl text-blue-500/25"
             }`}
             style={{
-              transform: 'rotate(-25deg)',
-              textShadow: isCompleted 
-                ? '0 0 40px rgba(34, 197, 94, 0.4)' 
+              transform: "rotate(-25deg)",
+              textShadow: isCompleted
+                ? "0 0 40px rgba(34, 197, 94, 0.4)"
                 : isCancelled
-                ? '0 0 40px rgba(239, 68, 68, 0.4)'
-                : '0 0 30px rgba(59, 130, 246, 0.3)',
-              letterSpacing: '0.12em',
+                  ? "0 0 40px rgba(239, 68, 68, 0.4)"
+                  : "0 0 30px rgba(59, 130, 246, 0.3)",
+              letterSpacing: "0.12em",
             }}
           >
-            {isCompleted ? 'COMPLETED' : isCancelled ? 'CANCELLED' : 'LIVE'}
+            {isCompleted ? "COMPLETED" : isCancelled ? "CANCELLED" : "LIVE"}
           </div>
         </div>
       )}
@@ -477,14 +581,22 @@ export default function CompetitionCard({
         {/* Competition Type Badge */}
         <div className="flex justify-center mb-4">
           <div className={`relative group/type cursor-default`}>
-            <div className={`absolute inset-0 bg-gradient-to-r ${theme.gradient} rounded-xl blur opacity-50 group-hover/type:opacity-80 transition-opacity`}></div>
-            <div className={`relative flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900/80 border border-gray-700 backdrop-blur`}>
+            <div
+              className={`absolute inset-0 bg-gradient-to-r ${theme.gradient} rounded-xl blur opacity-50 group-hover/type:opacity-80 transition-opacity`}
+            ></div>
+            <div
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900/80 border border-gray-700 backdrop-blur`}
+            >
               <span className="text-2xl">{theme.icon}</span>
               <div>
-                <p className={`text-sm font-black bg-gradient-to-r ${theme.gradient} bg-clip-text text-transparent`}>
+                <p
+                  className={`text-sm font-black bg-gradient-to-r ${theme.gradient} bg-clip-text text-transparent`}
+                >
                   {rankingInfo.name}
                 </p>
-                <p className="text-[10px] text-gray-400">{rankingInfo.description}</p>
+                <p className="text-[10px] text-gray-400">
+                  {rankingInfo.description}
+                </p>
               </div>
             </div>
           </div>
@@ -494,44 +606,79 @@ export default function CompetitionCard({
         <h3 className="text-xl font-black text-center text-gray-100 mb-2 group-hover:text-yellow-400 transition-colors">
           {competition.name}
         </h3>
-        
+
         {/* Difficulty Badge */}
         <div className="flex justify-center mb-3">
-          <DifficultyBadge difficulty={difficulty} size="md" showTooltip={true} />
+          <DifficultyBadge
+            difficulty={difficulty as DifficultyAnalysis | undefined}
+            size="md"
+            showTooltip={true}
+          />
         </div>
-        
-        <p className="text-sm text-gray-400 text-center mb-4">{competition.description}</p>
+
+        <p className="text-sm text-gray-400 text-center mb-4">
+          {competition.description}
+        </p>
 
         {/* Prize Pool - Casino Style */}
         <div className="relative mb-5">
-          <div className={`absolute inset-0 bg-gradient-to-r ${isCancelled ? 'from-red-500/20 via-red-500/20 to-red-500/20' : 'from-yellow-500/20 via-amber-500/20 to-yellow-500/20'} rounded-2xl blur-xl`}></div>
-          <div className={`relative p-5 rounded-2xl bg-gradient-to-br ${isCancelled ? 'from-red-500/10 via-red-500/5 to-transparent border-2 border-red-500/40' : 'from-yellow-500/10 via-amber-500/5 to-transparent border-2 border-yellow-500/40'} overflow-hidden`}>
+          <div
+            className={`absolute inset-0 bg-gradient-to-r ${isCancelled ? "from-red-500/20 via-red-500/20 to-red-500/20" : "from-yellow-500/20 via-amber-500/20 to-yellow-500/20"} rounded-2xl blur-xl`}
+          ></div>
+          <div
+            className={`relative p-5 rounded-2xl bg-gradient-to-br ${isCancelled ? "from-red-500/10 via-red-500/5 to-transparent border-2 border-red-500/40" : "from-yellow-500/10 via-amber-500/5 to-transparent border-2 border-yellow-500/40"} overflow-hidden`}
+          >
             {/* Casino-style decorative elements */}
-            <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${isCancelled ? 'via-red-400' : 'via-yellow-400'} to-transparent`}></div>
-            <div className={`absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${isCancelled ? 'via-red-400' : 'via-yellow-400'} to-transparent`}></div>
-            
+            <div
+              className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${isCancelled ? "via-red-400" : "via-yellow-400"} to-transparent`}
+            ></div>
+            <div
+              className={`absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${isCancelled ? "via-red-400" : "via-yellow-400"} to-transparent`}
+            ></div>
+
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-1 mb-1">
-                  <Crown className={`h-4 w-4 ${isCancelled ? 'text-red-500' : 'text-yellow-500'}`} />
-                  <p className={`text-xs font-bold ${isCancelled ? 'text-red-400' : 'text-yellow-400'} uppercase tracking-wider`}>
-                    {isCancelled ? 'Prize Pool (Refunded)' : 'Grand Prize Pool'}
+                  <Crown
+                    className={`h-4 w-4 ${isCancelled ? "text-red-500" : "text-yellow-500"}`}
+                  />
+                  <p
+                    className={`text-xs font-bold ${isCancelled ? "text-red-400" : "text-yellow-400"} uppercase tracking-wider`}
+                  >
+                    {isCancelled ? "Prize Pool (Refunded)" : "Grand Prize Pool"}
                   </p>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${isCancelled ? 'from-red-400 via-red-300 to-red-500 line-through' : 'from-yellow-400 via-amber-300 to-yellow-500'} drop-shadow-lg`}>
+                  <span
+                    className={`text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${isCancelled ? "from-red-400 via-red-300 to-red-500 line-through" : "from-yellow-400 via-amber-300 to-yellow-500"} drop-shadow-lg`}
+                  >
                     {getPrizePool().toFixed(0)}
                   </span>
-                  <span className={`text-sm font-bold ${isCancelled ? 'text-red-400/80' : 'text-yellow-400/80'}`}>{settings?.credits.symbol}</span>
+                  <span
+                    className={`text-sm font-bold ${isCancelled ? "text-red-400/80" : "text-yellow-400/80"}`}
+                  >
+                    {settings?.credits.symbol}
+                  </span>
                 </div>
                 {settings?.credits.showEUREquivalent && (
-                  <p className="text-xs text-gray-500">≈ €{(getPrizePool() * (settings?.credits.valueInEUR || 1)).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">
+                    ≈ €
+                    {(
+                      getPrizePool() * (settings?.credits.valueInEUR || 1)
+                    ).toFixed(2)}
+                  </p>
                 )}
               </div>
               <div className="relative">
-                <div className={`absolute inset-0 ${isCancelled ? 'bg-red-500' : 'bg-yellow-500'} rounded-xl blur-lg opacity-30 ${isCancelled ? '' : 'animate-pulse'}`}></div>
-                <div className={`relative w-16 h-16 bg-gradient-to-br ${isCancelled ? 'from-red-400 to-red-600' : 'from-yellow-400 to-amber-600'} rounded-xl flex items-center justify-center shadow-xl transform group-hover:rotate-12 transition-transform`}>
-                  <Trophy className={`h-9 w-9 ${isCancelled ? 'text-red-900' : 'text-yellow-900'}`} />
+                <div
+                  className={`absolute inset-0 ${isCancelled ? "bg-red-500" : "bg-yellow-500"} rounded-xl blur-lg opacity-30 ${isCancelled ? "" : "animate-pulse"}`}
+                ></div>
+                <div
+                  className={`relative w-16 h-16 bg-gradient-to-br ${isCancelled ? "from-red-400 to-red-600" : "from-yellow-400 to-amber-600"} rounded-xl flex items-center justify-center shadow-xl transform group-hover:rotate-12 transition-transform`}
+                >
+                  <Trophy
+                    className={`h-9 w-9 ${isCancelled ? "text-red-900" : "text-yellow-900"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -541,14 +688,24 @@ export default function CompetitionCard({
         {/* Stats Grid - Gaming Style */}
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
-            <div className={`absolute top-0 right-0 w-8 h-8 ${isCancelled ? 'bg-red-500/10' : 'bg-green-500/10'} rounded-full blur-lg`}></div>
+            <div
+              className={`absolute top-0 right-0 w-8 h-8 ${isCancelled ? "bg-red-500/10" : "bg-green-500/10"} rounded-full blur-lg`}
+            ></div>
             <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-lg ${isCancelled ? 'bg-red-500/20' : 'bg-green-500/20'} flex items-center justify-center`}>
-                <Zap className={`h-4 w-4 ${isCancelled ? 'text-red-400' : 'text-green-400'}`} />
+              <div
+                className={`w-8 h-8 rounded-lg ${isCancelled ? "bg-red-500/20" : "bg-green-500/20"} flex items-center justify-center`}
+              >
+                <Zap
+                  className={`h-4 w-4 ${isCancelled ? "text-red-400" : "text-green-400"}`}
+                />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Entry Fee</p>
-                <p className={`text-sm font-bold ${isCancelled ? 'text-red-400 line-through' : 'text-gray-100'}`}>{getEntryFee()} {settings?.credits.symbol}</p>
+                <p
+                  className={`text-sm font-bold ${isCancelled ? "text-red-400 line-through" : "text-gray-100"}`}
+                >
+                  {getEntryFee()} {settings?.credits.symbol}
+                </p>
               </div>
             </div>
           </div>
@@ -563,7 +720,9 @@ export default function CompetitionCard({
                 <p className="text-[10px] text-gray-500 uppercase">Players</p>
                 <p className="text-sm font-bold text-gray-100">
                   {competition.currentParticipants}
-                  <span className="text-gray-500">/{competition.maxParticipants}</span>
+                  <span className="text-gray-500">
+                    /{competition.maxParticipants}
+                  </span>
                 </p>
               </div>
             </div>
@@ -592,7 +751,9 @@ export default function CompetitionCard({
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Duration</p>
-                <p className="text-sm font-bold text-gray-100">{getDuration()}</p>
+                <p className="text-sm font-bold text-gray-100">
+                  {getDuration()}
+                </p>
               </div>
             </div>
           </div>
@@ -615,7 +776,8 @@ export default function CompetitionCard({
             </div>
           </div>
 
-          {competition.rules?.minimumTrades && competition.rules.minimumTrades > 0 ? (
+          {competition.rules?.minimumTrades &&
+          competition.rules.minimumTrades > 0 ? (
             <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
               <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full blur-lg"></div>
               <div className="flex items-center gap-2">
@@ -623,8 +785,12 @@ export default function CompetitionCard({
                   <Swords className="h-4 w-4 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Min Trades</p>
-                  <p className="text-sm font-bold text-cyan-400">{competition.rules.minimumTrades}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">
+                    Min Trades
+                  </p>
+                  <p className="text-sm font-bold text-cyan-400">
+                    {competition.rules.minimumTrades}
+                  </p>
                 </div>
               </div>
             </div>
@@ -636,7 +802,9 @@ export default function CompetitionCard({
                   <Flame className="h-4 w-4 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Liquidation</p>
+                  <p className="text-[10px] text-gray-500 uppercase">
+                    Liquidation
+                  </p>
                   <p className="text-sm font-bold text-red-400">= DQ</p>
                 </div>
               </div>
@@ -666,7 +834,9 @@ export default function CompetitionCard({
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Starts</p>
-                <p className="text-xs font-bold text-gray-100">{formatDate(competition.startTime)}</p>
+                <p className="text-xs font-bold text-gray-100">
+                  {formatDate(competition.startTime)}
+                </p>
               </div>
             </div>
           </div>
@@ -678,7 +848,9 @@ export default function CompetitionCard({
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Ends</p>
-                <p className="text-xs font-bold text-gray-100">{formatDate(competition.endTime)}</p>
+                <p className="text-xs font-bold text-gray-100">
+                  {formatDate(competition.endTime)}
+                </p>
               </div>
             </div>
           </div>
@@ -701,50 +873,78 @@ export default function CompetitionCard({
         )}
 
         {/* Difficulty Bar */}
-        <div className={`mb-4 p-3 rounded-xl border ${
-          difficulty.score <= 20 ? 'bg-green-500/10 border-green-500/30'
-            : difficulty.score <= 40 ? 'bg-blue-500/10 border-blue-500/30'
-            : difficulty.score <= 60 ? 'bg-yellow-500/10 border-yellow-500/30'
-            : difficulty.score <= 80 ? 'bg-orange-500/10 border-orange-500/30'
-            : 'bg-red-500/10 border-red-500/30'
-        }`}>
+        <div
+          className={`mb-4 p-3 rounded-xl border ${
+            difficulty.score <= 20
+              ? "bg-green-500/10 border-green-500/30"
+              : difficulty.score <= 40
+                ? "bg-blue-500/10 border-blue-500/30"
+                : difficulty.score <= 60
+                  ? "bg-yellow-500/10 border-yellow-500/30"
+                  : difficulty.score <= 80
+                    ? "bg-orange-500/10 border-orange-500/30"
+                    : "bg-red-500/10 border-red-500/30"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Gauge className={`h-4 w-4 ${
-                difficulty.score <= 20 ? 'text-green-400'
-                  : difficulty.score <= 40 ? 'text-blue-400'
-                  : difficulty.score <= 60 ? 'text-yellow-400'
-                  : difficulty.score <= 80 ? 'text-orange-400'
-                  : 'text-red-400'
-              }`} />
-              <span className={`text-xs font-bold ${
-                difficulty.score <= 20 ? 'text-green-400'
-                  : difficulty.score <= 40 ? 'text-blue-400'
-                  : difficulty.score <= 60 ? 'text-yellow-400'
-                  : difficulty.score <= 80 ? 'text-orange-400'
-                  : 'text-red-400'
-              }`}>
-                {difficulty.emoji || '🎯'} {difficulty.level}
+              <Gauge
+                className={`h-4 w-4 ${
+                  difficulty.score <= 20
+                    ? "text-green-400"
+                    : difficulty.score <= 40
+                      ? "text-blue-400"
+                      : difficulty.score <= 60
+                        ? "text-yellow-400"
+                        : difficulty.score <= 80
+                          ? "text-orange-400"
+                          : "text-red-400"
+                }`}
+              />
+              <span
+                className={`text-xs font-bold ${
+                  difficulty.score <= 20
+                    ? "text-green-400"
+                    : difficulty.score <= 40
+                      ? "text-blue-400"
+                      : difficulty.score <= 60
+                        ? "text-yellow-400"
+                        : difficulty.score <= 80
+                          ? "text-orange-400"
+                          : "text-red-400"
+                }`}
+              >
+                {difficulty.emoji || "🎯"} {difficulty.level}
               </span>
             </div>
-            <span className={`text-xs font-mono ${
-              difficulty.score <= 20 ? 'text-green-400'
-                : difficulty.score <= 40 ? 'text-blue-400'
-                : difficulty.score <= 60 ? 'text-yellow-400'
-                : difficulty.score <= 80 ? 'text-orange-400'
-                : 'text-red-400'
-            }`}>
+            <span
+              className={`text-xs font-mono ${
+                difficulty.score <= 20
+                  ? "text-green-400"
+                  : difficulty.score <= 40
+                    ? "text-blue-400"
+                    : difficulty.score <= 60
+                      ? "text-yellow-400"
+                      : difficulty.score <= 80
+                        ? "text-orange-400"
+                        : "text-red-400"
+              }`}
+            >
               {difficulty.score}/100
             </span>
           </div>
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div 
+            <div
               className={`h-full transition-all duration-500 ${
-                difficulty.score <= 20 ? 'bg-gradient-to-r from-green-600 to-green-400'
-                  : difficulty.score <= 40 ? 'bg-gradient-to-r from-blue-600 to-blue-400'
-                  : difficulty.score <= 60 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
-                  : difficulty.score <= 80 ? 'bg-gradient-to-r from-orange-600 to-orange-400'
-                  : 'bg-gradient-to-r from-red-600 to-red-400'
+                difficulty.score <= 20
+                  ? "bg-gradient-to-r from-green-600 to-green-400"
+                  : difficulty.score <= 40
+                    ? "bg-gradient-to-r from-blue-600 to-blue-400"
+                    : difficulty.score <= 60
+                      ? "bg-gradient-to-r from-yellow-600 to-yellow-400"
+                      : difficulty.score <= 80
+                        ? "bg-gradient-to-r from-orange-600 to-orange-400"
+                        : "bg-gradient-to-r from-red-600 to-red-400"
               }`}
               style={{ width: `${difficulty.score}%` }}
             />
@@ -760,10 +960,16 @@ export default function CompetitionCard({
                 {(() => {
                   const minLevel = competition.levelRequirement.minLevel || 1;
                   const maxLevel = competition.levelRequirement.maxLevel;
-                  const minInfo = LEVEL_NAMES[minLevel] || { emoji: '🌱', name: 'Novice Trader' };
-                  
+                  const minInfo = LEVEL_NAMES[minLevel] || {
+                    emoji: "🌱",
+                    name: "Novice Trader",
+                  };
+
                   if (maxLevel && maxLevel !== minLevel) {
-                    const maxInfo = LEVEL_NAMES[maxLevel] || { emoji: '👑', name: 'Trading God' };
+                    const maxInfo = LEVEL_NAMES[maxLevel] || {
+                      emoji: "👑",
+                      name: "Trading God",
+                    };
                     return `${minInfo.emoji} ${minInfo.name} to ${maxInfo.emoji} ${maxInfo.name}`;
                   }
                   return `${minInfo.emoji} ${minInfo.name} or higher`;
@@ -780,7 +986,8 @@ export default function CompetitionCard({
               key={asset}
               className="px-2 py-1 rounded-lg bg-gray-800/80 text-[10px] font-bold text-gray-300 uppercase border border-gray-700/50"
             >
-              {asset === 'forex' && '💱'} {asset === 'crypto' && '₿'} {asset === 'stocks' && '📊'} {asset === 'indices' && '📈'} {asset}
+              {asset === "forex" && "💱"} {asset === "crypto" && "₿"}{" "}
+              {asset === "stocks" && "📊"} {asset === "indices" && "📈"} {asset}
             </span>
           ))}
         </div>
@@ -791,12 +998,14 @@ export default function CompetitionCard({
             <Button
               className={`w-full font-black text-base py-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                 isUserIn
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/30'
+                  ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/30"
                   : isFull || !canAfford
-                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                  : `bg-gradient-to-r ${theme.gradient} text-gray-900 shadow-lg ${theme.glow} hover:shadow-xl`
+                    ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                    : `bg-gradient-to-r ${theme.gradient} text-gray-900 shadow-lg ${theme.glow} hover:shadow-xl`
               }`}
-              disabled={entering || (isFull && !isUserIn) || (!canAfford && !isUserIn)}
+              disabled={
+                entering || (isFull && !isUserIn) || (!canAfford && !isUserIn)
+              }
             >
               {entering ? (
                 <span className="flex items-center gap-2">
@@ -836,13 +1045,15 @@ export default function CompetitionCard({
             <Button
               variant="outline"
               className={`w-full font-bold py-6 rounded-xl border-2 bg-transparent transition-all duration-300 transform hover:scale-105 ${
-                isCancelled 
-                  ? 'border-red-600 text-red-400 hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 hover:text-white hover:border-transparent'
-                  : 'border-gray-600 text-gray-100 hover:bg-gradient-to-r hover:from-yellow-500 hover:to-amber-500 hover:text-gray-900 hover:border-transparent'
+                isCancelled
+                  ? "border-red-600 text-red-400 hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 hover:text-white hover:border-transparent"
+                  : "border-gray-600 text-gray-100 hover:bg-gradient-to-r hover:from-yellow-500 hover:to-amber-500 hover:text-gray-900 hover:border-transparent"
               }`}
             >
-              <Trophy className={`h-5 w-5 mr-2 ${isCancelled ? 'text-red-400' : ''}`} />
-              {isCancelled ? 'View Details' : 'View Results'}
+              <Trophy
+                className={`h-5 w-5 mr-2 ${isCancelled ? "text-red-400" : ""}`}
+              />
+              {isCancelled ? "View Details" : "View Results"}
             </Button>
           </Link>
         )}

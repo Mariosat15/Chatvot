@@ -1,6 +1,9 @@
-import Notification from '@/database/models/notification.model';
-import NotificationTemplate, { NotificationType, NotificationCategory } from '@/database/models/notification-template.model';
-import { connectToDatabase } from '@/database/mongoose';
+import Notification from "@/database/models/notification.model";
+import NotificationTemplate, {
+  NotificationType,
+  NotificationCategory,
+} from "@/database/models/notification-template.model";
+import { connectToDatabase } from "@/database/mongoose";
 
 export interface NotificationData {
   userId: string;
@@ -28,7 +31,10 @@ export interface GetNotificationsOptions {
 /**
  * Replace template variables with actual values
  */
-function replaceVariables(text: string, variables: Record<string, any>): string {
+function replaceVariables(
+  text: string,
+  variables: Record<string, any>,
+): string {
   return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
     return variables[key] !== undefined ? String(variables[key]) : match;
   });
@@ -45,20 +51,24 @@ class NotificationService {
     try {
       await connectToDatabase();
 
-      const template = await NotificationTemplate.findOne({ 
-        templateId: options.templateId, 
-        isEnabled: true 
+      const template = await NotificationTemplate.findOne({
+        templateId: options.templateId,
+        isEnabled: true,
       });
-      
+
       if (!template) {
-        console.warn(`Notification template '${options.templateId}' not found or disabled`);
+        console.warn(
+          `Notification template '${options.templateId}' not found or disabled`,
+        );
         return null;
       }
 
       const variables = options.variables || {};
       const title = replaceVariables(template.title, variables);
       const message = replaceVariables(template.message, variables);
-      const actionUrl = template.actionUrl ? replaceVariables(template.actionUrl, variables) : undefined;
+      const actionUrl = template.actionUrl
+        ? replaceVariables(template.actionUrl, variables)
+        : undefined;
 
       const notification = await Notification.create({
         userId: options.userId,
@@ -74,16 +84,18 @@ class NotificationService {
         actionText: template.actionText,
         isRead: false,
         metadata: variables,
-        sentBy: options.adminId ? {
-          adminId: options.adminId,
-          adminEmail: options.adminEmail,
-        } : undefined,
+        sentBy: options.adminId
+          ? {
+              adminId: options.adminId,
+              adminEmail: options.adminEmail,
+            }
+          : undefined,
         isInstant: false,
       });
 
       return notification;
     } catch (error) {
-      console.error('Error sending notification:', error);
+      console.error("Error sending notification:", error);
       return null;
     }
   }
@@ -112,11 +124,11 @@ class NotificationService {
         templateId: `custom_${data.type}`,
         title: data.title,
         message: data.message,
-        icon: data.icon || 'bell',
-        category: data.category || 'system',
+        icon: data.icon || "bell",
+        category: data.category || "system",
         type: data.type,
-        priority: data.priority || 'normal',
-        color: data.color || 'blue',
+        priority: data.priority || "normal",
+        color: data.color || "blue",
         actionUrl: data.actionUrl,
         actionText: data.actionText,
         isRead: false,
@@ -126,7 +138,7 @@ class NotificationService {
 
       return notification;
     } catch (error) {
-      console.error('Error creating custom notification:', error);
+      console.error("Error creating custom notification:", error);
       return null;
     }
   }
@@ -134,7 +146,10 @@ class NotificationService {
   /**
    * Get user's notifications
    */
-  async getUserNotifications(userId: string, options: GetNotificationsOptions = {}) {
+  async getUserNotifications(
+    userId: string,
+    options: GetNotificationsOptions = {},
+  ) {
     await connectToDatabase();
 
     const { limit = 50, offset = 0, category, unreadOnly } = options;
@@ -163,12 +178,12 @@ class NotificationService {
    */
   async markAsRead(notificationId: string, userId: string): Promise<boolean> {
     await connectToDatabase();
-    
+
     const result = await Notification.findOneAndUpdate(
       { _id: notificationId, userId },
-      { isRead: true, readAt: new Date() }
+      { isRead: true, readAt: new Date() },
     );
-    
+
     return !!result;
   }
 
@@ -177,12 +192,12 @@ class NotificationService {
    */
   async markAllAsRead(userId: string): Promise<number> {
     await connectToDatabase();
-    
+
     const result = await Notification.updateMany(
       { userId, isRead: false },
-      { isRead: true, readAt: new Date() }
+      { isRead: true, readAt: new Date() },
     );
-    
+
     return result.modifiedCount;
   }
 
@@ -191,7 +206,7 @@ class NotificationService {
    */
   async clearAllNotifications(userId: string): Promise<number> {
     await connectToDatabase();
-    
+
     const result = await Notification.deleteMany({ userId });
     return result.deletedCount;
   }
@@ -199,14 +214,17 @@ class NotificationService {
   /**
    * Delete a single notification
    */
-  async deleteNotification(notificationId: string, userId: string): Promise<boolean> {
+  async deleteNotification(
+    notificationId: string,
+    userId: string,
+  ): Promise<boolean> {
     await connectToDatabase();
-    
+
     const result = await Notification.findOneAndDelete({
       _id: notificationId,
       userId,
     });
-    
+
     return !!result;
   }
 
@@ -235,17 +253,19 @@ class NotificationService {
     try {
       const result = await this.send({
         userId,
-        templateId: 'deposit_initiated',
+        templateId: "deposit_initiated",
         variables: { amount: `€${amount.toFixed(2)}` },
       });
       if (result) {
         console.log(`✅ Deposit initiated notification CREATED: ${result._id}`);
       } else {
-        console.log(`⚠️ Deposit initiated notification NOT created (check template/preferences)`);
+        console.log(
+          `⚠️ Deposit initiated notification NOT created (check template/preferences)`,
+        );
       }
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyDepositInitiated:', error);
+      console.error("❌ Error in notifyDepositInitiated:", error);
       return null;
     }
   }
@@ -253,18 +273,28 @@ class NotificationService {
   /**
    * Send deposit completed notification
    */
-  async notifyDepositCompleted(userId: string, amount: number, balance: number): Promise<any> {
+  async notifyDepositCompleted(
+    userId: string,
+    amount: number,
+    balance: number,
+  ): Promise<any> {
     console.log(`🔔 Sending deposit_completed notification to ${userId}`);
     try {
       const result = await this.send({
         userId,
-        templateId: 'deposit_completed',
-        variables: { amount: `€${amount.toFixed(2)}`, balance: balance.toFixed(2) },
+        templateId: "deposit_completed",
+        variables: {
+          amount: `€${amount.toFixed(2)}`,
+          balance: balance.toFixed(2),
+        },
       });
-      console.log(`✅ Deposit notification result:`, result ? 'sent' : 'not sent');
+      console.log(
+        `✅ Deposit notification result:`,
+        result ? "sent" : "not sent",
+      );
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyDepositCompleted:', error);
+      console.error("❌ Error in notifyDepositCompleted:", error);
       return null;
     }
   }
@@ -272,17 +302,21 @@ class NotificationService {
   /**
    * Send deposit failed notification
    */
-  async notifyDepositFailed(userId: string, amount: number, reason: string): Promise<any> {
+  async notifyDepositFailed(
+    userId: string,
+    amount: number,
+    reason: string,
+  ): Promise<any> {
     console.log(`🔔 Sending deposit_failed notification to ${userId}`);
     try {
       const result = await this.send({
         userId,
-        templateId: 'deposit_failed',
+        templateId: "deposit_failed",
         variables: { amount: `€${amount.toFixed(2)}`, reason },
       });
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyDepositFailed:', error);
+      console.error("❌ Error in notifyDepositFailed:", error);
       return null;
     }
   }
@@ -290,17 +324,20 @@ class NotificationService {
   /**
    * Send withdrawal initiated notification
    */
-  async notifyWithdrawalInitiated(userId: string, amount: number): Promise<any> {
+  async notifyWithdrawalInitiated(
+    userId: string,
+    amount: number,
+  ): Promise<any> {
     console.log(`🔔 Sending withdrawal_initiated notification to ${userId}`);
     try {
       const result = await this.send({
         userId,
-        templateId: 'withdrawal_initiated',
+        templateId: "withdrawal_initiated",
         variables: { amount: `€${amount.toFixed(2)}` },
       });
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyWithdrawalInitiated:', error);
+      console.error("❌ Error in notifyWithdrawalInitiated:", error);
       return null;
     }
   }
@@ -308,17 +345,20 @@ class NotificationService {
   /**
    * Send withdrawal completed notification
    */
-  async notifyWithdrawalCompleted(userId: string, amount: number): Promise<any> {
+  async notifyWithdrawalCompleted(
+    userId: string,
+    amount: number,
+  ): Promise<any> {
     console.log(`🔔 Sending withdrawal_completed notification to ${userId}`);
     try {
       const result = await this.send({
         userId,
-        templateId: 'withdrawal_completed',
+        templateId: "withdrawal_completed",
         variables: { amount: `€${amount.toFixed(2)}` },
       });
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyWithdrawalCompleted:', error);
+      console.error("❌ Error in notifyWithdrawalCompleted:", error);
       return null;
     }
   }
@@ -326,17 +366,21 @@ class NotificationService {
   /**
    * Send withdrawal failed notification
    */
-  async notifyWithdrawalFailed(userId: string, amount: number, reason: string): Promise<any> {
+  async notifyWithdrawalFailed(
+    userId: string,
+    amount: number,
+    reason: string,
+  ): Promise<any> {
     console.log(`🔔 Sending withdrawal_failed notification to ${userId}`);
     try {
       const result = await this.send({
         userId,
-        templateId: 'withdrawal_failed',
+        templateId: "withdrawal_failed",
         variables: { amount: `€${amount.toFixed(2)}`, reason },
       });
       return result;
     } catch (error) {
-      console.error('❌ Error in notifyWithdrawalFailed:', error);
+      console.error("❌ Error in notifyWithdrawalFailed:", error);
       return null;
     }
   }
@@ -344,10 +388,14 @@ class NotificationService {
   /**
    * Send badge earned notification
    */
-  async notifyBadgeEarned(userId: string, badgeName: string, badgeDescription: string): Promise<any> {
+  async notifyBadgeEarned(
+    userId: string,
+    badgeName: string,
+    badgeDescription: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'badge_earned',
+      templateId: "badge_earned",
       variables: {
         badgeName,
         badgeDescription,
@@ -358,10 +406,14 @@ class NotificationService {
   /**
    * Send competition disqualified notification
    */
-  async notifyDisqualified(userId: string, competitionName: string, reason: string): Promise<any> {
+  async notifyDisqualified(
+    userId: string,
+    competitionName: string,
+    reason: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_disqualified',
+      templateId: "competition_disqualified",
       variables: {
         competitionName,
         reason,
@@ -372,10 +424,14 @@ class NotificationService {
   /**
    * Send liquidation notification
    */
-  async notifyLiquidation(userId: string, competitionName: string, reason: string): Promise<any> {
+  async notifyLiquidation(
+    userId: string,
+    competitionName: string,
+    reason: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'liquidation',
+      templateId: "liquidation",
       variables: {
         competitionName,
         reason,
@@ -387,14 +443,19 @@ class NotificationService {
    * Send stop loss triggered notification
    * Template expects: {{symbol}}, {{price}}, {{loss}}
    */
-  async notifyStopLossTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+  async notifyStopLossTriggered(
+    userId: string,
+    symbol: string,
+    exitPrice: number,
+    realizedPnl: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'stop_loss_triggered',
+      templateId: "stop_loss_triggered",
       variables: {
         symbol,
-        price: exitPrice.toFixed(5),  // Template uses {{price}}
-        loss: `-€${Math.abs(realizedPnl).toFixed(2)}`,  // Template uses {{loss}}
+        price: exitPrice.toFixed(5), // Template uses {{price}}
+        loss: `-€${Math.abs(realizedPnl).toFixed(2)}`, // Template uses {{loss}}
       },
     });
   }
@@ -403,14 +464,19 @@ class NotificationService {
    * Send take profit triggered notification
    * Template expects: {{symbol}}, {{price}}, {{profit}}
    */
-  async notifyTakeProfitTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+  async notifyTakeProfitTriggered(
+    userId: string,
+    symbol: string,
+    exitPrice: number,
+    realizedPnl: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'take_profit_triggered',
+      templateId: "take_profit_triggered",
       variables: {
         symbol,
-        price: exitPrice.toFixed(5),  // Template uses {{price}}
-        profit: `+€${Math.abs(realizedPnl).toFixed(2)}`,  // Template uses {{profit}}
+        price: exitPrice.toFixed(5), // Template uses {{price}}
+        profit: `+€${Math.abs(realizedPnl).toFixed(2)}`, // Template uses {{profit}}
       },
     });
   }
@@ -418,10 +484,14 @@ class NotificationService {
   /**
    * Send level up notification when user gains a new level
    */
-  async notifyLevelUp(userId: string, level: number, title: string): Promise<any> {
+  async notifyLevelUp(
+    userId: string,
+    level: number,
+    title: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'level_up',
+      templateId: "level_up",
       variables: {
         level: level.toString(),
         title,
@@ -432,10 +502,13 @@ class NotificationService {
   /**
    * Send competition joined notification
    */
-  async notifyCompetitionJoined(userId: string, competitionName: string): Promise<any> {
+  async notifyCompetitionJoined(
+    userId: string,
+    competitionName: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_joined',
+      templateId: "competition_joined",
       variables: { competitionName },
     });
   }
@@ -443,23 +516,35 @@ class NotificationService {
   /**
    * Send competition cancelled notification
    */
-  async notifyCompetitionCancelled(userId: string, competitionName: string, reason?: string): Promise<any> {
+  async notifyCompetitionCancelled(
+    userId: string,
+    competitionName: string,
+    reason?: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_cancelled',
-      variables: { competitionName, reason: reason || 'Competition was cancelled' },
+      templateId: "competition_cancelled",
+      variables: {
+        competitionName,
+        reason: reason || "Competition was cancelled",
+      },
     });
   }
 
   /**
    * Send competition won notification
    */
-  async notifyCompetitionWon(userId: string, competitionName: string, prize: number, position: number): Promise<any> {
+  async notifyCompetitionWon(
+    userId: string,
+    competitionName: string,
+    prize: number,
+    position: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_won',
-      variables: { 
-        competitionName, 
+      templateId: "competition_won",
+      variables: {
+        competitionName,
         prize: `€${prize.toFixed(2)}`,
         position: position.toString(),
       },
@@ -469,12 +554,17 @@ class NotificationService {
   /**
    * Send podium finish notification (2nd, 3rd place)
    */
-  async notifyPodiumFinish(userId: string, competitionName: string, prize: number, position: number): Promise<any> {
+  async notifyPodiumFinish(
+    userId: string,
+    competitionName: string,
+    prize: number,
+    position: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_podium',
-      variables: { 
-        competitionName, 
+      templateId: "competition_podium",
+      variables: {
+        competitionName,
         prize: `€${prize.toFixed(2)}`,
         finalRank: position.toString(),
       },
@@ -484,12 +574,16 @@ class NotificationService {
   /**
    * Send prize received notification
    */
-  async notifyPrizeReceived(userId: string, competitionName: string, prize: number): Promise<any> {
+  async notifyPrizeReceived(
+    userId: string,
+    competitionName: string,
+    prize: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_prize_received',
-      variables: { 
-        competitionName, 
+      templateId: "competition_prize_received",
+      variables: {
+        competitionName,
         prize: `€${prize.toFixed(2)}`,
       },
     });
@@ -498,12 +592,16 @@ class NotificationService {
   /**
    * Send competition ended notification
    */
-  async notifyCompetitionEnded(userId: string, competitionName: string, finalPosition: number): Promise<any> {
+  async notifyCompetitionEnded(
+    userId: string,
+    competitionName: string,
+    finalPosition: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_ended',
-      variables: { 
-        competitionName, 
+      templateId: "competition_ended",
+      variables: {
+        competitionName,
         finalPosition: finalPosition.toString(),
       },
     });
@@ -513,15 +611,21 @@ class NotificationService {
    * Send order filled notification
    * Template expects: {{symbol}}, {{orderType}}, {{price}}, {{size}}
    */
-  async notifyOrderFilled(userId: string, symbol: string, side: string, quantity: number, price: number): Promise<any> {
+  async notifyOrderFilled(
+    userId: string,
+    symbol: string,
+    side: string,
+    quantity: number,
+    price: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'order_filled',
-      variables: { 
-        symbol, 
-        orderType: side.toUpperCase(),  // Template uses {{orderType}}
+      templateId: "order_filled",
+      variables: {
+        symbol,
+        orderType: side.toUpperCase(), // Template uses {{orderType}}
         price: price.toFixed(5),
-        size: quantity.toString(),  // Template uses {{size}}
+        size: quantity.toString(), // Template uses {{size}}
       },
     });
   }
@@ -530,14 +634,22 @@ class NotificationService {
    * Send position closed notification
    * Template expects: {{symbol}}, {{pnl}}, {{pnlPercent}}
    */
-  async notifyPositionClosed(userId: string, symbol: string, realizedPnl: number, pnlPercentage: number): Promise<any> {
+  async notifyPositionClosed(
+    userId: string,
+    symbol: string,
+    realizedPnl: number,
+    pnlPercentage: number,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'position_closed',
-      variables: { 
-        symbol, 
-        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
-        pnlPercent: `${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}`,  // Template uses {{pnlPercent}}
+      templateId: "position_closed",
+      variables: {
+        symbol,
+        pnl:
+          realizedPnl >= 0
+            ? `+€${realizedPnl.toFixed(2)}`
+            : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+        pnlPercent: `${pnlPercentage >= 0 ? "+" : ""}${pnlPercentage.toFixed(2)}`, // Template uses {{pnlPercent}}
       },
     });
   }
@@ -545,10 +657,14 @@ class NotificationService {
   /**
    * Send competition starting soon notification
    */
-  async notifyCompetitionStartingSoon(userId: string, competitionName: string, startsIn: string): Promise<any> {
+  async notifyCompetitionStartingSoon(
+    userId: string,
+    competitionName: string,
+    startsIn: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_starting_soon',
+      templateId: "competition_starting_soon",
       variables: { competitionName, startsIn },
     });
   }
@@ -556,10 +672,14 @@ class NotificationService {
   /**
    * Send competition ending soon notification
    */
-  async notifyCompetitionEndingSoon(userId: string, competitionName: string, endsIn: string): Promise<any> {
+  async notifyCompetitionEndingSoon(
+    userId: string,
+    competitionName: string,
+    endsIn: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_ending_soon',
+      templateId: "competition_ending_soon",
       variables: { competitionName, endsIn },
     });
   }
@@ -567,10 +687,13 @@ class NotificationService {
   /**
    * Send competition started notification
    */
-  async notifyCompetitionStarted(userId: string, competitionName: string): Promise<any> {
+  async notifyCompetitionStarted(
+    userId: string,
+    competitionName: string,
+  ): Promise<any> {
     return this.send({
       userId,
-      templateId: 'competition_started',
+      templateId: "competition_started",
       variables: { competitionName },
     });
   }
@@ -581,7 +704,7 @@ class NotificationService {
   async notifyMarginWarning(userId: string, marginLevel: number): Promise<any> {
     return this.send({
       userId,
-      templateId: 'margin_warning',
+      templateId: "margin_warning",
       variables: { marginLevel: `${marginLevel.toFixed(1)}%` },
     });
   }
@@ -592,7 +715,7 @@ class NotificationService {
   async notifyMarginCall(userId: string, marginLevel: number): Promise<any> {
     return this.send({
       userId,
-      templateId: 'margin_call',
+      templateId: "margin_call",
       variables: { marginLevel: `${marginLevel.toFixed(1)}%` },
     });
   }
@@ -603,63 +726,97 @@ export const notificationService = new NotificationService();
 
 // ========== Helper functions for backwards compatibility ==========
 
-export async function sendNotification(data: NotificationData): Promise<boolean> {
+export async function sendNotification(
+  data: NotificationData,
+): Promise<boolean> {
   return notificationService.sendByType(data);
 }
 
 export async function sendBulkNotifications(
   userIds: string[],
   type: NotificationType,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ): Promise<number> {
   let successCount = 0;
-  
+
   for (const userId of userIds) {
     const success = await sendNotification({ userId, type, metadata });
     if (success) successCount++;
   }
-  
+
   return successCount;
 }
 
 // ========== KYC-specific notification helpers ==========
 
-export async function sendKYCStartedNotification(userId: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'kyc_started' });
+export async function sendKYCStartedNotification(
+  userId: string,
+): Promise<boolean> {
+  return sendNotification({ userId, type: "kyc_started" });
 }
 
-export async function sendKYCApprovedNotification(userId: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'kyc_approved' });
+export async function sendKYCApprovedNotification(
+  userId: string,
+): Promise<boolean> {
+  return sendNotification({ userId, type: "kyc_approved" });
 }
 
-export async function sendKYCDeclinedNotification(userId: string, reason?: string): Promise<boolean> {
+export async function sendKYCDeclinedNotification(
+  userId: string,
+  reason?: string,
+): Promise<boolean> {
   return sendNotification({
     userId,
-    type: 'kyc_declined',
-    metadata: { reason: reason || 'Verification could not be completed' },
+    type: "kyc_declined",
+    metadata: { reason: reason || "Verification could not be completed" },
   });
 }
 
-export async function sendKYCExpiredNotification(userId: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'kyc_expired' });
+export async function sendKYCExpiredNotification(
+  userId: string,
+): Promise<boolean> {
+  return sendNotification({ userId, type: "kyc_expired" });
 }
 
-export async function sendKYCRequiredNotification(userId: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'kyc_required' });
+export async function sendKYCRequiredNotification(
+  userId: string,
+): Promise<boolean> {
+  return sendNotification({ userId, type: "kyc_required" });
 }
 
 // ========== Withdrawal notification helpers ==========
 
-export async function sendWithdrawalInitiatedNotification(userId: string, amount: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'withdrawal_initiated', metadata: { amount } });
+export async function sendWithdrawalInitiatedNotification(
+  userId: string,
+  amount: string,
+): Promise<boolean> {
+  return sendNotification({
+    userId,
+    type: "withdrawal_initiated",
+    metadata: { amount },
+  });
 }
 
-export async function sendWithdrawalCompletedNotification(userId: string, amount: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'withdrawal_completed', metadata: { amount } });
+export async function sendWithdrawalCompletedNotification(
+  userId: string,
+  amount: string,
+): Promise<boolean> {
+  return sendNotification({
+    userId,
+    type: "withdrawal_completed",
+    metadata: { amount },
+  });
 }
 
-export async function sendWithdrawalFailedNotification(userId: string, reason: string): Promise<boolean> {
-  return sendNotification({ userId, type: 'withdrawal_failed', metadata: { reason } });
+export async function sendWithdrawalFailedNotification(
+  userId: string,
+  reason: string,
+): Promise<boolean> {
+  return sendNotification({
+    userId,
+    type: "withdrawal_failed",
+    metadata: { reason },
+  });
 }
 
 // ========== Deposit notification helpers ==========
@@ -667,9 +824,13 @@ export async function sendWithdrawalFailedNotification(userId: string, reason: s
 export async function sendDepositCompletedNotification(
   userId: string,
   amount: string,
-  balance: string
+  balance: string,
 ): Promise<boolean> {
-  return sendNotification({ userId, type: 'deposit_completed', metadata: { amount, balance } });
+  return sendNotification({
+    userId,
+    type: "deposit_completed",
+    metadata: { amount, balance },
+  });
 }
 
 // ========== Social/Messaging notification helpers ==========
@@ -688,21 +849,23 @@ export interface CreateUserNotificationOptions {
 /**
  * Create a custom user notification (for social features like friend requests, blocks, messages)
  */
-export async function createUserNotification(options: CreateUserNotificationOptions): Promise<boolean> {
+export async function createUserNotification(
+  options: CreateUserNotificationOptions,
+): Promise<boolean> {
   try {
     const notification = await notificationService.createCustom({
       userId: options.userId,
       type: options.type,
       title: options.title,
       message: options.message,
-      icon: options.icon || 'bell',
-      category: options.category || 'social',
+      icon: options.icon || "bell",
+      category: options.category || "social",
       actionUrl: options.actionUrl,
       metadata: options.metadata,
     });
     return !!notification;
   } catch (error) {
-    console.error('Error creating user notification:', error);
+    console.error("Error creating user notification:", error);
     return false;
   }
 }
@@ -714,15 +877,15 @@ export async function sendNewMessageNotification(
   userId: string,
   senderName: string,
   messagePreview: string,
-  conversationId: string
+  conversationId: string,
 ): Promise<boolean> {
   return createUserNotification({
     userId,
-    type: 'new_message',
-    title: 'New Message',
-    message: `${senderName}: ${messagePreview.substring(0, 50)}${messagePreview.length > 50 ? '...' : ''}`,
-    icon: 'message-circle',
-    category: 'messaging',
+    type: "new_message",
+    title: "New Message",
+    message: `${senderName}: ${messagePreview.substring(0, 50)}${messagePreview.length > 50 ? "..." : ""}`,
+    icon: "message-circle",
+    category: "messaging",
     actionUrl: `/messaging?conversation=${conversationId}`,
     metadata: { senderName, conversationId },
   });
@@ -734,16 +897,16 @@ export async function sendNewMessageNotification(
 export async function sendFriendRequestNotification(
   userId: string,
   fromUserName: string,
-  fromUserId: string
+  fromUserId: string,
 ): Promise<boolean> {
   return createUserNotification({
     userId,
-    type: 'friend_request',
-    title: 'Friend Request',
+    type: "friend_request",
+    title: "Friend Request",
     message: `${fromUserName} wants to be your friend.`,
-    icon: 'user-plus',
-    category: 'social',
-    actionUrl: '/messaging?tab=requests',
+    icon: "user-plus",
+    category: "social",
+    actionUrl: "/messaging?tab=requests",
     metadata: { fromUserName, fromUserId },
   });
 }
@@ -754,15 +917,15 @@ export async function sendFriendRequestNotification(
 export async function sendFriendRequestAcceptedNotification(
   userId: string,
   friendName: string,
-  friendId: string
+  friendId: string,
 ): Promise<boolean> {
   return createUserNotification({
     userId,
-    type: 'friend_request_accepted',
-    title: 'Friend Request Accepted',
+    type: "friend_request_accepted",
+    title: "Friend Request Accepted",
     message: `${friendName} accepted your friend request!`,
-    icon: 'users',
-    category: 'social',
+    icon: "users",
+    category: "social",
     actionUrl: `/messaging?friend=${friendId}`,
     metadata: { friendName, friendId },
   });

@@ -1,38 +1,33 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { toast } from 'sonner';
+} from "@/components/ui/accordion";
+import { toast } from "sonner";
 import {
   Save,
   RefreshCw,
@@ -66,7 +61,7 @@ import {
   CreditCard,
   Mail,
   Phone,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface ThemePreset {
   id: string;
@@ -245,7 +240,7 @@ interface HeroSettings {
   // Trust Badges
   trustBadges: Array<{
     id: string;
-    type: 'security' | 'partner' | 'press' | 'award';
+    type: "security" | "partner" | "press" | "award";
     name: string;
     logo: string;
     url?: string;
@@ -305,17 +300,48 @@ interface HeroSettings {
   enterpriseHeroCTALink: string;
   enterpriseHeroSecondaryCTAText: string;
   enterpriseHeroSecondaryCTALink: string;
-  enterpriseTrustBadges: Array<{ id: string; icon: string; text: string; enabled: boolean; }>;
+  enterpriseTrustBadges: Array<{
+    id: string;
+    icon: string;
+    text: string;
+    enabled: boolean;
+  }>;
   enterpriseWhiteLabelTitle: string;
   enterpriseWhiteLabelSubtitle: string;
-  enterpriseWhiteLabelFeatures: Array<{ id: string; icon: string; title: string; description: string; enabled: boolean; order: number; }>;
+  enterpriseWhiteLabelFeatures: Array<{
+    id: string;
+    icon: string;
+    title: string;
+    description: string;
+    enabled: boolean;
+    order: number;
+  }>;
   enterpriseAdminTitle: string;
   enterpriseAdminSubtitle: string;
   enterpriseAdminDescription: string;
-  enterpriseAdminFeatures: Array<{ id: string; icon: string; title: string; description: string; color: string; enabled: boolean; order: number; }>;
+  enterpriseAdminFeatures: Array<{
+    id: string;
+    icon: string;
+    title: string;
+    description: string;
+    color: string;
+    enabled: boolean;
+    order: number;
+  }>;
   enterprisePricingTitle: string;
   enterprisePricingSubtitle: string;
-  enterprisePricingTiers: Array<{ id: string; name: string; price: string; period: string; description: string; features: string[]; ctaText: string; highlighted: boolean; enabled: boolean; order: number; }>;
+  enterprisePricingTiers: Array<{
+    id: string;
+    name: string;
+    price: string;
+    period: string;
+    description: string;
+    features: string[];
+    ctaText: string;
+    highlighted: boolean;
+    enabled: boolean;
+    order: number;
+  }>;
   enterpriseContactTitle: string;
   enterpriseContactSubtitle: string;
   enterpriseContactEmail: string;
@@ -333,96 +359,96 @@ interface HeroSettings {
 }
 
 const defaultSettings: HeroSettings = {
-  siteName: 'TradingArena',
-  tagline: 'Where Champions Trade',
-  description: 'The ultimate competitive trading platform',
-  logo: '',
-  favicon: '',
-  activeTheme: 'cyber-neon',
+  siteName: "TradingArena",
+  tagline: "Where Champions Trade",
+  description: "The ultimate competitive trading platform",
+  logo: "",
+  favicon: "",
+  activeTheme: "cyber-neon",
   customTheme: {
-    primaryColor: '#00f0ff',
-    secondaryColor: '#ff00ff',
-    accentColor: '#ffd700',
-    backgroundColor: '#0a0a0f',
-    textColor: '#ffffff',
-    gradientFrom: '#00f0ff',
-    gradientTo: '#ff00ff',
+    primaryColor: "#00f0ff",
+    secondaryColor: "#ff00ff",
+    accentColor: "#ffd700",
+    backgroundColor: "#0a0a0f",
+    textColor: "#ffffff",
+    gradientFrom: "#00f0ff",
+    gradientTo: "#ff00ff",
     gradientAngle: 135,
-    fontFamily: 'Orbitron',
-    headingFont: 'Orbitron',
-    buttonRadius: '0.75rem',
-    cardRadius: '1rem',
-    shadowIntensity: 'medium',
-    glowIntensity: 'medium',
+    fontFamily: "Orbitron",
+    headingFont: "Orbitron",
+    buttonRadius: "0.75rem",
+    cardRadius: "1rem",
+    shadowIntensity: "medium",
+    glowIntensity: "medium",
   },
-  heroTitle: 'DOMINATE THE MARKETS',
-  heroSubtitle: 'Compete • Trade • Win',
-  heroDescription: 'Join the world\'s most exciting trading competitions.',
-  heroBackgroundImage: '',
-  heroBackgroundVideo: '',
-  heroBackgroundType: 'particles',
+  heroTitle: "DOMINATE THE MARKETS",
+  heroSubtitle: "Compete • Trade • Win",
+  heroDescription: "Join the world's most exciting trading competitions.",
+  heroBackgroundImage: "",
+  heroBackgroundVideo: "",
+  heroBackgroundType: "particles",
   heroParticlesConfig: {
     enabled: true,
-    color: '#00f0ff',
+    color: "#00f0ff",
     count: 50,
     speed: 2,
-    shape: 'circle',
+    shape: "circle",
   },
   heroCTAButtons: [],
-  heroAnimationType: 'glitch',
-  featuresTitle: 'UNLEASH YOUR POTENTIAL',
-  featuresSubtitle: 'Everything you need to dominate',
+  heroAnimationType: "glitch",
+  featuresTitle: "UNLEASH YOUR POTENTIAL",
+  featuresSubtitle: "Everything you need to dominate",
   features: [],
-  featuresLayout: 'grid',
+  featuresLayout: "grid",
   featuresColumns: 3,
-  statsTitle: 'THE NUMBERS SPEAK',
-  statsSubtitle: 'Join the fastest growing trading community',
+  statsTitle: "THE NUMBERS SPEAK",
+  statsSubtitle: "Join the fastest growing trading community",
   stats: [],
-  statsBackground: 'gradient',
+  statsBackground: "gradient",
   statsAnimated: true,
-  howItWorksTitle: 'START WINNING IN 4 STEPS',
-  howItWorksSubtitle: 'From zero to champion',
+  howItWorksTitle: "START WINNING IN 4 STEPS",
+  howItWorksSubtitle: "From zero to champion",
   howItWorksSteps: [],
-  howItWorksLayout: 'timeline',
-  competitionsTitle: 'LIVE COMPETITIONS',
-  competitionsSubtitle: 'Enter the arena',
-  competitionsDescription: 'Real-time trading battles with live leaderboards',
-  competitionsCTAText: 'View All Competitions',
-  competitionsCTALink: '/competitions',
-  challengesTitle: '1V1 CHALLENGES',
-  challengesSubtitle: 'Prove your skills',
-  challengesDescription: 'Challenge any trader to a head-to-head battle',
-  challengesCTAText: 'Start a Challenge',
-  challengesCTALink: '/challenges',
-  leaderboardTitle: 'TOP TRADERS',
-  leaderboardSubtitle: 'The elite of the elite',
+  howItWorksLayout: "timeline",
+  competitionsTitle: "LIVE COMPETITIONS",
+  competitionsSubtitle: "Enter the arena",
+  competitionsDescription: "Real-time trading battles with live leaderboards",
+  competitionsCTAText: "View All Competitions",
+  competitionsCTALink: "/competitions",
+  challengesTitle: "1V1 CHALLENGES",
+  challengesSubtitle: "Prove your skills",
+  challengesDescription: "Challenge any trader to a head-to-head battle",
+  challengesCTAText: "Start a Challenge",
+  challengesCTALink: "/challenges",
+  leaderboardTitle: "TOP TRADERS",
+  leaderboardSubtitle: "The elite of the elite",
   leaderboardShowTop: 5,
-  leaderboardStyle: 'podium',
-  marketplaceTitle: 'TRADING ARSENAL',
-  marketplaceSubtitle: 'Upgrade your style',
+  leaderboardStyle: "podium",
+  marketplaceTitle: "TRADING ARSENAL",
+  marketplaceSubtitle: "Upgrade your style",
   marketplaceShowItems: 4,
-  adminShowcaseTitle: 'POWERFUL ADMIN PANEL',
-  adminShowcaseSubtitle: 'Total control at your fingertips',
-  adminShowcaseDescription: 'Manage every aspect of your trading platform',
+  adminShowcaseTitle: "POWERFUL ADMIN PANEL",
+  adminShowcaseSubtitle: "Total control at your fingertips",
+  adminShowcaseDescription: "Manage every aspect of your trading platform",
   adminShowcaseFeatures: [],
   adminShowcaseScreenshots: [],
-  adminShowcaseCTAText: 'See Admin Features',
-  adminShowcaseCTALink: '#admin-features',
-  whiteLabelTitle: 'WHITE LABEL SOLUTION',
-  whiteLabelSubtitle: 'Your brand, your platform',
-  whiteLabelDescription: 'Launch your own branded trading platform',
+  adminShowcaseCTAText: "See Admin Features",
+  adminShowcaseCTALink: "#admin-features",
+  whiteLabelTitle: "WHITE LABEL SOLUTION",
+  whiteLabelSubtitle: "Your brand, your platform",
+  whiteLabelDescription: "Launch your own branded trading platform",
   whiteLabelFeatures: [],
-  whiteLabelCTAText: 'Get Started',
-  whiteLabelCTALink: '/contact',
-  ctaTitle: 'READY TO DOMINATE?',
-  ctaSubtitle: 'Join thousands of traders already winning',
-  ctaDescription: 'Create your free account and start competing today',
-  ctaButtonText: 'START TRADING NOW',
-  ctaButtonLink: '/sign-up',
-  ctaBackground: '',
-  ctaStyle: 'animated',
-  footerCopyright: '© 2024 TradingArena. All rights reserved.',
-  footerDisclaimer: '',
+  whiteLabelCTAText: "Get Started",
+  whiteLabelCTALink: "/contact",
+  ctaTitle: "READY TO DOMINATE?",
+  ctaSubtitle: "Join thousands of traders already winning",
+  ctaDescription: "Create your free account and start competing today",
+  ctaButtonText: "START TRADING NOW",
+  ctaButtonLink: "/sign-up",
+  ctaBackground: "",
+  ctaStyle: "animated",
+  footerCopyright: "© 2024 TradingArena. All rights reserved.",
+  footerDisclaimer: "",
   sectionVisibility: {
     hero: true,
     features: true,
@@ -444,7 +470,7 @@ const defaultSettings: HeroSettings = {
     footer: true,
   },
   trustBadges: [],
-  trustBadgesTitle: 'Trusted By Traders Worldwide',
+  trustBadgesTitle: "Trusted By Traders Worldwide",
   liveDataSettings: {
     showRealStats: true,
     showActivityFeed: true,
@@ -452,49 +478,54 @@ const defaultSettings: HeroSettings = {
     activityFeedRefreshRate: 30000,
     statsRefreshRate: 60000,
   },
-  testimonialsTitle: 'What Our Traders Say',
-  testimonialsSubtitle: 'Real Stories from Real Winners',
+  testimonialsTitle: "What Our Traders Say",
+  testimonialsSubtitle: "Real Stories from Real Winners",
   testimonials: [],
-  faqTitle: 'Frequently Asked Questions',
+  faqTitle: "Frequently Asked Questions",
   faqSubtitle: "Got Questions? We've Got Answers",
   faqItems: [],
   seo: {
-    metaTitle: '',
-    metaDescription: '',
+    metaTitle: "",
+    metaDescription: "",
     metaKeywords: [],
-    ogImage: '',
-    ogTitle: '',
-    ogDescription: '',
+    ogImage: "",
+    ogTitle: "",
+    ogDescription: "",
   },
-  customCSS: '',
-  customJS: '',
-  googleAnalyticsId: '',
-  facebookPixelId: '',
+  customCSS: "",
+  customJS: "",
+  googleAnalyticsId: "",
+  facebookPixelId: "",
   // Enterprise Page Settings Defaults
-  enterpriseHeroTitle: 'Launch Your Own Trading Platform',
-  enterpriseHeroSubtitle: 'Enterprise Solutions',
-  enterpriseHeroDescription: 'Complete white-label solution with powerful admin panel, fraud detection, payment processing, and everything you need.',
-  enterpriseHeroBadge: 'Enterprise Solutions',
-  enterpriseHeroCTAText: 'Request Demo',
-  enterpriseHeroCTALink: '#contact',
-  enterpriseHeroSecondaryCTAText: 'See Admin Panel',
-  enterpriseHeroSecondaryCTALink: '#admin',
+  enterpriseHeroTitle: "Launch Your Own Trading Platform",
+  enterpriseHeroSubtitle: "Enterprise Solutions",
+  enterpriseHeroDescription:
+    "Complete white-label solution with powerful admin panel, fraud detection, payment processing, and everything you need.",
+  enterpriseHeroBadge: "Enterprise Solutions",
+  enterpriseHeroCTAText: "Request Demo",
+  enterpriseHeroCTALink: "#contact",
+  enterpriseHeroSecondaryCTAText: "See Admin Panel",
+  enterpriseHeroSecondaryCTALink: "#admin",
   enterpriseTrustBadges: [],
-  enterpriseWhiteLabelTitle: 'White Label Solution',
-  enterpriseWhiteLabelSubtitle: 'Launch your own branded trading platform without writing a single line of code',
+  enterpriseWhiteLabelTitle: "White Label Solution",
+  enterpriseWhiteLabelSubtitle:
+    "Launch your own branded trading platform without writing a single line of code",
   enterpriseWhiteLabelFeatures: [],
-  enterpriseAdminTitle: 'Complete Control Center',
-  enterpriseAdminSubtitle: 'Powerful Admin Panel',
-  enterpriseAdminDescription: 'Everything you need to manage your platform, users, competitions, and revenue in one place',
+  enterpriseAdminTitle: "Complete Control Center",
+  enterpriseAdminSubtitle: "Powerful Admin Panel",
+  enterpriseAdminDescription:
+    "Everything you need to manage your platform, users, competitions, and revenue in one place",
   enterpriseAdminFeatures: [],
-  enterprisePricingTitle: 'Simple, Transparent Pricing',
-  enterprisePricingSubtitle: 'Choose the plan that fits your needs. All plans include core features.',
+  enterprisePricingTitle: "Simple, Transparent Pricing",
+  enterprisePricingSubtitle:
+    "Choose the plan that fits your needs. All plans include core features.",
   enterprisePricingTiers: [],
-  enterpriseContactTitle: 'Ready to Get Started?',
-  enterpriseContactSubtitle: 'Contact our sales team for a personalized demo and quote',
-  enterpriseContactEmail: 'enterprise@chartvolt.com',
-  enterpriseContactPhone: '+1 (234) 567-890',
-  enterpriseContactCTAText: 'Schedule Demo',
+  enterpriseContactTitle: "Ready to Get Started?",
+  enterpriseContactSubtitle:
+    "Contact our sales team for a personalized demo and quote",
+  enterpriseContactEmail: "enterprise@chartvolt.com",
+  enterpriseContactPhone: "+1 (234) 567-890",
+  enterpriseContactCTAText: "Schedule Demo",
   enterpriseSectionVisibility: {
     hero: true,
     trustBadges: true,
@@ -511,15 +542,17 @@ export default function HeroPageSection() {
   const [themePresets, setThemePresets] = useState<ThemePreset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('themes');
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [activeTab, setActiveTab] = useState("themes");
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
+    "desktop",
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   // Fetch settings
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/hero-settings');
+      const response = await fetch("/api/hero-settings");
       if (response.ok) {
         const data = await response.json();
         if (data.settings) {
@@ -530,8 +563,8 @@ export default function HeroPageSection() {
         }
       }
     } catch (error) {
-      console.error('Error fetching hero settings:', error);
-      toast.error('Failed to load hero settings');
+      console.error("Error fetching hero settings:", error);
+      toast.error("Failed to load hero settings");
     } finally {
       setLoading(false);
     }
@@ -545,21 +578,21 @@ export default function HeroPageSection() {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/hero-settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/hero-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       if (response.ok) {
-        toast.success('Hero settings saved successfully');
+        toast.success("Hero settings saved successfully");
         setHasChanges(false);
       } else {
-        throw new Error('Failed to save');
+        throw new Error("Failed to save");
       }
     } catch (error) {
-      console.error('Error saving hero settings:', error);
-      toast.error('Failed to save hero settings');
+      console.error("Error saving hero settings:", error);
+      toast.error("Failed to save hero settings");
     } finally {
       setSaving(false);
     }
@@ -568,10 +601,10 @@ export default function HeroPageSection() {
   // Apply theme preset
   const applyTheme = async (themeId: string) => {
     try {
-      const response = await fetch('/api/hero-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'apply-theme', themeId }),
+      const response = await fetch("/api/hero-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply-theme", themeId }),
       });
 
       if (response.ok) {
@@ -580,20 +613,23 @@ export default function HeroPageSection() {
         toast.success(data.message);
       }
     } catch (error) {
-      console.error('Error applying theme:', error);
-      toast.error('Failed to apply theme');
+      console.error("Error applying theme:", error);
+      toast.error("Failed to apply theme");
     }
   };
 
   // Upload image
-  const uploadImage = async (file: File, type: string): Promise<string | null> => {
+  const uploadImage = async (
+    file: File,
+    type: string,
+  ): Promise<string | null> => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', type);
+      formData.append("file", file);
+      formData.append("type", type);
 
-      const response = await fetch('/api/hero-settings/upload', {
-        method: 'POST',
+      const response = await fetch("/api/hero-settings/upload", {
+        method: "POST",
         body: formData,
       });
 
@@ -603,24 +639,24 @@ export default function HeroPageSection() {
       }
       return null;
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
       return null;
     }
   };
 
   // Update settings helper
   const updateSettings = (path: string, value: unknown) => {
-    setSettings(prev => {
+    setSettings((prev) => {
       const newSettings = { ...prev };
-      const keys = path.split('.');
+      const keys = path.split(".");
       let current: Record<string, unknown> = newSettings;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         current = current[keys[i]] as Record<string, unknown>;
       }
       current[keys[keys.length - 1]] = value;
-      
+
       return newSettings;
     });
     setHasChanges(true);
@@ -651,29 +687,29 @@ export default function HeroPageSection() {
           {/* Preview Toggle */}
           <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
             <button
-              onClick={() => setPreviewMode('desktop')}
-              className={`p-2 rounded ${previewMode === 'desktop' ? 'bg-gray-700 text-white' : 'text-gray-400'}`}
+              onClick={() => setPreviewMode("desktop")}
+              className={`p-2 rounded ${previewMode === "desktop" ? "bg-gray-700 text-white" : "text-gray-400"}`}
             >
               <Monitor className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setPreviewMode('mobile')}
-              className={`p-2 rounded ${previewMode === 'mobile' ? 'bg-gray-700 text-white' : 'text-gray-400'}`}
+              onClick={() => setPreviewMode("mobile")}
+              className={`p-2 rounded ${previewMode === "mobile" ? "bg-gray-700 text-white" : "text-gray-400"}`}
             >
               <Smartphone className="h-4 w-4" />
             </button>
           </div>
-          
+
           {/* Preview Button */}
           <Button
             variant="outline"
             className="border-gray-600 text-gray-300"
-            onClick={() => window.open('/landing', '_blank')}
+            onClick={() => window.open("/landing", "_blank")}
           >
             <Eye className="h-4 w-4 mr-2" />
             Preview
           </Button>
-          
+
           {/* Save Button */}
           <Button
             onClick={saveSettings}
@@ -685,43 +721,71 @@ export default function HeroPageSection() {
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-            {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Saved'}
+            {saving ? "Saving..." : hasChanges ? "Save Changes" : "Saved"}
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="bg-gray-800 p-1 flex-wrap h-auto">
-          <TabsTrigger value="themes" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="themes"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <Palette className="h-4 w-4 mr-2" />
             Themes
           </TabsTrigger>
-          <TabsTrigger value="hero" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="hero"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <Sparkles className="h-4 w-4 mr-2" />
             Hero
           </TabsTrigger>
-          <TabsTrigger value="sections" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="sections"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <Layout className="h-4 w-4 mr-2" />
             Sections
           </TabsTrigger>
-          <TabsTrigger value="branding" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="branding"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <ImageIcon className="h-4 w-4 mr-2" />
             Branding
           </TabsTrigger>
-          <TabsTrigger value="seo" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="seo"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <Search className="h-4 w-4 mr-2" />
             SEO
           </TabsTrigger>
-          <TabsTrigger value="advanced" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="advanced"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <Code className="h-4 w-4 mr-2" />
             Advanced
           </TabsTrigger>
-          <TabsTrigger value="footer" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900">
+          <TabsTrigger
+            value="footer"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-gray-900"
+          >
             <FileText className="h-4 w-4 mr-2" />
             Footer
           </TabsTrigger>
-          <TabsTrigger value="enterprise" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+          <TabsTrigger
+            value="enterprise"
+            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white"
+          >
             <Building2 className="h-4 w-4 mr-2" />
             Enterprise
           </TabsTrigger>
@@ -744,8 +808,8 @@ export default function HeroPageSection() {
                     onClick={() => applyTheme(theme.id)}
                     className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
                       settings.activeTheme === theme.id
-                        ? 'border-yellow-500 bg-yellow-500/10'
-                        : 'border-gray-600 hover:border-gray-500 bg-gray-900'
+                        ? "border-yellow-500 bg-yellow-500/10"
+                        : "border-gray-600 hover:border-gray-500 bg-gray-900"
                     }`}
                   >
                     {settings.activeTheme === theme.id && (
@@ -783,7 +847,9 @@ export default function HeroPageSection() {
 
               {/* Custom Theme Colors */}
               <div className="mt-8 pt-6 border-t border-gray-700">
-                <h4 className="font-bold text-white mb-4">Custom Theme Colors</h4>
+                <h4 className="font-bold text-white mb-4">
+                  Custom Theme Colors
+                </h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <Label className="text-gray-400">Primary Color</Label>
@@ -791,12 +857,22 @@ export default function HeroPageSection() {
                       <input
                         type="color"
                         value={settings.customTheme.primaryColor}
-                        onChange={(e) => updateSettings('customTheme.primaryColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.primaryColor",
+                            e.target.value,
+                          )
+                        }
                         className="w-12 h-10 rounded cursor-pointer"
                       />
                       <Input
                         value={settings.customTheme.primaryColor}
-                        onChange={(e) => updateSettings('customTheme.primaryColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.primaryColor",
+                            e.target.value,
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white"
                       />
                     </div>
@@ -807,12 +883,22 @@ export default function HeroPageSection() {
                       <input
                         type="color"
                         value={settings.customTheme.secondaryColor}
-                        onChange={(e) => updateSettings('customTheme.secondaryColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.secondaryColor",
+                            e.target.value,
+                          )
+                        }
                         className="w-12 h-10 rounded cursor-pointer"
                       />
                       <Input
                         value={settings.customTheme.secondaryColor}
-                        onChange={(e) => updateSettings('customTheme.secondaryColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.secondaryColor",
+                            e.target.value,
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white"
                       />
                     </div>
@@ -823,12 +909,22 @@ export default function HeroPageSection() {
                       <input
                         type="color"
                         value={settings.customTheme.accentColor}
-                        onChange={(e) => updateSettings('customTheme.accentColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.accentColor",
+                            e.target.value,
+                          )
+                        }
                         className="w-12 h-10 rounded cursor-pointer"
                       />
                       <Input
                         value={settings.customTheme.accentColor}
-                        onChange={(e) => updateSettings('customTheme.accentColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.accentColor",
+                            e.target.value,
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white"
                       />
                     </div>
@@ -839,12 +935,22 @@ export default function HeroPageSection() {
                       <input
                         type="color"
                         value={settings.customTheme.backgroundColor}
-                        onChange={(e) => updateSettings('customTheme.backgroundColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.backgroundColor",
+                            e.target.value,
+                          )
+                        }
                         className="w-12 h-10 rounded cursor-pointer"
                       />
                       <Input
                         value={settings.customTheme.backgroundColor}
-                        onChange={(e) => updateSettings('customTheme.backgroundColor', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "customTheme.backgroundColor",
+                            e.target.value,
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white"
                       />
                     </div>
@@ -857,17 +963,27 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Heading Font</Label>
                     <Select
                       value={settings.customTheme.headingFont}
-                      onValueChange={(v) => updateSettings('customTheme.headingFont', v)}
+                      onValueChange={(v) =>
+                        updateSettings("customTheme.headingFont", v)
+                      }
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-600">
-                        <SelectItem value="Orbitron">Orbitron (Futuristic)</SelectItem>
+                        <SelectItem value="Orbitron">
+                          Orbitron (Futuristic)
+                        </SelectItem>
                         <SelectItem value="Cinzel">Cinzel (Elegant)</SelectItem>
-                        <SelectItem value="Rajdhani">Rajdhani (Modern)</SelectItem>
-                        <SelectItem value="Share Tech Mono">Share Tech Mono (Tech)</SelectItem>
-                        <SelectItem value="Bebas Neue">Bebas Neue (Bold)</SelectItem>
+                        <SelectItem value="Rajdhani">
+                          Rajdhani (Modern)
+                        </SelectItem>
+                        <SelectItem value="Share Tech Mono">
+                          Share Tech Mono (Tech)
+                        </SelectItem>
+                        <SelectItem value="Bebas Neue">
+                          Bebas Neue (Bold)
+                        </SelectItem>
                         <SelectItem value="Exo 2">Exo 2 (Clean)</SelectItem>
                         <SelectItem value="Inter">Inter (Minimal)</SelectItem>
                       </SelectContent>
@@ -877,7 +993,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Body Font</Label>
                     <Select
                       value={settings.customTheme.fontFamily}
-                      onValueChange={(v) => updateSettings('customTheme.fontFamily', v)}
+                      onValueChange={(v) =>
+                        updateSettings("customTheme.fontFamily", v)
+                      }
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
@@ -886,7 +1004,9 @@ export default function HeroPageSection() {
                         <SelectItem value="Inter">Inter</SelectItem>
                         <SelectItem value="Rajdhani">Rajdhani</SelectItem>
                         <SelectItem value="Exo 2">Exo 2</SelectItem>
-                        <SelectItem value="Space Grotesk">Space Grotesk</SelectItem>
+                        <SelectItem value="Space Grotesk">
+                          Space Grotesk
+                        </SelectItem>
                         <SelectItem value="Poppins">Poppins</SelectItem>
                       </SelectContent>
                     </Select>
@@ -899,7 +1019,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Shadow Intensity</Label>
                     <Select
                       value={settings.customTheme.shadowIntensity}
-                      onValueChange={(v) => updateSettings('customTheme.shadowIntensity', v)}
+                      onValueChange={(v) =>
+                        updateSettings("customTheme.shadowIntensity", v)
+                      }
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
@@ -916,7 +1038,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Glow Intensity</Label>
                     <Select
                       value={settings.customTheme.glowIntensity}
-                      onValueChange={(v) => updateSettings('customTheme.glowIntensity', v)}
+                      onValueChange={(v) =>
+                        updateSettings("customTheme.glowIntensity", v)
+                      }
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
@@ -951,7 +1075,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Hero Title</Label>
                   <Input
                     value={settings.heroTitle}
-                    onChange={(e) => updateSettings('heroTitle', e.target.value)}
+                    onChange={(e) =>
+                      updateSettings("heroTitle", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="DOMINATE THE MARKETS"
                   />
@@ -960,7 +1086,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Hero Subtitle</Label>
                   <Input
                     value={settings.heroSubtitle}
-                    onChange={(e) => updateSettings('heroSubtitle', e.target.value)}
+                    onChange={(e) =>
+                      updateSettings("heroSubtitle", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Compete • Trade • Win"
                   />
@@ -971,7 +1099,9 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Hero Description</Label>
                 <Textarea
                   value={settings.heroDescription}
-                  onChange={(e) => updateSettings('heroDescription', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("heroDescription", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={3}
                 />
@@ -983,7 +1113,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Background Type</Label>
                   <Select
                     value={settings.heroBackgroundType}
-                    onValueChange={(v) => updateSettings('heroBackgroundType', v)}
+                    onValueChange={(v) =>
+                      updateSettings("heroBackgroundType", v)
+                    }
                   >
                     <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                       <SelectValue />
@@ -993,7 +1125,9 @@ export default function HeroPageSection() {
                       <SelectItem value="gradient">Gradient</SelectItem>
                       <SelectItem value="image">Image</SelectItem>
                       <SelectItem value="video">Video</SelectItem>
-                      <SelectItem value="particles">Animated Particles</SelectItem>
+                      <SelectItem value="particles">
+                        Animated Particles
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1001,7 +1135,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Animation Type</Label>
                   <Select
                     value={settings.heroAnimationType}
-                    onValueChange={(v) => updateSettings('heroAnimationType', v)}
+                    onValueChange={(v) =>
+                      updateSettings("heroAnimationType", v)
+                    }
                   >
                     <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                       <SelectValue />
@@ -1010,7 +1146,9 @@ export default function HeroPageSection() {
                       <SelectItem value="fade">Fade In</SelectItem>
                       <SelectItem value="slide">Slide Up</SelectItem>
                       <SelectItem value="zoom">Zoom In</SelectItem>
-                      <SelectItem value="typewriter">Typewriter Effect</SelectItem>
+                      <SelectItem value="typewriter">
+                        Typewriter Effect
+                      </SelectItem>
                       <SelectItem value="glitch">Glitch Effect</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1018,23 +1156,34 @@ export default function HeroPageSection() {
               </div>
 
               {/* Particles Config */}
-              {settings.heroBackgroundType === 'particles' && (
+              {settings.heroBackgroundType === "particles" && (
                 <div className="p-4 bg-gray-900 rounded-lg space-y-4">
-                  <h4 className="font-medium text-white">Particles Configuration</h4>
+                  <h4 className="font-medium text-white">
+                    Particles Configuration
+                  </h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={settings.heroParticlesConfig.enabled}
-                        onCheckedChange={(v) => updateSettings('heroParticlesConfig.enabled', v)}
+                        onCheckedChange={(v) =>
+                          updateSettings("heroParticlesConfig.enabled", v)
+                        }
                       />
                       <Label className="text-gray-400">Enabled</Label>
                     </div>
                     <div>
-                      <Label className="text-gray-400 text-sm">Particle Color</Label>
+                      <Label className="text-gray-400 text-sm">
+                        Particle Color
+                      </Label>
                       <input
                         type="color"
                         value={settings.heroParticlesConfig.color}
-                        onChange={(e) => updateSettings('heroParticlesConfig.color', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings(
+                            "heroParticlesConfig.color",
+                            e.target.value,
+                          )
+                        }
                         className="w-full h-8 rounded cursor-pointer mt-1"
                       />
                     </div>
@@ -1043,7 +1192,12 @@ export default function HeroPageSection() {
                       <Input
                         type="number"
                         value={settings.heroParticlesConfig.count}
-                        onChange={(e) => updateSettings('heroParticlesConfig.count', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          updateSettings(
+                            "heroParticlesConfig.count",
+                            parseInt(e.target.value),
+                          )
+                        }
                         className="bg-gray-800 border-gray-600 text-white mt-1"
                         min={10}
                         max={200}
@@ -1053,7 +1207,9 @@ export default function HeroPageSection() {
                       <Label className="text-gray-400 text-sm">Shape</Label>
                       <Select
                         value={settings.heroParticlesConfig.shape}
-                        onValueChange={(v) => updateSettings('heroParticlesConfig.shape', v)}
+                        onValueChange={(v) =>
+                          updateSettings("heroParticlesConfig.shape", v)
+                        }
                       >
                         <SelectTrigger className="bg-gray-800 border-gray-600 text-white mt-1">
                           <SelectValue />
@@ -1075,14 +1231,17 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400 mb-2 block">CTA Buttons</Label>
                 <div className="space-y-3">
                   {settings.heroCTAButtons.map((btn, idx) => (
-                    <div key={btn.id} className="flex gap-3 items-center bg-gray-900 p-3 rounded-lg">
+                    <div
+                      key={btn.id}
+                      className="flex gap-3 items-center bg-gray-900 p-3 rounded-lg"
+                    >
                       <GripVertical className="h-4 w-4 text-gray-500" />
                       <Input
                         value={btn.text}
                         onChange={(e) => {
                           const newButtons = [...settings.heroCTAButtons];
                           newButtons[idx].text = e.target.value;
-                          updateSettings('heroCTAButtons', newButtons);
+                          updateSettings("heroCTAButtons", newButtons);
                         }}
                         className="bg-gray-800 border-gray-600 text-white"
                         placeholder="Button Text"
@@ -1092,7 +1251,7 @@ export default function HeroPageSection() {
                         onChange={(e) => {
                           const newButtons = [...settings.heroCTAButtons];
                           newButtons[idx].href = e.target.value;
-                          updateSettings('heroCTAButtons', newButtons);
+                          updateSettings("heroCTAButtons", newButtons);
                         }}
                         className="bg-gray-800 border-gray-600 text-white"
                         placeholder="/link"
@@ -1102,7 +1261,7 @@ export default function HeroPageSection() {
                         onValueChange={(v) => {
                           const newButtons = [...settings.heroCTAButtons];
                           newButtons[idx].style = v;
-                          updateSettings('heroCTAButtons', newButtons);
+                          updateSettings("heroCTAButtons", newButtons);
                         }}
                       >
                         <SelectTrigger className="w-32 bg-gray-800 border-gray-600 text-white">
@@ -1120,15 +1279,17 @@ export default function HeroPageSection() {
                         onCheckedChange={(v) => {
                           const newButtons = [...settings.heroCTAButtons];
                           newButtons[idx].enabled = v;
-                          updateSettings('heroCTAButtons', newButtons);
+                          updateSettings("heroCTAButtons", newButtons);
                         }}
                       />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          const newButtons = settings.heroCTAButtons.filter((_, i) => i !== idx);
-                          updateSettings('heroCTAButtons', newButtons);
+                          const newButtons = settings.heroCTAButtons.filter(
+                            (_, i) => i !== idx,
+                          );
+                          updateSettings("heroCTAButtons", newButtons);
                         }}
                         className="text-red-400 hover:text-red-300"
                       >
@@ -1143,14 +1304,14 @@ export default function HeroPageSection() {
                         ...settings.heroCTAButtons,
                         {
                           id: `btn-${Date.now()}`,
-                          text: 'New Button',
-                          href: '/',
-                          style: 'primary',
-                          icon: '',
+                          text: "New Button",
+                          href: "/",
+                          style: "primary",
+                          icon: "",
                           enabled: true,
                         },
                       ];
-                      updateSettings('heroCTAButtons', newButtons);
+                      updateSettings("heroCTAButtons", newButtons);
                     }}
                     className="border-dashed border-gray-600 text-gray-400"
                   >
@@ -1174,24 +1335,30 @@ export default function HeroPageSection() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {Object.entries(settings.sectionVisibility).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className={`p-4 rounded-lg border ${
-                      value ? 'border-green-500/50 bg-green-500/10' : 'border-gray-600 bg-gray-900'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-white capitalize font-medium">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </span>
-                      <Switch
-                        checked={value}
-                        onCheckedChange={(v) => updateSettings(`sectionVisibility.${key}`, v)}
-                      />
+                {Object.entries(settings.sectionVisibility).map(
+                  ([key, value]) => (
+                    <div
+                      key={key}
+                      className={`p-4 rounded-lg border ${
+                        value
+                          ? "border-green-500/50 bg-green-500/10"
+                          : "border-gray-600 bg-gray-900"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-white capitalize font-medium">
+                          {key.replace(/([A-Z])/g, " $1").trim()}
+                        </span>
+                        <Switch
+                          checked={value}
+                          onCheckedChange={(v) =>
+                            updateSettings(`sectionVisibility.${key}`, v)
+                          }
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1199,7 +1366,10 @@ export default function HeroPageSection() {
           {/* Section Configurations */}
           <Accordion type="multiple" className="space-y-4">
             {/* Features Section */}
-            <AccordionItem value="features" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="features"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Zap className="h-5 w-5 text-yellow-500" />
@@ -1212,7 +1382,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
                       value={settings.featuresTitle}
-                      onChange={(e) => updateSettings('featuresTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("featuresTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1220,7 +1392,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
                       value={settings.featuresSubtitle}
-                      onChange={(e) => updateSettings('featuresSubtitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("featuresSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1230,7 +1404,7 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Layout</Label>
                     <Select
                       value={settings.featuresLayout}
-                      onValueChange={(v) => updateSettings('featuresLayout', v)}
+                      onValueChange={(v) => updateSettings("featuresLayout", v)}
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
@@ -1246,7 +1420,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Columns</Label>
                     <Select
                       value={String(settings.featuresColumns)}
-                      onValueChange={(v) => updateSettings('featuresColumns', parseInt(v))}
+                      onValueChange={(v) =>
+                        updateSettings("featuresColumns", parseInt(v))
+                      }
                     >
                       <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1">
                         <SelectValue />
@@ -1263,7 +1439,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* Stats Section */}
-            <AccordionItem value="stats" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="stats"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-blue-500" />
@@ -1276,7 +1455,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
                       value={settings.statsTitle}
-                      onChange={(e) => updateSettings('statsTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("statsTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1284,7 +1465,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
                       value={settings.statsSubtitle}
-                      onChange={(e) => updateSettings('statsSubtitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("statsSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1292,15 +1475,20 @@ export default function HeroPageSection() {
                 <div className="flex items-center gap-4">
                   <Switch
                     checked={settings.statsAnimated}
-                    onCheckedChange={(v) => updateSettings('statsAnimated', v)}
+                    onCheckedChange={(v) => updateSettings("statsAnimated", v)}
                   />
-                  <Label className="text-gray-400">Animate counters on scroll</Label>
+                  <Label className="text-gray-400">
+                    Animate counters on scroll
+                  </Label>
                 </div>
               </AccordionContent>
             </AccordionItem>
 
             {/* Competitions Section */}
-            <AccordionItem value="competitions" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="competitions"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-orange-500" />
@@ -1313,7 +1501,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
                       value={settings.competitionsTitle}
-                      onChange={(e) => updateSettings('competitionsTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("competitionsTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1321,7 +1511,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
                       value={settings.competitionsSubtitle}
-                      onChange={(e) => updateSettings('competitionsSubtitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("competitionsSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1330,7 +1522,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Description</Label>
                   <Textarea
                     value={settings.competitionsDescription}
-                    onChange={(e) => updateSettings('competitionsDescription', e.target.value)}
+                    onChange={(e) =>
+                      updateSettings("competitionsDescription", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                   />
                 </div>
@@ -1339,7 +1533,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">CTA Button Text</Label>
                     <Input
                       value={settings.competitionsCTAText}
-                      onChange={(e) => updateSettings('competitionsCTAText', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("competitionsCTAText", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1347,7 +1543,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">CTA Button Link</Label>
                     <Input
                       value={settings.competitionsCTALink}
-                      onChange={(e) => updateSettings('competitionsCTALink', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("competitionsCTALink", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1356,7 +1554,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* Admin Showcase */}
-            <AccordionItem value="admin" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="admin"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-purple-500" />
@@ -1369,7 +1570,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
                       value={settings.adminShowcaseTitle}
-                      onChange={(e) => updateSettings('adminShowcaseTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("adminShowcaseTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1377,7 +1580,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
                       value={settings.adminShowcaseSubtitle}
-                      onChange={(e) => updateSettings('adminShowcaseSubtitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("adminShowcaseSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1386,7 +1591,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Description</Label>
                   <Textarea
                     value={settings.adminShowcaseDescription}
-                    onChange={(e) => updateSettings('adminShowcaseDescription', e.target.value)}
+                    onChange={(e) =>
+                      updateSettings("adminShowcaseDescription", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                   />
                 </div>
@@ -1394,7 +1601,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* White Label */}
-            <AccordionItem value="whitelabel" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="whitelabel"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Globe className="h-5 w-5 text-cyan-500" />
@@ -1407,7 +1617,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
                       value={settings.whiteLabelTitle}
-                      onChange={(e) => updateSettings('whiteLabelTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("whiteLabelTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1415,7 +1627,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
                       value={settings.whiteLabelSubtitle}
-                      onChange={(e) => updateSettings('whiteLabelSubtitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("whiteLabelSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1424,7 +1638,9 @@ export default function HeroPageSection() {
                   <Label className="text-gray-400">Description</Label>
                   <Textarea
                     value={settings.whiteLabelDescription}
-                    onChange={(e) => updateSettings('whiteLabelDescription', e.target.value)}
+                    onChange={(e) =>
+                      updateSettings("whiteLabelDescription", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                   />
                 </div>
@@ -1433,7 +1649,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">CTA Button Text</Label>
                     <Input
                       value={settings.whiteLabelCTAText}
-                      onChange={(e) => updateSettings('whiteLabelCTAText', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("whiteLabelCTAText", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1441,7 +1659,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">CTA Button Link</Label>
                     <Input
                       value={settings.whiteLabelCTALink}
-                      onChange={(e) => updateSettings('whiteLabelCTALink', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("whiteLabelCTALink", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1450,7 +1670,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* Live Data Settings */}
-            <AccordionItem value="livedata" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="livedata"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Zap className="h-5 w-5 text-yellow-500" />
@@ -1459,55 +1682,97 @@ export default function HeroPageSection() {
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4 space-y-4">
                 <p className="text-sm text-gray-400 mb-4">
-                  Configure real-time data feeds for your landing page including live stats, activity feed, and leaderboard.
+                  Configure real-time data feeds for your landing page including
+                  live stats, activity feed, and leaderboard.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-white">Show Real Stats</Label>
-                      <p className="text-xs text-gray-500">Display actual platform statistics</p>
+                      <p className="text-xs text-gray-500">
+                        Display actual platform statistics
+                      </p>
                     </div>
                     <Switch
                       checked={settings.liveDataSettings?.showRealStats ?? true}
-                      onCheckedChange={(v) => updateSettings('liveDataSettings.showRealStats', v)}
+                      onCheckedChange={(v) =>
+                        updateSettings("liveDataSettings.showRealStats", v)
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-white">Show Activity Feed</Label>
-                      <p className="text-xs text-gray-500">Live feed of recent platform activity</p>
+                      <p className="text-xs text-gray-500">
+                        Live feed of recent platform activity
+                      </p>
                     </div>
                     <Switch
-                      checked={settings.liveDataSettings?.showActivityFeed ?? true}
-                      onCheckedChange={(v) => updateSettings('liveDataSettings.showActivityFeed', v)}
+                      checked={
+                        settings.liveDataSettings?.showActivityFeed ?? true
+                      }
+                      onCheckedChange={(v) =>
+                        updateSettings("liveDataSettings.showActivityFeed", v)
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-white">Show Leaderboard Preview</Label>
-                      <p className="text-xs text-gray-500">Top traders preview on landing page</p>
+                      <Label className="text-white">
+                        Show Leaderboard Preview
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Top traders preview on landing page
+                      </p>
                     </div>
                     <Switch
-                      checked={settings.liveDataSettings?.showLeaderboardPreview ?? true}
-                      onCheckedChange={(v) => updateSettings('liveDataSettings.showLeaderboardPreview', v)}
+                      checked={
+                        settings.liveDataSettings?.showLeaderboardPreview ??
+                        true
+                      }
+                      onCheckedChange={(v) =>
+                        updateSettings(
+                          "liveDataSettings.showLeaderboardPreview",
+                          v,
+                        )
+                      }
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-gray-400">Stats Refresh Rate (ms)</Label>
+                      <Label className="text-gray-400">
+                        Stats Refresh Rate (ms)
+                      </Label>
                       <Input
                         type="number"
-                        value={settings.liveDataSettings?.statsRefreshRate ?? 60000}
-                        onChange={(e) => updateSettings('liveDataSettings.statsRefreshRate', parseInt(e.target.value))}
+                        value={
+                          settings.liveDataSettings?.statsRefreshRate ?? 60000
+                        }
+                        onChange={(e) =>
+                          updateSettings(
+                            "liveDataSettings.statsRefreshRate",
+                            parseInt(e.target.value),
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white mt-1"
                       />
                     </div>
                     <div>
-                      <Label className="text-gray-400">Activity Feed Refresh Rate (ms)</Label>
+                      <Label className="text-gray-400">
+                        Activity Feed Refresh Rate (ms)
+                      </Label>
                       <Input
                         type="number"
-                        value={settings.liveDataSettings?.activityFeedRefreshRate ?? 30000}
-                        onChange={(e) => updateSettings('liveDataSettings.activityFeedRefreshRate', parseInt(e.target.value))}
+                        value={
+                          settings.liveDataSettings?.activityFeedRefreshRate ??
+                          30000
+                        }
+                        onChange={(e) =>
+                          updateSettings(
+                            "liveDataSettings.activityFeedRefreshRate",
+                            parseInt(e.target.value),
+                          )
+                        }
                         className="bg-gray-900 border-gray-600 text-white mt-1"
                       />
                     </div>
@@ -1517,7 +1782,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* Testimonials Section */}
-            <AccordionItem value="testimonials" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="testimonials"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-purple-500" />
@@ -1529,16 +1797,25 @@ export default function HeroPageSection() {
                   <div>
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
-                      value={settings.testimonialsTitle || 'What Our Traders Say'}
-                      onChange={(e) => updateSettings('testimonialsTitle', e.target.value)}
+                      value={
+                        settings.testimonialsTitle || "What Our Traders Say"
+                      }
+                      onChange={(e) =>
+                        updateSettings("testimonialsTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
                   <div>
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
-                      value={settings.testimonialsSubtitle || 'Real Stories from Real Winners'}
-                      onChange={(e) => updateSettings('testimonialsSubtitle', e.target.value)}
+                      value={
+                        settings.testimonialsSubtitle ||
+                        "Real Stories from Real Winners"
+                      }
+                      onChange={(e) =>
+                        updateSettings("testimonialsSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1552,15 +1829,18 @@ export default function HeroPageSection() {
                       onClick={() => {
                         const newTestimonial = {
                           id: `testimonial-${Date.now()}`,
-                          name: 'New Trader',
-                          role: 'Professional Trader',
-                          avatar: '',
-                          content: 'Your testimonial text here...',
+                          name: "New Trader",
+                          role: "Professional Trader",
+                          avatar: "",
+                          content: "Your testimonial text here...",
                           rating: 5,
                           enabled: true,
                           order: (settings.testimonials?.length || 0) + 1,
                         };
-                        updateSettings('testimonials', [...(settings.testimonials || []), newTestimonial]);
+                        updateSettings("testimonials", [
+                          ...(settings.testimonials || []),
+                          newTestimonial,
+                        ]);
                       }}
                       className="border-purple-500 text-purple-400 hover:bg-purple-500/20"
                     >
@@ -1569,15 +1849,21 @@ export default function HeroPageSection() {
                   </div>
                   <div className="space-y-3">
                     {(settings.testimonials || []).map((testimonial, index) => (
-                      <div key={testimonial.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                      <div
+                        key={testimonial.id}
+                        className="p-4 bg-gray-900 rounded-lg border border-gray-700"
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                           <Input
                             placeholder="Name"
                             value={testimonial.name}
                             onChange={(e) => {
                               const updated = [...settings.testimonials];
-                              updated[index] = { ...testimonial, name: e.target.value };
-                              updateSettings('testimonials', updated);
+                              updated[index] = {
+                                ...testimonial,
+                                name: e.target.value,
+                              };
+                              updateSettings("testimonials", updated);
                             }}
                             className="bg-gray-800 border-gray-600 text-white"
                           />
@@ -1586,8 +1872,11 @@ export default function HeroPageSection() {
                             value={testimonial.role}
                             onChange={(e) => {
                               const updated = [...settings.testimonials];
-                              updated[index] = { ...testimonial, role: e.target.value };
-                              updateSettings('testimonials', updated);
+                              updated[index] = {
+                                ...testimonial,
+                                role: e.target.value,
+                              };
+                              updateSettings("testimonials", updated);
                             }}
                             className="bg-gray-800 border-gray-600 text-white"
                           />
@@ -1597,29 +1886,39 @@ export default function HeroPageSection() {
                           value={testimonial.content}
                           onChange={(e) => {
                             const updated = [...settings.testimonials];
-                            updated[index] = { ...testimonial, content: e.target.value };
-                            updateSettings('testimonials', updated);
+                            updated[index] = {
+                              ...testimonial,
+                              content: e.target.value,
+                            };
+                            updateSettings("testimonials", updated);
                           }}
                           className="bg-gray-800 border-gray-600 text-white mb-3"
                         />
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
-                              <Label className="text-gray-400 text-sm">Rating:</Label>
+                              <Label className="text-gray-400 text-sm">
+                                Rating:
+                              </Label>
                               <Select
                                 value={String(testimonial.rating)}
                                 onValueChange={(v) => {
                                   const updated = [...settings.testimonials];
-                                  updated[index] = { ...testimonial, rating: parseInt(v) };
-                                  updateSettings('testimonials', updated);
+                                  updated[index] = {
+                                    ...testimonial,
+                                    rating: parseInt(v),
+                                  };
+                                  updateSettings("testimonials", updated);
                                 }}
                               >
                                 <SelectTrigger className="w-20 bg-gray-800 border-gray-600 text-white">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {[1, 2, 3, 4, 5].map(r => (
-                                    <SelectItem key={r} value={String(r)}>{r} ★</SelectItem>
+                                  {[1, 2, 3, 4, 5].map((r) => (
+                                    <SelectItem key={r} value={String(r)}>
+                                      {r} ★
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -1629,19 +1928,26 @@ export default function HeroPageSection() {
                                 checked={testimonial.enabled}
                                 onCheckedChange={(v) => {
                                   const updated = [...settings.testimonials];
-                                  updated[index] = { ...testimonial, enabled: v };
-                                  updateSettings('testimonials', updated);
+                                  updated[index] = {
+                                    ...testimonial,
+                                    enabled: v,
+                                  };
+                                  updateSettings("testimonials", updated);
                                 }}
                               />
-                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                              <Label className="text-gray-400 text-sm">
+                                Enabled
+                              </Label>
                             </div>
                           </div>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              const updated = settings.testimonials.filter((_, i) => i !== index);
-                              updateSettings('testimonials', updated);
+                              const updated = settings.testimonials.filter(
+                                (_, i) => i !== index,
+                              );
+                              updateSettings("testimonials", updated);
                             }}
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
                           >
@@ -1656,7 +1962,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* FAQ Section */}
-            <AccordionItem value="faq" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="faq"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-blue-500" />
@@ -1668,16 +1977,23 @@ export default function HeroPageSection() {
                   <div>
                     <Label className="text-gray-400">Section Title</Label>
                     <Input
-                      value={settings.faqTitle || 'Frequently Asked Questions'}
-                      onChange={(e) => updateSettings('faqTitle', e.target.value)}
+                      value={settings.faqTitle || "Frequently Asked Questions"}
+                      onChange={(e) =>
+                        updateSettings("faqTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
                   <div>
                     <Label className="text-gray-400">Section Subtitle</Label>
                     <Input
-                      value={settings.faqSubtitle || "Got Questions? We've Got Answers"}
-                      onChange={(e) => updateSettings('faqSubtitle', e.target.value)}
+                      value={
+                        settings.faqSubtitle ||
+                        "Got Questions? We've Got Answers"
+                      }
+                      onChange={(e) =>
+                        updateSettings("faqSubtitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -1691,13 +2007,16 @@ export default function HeroPageSection() {
                       onClick={() => {
                         const newFaq = {
                           id: `faq-${Date.now()}`,
-                          question: 'New Question?',
-                          answer: 'Answer here...',
-                          category: 'general',
+                          question: "New Question?",
+                          answer: "Answer here...",
+                          category: "general",
                           order: (settings.faqItems?.length || 0) + 1,
                           enabled: true,
                         };
-                        updateSettings('faqItems', [...(settings.faqItems || []), newFaq]);
+                        updateSettings("faqItems", [
+                          ...(settings.faqItems || []),
+                          newFaq,
+                        ]);
                       }}
                       className="border-blue-500 text-blue-400 hover:bg-blue-500/20"
                     >
@@ -1706,14 +2025,20 @@ export default function HeroPageSection() {
                   </div>
                   <div className="space-y-3">
                     {(settings.faqItems || []).map((faq, index) => (
-                      <div key={faq.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                      <div
+                        key={faq.id}
+                        className="p-4 bg-gray-900 rounded-lg border border-gray-700"
+                      >
                         <Input
                           placeholder="Question"
                           value={faq.question}
                           onChange={(e) => {
                             const updated = [...settings.faqItems];
-                            updated[index] = { ...faq, question: e.target.value };
-                            updateSettings('faqItems', updated);
+                            updated[index] = {
+                              ...faq,
+                              question: e.target.value,
+                            };
+                            updateSettings("faqItems", updated);
                           }}
                           className="bg-gray-800 border-gray-600 text-white mb-3"
                         />
@@ -1723,7 +2048,7 @@ export default function HeroPageSection() {
                           onChange={(e) => {
                             const updated = [...settings.faqItems];
                             updated[index] = { ...faq, answer: e.target.value };
-                            updateSettings('faqItems', updated);
+                            updateSettings("faqItems", updated);
                           }}
                           className="bg-gray-800 border-gray-600 text-white mb-3"
                         />
@@ -1734,8 +2059,11 @@ export default function HeroPageSection() {
                               value={faq.category}
                               onChange={(e) => {
                                 const updated = [...settings.faqItems];
-                                updated[index] = { ...faq, category: e.target.value };
-                                updateSettings('faqItems', updated);
+                                updated[index] = {
+                                  ...faq,
+                                  category: e.target.value,
+                                };
+                                updateSettings("faqItems", updated);
                               }}
                               className="w-32 bg-gray-800 border-gray-600 text-white"
                             />
@@ -1745,18 +2073,22 @@ export default function HeroPageSection() {
                                 onCheckedChange={(v) => {
                                   const updated = [...settings.faqItems];
                                   updated[index] = { ...faq, enabled: v };
-                                  updateSettings('faqItems', updated);
+                                  updateSettings("faqItems", updated);
                                 }}
                               />
-                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                              <Label className="text-gray-400 text-sm">
+                                Enabled
+                              </Label>
                             </div>
                           </div>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              const updated = settings.faqItems.filter((_, i) => i !== index);
-                              updateSettings('faqItems', updated);
+                              const updated = settings.faqItems.filter(
+                                (_, i) => i !== index,
+                              );
+                              updateSettings("faqItems", updated);
                             }}
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
                           >
@@ -1771,7 +2103,10 @@ export default function HeroPageSection() {
             </AccordionItem>
 
             {/* Trust Badges Section */}
-            <AccordionItem value="trustbadges" className="bg-gray-800 border border-gray-700 rounded-lg">
+            <AccordionItem
+              value="trustbadges"
+              className="bg-gray-800 border border-gray-700 rounded-lg"
+            >
               <AccordionTrigger className="px-4 text-white hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-green-500" />
@@ -1782,8 +2117,13 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Section Title</Label>
                   <Input
-                    value={settings.trustBadgesTitle || 'Trusted By Traders Worldwide'}
-                    onChange={(e) => updateSettings('trustBadgesTitle', e.target.value)}
+                    value={
+                      settings.trustBadgesTitle ||
+                      "Trusted By Traders Worldwide"
+                    }
+                    onChange={(e) =>
+                      updateSettings("trustBadgesTitle", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                   />
                 </div>
@@ -1796,13 +2136,16 @@ export default function HeroPageSection() {
                       onClick={() => {
                         const newBadge = {
                           id: `badge-${Date.now()}`,
-                          type: 'security' as const,
-                          name: 'New Badge',
-                          logo: '',
-                          url: '',
+                          type: "security" as const,
+                          name: "New Badge",
+                          logo: "",
+                          url: "",
                           enabled: true,
                         };
-                        updateSettings('trustBadges', [...(settings.trustBadges || []), newBadge]);
+                        updateSettings("trustBadges", [
+                          ...(settings.trustBadges || []),
+                          newBadge,
+                        ]);
                       }}
                       className="border-green-500 text-green-400 hover:bg-green-500/20"
                     >
@@ -1811,15 +2154,21 @@ export default function HeroPageSection() {
                   </div>
                   <div className="space-y-3">
                     {(settings.trustBadges || []).map((badge, index) => (
-                      <div key={badge.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                      <div
+                        key={badge.id}
+                        className="p-4 bg-gray-900 rounded-lg border border-gray-700"
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                           <Input
                             placeholder="Badge Name"
                             value={badge.name}
                             onChange={(e) => {
                               const updated = [...settings.trustBadges];
-                              updated[index] = { ...badge, name: e.target.value };
-                              updateSettings('trustBadges', updated);
+                              updated[index] = {
+                                ...badge,
+                                name: e.target.value,
+                              };
+                              updateSettings("trustBadges", updated);
                             }}
                             className="bg-gray-800 border-gray-600 text-white"
                           />
@@ -1827,8 +2176,15 @@ export default function HeroPageSection() {
                             value={badge.type}
                             onValueChange={(v) => {
                               const updated = [...settings.trustBadges];
-                              updated[index] = { ...badge, type: v as 'security' | 'partner' | 'press' | 'award' };
-                              updateSettings('trustBadges', updated);
+                              updated[index] = {
+                                ...badge,
+                                type: v as
+                                  | "security"
+                                  | "partner"
+                                  | "press"
+                                  | "award",
+                              };
+                              updateSettings("trustBadges", updated);
                             }}
                           >
                             <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
@@ -1846,8 +2202,11 @@ export default function HeroPageSection() {
                             value={badge.logo}
                             onChange={(e) => {
                               const updated = [...settings.trustBadges];
-                              updated[index] = { ...badge, logo: e.target.value };
-                              updateSettings('trustBadges', updated);
+                              updated[index] = {
+                                ...badge,
+                                logo: e.target.value,
+                              };
+                              updateSettings("trustBadges", updated);
                             }}
                             className="bg-gray-800 border-gray-600 text-white"
                           />
@@ -1856,11 +2215,14 @@ export default function HeroPageSection() {
                           <div className="flex items-center gap-4">
                             <Input
                               placeholder="Link URL (optional)"
-                              value={badge.url || ''}
+                              value={badge.url || ""}
                               onChange={(e) => {
                                 const updated = [...settings.trustBadges];
-                                updated[index] = { ...badge, url: e.target.value };
-                                updateSettings('trustBadges', updated);
+                                updated[index] = {
+                                  ...badge,
+                                  url: e.target.value,
+                                };
+                                updateSettings("trustBadges", updated);
                               }}
                               className="w-48 bg-gray-800 border-gray-600 text-white"
                             />
@@ -1870,18 +2232,22 @@ export default function HeroPageSection() {
                                 onCheckedChange={(v) => {
                                   const updated = [...settings.trustBadges];
                                   updated[index] = { ...badge, enabled: v };
-                                  updateSettings('trustBadges', updated);
+                                  updateSettings("trustBadges", updated);
                                 }}
                               />
-                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                              <Label className="text-gray-400 text-sm">
+                                Enabled
+                              </Label>
                             </div>
                           </div>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              const updated = settings.trustBadges.filter((_, i) => i !== index);
-                              updateSettings('trustBadges', updated);
+                              const updated = settings.trustBadges.filter(
+                                (_, i) => i !== index,
+                              );
+                              updateSettings("trustBadges", updated);
                             }}
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
                           >
@@ -1909,8 +2275,11 @@ export default function HeroPageSection() {
                 <div>
                   <h4 className="font-semibold text-blue-400">Logo & Images</h4>
                   <p className="text-sm text-gray-400 mt-1">
-                    Your logo and images are managed in <span className="text-blue-400 font-medium">Settings → Branding</span>. 
-                    The hero page automatically uses your app logo from there.
+                    Your logo and images are managed in{" "}
+                    <span className="text-blue-400 font-medium">
+                      Settings → Branding
+                    </span>
+                    . The hero page automatically uses your app logo from there.
                   </p>
                 </div>
               </div>
@@ -1929,23 +2298,29 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Tagline</Label>
                 <Input
                   value={settings.tagline}
-                  onChange={(e) => updateSettings('tagline', e.target.value)}
+                  onChange={(e) => updateSettings("tagline", e.target.value)}
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Where Champions Trade"
                 />
-                <p className="text-xs text-gray-500 mt-1">Shown below the logo in the header</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Shown below the logo in the header
+                </p>
               </div>
 
               <div>
                 <Label className="text-gray-400">Site Description</Label>
                 <Textarea
                   value={settings.description}
-                  onChange={(e) => updateSettings('description', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("description", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={3}
                   placeholder="The ultimate competitive trading platform"
                 />
-                <p className="text-xs text-gray-500 mt-1">Used in meta tags and footer</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Used in meta tags and footer
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -1965,7 +2340,9 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Meta Title</Label>
                 <Input
                   value={settings.seo.metaTitle}
-                  onChange={(e) => updateSettings('seo.metaTitle', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("seo.metaTitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Page title for search engines"
                 />
@@ -1974,7 +2351,9 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Meta Description</Label>
                 <Textarea
                   value={settings.seo.metaDescription}
-                  onChange={(e) => updateSettings('seo.metaDescription', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("seo.metaDescription", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Description for search engines (150-160 characters)"
                   rows={3}
@@ -1984,23 +2363,34 @@ export default function HeroPageSection() {
                 </p>
               </div>
               <div>
-                <Label className="text-gray-400">Meta Keywords (comma separated)</Label>
+                <Label className="text-gray-400">
+                  Meta Keywords (comma separated)
+                </Label>
                 <Input
-                  value={settings.seo.metaKeywords.join(', ')}
-                  onChange={(e) => updateSettings('seo.metaKeywords', e.target.value.split(',').map(k => k.trim()))}
+                  value={settings.seo.metaKeywords.join(", ")}
+                  onChange={(e) =>
+                    updateSettings(
+                      "seo.metaKeywords",
+                      e.target.value.split(",").map((k) => k.trim()),
+                    )
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="trading, competitions, forex, crypto"
                 />
               </div>
 
               <div className="pt-4 border-t border-gray-700">
-                <h4 className="font-medium text-white mb-4">Open Graph (Social Sharing)</h4>
+                <h4 className="font-medium text-white mb-4">
+                  Open Graph (Social Sharing)
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-400">OG Title</Label>
                     <Input
                       value={settings.seo.ogTitle}
-                      onChange={(e) => updateSettings('seo.ogTitle', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("seo.ogTitle", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -2008,7 +2398,9 @@ export default function HeroPageSection() {
                     <Label className="text-gray-400">OG Description</Label>
                     <Input
                       value={settings.seo.ogDescription}
-                      onChange={(e) => updateSettings('seo.ogDescription', e.target.value)}
+                      onChange={(e) =>
+                        updateSettings("seo.ogDescription", e.target.value)
+                      }
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
                   </div>
@@ -2023,16 +2415,14 @@ export default function HeroPageSection() {
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white">Custom Code</CardTitle>
-              <CardDescription>
-                Add custom CSS and JavaScript
-              </CardDescription>
+              <CardDescription>Add custom CSS and JavaScript</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
                 <Label className="text-gray-400">Custom CSS</Label>
                 <Textarea
                   value={settings.customCSS}
-                  onChange={(e) => updateSettings('customCSS', e.target.value)}
+                  onChange={(e) => updateSettings("customCSS", e.target.value)}
                   className="bg-gray-900 border-gray-600 text-white mt-1 font-mono"
                   rows={8}
                   placeholder="/* Your custom CSS here */"
@@ -2042,7 +2432,7 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Custom JavaScript</Label>
                 <Textarea
                   value={settings.customJS}
-                  onChange={(e) => updateSettings('customJS', e.target.value)}
+                  onChange={(e) => updateSettings("customJS", e.target.value)}
                   className="bg-gray-900 border-gray-600 text-white mt-1 font-mono"
                   rows={8}
                   placeholder="// Your custom JavaScript here"
@@ -2054,16 +2444,16 @@ export default function HeroPageSection() {
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white">Analytics</CardTitle>
-              <CardDescription>
-                Connect your analytics services
-              </CardDescription>
+              <CardDescription>Connect your analytics services</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-gray-400">Google Analytics ID</Label>
                 <Input
                   value={settings.googleAnalyticsId}
-                  onChange={(e) => updateSettings('googleAnalyticsId', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("googleAnalyticsId", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="G-XXXXXXXXXX"
                 />
@@ -2072,7 +2462,9 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Facebook Pixel ID</Label>
                 <Input
                   value={settings.facebookPixelId}
-                  onChange={(e) => updateSettings('facebookPixelId', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("facebookPixelId", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Your Facebook Pixel ID"
                 />
@@ -2095,23 +2487,30 @@ export default function HeroPageSection() {
                 <Label className="text-gray-400">Copyright Text</Label>
                 <Input
                   value={settings.footerCopyright}
-                  onChange={(e) => updateSettings('footerCopyright', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("footerCopyright", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="© 2024 YourCompany. All rights reserved."
                 />
-                <p className="text-xs text-gray-500 mt-1">Displayed at the bottom of the footer</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Displayed at the bottom of the footer
+                </p>
               </div>
               <div>
                 <Label className="text-gray-400">Legal Disclaimer</Label>
                 <Textarea
                   value={settings.footerDisclaimer}
-                  onChange={(e) => updateSettings('footerDisclaimer', e.target.value)}
+                  onChange={(e) =>
+                    updateSettings("footerDisclaimer", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={5}
                   placeholder="Additional legal disclaimer text (e.g., trading risks, regulatory information)..."
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  This will be added after the default risk disclaimer. Use for additional legal notices specific to your jurisdiction.
+                  This will be added after the default risk disclaimer. Use for
+                  additional legal notices specific to your jurisdiction.
                 </p>
               </div>
             </CardContent>
@@ -2127,14 +2526,20 @@ export default function HeroPageSection() {
             <CardContent>
               <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  <strong className="text-gray-300">Risk Disclaimer:</strong> Trading in financial markets involves substantial risk of loss and is not suitable for every investor. 
-                  The valuation of financial instruments may fluctuate, and as a result, traders may lose more than their original investment. 
-                  Past performance is not indicative of future results. All trading strategies are used at your own risk. 
-                  This platform is for educational and entertainment purposes only. Virtual currency used on this platform has no real monetary value.
+                  <strong className="text-gray-300">Risk Disclaimer:</strong>{" "}
+                  Trading in financial markets involves substantial risk of loss
+                  and is not suitable for every investor. The valuation of
+                  financial instruments may fluctuate, and as a result, traders
+                  may lose more than their original investment. Past performance
+                  is not indicative of future results. All trading strategies
+                  are used at your own risk. This platform is for educational
+                  and entertainment purposes only. Virtual currency used on this
+                  platform has no real monetary value.
                 </p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                This default disclaimer cannot be removed but can be extended with your custom disclaimer above.
+                This default disclaimer cannot be removed but can be extended
+                with your custom disclaimer above.
               </p>
             </CardContent>
           </Card>
@@ -2149,15 +2554,19 @@ export default function HeroPageSection() {
                 <Building2 className="h-5 w-5 text-purple-400" />
                 Enterprise Hero Section
               </CardTitle>
-              <CardDescription>Configure the hero section of the Enterprise page</CardDescription>
+              <CardDescription>
+                Configure the hero section of the Enterprise page
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-gray-400">Hero Title</Label>
                   <Input
-                    value={settings.enterpriseHeroTitle || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroTitle', e.target.value)}
+                    value={settings.enterpriseHeroTitle || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseHeroTitle", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Launch Your Own Trading Platform"
                   />
@@ -2165,8 +2574,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Badge Text</Label>
                   <Input
-                    value={settings.enterpriseHeroBadge || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroBadge', e.target.value)}
+                    value={settings.enterpriseHeroBadge || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseHeroBadge", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Enterprise Solutions"
                   />
@@ -2175,8 +2586,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Hero Description</Label>
                 <Textarea
-                  value={settings.enterpriseHeroDescription || ''}
-                  onChange={(e) => updateSettings('enterpriseHeroDescription', e.target.value)}
+                  value={settings.enterpriseHeroDescription || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseHeroDescription", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={3}
                   placeholder="Complete white-label solution with powerful admin panel..."
@@ -2186,8 +2599,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Primary CTA Text</Label>
                   <Input
-                    value={settings.enterpriseHeroCTAText || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroCTAText', e.target.value)}
+                    value={settings.enterpriseHeroCTAText || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseHeroCTAText", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Request Demo"
                   />
@@ -2195,8 +2610,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Primary CTA Link</Label>
                   <Input
-                    value={settings.enterpriseHeroCTALink || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroCTALink', e.target.value)}
+                    value={settings.enterpriseHeroCTALink || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseHeroCTALink", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="#contact"
                   />
@@ -2206,8 +2623,13 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Secondary CTA Text</Label>
                   <Input
-                    value={settings.enterpriseHeroSecondaryCTAText || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroSecondaryCTAText', e.target.value)}
+                    value={settings.enterpriseHeroSecondaryCTAText || ""}
+                    onChange={(e) =>
+                      updateSettings(
+                        "enterpriseHeroSecondaryCTAText",
+                        e.target.value,
+                      )
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="See Admin Panel"
                   />
@@ -2215,8 +2637,13 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Secondary CTA Link</Label>
                   <Input
-                    value={settings.enterpriseHeroSecondaryCTALink || ''}
-                    onChange={(e) => updateSettings('enterpriseHeroSecondaryCTALink', e.target.value)}
+                    value={settings.enterpriseHeroSecondaryCTALink || ""}
+                    onChange={(e) =>
+                      updateSettings(
+                        "enterpriseHeroSecondaryCTALink",
+                        e.target.value,
+                      )
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="#admin"
                   />
@@ -2232,14 +2659,18 @@ export default function HeroPageSection() {
                 <Globe className="h-5 w-5 text-purple-400" />
                 White Label Section
               </CardTitle>
-              <CardDescription>Configure the white label features section</CardDescription>
+              <CardDescription>
+                Configure the white label features section
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-gray-400">Section Title</Label>
                 <Input
-                  value={settings.enterpriseWhiteLabelTitle || ''}
-                  onChange={(e) => updateSettings('enterpriseWhiteLabelTitle', e.target.value)}
+                  value={settings.enterpriseWhiteLabelTitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseWhiteLabelTitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="White Label Solution"
                 />
@@ -2247,8 +2678,13 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Section Subtitle</Label>
                 <Textarea
-                  value={settings.enterpriseWhiteLabelSubtitle || ''}
-                  onChange={(e) => updateSettings('enterpriseWhiteLabelSubtitle', e.target.value)}
+                  value={settings.enterpriseWhiteLabelSubtitle || ""}
+                  onChange={(e) =>
+                    updateSettings(
+                      "enterpriseWhiteLabelSubtitle",
+                      e.target.value,
+                    )
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={2}
                   placeholder="Launch your own branded trading platform..."
@@ -2264,14 +2700,18 @@ export default function HeroPageSection() {
                 <Shield className="h-5 w-5 text-yellow-400" />
                 Admin Panel Showcase
               </CardTitle>
-              <CardDescription>Configure the admin panel showcase section</CardDescription>
+              <CardDescription>
+                Configure the admin panel showcase section
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-gray-400">Section Title</Label>
                 <Input
-                  value={settings.enterpriseAdminTitle || ''}
-                  onChange={(e) => updateSettings('enterpriseAdminTitle', e.target.value)}
+                  value={settings.enterpriseAdminTitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseAdminTitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Complete Control Center"
                 />
@@ -2279,8 +2719,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Section Subtitle</Label>
                 <Input
-                  value={settings.enterpriseAdminSubtitle || ''}
-                  onChange={(e) => updateSettings('enterpriseAdminSubtitle', e.target.value)}
+                  value={settings.enterpriseAdminSubtitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseAdminSubtitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Powerful Admin Panel"
                 />
@@ -2288,8 +2730,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Description</Label>
                 <Textarea
-                  value={settings.enterpriseAdminDescription || ''}
-                  onChange={(e) => updateSettings('enterpriseAdminDescription', e.target.value)}
+                  value={settings.enterpriseAdminDescription || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseAdminDescription", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={2}
                   placeholder="Everything you need to manage your platform..."
@@ -2311,8 +2755,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Section Title</Label>
                 <Input
-                  value={settings.enterprisePricingTitle || ''}
-                  onChange={(e) => updateSettings('enterprisePricingTitle', e.target.value)}
+                  value={settings.enterprisePricingTitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterprisePricingTitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Simple, Transparent Pricing"
                 />
@@ -2320,8 +2766,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Section Subtitle</Label>
                 <Textarea
-                  value={settings.enterprisePricingSubtitle || ''}
-                  onChange={(e) => updateSettings('enterprisePricingSubtitle', e.target.value)}
+                  value={settings.enterprisePricingSubtitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterprisePricingSubtitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   rows={2}
                   placeholder="Choose the plan that fits your needs..."
@@ -2344,8 +2792,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Section Title</Label>
                   <Input
-                    value={settings.enterpriseContactTitle || ''}
-                    onChange={(e) => updateSettings('enterpriseContactTitle', e.target.value)}
+                    value={settings.enterpriseContactTitle || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseContactTitle", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Ready to Get Started?"
                   />
@@ -2353,8 +2803,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">CTA Button Text</Label>
                   <Input
-                    value={settings.enterpriseContactCTAText || ''}
-                    onChange={(e) => updateSettings('enterpriseContactCTAText', e.target.value)}
+                    value={settings.enterpriseContactCTAText || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseContactCTAText", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="Schedule Demo"
                   />
@@ -2363,8 +2815,10 @@ export default function HeroPageSection() {
               <div>
                 <Label className="text-gray-400">Section Subtitle</Label>
                 <Input
-                  value={settings.enterpriseContactSubtitle || ''}
-                  onChange={(e) => updateSettings('enterpriseContactSubtitle', e.target.value)}
+                  value={settings.enterpriseContactSubtitle || ""}
+                  onChange={(e) =>
+                    updateSettings("enterpriseContactSubtitle", e.target.value)
+                  }
                   className="bg-gray-900 border-gray-600 text-white mt-1"
                   placeholder="Contact our sales team for a personalized demo"
                 />
@@ -2373,8 +2827,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Contact Email</Label>
                   <Input
-                    value={settings.enterpriseContactEmail || ''}
-                    onChange={(e) => updateSettings('enterpriseContactEmail', e.target.value)}
+                    value={settings.enterpriseContactEmail || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseContactEmail", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="enterprise@yourcompany.com"
                   />
@@ -2382,8 +2838,10 @@ export default function HeroPageSection() {
                 <div>
                   <Label className="text-gray-400">Contact Phone</Label>
                   <Input
-                    value={settings.enterpriseContactPhone || ''}
-                    onChange={(e) => updateSettings('enterpriseContactPhone', e.target.value)}
+                    value={settings.enterpriseContactPhone || ""}
+                    onChange={(e) =>
+                      updateSettings("enterpriseContactPhone", e.target.value)
+                    }
                     className="bg-gray-900 border-gray-600 text-white mt-1"
                     placeholder="+1 (234) 567-890"
                   />
@@ -2399,26 +2857,42 @@ export default function HeroPageSection() {
                 <Eye className="h-5 w-5 text-blue-400" />
                 Enterprise Section Visibility
               </CardTitle>
-              <CardDescription>Toggle visibility of each section on the Enterprise page</CardDescription>
+              <CardDescription>
+                Toggle visibility of each section on the Enterprise page
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { key: 'hero', label: 'Hero' },
-                  { key: 'trustBadges', label: 'Trust Badges' },
-                  { key: 'whiteLabel', label: 'White Label' },
-                  { key: 'adminShowcase', label: 'Admin Showcase' },
-                  { key: 'pricing', label: 'Pricing' },
-                  { key: 'contact', label: 'Contact' },
-                  { key: 'footer', label: 'Footer' },
+                  { key: "hero", label: "Hero" },
+                  { key: "trustBadges", label: "Trust Badges" },
+                  { key: "whiteLabel", label: "White Label" },
+                  { key: "adminShowcase", label: "Admin Showcase" },
+                  { key: "pricing", label: "Pricing" },
+                  { key: "contact", label: "Contact" },
+                  { key: "footer", label: "Footer" },
                 ].map((section) => (
-                  <div key={section.key} className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
-                    <span className="text-sm text-gray-300">{section.label}</span>
+                  <div
+                    key={section.key}
+                    className="flex items-center justify-between p-3 bg-gray-900 rounded-lg"
+                  >
+                    <span className="text-sm text-gray-300">
+                      {section.label}
+                    </span>
                     <Switch
-                      checked={settings.enterpriseSectionVisibility?.[section.key as keyof typeof settings.enterpriseSectionVisibility] ?? true}
+                      checked={
+                        settings.enterpriseSectionVisibility?.[
+                          section.key as keyof typeof settings.enterpriseSectionVisibility
+                        ] ?? true
+                      }
                       onCheckedChange={(checked) => {
-                        const current = settings.enterpriseSectionVisibility || {} as typeof settings.enterpriseSectionVisibility;
-                        updateSettings('enterpriseSectionVisibility', { ...current, [section.key]: checked });
+                        const current =
+                          settings.enterpriseSectionVisibility ||
+                          ({} as typeof settings.enterpriseSectionVisibility);
+                        updateSettings("enterpriseSectionVisibility", {
+                          ...current,
+                          [section.key]: checked,
+                        });
                       }}
                     />
                   </div>
@@ -2432,8 +2906,12 @@ export default function HeroPageSection() {
             <CardContent className="py-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Preview Enterprise Page</h3>
-                  <p className="text-gray-400 text-sm">See how your changes look on the live page</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Preview Enterprise Page
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    See how your changes look on the live page
+                  </p>
                 </div>
                 <a href="/enterprise" target="_blank" rel="noopener noreferrer">
                   <Button className="bg-purple-500 hover:bg-purple-400 text-white">
@@ -2449,4 +2927,3 @@ export default function HeroPageSection() {
     </div>
   );
 }
-

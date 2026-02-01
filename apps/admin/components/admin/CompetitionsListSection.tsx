@@ -1,13 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { 
-  Trophy, Trash2, Edit, Eye, Users, Calendar, DollarSign, 
-  RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Ban, Loader2
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Trophy,
+  Trash2,
+  Edit,
+  Eye,
+  Users,
+  Calendar,
+  DollarSign,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Ban,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,13 +37,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 // Live countdown badge component
-function LiveCountdownBadge({ targetDate, label, isEnding = false }: { targetDate: string; label: string; isEnding?: boolean }) {
-  const [countdown, setCountdown] = useState('');
+function LiveCountdownBadge({
+  targetDate,
+  label,
+  isEnding = false,
+}: {
+  targetDate: string;
+  label: string;
+  isEnding?: boolean;
+}) {
+  const [countdown, setCountdown] = useState("");
 
   useEffect(() => {
     const calculateCountdown = () => {
@@ -40,12 +60,14 @@ function LiveCountdownBadge({ targetDate, label, isEnding = false }: { targetDat
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setCountdown(isEnding ? 'Ended' : 'Started');
+        setCountdown(isEnding ? "Ended" : "Started");
         return;
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -64,11 +86,13 @@ function LiveCountdownBadge({ targetDate, label, isEnding = false }: { targetDat
   }, [targetDate, isEnding]);
 
   return (
-    <div className={`px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 ${
-      isEnding 
-        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
-        : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-    }`}>
+    <div
+      className={`px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 ${
+        isEnding
+          ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+          : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+      }`}
+    >
       <Clock className="h-3 w-3 animate-pulse" />
       <span className="text-gray-400">{label}:</span>
       <span className="font-mono tabular-nums">{countdown}</span>
@@ -81,7 +105,7 @@ interface Competition {
   name: string;
   description: string;
   slug: string;
-  status: 'upcoming' | 'active' | 'completed' | 'cancelled';
+  status: "upcoming" | "active" | "completed" | "cancelled";
   startTime: string;
   endTime: string;
   entryFee: number;
@@ -98,12 +122,14 @@ export default function CompetitionsListSection() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [competitionToDelete, setCompetitionToDelete] = useState<Competition | null>(null);
-  
+  const [competitionToDelete, setCompetitionToDelete] =
+    useState<Competition | null>(null);
+
   // Cancel competition state
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [competitionToCancel, setCompetitionToCancel] = useState<Competition | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
+  const [competitionToCancel, setCompetitionToCancel] =
+    useState<Competition | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
@@ -112,12 +138,12 @@ export default function CompetitionsListSection() {
 
   const fetchCompetitions = async () => {
     try {
-      const response = await fetch('/api/competitions');
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch("/api/competitions");
+      if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setCompetitions(data.competitions || []);
     } catch (error) {
-      toast.error('Failed to load competitions');
+      toast.error("Failed to load competitions");
       console.error(error);
     } finally {
       setLoading(false);
@@ -134,19 +160,26 @@ export default function CompetitionsListSection() {
 
     setDeletingId(competitionToDelete._id);
     try {
-      const response = await fetch(`/api/competitions/${competitionToDelete._id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/competitions/${competitionToDelete._id}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to delete');
+        throw new Error(data.error || "Failed to delete");
       }
 
-      toast.success('Competition deleted successfully');
-      setCompetitions(competitions.filter(c => c._id !== competitionToDelete._id));
+      toast.success("Competition deleted successfully");
+      setCompetitions(
+        competitions.filter((c) => c._id !== competitionToDelete._id),
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete competition",
+      );
     } finally {
       setDeletingId(null);
       setDeleteDialogOpen(false);
@@ -157,44 +190,53 @@ export default function CompetitionsListSection() {
   // Cancel competition handlers
   const handleCancelClick = (competition: Competition) => {
     setCompetitionToCancel(competition);
-    setCancelReason('');
+    setCancelReason("");
     setCancelDialogOpen(true);
   };
 
   const handleCancelConfirm = async () => {
     if (!competitionToCancel || !cancelReason.trim()) {
-      toast.error('Please provide a reason for cancellation');
+      toast.error("Please provide a reason for cancellation");
       return;
     }
 
     setIsCancelling(true);
     try {
-      const response = await fetch(`/api/competitions/${competitionToCancel._id}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: cancelReason }),
-      });
+      const response = await fetch(
+        `/api/competitions/${competitionToCancel._id}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: cancelReason }),
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel competition');
+        throw new Error(data.error || "Failed to cancel competition");
       }
 
-      toast.success(`Competition cancelled! ${data.refundedCount} participants refunded.`);
-      
+      toast.success(
+        `Competition cancelled! ${data.refundedCount} participants refunded.`,
+      );
+
       // Update local state
-      setCompetitions(competitions.map(c => 
-        c._id === competitionToCancel._id 
-          ? { ...c, status: 'cancelled' as const }
-          : c
-      ));
-      
+      setCompetitions(
+        competitions.map((c) =>
+          c._id === competitionToCancel._id
+            ? { ...c, status: "cancelled" as const }
+            : c,
+        ),
+      );
+
       setCancelDialogOpen(false);
       setCompetitionToCancel(null);
-      setCancelReason('');
+      setCancelReason("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to cancel competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel competition",
+      );
     } finally {
       setIsCancelling(false);
     }
@@ -202,28 +244,28 @@ export default function CompetitionsListSection() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'upcoming':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'completed':
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      case 'cancelled':
-        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case "active":
+        return "bg-green-500/20 text-green-400 border-green-500/30";
+      case "upcoming":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+      case "completed":
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+      case "cancelled":
+        return "bg-red-500/20 text-red-400 border-red-500/30";
       default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <CheckCircle className="h-4 w-4" />;
-      case 'upcoming':
+      case "upcoming":
         return <Clock className="h-4 w-4" />;
-      case 'completed':
+      case "completed":
         return <Trophy className="h-4 w-4" />;
-      case 'cancelled':
+      case "cancelled":
         return <XCircle className="h-4 w-4" />;
       default:
         return <AlertCircle className="h-4 w-4" />;
@@ -242,8 +284,12 @@ export default function CompetitionsListSection() {
     return (
       <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-12 text-center">
         <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-300 mb-2">No Competitions Yet</h3>
-        <p className="text-gray-500 mb-6">Create your first trading competition to get started</p>
+        <h3 className="text-xl font-semibold text-gray-300 mb-2">
+          No Competitions Yet
+        </h3>
+        <p className="text-gray-500 mb-6">
+          Create your first trading competition to get started
+        </p>
         <Link href="/competitions/create">
           <Button className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold">
             Create Competition
@@ -261,7 +307,9 @@ export default function CompetitionsListSection() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-500 uppercase">Total</p>
-              <p className="text-2xl font-bold text-gray-200">{competitions.length}</p>
+              <p className="text-2xl font-bold text-gray-200">
+                {competitions.length}
+              </p>
             </div>
             <Trophy className="h-8 w-8 text-gray-600" />
           </div>
@@ -271,7 +319,7 @@ export default function CompetitionsListSection() {
             <div>
               <p className="text-xs text-gray-500 uppercase">Active</p>
               <p className="text-2xl font-bold text-green-400">
-                {competitions.filter(c => c.status === 'active').length}
+                {competitions.filter((c) => c.status === "active").length}
               </p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500/50" />
@@ -282,7 +330,7 @@ export default function CompetitionsListSection() {
             <div>
               <p className="text-xs text-gray-500 uppercase">Upcoming</p>
               <p className="text-2xl font-bold text-blue-400">
-                {competitions.filter(c => c.status === 'upcoming').length}
+                {competitions.filter((c) => c.status === "upcoming").length}
               </p>
             </div>
             <Clock className="h-8 w-8 text-blue-500/50" />
@@ -293,7 +341,7 @@ export default function CompetitionsListSection() {
             <div>
               <p className="text-xs text-gray-500 uppercase">Completed</p>
               <p className="text-2xl font-bold text-gray-400">
-                {competitions.filter(c => c.status === 'completed').length}
+                {competitions.filter((c) => c.status === "completed").length}
               </p>
             </div>
             <Trophy className="h-8 w-8 text-gray-600" />
@@ -316,43 +364,57 @@ export default function CompetitionsListSection() {
                     <Trophy className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-100 truncate">{competition.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2">{competition.description}</p>
+                    <h3 className="text-lg font-bold text-gray-100 truncate">
+                      {competition.name}
+                    </h3>
+                    <p className="text-sm text-gray-400 line-clamp-2">
+                      {competition.description}
+                    </p>
                   </div>
                 </div>
 
                 {/* Status and Stats */}
                 <div className="flex flex-wrap items-center gap-3 mt-4">
-                  <div className={`px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 ${getStatusColor(competition.status)}`}>
+                  <div
+                    className={`px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 ${getStatusColor(competition.status)}`}
+                  >
                     {getStatusIcon(competition.status)}
                     {competition.status.toUpperCase()}
                   </div>
 
                   {/* Live Countdown for Upcoming */}
-                  {competition.status === 'upcoming' && (
-                    <LiveCountdownBadge targetDate={competition.startTime} label="Starts in" />
+                  {competition.status === "upcoming" && (
+                    <LiveCountdownBadge
+                      targetDate={competition.startTime}
+                      label="Starts in"
+                    />
                   )}
 
                   {/* Time Remaining for Active */}
-                  {competition.status === 'active' && (
-                    <LiveCountdownBadge targetDate={competition.endTime} label="Ends in" isEnding />
+                  {competition.status === "active" && (
+                    <LiveCountdownBadge
+                      targetDate={competition.endTime}
+                      label="Ends in"
+                      isEnding
+                    />
                   )}
-                  
+
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Users className="h-3 w-3" />
-                    {competition.currentParticipants}/{competition.maxParticipants}
+                    {competition.currentParticipants}/
+                    {competition.maxParticipants}
                   </div>
-                  
+
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <DollarSign className="h-3 w-3" />
                     Entry: €{competition.entryFee}
                   </div>
-                  
+
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Trophy className="h-3 w-3" />
                     Pool: €{competition.prizePool?.toFixed(0) || 0}
                   </div>
-                  
+
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Calendar className="h-3 w-3" />
                     {new Date(competition.startTime).toLocaleDateString()}
@@ -372,7 +434,7 @@ export default function CompetitionsListSection() {
                     View
                   </Button>
                 </Link>
-                
+
                 <Link href={`/competitions/edit/${competition._id}`}>
                   <Button
                     size="sm"
@@ -385,7 +447,7 @@ export default function CompetitionsListSection() {
                 </Link>
 
                 {/* Cancel Button - Only for upcoming competitions */}
-                {competition.status === 'upcoming' && (
+                {competition.status === "upcoming" && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -396,7 +458,7 @@ export default function CompetitionsListSection() {
                     Cancel & Refund
                   </Button>
                 )}
-                
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -426,9 +488,15 @@ export default function CompetitionsListSection() {
               Delete Competition?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-400">
-              Are you sure you want to delete "<span className="font-semibold text-gray-300">{competitionToDelete?.name}</span>"?
-              <br /><br />
-              This action cannot be undone. All participants and related data will be removed.
+              Are you sure you want to delete "
+              <span className="font-semibold text-gray-300">
+                {competitionToDelete?.name}
+              </span>
+              "?
+              <br />
+              <br />
+              This action cannot be undone. All participants and related data
+              will be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -454,7 +522,11 @@ export default function CompetitionsListSection() {
               Cancel Competition & Refund
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              Are you sure you want to cancel <span className="text-white font-semibold">"{competitionToCancel?.name}"</span>?
+              Are you sure you want to cancel{" "}
+              <span className="text-white font-semibold">
+                "{competitionToCancel?.name}"
+              </span>
+              ?
             </DialogDescription>
           </DialogHeader>
 
@@ -465,7 +537,13 @@ export default function CompetitionsListSection() {
               </p>
               <ul className="mt-2 space-y-1 text-sm text-orange-300/80 list-disc list-inside">
                 <li>Immediately cancel the competition</li>
-                <li>Refund <strong>{competitionToCancel?.currentParticipants || 0}</strong> participant(s) their full entry fees</li>
+                <li>
+                  Refund{" "}
+                  <strong>
+                    {competitionToCancel?.currentParticipants || 0}
+                  </strong>{" "}
+                  participant(s) their full entry fees
+                </li>
                 <li>Send notification to all participants</li>
                 <li>This action cannot be undone</li>
               </ul>
@@ -517,4 +595,3 @@ export default function CompetitionsListSection() {
     </div>
   );
 }
-

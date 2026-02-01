@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, ChevronLeft, ChevronRight, Building2, TrendingUp } from 'lucide-react';
-import { LandingTheme } from '@/lib/themes/landing-themes';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Quote,
+  ChevronLeft,
+  ChevronRight,
+  Building2,
+  TrendingUp,
+} from "lucide-react";
+import { LandingTheme } from "@/lib/themes/landing-themes";
 
 interface CaseStudy {
   id: string;
@@ -37,20 +43,20 @@ export default function CaseStudies({
   effectiveColors: propColors,
   effectiveHeadingFont: propFont,
   caseStudies = [],
-  title = 'Success Stories',
-  subtitle = 'See how our clients are succeeding',
+  title = "Success Stories",
+  subtitle = "See how our clients are succeeding",
 }: CaseStudiesProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#a855f7',
-    secondary: propColors?.secondary || '#ec4899',
-    accent: propColors?.accent || '#fbbf24',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#a855f7",
+    secondary: propColors?.secondary || "#ec4899",
+    accent: propColors?.accent || "#fbbf24",
+    text: propColors?.text || "#ffffff",
   };
-  const effectiveHeadingFont = propFont || 'inherit';
+  const effectiveHeadingFont = propFont || "inherit";
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const enabledCaseStudies = caseStudies
-    .filter(cs => cs.enabled)
+    .filter((cs) => cs.enabled)
     .sort((a, b) => a.order - b.order);
 
   if (enabledCaseStudies.length === 0) {
@@ -58,21 +64,21 @@ export default function CaseStudies({
   }
 
   const handlePrev = () => {
-    setCurrentIndex(prev => 
-      prev === 0 ? enabledCaseStudies.length - 1 : prev - 1
+    setCurrentIndex((prev) =>
+      prev === 0 ? enabledCaseStudies.length - 1 : prev - 1,
     );
   };
 
   const handleNext = () => {
-    setCurrentIndex(prev => (prev + 1) % enabledCaseStudies.length);
+    setCurrentIndex((prev) => (prev + 1) % enabledCaseStudies.length);
   };
 
   const currentStudy = enabledCaseStudies[currentIndex];
 
   return (
-    <section 
+    <section
       className="py-20 md:py-28"
-      style={{ 
+      style={{
         background: `linear-gradient(180deg, transparent, ${effectiveColors.primary}08, transparent)`,
       }}
     >
@@ -84,27 +90,30 @@ export default function CaseStudies({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-            style={{ 
-              backgroundColor: `${theme?.colors?.success || '#22c55e'}15`,
-              border: `1px solid ${theme?.colors?.success || '#22c55e'}30`,
-              color: theme?.colors?.success || '#22c55e',
+            style={{
+              backgroundColor: `${theme?.colors?.success || "#22c55e"}15`,
+              border: `1px solid ${theme?.colors?.success || "#22c55e"}30`,
+              color: theme?.colors?.success || "#22c55e",
             }}
           >
             <Building2 className="h-4 w-4" />
             Success Stories
           </motion.div>
-          
+
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-black mb-6"
-            style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+            style={{
+              color: effectiveColors.text,
+              fontFamily: effectiveHeadingFont,
+            }}
           >
             {title}
           </motion.h2>
-          
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -127,7 +136,7 @@ export default function CaseStudies({
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.3 }}
               className="rounded-3xl overflow-hidden"
-              style={{ 
+              style={{
                 backgroundColor: theme?.colors?.backgroundCard,
                 border: `1px solid ${theme?.colors?.border}`,
                 boxShadow: `0 25px 50px ${effectiveColors.primary}15`,
@@ -139,26 +148,34 @@ export default function CaseStudies({
                   {/* Company Logo/Name */}
                   <div className="flex items-center gap-4 mb-8">
                     {currentStudy.companyLogo ? (
-                      <img 
-                        src={currentStudy.companyLogo} 
+                      <img
+                        src={currentStudy.companyLogo}
                         alt={currentStudy.companyName}
                         className="h-12 w-auto object-contain"
                       />
                     ) : (
-                      <div 
+                      <div
                         className="h-12 w-12 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${effectiveColors.primary}20` }}
+                        style={{
+                          backgroundColor: `${effectiveColors.primary}20`,
+                        }}
                       >
-                        <Building2 className="h-6 w-6" style={{ color: effectiveColors.primary }} />
+                        <Building2
+                          className="h-6 w-6"
+                          style={{ color: effectiveColors.primary }}
+                        />
                       </div>
                     )}
                     <div>
-                      <h3 className="font-bold text-lg" style={{ color: effectiveColors.text }}>
+                      <h3
+                        className="font-bold text-lg"
+                        style={{ color: effectiveColors.text }}
+                      >
                         {currentStudy.companyName}
                       </h3>
-                      <span 
+                      <span
                         className="text-sm px-2 py-0.5 rounded-full"
-                        style={{ 
+                        style={{
                           backgroundColor: `${effectiveColors.secondary}15`,
                           color: effectiveColors.secondary,
                         }}
@@ -170,11 +187,11 @@ export default function CaseStudies({
 
                   {/* Quote */}
                   <div className="relative mb-8">
-                    <Quote 
+                    <Quote
                       className="absolute -top-2 -left-2 h-8 w-8 opacity-20"
                       style={{ color: effectiveColors.primary }}
                     />
-                    <blockquote 
+                    <blockquote
                       className="text-xl md:text-2xl font-medium leading-relaxed pl-6"
                       style={{ color: effectiveColors.text }}
                     >
@@ -184,9 +201,9 @@ export default function CaseStudies({
 
                   {/* Author */}
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
-                      style={{ 
+                      style={{
                         background: theme?.effects?.gradientStyle,
                         color: theme?.colors?.background,
                       }}
@@ -194,10 +211,16 @@ export default function CaseStudies({
                       {currentStudy.quotePerson.charAt(0)}
                     </div>
                     <div>
-                      <div className="font-bold" style={{ color: effectiveColors.text }}>
+                      <div
+                        className="font-bold"
+                        style={{ color: effectiveColors.text }}
+                      >
                         {currentStudy.quotePerson}
                       </div>
-                      <div className="text-sm" style={{ color: theme?.colors?.textMuted }}>
+                      <div
+                        className="text-sm"
+                        style={{ color: theme?.colors?.textMuted }}
+                      >
                         {currentStudy.quoteTitle}
                       </div>
                     </div>
@@ -205,15 +228,21 @@ export default function CaseStudies({
                 </div>
 
                 {/* Right - Metrics */}
-                <div 
+                <div
                   className="p-8 md:p-12"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${effectiveColors.primary}10, ${effectiveColors.secondary}10)`,
                   }}
                 >
                   <div className="flex items-center gap-2 mb-6">
-                    <TrendingUp className="h-5 w-5" style={{ color: effectiveColors.primary }} />
-                    <span className="font-bold" style={{ color: effectiveColors.text }}>
+                    <TrendingUp
+                      className="h-5 w-5"
+                      style={{ color: effectiveColors.primary }}
+                    />
+                    <span
+                      className="font-bold"
+                      style={{ color: effectiveColors.text }}
+                    >
                       Results Achieved
                     </span>
                   </div>
@@ -226,18 +255,18 @@ export default function CaseStudies({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 + index * 0.1 }}
                         className="p-4 rounded-xl"
-                        style={{ 
+                        style={{
                           backgroundColor: `${theme?.colors?.background}80`,
                           border: `1px solid ${theme?.colors?.border}`,
                         }}
                       >
-                        <div 
+                        <div
                           className="text-3xl font-black mb-1"
                           style={{ color: effectiveColors.primary }}
                         >
                           {metric.value}
                         </div>
-                        <div 
+                        <div
                           className="text-sm font-medium"
                           style={{ color: theme?.colors?.textMuted }}
                         >
@@ -257,7 +286,7 @@ export default function CaseStudies({
               <button
                 onClick={handlePrev}
                 className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 md:-translate-x-12 w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                style={{ 
+                style={{
                   backgroundColor: theme?.colors?.backgroundCard,
                   border: `1px solid ${theme?.colors?.border}`,
                   color: effectiveColors.primary,
@@ -268,7 +297,7 @@ export default function CaseStudies({
               <button
                 onClick={handleNext}
                 className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 md:translate-x-12 w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                style={{ 
+                style={{
                   backgroundColor: theme?.colors?.backgroundCard,
                   border: `1px solid ${theme?.colors?.border}`,
                   color: effectiveColors.primary,
@@ -284,11 +313,13 @@ export default function CaseStudies({
                     key={index}
                     onClick={() => setCurrentIndex(index)}
                     className="w-3 h-3 rounded-full transition-all"
-                    style={{ 
-                      backgroundColor: index === currentIndex 
-                        ? effectiveColors.primary 
-                        : `${effectiveColors.primary}30`,
-                      transform: index === currentIndex ? 'scale(1.2)' : 'scale(1)',
+                    style={{
+                      backgroundColor:
+                        index === currentIndex
+                          ? effectiveColors.primary
+                          : `${effectiveColors.primary}30`,
+                      transform:
+                        index === currentIndex ? "scale(1.2)" : "scale(1)",
                     }}
                   />
                 ))}

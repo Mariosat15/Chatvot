@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import MessagingService from '@/lib/services/messaging/messaging.service';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import MessagingService from "@/lib/services/messaging/messaging.service";
+import { connectToDatabase } from "@/database/mongoose";
+import { ObjectId } from "mongodb";
 
 /**
  * GET /api/messaging/search/users
@@ -12,77 +13,113 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const query = searchParams.get("q");
+    const limit = parseInt(searchParams.get("limit") || "20");
 
     if (!query || query.length < 2) {
       return NextResponse.json(
-        { error: 'Search query must be at least 2 characters' },
-        { status: 400 }
+        { error: "Search query must be at least 2 characters" },
+        { status: 400 },
       );
     }
 
-    const users = await MessagingService.searchUsers(query, session.user.id, limit);
+    const currentUserId = session.user.id;
+    const users = await MessagingService.searchUsers(
+      query,
+      currentUserId,
+      limit,
+    );
 
     // Get friendship/block status for each user
-    const { Friendship, FriendRequest } = await import('@/database/models/messaging/friend.model');
-    const { BlockedUser } = await import('@/database/models/messaging/blocked-user.model');
+    const friendModel =
+      await import("@/database/models/messaging/friend.model");
+    const Friendship = friendModel.Friendship as unknown as {
+      getFriendship: (
+        u1: string,
+        u2: string,
+      ) => Promise<{ blockedBy?: string } | null>;
+      areFriends: (u1: string, u2: string) => Promise<boolean>;
+    };
+    const FriendRequest = friendModel.FriendRequest as unknown as {
+      hasPendingRequest: (u1: string, u2: string) => Promise<boolean>;
+    };
+    const blockedModel =
+      await import("@/database/models/messaging/blocked-user.model");
+    const BlockedUser = blockedModel.BlockedUser as unknown as {
+      isBlocked: (u1: string, u2: string) => Promise<boolean>;
+    };
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     const usersWithStatus = await Promise.all(
-      users.map(async user => {
+      users.map(async (user) => {
         // Check if blocked (by either party)
-        const isBlockedByMe = await BlockedUser.isBlocked(session.user.id, user.id);
-        const isBlockedByThem = await BlockedUser.isBlocked(user.id, session.user.id);
-        
+        const isBlockedByMe = await BlockedUser.isBlocked(
+          currentUserId,
+          user.id,
+        );
+        const isBlockedByThem = await BlockedUser.isBlocked(
+          user.id,
+          currentUserId,
+        );
+
         // Also check friendship block status
-        const friendship = await Friendship.getFriendship(session.user.id, user.id);
+        const friendship = await Friendship.getFriendship(
+          currentUserId,
+          user.id,
+        );
         const isFriendshipBlocked = friendship?.blockedBy != null;
-        
+
         if (isBlockedByMe || isBlockedByThem || isFriendshipBlocked) {
           // Don't show blocked users in search results
           return null;
         }
-        
+
         // Check if user allows friend requests
-        const userDoc = await db.collection('user').findOne(
-          { $or: [{ id: user.id }, { _id: user.id }] },
-          { projection: { 'privacySettings.allowFriendRequests': 1 } }
+        const userDoc = await db?.collection("user").findOne(
+          {
+            $or: [
+              { id: user.id },
+              ...(ObjectId.isValid(user.id)
+                ? [{ _id: new ObjectId(user.id) }]
+                : []),
+            ],
+          },
+          { projection: { "privacySettings.allowFriendRequests": 1 } },
         );
-        const allowsFriendRequests = userDoc?.privacySettings?.allowFriendRequests !== false;
-        
+        const allowsFriendRequests =
+          userDoc?.privacySettings?.allowFriendRequests !== false;
+
         const areFriends = friendship && !friendship.blockedBy;
         const hasPendingRequest = await FriendRequest.hasPendingRequest(
-          session.user.id,
-          user.id
+          currentUserId,
+          user.id,
         );
-        
+
         return {
           ...user,
           isFriend: !!areFriends,
           hasPendingRequest,
           allowsFriendRequests,
         };
-      })
+      }),
     );
 
     // Filter out null (blocked) users
-    const filteredUsers = usersWithStatus.filter(u => u !== null);
+    const filteredUsers = usersWithStatus.filter((u) => u !== null);
 
     return NextResponse.json({
       users: filteredUsers,
     });
   } catch (error) {
-    console.error('Error searching users:', error);
+    console.error("Error searching users:", error);
     return NextResponse.json(
-      { error: 'Failed to search users' },
-      { status: 500 }
+      { error: "Failed to search users" },
+      { status: 500 },
     );
   }
 }
-

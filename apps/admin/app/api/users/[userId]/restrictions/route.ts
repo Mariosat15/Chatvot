@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import UserRestriction from '@/database/models/user-restriction.model';
-import AuditLog from '@/database/models/audit-log.model';
-import UserNote from '@/database/models/user-notes.model';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import UserRestriction from "@/database/models/user-restriction.model";
+import AuditLog from "@/database/models/audit-log.model";
+import UserNote from "@/database/models/user-notes.model";
+import { getAdminSession } from "@/lib/admin/auth";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId } = await params;
@@ -24,19 +24,22 @@ export async function GET(
 
     return NextResponse.json({ restrictions });
   } catch (error) {
-    console.error('Error fetching user restrictions:', error);
-    return NextResponse.json({ error: 'Failed to fetch restrictions' }, { status: 500 });
+    console.error("Error fetching user restrictions:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch restrictions" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId } = await params;
@@ -51,13 +54,13 @@ export async function POST(
 
     if (existingRestriction) {
       return NextResponse.json(
-        { error: 'User already has an active restriction' },
-        { status: 400 }
+        { error: "User already has an active restriction" },
+        { status: 400 },
       );
     }
 
     // Determine blocked actions based on restriction type
-    const isBanned = body.restrictionType === 'banned';
+    const isBanned = body.restrictionType === "banned";
     const blockSettings = {
       canTrade: false,
       canEnterCompetitions: false,
@@ -82,24 +85,24 @@ export async function POST(
     await UserNote.create({
       userId,
       adminId: session.id,
-      adminName: session.name || session.email || 'Admin',
-      content: `User ${isBanned ? 'banned' : 'suspended'}. Reason: ${body.reason}${
-        body.customReason ? `. Details: ${body.customReason}` : ''
+      adminName: session.name || session.email || "Admin",
+      content: `User ${isBanned ? "banned" : "suspended"}. Reason: ${body.reason}${
+        body.customReason ? `. Details: ${body.customReason}` : ""
       }`,
-      category: 'ban',
-      priority: 'high',
+      category: "ban",
+      priority: "high",
     });
 
     // Create audit log
     await AuditLog.logAction({
       userId: session.id,
-      userName: session.name || 'Admin',
-      userEmail: session.email || 'admin@system',
-      userRole: 'admin',
-      action: isBanned ? 'user_banned' : 'user_suspended',
-      actionCategory: 'user_management',
-      description: `${isBanned ? 'Banned' : 'Suspended'} user ${userId}. Reason: ${body.reason}`,
-      targetType: 'user',
+      userName: session.name || "Admin",
+      userEmail: session.email || "admin@system",
+      userRole: "admin",
+      action: isBanned ? "user_banned" : "user_suspended",
+      actionCategory: "user_management",
+      description: `${isBanned ? "Banned" : "Suspended"} user ${userId}. Reason: ${body.reason}`,
+      targetType: "user",
       targetId: userId,
       metadata: {
         restrictionType: body.restrictionType,
@@ -107,13 +110,15 @@ export async function POST(
         customReason: body.customReason,
         expiresAt: body.expiresAt,
       },
-      status: 'success',
+      status: "success",
     });
 
     return NextResponse.json({ restriction });
   } catch (error) {
-    console.error('Error creating user restriction:', error);
-    return NextResponse.json({ error: 'Failed to create restriction' }, { status: 500 });
+    console.error("Error creating user restriction:", error);
+    return NextResponse.json(
+      { error: "Failed to create restriction" },
+      { status: 500 },
+    );
   }
 }
-

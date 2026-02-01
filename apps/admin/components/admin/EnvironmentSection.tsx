@@ -1,43 +1,65 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { Save, Eye, EyeOff, RefreshCw, Settings, Globe, Mail, Key, Database, Shield, AlertCircle, Server, Lock, Brain, Sparkles } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import {
+  Save,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Settings,
+  Globe,
+  Mail,
+  Key,
+  Database,
+  Shield,
+  AlertCircle,
+  Server,
+  Lock,
+  Brain,
+  Sparkles,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export default function EnvironmentSection() {
   const [formData, setFormData] = useState({
     // General
-    nodeEnv: 'development',
-    nextPublicBaseUrl: '',
-    
+    nodeEnv: "development",
+    nextPublicBaseUrl: "",
+
     // Email
-    nodemailerEmail: '',
-    nodemailerPassword: '',
-    
+    nodemailerEmail: "",
+    nodemailerPassword: "",
+
     // API Keys & URLs
-    massiveApiKey: '',
-    nextPublicMassiveApiKey: '',
-    
+    massiveApiKey: "",
+    nextPublicMassiveApiKey: "",
+
     // OpenAI Configuration
-    openaiApiKey: '',
-    openaiModel: 'gpt-4o-mini',
+    openaiApiKey: "",
+    openaiModel: "gpt-4o-mini",
     openaiEnabled: false,
     openaiForEmails: false,
-    
+
     // Database
-    mongodbUri: '',
-    
+    mongodbUri: "",
+
     // Authentication
-    betterAuthSecret: '',
-    betterAuthUrl: '',
+    betterAuthSecret: "",
+    betterAuthUrl: "",
   });
-  
+
   const [showPasswords, setShowPasswords] = useState({
     nodemailerPassword: false,
     massiveApiKey: false,
@@ -46,7 +68,7 @@ export default function EnvironmentSection() {
     mongodbUri: false,
     betterAuthSecret: false,
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
@@ -57,13 +79,13 @@ export default function EnvironmentSection() {
   const fetchSettings = async () => {
     setIsFetching(true);
     try {
-      const response = await fetch('/api/environment');
+      const response = await fetch("/api/environment");
       if (response.ok) {
         const data = await response.json();
         setFormData(data);
       }
     } catch (error) {
-      toast.error('Failed to load settings');
+      toast.error("Failed to load settings");
     } finally {
       setIsFetching(false);
     }
@@ -74,22 +96,22 @@ export default function EnvironmentSection() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/environment', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/environment", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Environment variables updated successfully');
-        toast.info('Restart your application for changes to take effect');
+        toast.success("Environment variables updated successfully");
+        toast.info("Restart your application for changes to take effect");
       } else {
-        toast.error(data.error || 'Update failed');
+        toast.error(data.error || "Update failed");
       }
     } catch (error) {
-      toast.error('An error occurred');
+      toast.error("An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -139,42 +161,42 @@ export default function EnvironmentSection() {
           <Tabs defaultValue="general" className="w-full">
             <div className="bg-gray-800/50 border-b border-gray-700 px-6 pt-6">
               <TabsList className="bg-transparent w-full justify-start gap-2">
-                <TabsTrigger 
-                  value="general" 
+                <TabsTrigger
+                  value="general"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
                   <Globe className="h-4 w-4 mr-2" />
                   General
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="email"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Email
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="apis"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
                   <Key className="h-4 w-4 mr-2" />
                   API Keys
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="database"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
                   <Database className="h-4 w-4 mr-2" />
                   Database
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="auth"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-500 data-[state=active]:to-red-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
                   <Shield className="h-4 w-4 mr-2" />
                   Auth
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="ai"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-violet-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
                 >
@@ -194,7 +216,10 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="nodeEnv" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="nodeEnv"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Settings className="h-4 w-4 text-green-400" />
                           Node Environment
                         </Label>
@@ -208,14 +233,21 @@ export default function EnvironmentSection() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="development">Development</SelectItem>
-                            <SelectItem value="production">Production</SelectItem>
+                            <SelectItem value="development">
+                              Development
+                            </SelectItem>
+                            <SelectItem value="production">
+                              Production
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div>
-                        <Label htmlFor="nextPublicBaseUrl" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="nextPublicBaseUrl"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Globe className="h-4 w-4 text-green-400" />
                           Base URL (Public)
                         </Label>
@@ -224,12 +256,17 @@ export default function EnvironmentSection() {
                           type="url"
                           value={formData.nextPublicBaseUrl}
                           onChange={(e) =>
-                            setFormData({ ...formData, nextPublicBaseUrl: e.target.value })
+                            setFormData({
+                              ...formData,
+                              nextPublicBaseUrl: e.target.value,
+                            })
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
                           placeholder="http://localhost:3000"
                         />
-                        <p className="text-xs text-gray-500 mt-2">The public URL where your application is hosted</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          The public URL where your application is hosted
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -237,7 +274,6 @@ export default function EnvironmentSection() {
               </TabsContent>
 
               <TabsContent value="email" className="mt-0">
-
                 <div className="space-y-6">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
                     <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
@@ -246,7 +282,10 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="nodemailerEmail" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="nodemailerEmail"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Mail className="h-4 w-4 text-purple-400" />
                           Email Address
                         </Label>
@@ -255,23 +294,35 @@ export default function EnvironmentSection() {
                           type="email"
                           value={formData.nodemailerEmail}
                           onChange={(e) =>
-                            setFormData({ ...formData, nodemailerEmail: e.target.value })
+                            setFormData({
+                              ...formData,
+                              nodemailerEmail: e.target.value,
+                            })
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
                           placeholder="your-email@gmail.com"
                         />
-                        <p className="text-xs text-gray-500 mt-2">Gmail account for sending emails</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Gmail account for sending emails
+                        </p>
                       </div>
 
                       <div>
-                        <Label htmlFor="nodemailerPassword" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="nodemailerPassword"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Key className="h-4 w-4 text-purple-400" />
                           App Password
                         </Label>
                         <div className="relative">
                           <Input
                             id="nodemailerPassword"
-                            type={showPasswords.nodemailerPassword ? 'text' : 'password'}
+                            type={
+                              showPasswords.nodemailerPassword
+                                ? "text"
+                                : "password"
+                            }
                             value={formData.nodemailerPassword}
                             onChange={(e) =>
                               setFormData({
@@ -284,7 +335,9 @@ export default function EnvironmentSection() {
                           />
                           <button
                             type="button"
-                            onClick={() => togglePasswordVisibility('nodemailerPassword')}
+                            onClick={() =>
+                              togglePasswordVisibility("nodemailerPassword")
+                            }
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                           >
                             {showPasswords.nodemailerPassword ? (
@@ -294,7 +347,10 @@ export default function EnvironmentSection() {
                             )}
                           </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Generate this in Google Account settings → Security → App passwords</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Generate this in Google Account settings → Security →
+                          App passwords
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -302,17 +358,24 @@ export default function EnvironmentSection() {
               </TabsContent>
 
               <TabsContent value="apis" className="mt-0">
-
                 <div className="space-y-6">
                   {/* Notice */}
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
                     <Lock className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-sm font-semibold text-yellow-500 mb-1">Read-Only Credentials</h4>
+                      <h4 className="text-sm font-semibold text-yellow-500 mb-1">
+                        Read-Only Credentials
+                      </h4>
                       <p className="text-sm text-gray-300">
-                        API credentials shown here are <strong>read-only</strong>. 
-                        Payment provider credentials (Stripe, Clerk, etc.) are managed in the <strong>Payment Providers</strong> tab.
-                        To edit other credentials, update them directly in your <code className="bg-gray-800 px-2 py-1 rounded text-xs">.env</code> file.
+                        API credentials shown here are{" "}
+                        <strong>read-only</strong>. Payment provider credentials
+                        (Stripe, Clerk, etc.) are managed in the{" "}
+                        <strong>Payment Providers</strong> tab. To edit other
+                        credentials, update them directly in your{" "}
+                        <code className="bg-gray-800 px-2 py-1 rounded text-xs">
+                          .env
+                        </code>{" "}
+                        file.
                       </p>
                     </div>
                   </div>
@@ -325,14 +388,19 @@ export default function EnvironmentSection() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Massive API Key */}
                       <div>
-                        <Label htmlFor="massiveApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="massiveApiKey"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Key className="h-4 w-4 text-orange-400" />
                           Massive API Key
                         </Label>
                         <div className="relative">
                           <Input
                             id="massiveApiKey"
-                            type={showPasswords.massiveApiKey ? 'text' : 'password'}
+                            type={
+                              showPasswords.massiveApiKey ? "text" : "password"
+                            }
                             value={formData.massiveApiKey}
                             disabled
                             className="bg-gray-900 border-gray-700 text-gray-400 h-11 pr-10 cursor-not-allowed"
@@ -340,7 +408,9 @@ export default function EnvironmentSection() {
                           />
                           <button
                             type="button"
-                            onClick={() => togglePasswordVisibility('massiveApiKey')}
+                            onClick={() =>
+                              togglePasswordVisibility("massiveApiKey")
+                            }
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                           >
                             {showPasswords.massiveApiKey ? (
@@ -353,14 +423,21 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label htmlFor="nextPublicMassiveApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="nextPublicMassiveApiKey"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Key className="h-4 w-4 text-orange-400" />
                           Massive API Key (Public)
                         </Label>
                         <div className="relative">
                           <Input
                             id="nextPublicMassiveApiKey"
-                            type={showPasswords.nextPublicMassiveApiKey ? 'text' : 'password'}
+                            type={
+                              showPasswords.nextPublicMassiveApiKey
+                                ? "text"
+                                : "password"
+                            }
                             value={formData.nextPublicMassiveApiKey}
                             disabled
                             className="bg-gray-900 border-gray-700 text-gray-400 h-11 pr-10 cursor-not-allowed"
@@ -368,7 +445,11 @@ export default function EnvironmentSection() {
                           />
                           <button
                             type="button"
-                            onClick={() => togglePasswordVisibility('nextPublicMassiveApiKey')}
+                            onClick={() =>
+                              togglePasswordVisibility(
+                                "nextPublicMassiveApiKey",
+                              )
+                            }
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                           >
                             {showPasswords.nextPublicMassiveApiKey ? (
@@ -392,24 +473,30 @@ export default function EnvironmentSection() {
                       MongoDB Configuration
                     </h3>
                     <div>
-                      <Label htmlFor="mongodbUri" className="text-gray-300 flex items-center gap-2 mb-2">
+                      <Label
+                        htmlFor="mongodbUri"
+                        className="text-gray-300 flex items-center gap-2 mb-2"
+                      >
                         <Database className="h-4 w-4 text-cyan-400" />
                         MongoDB Connection String
                       </Label>
                       <div className="relative">
                         <Input
                           id="mongodbUri"
-                          type={showPasswords.mongodbUri ? 'text' : 'password'}
+                          type={showPasswords.mongodbUri ? "text" : "password"}
                           value={formData.mongodbUri}
                           onChange={(e) =>
-                            setFormData({ ...formData, mongodbUri: e.target.value })
+                            setFormData({
+                              ...formData,
+                              mongodbUri: e.target.value,
+                            })
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                           placeholder="mongodb+srv://username:password@cluster.mongodb.net/dbname"
                         />
                         <button
                           type="button"
-                          onClick={() => togglePasswordVisibility('mongodbUri')}
+                          onClick={() => togglePasswordVisibility("mongodbUri")}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                         >
                           {showPasswords.mongodbUri ? (
@@ -419,7 +506,9 @@ export default function EnvironmentSection() {
                           )}
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">Your MongoDB Atlas connection string</p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Your MongoDB Atlas connection string
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -434,24 +523,36 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="betterAuthSecret" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="betterAuthSecret"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Key className="h-4 w-4 text-red-400" />
                           Better Auth Secret
                         </Label>
                         <div className="relative">
                           <Input
                             id="betterAuthSecret"
-                            type={showPasswords.betterAuthSecret ? 'text' : 'password'}
+                            type={
+                              showPasswords.betterAuthSecret
+                                ? "text"
+                                : "password"
+                            }
                             value={formData.betterAuthSecret}
                             onChange={(e) =>
-                              setFormData({ ...formData, betterAuthSecret: e.target.value })
+                              setFormData({
+                                ...formData,
+                                betterAuthSecret: e.target.value,
+                              })
                             }
                             className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                             placeholder="Random secret string for authentication"
                           />
                           <button
                             type="button"
-                            onClick={() => togglePasswordVisibility('betterAuthSecret')}
+                            onClick={() =>
+                              togglePasswordVisibility("betterAuthSecret")
+                            }
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                           >
                             {showPasswords.betterAuthSecret ? (
@@ -464,7 +565,10 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label htmlFor="betterAuthUrl" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="betterAuthUrl"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Globe className="h-4 w-4 text-red-400" />
                           Better Auth URL
                         </Label>
@@ -473,7 +577,10 @@ export default function EnvironmentSection() {
                           type="url"
                           value={formData.betterAuthUrl}
                           onChange={(e) =>
-                            setFormData({ ...formData, betterAuthUrl: e.target.value })
+                            setFormData({
+                              ...formData,
+                              betterAuthUrl: e.target.value,
+                            })
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
                           placeholder="http://localhost:3000"
@@ -496,9 +603,12 @@ export default function EnvironmentSection() {
                       {/* Main AI Toggle */}
                       <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700">
                         <div>
-                          <Label className="text-gray-100 font-medium">Enable AI Features</Label>
+                          <Label className="text-gray-100 font-medium">
+                            Enable AI Features
+                          </Label>
                           <p className="text-sm text-gray-400 mt-1">
-                            Master toggle for all AI-powered features in the application
+                            Master toggle for all AI-powered features in the
+                            application
                           </p>
                         </div>
                         <Switch
@@ -510,17 +620,25 @@ export default function EnvironmentSection() {
                       </div>
 
                       {/* AI for Emails Toggle */}
-                      <div className={`flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700 ${!formData.openaiEnabled ? 'opacity-50' : ''}`}>
+                      <div
+                        className={`flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700 ${!formData.openaiEnabled ? "opacity-50" : ""}`}
+                      >
                         <div>
-                          <Label className="text-gray-100 font-medium">AI for Email Personalization</Label>
+                          <Label className="text-gray-100 font-medium">
+                            AI for Email Personalization
+                          </Label>
                           <p className="text-sm text-gray-400 mt-1">
-                            Use AI to generate personalized welcome emails for new users
+                            Use AI to generate personalized welcome emails for
+                            new users
                           </p>
                         </div>
                         <Switch
                           checked={formData.openaiForEmails}
                           onCheckedChange={(checked) =>
-                            setFormData({ ...formData, openaiForEmails: checked })
+                            setFormData({
+                              ...formData,
+                              openaiForEmails: checked,
+                            })
                           }
                           disabled={!formData.openaiEnabled}
                         />
@@ -537,24 +655,34 @@ export default function EnvironmentSection() {
                     <div className="space-y-4">
                       {/* API Key */}
                       <div>
-                        <Label htmlFor="openaiApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="openaiApiKey"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Key className="h-4 w-4 text-violet-400" />
                           OpenAI API Key
                         </Label>
                         <div className="relative">
                           <Input
                             id="openaiApiKey"
-                            type={showPasswords.openaiApiKey ? 'text' : 'password'}
+                            type={
+                              showPasswords.openaiApiKey ? "text" : "password"
+                            }
                             value={formData.openaiApiKey}
                             onChange={(e) =>
-                              setFormData({ ...formData, openaiApiKey: e.target.value })
+                              setFormData({
+                                ...formData,
+                                openaiApiKey: e.target.value,
+                              })
                             }
                             className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                             placeholder="sk-..."
                           />
                           <button
                             type="button"
-                            onClick={() => togglePasswordVisibility('openaiApiKey')}
+                            onClick={() =>
+                              togglePasswordVisibility("openaiApiKey")
+                            }
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                           >
                             {showPasswords.openaiApiKey ? (
@@ -565,8 +693,13 @@ export default function EnvironmentSection() {
                           </button>
                         </div>
                         <p className="text-xs text-gray-500 mt-2">
-                          Get your API key from{' '}
-                          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300">
+                          Get your API key from{" "}
+                          <a
+                            href="https://platform.openai.com/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-violet-400 hover:text-violet-300"
+                          >
                             platform.openai.com/api-keys
                           </a>
                         </p>
@@ -574,7 +707,10 @@ export default function EnvironmentSection() {
 
                       {/* Model Selection */}
                       <div>
-                        <Label htmlFor="openaiModel" className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Label
+                          htmlFor="openaiModel"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
                           <Settings className="h-4 w-4 text-violet-400" />
                           AI Model
                         </Label>
@@ -588,14 +724,23 @@ export default function EnvironmentSection() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</SelectItem>
-                            <SelectItem value="gpt-4o">GPT-4o (Smart & Fast)</SelectItem>
-                            <SelectItem value="gpt-4-turbo">GPT-4 Turbo (High Quality)</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</SelectItem>
+                            <SelectItem value="gpt-4o-mini">
+                              GPT-4o Mini (Fast & Cheap)
+                            </SelectItem>
+                            <SelectItem value="gpt-4o">
+                              GPT-4o (Smart & Fast)
+                            </SelectItem>
+                            <SelectItem value="gpt-4-turbo">
+                              GPT-4 Turbo (High Quality)
+                            </SelectItem>
+                            <SelectItem value="gpt-3.5-turbo">
+                              GPT-3.5 Turbo (Legacy)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-gray-500 mt-2">
-                          Recommended: <strong>GPT-4o Mini</strong> for best balance of speed and cost
+                          Recommended: <strong>GPT-4o Mini</strong> for best
+                          balance of speed and cost
                         </p>
                       </div>
                     </div>
@@ -606,11 +751,22 @@ export default function EnvironmentSection() {
                     <div className="flex items-start gap-3">
                       <Brain className="h-5 w-5 text-violet-400 mt-0.5" />
                       <div>
-                        <h4 className="text-sm font-semibold text-violet-400">AI Features Include</h4>
+                        <h4 className="text-sm font-semibold text-violet-400">
+                          AI Features Include
+                        </h4>
                         <ul className="text-xs text-gray-400 mt-2 space-y-1 list-disc list-inside">
-                          <li>Performance Simulator Analysis - AI-powered test result analysis</li>
-                          <li>Email Personalization - Personalized welcome emails for new users</li>
-                          <li>Future: Trading pattern analysis, fraud detection enhancements</li>
+                          <li>
+                            Performance Simulator Analysis - AI-powered test
+                            result analysis
+                          </li>
+                          <li>
+                            Email Personalization - Personalized welcome emails
+                            for new users
+                          </li>
+                          <li>
+                            Future: Trading pattern analysis, fraud detection
+                            enhancements
+                          </li>
                         </ul>
                       </div>
                     </div>
@@ -625,9 +781,12 @@ export default function EnvironmentSection() {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
                   <div>
-                    <h4 className="text-sm font-semibold text-yellow-400">Important</h4>
+                    <h4 className="text-sm font-semibold text-yellow-400">
+                      Important
+                    </h4>
                     <p className="text-xs text-gray-400 mt-1">
-                      After saving changes, you must restart your application for the new environment variables to take effect.
+                      After saving changes, you must restart your application
+                      for the new environment variables to take effect.
                     </p>
                   </div>
                 </div>
@@ -639,7 +798,9 @@ export default function EnvironmentSection() {
                 className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold h-14 text-lg shadow-lg shadow-blue-500/50"
               >
                 <Save className="h-5 w-5 mr-2" />
-                {isLoading ? 'Saving Changes...' : 'Save All Environment Variables'}
+                {isLoading
+                  ? "Saving Changes..."
+                  : "Save All Environment Variables"}
               </Button>
             </div>
           </Tabs>

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { 
-  Crown, 
-  ArrowLeft, 
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import {
+  Crown,
+  ArrowLeft,
   TrendingUp,
   Calendar,
   Filter,
@@ -16,13 +16,13 @@ import {
   ChevronRight,
   ChevronDown,
   X,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Earning {
   _id: string;
-  sourceType: 'competition' | 'challenge';
+  sourceType: "competition" | "challenge";
   sourceId: string;
   sourceName: string;
   referredUserId: string;
@@ -33,7 +33,7 @@ interface Earning {
   grossEarning: number;
   platformFee: number;
   netEarning: number;
-  status: 'pending' | 'paid' | 'cancelled';
+  status: "pending" | "paid" | "cancelled";
   eventStartTime: string;
   eventEndTime: string;
   createdAt: string;
@@ -56,27 +56,29 @@ interface EarningsData {
   };
 }
 
-type DatePreset = 'all' | '30' | '60' | '90' | '120' | 'custom';
+type DatePreset = "all" | "30" | "60" | "90" | "120" | "custom";
 
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
-  { value: 'all', label: 'All Time' },
-  { value: '30', label: 'Last 30 Days' },
-  { value: '60', label: 'Last 60 Days' },
-  { value: '90', label: 'Last 90 Days' },
-  { value: '120', label: 'Last 120 Days' },
-  { value: 'custom', label: 'Custom Range' },
+  { value: "all", label: "All Time" },
+  { value: "30", label: "Last 30 Days" },
+  { value: "60", label: "Last 60 Days" },
+  { value: "90", label: "Last 90 Days" },
+  { value: "120", label: "Last 120 Days" },
+  { value: "custom", label: "Custom Range" },
 ];
 
 export default function GMEarningsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<EarningsData | null>(null);
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<'all' | 'competition' | 'challenge'>('all');
-  
+  const [filter, setFilter] = useState<"all" | "competition" | "challenge">(
+    "all",
+  );
+
   // Date filter state
-  const [datePreset, setDatePreset] = useState<DatePreset>('all');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   const fetchEarnings = useCallback(async () => {
@@ -84,31 +86,31 @@ export default function GMEarningsPage() {
       setLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: "20",
       });
-      if (filter !== 'all') {
-        params.set('sourceType', filter);
+      if (filter !== "all") {
+        params.set("sourceType", filter);
       }
-      
+
       // Add date filter params
-      if (datePreset !== 'all' && datePreset !== 'custom') {
-        params.set('days', datePreset);
-      } else if (datePreset === 'custom') {
-        if (customStartDate) params.set('startDate', customStartDate);
-        if (customEndDate) params.set('endDate', customEndDate);
+      if (datePreset !== "all" && datePreset !== "custom") {
+        params.set("days", datePreset);
+      } else if (datePreset === "custom") {
+        if (customStartDate) params.set("startDate", customStartDate);
+        if (customEndDate) params.set("endDate", customEndDate);
       }
-      
+
       const response = await fetch(`/api/gamemaster/earnings?${params}`);
       const result = await response.json();
-      
+
       if (result.success) {
         setData(result.data);
       } else {
-        toast.error(result.error || 'Failed to load earnings');
+        toast.error(result.error || "Failed to load earnings");
       }
     } catch (error) {
-      console.error('Error fetching earnings:', error);
-      toast.error('Failed to load earnings');
+      console.error("Error fetching earnings:", error);
+      toast.error("Failed to load earnings");
     } finally {
       setLoading(false);
     }
@@ -121,7 +123,7 @@ export default function GMEarningsPage() {
   const handleDatePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
     setPage(1);
-    if (preset !== 'custom') {
+    if (preset !== "custom") {
       setShowDateDropdown(false);
     }
   };
@@ -133,20 +135,26 @@ export default function GMEarningsPage() {
   };
 
   const clearDateFilter = () => {
-    setDatePreset('all');
-    setCustomStartDate('');
-    setCustomEndDate('');
+    setDatePreset("all");
+    setCustomStartDate("");
+    setCustomEndDate("");
     setPage(1);
   };
 
   const getDateFilterLabel = () => {
-    if (datePreset === 'all') return 'All Time';
-    if (datePreset === 'custom' && (customStartDate || customEndDate)) {
-      const start = customStartDate ? new Date(customStartDate).toLocaleDateString() : 'Start';
-      const end = customEndDate ? new Date(customEndDate).toLocaleDateString() : 'Now';
+    if (datePreset === "all") return "All Time";
+    if (datePreset === "custom" && (customStartDate || customEndDate)) {
+      const start = customStartDate
+        ? new Date(customStartDate).toLocaleDateString()
+        : "Start";
+      const end = customEndDate
+        ? new Date(customEndDate).toLocaleDateString()
+        : "Now";
       return `${start} - ${end}`;
     }
-    return DATE_PRESETS.find(p => p.value === datePreset)?.label || 'All Time';
+    return (
+      DATE_PRESETS.find((p) => p.value === datePreset)?.label || "All Time"
+    );
   };
 
   return (
@@ -154,21 +162,25 @@ export default function GMEarningsPage() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-emerald-500/10 to-green-500/10">
         <div className="max-w-6xl mx-auto px-4 py-6">
-          <Link 
+          <Link
             href="/gamemaster"
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center">
               <TrendingUp className="h-7 w-7 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Earnings History</h1>
-              <p className="text-gray-400">Track your referral earnings in detail</p>
+              <h1 className="text-2xl font-bold text-white">
+                Earnings History
+              </h1>
+              <p className="text-gray-400">
+                Track your referral earnings in detail
+              </p>
             </div>
           </div>
         </div>
@@ -180,29 +192,39 @@ export default function GMEarningsPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Total Earned</div>
-              <div className="text-2xl font-bold text-emerald-400">⚡ {(data.totals?.totalEarnings ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-400">
+                ⚡ {(data.totals?.totalEarnings ?? 0).toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Paid Out</div>
-              <div className="text-2xl font-bold text-white">⚡ {(data.totals?.paidEarnings ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">
+                ⚡ {(data.totals?.paidEarnings ?? 0).toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Pending</div>
-              <div className="text-2xl font-bold text-yellow-400">⚡ {(data.totals?.pendingEarnings ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-yellow-400">
+                ⚡ {(data.totals?.pendingEarnings ?? 0).toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Trophy className="h-3 w-3 text-yellow-400" />
                 From Competitions
               </div>
-              <div className="text-xl font-bold text-white">⚡ {(data.totals?.fromCompetitions ?? 0).toLocaleString()}</div>
+              <div className="text-xl font-bold text-white">
+                ⚡ {(data.totals?.fromCompetitions ?? 0).toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Swords className="h-3 w-3 text-red-400" />
                 From Challenges
               </div>
-              <div className="text-xl font-bold text-white">⚡ {(data.totals?.fromChallenges ?? 0).toLocaleString()}</div>
+              <div className="text-xl font-bold text-white">
+                ⚡ {(data.totals?.fromChallenges ?? 0).toLocaleString()}
+              </div>
             </div>
           </div>
         )}
@@ -215,18 +237,21 @@ export default function GMEarningsPage() {
             <span className="text-sm text-gray-400">Filter:</span>
             <div className="flex gap-2">
               {[
-                { value: 'all', label: 'All' },
-                { value: 'competition', label: 'Competitions' },
-                { value: 'challenge', label: 'Challenges' },
+                { value: "all", label: "All" },
+                { value: "competition", label: "Competitions" },
+                { value: "challenge", label: "Challenges" },
               ].map((f) => (
                 <button
                   key={f.value}
-                  onClick={() => { setFilter(f.value as typeof filter); setPage(1); }}
+                  onClick={() => {
+                    setFilter(f.value as typeof filter);
+                    setPage(1);
+                  }}
                   className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                     filter === f.value
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800",
                   )}
                 >
                   {f.label}
@@ -243,10 +268,18 @@ export default function GMEarningsPage() {
             >
               <Calendar className="h-4 w-4" />
               <span>{getDateFilterLabel()}</span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform", showDateDropdown && "rotate-180")} />
-              {datePreset !== 'all' && (
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  showDateDropdown && "rotate-180",
+                )}
+              />
+              {datePreset !== "all" && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); clearDateFilter(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearDateFilter();
+                  }}
                   className="ml-1 p-0.5 rounded hover:bg-gray-600"
                 >
                   <X className="h-3 w-3" />
@@ -262,10 +295,10 @@ export default function GMEarningsPage() {
                       key={preset.value}
                       onClick={() => handleDatePresetChange(preset.value)}
                       className={cn(
-                        'w-full px-3 py-2 rounded-lg text-sm text-left transition-colors',
+                        "w-full px-3 py-2 rounded-lg text-sm text-left transition-colors",
                         datePreset === preset.value
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'text-gray-300 hover:bg-gray-700'
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : "text-gray-300 hover:bg-gray-700",
                       )}
                     >
                       {preset.label}
@@ -273,10 +306,12 @@ export default function GMEarningsPage() {
                   ))}
                 </div>
 
-                {datePreset === 'custom' && (
+                {datePreset === "custom" && (
                   <div className="border-t border-gray-700 p-4 space-y-3">
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Start Date</label>
+                      <label className="text-xs text-gray-400 mb-1 block">
+                        Start Date
+                      </label>
                       <input
                         type="date"
                         value={customStartDate}
@@ -285,7 +320,9 @@ export default function GMEarningsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">End Date</label>
+                      <label className="text-xs text-gray-400 mb-1 block">
+                        End Date
+                      </label>
                       <input
                         type="date"
                         value={customEndDate}
@@ -317,7 +354,8 @@ export default function GMEarningsPage() {
               <TrendingUp className="h-12 w-12 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400">No earnings yet</p>
               <p className="text-sm text-gray-500 mt-1">
-                Earnings will appear here when your referred users participate in competitions
+                Earnings will appear here when your referred users participate
+                in competitions
               </p>
             </div>
           ) : (
@@ -337,24 +375,33 @@ export default function GMEarningsPage() {
                   </thead>
                   <tbody>
                     {data.earnings.map((earning) => (
-                      <tr key={earning._id} className="border-t border-gray-700/50 hover:bg-gray-800/30">
+                      <tr
+                        key={earning._id}
+                        className="border-t border-gray-700/50 hover:bg-gray-800/30"
+                      >
                         <td className="px-6 py-4 text-gray-300 text-sm">
                           {new Date(earning.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            {earning.sourceType === 'competition' ? (
+                            {earning.sourceType === "competition" ? (
                               <Trophy className="h-4 w-4 text-yellow-400" />
                             ) : (
                               <Swords className="h-4 w-4 text-red-400" />
                             )}
-                            <span className="text-white text-sm">{earning.sourceName}</span>
+                            <span className="text-white text-sm">
+                              {earning.sourceName}
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div>
-                            <p className="text-white text-sm">{earning.referredUserName}</p>
-                            <p className="text-gray-500 text-xs">{earning.referredUserEmail}</p>
+                            <p className="text-white text-sm">
+                              {earning.referredUserName}
+                            </p>
+                            <p className="text-gray-500 text-xs">
+                              {earning.referredUserEmail}
+                            </p>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-300">
@@ -367,14 +414,16 @@ export default function GMEarningsPage() {
                           ⚡ {(earning.netEarning ?? 0).toLocaleString()}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={cn(
-                            'px-2 py-1 rounded-full text-xs font-medium',
-                            earning.status === 'paid' 
-                              ? 'bg-emerald-500/20 text-emerald-400' 
-                              : earning.status === 'pending'
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          )}>
+                          <span
+                            className={cn(
+                              "px-2 py-1 rounded-full text-xs font-medium",
+                              earning.status === "paid"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : earning.status === "pending"
+                                  ? "bg-yellow-500/20 text-yellow-400"
+                                  : "bg-red-500/20 text-red-400",
+                            )}
+                          >
                             {earning.status}
                           </span>
                         </td>
@@ -388,21 +437,32 @@ export default function GMEarningsPage() {
               {data.pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
                   <p className="text-sm text-gray-400">
-                    Showing {((data.pagination.page - 1) * data.pagination.limit) + 1} - {Math.min(data.pagination.page * data.pagination.limit, data.pagination.total)} of {data.pagination.total}
+                    Showing{" "}
+                    {(data.pagination.page - 1) * data.pagination.limit + 1} -{" "}
+                    {Math.min(
+                      data.pagination.page * data.pagination.limit,
+                      data.pagination.total,
+                    )}{" "}
+                    of {data.pagination.total}
                   </p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
                       className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-sm text-gray-400">
-                      Page {data.pagination.page} of {data.pagination.totalPages}
+                      Page {data.pagination.page} of{" "}
+                      {data.pagination.totalPages}
                     </span>
                     <button
-                      onClick={() => setPage(p => Math.min(data.pagination.totalPages, p + 1))}
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(data.pagination.totalPages, p + 1),
+                        )
+                      }
                       disabled={page === data.pagination.totalPages}
                       className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >

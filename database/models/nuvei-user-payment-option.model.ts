@@ -1,11 +1,11 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 /**
  * Nuvei User Payment Option (UPO) Model
  * Stores user payment options from Nuvei for both:
  * - Card refunds (from deposits)
  * - Bank payouts (from /accountCapture)
- * 
+ *
  * When a user makes a deposit with Nuvei, their card is tokenized and stored as a UPO.
  * When a user adds a bank account via /accountCapture, it's also stored as a UPO.
  * These UPOs can be used later for withdrawals.
@@ -13,28 +13,28 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface INuveiUserPaymentOption extends Document {
   userId: string;
-  userPaymentOptionId: string;  // Nuvei's UPO ID
-  type: 'card' | 'bank';        // Type of payment option
-  
+  userPaymentOptionId: string; // Nuvei's UPO ID
+  type: "card" | "bank"; // Type of payment option
+
   // Card-specific fields
-  cardBrand?: string;           // Visa, Mastercard, etc.
-  cardLast4?: string;           // Last 4 digits
-  expMonth?: string;            // Expiration month
-  expYear?: string;             // Expiration year
-  uniqueCC?: string;            // Unique card identifier (fingerprint)
-  
+  cardBrand?: string; // Visa, Mastercard, etc.
+  cardLast4?: string; // Last 4 digits
+  expMonth?: string; // Expiration month
+  expYear?: string; // Expiration year
+  uniqueCC?: string; // Unique card identifier (fingerprint)
+
   // Bank-specific fields
-  paymentMethod?: string;       // e.g., 'apmgw_BankPayouts'
-  bankName?: string;            // Bank name if available
-  ibanLast4?: string;           // Last 4 digits of IBAN
-  accountHolderName?: string;   // Account holder name
-  countryCode?: string;         // Country code (CY, DE, etc.)
-  currencyCode?: string;        // Currency code (EUR, USD, etc.)
-  
-  lastUsed: Date;               // Last time this UPO was used
-  createdFromTransactionId?: string;  // Transaction that created this UPO
-  registrationDate?: string;    // From Nuvei's upoRegistrationDate
-  isActive: boolean;            // Whether this UPO is still valid
+  paymentMethod?: string; // e.g., 'apmgw_BankPayouts'
+  bankName?: string; // Bank name if available
+  ibanLast4?: string; // Last 4 digits of IBAN
+  accountHolderName?: string; // Account holder name
+  countryCode?: string; // Country code (CY, DE, etc.)
+  currencyCode?: string; // Currency code (EUR, USD, etc.)
+
+  lastUsed: Date; // Last time this UPO was used
+  createdFromTransactionId?: string; // Transaction that created this UPO
+  registrationDate?: string; // From Nuvei's upoRegistrationDate
+  isActive: boolean; // Whether this UPO is still valid
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,8 +58,8 @@ const NuveiUserPaymentOptionSchema = new Schema<INuveiUserPaymentOption>(
     },
     type: {
       type: String,
-      enum: ['card', 'bank'],
-      default: 'card',
+      enum: ["card", "bank"],
+      default: "card",
     },
     // Card-specific fields
     cardBrand: String,
@@ -88,33 +88,36 @@ const NuveiUserPaymentOptionSchema = new Schema<INuveiUserPaymentOption>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index for efficient lookups
-NuveiUserPaymentOptionSchema.index({ userId: 1, userPaymentOptionId: 1 }, { unique: true });
+NuveiUserPaymentOptionSchema.index(
+  { userId: 1, userPaymentOptionId: 1 },
+  { unique: true },
+);
 NuveiUserPaymentOptionSchema.index({ userId: 1, isActive: 1, lastUsed: -1 });
 
 // Static: Get all active UPOs for a user
 NuveiUserPaymentOptionSchema.statics.getActiveUPOs = async function (
-  userId: string
+  userId: string,
 ): Promise<INuveiUserPaymentOption[]> {
   return this.find({ userId, isActive: true }).sort({ lastUsed: -1 });
 };
 
 // Static: Get the most recently used UPO for a user
 NuveiUserPaymentOptionSchema.statics.getMostRecentUPO = async function (
-  userId: string
+  userId: string,
 ): Promise<INuveiUserPaymentOption | null> {
   return this.findOne({ userId, isActive: true }).sort({ lastUsed: -1 });
 };
 
 const NuveiUserPaymentOption =
-  (mongoose.models?.NuveiUserPaymentOption as unknown as INuveiUserPaymentOptionModel) ||
+  (mongoose.models
+    ?.NuveiUserPaymentOption as unknown as INuveiUserPaymentOptionModel) ||
   mongoose.model<INuveiUserPaymentOption, INuveiUserPaymentOptionModel>(
-    'NuveiUserPaymentOption',
-    NuveiUserPaymentOptionSchema
+    "NuveiUserPaymentOption",
+    NuveiUserPaymentOptionSchema,
   );
 
 export default NuveiUserPaymentOption;
-

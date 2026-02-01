@@ -1,12 +1,21 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
-import { Save, Key, Mail, Lock, Shield, AlertCircle, CheckCircle2, User } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import {
+  Save,
+  Key,
+  Mail,
+  Lock,
+  Shield,
+  AlertCircle,
+  CheckCircle2,
+  User,
+} from "lucide-react";
 
 interface CredentialsSectionProps {
   currentEmail: string;
@@ -15,15 +24,15 @@ interface CredentialsSectionProps {
 
 export default function CredentialsSection({
   currentEmail,
-  currentName = 'Admin',
+  currentName = "Admin",
 }: CredentialsSectionProps) {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: currentName,
     email: currentEmail,
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,21 +40,21 @@ export default function CredentialsSection({
     e.preventDefault();
 
     if (formData.newPassword !== formData.confirmPassword) {
-      toast.error('New passwords do not match');
+      toast.error("New passwords do not match");
       return;
     }
 
     if (formData.newPassword && formData.newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/credentials', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/credentials", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
@@ -57,29 +66,29 @@ export default function CredentialsSection({
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Credentials updated successfully');
+        toast.success("Credentials updated successfully");
         setFormData({
           name: data.name || formData.name,
           email: data.email,
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: '',
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
         });
-        
+
         // If email changed, logout and redirect to login
         if (data.email !== currentEmail) {
-          toast.info('Please login with your new email');
+          toast.info("Please login with your new email");
           setTimeout(() => {
-            router.push('/login');
+            router.push("/login");
           }, 2000);
         } else {
           router.refresh();
         }
       } else {
-        toast.error(data.error || 'Update failed');
+        toast.error(data.error || "Update failed");
       }
     } catch (error) {
-      toast.error('An error occurred');
+      toast.error("An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -118,9 +127,14 @@ export default function CredentialsSection({
               <div className="h-10 w-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
                 <User className="h-5 w-5 text-cyan-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-100">Admin Name</h3>
+              <h3 className="text-lg font-semibold text-gray-100">
+                Admin Name
+              </h3>
             </div>
-            <Label htmlFor="name" className="text-gray-300 flex items-center gap-2 mb-2">
+            <Label
+              htmlFor="name"
+              className="text-gray-300 flex items-center gap-2 mb-2"
+            >
               <User className="h-4 w-4 text-cyan-400" />
               Display Name
             </Label>
@@ -146,9 +160,14 @@ export default function CredentialsSection({
               <div className="h-10 w-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
                 <Mail className="h-5 w-5 text-blue-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-100">Email Address</h3>
+              <h3 className="text-lg font-semibold text-gray-100">
+                Email Address
+              </h3>
             </div>
-            <Label htmlFor="email" className="text-gray-300 flex items-center gap-2 mb-2">
+            <Label
+              htmlFor="email"
+              className="text-gray-300 flex items-center gap-2 mb-2"
+            >
               <Mail className="h-4 w-4 text-blue-400" />
               Admin Email
             </Label>
@@ -174,9 +193,14 @@ export default function CredentialsSection({
               <div className="h-10 w-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
                 <Shield className="h-5 w-5 text-purple-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-100">Verification</h3>
+              <h3 className="text-lg font-semibold text-gray-100">
+                Verification
+              </h3>
             </div>
-            <Label htmlFor="currentPassword" className="text-gray-300 flex items-center gap-2 mb-2">
+            <Label
+              htmlFor="currentPassword"
+              className="text-gray-300 flex items-center gap-2 mb-2"
+            >
               <Lock className="h-4 w-4 text-purple-400" />
               Current Password *
             </Label>
@@ -205,14 +229,21 @@ export default function CredentialsSection({
                 <Lock className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-100">Change Password</h3>
-                <p className="text-sm text-gray-400">Optional - leave blank to keep current password</p>
+                <h3 className="text-lg font-semibold text-gray-100">
+                  Change Password
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Optional - leave blank to keep current password
+                </p>
               </div>
             </div>
 
             <div className="space-y-6">
               <div>
-                <Label htmlFor="newPassword" className="text-gray-300 flex items-center gap-2 mb-2">
+                <Label
+                  htmlFor="newPassword"
+                  className="text-gray-300 flex items-center gap-2 mb-2"
+                >
                   <Lock className="h-4 w-4 text-green-400" />
                   New Password
                 </Label>
@@ -233,7 +264,10 @@ export default function CredentialsSection({
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-gray-300 flex items-center gap-2 mb-2">
+                <Label
+                  htmlFor="confirmPassword"
+                  className="text-gray-300 flex items-center gap-2 mb-2"
+                >
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
                   Confirm New Password
                 </Label>
@@ -243,19 +277,31 @@ export default function CredentialsSection({
                   autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
+                    setFormData({
+                      ...formData,
+                      confirmPassword: e.target.value,
+                    })
                   }
                   className="bg-gray-800 border-gray-600 text-gray-100 h-12 focus:ring-2 focus:ring-green-500"
                   placeholder="Re-enter new password"
                 />
                 {formData.newPassword && formData.confirmPassword && (
-                  <p className={`text-xs mt-2 flex items-center gap-1 ${
-                    formData.newPassword === formData.confirmPassword ? 'text-green-400' : 'text-red-400'
-                  }`}>
+                  <p
+                    className={`text-xs mt-2 flex items-center gap-1 ${
+                      formData.newPassword === formData.confirmPassword
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
                     {formData.newPassword === formData.confirmPassword ? (
-                      <><CheckCircle2 className="h-3 w-3" /> Passwords match</>
+                      <>
+                        <CheckCircle2 className="h-3 w-3" /> Passwords match
+                      </>
                     ) : (
-                      <><AlertCircle className="h-3 w-3" /> Passwords don't match</>
+                      <>
+                        <AlertCircle className="h-3 w-3" /> Passwords don't
+                        match
+                      </>
                     )}
                   </p>
                 )}
@@ -268,10 +314,13 @@ export default function CredentialsSection({
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
               <div>
-                <h4 className="text-sm font-semibold text-yellow-400">Security Notice</h4>
+                <h4 className="text-sm font-semibold text-yellow-400">
+                  Security Notice
+                </h4>
                 <p className="text-xs text-gray-400 mt-1">
-                  Make sure to use a strong password with a mix of letters, numbers, and special characters.
-                  You'll be logged out if you change your email.
+                  Make sure to use a strong password with a mix of letters,
+                  numbers, and special characters. You'll be logged out if you
+                  change your email.
                 </p>
               </div>
             </div>
@@ -283,11 +332,10 @@ export default function CredentialsSection({
             className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold h-14 text-lg shadow-lg shadow-yellow-500/50"
           >
             <Save className="h-5 w-5 mr-2" />
-            {isLoading ? 'Saving Changes...' : 'Save Credentials'}
+            {isLoading ? "Saving Changes..." : "Save Credentials"}
           </Button>
         </form>
       </div>
     </div>
   );
 }
-

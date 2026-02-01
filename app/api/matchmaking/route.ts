@@ -1,32 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { 
-  getRankedMatches, 
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import {
+  getRankedMatches,
   findBestMatch,
-  getMatchableTraders 
-} from '@/lib/services/matchmaking.service';
+  getMatchableTraders,
+} from "@/lib/services/matchmaking.service";
 
 // GET - Get ranked matches for card swiping or find best match
 export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action') || 'ranked';
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const action = searchParams.get("action") || "ranked";
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
 
-    if (action === 'best') {
+    if (action === "best") {
       // Find single best match
       const bestMatch = await findBestMatch(session.user.id);
-      
+
       if (!bestMatch) {
         return NextResponse.json({
           success: false,
-          message: 'No suitable matches found',
+          message: "No suitable matches found",
           match: null,
         });
       }
@@ -37,10 +37,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (action === 'all') {
+    if (action === "all") {
       // Get all matchable traders
       const traders = await getMatchableTraders(session.user.id);
-      
+
       return NextResponse.json({
         success: true,
         traders,
@@ -57,11 +57,10 @@ export async function GET(request: NextRequest) {
       total: matches.length,
     });
   } catch (error) {
-    console.error('Error in matchmaking:', error);
+    console.error("Error in matchmaking:", error);
     return NextResponse.json(
-      { error: 'Failed to get matches' },
-      { status: 500 }
+      { error: "Failed to get matches" },
+      { status: 500 },
     );
   }
 }
-

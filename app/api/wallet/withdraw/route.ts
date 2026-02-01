@@ -1,20 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import WithdrawalSettings from '@/database/models/withdrawal-settings.model';
-import WithdrawalRequest from '@/database/models/withdrawal-request.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import AppSettings from '@/database/models/app-settings.model';
-import UserBankAccount from '@/database/models/user-bank-account.model';
-import KYCSettings from '@/database/models/kyc-settings.model';
-import { sanitizeUserNote, sanitizeAmount } from '@/lib/utils/sanitize';
-import { createSecurityLogger } from '@/lib/utils/security-logger';
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import AppSettings from "@/database/models/app-settings.model";
+import UserBankAccount from "@/database/models/user-bank-account.model";
+import KYCSettings from "@/database/models/kyc-settings.model";
+import { sanitizeUserNote, sanitizeAmount } from "@/lib/utils/sanitize";
+import { createSecurityLogger } from "@/lib/utils/security-logger";
 
 /**
  * GET /api/wallet/withdraw
@@ -27,16 +27,22 @@ export async function GET() {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
 
-    const [withdrawalSettings, creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
+    const [
+      withdrawalSettings,
+      creditSettings,
+      wallet,
+      appSettings,
+      kycSettings,
+    ] = await Promise.all([
       WithdrawalSettings.getSingleton(),
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId: session.user.id }),
-      AppSettings.findById('global-app-settings'),
+      AppSettings.findById("global-app-settings"),
       KYCSettings.findOne(),
     ]);
 
@@ -44,15 +50,17 @@ export async function GET() {
       return NextResponse.json({
         success: true,
         eligible: false,
-        reason: 'No wallet found',
+        reason: "No wallet found",
         settings: null,
       });
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
-    
+
     // Determine if KYC is required - check KYC settings first, fallback to withdrawal settings
-    const kycRequiredForWithdrawal = (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) || withdrawalSettings.requireKYC;
+    const kycRequiredForWithdrawal =
+      (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
+      withdrawalSettings.requireKYC;
 
     // Check eligibility
     const eligibility = await checkWithdrawalEligibility(
@@ -61,7 +69,7 @@ export async function GET() {
       withdrawalSettings,
       creditSettings,
       isSandbox,
-      kycRequiredForWithdrawal
+      kycRequiredForWithdrawal,
     );
 
     // Calculate fees
@@ -75,13 +83,14 @@ export async function GET() {
     // Get user's last deposit for original payment method
     const lastDeposit = await WalletTransaction.findOne({
       userId: session.user.id,
-      transactionType: 'deposit',
-      status: 'completed',
+      transactionType: "deposit",
+      status: "completed",
     }).sort({ createdAt: -1 });
 
     // Get user's bank accounts for withdrawals
     const bankAccounts = await UserBankAccount.getUserAccounts(session.user.id);
-    const defaultBankAccount = bankAccounts.find(a => a.isDefault) || bankAccounts[0];
+    const defaultBankAccount =
+      bankAccounts.find((a) => a.isDefault) || bankAccounts[0];
     const hasBankAccount = bankAccounts.length > 0;
 
     // Get conversion rate
@@ -91,7 +100,7 @@ export async function GET() {
     // Build available withdrawal methods
     const availableWithdrawalMethods: Array<{
       id: string;
-      type: 'original_method' | 'bank_account';
+      type: "original_method" | "bank_account";
       label: string;
       details: string;
       cardBrand?: string;
@@ -106,20 +115,23 @@ export async function GET() {
     // Try to get stored UPOs for card refunds (Nuvei)
     let storedUPOs: any[] = [];
     try {
-      const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+      const NuveiUserPaymentOption = (
+        await import("@/database/models/nuvei-user-payment-option.model")
+      ).default;
       storedUPOs = await NuveiUserPaymentOption.getActiveUPOs(session.user.id);
-    } catch (e) {
-      console.log('Could not fetch stored UPOs (model may not exist yet)');
+    } catch {
+      console.log("Could not fetch stored UPOs (model may not exist yet)");
     }
 
     // Add stored UPOs as card options (these have valid UPO IDs for Nuvei refunds)
     for (const upo of storedUPOs) {
-      const expiryStr = upo.expMonth && upo.expYear ? `${upo.expMonth}/${upo.expYear}` : '';
+      const expiryStr =
+        upo.expMonth && upo.expYear ? `${upo.expMonth}/${upo.expYear}` : "";
       availableWithdrawalMethods.push({
         id: `upo_${upo.userPaymentOptionId}`,
-        type: 'original_method',
-        label: `${upo.cardBrand || 'Card'} •••• ${upo.cardLast4 || '****'}`,
-        details: expiryStr ? `Expires ${expiryStr}` : 'From deposit',
+        type: "original_method",
+        label: `${upo.cardBrand || "Card"} •••• ${upo.cardLast4 || "****"}`,
+        details: expiryStr ? `Expires ${expiryStr}` : "From deposit",
         cardBrand: upo.cardBrand,
         cardLast4: upo.cardLast4,
         userPaymentOptionId: upo.userPaymentOptionId, // CRITICAL: Include UPO ID
@@ -129,16 +141,20 @@ export async function GET() {
     // Add original payment method if no UPOs stored but there's a deposit
     // (without UPO, can only be used for manual refunds, not automatic Nuvei)
     if (storedUPOs.length === 0 && lastDeposit?.paymentMethod) {
-      const cardLast4 = lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4;
-      const cardBrand = lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand || lastDeposit.paymentMethod;
+      const cardLast4 =
+        lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4;
+      const cardBrand =
+        lastDeposit.metadata?.cardBrand ||
+        lastDeposit.metadata?.brand ||
+        lastDeposit.paymentMethod;
       const upoFromDeposit = lastDeposit.metadata?.userPaymentOptionId;
-      
+
       availableWithdrawalMethods.push({
-        id: 'original_method',
-        type: 'original_method',
+        id: "original_method",
+        type: "original_method",
         label: `Original Payment Method`,
-        details: cardLast4 
-          ? `${cardBrand} •••• ${cardLast4}${!upoFromDeposit ? ' (manual only)' : ''}`
+        details: cardLast4
+          ? `${cardBrand} •••• ${cardLast4}${!upoFromDeposit ? " (manual only)" : ""}`
           : cardBrand,
         cardBrand,
         cardLast4,
@@ -147,16 +163,19 @@ export async function GET() {
     }
 
     // Add bank accounts (only if bank withdrawals are enabled)
-    const bankWithdrawalsEnabled = withdrawalSettings.bankWithdrawalsEnabled ?? true;
-    const cardWithdrawalsEnabled = withdrawalSettings.cardWithdrawalsEnabled ?? true;
-    
+    const bankWithdrawalsEnabled =
+      withdrawalSettings.bankWithdrawalsEnabled ?? true;
+    const cardWithdrawalsEnabled =
+      withdrawalSettings.cardWithdrawalsEnabled ?? true;
+
     if (bankWithdrawalsEnabled) {
       for (const bankAccount of bankAccounts) {
         availableWithdrawalMethods.push({
           id: bankAccount._id.toString(),
-          type: 'bank_account',
-          label: bankAccount.nickname || `Bank Account ****${bankAccount.ibanLast4}`,
-          details: bankAccount.bankName 
+          type: "bank_account",
+          label:
+            bankAccount.nickname || `Bank Account ****${bankAccount.ibanLast4}`,
+          details: bankAccount.bankName
             ? `${bankAccount.bankName} (****${bankAccount.ibanLast4})`
             : `****${bankAccount.ibanLast4}`,
           bankName: bankAccount.bankName,
@@ -166,23 +185,31 @@ export async function GET() {
         });
       }
     }
-    
+
     // Filter out card methods if card withdrawals are disabled
-    const filteredWithdrawalMethods = cardWithdrawalsEnabled 
-      ? availableWithdrawalMethods 
-      : availableWithdrawalMethods.filter(m => m.type !== 'original_method');
+    const filteredWithdrawalMethods = cardWithdrawalsEnabled
+      ? availableWithdrawalMethods
+      : availableWithdrawalMethods.filter((m) => m.type !== "original_method");
 
     // Update warning if no methods available
     if (filteredWithdrawalMethods.length === 0 && eligibility.eligible) {
       eligibility.warnings = eligibility.warnings || [];
       if (!bankWithdrawalsEnabled && !cardWithdrawalsEnabled) {
-        eligibility.warnings.push('Withdrawals are currently disabled by the administrator.');
+        eligibility.warnings.push(
+          "Withdrawals are currently disabled by the administrator.",
+        );
       } else if (!bankWithdrawalsEnabled) {
-        eligibility.warnings.push('Bank withdrawals are currently disabled. You can only withdraw to your card.');
+        eligibility.warnings.push(
+          "Bank withdrawals are currently disabled. You can only withdraw to your card.",
+        );
       } else if (!cardWithdrawalsEnabled) {
-        eligibility.warnings.push('Card withdrawals are currently disabled. Please add a bank account.');
+        eligibility.warnings.push(
+          "Card withdrawals are currently disabled. Please add a bank account.",
+        );
       } else {
-        eligibility.warnings.push('No withdrawal method available. Please add a bank account or make a deposit first.');
+        eligibility.warnings.push(
+          "No withdrawal method available. Please add a bank account or make a deposit first.",
+        );
       }
     }
 
@@ -224,21 +251,23 @@ export async function GET() {
       nuveiEnabled: withdrawalSettings.nuveiWithdrawalEnabled === true,
       // Legacy bank account info (only if bank withdrawals enabled)
       hasBankAccount: bankWithdrawalsEnabled && hasBankAccount,
-      bankAccount: defaultBankAccount ? {
-        id: defaultBankAccount._id,
-        nickname: defaultBankAccount.nickname,
-        bankName: defaultBankAccount.bankName,
-        ibanLast4: defaultBankAccount.ibanLast4,
-        country: defaultBankAccount.country,
-        isVerified: defaultBankAccount.isVerified,
-      } : null,
+      bankAccount: defaultBankAccount
+        ? {
+            id: defaultBankAccount._id,
+            nickname: defaultBankAccount.nickname,
+            bankName: defaultBankAccount.bankName,
+            ibanLast4: defaultBankAccount.ibanLast4,
+            country: defaultBankAccount.country,
+            isVerified: defaultBankAccount.isVerified,
+          }
+        : null,
       bankAccountCount: bankAccounts.length,
     });
   } catch (error) {
-    console.error('Error getting withdrawal info:', error);
+    console.error("Error getting withdrawal info:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to get withdrawal information' },
-      { status: 500 }
+      { success: false, error: "Failed to get withdrawal information" },
+      { status: 500 },
     );
   }
 }
@@ -250,7 +279,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   // SECURITY: Create logger for this request
   const securityLogger = createSecurityLogger(request);
-  
+
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
 
@@ -260,135 +289,161 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      await securityLogger.log({ statusCode: 401, success: false, errorMessage: 'Unauthorized' });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      await securityLogger.log({
+        statusCode: 401,
+        success: false,
+        errorMessage: "Unauthorized",
+      });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
-    
+
     // SECURITY: Get settings from database (also used for rate limiting)
     const withdrawalSettings = await WithdrawalSettings.getSingleton();
-    
+
     // SECURITY: Rate limiting - uses admin-configured limits (default 5/min if not set)
     if (withdrawalSettings.apiRateLimitEnabled !== false) {
-      const { checkRateLimit, getRateLimitHeaders } = await import('@/lib/utils/rate-limiter');
+      const { checkRateLimit, getRateLimitHeaders } =
+        await import("@/lib/utils/rate-limiter");
       const rateLimitResult = checkRateLimit(session.user.id, {
         maxRequests: withdrawalSettings.apiRateLimitRequestsPerMinute || 5,
         windowMs: 60 * 1000, // 1 minute window
-        keyPrefix: 'withdrawal',
+        keyPrefix: "withdrawal",
       });
-      
+
       if (!rateLimitResult.success) {
-        console.log(`🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`);
+        console.log(
+          `🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`,
+        );
         return NextResponse.json(
-          { success: false, error: 'Too many requests. Please wait a moment before trying again.' },
-          { 
+          {
+            success: false,
+            error:
+              "Too many requests. Please wait a moment before trying again.",
+          },
+          {
             status: 429,
             headers: getRateLimitHeaders(rateLimitResult),
-          }
+          },
         );
       }
     }
-    
+
     // withdrawalSettings is reused below - no need to fetch again
 
     const body = await request.json();
     const { withdrawalMethodId, userNote: rawUserNote } = body;
-    
+
     // SECURITY: Sanitize inputs
     const amountEUR = sanitizeAmount(body.amountEUR);
     const userNote = sanitizeUserNote(rawUserNote);
 
     if (!amountEUR || amountEUR <= 0) {
       return NextResponse.json(
-        { success: false, error: 'Invalid withdrawal amount' },
-        { status: 400 }
+        { success: false, error: "Invalid withdrawal amount" },
+        { status: 400 },
       );
     }
 
     if (!withdrawalMethodId) {
       return NextResponse.json(
-        { success: false, error: 'Please select a withdrawal method' },
-        { status: 400 }
+        { success: false, error: "Please select a withdrawal method" },
+        { status: 400 },
       );
     }
 
     // Note: connectToDatabase() already called above for rate limiting
     // Fetch remaining settings (withdrawalSettings already fetched for rate limit check)
-    const [creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
-      CreditConversionSettings.getSingleton(),
-      CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
-      AppSettings.findById('global-app-settings'),
-      KYCSettings.findOne(),
-    ]);
+    const [creditSettings, wallet, appSettings, kycSettings] =
+      await Promise.all([
+        CreditConversionSettings.getSingleton(),
+        CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
+        AppSettings.findById("global-app-settings"),
+        KYCSettings.findOne(),
+      ]);
 
     if (!wallet) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: 'Wallet not found' },
-        { status: 404 }
+        { success: false, error: "Wallet not found" },
+        { status: 404 },
       );
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
-    const kycRequiredForWithdrawal = (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) || withdrawalSettings.requireKYC;
+    const kycRequiredForWithdrawal =
+      (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
+      withdrawalSettings.requireKYC;
 
     // Determine withdrawal method (original method, UPO card, or bank account)
     let bankAccount = null;
     let originalPaymentDetails = null;
-    let payoutMethodType = 'bank_transfer';
+    let payoutMethodType = "bank_transfer";
 
-    if (withdrawalMethodId === 'original_method') {
+    if (withdrawalMethodId === "original_method") {
       // Using original payment method (card)
       const lastDeposit = await WalletTransaction.findOne({
         userId: session.user.id,
-        transactionType: 'deposit',
-        status: 'completed',
-      }).sort({ createdAt: -1 }).session(mongoSession);
+        transactionType: "deposit",
+        status: "completed",
+      })
+        .sort({ createdAt: -1 })
+        .session(mongoSession);
 
       if (!lastDeposit) {
         await mongoSession.abortTransaction();
         return NextResponse.json(
-          { success: false, error: 'No original payment method found. Please make a deposit first or add a bank account.' },
-          { status: 400 }
+          {
+            success: false,
+            error:
+              "No original payment method found. Please make a deposit first or add a bank account.",
+          },
+          { status: 400 },
         );
       }
 
-      payoutMethodType = 'original_method';
+      payoutMethodType = "original_method";
       originalPaymentDetails = {
         paymentIntentId: lastDeposit.metadata?.paymentIntentId,
         paymentMethod: lastDeposit.paymentMethod,
-        cardBrand: lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand,
-        cardLast4: lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4,
+        cardBrand:
+          lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand,
+        cardLast4:
+          lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4,
         cardExpMonth: lastDeposit.metadata?.cardExpMonth,
         cardExpYear: lastDeposit.metadata?.cardExpYear,
         cardCountry: lastDeposit.metadata?.cardCountry,
       };
-    } else if (withdrawalMethodId.startsWith('upo_')) {
+    } else if (withdrawalMethodId.startsWith("upo_")) {
       // Using a Nuvei UPO (User Payment Option) - card from previous deposit
-      const upoId = withdrawalMethodId.replace('upo_', '');
-      
+      const upoId = withdrawalMethodId.replace("upo_", "");
+
       // Try to find the UPO in our stored records
-      const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+      const NuveiUserPaymentOption = (
+        await import("@/database/models/nuvei-user-payment-option.model")
+      ).default;
       const storedUpo = await NuveiUserPaymentOption.findOne({
         userId: session.user.id,
         userPaymentOptionId: upoId,
       }).session(mongoSession);
-      
+
       if (!storedUpo) {
         // UPO not found in our records, but might still be valid in Nuvei
         // For manual processing, just record the card details
-        console.log(`⚠️ UPO ${upoId} not found in local records, proceeding with manual withdrawal`);
+        console.log(
+          `⚠️ UPO ${upoId} not found in local records, proceeding with manual withdrawal`,
+        );
       }
-      
-      payoutMethodType = 'card_payout';
+
+      payoutMethodType = "card_payout";
       originalPaymentDetails = {
         userPaymentOptionId: upoId,
-        paymentMethod: 'nuvei_card',
-        cardBrand: storedUpo?.cardBrand || 'Card',
-        cardLast4: storedUpo?.cardLast4 || '****',
-        cardExpMonth: storedUpo?.expiryMonth,
-        cardExpYear: storedUpo?.expiryYear,
+        paymentMethod: "nuvei_card",
+        cardBrand: storedUpo?.cardBrand || "Card",
+        cardLast4: storedUpo?.cardLast4 || "****",
+        cardExpMonth: storedUpo?.expMonth,
+        cardExpYear: storedUpo?.expYear,
       };
     } else {
       // Using bank account - withdrawalMethodId should be a valid MongoDB ObjectId
@@ -401,30 +456,35 @@ export async function POST(request: NextRequest) {
       if (!bankAccount) {
         await mongoSession.abortTransaction();
         return NextResponse.json(
-          { success: false, error: 'Selected bank account not found' },
-          { status: 400 }
+          { success: false, error: "Selected bank account not found" },
+          { status: 400 },
         );
       }
-      
+
       // Check if this bank account has a Nuvei UPO (created when account was added)
-      if (bankAccount.nuveiUpoId && bankAccount.nuveiStatus === 'active') {
-        console.log('💳 Bank account has Nuvei UPO:', bankAccount.nuveiUpoId);
+      if (bankAccount.nuveiUpoId && bankAccount.nuveiStatus === "active") {
+        console.log("💳 Bank account has Nuvei UPO:", bankAccount.nuveiUpoId);
       } else if (!bankAccount.nuveiUpoId) {
         // Try to find a bank UPO for this user in case it was created separately
-        const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+        const NuveiUserPaymentOption = (
+          await import("@/database/models/nuvei-user-payment-option.model")
+        ).default;
         const bankUpo = await NuveiUserPaymentOption.findOne({
           userId: session.user.id,
-          type: 'bank',
+          type: "bank",
           isActive: true,
         }).sort({ lastUsed: -1 });
-        
+
         if (bankUpo) {
-          console.log('💳 Found bank UPO from separate record:', bankUpo.userPaymentOptionId);
+          console.log(
+            "💳 Found bank UPO from separate record:",
+            bankUpo.userPaymentOptionId,
+          );
           bankAccount.nuveiUpoId = String(bankUpo.userPaymentOptionId);
         }
       }
-      
-      payoutMethodType = 'bank_transfer';
+
+      payoutMethodType = "bank_transfer";
     }
 
     // Check eligibility
@@ -434,14 +494,14 @@ export async function POST(request: NextRequest) {
       withdrawalSettings,
       creditSettings,
       isSandbox,
-      kycRequiredForWithdrawal
+      kycRequiredForWithdrawal,
     );
 
     if (!eligibility.eligible) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
         { success: false, error: eligibility.reason },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -449,16 +509,22 @@ export async function POST(request: NextRequest) {
     if (amountEUR < withdrawalSettings.minimumWithdrawal) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: `Minimum withdrawal is €${withdrawalSettings.minimumWithdrawal}` },
-        { status: 400 }
+        {
+          success: false,
+          error: `Minimum withdrawal is €${withdrawalSettings.minimumWithdrawal}`,
+        },
+        { status: 400 },
       );
     }
 
     if (amountEUR > withdrawalSettings.maximumWithdrawal) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: `Maximum withdrawal is €${withdrawalSettings.maximumWithdrawal}` },
-        { status: 400 }
+        {
+          success: false,
+          error: `Maximum withdrawal is €${withdrawalSettings.maximumWithdrawal}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -469,30 +535,42 @@ export async function POST(request: NextRequest) {
     if (amountCredits > wallet.creditBalance) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: 'Insufficient balance' },
-        { status: 400 }
+        { success: false, error: "Insufficient balance" },
+        { status: 400 },
       );
     }
 
     // Check daily limit
     const dailyTotal = await WithdrawalRequest.getDailyTotal(session.user.id);
-    if (withdrawalSettings.dailyWithdrawalLimit > 0 && 
-        dailyTotal + amountEUR > withdrawalSettings.dailyWithdrawalLimit) {
+    if (
+      withdrawalSettings.dailyWithdrawalLimit > 0 &&
+      dailyTotal + amountEUR > withdrawalSettings.dailyWithdrawalLimit
+    ) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: `Would exceed daily limit of €${withdrawalSettings.dailyWithdrawalLimit}` },
-        { status: 400 }
+        {
+          success: false,
+          error: `Would exceed daily limit of €${withdrawalSettings.dailyWithdrawalLimit}`,
+        },
+        { status: 400 },
       );
     }
 
     // Check monthly limit
-    const monthlyTotal = await WithdrawalRequest.getMonthlyTotal(session.user.id);
-    if (withdrawalSettings.monthlyWithdrawalLimit > 0 && 
-        monthlyTotal + amountEUR > withdrawalSettings.monthlyWithdrawalLimit) {
+    const monthlyTotal = await WithdrawalRequest.getMonthlyTotal(
+      session.user.id,
+    );
+    if (
+      withdrawalSettings.monthlyWithdrawalLimit > 0 &&
+      monthlyTotal + amountEUR > withdrawalSettings.monthlyWithdrawalLimit
+    ) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
-        { success: false, error: `Would exceed monthly limit of €${withdrawalSettings.monthlyWithdrawalLimit}` },
-        { status: 400 }
+        {
+          success: false,
+          error: `Would exceed monthly limit of €${withdrawalSettings.monthlyWithdrawalLimit}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -504,7 +582,7 @@ export async function POST(request: NextRequest) {
       ? withdrawalSettings.platformFeeFixed
       : 0;
 
-    const platformFee = (amountEUR * feePercentage / 100) + feeFixed;
+    const platformFee = (amountEUR * feePercentage) / 100 + feeFixed;
     const platformFeeCredits = platformFee * exchangeRate;
     const netAmountEUR = amountEUR - platformFee;
 
@@ -525,7 +603,7 @@ export async function POST(request: NextRequest) {
       platformFeeCredits,
       bankFee: 0, // Will be calculated when processing
       netAmountEUR,
-      status: 'pending',
+      status: "pending",
       payoutMethod: payoutMethodType,
       walletBalanceBefore: balanceBefore,
       walletBalanceAfter: wallet.creditBalance,
@@ -533,15 +611,19 @@ export async function POST(request: NextRequest) {
       kycVerified: wallet.kycVerified,
       userNote,
       requestedAt: new Date(),
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      userAgent: request.headers.get('user-agent'),
+      ipAddress:
+        request.headers.get("x-forwarded-for") ||
+        request.headers.get("x-real-ip"),
+      userAgent: request.headers.get("user-agent"),
     };
 
     // Add method-specific details
-    if (payoutMethodType === 'original_method' && originalPaymentDetails) {
+    if (payoutMethodType === "original_method" && originalPaymentDetails) {
       // Original payment method (card refund from Stripe/other provider)
-      withdrawalRequestData.originalPaymentId = originalPaymentDetails.paymentIntentId;
-      withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod;
+      withdrawalRequestData.originalPaymentId =
+        originalPaymentDetails.paymentIntentId;
+      withdrawalRequestData.originalPaymentMethod =
+        originalPaymentDetails.paymentMethod;
       withdrawalRequestData.originalCardDetails = {
         brand: originalPaymentDetails.cardBrand,
         last4: originalPaymentDetails.cardLast4,
@@ -549,9 +631,10 @@ export async function POST(request: NextRequest) {
         expYear: originalPaymentDetails.cardExpYear,
         country: originalPaymentDetails.cardCountry,
       };
-    } else if (payoutMethodType === 'card_payout' && originalPaymentDetails) {
+    } else if (payoutMethodType === "card_payout" && originalPaymentDetails) {
       // Nuvei UPO card refund
-      withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod || 'nuvei_card';
+      withdrawalRequestData.originalPaymentMethod =
+        originalPaymentDetails.paymentMethod || "nuvei_card";
       withdrawalRequestData.originalCardDetails = {
         brand: originalPaymentDetails.cardBrand,
         last4: originalPaymentDetails.cardLast4,
@@ -563,7 +646,9 @@ export async function POST(request: NextRequest) {
       // Bank transfer
       withdrawalRequestData.bankDetails = {
         accountHolderName: bankAccount.accountHolderName,
-        iban: bankAccount.ibanLast4 ? `****${bankAccount.ibanLast4}` : undefined,
+        iban: bankAccount.ibanLast4
+          ? `****${bankAccount.ibanLast4}`
+          : undefined,
         fullIban: bankAccount.iban, // Store full IBAN for processing
         bankName: bankAccount.bankName,
         swiftBic: bankAccount.swiftBic,
@@ -572,12 +657,12 @@ export async function POST(request: NextRequest) {
         nuveiUpoId: bankAccount.nuveiUpoId,
       };
       withdrawalRequestData.bankAccountId = bankAccount._id;
-      
+
       // If bank account has Nuvei UPO, also store it for automatic processing
       if (bankAccount.nuveiUpoId) {
         withdrawalRequestData.originalCardDetails = {
           userPaymentOptionId: bankAccount.nuveiUpoId,
-          type: 'bank_upo',
+          type: "bank_upo",
         };
       }
     }
@@ -585,31 +670,33 @@ export async function POST(request: NextRequest) {
     // Create withdrawal request
     const withdrawalRequest = await WithdrawalRequest.create(
       [withdrawalRequestData],
-      { session: mongoSession }
+      { session: mongoSession },
     );
 
     // Record wallet transaction with proper description (same format as deposits)
     const withdrawalTx = await WalletTransaction.create(
-      [{
-        userId: session.user.id,
-        transactionType: 'withdrawal',
-        amount: -amountCredits,
-        balanceBefore,
-        balanceAfter: wallet.creditBalance,
-        currency: 'EUR',
-        exchangeRate,
-        status: 'pending',
-        description: `${amountCredits} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
-        metadata: {
-          withdrawalRequestId: withdrawalRequest[0]._id,
-          amountEUR,
-          netAmountEUR,
-          platformFee,
-          platformFeePercentage: feePercentage,
-          platformFeeFixed: feeFixed,
+      [
+        {
+          userId: session.user.id,
+          transactionType: "withdrawal",
+          amount: -amountCredits,
+          balanceBefore,
+          balanceAfter: wallet.creditBalance,
+          currency: "EUR",
+          exchangeRate,
+          status: "pending",
+          description: `${amountCredits} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
+          metadata: {
+            withdrawalRequestId: withdrawalRequest[0]._id,
+            amountEUR,
+            netAmountEUR,
+            platformFee,
+            platformFeePercentage: feePercentage,
+            platformFeeFixed: feeFixed,
+          },
         },
-      }],
-      { session: mongoSession }
+      ],
+      { session: mongoSession },
     );
 
     // NOTE: Don't create withdrawal_fee transaction here!
@@ -622,7 +709,9 @@ export async function POST(request: NextRequest) {
 
     // NOTE: Don't record withdrawal fee to platform financials here either!
     // It will be recorded when the withdrawal is completed.
-    console.log(`💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`);
+    console.log(
+      `💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`,
+    );
 
     // Check for auto-approval
     // Important: Only auto-approve if Nuvei automatic processing is enabled
@@ -633,55 +722,72 @@ export async function POST(request: NextRequest) {
     if (isManualMode) {
       // In manual mode, all withdrawals stay in 'pending' status
       // Admin must manually approve/process them
-      console.log('💼 Manual mode: Withdrawal stays in pending for admin review');
-      
+      console.log(
+        "💼 Manual mode: Withdrawal stays in pending for admin review",
+      );
+
       // If usePaymentProcessorForManual is enabled, create the request in Nuvei
       // This allows Nuvei to process the payout when admin approves
       if (withdrawalSettings.usePaymentProcessorForManual) {
         try {
-          console.log('🏦 Creating withdrawal request in Nuvei (manual mode with processor)...');
-          
+          console.log(
+            "🏦 Creating withdrawal request in Nuvei (manual mode with processor)...",
+          );
+
           // Get user's UPO for the withdrawal method
           let userPaymentOptionId: string | undefined;
-          
-          if (payoutMethodType === 'card_payout' && originalPaymentDetails?.userPaymentOptionId) {
+
+          if (
+            payoutMethodType === "card_payout" &&
+            originalPaymentDetails?.userPaymentOptionId
+          ) {
             userPaymentOptionId = originalPaymentDetails.userPaymentOptionId;
-          } else if (payoutMethodType === 'bank_transfer' && bankAccount) {
+          } else if (payoutMethodType === "bank_transfer" && bankAccount) {
             // Get UPO from bank account if connected to Nuvei
             userPaymentOptionId = bankAccount.nuveiUpoId;
           }
-          
+
           if (userPaymentOptionId) {
-            const NuveiService = (await import('@/lib/services/nuvei.service')).default;
-            const nuveiService = NuveiService.getInstance();
-            
+            const nuveiService = (await import("@/lib/services/nuvei.service"))
+              .default;
+
             const merchantWDRequestId = `wd_${session.user.id.slice(-8)}_${Date.now()}`;
-            const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
-            
+            const origin =
+              request.headers.get("origin") ||
+              process.env.NEXT_PUBLIC_APP_URL ||
+              process.env.NEXT_PUBLIC_BASE_URL;
+
             const nuveiResult = await nuveiService.createWithdrawRequest({
               userTokenId: `user_${session.user.id}`,
               amount: netAmountEUR.toFixed(2),
-              currency: 'EUR',
+              currency: "EUR",
               merchantWDRequestId,
               userPaymentOptionId,
               email: session.user.email || undefined,
-              firstName: session.user.name?.split(' ')[0] || undefined,
-              lastName: session.user.name?.split(' ').slice(1).join(' ') || undefined,
+              firstName: session.user.name?.split(" ")[0] || undefined,
+              lastName:
+                session.user.name?.split(" ").slice(1).join(" ") || undefined,
               notificationUrl: `${origin}/api/nuvei/webhook`,
             });
-            
-            if ('error' in nuveiResult && nuveiResult.error) {
-              console.error('❌ Failed to create Nuvei withdrawal request:', nuveiResult.error);
+
+            if ("error" in nuveiResult && nuveiResult.error) {
+              console.error(
+                "❌ Failed to create Nuvei withdrawal request:",
+                nuveiResult.error,
+              );
               // Don't fail the withdrawal - just mark for manual processing
               withdrawalRequest[0].metadata = {
-                ...withdrawalRequest[0].metadata,
+                ...(withdrawalRequest[0].metadata || {}),
                 nuveiError: nuveiResult.error,
                 requiresManualProcessing: true,
               };
-            } else {
-              console.log('✅ Nuvei withdrawal request created:', nuveiResult.wdRequestId);
+            } else if ("wdRequestId" in nuveiResult) {
+              console.log(
+                "✅ Nuvei withdrawal request created:",
+                nuveiResult.wdRequestId,
+              );
               withdrawalRequest[0].metadata = {
-                ...withdrawalRequest[0].metadata,
+                ...(withdrawalRequest[0].metadata || {}),
                 nuveiWdRequestId: nuveiResult.wdRequestId,
                 nuveiWdStatus: nuveiResult.wdRequestStatus,
                 merchantWDRequestId,
@@ -690,47 +796,58 @@ export async function POST(request: NextRequest) {
             }
             await withdrawalRequest[0].save();
           } else {
-            console.log('⚠️ No UPO available for Nuvei - will require full manual processing');
+            console.log(
+              "⚠️ No UPO available for Nuvei - will require full manual processing",
+            );
             withdrawalRequest[0].metadata = {
-              ...withdrawalRequest[0].metadata,
+              ...(withdrawalRequest[0].metadata || {}),
               requiresManualProcessing: true,
-              noUpoReason: 'No payment option linked',
+              noUpoReason: "No payment option linked",
             };
             await withdrawalRequest[0].save();
           }
         } catch (nuveiError) {
-          console.error('❌ Error creating Nuvei withdrawal request:', nuveiError);
+          console.error(
+            "❌ Error creating Nuvei withdrawal request:",
+            nuveiError,
+          );
           // Don't fail - just mark for manual processing
         }
       }
     } else if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
       // Auto-approve sandbox withdrawals ONLY when automatic processing is enabled
-      withdrawalRequest[0].status = 'approved';
+      withdrawalRequest[0].status = "approved";
       withdrawalRequest[0].isAutoApproved = true;
-      withdrawalRequest[0].autoApprovalReason = 'Sandbox mode auto-approval';
+      withdrawalRequest[0].autoApprovalReason = "Sandbox mode auto-approval";
       withdrawalRequest[0].processedAt = new Date();
       await withdrawalRequest[0].save();
       autoApproved = true;
     } else if (
-      withdrawalSettings.processingMode === 'automatic' &&
+      withdrawalSettings.processingMode === "automatic" &&
       withdrawalSettings.autoApproveEnabled &&
       amountEUR <= withdrawalSettings.autoApproveMaxAmount
     ) {
       // Check auto-approval criteria for production
       const accountCreatedAt = new Date(session.user.createdAt || Date.now());
-      const accountAge = Math.floor((Date.now() - accountCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const accountAge = Math.floor(
+        (Date.now() - accountCreatedAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
       const previousWithdrawals = await WithdrawalRequest.countDocuments({
         userId: session.user.id,
-        status: 'completed',
+        status: "completed",
       });
 
-      const meetsKYC = !withdrawalSettings.autoApproveRequireKYC || wallet.kycVerified;
-      const meetsAge = accountAge >= withdrawalSettings.autoApproveMinAccountAge;
-      const meetsHistory = previousWithdrawals >= withdrawalSettings.autoApproveMinSuccessfulWithdrawals;
+      const meetsKYC =
+        !withdrawalSettings.autoApproveRequireKYC || wallet.kycVerified;
+      const meetsAge =
+        accountAge >= withdrawalSettings.autoApproveMinAccountAge;
+      const meetsHistory =
+        previousWithdrawals >=
+        withdrawalSettings.autoApproveMinSuccessfulWithdrawals;
 
       if (meetsKYC && meetsAge && meetsHistory) {
-        withdrawalRequest[0].status = 'approved';
+        withdrawalRequest[0].status = "approved";
         withdrawalRequest[0].isAutoApproved = true;
         withdrawalRequest[0].autoApprovalReason = `Met auto-approval criteria: Amount ≤ €${withdrawalSettings.autoApproveMaxAmount}, Account age ${accountAge} days, Previous withdrawals: ${previousWithdrawals}`;
         withdrawalRequest[0].processedAt = new Date();
@@ -742,18 +859,21 @@ export async function POST(request: NextRequest) {
     // Note: Auto-approved withdrawals still need admin to complete the bank transfer
     // The auto-approval just skips the initial review step in sandbox mode
     // Admin must still mark as "completed" after actual bank transfer
-    
+
     const finalStatus = withdrawalRequest[0].status;
-    let message = 'Withdrawal request submitted successfully. It will be reviewed shortly.';
-    
-    if (autoApproved && finalStatus === 'approved') {
-      message = '✅ Withdrawal auto-approved! Funds will be transferred to your bank account within 24-48 hours.';
-    } else if (autoApproved && finalStatus === 'completed') {
-      message = '🎉 Withdrawal processed successfully! Funds are on the way.';
-    } else if (finalStatus === 'processing') {
-      message = 'Withdrawal approved and being processed! You will be notified when complete.';
+    let message =
+      "Withdrawal request submitted successfully. It will be reviewed shortly.";
+
+    if (autoApproved && finalStatus === "approved") {
+      message =
+        "✅ Withdrawal auto-approved! Funds will be transferred to your bank account within 24-48 hours.";
+    } else if (autoApproved && finalStatus === "completed") {
+      message = "🎉 Withdrawal processed successfully! Funds are on the way.";
+    } else if (finalStatus === "processing") {
+      message =
+        "Withdrawal approved and being processed! You will be notified when complete.";
     } else if (autoApproved) {
-      message = 'Withdrawal request approved! Processing will begin shortly.';
+      message = "Withdrawal request approved! Processing will begin shortly.";
     }
 
     // SECURITY: Log successful withdrawal request
@@ -781,18 +901,18 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     await mongoSession.abortTransaction();
-    console.error('Error creating withdrawal:', error);
-    
+    console.error("Error creating withdrawal:", error);
+
     // SECURITY: Log failed withdrawal request
     await securityLogger.log({
       statusCode: 500,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
-    
+
     return NextResponse.json(
-      { success: false, error: 'Failed to create withdrawal request' },
-      { status: 500 }
+      { success: false, error: "Failed to create withdrawal request" },
+      { status: 500 },
     );
   } finally {
     mongoSession.endSession();
@@ -808,10 +928,10 @@ async function checkWithdrawalEligibility(
   settings: any,
   creditSettings: any,
   isSandbox: boolean,
-  kycRequired: boolean = false
+  kycRequired: boolean = false,
 ): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
-  
+
   // Get the actual conversion rate from credit settings
   const conversionRate = creditSettings?.eurToCreditsRate || 100;
 
@@ -819,13 +939,16 @@ async function checkWithdrawalEligibility(
   // FIRST: Check user restrictions (banned/suspended)
   // This must be checked before anything else!
   // ============================================
-  const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-  const restrictionCheck = await canUserPerformAction(userId, 'withdraw');
-  
+  const { canUserPerformAction } =
+    await import("@/lib/services/user-restriction.service");
+  const restrictionCheck = await canUserPerformAction(userId, "withdraw");
+
   if (!restrictionCheck.allowed) {
     return {
       eligible: false,
-      reason: restrictionCheck.reason || 'Your account is restricted from withdrawals. Please contact support.',
+      reason:
+        restrictionCheck.reason ||
+        "Your account is restricted from withdrawals. Please contact support.",
       warnings,
     };
   }
@@ -834,7 +957,7 @@ async function checkWithdrawalEligibility(
   if (isSandbox && !settings.sandboxEnabled) {
     return {
       eligible: false,
-      reason: 'Withdrawals are disabled in sandbox mode',
+      reason: "Withdrawals are disabled in sandbox mode",
       warnings,
     };
   }
@@ -843,11 +966,11 @@ async function checkWithdrawalEligibility(
   if (!wallet.isActive) {
     return {
       eligible: false,
-      reason: 'Your wallet is inactive. Please contact support.',
+      reason: "Your wallet is inactive. Please contact support.",
       warnings,
     };
   }
-  
+
   // Note: wallet.withdrawalEnabled is no longer checked here
   // Admin withdrawal settings now control eligibility globally
 
@@ -866,7 +989,8 @@ async function checkWithdrawalEligibility(
   if (kycRequired && !wallet.kycVerified) {
     return {
       eligible: false,
-      reason: 'KYC verification required before withdrawal. Please complete identity verification.',
+      reason:
+        "KYC verification required before withdrawal. Please complete identity verification.",
       warnings,
     };
   }
@@ -875,7 +999,7 @@ async function checkWithdrawalEligibility(
   if (settings.minimumDepositRequired && wallet.totalDeposited === 0) {
     return {
       eligible: false,
-      reason: 'You must make at least one deposit before withdrawing',
+      reason: "You must make at least one deposit before withdrawing",
       warnings,
     };
   }
@@ -883,7 +1007,7 @@ async function checkWithdrawalEligibility(
   // Check withdrawal frequency limits
   const todayCount = await WithdrawalRequest.countDocuments({
     userId,
-    status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+    status: { $in: ["pending", "approved", "processing", "completed"] },
     requestedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
   });
 
@@ -899,10 +1023,10 @@ async function checkWithdrawalEligibility(
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
-  
+
   const monthCount = await WithdrawalRequest.countDocuments({
     userId,
-    status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+    status: { $in: ["pending", "approved", "processing", "completed"] },
     requestedAt: { $gte: startOfMonth },
   });
 
@@ -918,15 +1042,17 @@ async function checkWithdrawalEligibility(
   if (settings.cooldownHours > 0) {
     const lastWithdrawal = await WithdrawalRequest.findOne({
       userId,
-      status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+      status: { $in: ["pending", "approved", "processing", "completed"] },
     }).sort({ requestedAt: -1 });
 
     if (lastWithdrawal) {
       const cooldownEnd = new Date(lastWithdrawal.requestedAt);
       cooldownEnd.setHours(cooldownEnd.getHours() + settings.cooldownHours);
-      
+
       if (cooldownEnd > new Date()) {
-        const hoursLeft = Math.ceil((cooldownEnd.getTime() - Date.now()) / (1000 * 60 * 60));
+        const hoursLeft = Math.ceil(
+          (cooldownEnd.getTime() - Date.now()) / (1000 * 60 * 60),
+        );
         return {
           eligible: false,
           reason: `Please wait ${hoursLeft} more hour(s) before your next withdrawal`,
@@ -940,16 +1066,18 @@ async function checkWithdrawalEligibility(
   if (settings.holdPeriodAfterDeposit > 0) {
     const lastDeposit = await WalletTransaction.findOne({
       userId,
-      transactionType: 'deposit',
-      status: 'completed',
+      transactionType: "deposit",
+      status: "completed",
     }).sort({ createdAt: -1 });
 
     if (lastDeposit) {
       const holdEnd = new Date(lastDeposit.createdAt);
       holdEnd.setHours(holdEnd.getHours() + settings.holdPeriodAfterDeposit);
-      
+
       if (holdEnd > new Date()) {
-        const hoursLeft = Math.ceil((holdEnd.getTime() - Date.now()) / (1000 * 60 * 60));
+        const hoursLeft = Math.ceil(
+          (holdEnd.getTime() - Date.now()) / (1000 * 60 * 60),
+        );
         return {
           eligible: false,
           reason: `Please wait ${hoursLeft} more hour(s) after your last deposit`,
@@ -963,20 +1091,26 @@ async function checkWithdrawalEligibility(
   if (!settings.allowWithdrawalDuringActiveCompetitions) {
     // IMPROVED: Check for participants where BOTH the participant AND competition are still active
     // This handles cases where competition ended but participant status wasn't updated
-    const Competition = (await import('@/database/models/trading/competition.model')).default;
-    
+    const Competition = (
+      await import("@/database/models/trading/competition.model")
+    ).default;
+
     // Get all participant records for this user
     const participantRecords = await CompetitionParticipant.find({
       userId: userId,
-      status: 'active',
-    }).select('competitionId').lean();
+      status: "active",
+    })
+      .select("competitionId")
+      .lean();
 
     if (participantRecords.length > 0) {
       // Check if any of these competitions are actually still active
-      const competitionIds = participantRecords.map((p: any) => p.competitionId);
+      const competitionIds = participantRecords.map(
+        (p: any) => p.competitionId,
+      );
       const activeCompetitionCount = await Competition.countDocuments({
         _id: { $in: competitionIds },
-        status: 'active', // Only count if competition itself is still active
+        status: "active", // Only count if competition itself is still active
       });
 
       if (activeCompetitionCount > 0) {
@@ -990,21 +1124,28 @@ async function checkWithdrawalEligibility(
       // If participant is 'active' but competition is NOT active, auto-fix the participant status
       if (participantRecords.length > activeCompetitionCount) {
         const staleCount = participantRecords.length - activeCompetitionCount;
-        console.log(`⚠️ Found ${staleCount} orphaned 'active' participant(s) - competition already ended. Auto-fixing...`);
-        
+        console.log(
+          `⚠️ Found ${staleCount} orphaned 'active' participant(s) - competition already ended. Auto-fixing...`,
+        );
+
         // Get competitions that are NOT active
         const nonActiveCompetitions = await Competition.find({
           _id: { $in: competitionIds },
-          status: { $ne: 'active' },
-        }).select('_id status').lean();
+          status: { $ne: "active" },
+        })
+          .select("_id status")
+          .lean();
 
         for (const comp of nonActiveCompetitions) {
-          const newStatus = (comp as any).status === 'cancelled' ? 'refunded' : 'completed';
+          const newStatus =
+            (comp as any).status === "cancelled" ? "refunded" : "completed";
           await CompetitionParticipant.updateMany(
-            { userId, competitionId: (comp as any)._id, status: 'active' },
-            { $set: { status: newStatus } }
+            { userId, competitionId: (comp as any)._id, status: "active" },
+            { $set: { status: newStatus } },
           );
-          console.log(`   ✅ Fixed participant status to '${newStatus}' for competition ${(comp as any)._id}`);
+          console.log(
+            `   ✅ Fixed participant status to '${newStatus}' for competition ${(comp as any)._id}`,
+          );
         }
       }
     }
@@ -1015,55 +1156,85 @@ async function checkWithdrawalEligibility(
     // Status values: 'pending' = waiting for accept, 'accepted' = accepted but not started, 'active' = in progress
     const activeChallenges = await Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
-      status: { $in: ['pending', 'accepted', 'active'] },
-    }).select('_id status challengerId challengedId acceptDeadline createdAt').lean();
+      status: { $in: ["pending", "accepted", "active"] },
+    })
+      .select("_id status challengerId challengedId acceptDeadline createdAt")
+      .lean();
 
     // Debug log to help identify stale challenges
     if (activeChallenges.length > 0) {
-      console.log(`🔍 Found ${activeChallenges.length} blocking challenge(s) for user ${userId}:`);
+      console.log(
+        `🔍 Found ${activeChallenges.length} blocking challenge(s) for user ${userId}:`,
+      );
       activeChallenges.forEach((c: any, i: number) => {
-        console.log(`   Challenge ${i + 1}: id=${c._id}, status=${c.status}, challengerId=${c.challengerId}, challengedId=${c.challengedId}, acceptDeadline=${c.acceptDeadline}, createdAt=${c.createdAt}`);
+        console.log(
+          `   Challenge ${i + 1}: id=${c._id}, status=${c.status}, challengerId=${c.challengerId}, challengedId=${c.challengedId}, acceptDeadline=${c.acceptDeadline}, createdAt=${c.createdAt}`,
+        );
       });
-      
+
       // Check if any pending challenges have expired accept deadlines
       const now = new Date();
-      const expiredPending = activeChallenges.filter((c: any) => 
-        c.status === 'pending' && c.acceptDeadline && new Date(c.acceptDeadline) < now
+      const expiredPending = activeChallenges.filter(
+        (c: any) =>
+          c.status === "pending" &&
+          c.acceptDeadline &&
+          new Date(c.acceptDeadline) < now,
       );
-      
+
       if (expiredPending.length > 0) {
-        console.log(`⚠️  Found ${expiredPending.length} expired pending challenge(s) - these should have been auto-expired!`);
+        console.log(
+          `⚠️  Found ${expiredPending.length} expired pending challenge(s) - these should have been auto-expired!`,
+        );
         // Auto-expire these stale challenges
         for (const expiredChallenge of expiredPending) {
           try {
             await Challenge.updateOne(
-              { _id: expiredChallenge._id, status: 'pending' },
-              { $set: { status: 'expired', expiredAt: now } }
+              { _id: expiredChallenge._id, status: "pending" },
+              { $set: { status: "expired", expiredAt: now } },
             );
-            console.log(`   ✅ Auto-expired stale challenge ${expiredChallenge._id}`);
+            console.log(
+              `   ✅ Auto-expired stale challenge ${expiredChallenge._id}`,
+            );
           } catch (err) {
-            console.error(`   ❌ Failed to expire challenge ${expiredChallenge._id}:`, err);
+            console.error(
+              `   ❌ Failed to expire challenge ${expiredChallenge._id}:`,
+              err,
+            );
           }
         }
-        
+
         // Re-check after cleanup
-        const remainingChallenges = activeChallenges.filter((c: any) => 
-          !(c.status === 'pending' && c.acceptDeadline && new Date(c.acceptDeadline) < now)
+        const remainingChallenges = activeChallenges.filter(
+          (c: any) =>
+            !(
+              c.status === "pending" &&
+              c.acceptDeadline &&
+              new Date(c.acceptDeadline) < now
+            ),
         );
-        
+
         if (remainingChallenges.length === 0) {
-          console.log(`   ✅ All blocking challenges were expired - user can now withdraw`);
+          console.log(
+            `   ✅ All blocking challenges were expired - user can now withdraw`,
+          );
           // Continue to next check instead of blocking
         } else {
-          const pendingCount = remainingChallenges.filter((c: any) => c.status === 'pending').length;
-          const activeCount = remainingChallenges.filter((c: any) => c.status === 'accepted' || c.status === 'active').length;
-          
-          let message = 'You have ';
+          const pendingCount = remainingChallenges.filter(
+            (c: any) => c.status === "pending",
+          ).length;
+          const activeCount = remainingChallenges.filter(
+            (c: any) => c.status === "accepted" || c.status === "active",
+          ).length;
+
+          let message = "You have ";
           const parts = [];
-          if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+          if (pendingCount > 0)
+            parts.push(`${pendingCount} pending challenge(s)`);
           if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
-          message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
-          
+          message +=
+            parts.join(" and ") +
+            ". Complete or cancel them before withdrawing.";
+
           return {
             eligible: false,
             reason: message,
@@ -1071,15 +1242,21 @@ async function checkWithdrawalEligibility(
           };
         }
       } else {
-        const pendingCount = activeChallenges.filter((c: any) => c.status === 'pending').length;
-        const activeCount = activeChallenges.filter((c: any) => c.status === 'accepted' || c.status === 'active').length;
-        
-        let message = 'You have ';
+        const pendingCount = activeChallenges.filter(
+          (c: any) => c.status === "pending",
+        ).length;
+        const activeCount = activeChallenges.filter(
+          (c: any) => c.status === "accepted" || c.status === "active",
+        ).length;
+
+        let message = "You have ";
         const parts = [];
-        if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+        if (pendingCount > 0)
+          parts.push(`${pendingCount} pending challenge(s)`);
         if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
-        message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
-        
+        message +=
+          parts.join(" and ") + ". Complete or cancel them before withdrawing.";
+
         return {
           eligible: false,
           reason: message,
@@ -1092,17 +1269,18 @@ async function checkWithdrawalEligibility(
   // Check pending withdrawals
   const pendingWithdrawals = await WithdrawalRequest.countDocuments({
     userId,
-    status: { $in: ['pending', 'approved', 'processing'] },
+    status: { $in: ["pending", "approved", "processing"] },
   });
 
   if (pendingWithdrawals > 0) {
-    warnings.push(`You have ${pendingWithdrawals} pending withdrawal request(s)`);
+    warnings.push(
+      `You have ${pendingWithdrawals} pending withdrawal request(s)`,
+    );
   }
 
   return {
     eligible: true,
-    reason: 'Eligible for withdrawal',
+    reason: "Eligible for withdrawal",
     warnings,
   };
 }
-

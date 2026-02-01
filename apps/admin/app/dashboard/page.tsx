@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import AdminDashboard from '@/components/admin/AdminDashboard';
+import { redirect } from "next/navigation";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import AdminDashboard from "@/components/admin/AdminDashboard";
 
 export default async function AdminDashboardPage({
   searchParams,
@@ -10,21 +10,20 @@ export default async function AdminDashboardPage({
   const auth = await verifyAdminAuth();
 
   if (!auth.isAuthenticated) {
-    redirect('/login');
+    redirect("/login");
   }
 
   const params = await searchParams;
-  const isFirstLogin = params.firstLogin === 'true';
+  const isFirstLogin = params.firstLogin === "true";
 
   return (
-    <AdminDashboard 
-      isFirstLogin={isFirstLogin} 
-      adminEmail={auth.email!} 
+    <AdminDashboard
+      isFirstLogin={isFirstLogin}
+      adminEmail={auth.email!}
       adminName={auth.name}
       isSuperAdmin={auth.isSuperAdmin || false}
-      role={auth.role || 'Employee'}
+      role={auth.role || "Employee"}
       allowedSections={auth.allowedSections || []}
     />
   );
 }
-

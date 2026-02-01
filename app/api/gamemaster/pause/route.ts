@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 
 /**
  * POST /api/gamemaster/pause
@@ -17,20 +17,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = session.user.id;
     const body = await req.json();
     const { action } = body; // 'pause' or 'resume'
 
-    if (!action || !['pause', 'resume'].includes(action)) {
+    if (!action || !["pause", "resume"].includes(action)) {
       return NextResponse.json(
         { error: 'Invalid action. Must be "pause" or "resume"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -41,36 +38,39 @@ export async function POST(req: NextRequest) {
 
     if (!subscription) {
       return NextResponse.json(
-        { error: 'No Game Master subscription found' },
-        { status: 404 }
+        { error: "No Game Master subscription found" },
+        { status: 404 },
       );
     }
 
-    if (subscription.status !== 'active') {
+    if (subscription.status !== "active") {
       return NextResponse.json(
-        { error: 'Only active subscriptions can be paused/resumed' },
-        { status: 400 }
+        { error: "Only active subscriptions can be paused/resumed" },
+        { status: 400 },
       );
     }
 
-    if (action === 'pause') {
+    if (action === "pause") {
       if (subscription.isPaused) {
         return NextResponse.json(
-          { error: 'Subscription is already paused' },
-          { status: 400 }
+          { error: "Subscription is already paused" },
+          { status: 400 },
         );
       }
 
       subscription.isPaused = true;
       subscription.pausedAt = new Date();
-      subscription.pauseReason = 'User requested pause';
+      subscription.pauseReason = "User requested pause";
       await subscription.save();
 
-      console.log(`⏸️ [GM PAUSE] User ${userId} paused their Game Master subscription`);
+      console.log(
+        `⏸️ [GM PAUSE] User ${userId} paused their Game Master subscription`,
+      );
 
       return NextResponse.json({
         success: true,
-        message: 'Subscription paused. You will not receive referral fees while paused.',
+        message:
+          "Subscription paused. You will not receive referral fees while paused.",
         isPaused: true,
         pausedAt: subscription.pausedAt,
       });
@@ -78,8 +78,8 @@ export async function POST(req: NextRequest) {
       // Resume
       if (!subscription.isPaused) {
         return NextResponse.json(
-          { error: 'Subscription is not paused' },
-          { status: 400 }
+          { error: "Subscription is not paused" },
+          { status: 400 },
         );
       }
 
@@ -88,19 +88,22 @@ export async function POST(req: NextRequest) {
       subscription.pauseReason = undefined;
       await subscription.save();
 
-      console.log(`▶️ [GM RESUME] User ${userId} resumed their Game Master subscription`);
+      console.log(
+        `▶️ [GM RESUME] User ${userId} resumed their Game Master subscription`,
+      );
 
       return NextResponse.json({
         success: true,
-        message: 'Subscription resumed. You will now receive referral fees again.',
+        message:
+          "Subscription resumed. You will now receive referral fees again.",
         isPaused: false,
       });
     }
   } catch (error) {
-    console.error('Error pausing/resuming GM subscription:', error);
+    console.error("Error pausing/resuming GM subscription:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -116,20 +119,19 @@ export async function GET(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
 
-    const subscription = await GameMasterSubscription.findOne({ userId: session.user.id });
+    const subscription = await GameMasterSubscription.findOne({
+      userId: session.user.id,
+    });
 
     if (!subscription) {
       return NextResponse.json(
-        { error: 'No Game Master subscription found' },
-        { status: 404 }
+        { error: "No Game Master subscription found" },
+        { status: 404 },
       );
     }
 
@@ -137,13 +139,16 @@ export async function GET(req: NextRequest) {
       success: true,
       isPaused: subscription.isPaused,
       pausedAt: subscription.pausedAt,
-      canEarnFees: subscription.status === 'active' && !subscription.isPaused && subscription.endDate > new Date(),
+      canEarnFees:
+        subscription.status === "active" &&
+        !subscription.isPaused &&
+        subscription.endDate > new Date(),
     });
   } catch (error) {
-    console.error('Error getting pause status:', error);
+    console.error("Error getting pause status:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

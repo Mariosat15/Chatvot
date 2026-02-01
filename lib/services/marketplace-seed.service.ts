@@ -1,8 +1,8 @@
 /**
  * Marketplace Seed Service
- * 
+ *
  * Seeds default marketplace indicator items
- * 
+ *
  * SUPPORTED INDICATOR TYPES (matching chart implementations):
  * - sma: Simple Moving Average (overlay)
  * - ema: Exponential Moving Average (overlay)
@@ -12,17 +12,21 @@
  * - macd: MACD (oscillator)
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import { MarketplaceItem, IMarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
+import { connectToDatabase } from "@/database/mongoose";
+import {
+  MarketplaceItem,
+  IMarketplaceItem,
+} from "@/database/models/marketplace/marketplace-item.model";
 
 // ============================================================================
 // INDICATOR TEMPLATES - Only indicators with chart implementations
 // ============================================================================
 
 const SUPPORT_RESISTANCE_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'Auto Support & Resistance',
-  slug: 'auto-support-resistance',
-  shortDescription: 'Automatically detects and draws key support and resistance levels.',
+  name: "Auto Support & Resistance",
+  slug: "auto-support-resistance",
+  shortDescription:
+    "Automatically detects and draws key support and resistance levels.",
   fullDescription: `# Auto Support & Resistance
 
 ## Overview
@@ -41,34 +45,38 @@ Automatically identifies and plots significant support and resistance levels bas
 - Entry and exit planning
 - Stop loss placement
 - Target setting`,
-  category: 'indicator',
+  category: "indicator",
   price: 250,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  indicatorType: 'support_resistance',
-  codeTemplate: JSON.stringify({
-    type: 'support_resistance',
-    displayType: 'overlay',
-    description: 'Auto-detects support and resistance levels',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "support_resistance",
+  codeTemplate: JSON.stringify(
+    {
+      type: "support_resistance",
+      displayType: "overlay",
+      description: "Auto-detects support and resistance levels",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     period: 20,
     strength: 2,
-    color: '#3b82f6',
+    color: "#3b82f6",
     lineWidth: 2,
   },
   supportedAssets: [],
-  tags: ['support', 'resistance', 'levels', 'price-action'],
-  riskLevel: 'low',
+  tags: ["support", "resistance", "levels", "price-action"],
+  riskLevel: "low",
 };
 
 const SIMPLE_MA_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'Simple Moving Average',
-  slug: 'simple-moving-average',
-  shortDescription: 'Classic SMA indicator with customizable period.',
+  name: "Simple Moving Average",
+  slug: "simple-moving-average",
+  shortDescription: "Classic SMA indicator with customizable period.",
   fullDescription: `# Simple Moving Average (SMA)
 
 ## Overview
@@ -88,33 +96,37 @@ Calculates the average price over the specified period and plots it as a smooth 
 - Entry/exit confirmation
 
 ## Free Indicator!`,
-  category: 'indicator',
+  category: "indicator",
   price: 0,
   isFree: true,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  indicatorType: 'sma',
-  codeTemplate: JSON.stringify({
-    type: 'sma',
-    displayType: 'overlay',
-    description: 'Simple Moving Average line',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "sma",
+  codeTemplate: JSON.stringify(
+    {
+      type: "sma",
+      displayType: "overlay",
+      description: "Simple Moving Average line",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     period: 20,
-    color: '#3b82f6',
+    color: "#3b82f6",
     lineWidth: 2,
   },
   supportedAssets: [],
-  tags: ['moving-average', 'trend', 'free', 'beginner', 'sma'],
-  riskLevel: 'low',
+  tags: ["moving-average", "trend", "free", "beginner", "sma"],
+  riskLevel: "low",
 };
 
 const EMA_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'Exponential Moving Average',
-  slug: 'exponential-moving-average',
-  shortDescription: 'EMA indicator - faster response to recent price changes.',
+  name: "Exponential Moving Average",
+  slug: "exponential-moving-average",
+  shortDescription: "EMA indicator - faster response to recent price changes.",
   fullDescription: `# Exponential Moving Average (EMA)
 
 ## Overview
@@ -132,33 +144,38 @@ Uses an exponential weighting formula where recent prices have more impact.
 - EMA reacts faster to price changes
 - Better for short-term trading
 - More popular among active traders`,
-  category: 'indicator',
+  category: "indicator",
   price: 100,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  indicatorType: 'ema',
-  codeTemplate: JSON.stringify({
-    type: 'ema',
-    displayType: 'overlay',
-    description: 'Exponential Moving Average line',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "ema",
+  codeTemplate: JSON.stringify(
+    {
+      type: "ema",
+      displayType: "overlay",
+      description: "Exponential Moving Average line",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     period: 12,
-    color: '#f97316',
+    color: "#f97316",
     lineWidth: 2,
   },
   supportedAssets: [],
-  tags: ['moving-average', 'trend', 'ema', 'responsive'],
-  riskLevel: 'low',
+  tags: ["moving-average", "trend", "ema", "responsive"],
+  riskLevel: "low",
 };
 
 const BOLLINGER_BANDS_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'Bollinger Bands',
-  slug: 'bollinger-bands',
-  shortDescription: 'Volatility bands that expand and contract with market conditions.',
+  name: "Bollinger Bands",
+  slug: "bollinger-bands",
+  shortDescription:
+    "Volatility bands that expand and contract with market conditions.",
   fullDescription: `# Bollinger Bands
 
 ## Overview
@@ -177,34 +194,39 @@ Three bands showing volatility - a middle band (SMA) and two outer bands at stan
 - Price at upper band = potentially overbought
 - Price at lower band = potentially oversold
 - Bands squeezing = low volatility, potential breakout`,
-  category: 'indicator',
+  category: "indicator",
   price: 200,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  indicatorType: 'bb',
-  codeTemplate: JSON.stringify({
-    type: 'bb',
-    displayType: 'overlay',
-    description: 'Bollinger Bands volatility indicator',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "bb",
+  codeTemplate: JSON.stringify(
+    {
+      type: "bb",
+      displayType: "overlay",
+      description: "Bollinger Bands volatility indicator",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     period: 20,
     stdDev: 2,
-    color: '#8b5cf6',
+    color: "#8b5cf6",
     lineWidth: 1,
   },
   supportedAssets: [],
-  tags: ['volatility', 'bollinger', 'bands', 'standard-deviation'],
-  riskLevel: 'low',
+  tags: ["volatility", "bollinger", "bands", "standard-deviation"],
+  riskLevel: "low",
 };
 
 const RSI_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'RSI Indicator',
-  slug: 'rsi-indicator',
-  shortDescription: 'Relative Strength Index - detect overbought/oversold conditions.',
+  name: "RSI Indicator",
+  slug: "rsi-indicator",
+  shortDescription:
+    "Relative Strength Index - detect overbought/oversold conditions.",
   fullDescription: `# Relative Strength Index (RSI)
 
 ## Overview
@@ -224,35 +246,40 @@ RSI is a momentum oscillator measuring the speed and magnitude of price movement
 - Use with other indicators for confirmation
 - Look for divergences between price and RSI
 - Works best in ranging markets`,
-  category: 'indicator',
+  category: "indicator",
   price: 150,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  indicatorType: 'rsi',
-  codeTemplate: JSON.stringify({
-    type: 'rsi',
-    displayType: 'oscillator',
-    description: 'RSI momentum oscillator',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "rsi",
+  codeTemplate: JSON.stringify(
+    {
+      type: "rsi",
+      displayType: "oscillator",
+      description: "RSI momentum oscillator",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     period: 14,
     overbought: 70,
     oversold: 30,
-    color: '#10b981',
+    color: "#10b981",
     lineWidth: 2,
   },
   supportedAssets: [],
-  tags: ['momentum', 'rsi', 'oscillator', 'overbought', 'oversold'],
-  riskLevel: 'low',
+  tags: ["momentum", "rsi", "oscillator", "overbought", "oversold"],
+  riskLevel: "low",
 };
 
 const MACD_INDICATOR: Partial<IMarketplaceItem> = {
-  name: 'MACD Indicator',
-  slug: 'macd-indicator',
-  shortDescription: 'Moving Average Convergence Divergence for trend and momentum.',
+  name: "MACD Indicator",
+  slug: "macd-indicator",
+  shortDescription:
+    "Moving Average Convergence Divergence for trend and momentum.",
   fullDescription: `# MACD (Moving Average Convergence Divergence)
 
 ## Overview
@@ -272,29 +299,33 @@ MACD is a trend-following momentum indicator showing the relationship between tw
 - MACD crosses above Signal = Bullish
 - MACD crosses below Signal = Bearish
 - Histogram shows momentum strength`,
-  category: 'indicator',
+  category: "indicator",
   price: 200,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  indicatorType: 'macd',
-  codeTemplate: JSON.stringify({
-    type: 'macd',
-    displayType: 'oscillator',
-    description: 'MACD indicator with histogram',
-  }, null, 2),
+  version: "1.0.0",
+  indicatorType: "macd",
+  codeTemplate: JSON.stringify(
+    {
+      type: "macd",
+      displayType: "oscillator",
+      description: "MACD indicator with histogram",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     fastPeriod: 12,
     slowPeriod: 26,
     signalPeriod: 9,
-    color: '#3b82f6',
+    color: "#3b82f6",
     lineWidth: 2,
   },
   supportedAssets: [],
-  tags: ['momentum', 'macd', 'trend', 'ema'],
-  riskLevel: 'low',
+  tags: ["momentum", "macd", "trend", "ema"],
+  riskLevel: "low",
 };
 
 // ============================================================================
@@ -302,9 +333,10 @@ MACD is a trend-following momentum indicator showing the relationship between tw
 // ============================================================================
 
 const MA_CROSSOVER_STRATEGY: Partial<IMarketplaceItem> = {
-  name: 'MA Crossover Strategy',
-  slug: 'ma-crossover-strategy',
-  shortDescription: 'Buy/sell signals when price crosses moving averages with RSI confirmation.',
+  name: "MA Crossover Strategy",
+  slug: "ma-crossover-strategy",
+  shortDescription:
+    "Buy/sell signals when price crosses moving averages with RSI confirmation.",
   fullDescription: `# MA Crossover Strategy
 
 ## Overview
@@ -330,79 +362,83 @@ This strategy generates buy and sell signals based on price crossing moving aver
 
 ## Risk Level
 Medium - Moving average crossovers can lag, but RSI helps filter signals.`,
-  category: 'strategy',
+  category: "strategy",
   price: 500,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false, // Show in Strategies section, not just Featured
-  version: '1.0.0',
+  version: "1.0.0",
   strategyConfig: {
     rules: [
       {
-        id: 'buy-rule-1',
-        name: 'Buy Signal',
+        id: "buy-rule-1",
+        name: "Buy Signal",
         conditions: [
           {
-            id: 'cond-1',
-            indicator: 'price',
-            operator: 'crosses_above',
-            compareWith: 'indicator',
-            compareIndicator: 'sma',
+            id: "cond-1",
+            indicator: "price",
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "sma",
             compareIndicatorParams: { period: 20 },
           },
           {
-            id: 'cond-2',
-            indicator: 'rsi',
+            id: "cond-2",
+            indicator: "rsi",
             indicatorParams: { period: 14 },
-            operator: 'below',
-            compareWith: 'value',
+            operator: "below",
+            compareWith: "value",
             compareValue: 70,
           },
         ],
-        logic: 'AND',
-        signal: 'strong_buy',
+        logic: "AND",
+        signal: "strong_buy",
         signalStrength: 4,
       },
       {
-        id: 'sell-rule-1',
-        name: 'Sell Signal',
+        id: "sell-rule-1",
+        name: "Sell Signal",
         conditions: [
           {
-            id: 'cond-3',
-            indicator: 'price',
-            operator: 'crosses_below',
-            compareWith: 'indicator',
-            compareIndicator: 'sma',
+            id: "cond-3",
+            indicator: "price",
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "sma",
             compareIndicatorParams: { period: 20 },
           },
           {
-            id: 'cond-4',
-            indicator: 'rsi',
+            id: "cond-4",
+            indicator: "rsi",
             indicatorParams: { period: 14 },
-            operator: 'above',
-            compareWith: 'value',
+            operator: "above",
+            compareWith: "value",
             compareValue: 30,
           },
         ],
-        logic: 'AND',
-        signal: 'strong_sell',
+        logic: "AND",
+        signal: "strong_sell",
         signalStrength: 4,
       },
     ],
-    defaultIndicators: ['sma', 'rsi'],
+    defaultIndicators: ["sma", "rsi"],
     signalDisplay: {
       showOnChart: true,
       showArrows: true,
       showLabels: true,
-      arrowSize: 'medium',
+      arrowSize: "medium",
     },
   },
-  codeTemplate: JSON.stringify({
-    type: 'strategy',
-    name: 'MA Crossover Strategy',
-    description: 'Price crosses SMA with RSI confirmation',
-  }, null, 2),
+  codeTemplate: JSON.stringify(
+    {
+      type: "strategy",
+      name: "MA Crossover Strategy",
+      description: "Price crosses SMA with RSI confirmation",
+    },
+    null,
+    2,
+  ),
   defaultSettings: {
     smaPeriod: 20,
     rsiPeriod: 14,
@@ -410,8 +446,8 @@ Medium - Moving average crossovers can lag, but RSI helps filter signals.`,
     rsiOversold: 30,
   },
   supportedAssets: [],
-  tags: ['strategy', 'crossover', 'sma', 'rsi', 'trend-following'],
-  riskLevel: 'medium',
+  tags: ["strategy", "crossover", "sma", "rsi", "trend-following"],
+  riskLevel: "medium",
 };
 
 // ============================================================================
@@ -419,9 +455,10 @@ Medium - Moving average crossovers can lag, but RSI helps filter signals.`,
 // ============================================================================
 
 const AVATAR_SHADOW_TRADER: Partial<IMarketplaceItem> = {
-  name: 'Shadow Trader',
-  slug: 'avatar-shadow-trader',
-  shortDescription: 'A mysterious hooded figure wielding a flaming Bitcoin and katana.',
+  name: "Shadow Trader",
+  slug: "avatar-shadow-trader",
+  shortDescription:
+    "A mysterious hooded figure wielding a flaming Bitcoin and katana.",
   fullDescription: `# Shadow Trader
 
 ## Origin Story
@@ -434,26 +471,27 @@ Once a legendary samurai in feudal Japan, Kuro Yamazaki discovered a portal thro
 - **Trading Charts Background**: Always analyzing, always watching
 
 *"In the shadows of the charts, opportunity awaits the patient warrior."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/shadow-trader.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/shadow-trader.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'ninja', 'crypto', 'legendary'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "ninja", "crypto", "legendary"],
+  riskLevel: "low",
 };
 
 const AVATAR_PHANTOM_OPERATIVE: Partial<IMarketplaceItem> = {
-  name: 'Phantom Operative',
-  slug: 'avatar-phantom-operative',
-  shortDescription: 'Elite tactical trader with advanced combat gear and glowing red optics.',
+  name: "Phantom Operative",
+  slug: "avatar-phantom-operative",
+  shortDescription:
+    "Elite tactical trader with advanced combat gear and glowing red optics.",
   fullDescription: `# Phantom Operative
 
 ## Origin Story
@@ -466,26 +504,27 @@ Former special forces commander Victor "Ghost" Reyes was recruited by a secretiv
 - **Dark Hood**: Operating in the shadows of the market
 
 *"Every trade is a mission. Every profit is victory."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/phantom-operative.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/phantom-operative.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'tactical', 'military', 'elite'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "tactical", "military", "elite"],
+  riskLevel: "low",
 };
 
 const AVATAR_CYBER_RONIN: Partial<IMarketplaceItem> = {
-  name: 'Cyber Ronin',
-  slug: 'avatar-cyber-ronin',
-  shortDescription: 'Futuristic samurai warrior with neon-lit crimson armor and dual katanas.',
+  name: "Cyber Ronin",
+  slug: "avatar-cyber-ronin",
+  shortDescription:
+    "Futuristic samurai warrior with neon-lit crimson armor and dual katanas.",
   fullDescription: `# Cyber Ronin
 
 ## Origin Story
@@ -498,26 +537,27 @@ In Neo-Tokyo 2087, the legendary trader Akira Takeshi refused to serve the corpo
 - **Red Accents**: Warning to market manipulators
 
 *"Honor in profit. Discipline in loss. The way of the Cyber Ronin."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/cyber-ronin.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/cyber-ronin.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'samurai', 'cyber', 'futuristic'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "samurai", "cyber", "futuristic"],
+  riskLevel: "low",
 };
 
 const AVATAR_CRYPTO_ORACLE: Partial<IMarketplaceItem> = {
-  name: 'Crypto Oracle',
-  slug: 'avatar-crypto-oracle',
-  shortDescription: 'Mystical tech-mage who channels market wisdom through arcane algorithms.',
+  name: "Crypto Oracle",
+  slug: "avatar-crypto-oracle",
+  shortDescription:
+    "Mystical tech-mage who channels market wisdom through arcane algorithms.",
   fullDescription: `# Crypto Oracle
 
 ## Origin Story
@@ -530,26 +570,27 @@ Dr. Elena Voss was a quantum physicist who discovered that market patterns mirro
 - **Hooded Robe**: Keeper of trading secrets
 
 *"The markets speak to those who listen with both logic and intuition."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/crypto-oracle.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/crypto-oracle.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'mage', 'oracle', 'mystical'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "mage", "oracle", "mystical"],
+  riskLevel: "low",
 };
 
 const AVATAR_NEBULA_SNIPER: Partial<IMarketplaceItem> = {
-  name: 'Nebula Sniper',
-  slug: 'avatar-nebula-sniper',
-  shortDescription: 'Cosmic marksman who targets opportunities across the market universe.',
+  name: "Nebula Sniper",
+  slug: "avatar-nebula-sniper",
+  shortDescription:
+    "Cosmic marksman who targets opportunities across the market universe.",
   fullDescription: `# Nebula Sniper
 
 ## Origin Story
@@ -562,26 +603,27 @@ Commander Zara Chen was Earth's finest long-range specialist before the Galactic
 - **Battle Armor**: Protection against volatility
 
 *"One shot. One trade. Maximum impact."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/nebula-sniper.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/nebula-sniper.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'sniper', 'space', 'precision'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "sniper", "space", "precision"],
+  riskLevel: "low",
 };
 
 const AVATAR_BLOOD_SHOGUN: Partial<IMarketplaceItem> = {
-  name: 'Blood Shogun',
-  slug: 'avatar-blood-shogun',
-  shortDescription: 'Battle-scarred warrior whose crimson scarf tells tales of market conquests.',
+  name: "Blood Shogun",
+  slug: "avatar-blood-shogun",
+  shortDescription:
+    "Battle-scarred warrior whose crimson scarf tells tales of market conquests.",
   fullDescription: `# Blood Shogun
 
 ## Origin Story
@@ -594,26 +636,27 @@ General Ryu Matsumoto earned his title on countless battlefields before discover
 - **Battle-worn Katana**: Sharpened by experience
 
 *"Every scar is a lesson. Every loss, a teacher."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/blood-shogun.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/blood-shogun.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'warrior', 'shogun', 'battle'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "warrior", "shogun", "battle"],
+  riskLevel: "low",
 };
 
 const AVATAR_VOID_HUNTER: Partial<IMarketplaceItem> = {
-  name: 'Void Hunter',
-  slug: 'avatar-void-hunter',
-  shortDescription: 'Interdimensional trader who harvests profits from market anomalies.',
+  name: "Void Hunter",
+  slug: "avatar-void-hunter",
+  shortDescription:
+    "Interdimensional trader who harvests profits from market anomalies.",
   fullDescription: `# Void Hunter
 
 ## Origin Story
@@ -626,26 +669,26 @@ When scientist Dr. Marcus Webb opened a portal to another dimension, he discover
 - **Glowing Visor**: Seeing patterns in chaos
 
 *"In the void between candles, fortunes are made."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/void-hunter.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/void-hunter.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'void', 'hunter', 'cosmic'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "void", "hunter", "cosmic"],
+  riskLevel: "low",
 };
 
 const AVATAR_INFERNO_LORD: Partial<IMarketplaceItem> = {
-  name: 'Inferno Lord',
-  slug: 'avatar-inferno-lord',
-  shortDescription: 'Demonic titan who thrives in the flames of market chaos.',
+  name: "Inferno Lord",
+  slug: "avatar-inferno-lord",
+  shortDescription: "Demonic titan who thrives in the flames of market chaos.",
   fullDescription: `# Inferno Lord
 
 ## Origin Story
@@ -658,26 +701,26 @@ Once a mortal trader consumed by greed, Azaroth was transformed by the fires of 
 - **Glowing Core**: Inner conviction
 
 *"Let the markets burn. I am reborn in every crash."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/inferno-lord.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/inferno-lord.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'demon', 'fire', 'chaos'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "demon", "fire", "chaos"],
+  riskLevel: "low",
 };
 
 const AVATAR_ALCHEMIST_PRIME: Partial<IMarketplaceItem> = {
-  name: 'Alchemist Prime',
-  slug: 'avatar-alchemist-prime',
-  shortDescription: 'Master of transformation who turns market lead into gold.',
+  name: "Alchemist Prime",
+  slug: "avatar-alchemist-prime",
+  shortDescription: "Master of transformation who turns market lead into gold.",
   fullDescription: `# Alchemist Prime
 
 ## Origin Story
@@ -690,26 +733,27 @@ Aldric Goldweaver was a medieval alchemist who finally discovered the secret of 
 - **Blue Eyes**: Clarity of vision
 
 *"The philosopher's stone was never about gold. It was about understanding value."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/alchemist-prime.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/alchemist-prime.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'alchemist', 'mystical', 'gold'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "alchemist", "mystical", "gold"],
+  riskLevel: "low",
 };
 
 const AVATAR_STORM_CENTURION: Partial<IMarketplaceItem> = {
-  name: 'Storm Centurion',
-  slug: 'avatar-storm-centurion',
-  shortDescription: 'Lightning-wielding gladiator who commands the arena of trading.',
+  name: "Storm Centurion",
+  slug: "avatar-storm-centurion",
+  shortDescription:
+    "Lightning-wielding gladiator who commands the arena of trading.",
   fullDescription: `# Storm Centurion
 
 ## Origin Story
@@ -722,26 +766,27 @@ Marcus Aurelius Volt was the champion of the Colosseum trading pits before they 
 - **Red Plume**: Leadership and visibility
 
 *"In the arena of markets, only the swift survive."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/storm-centurion.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/storm-centurion.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'gladiator', 'lightning', 'warrior'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "gladiator", "lightning", "warrior"],
+  riskLevel: "low",
 };
 
 const AVATAR_QUANTUM_SAGE: Partial<IMarketplaceItem> = {
-  name: 'Quantum Sage',
-  slug: 'avatar-quantum-sage',
-  shortDescription: 'Enlightened master who sees all possible market outcomes simultaneously.',
+  name: "Quantum Sage",
+  slug: "avatar-quantum-sage",
+  shortDescription:
+    "Enlightened master who sees all possible market outcomes simultaneously.",
   fullDescription: `# Quantum Sage
 
 ## Origin Story
@@ -754,26 +799,27 @@ Professor Thaddeus Quark achieved the impossible—he merged his consciousness w
 - **Wise Countenance**: Centuries of market wisdom
 
 *"In every trade, infinite outcomes. The sage chooses wisely."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/quantum-sage.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/quantum-sage.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'sage', 'quantum', 'wisdom'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "sage", "quantum", "wisdom"],
+  riskLevel: "low",
 };
 
 const AVATAR_DIGITAL_ASSASSIN: Partial<IMarketplaceItem> = {
-  name: 'Digital Assassin',
-  slug: 'avatar-digital-assassin',
-  shortDescription: 'Silent killer of bad trades with plasma-powered precision.',
+  name: "Digital Assassin",
+  slug: "avatar-digital-assassin",
+  shortDescription:
+    "Silent killer of bad trades with plasma-powered precision.",
   fullDescription: `# Digital Assassin
 
 ## Origin Story
@@ -786,20 +832,20 @@ Known only by her codename "Zero," this elite operative was trained by a clandes
 - **Masked Face**: Anonymous trading
 
 *"Every bad trade has a weakness. I find it."*`,
-  category: 'cosmetic',
+  category: "cosmetic",
   price: 5,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  cosmeticType: 'avatar',
-  imageUrl: '/assets/avatars/digital-assassin.png',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  cosmeticType: "avatar",
+  imageUrl: "/assets/avatars/digital-assassin.png",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['avatar', 'cosmetic', 'assassin', 'digital', 'precision'],
-  riskLevel: 'low',
+  tags: ["avatar", "cosmetic", "assassin", "digital", "precision"],
+  riskLevel: "low",
 };
 
 // ============================================================================
@@ -807,9 +853,10 @@ Known only by her codename "Zero," this elite operative was trained by a clandes
 // ============================================================================
 
 const GAMEMASTER_STARTER_PACKAGE: Partial<IMarketplaceItem> = {
-  name: 'Game Master Starter',
-  slug: 'game-master-starter',
-  shortDescription: 'Begin your Game Master journey! Create daily competitions, earn 5% from referrals, and build your trading community.',
+  name: "Game Master Starter",
+  slug: "game-master-starter",
+  shortDescription:
+    "Begin your Game Master journey! Create daily competitions, earn 5% from referrals, and build your trading community.",
   fullDescription: `# Welcome to Your Game Master Journey
 
 The **Starter Package** is your gateway to becoming a Game Master on ChartVolt. Perfect for traders who want to dip their toes into community building while earning passive income.
@@ -835,32 +882,33 @@ When users sign up using your unique referral link and join ANY competition on t
 - Anyone wanting to start earning from referrals
 
 *"Every Game Master empire started somewhere. Start yours today."*`,
-  category: 'gamemaster',
+  category: "gamemaster",
   price: 299,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: false,
-  version: '1.0.0',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['gamemaster', 'starter', 'referral', 'beginner', 'affordable'],
-  riskLevel: 'low',
+  tags: ["gamemaster", "starter", "referral", "beginner", "affordable"],
+  riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 1,
     maxUsersPerCompetition: 30,
     referralFeePercentage: 5,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
-    canEarnFromChallenges: false,  // Starter package doesn't include challenge earnings
+    canEarnFromChallenges: false, // Starter package doesn't include challenge earnings
   },
 };
 
 const GAMEMASTER_PRO_PACKAGE: Partial<IMarketplaceItem> = {
-  name: 'Game Master Pro',
-  slug: 'game-master-pro',
-  shortDescription: 'Level up your Game Master game! 3 daily competitions, 75 participants, and 7.5% referral earnings. The choice of serious community builders.',
+  name: "Game Master Pro",
+  slug: "game-master-pro",
+  shortDescription:
+    "Level up your Game Master game! 3 daily competitions, 75 participants, and 7.5% referral earnings. The choice of serious community builders.",
   fullDescription: `# The Professional's Choice
 
 The **Pro Package** is designed for Game Masters who are serious about building a thriving trading community. More competitions, bigger events, better earnings.
@@ -890,33 +938,34 @@ At 7.5% referral rate, just 8,000 credits in entry fees from your referrals pays
 - Active traders looking to monetize their network
 
 *"Pro isn't just a tier—it's a statement. You're here to build something real."*`,
-  category: 'gamemaster',
+  category: "gamemaster",
   price: 599,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['gamemaster', 'pro', 'referral', 'popular', 'recommended'],
-  riskLevel: 'low',
+  tags: ["gamemaster", "pro", "referral", "popular", "recommended"],
+  riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 3,
     maxUsersPerCompetition: 75,
     referralFeePercentage: 7.5,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
-    canEarnFromChallenges: true,   // Pro package includes challenge earnings
-    challengeReferralFeePercentage: 5,  // 5% for challenges
+    canEarnFromChallenges: true, // Pro package includes challenge earnings
+    challengeReferralFeePercentage: 5, // 5% for challenges
   },
 };
 
 const GAMEMASTER_ELITE_PACKAGE: Partial<IMarketplaceItem> = {
-  name: 'Game Master Elite',
-  slug: 'game-master-elite',
-  shortDescription: 'The ultimate Game Master experience. 10 daily competitions, 150 participants, and maximum 10% referral earnings. For those who dominate.',
+  name: "Game Master Elite",
+  slug: "game-master-elite",
+  shortDescription:
+    "The ultimate Game Master experience. 10 daily competitions, 150 participants, and maximum 10% referral earnings. For those who dominate.",
   fullDescription: `# Dominate the Arena
 
 The **Elite Package** is for Game Masters who refuse to compromise. Maximum power. Maximum earnings. Maximum respect.
@@ -962,26 +1011,33 @@ At 10% referral rate, your passive income potential is unmatched:
 👑 Exclusive Elite badge on your profile
 
 *"At the top, there's only one tier. Welcome to Elite."*`,
-  category: 'gamemaster',
+  category: "gamemaster",
   price: 999,
   isFree: false,
-  status: 'active',
+  status: "active",
   isPublished: true,
   isFeatured: true,
-  version: '1.0.0',
-  codeTemplate: '{}',
+  version: "1.0.0",
+  codeTemplate: "{}",
   defaultSettings: {},
   supportedAssets: [],
-  tags: ['gamemaster', 'elite', 'referral', 'premium', 'unlimited', 'best-value'],
-  riskLevel: 'low',
+  tags: [
+    "gamemaster",
+    "elite",
+    "referral",
+    "premium",
+    "unlimited",
+    "best-value",
+  ],
+  riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 10,
     maxUsersPerCompetition: 150,
     referralFeePercentage: 10,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
-    canEarnFromChallenges: true,   // Elite package includes challenge earnings
-    challengeReferralFeePercentage: 7,  // 7% for challenges (higher tier)
+    canEarnFromChallenges: true, // Elite package includes challenge earnings
+    challengeReferralFeePercentage: 7, // 7% for challenges (higher tier)
   },
 };
 
@@ -991,14 +1047,14 @@ At 10% referral rate, your passive income potential is unmatched:
 
 const ALL_ITEMS = [
   // Indicators
-  SIMPLE_MA_INDICATOR,      // Free SMA
-  EMA_INDICATOR,            // EMA 
+  SIMPLE_MA_INDICATOR, // Free SMA
+  EMA_INDICATOR, // EMA
   BOLLINGER_BANDS_INDICATOR, // Bollinger Bands
   SUPPORT_RESISTANCE_INDICATOR, // S/R Levels
-  RSI_INDICATOR,            // RSI
-  MACD_INDICATOR,           // MACD
+  RSI_INDICATOR, // RSI
+  MACD_INDICATOR, // MACD
   // Strategies
-  MA_CROSSOVER_STRATEGY,    // MA + RSI strategy
+  MA_CROSSOVER_STRATEGY, // MA + RSI strategy
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
@@ -1022,21 +1078,23 @@ const ALL_ITEMS = [
 // SEED FUNCTION
 // ============================================================================
 
-export async function seedMarketplaceItems(adminId: string = 'system'): Promise<{
+export async function seedMarketplaceItems(
+  adminId: string = "system",
+): Promise<{
   created: number;
   updated: number;
   skipped: number;
   errors: string[];
 }> {
   await connectToDatabase();
-  
+
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
-  
+
   for (const itemData of ALL_ITEMS) {
     try {
       // Check if item already exists
       const existing = await MarketplaceItem.findOne({ slug: itemData.slug });
-      
+
       if (existing) {
         // Update existing item - ensure all required fields are set
         // BUT preserve admin-uploaded data (images, custom descriptions, etc.)
@@ -1052,7 +1110,8 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
           existing.iconName = itemData.iconName;
         }
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
-        existing.defaultSettings = itemData.defaultSettings || existing.defaultSettings;
+        existing.defaultSettings =
+          itemData.defaultSettings || existing.defaultSettings;
         // PRESERVE existing descriptions if admin has customized them
         if (!existing.fullDescription && itemData.fullDescription) {
           existing.fullDescription = itemData.fullDescription;
@@ -1063,7 +1122,7 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         existing.version = itemData.version || existing.version;
         // CRITICAL: Ensure these are set correctly for items to appear
         existing.isPublished = itemData.isPublished ?? true;
-        existing.status = itemData.status || 'active';
+        existing.status = itemData.status || "active";
         existing.category = itemData.category || existing.category;
         // PRESERVE existing price if admin has customized it (only update if 0 or undefined)
         if (existing.price === 0 || existing.price === undefined) {
@@ -1087,7 +1146,7 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         result.updated++;
         continue;
       }
-      
+
       // Create new item
       await MarketplaceItem.create({
         ...itemData,
@@ -1095,12 +1154,16 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
       });
       result.created++;
     } catch (error) {
-      result.errors.push(`Failed to create ${itemData.slug}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.errors.push(
+        `Failed to create ${itemData.slug}: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
-  
-  console.log(`✅ Marketplace seeded: ${result.created} created, ${result.updated} updated`);
-  
+
+  console.log(
+    `✅ Marketplace seeded: ${result.created} created, ${result.updated} updated`,
+  );
+
   return result;
 }
 
@@ -1113,19 +1176,39 @@ export async function getMarketplaceStats(): Promise<{
   totalPurchases: number;
 }> {
   await connectToDatabase();
-  
-  const [totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMasterPackages] = await Promise.all([
+
+  const [
+    totalItems,
+    totalIndicators,
+    totalStrategies,
+    totalCosmetics,
+    totalGameMasterPackages,
+  ] = await Promise.all([
     MarketplaceItem.countDocuments({ isPublished: true }),
-    MarketplaceItem.countDocuments({ isPublished: true, category: 'indicator' }),
-    MarketplaceItem.countDocuments({ isPublished: true, category: 'strategy' }),
-    MarketplaceItem.countDocuments({ isPublished: true, category: 'cosmetic' }),
-    MarketplaceItem.countDocuments({ isPublished: true, category: 'gamemaster' }),
+    MarketplaceItem.countDocuments({
+      isPublished: true,
+      category: "indicator",
+    }),
+    MarketplaceItem.countDocuments({ isPublished: true, category: "strategy" }),
+    MarketplaceItem.countDocuments({ isPublished: true, category: "cosmetic" }),
+    MarketplaceItem.countDocuments({
+      isPublished: true,
+      category: "gamemaster",
+    }),
   ]);
-  
-  const { UserPurchase } = await import('@/database/models/marketplace/user-purchase.model');
+
+  const { UserPurchase } =
+    await import("@/database/models/marketplace/user-purchase.model");
   const totalPurchases = await UserPurchase.countDocuments();
-  
-  return { totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMasterPackages, totalPurchases };
+
+  return {
+    totalItems,
+    totalIndicators,
+    totalStrategies,
+    totalCosmetics,
+    totalGameMasterPackages,
+    totalPurchases,
+  };
 }
 
 /**
@@ -1133,11 +1216,41 @@ export async function getMarketplaceStats(): Promise<{
  */
 export function getAvailableIndicatorTypes() {
   return [
-    { type: 'sma', name: 'SMA', description: 'Simple Moving Average', displayType: 'overlay' },
-    { type: 'ema', name: 'EMA', description: 'Exponential Moving Average', displayType: 'overlay' },
-    { type: 'bb', name: 'Bollinger Bands', description: 'Volatility bands', displayType: 'overlay' },
-    { type: 'support_resistance', name: 'S/R Levels', description: 'Auto support/resistance', displayType: 'overlay' },
-    { type: 'rsi', name: 'RSI', description: 'Relative Strength Index', displayType: 'oscillator' },
-    { type: 'macd', name: 'MACD', description: 'Moving Average Convergence Divergence', displayType: 'oscillator' },
+    {
+      type: "sma",
+      name: "SMA",
+      description: "Simple Moving Average",
+      displayType: "overlay",
+    },
+    {
+      type: "ema",
+      name: "EMA",
+      description: "Exponential Moving Average",
+      displayType: "overlay",
+    },
+    {
+      type: "bb",
+      name: "Bollinger Bands",
+      description: "Volatility bands",
+      displayType: "overlay",
+    },
+    {
+      type: "support_resistance",
+      name: "S/R Levels",
+      description: "Auto support/resistance",
+      displayType: "overlay",
+    },
+    {
+      type: "rsi",
+      name: "RSI",
+      description: "Relative Strength Index",
+      displayType: "oscillator",
+    },
+    {
+      type: "macd",
+      name: "MACD",
+      description: "Moving Average Convergence Divergence",
+      displayType: "oscillator",
+    },
   ];
 }

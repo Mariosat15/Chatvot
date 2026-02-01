@@ -7,7 +7,7 @@
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -27,7 +27,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  */
 export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let lastTime = 0;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -56,25 +56,24 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 /**
  * Async throttle - for async functions, ensures only one call is in flight at a time
  */
-export function asyncThrottle<T extends (...args: unknown[]) => Promise<unknown>>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => Promise<void> {
+export function asyncThrottle<
+  T extends (...args: unknown[]) => Promise<unknown>,
+>(func: T, wait: number): (...args: Parameters<T>) => Promise<void> {
   let lastCall = 0;
   let pending: Promise<unknown> | null = null;
 
   return async function (this: unknown, ...args: Parameters<T>): Promise<void> {
     const now = Date.now();
-    
+
     // If there's a pending call, skip
     if (pending) return;
-    
+
     // If within throttle window, skip
     if (now - lastCall < wait) return;
 
     lastCall = now;
     pending = func.apply(this, args);
-    
+
     try {
       await pending;
     } finally {
@@ -88,12 +87,15 @@ export function asyncThrottle<T extends (...args: unknown[]) => Promise<unknown>
  * Prevents memory leaks from orphaned intervals
  */
 class IntervalManagerClass {
-  private intervals: Map<string, {
-    callback: () => void;
-    interval: number;
-    lastRun: number;
-  }> = new Map();
-  
+  private intervals: Map<
+    string,
+    {
+      callback: () => void;
+      interval: number;
+      lastRun: number;
+    }
+  > = new Map();
+
   private mainInterval: ReturnType<typeof setInterval> | null = null;
   private tickRate = 1000; // Check every second
 
@@ -123,7 +125,7 @@ class IntervalManagerClass {
   private startMainLoop(): void {
     this.mainInterval = setInterval(() => {
       const now = Date.now();
-      
+
       this.intervals.forEach((config, id) => {
         if (now - config.lastRun >= config.interval) {
           config.lastRun = now;
@@ -154,7 +156,7 @@ export const IntervalManager = new IntervalManagerClass();
  */
 export function createVisibilityAwareInterval(
   callback: () => void,
-  intervalMs: number
+  intervalMs: number,
 ): { start: () => void; stop: () => void } {
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let isRunning = false;
@@ -173,7 +175,7 @@ export function createVisibilityAwareInterval(
       callback(); // Run immediately
       intervalId = setInterval(callback, intervalMs);
     }
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
   };
 
   const stop = () => {
@@ -181,7 +183,7 @@ export function createVisibilityAwareInterval(
       clearInterval(intervalId);
       intervalId = null;
     }
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
     isRunning = false;
   };
 
@@ -191,7 +193,10 @@ export function createVisibilityAwareInterval(
 /**
  * Shallow compare two objects
  */
-export function shallowEqual<T extends Record<string, unknown>>(obj1: T, obj2: T): boolean {
+export function shallowEqual<T extends Record<string, unknown>>(
+  obj1: T,
+  obj2: T,
+): boolean {
   const keys1 = Object.keys(obj1);
   const keys2 = Object.keys(obj2);
 
@@ -210,7 +215,7 @@ export function shallowEqual<T extends Record<string, unknown>>(obj1: T, obj2: T
 export function priceChanged(
   oldPrice: { bid: number; ask: number } | undefined,
   newPrice: { bid: number; ask: number },
-  threshold = 0.00001
+  threshold = 0.00001,
 ): boolean {
   if (!oldPrice) return true;
   return (
@@ -224,7 +229,7 @@ export function priceChanged(
  */
 export function createBatchUpdater<T>(
   setState: React.Dispatch<React.SetStateAction<T>>,
-  delay = 16 // ~1 frame at 60fps
+  delay = 16, // ~1 frame at 60fps
 ): (updater: (prev: T) => T) => void {
   let updates: Array<(prev: T) => T> = [];
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -253,30 +258,29 @@ export function createBatchUpdater<T>(
  */
 export const PERFORMANCE_INTERVALS = {
   // Price updates
-  PRICE_POLLING: 2000,          // 2 seconds (was 1000)
-  PRICE_UI_UPDATE: 500,         // 500ms for UI smoothness
-  
+  PRICE_POLLING: 2000, // 2 seconds (was 1000)
+  PRICE_UI_UPDATE: 500, // 500ms for UI smoothness
+
   // Status checks
-  COMPETITION_STATUS: 10000,    // 10 seconds (was 5 seconds)
-  CHALLENGE_STATUS: 10000,      // 10 seconds (was 5 seconds)
-  CHALLENGE_LIVE_DATA: 5000,    // 5 seconds (was 3 seconds)
-  
+  COMPETITION_STATUS: 10000, // 10 seconds (was 5 seconds)
+  CHALLENGE_STATUS: 10000, // 10 seconds (was 5 seconds)
+  CHALLENGE_LIVE_DATA: 5000, // 5 seconds (was 3 seconds)
+
   // Admin/Background
-  NOTIFICATION_POLL: 60000,     // 60 seconds (was 30 seconds)
-  PRESENCE_HEARTBEAT: 30000,    // 30 seconds (was 10 seconds)
-  FRAUD_MONITORING: 60000,      // 60 seconds (was 30 seconds)
-  REDIS_STATS: 30000,           // 30 seconds (was 10 seconds)
-  WEBSOCKET_STATUS: 15000,      // 15 seconds (was 5 seconds)
-  
+  NOTIFICATION_POLL: 60000, // 60 seconds (was 30 seconds)
+  PRESENCE_HEARTBEAT: 30000, // 30 seconds (was 10 seconds)
+  FRAUD_MONITORING: 60000, // 60 seconds (was 30 seconds)
+  REDIS_STATS: 30000, // 30 seconds (was 10 seconds)
+  WEBSOCKET_STATUS: 15000, // 15 seconds (was 5 seconds)
+
   // Dashboard
-  DASHBOARD_REFRESH: 15000,     // 15 seconds (was 10 seconds)
-  LEADERBOARD_REFRESH: 5000,    // 5 seconds
-  
+  DASHBOARD_REFRESH: 15000, // 15 seconds (was 10 seconds)
+  LEADERBOARD_REFRESH: 5000, // 5 seconds
+
   // Countdowns - keep at 1 second for accuracy
   COUNTDOWN_UPDATE: 1000,
-  
+
   // Margin checks - now formula-based (local calculation triggers server call)
   // These are only used as backup safety net intervals
-  MARGIN_BACKUP_CHECK: 60000,   // 60 seconds - backup check (primary is formula-based)
+  MARGIN_BACKUP_CHECK: 60000, // 60 seconds - backup check (primary is formula-based)
 } as const;
-

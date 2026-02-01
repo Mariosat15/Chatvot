@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import TradingSymbol from '@/database/models/trading/symbol-settings.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import TradingSymbol from "@/database/models/trading/symbol-settings.model";
 
 /**
  * GET /api/symbols/[symbol]
@@ -8,29 +8,26 @@ import TradingSymbol from '@/database/models/trading/symbol-settings.model';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
     await connectToDatabase();
-    
+
     const { symbol: symbolParam } = await params;
     const symbol = decodeURIComponent(symbolParam).toUpperCase();
-    
+
     const symbolData = await TradingSymbol.findOne({ symbol }).lean();
-    
+
     if (!symbolData) {
-      return NextResponse.json(
-        { error: 'Symbol not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
-    
+
     return NextResponse.json({ symbol: symbolData });
   } catch (error) {
-    console.error('Failed to fetch symbol:', error);
+    console.error("Failed to fetch symbol:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch symbol' },
-      { status: 500 }
+      { error: "Failed to fetch symbol" },
+      { status: 500 },
     );
   }
 }
@@ -41,51 +38,48 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
     await connectToDatabase();
-    
+
     const { symbol: symbolParam } = await params;
     const symbol = decodeURIComponent(symbolParam).toUpperCase();
     const body = await request.json();
-    
+
     // Track if enabled state is being changed
-    const isEnableChange = 'enabled' in body;
-    
+    const isEnableChange = "enabled" in body;
+
     // Don't allow changing the symbol itself
     delete body.symbol;
     delete body._id;
     delete body.createdAt;
-    
+
     const updated = await TradingSymbol.findOneAndUpdate(
       { symbol },
       { $set: body },
-      { new: true }
+      { new: true },
     );
-    
+
     if (!updated) {
-      return NextResponse.json(
-        { error: 'Symbol not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
-    
+
     // If enabled state changed, notify price health monitor to refresh
     if (isEnableChange) {
       await notifyPriceHealthMonitorRefresh();
     }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       symbol: updated,
-      message: `${symbol} settings updated successfully`
+      message: `${symbol} settings updated successfully`,
     });
   } catch (error) {
-    console.error('Failed to update symbol:', error);
+    console.error("Failed to update symbol:", error);
     return NextResponse.json(
-      { error: 'Failed to update symbol' },
-      { status: 500 }
+      { error: "Failed to update symbol" },
+      { status: 500 },
     );
   }
 }
@@ -96,46 +90,45 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
     await connectToDatabase();
-    
+
     const { symbol: symbolParam } = await params;
     const symbol = decodeURIComponent(symbolParam).toUpperCase();
-    
+
     // Check if symbol exists
     const existing = await TradingSymbol.findOne({ symbol });
-    
+
     if (!existing) {
-      return NextResponse.json(
-        { error: 'Symbol not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
-    
+
     // Only allow deleting custom symbols
-    if (existing.category !== 'custom') {
+    if (existing.category !== "custom") {
       return NextResponse.json(
-        { error: 'Cannot delete default symbols. You can disable them instead.' },
-        { status: 400 }
+        {
+          error: "Cannot delete default symbols. You can disable them instead.",
+        },
+        { status: 400 },
       );
     }
-    
+
     await TradingSymbol.deleteOne({ symbol });
-    
+
     // Notify price health monitor to refresh (deleted symbol should no longer be monitored)
     await notifyPriceHealthMonitorRefresh();
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: `${symbol} deleted successfully`
+
+    return NextResponse.json({
+      success: true,
+      message: `${symbol} deleted successfully`,
     });
   } catch (error) {
-    console.error('Failed to delete symbol:', error);
+    console.error("Failed to delete symbol:", error);
     return NextResponse.json(
-      { error: 'Failed to delete symbol' },
-      { status: 500 }
+      { error: "Failed to delete symbol" },
+      { status: 500 },
     );
   }
 }
@@ -145,24 +138,26 @@ export async function DELETE(
  */
 async function notifyPriceHealthMonitorRefresh(): Promise<void> {
   try {
-    const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const mainAppUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const response = await fetch(`${mainAppUrl}/api/internal/price-health`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-internal-key': process.env.INTERNAL_API_KEY || 'internal-key',
+        "Content-Type": "application/json",
+        "x-internal-key": process.env.INTERNAL_API_KEY || "internal-key",
       },
-      body: JSON.stringify({ action: 'refreshSymbols' }),
+      body: JSON.stringify({ action: "refreshSymbols" }),
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       console.log(`✅ Price health monitor refreshed: ${data.message}`);
     } else {
-      console.warn('⚠️ Failed to notify price health monitor (main app may not be running)');
+      console.warn(
+        "⚠️ Failed to notify price health monitor (main app may not be running)",
+      );
     }
   } catch (error) {
-    console.warn('⚠️ Could not notify price health monitor:', error);
+    console.warn("⚠️ Could not notify price health monitor:", error);
   }
 }
-

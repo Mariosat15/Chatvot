@@ -1,19 +1,22 @@
-'use server';
+"use server";
 
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { getRealPrice } from '@/lib/services/real-forex-prices.service';
-import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getRealPrice } from "@/lib/services/real-forex-prices.service";
+import {
+  ForexSymbol,
+  calculateUnrealizedPnL,
+} from "@/lib/services/pnl-calculator.service";
 
 /**
  * Comprehensive Dashboard Data
@@ -25,7 +28,7 @@ export interface ComprehensiveDashboardData {
     name: string;
     email: string;
   };
-  
+
   // Overview Stats
   overview: {
     totalCapital: number;
@@ -45,7 +48,7 @@ export interface ComprehensiveDashboardData {
     activeContests: number;
     totalPrizesWon: number;
   };
-  
+
   // Competitions
   competitions: {
     active: CompetitionData[];
@@ -59,7 +62,7 @@ export interface ComprehensiveDashboardData {
       bestRank: number;
     };
   };
-  
+
   // Challenges (1v1)
   challenges: {
     active: ChallengeData[];
@@ -74,7 +77,7 @@ export interface ComprehensiveDashboardData {
       totalWon: number;
     };
   };
-  
+
   // Performance Charts Data
   charts: {
     walletBalanceHistory: { date: string; balance: number; change: number }[];
@@ -83,15 +86,20 @@ export interface ComprehensiveDashboardData {
     winLossDistribution: { wins: number; losses: number; breakeven: number };
     tradesBySymbol: { symbol: string; count: number; pnl: number }[];
     tradesByHour: { hour: number; count: number; pnl: number }[];
-    monthlyPerformance: { month: string; pnl: number; trades: number; winRate: number }[];
+    monthlyPerformance: {
+      month: string;
+      pnl: number;
+      trades: number;
+      winRate: number;
+    }[];
   };
-  
+
   // Recent Activity
   recentActivity: {
     trades: TradeData[];
     positions: PositionData[];
   };
-  
+
   // Streaks & Achievements
   streaks: {
     currentWinStreak: number;
@@ -179,7 +187,7 @@ interface ChallengeData {
 interface TradeData {
   id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   exitPrice: number;
   quantity: number;
@@ -188,13 +196,13 @@ interface TradeData {
   openedAt: Date;
   closedAt: Date;
   contestName: string;
-  contestType: 'competition' | 'challenge';
+  contestType: "competition" | "challenge";
 }
 
 interface PositionData {
   id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   currentPrice: number;
   quantity: number;
@@ -202,27 +210,27 @@ interface PositionData {
   unrealizedPnLPercentage: number;
   openedAt: Date;
   contestName: string;
-  contestType: 'competition' | 'challenge';
+  contestType: "competition" | "challenge";
 }
 
 /**
  * Get comprehensive dashboard data for the authenticated user
- * 
+ *
  * SOURCE OF TRUTH:
  * - Financial stats (totalPrizesWon) → CreditWallet model (line ~472)
  * - Trading metrics (trades, PnL, win rate) → CompetitionParticipant + ChallengeParticipant records
  * - Live capital → Only from ACTIVE contest participations (not wallet balance)
- * 
+ *
  * IMPORTANT: totalPrizesWon MUST come from wallet to match profile page!
  * See lib/services/unified-user-stats.service.ts for the canonical definition.
  */
 export async function getComprehensiveDashboardData(): Promise<ComprehensiveDashboardData> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect('/sign-in');
-  
+  if (!session?.user) redirect("/sign-in");
+
   const userId = session.user.id;
   await connectToDatabase();
-  
+
   // Parallel fetch all data
   const [
     competitionParticipations,
@@ -236,17 +244,23 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     CompetitionParticipant.find({ userId }).lean(),
     ChallengeParticipant.find({ userId }).lean(),
     Competition.find({}).lean(),
-    Challenge.find({ $or: [{ challengerId: userId }, { challengedId: userId }] }).lean(),
+    Challenge.find({
+      $or: [{ challengerId: userId }, { challengedId: userId }],
+    }).lean(),
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
     // Wallet is the SOURCE OF TRUTH for financial data (prizes won, etc.)
     CreditWallet.findOne({ userId }).lean(),
     // Wallet transactions for balance history chart
-    WalletTransaction.find({ userId, status: 'completed' }).sort({ createdAt: 1 }).lean(),
+    WalletTransaction.find({ userId, status: "completed" })
+      .sort({ createdAt: 1 })
+      .lean(),
   ]);
-  
+
   // Process competitions
-  const competitionsMap = new Map(allCompetitions.map((c: any) => [c._id.toString(), c]));
-  
+  const competitionsMap = new Map(
+    allCompetitions.map((c: any) => [c._id.toString(), c]),
+  );
+
   const processedCompetitions = {
     active: [] as CompetitionData[],
     upcoming: [] as CompetitionData[],
@@ -259,19 +273,19 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       bestRank: Infinity,
     },
   };
-  
+
   let totalRankSum = 0;
   let rankedCount = 0;
-  
+
   // Pre-fetch all participants for active competitions (needed for Win Potential card)
   const activeCompetitionIds = allCompetitions
-    .filter((c: any) => c.status === 'active')
+    .filter((c: any) => c.status === "active")
     .map((c: any) => c._id);
-  
+
   const allActiveParticipants = await CompetitionParticipant.find({
-    competitionId: { $in: activeCompetitionIds }
+    competitionId: { $in: activeCompetitionIds },
   }).lean();
-  
+
   // Group participants by competition
   const participantsByCompetition = new Map<string, any[]>();
   for (const p of allActiveParticipants as any[]) {
@@ -281,31 +295,36 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     }
     participantsByCompetition.get(compId)!.push(p);
   }
-  
+
   for (const participation of competitionParticipations as any[]) {
-    const competition = competitionsMap.get(participation.competitionId?.toString());
+    const competition = competitionsMap.get(
+      participation.competitionId?.toString(),
+    );
     if (!competition) continue;
-    
+
     // Get all participants for this competition (for win potential calculation)
-    const competitionParticipants = participantsByCompetition.get(competition._id.toString()) || [];
-    
+    const competitionParticipants =
+      participantsByCompetition.get(competition._id.toString()) || [];
+
     // Map participants to the format needed by WinPotentialCard
     const mappedParticipants = competitionParticipants.map((p: any) => ({
-      userId: p.userId?.toString() || '',
+      userId: p.userId?.toString() || "",
       currentCapital: p.currentCapital || 0,
-      startingCapital: p.startingCapital || competition.startingCapital || 10000,
+      startingCapital:
+        p.startingCapital || competition.startingCapital || 10000,
       pnl: p.pnl || 0,
       pnlPercentage: p.pnlPercentage || 0,
       totalTrades: p.totalTrades || 0,
       winningTrades: p.winningTrades || 0,
       losingTrades: p.losingTrades || 0,
-      winRate: p.totalTrades > 0 ? ((p.winningTrades || 0) / p.totalTrades) * 100 : 0,
+      winRate:
+        p.totalTrades > 0 ? ((p.winningTrades || 0) / p.totalTrades) * 100 : 0,
       averageWin: p.averageWin || 0,
       averageLoss: p.averageLoss || 0,
       currentRank: p.currentRank || 0,
-      status: p.status || 'active',
+      status: p.status || "active",
     }));
-    
+
     const compData: CompetitionData = {
       id: competition._id.toString(),
       name: competition.name,
@@ -319,44 +338,51 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       pnl: participation.pnl || 0,
       pnlPercentage: participation.pnlPercentage || 0,
       currentCapital: participation.currentCapital || 0,
-      startingCapital: participation.startingCapital || competition.startingCapital || 10000,
+      startingCapital:
+        participation.startingCapital || competition.startingCapital || 10000,
       totalTrades: participation.totalTrades || 0,
       winRate: participation.winRate || 0,
       openPositions: participation.currentOpenPositions || 0,
       prizeWon: participation.prizeWon,
       // Win Potential Card data
-      rankingMethod: competition.rules?.rankingMethod || 'pnl',
+      rankingMethod: competition.rules?.rankingMethod || "pnl",
       prizeDistribution: competition.prizeDistribution || [],
       minimumTrades: competition.rules?.minimumTrades || 0,
       userParticipation: {
         userId: userId,
         currentCapital: participation.currentCapital || 0,
-        startingCapital: participation.startingCapital || competition.startingCapital || 10000,
+        startingCapital:
+          participation.startingCapital || competition.startingCapital || 10000,
         pnl: participation.pnl || 0,
         pnlPercentage: participation.pnlPercentage || 0,
         totalTrades: participation.totalTrades || 0,
         winningTrades: participation.winningTrades || 0,
         losingTrades: participation.losingTrades || 0,
-        winRate: participation.totalTrades > 0 ? ((participation.winningTrades || 0) / participation.totalTrades) * 100 : 0,
+        winRate:
+          participation.totalTrades > 0
+            ? ((participation.winningTrades || 0) / participation.totalTrades) *
+              100
+            : 0,
         averageWin: participation.averageWin || 0,
         averageLoss: participation.averageLoss || 0,
         currentRank: participation.currentRank || 0,
-        status: participation.status || 'active',
+        status: participation.status || "active",
       },
       allParticipants: mappedParticipants,
     };
-    
-    if (competition.status === 'active') {
+
+    if (competition.status === "active") {
       processedCompetitions.active.push(compData);
-    } else if (competition.status === 'upcoming') {
+    } else if (competition.status === "upcoming") {
       processedCompetitions.upcoming.push(compData);
-    } else if (competition.status === 'completed') {
+    } else if (competition.status === "completed") {
       processedCompetitions.completed.push(compData);
-      
+
       if (participation.currentRank === 1) processedCompetitions.stats.won++;
-      if (participation.currentRank <= 3) processedCompetitions.stats.topThreeFinishes++;
+      if (participation.currentRank <= 3)
+        processedCompetitions.stats.topThreeFinishes++;
     }
-    
+
     if (participation.currentRank > 0) {
       totalRankSum += participation.currentRank;
       rankedCount++;
@@ -365,10 +391,12 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       }
     }
   }
-  
-  processedCompetitions.stats.averageRank = rankedCount > 0 ? totalRankSum / rankedCount : 0;
-  if (processedCompetitions.stats.bestRank === Infinity) processedCompetitions.stats.bestRank = 0;
-  
+
+  processedCompetitions.stats.averageRank =
+    rankedCount > 0 ? totalRankSum / rankedCount : 0;
+  if (processedCompetitions.stats.bestRank === Infinity)
+    processedCompetitions.stats.bestRank = 0;
+
   // Process challenges
   const processedChallenges = {
     active: [] as ChallengeData[],
@@ -383,94 +411,111 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       totalWon: 0,
     },
   };
-  
+
   for (const challenge of allChallenges as any[]) {
     const userParticipation = (challengeParticipations as any[]).find(
-      (p: any) => p.challengeId?.toString() === challenge._id.toString()
+      (p: any) => p.challengeId?.toString() === challenge._id.toString(),
     );
-    
+
     if (!userParticipation) continue;
-    
+
     const isChallenger = challenge.challengerId === userId;
     const opponentParticipation = (challengeParticipations as any[]).find(
-      (p: any) => p.challengeId?.toString() === challenge._id.toString() && p.userId !== userId
+      (p: any) =>
+        p.challengeId?.toString() === challenge._id.toString() &&
+        p.userId !== userId,
     );
-    
+
     const challengeData: ChallengeData = {
       id: challenge._id.toString(),
-      name: challenge.name || `Challenge vs ${isChallenger ? challenge.challengedUsername : challenge.challengerUsername}`,
+      name:
+        challenge.name ||
+        `Challenge vs ${isChallenger ? challenge.challengedUsername : challenge.challengerUsername}`,
       status: challenge.status,
       startTime: challenge.startTime,
       endTime: challenge.endTime,
       stakeAmount: challenge.stakeAmount || 0,
-      opponent: opponentParticipation ? {
-        name: opponentParticipation.username,
-        pnl: opponentParticipation.pnl || 0,
-        pnlPercentage: opponentParticipation.pnlPercentage || 0,
-      } : null,
+      opponent: opponentParticipation
+        ? {
+            name: opponentParticipation.username,
+            pnl: opponentParticipation.pnl || 0,
+            pnlPercentage: opponentParticipation.pnlPercentage || 0,
+          }
+        : null,
       userPnL: userParticipation.pnl || 0,
       userPnLPercentage: userParticipation.pnlPercentage || 0,
-      isLeading: opponentParticipation ? (userParticipation.pnl || 0) > (opponentParticipation.pnl || 0) : true,
+      isLeading: opponentParticipation
+        ? (userParticipation.pnl || 0) > (opponentParticipation.pnl || 0)
+        : true,
       isWinner: userParticipation.isWinner,
       prizeWon: userParticipation.prizeReceived,
     };
-    
+
     processedChallenges.stats.total++;
     processedChallenges.stats.totalStaked += challenge.stakeAmount || 0;
-    
-    if (challenge.status === 'active') {
+
+    if (challenge.status === "active") {
       processedChallenges.active.push(challengeData);
-    } else if (challenge.status === 'pending') {
+    } else if (challenge.status === "pending") {
       processedChallenges.pending.push(challengeData);
-    } else if (challenge.status === 'completed') {
+    } else if (challenge.status === "completed") {
       processedChallenges.completed.push(challengeData);
       if (userParticipation.isWinner) {
         processedChallenges.stats.wins++;
-        processedChallenges.stats.totalWon += userParticipation.prizeReceived || 0;
+        processedChallenges.stats.totalWon +=
+          userParticipation.prizeReceived || 0;
       } else {
         processedChallenges.stats.losses++;
       }
     }
   }
-  
-  const totalChallengeGames = processedChallenges.stats.wins + processedChallenges.stats.losses;
-  processedChallenges.stats.winRate = totalChallengeGames > 0 
-    ? (processedChallenges.stats.wins / totalChallengeGames) * 100 
-    : 0;
-  
+
+  const totalChallengeGames =
+    processedChallenges.stats.wins + processedChallenges.stats.losses;
+  processedChallenges.stats.winRate =
+    totalChallengeGames > 0
+      ? (processedChallenges.stats.wins / totalChallengeGames) * 100
+      : 0;
+
   // Calculate overview stats
   // ONLY count capital from ACTIVE competitions/challenges for "Live Balance"
   const activeCompetitionIdsSet = new Set(
     allCompetitions
-      .filter((c: any) => c.status === 'active')
-      .map((c: any) => c._id.toString())
+      .filter((c: any) => c.status === "active")
+      .map((c: any) => c._id.toString()),
   );
-  
+
   const activeChallengeIdsSet = new Set(
     allChallenges
-      .filter((c: any) => c.status === 'active')
-      .map((c: any) => c._id.toString())
+      .filter((c: any) => c.status === "active")
+      .map((c: any) => c._id.toString()),
   );
-  
+
   // Filter to only active participations for capital calculation
   const activeCompParticipations = (competitionParticipations as any[]).filter(
-    (p: any) => activeCompetitionIdsSet.has(p.competitionId?.toString())
+    (p: any) => activeCompetitionIdsSet.has(p.competitionId?.toString()),
   );
-  const activeChallengeParticipations = (challengeParticipations as any[]).filter(
-    (p: any) => activeChallengeIdsSet.has(p.challengeId?.toString())
-  );
-  
+  const activeChallengeParticipations = (
+    challengeParticipations as any[]
+  ).filter((p: any) => activeChallengeIdsSet.has(p.challengeId?.toString()));
+
   // For total stats, use all participations
-  const allParticipations = [...competitionParticipations, ...challengeParticipations] as any[];
+  const allParticipations = [
+    ...competitionParticipations,
+    ...challengeParticipations,
+  ] as any[];
   // For live capital, use only active participations
-  const activeParticipations = [...activeCompParticipations, ...activeChallengeParticipations];
-  
+  const activeParticipations = [
+    ...activeCompParticipations,
+    ...activeChallengeParticipations,
+  ];
+
   // Live capital = only from active contests
   let totalCapital = 0;
   for (const p of activeParticipations) {
     totalCapital += p.currentCapital || 0;
   }
-  
+
   // SINGLE SOURCE OF TRUTH: Get stats from TradeHistory collection
   // This ensures consistency between Dashboard, Profile, and Admin Panel
   const [tradeStats] = await TradeHistory.aggregate([
@@ -479,15 +524,25 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
-        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
-        totalPnL: { $sum: '$realizedPnl' },
-        grossWins: { $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-        grossLosses: { $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] } },
-        largestWin: { $max: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-        largestLoss: { $min: { $cond: [{ $lt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-      }
-    }
+        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        totalPnL: { $sum: "$realizedPnl" },
+        grossWins: {
+          $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+        grossLosses: {
+          $sum: {
+            $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0],
+          },
+        },
+        largestWin: {
+          $max: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+        largestLoss: {
+          $min: { $cond: [{ $lt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+      },
+    },
   ]);
 
   const stats = tradeStats || {
@@ -516,46 +571,78 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   for (const p of allParticipations) {
     unrealizedPnL += p.unrealizedPnl || 0;
   }
-  
+
   // IMPORTANT: Use wallet as SOURCE OF TRUTH for prizes won (not participation records)
   // This ensures consistency with the profile page which also uses wallet data
   const walletData = wallet as any;
-  const totalPrizesWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
-  
+  const totalPrizesWon =
+    (walletData?.totalWonFromCompetitions || 0) +
+    (walletData?.totalWonFromChallenges || 0);
+
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-  const profitFactor = totalGrossLosses > 0 ? totalGrossWins / totalGrossLosses : (totalGrossWins > 0 ? 999 : 0);
+  const profitFactor =
+    totalGrossLosses > 0
+      ? totalGrossWins / totalGrossLosses
+      : totalGrossWins > 0
+        ? 999
+        : 0;
   const averageWin = winningTrades > 0 ? totalGrossWins / winningTrades : 0;
   const averageLoss = losingTrades > 0 ? totalGrossLosses / losingTrades : 0;
-  
+
   // Build chart data including wallet balance history
   const currentWalletBalance = walletData?.creditBalance || 0;
-  const charts = await buildChartData(userId, allTrades as any[], walletTransactions as any[], currentWalletBalance);
-  
+  const charts = await buildChartData(
+    userId,
+    allTrades as any[],
+    walletTransactions as any[],
+    currentWalletBalance,
+  );
+
   // Get recent trades and positions
-  const recentTrades: TradeData[] = (allTrades as any[]).slice(0, 20).map((t: any) => ({
-    id: t._id.toString(),
-    symbol: t.symbol,
-    side: t.side,
-    entryPrice: t.entryPrice,
-    exitPrice: t.exitPrice,
-    quantity: t.quantity,
-    pnl: t.realizedPnl || 0,
-    pnlPercentage: t.entryPrice > 0 ? ((t.exitPrice - t.entryPrice) / t.entryPrice) * 100 * (t.side === 'long' ? 1 : -1) : 0,
-    openedAt: t.openedAt,
-    closedAt: t.closedAt,
-    contestName: t.competitionId ? 'Competition' : 'Challenge',
-    contestType: t.competitionId ? 'competition' : 'challenge',
-  }));
-  
+  const recentTrades: TradeData[] = (allTrades as any[])
+    .slice(0, 20)
+    .map((t: any) => ({
+      id: t._id.toString(),
+      symbol: t.symbol,
+      side: t.side,
+      entryPrice: t.entryPrice,
+      exitPrice: t.exitPrice,
+      quantity: t.quantity,
+      pnl: t.realizedPnl || 0,
+      pnlPercentage:
+        t.entryPrice > 0
+          ? ((t.exitPrice - t.entryPrice) / t.entryPrice) *
+            100 *
+            (t.side === "long" ? 1 : -1)
+          : 0,
+      openedAt: t.openedAt,
+      closedAt: t.closedAt,
+      contestName: t.competitionId ? "Competition" : "Challenge",
+      contestType: t.competitionId ? "competition" : "challenge",
+    }));
+
   // Get open positions
-  const openPositions = await TradingPosition.find({ userId, status: 'open' }).lean();
+  const openPositions = await TradingPosition.find({
+    userId,
+    status: "open",
+  }).lean();
   const positionsWithPrices: PositionData[] = [];
-  
+
   for (const pos of openPositions as any[]) {
     const price = await getRealPrice(pos.symbol as ForexSymbol);
-    const currentPrice = price ? (pos.side === 'long' ? price.bid : price.ask) : pos.entryPrice;
-    const unrealizedPnL = calculateUnrealizedPnL(pos.side, pos.entryPrice, currentPrice, pos.quantity, pos.symbol);
-    
+    const currentPrice = price
+      ? pos.side === "long"
+        ? price.bid
+        : price.ask
+      : pos.entryPrice;
+    const unrealizedPnL = calculateUnrealizedPnL(
+      pos.side,
+      pos.entryPrice,
+      currentPrice,
+      pos.quantity,
+      pos.symbol,
+    );
+
     positionsWithPrices.push({
       id: pos._id.toString(),
       symbol: pos.symbol,
@@ -564,25 +651,30 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       currentPrice,
       quantity: pos.quantity,
       unrealizedPnL,
-      unrealizedPnLPercentage: pos.marginUsed > 0 ? (unrealizedPnL / pos.marginUsed) * 100 : 0,
+      unrealizedPnLPercentage:
+        pos.marginUsed > 0 ? (unrealizedPnL / pos.marginUsed) * 100 : 0,
       openedAt: pos.openedAt,
-      contestName: pos.competitionId ? 'Competition' : 'Challenge',
-      contestType: pos.competitionId ? 'competition' : 'challenge',
+      contestName: pos.competitionId ? "Competition" : "Challenge",
+      contestType: pos.competitionId ? "competition" : "challenge",
     });
   }
-  
+
   // Calculate streaks
   const streaks = calculateStreaks(allTrades as any[]);
-  
+
   // Calculate starting capital for percentage
-  const totalStartingCapital = allParticipations.reduce((sum, p) => sum + (p.startingCapital || 10000), 0);
-  const totalPnLPercentage = totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
-  
+  const totalStartingCapital = allParticipations.reduce(
+    (sum, p) => sum + (p.startingCapital || 10000),
+    0,
+  );
+  const totalPnLPercentage =
+    totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
+
   return {
     user: {
       id: userId,
-      name: session.user.name || 'Trader',
-      email: session.user.email || '',
+      name: session.user.name || "Trader",
+      email: session.user.email || "",
     },
     overview: {
       totalCapital,
@@ -599,7 +691,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       averageLoss,
       largestWin,
       largestLoss,
-      activeContests: processedCompetitions.active.length + processedChallenges.active.length,
+      activeContests:
+        processedCompetitions.active.length + processedChallenges.active.length,
       totalPrizesWon,
     },
     competitions: processedCompetitions,
@@ -613,92 +706,137 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   };
 }
 
-async function buildChartData(userId: string, allTrades: any[], walletTransactions: any[], currentBalance: number) {
+async function buildChartData(
+  userId: string,
+  allTrades: any[],
+  walletTransactions: any[],
+  currentBalance: number,
+) {
   const now = new Date();
-  
+
   // Wallet Balance History - from transactions
-  const walletBalanceHistory: { date: string; balance: number; change: number }[] = [];
-  
+  const walletBalanceHistory: {
+    date: string;
+    balance: number;
+    change: number;
+  }[] = [];
+
   // Build daily balance from transactions over last 30 days
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   // Create a map of daily balances
   const dailyBalances = new Map<string, { balance: number; change: number }>();
-  
+
   // Initialize with transactions
   for (const tx of walletTransactions) {
     const txDate = new Date(tx.createdAt);
-    const dateStr = txDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
+    const dateStr = txDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
     // Store the latest balance for each day
     dailyBalances.set(dateStr, {
       balance: tx.balanceAfter || 0,
       change: tx.amount || 0,
     });
   }
-  
+
   // Build 30-day history
   let lastKnownBalance = 0;
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
+    const dateStr = date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
     if (dailyBalances.has(dateStr)) {
       const dayData = dailyBalances.get(dateStr)!;
       lastKnownBalance = dayData.balance;
-      walletBalanceHistory.push({ date: dateStr, balance: dayData.balance, change: dayData.change });
+      walletBalanceHistory.push({
+        date: dateStr,
+        balance: dayData.balance,
+        change: dayData.change,
+      });
     } else {
       // No transactions this day, use last known balance
-      walletBalanceHistory.push({ date: dateStr, balance: lastKnownBalance, change: 0 });
+      walletBalanceHistory.push({
+        date: dateStr,
+        balance: lastKnownBalance,
+        change: 0,
+      });
     }
   }
-  
+
   // If no history, just show current balance flat
-  if (walletBalanceHistory.length === 0 || walletBalanceHistory.every(d => d.balance === 0)) {
+  if (
+    walletBalanceHistory.length === 0 ||
+    walletBalanceHistory.every((d) => d.balance === 0)
+  ) {
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      walletBalanceHistory.push({ date: dateStr, balance: currentBalance, change: 0 });
+      const dateStr = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      walletBalanceHistory.push({
+        date: dateStr,
+        balance: currentBalance,
+        change: 0,
+      });
     }
   }
-  
+
   // Daily P&L for last 30 days
   const dailyPnL: { date: string; pnl: number; trades: number }[] = [];
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
+    const dateStr = date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     const dayTrades = allTrades.filter((t: any) => {
       const tradeDate = new Date(t.closedAt);
       return tradeDate >= startOfDay && tradeDate <= endOfDay;
     });
-    
-    const dayPnL = dayTrades.reduce((sum: number, t: any) => sum + (t.realizedPnl || 0), 0);
+
+    const dayPnL = dayTrades.reduce(
+      (sum: number, t: any) => sum + (t.realizedPnl || 0),
+      0,
+    );
     dailyPnL.push({ date: dateStr, pnl: dayPnL, trades: dayTrades.length });
   }
-  
+
   // Equity curve (cumulative) - based on trading performance
   const equityCurve: { date: string; equity: number; pnl: number }[] = [];
   let cumulativeEquity = 10000; // Starting capital assumption
   for (const day of dailyPnL) {
     cumulativeEquity += day.pnl;
-    equityCurve.push({ date: day.date, equity: cumulativeEquity, pnl: day.pnl });
+    equityCurve.push({
+      date: day.date,
+      equity: cumulativeEquity,
+      pnl: day.pnl,
+    });
   }
-  
+
   // Win/Loss distribution
   const wins = allTrades.filter((t: any) => (t.realizedPnl || 0) > 0).length;
   const losses = allTrades.filter((t: any) => (t.realizedPnl || 0) < 0).length;
-  const breakeven = allTrades.filter((t: any) => (t.realizedPnl || 0) === 0).length;
-  
+  const breakeven = allTrades.filter(
+    (t: any) => (t.realizedPnl || 0) === 0,
+  ).length;
+
   // Trades by symbol
   const symbolMap = new Map<string, { count: number; pnl: number }>();
   for (const trade of allTrades) {
@@ -711,7 +849,7 @@ async function buildChartData(userId: string, allTrades: any[], walletTransactio
     .map(([symbol, data]) => ({ symbol, ...data }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
-  
+
   // Trades by hour
   const hourMap = new Map<number, { count: number; pnl: number }>();
   for (let i = 0; i < 24; i++) hourMap.set(i, { count: 0, pnl: 0 });
@@ -721,13 +859,21 @@ async function buildChartData(userId: string, allTrades: any[], walletTransactio
     existing.count++;
     existing.pnl += trade.realizedPnl || 0;
   }
-  const tradesByHour = Array.from(hourMap.entries())
-    .map(([hour, data]) => ({ hour, ...data }));
-  
+  const tradesByHour = Array.from(hourMap.entries()).map(([hour, data]) => ({
+    hour,
+    ...data,
+  }));
+
   // Monthly performance
-  const monthMap = new Map<string, { pnl: number; trades: number; wins: number }>();
+  const monthMap = new Map<
+    string,
+    { pnl: number; trades: number; wins: number }
+  >();
   for (const trade of allTrades) {
-    const month = new Date(trade.closedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    const month = new Date(trade.closedAt).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+    });
     const existing = monthMap.get(month) || { pnl: 0, trades: 0, wins: 0 };
     existing.pnl += trade.realizedPnl || 0;
     existing.trades++;
@@ -742,7 +888,7 @@ async function buildChartData(userId: string, allTrades: any[], walletTransactio
       winRate: data.trades > 0 ? (data.wins / data.trades) * 100 : 0,
     }))
     .slice(-6);
-  
+
   return {
     walletBalanceHistory,
     equityCurve,
@@ -755,17 +901,17 @@ async function buildChartData(userId: string, allTrades: any[], walletTransactio
 }
 
 function calculateStreaks(trades: any[]) {
-  const sortedTrades = [...trades].sort((a, b) => 
-    new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime()
+  const sortedTrades = [...trades].sort(
+    (a, b) => new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime(),
   );
-  
+
   let currentWinStreak = 0;
   let currentLossStreak = 0;
   let longestWinStreak = 0;
   let longestLossStreak = 0;
   let tempWinStreak = 0;
   let tempLossStreak = 0;
-  
+
   for (const trade of sortedTrades) {
     const pnl = trade.realizedPnl || 0;
     if (pnl > 0) {
@@ -775,10 +921,11 @@ function calculateStreaks(trades: any[]) {
     } else if (pnl < 0) {
       tempLossStreak++;
       tempWinStreak = 0;
-      if (tempLossStreak > longestLossStreak) longestLossStreak = tempLossStreak;
+      if (tempLossStreak > longestLossStreak)
+        longestLossStreak = tempLossStreak;
     }
   }
-  
+
   // Current streak from the end
   for (let i = sortedTrades.length - 1; i >= 0; i--) {
     const pnl = sortedTrades[i].realizedPnl || 0;
@@ -790,32 +937,33 @@ function calculateStreaks(trades: any[]) {
       break;
     }
   }
-  
+
   // Trading days this month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const tradingDays = new Set(
     trades
       .filter((t: any) => new Date(t.closedAt) >= startOfMonth)
-      .map((t: any) => new Date(t.closedAt).toDateString())
+      .map((t: any) => new Date(t.closedAt).toDateString()),
   );
-  
+
   // Consecutive profitable days
   const dayPnLMap = new Map<string, number>();
   for (const trade of trades) {
     const day = new Date(trade.closedAt).toDateString();
     dayPnLMap.set(day, (dayPnLMap.get(day) || 0) + (trade.realizedPnl || 0));
   }
-  
+
   let consecutiveProfitableDays = 0;
-  const sortedDays = Array.from(dayPnLMap.entries())
-    .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
-  
+  const sortedDays = Array.from(dayPnLMap.entries()).sort(
+    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime(),
+  );
+
   for (const [, pnl] of sortedDays) {
     if (pnl > 0) consecutiveProfitableDays++;
     else break;
   }
-  
+
   return {
     currentWinStreak,
     currentLossStreak,
@@ -825,4 +973,3 @@ function calculateStreaks(trades: any[]) {
     consecutiveProfitableDays,
   };
 }
-

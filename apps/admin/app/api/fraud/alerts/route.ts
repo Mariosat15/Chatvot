@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin/fraud/alerts
@@ -13,10 +13,10 @@ export async function GET(request: Request) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status'); // 'pending', 'investigating', 'resolved', 'dismissed'
-    const severity = searchParams.get('severity'); // 'low', 'medium', 'high', 'critical'
-    const type = searchParams.get('type');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const status = searchParams.get("status"); // 'pending', 'investigating', 'resolved', 'dismissed'
+    const severity = searchParams.get("severity"); // 'low', 'medium', 'high', 'critical'
+    const type = searchParams.get("type");
+    const limit = parseInt(searchParams.get("limit") || "50");
 
     // Build query
     const query: any = {};
@@ -33,36 +33,43 @@ export async function GET(request: Request) {
     // Get statistics
     const stats = {
       total: await FraudAlert.countDocuments({}),
-      pending: await FraudAlert.countDocuments({ status: 'pending' }),
-      investigating: await FraudAlert.countDocuments({ status: 'investigating' }),
-      resolved: await FraudAlert.countDocuments({ status: 'resolved' }),
-      dismissed: await FraudAlert.countDocuments({ status: 'dismissed' }),
-      critical: await FraudAlert.countDocuments({ severity: 'critical', status: { $in: ['pending', 'investigating'] } }),
-      high: await FraudAlert.countDocuments({ severity: 'high', status: { $in: ['pending', 'investigating'] } }),
+      pending: await FraudAlert.countDocuments({ status: "pending" }),
+      investigating: await FraudAlert.countDocuments({
+        status: "investigating",
+      }),
+      resolved: await FraudAlert.countDocuments({ status: "resolved" }),
+      dismissed: await FraudAlert.countDocuments({ status: "dismissed" }),
+      critical: await FraudAlert.countDocuments({
+        severity: "critical",
+        status: { $in: ["pending", "investigating"] },
+      }),
+      high: await FraudAlert.countDocuments({
+        severity: "high",
+        status: { $in: ["pending", "investigating"] },
+      }),
     };
 
     // Get alert type breakdown
     const alertTypes = await FraudAlert.aggregate([
-      { $match: { status: { $in: ['pending', 'investigating'] } } },
-      { $group: { _id: '$alertType', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+      { $match: { status: { $in: ["pending", "investigating"] } } },
+      { $group: { _id: "$alertType", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
     ]);
 
     return NextResponse.json({
       success: true,
       alerts,
       stats,
-      alertTypes
+      alertTypes,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching fraud alerts:', error);
+    console.error("Error fetching fraud alerts:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch alerts' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch alerts" },
+      { status: 500 },
     );
   }
 }
-

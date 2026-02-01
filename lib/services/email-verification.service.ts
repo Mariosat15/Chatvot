@@ -3,12 +3,12 @@
  * Handles sending verification emails and validating verification tokens
  */
 
-import crypto from 'crypto';
-import { connectToDatabase } from '@/database/mongoose';
-import EmailTemplate from '@/database/models/email-template.model';
-import { getTransporter } from '@/lib/nodemailer';
-import { getSettings } from '@/lib/services/settings.service';
-import { ObjectId } from 'mongodb';
+import crypto from "crypto";
+import { connectToDatabase } from "@/database/mongoose";
+import EmailTemplate from "@/database/models/email-template.model";
+import { getTransporter } from "@/lib/nodemailer";
+import { getSettings } from "@/lib/services/settings.service";
+import { ObjectId } from "mongodb";
 
 /**
  * Build query to find user by multiple ID formats
@@ -42,7 +42,7 @@ interface VerificationResult {
  * Generate a secure verification token
  */
 export function generateVerificationToken(): string {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 /**
@@ -57,62 +57,77 @@ export function getTokenExpiry(): Date {
 /**
  * Send email verification email to user
  */
-export async function sendVerificationEmail({ email, name, userId }: SendVerificationEmailParams): Promise<boolean> {
+export async function sendVerificationEmail({
+  email,
+  name,
+  userId,
+}: SendVerificationEmailParams): Promise<boolean> {
   try {
     await connectToDatabase();
-    
+
     // Get settings for platform name
     const settings = await getSettings();
-    const platformName = settings.siteName || 'ChartVolt';
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
-    
+    const platformName = settings.siteName || "ChartVolt";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.BETTER_AUTH_URL ||
+      "http://localhost:3000";
+
     // Generate verification token
     const token = generateVerificationToken();
     const tokenExpiry = getTokenExpiry();
-    
+
     // Store token in database
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      console.error('❌ Database connection not available');
+      console.error("❌ Database connection not available");
       return false;
     }
-    
+
     // Update user with verification token
     // Use $or query to handle different ID formats from better-auth
     const userQueries = buildUserIdQuery(userId);
-    const updateResult = await db.collection('user').updateOne(
+    const updateResult = await db.collection("user").updateOne(
       { $or: userQueries },
-      { 
-        $set: { 
+      {
+        $set: {
           emailVerificationToken: token,
           emailVerificationTokenExpiry: tokenExpiry,
           emailVerified: false,
-          updatedAt: new Date()
-        } 
-      }
+          updatedAt: new Date(),
+        },
+      },
     );
-    
-    console.log(`📧 Token stored for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`);
-    
+
+    console.log(
+      `📧 Token stored for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`,
+    );
+
     // Build verification URL
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&userId=${userId}`;
-    
+
     // Get email template
-    const template = await EmailTemplate.findOne({ templateType: 'email_verification' });
-    
+    const template = await EmailTemplate.findOne({
+      templateType: "email_verification",
+    });
+
     // Build email content
-    const subject = template?.subject?.replace('{{platformName}}', platformName) 
-      || `Verify your email - ${platformName}`;
-    const fromName = template?.fromName?.replace('{{platformName}}', platformName) 
-      || platformName;
-    const headingText = template?.headingText?.replace('{{name}}', name) 
-      || `Hi ${name}, please verify your email`;
-    const introText = template?.introText 
-      || `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
-    const ctaButtonText = template?.ctaButtonText || 'Verify Email';
-    
+    const subject =
+      template?.subject?.replace("{{platformName}}", platformName) ||
+      `Verify your email - ${platformName}`;
+    const fromName =
+      template?.fromName?.replace("{{platformName}}", platformName) ||
+      platformName;
+    const headingText =
+      template?.headingText?.replace("{{name}}", name) ||
+      `Hi ${name}, please verify your email`;
+    const introText =
+      template?.introText ||
+      `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
+    const ctaButtonText = template?.ctaButtonText || "Verify Email";
+
     // Build HTML email
     const htmlContent = `
 <!DOCTYPE html>
@@ -186,22 +201,23 @@ export async function sendVerificationEmail({ email, name, userId }: SendVerific
 </body>
 </html>
     `;
-    
+
     // Send email
     const transporter = await getTransporter();
-    const senderEmail = settings.nodemailerEmail || process.env.NODEMAILER_EMAIL;
-    
+    const senderEmail =
+      settings.nodemailerEmail || process.env.NODEMAILER_EMAIL;
+
     await transporter.sendMail({
       from: `"${fromName}" <${senderEmail}>`,
       to: email,
       subject,
       html: htmlContent,
     });
-    
+
     console.log(`✅ Verification email sent to ${email}`);
     return true;
   } catch (error) {
-    console.error('❌ Failed to send verification email:', error);
+    console.error("❌ Failed to send verification email:", error);
     return false;
   }
 }
@@ -209,73 +225,99 @@ export async function sendVerificationEmail({ email, name, userId }: SendVerific
 /**
  * Verify email token and mark user as verified
  */
-export async function verifyEmailToken(token: string, userId: string): Promise<VerificationResult> {
+export async function verifyEmailToken(
+  token: string,
+  userId: string,
+): Promise<VerificationResult> {
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return { success: false, error: 'Database connection failed' };
+      return { success: false, error: "Database connection failed" };
     }
-    
+
     // Build queries to handle different ID formats
     const userQueries = buildUserIdQuery(userId);
-    
+
     // Find user with matching token (using $or for ID and $and for token)
-    const user = await db.collection('user').findOne({
-      $and: [
-        { $or: userQueries },
-        { emailVerificationToken: token }
-      ]
+    const user = await db.collection("user").findOne({
+      $and: [{ $or: userQueries }, { emailVerificationToken: token }],
     });
-    
+
     console.log(`📧 Looking for user ${userId} with token: found=${!!user}`);
-    
+
     if (!user) {
       // Try to find user without token to give better error message
-      const userWithoutToken = await db.collection('user').findOne({ $or: userQueries });
+      const userWithoutToken = await db
+        .collection("user")
+        .findOne({ $or: userQueries });
       if (userWithoutToken) {
         if (userWithoutToken.emailVerified === true) {
-          return { success: false, error: 'Email is already verified. Please sign in.' };
+          return {
+            success: false,
+            error: "Email is already verified. Please sign in.",
+          };
         }
-        console.log(`📧 User found but token doesn't match. Stored token: ${userWithoutToken.emailVerificationToken?.substring(0, 10)}...`);
+        console.log(
+          `📧 User found but token doesn't match. Stored token: ${userWithoutToken.emailVerificationToken?.substring(0, 10)}...`,
+        );
         // Token doesn't match - user probably clicked old link after requesting new one
-        return { success: false, error: 'This verification link is outdated. Please check your email for the latest verification link, or request a new one.' };
+        return {
+          success: false,
+          error:
+            "This verification link is outdated. Please check your email for the latest verification link, or request a new one.",
+        };
       }
-      return { success: false, error: 'Invalid verification link. Please request a new verification email.' };
+      return {
+        success: false,
+        error:
+          "Invalid verification link. Please request a new verification email.",
+      };
     }
-    
+
     // Check if token has expired
-    if (user.emailVerificationTokenExpiry && new Date(user.emailVerificationTokenExpiry) < new Date()) {
-      return { success: false, error: 'Verification link has expired. Please request a new one.' };
+    if (
+      user.emailVerificationTokenExpiry &&
+      new Date(user.emailVerificationTokenExpiry) < new Date()
+    ) {
+      return {
+        success: false,
+        error: "Verification link has expired. Please request a new one.",
+      };
     }
-    
+
     // Mark email as verified and clear token
-    const updateResult = await db.collection('user').updateOne(
+    const updateResult = await db.collection("user").updateOne(
       { $or: userQueries },
-      { 
-        $set: { 
+      {
+        $set: {
           emailVerified: true,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         $unset: {
-          emailVerificationToken: '',
-          emailVerificationTokenExpiry: ''
-        }
-      }
+          emailVerificationToken: "",
+          emailVerificationTokenExpiry: "",
+        },
+      },
     );
-    
-    console.log(`✅ Email verified for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`);
-    
+
+    console.log(
+      `✅ Email verified for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`,
+    );
+
     if (updateResult.modifiedCount === 0) {
       console.error(`⚠️ User found but update failed for ${userId}`);
-      return { success: false, error: 'Verification failed. Please try again.' };
+      return {
+        success: false,
+        error: "Verification failed. Please try again.",
+      };
     }
-    
+
     return { success: true, userId };
   } catch (error) {
-    console.error('❌ Email verification failed:', error);
-    return { success: false, error: 'Verification failed. Please try again.' };
+    console.error("❌ Email verification failed:", error);
+    return { success: false, error: "Verification failed. Please try again." };
   }
 }
 
@@ -283,89 +325,108 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
  * Resend verification email
  * IMPORTANT: Reuses existing valid token to avoid invalidating emails user already received
  */
-export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
+export async function resendVerificationEmail(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return { success: false, error: 'Database connection failed' };
+      return { success: false, error: "Database connection failed" };
     }
-    
+
     // Find user by email (case-insensitive)
-    const user = await db.collection('user').findOne({ 
-      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    const user = await db.collection("user").findOne({
+      email: { $regex: new RegExp(`^${email}$`, "i") },
     });
-    
+
     if (!user) {
-      return { success: false, error: 'No account found with this email' };
+      return { success: false, error: "No account found with this email" };
     }
-    
+
     if (user.emailVerified === true) {
-      return { success: false, error: 'Email is already verified' };
+      return { success: false, error: "Email is already verified" };
     }
-    
+
     // Get user ID - better-auth may use 'id' field or '_id'
     const userId = user.id || user._id?.toString();
-    
+
     if (!userId) {
-      console.error('❌ User found but has no ID:', user.email);
-      return { success: false, error: 'User account error' };
+      console.error("❌ User found but has no ID:", user.email);
+      return { success: false, error: "User account error" };
     }
-    
-    console.log(`📧 Resending verification email to ${user.email} (userId: ${userId})`);
-    
+
+    console.log(
+      `📧 Resending verification email to ${user.email} (userId: ${userId})`,
+    );
+
     // Check if user already has a valid (non-expired) token
     // If so, reuse it instead of generating a new one (to avoid invalidating emails already sent)
     let token = user.emailVerificationToken;
-    let tokenExpiry = user.emailVerificationTokenExpiry ? new Date(user.emailVerificationTokenExpiry) : null;
+    let tokenExpiry = user.emailVerificationTokenExpiry
+      ? new Date(user.emailVerificationTokenExpiry)
+      : null;
     const now = new Date();
-    
+
     // If no token or token is expired, generate a new one
     if (!token || !tokenExpiry || tokenExpiry < now) {
       console.log(`📧 Generating new token (old token expired or missing)`);
       token = generateVerificationToken();
       tokenExpiry = getTokenExpiry();
-      
+
       // Update token in database
       const userQueries = buildUserIdQuery(userId);
-      await db.collection('user').updateOne(
+      await db.collection("user").updateOne(
         { $or: userQueries },
-        { 
-          $set: { 
+        {
+          $set: {
             emailVerificationToken: token,
             emailVerificationTokenExpiry: tokenExpiry,
-            updatedAt: new Date()
-          } 
-        }
+            updatedAt: new Date(),
+          },
+        },
       );
       console.log(`📧 New token stored for user ${userId}`);
     } else {
-      console.log(`📧 Reusing existing valid token (expires: ${tokenExpiry.toISOString()})`);
+      console.log(
+        `📧 Reusing existing valid token (expires: ${tokenExpiry.toISOString()})`,
+      );
     }
-    
+
     // Get settings for platform name and build email
     const settings = await getSettings();
-    const platformName = settings.siteName || 'ChartVolt';
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+    const platformName = settings.siteName || "ChartVolt";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.BETTER_AUTH_URL ||
+      "http://localhost:3000";
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&userId=${userId}`;
-    
+
     // Get email template
-    const EmailTemplate = (await import('@/database/models/email-template.model')).default;
-    const template = await EmailTemplate.findOne({ templateType: 'email_verification' });
-    
+    const EmailTemplate = (
+      await import("@/database/models/email-template.model")
+    ).default;
+    const template = await EmailTemplate.findOne({
+      templateType: "email_verification",
+    });
+
     // Build email content
-    const userName = user.name || 'User';
-    const subject = template?.subject?.replace('{{platformName}}', platformName) 
-      || `Verify your email - ${platformName}`;
-    const fromName = template?.fromName?.replace('{{platformName}}', platformName) 
-      || platformName;
-    const headingText = template?.headingText?.replace('{{name}}', userName) 
-      || `Hi ${userName}, please verify your email`;
-    const introText = template?.introText 
-      || `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
-    const ctaButtonText = template?.ctaButtonText || 'Verify Email';
-    
+    const userName = user.name || "User";
+    const subject =
+      template?.subject?.replace("{{platformName}}", platformName) ||
+      `Verify your email - ${platformName}`;
+    const fromName =
+      template?.fromName?.replace("{{platformName}}", platformName) ||
+      platformName;
+    const headingText =
+      template?.headingText?.replace("{{name}}", userName) ||
+      `Hi ${userName}, please verify your email`;
+    const introText =
+      template?.introText ||
+      `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
+    const ctaButtonText = template?.ctaButtonText || "Verify Email";
+
     // Build HTML email (simplified version)
     const htmlContent = `
 <!DOCTYPE html>
@@ -417,25 +478,25 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
 </html>`;
 
     // Send email using nodemailer transporter
-    const { getTransporter } = await import('@/lib/nodemailer');
+    const { getTransporter } = await import("@/lib/nodemailer");
     const transporter = await getTransporter();
-    
+
     try {
       await transporter.sendMail({
         to: user.email,
         subject,
         html: htmlContent,
-        from: `${fromName} <${process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com'}>`,
+        from: `${fromName} <${process.env.NODEMAILER_EMAIL || "noreply@chartvolt.com"}>`,
       });
       console.log(`✅ Verification email sent to ${user.email}`);
       return { success: true };
     } catch (emailError) {
-      console.error('❌ Failed to send verification email:', emailError);
-      return { success: false, error: 'Failed to send verification email' };
+      console.error("❌ Failed to send verification email:", emailError);
+      return { success: false, error: "Failed to send verification email" };
     }
   } catch (error) {
-    console.error('❌ Resend verification failed:', error);
-    return { success: false, error: 'Failed to resend verification email' };
+    console.error("❌ Resend verification failed:", error);
+    return { success: false, error: "Failed to resend verification email" };
   }
 }
 
@@ -446,14 +507,14 @@ export async function isEmailVerified(userId: string): Promise<boolean> {
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) return false;
-    
+
     const userQueries = buildUserIdQuery(userId);
-    const user = await db.collection('user').findOne({ $or: userQueries });
+    const user = await db.collection("user").findOne({ $or: userQueries });
     return user?.emailVerified === true;
   } catch (error) {
-    console.error('❌ Error checking email verification:', error);
+    console.error("❌ Error checking email verification:", error);
     return false;
   }
 }
@@ -461,78 +522,81 @@ export async function isEmailVerified(userId: string): Promise<boolean> {
 /**
  * Admin: Manually verify user's email
  */
-export async function adminVerifyEmail(userId: string): Promise<{ success: boolean; error?: string }> {
+export async function adminVerifyEmail(
+  userId: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return { success: false, error: 'Database connection failed' };
+      return { success: false, error: "Database connection failed" };
     }
-    
+
     const userQueries = buildUserIdQuery(userId);
-    const result = await db.collection('user').updateOne(
+    const result = await db.collection("user").updateOne(
       { $or: userQueries },
-      { 
-        $set: { 
+      {
+        $set: {
           emailVerified: true,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         $unset: {
-          emailVerificationToken: '',
-          emailVerificationTokenExpiry: ''
-        }
-      }
+          emailVerificationToken: "",
+          emailVerificationTokenExpiry: "",
+        },
+      },
     );
-    
+
     if (result.matchedCount === 0) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: "User not found" };
     }
-    
+
     console.log(`✅ Admin manually verified email for user ${userId}`);
     return { success: true };
   } catch (error) {
-    console.error('❌ Admin email verification failed:', error);
-    return { success: false, error: 'Failed to verify email' };
+    console.error("❌ Admin email verification failed:", error);
+    return { success: false, error: "Failed to verify email" };
   }
 }
 
 /**
  * Admin: Reset user's email verification status
  */
-export async function adminResetEmailVerification(userId: string): Promise<{ success: boolean; error?: string }> {
+export async function adminResetEmailVerification(
+  userId: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return { success: false, error: 'Database connection failed' };
+      return { success: false, error: "Database connection failed" };
     }
-    
+
     const userQueries = buildUserIdQuery(userId);
-    const result = await db.collection('user').updateOne(
+    const result = await db.collection("user").updateOne(
       { $or: userQueries },
-      { 
-        $set: { 
+      {
+        $set: {
           emailVerified: false,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         $unset: {
-          emailVerificationToken: '',
-          emailVerificationTokenExpiry: ''
-        }
-      }
+          emailVerificationToken: "",
+          emailVerificationTokenExpiry: "",
+        },
+      },
     );
-    
+
     if (result.matchedCount === 0) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: "User not found" };
     }
-    
+
     console.log(`✅ Admin reset email verification for user ${userId}`);
     return { success: true };
   } catch (error) {
-    console.error('❌ Admin reset email verification failed:', error);
-    return { success: false, error: 'Failed to reset email verification' };
+    console.error("❌ Admin reset email verification failed:", error);
+    return { success: false, error: "Failed to reset email verification" };
   }
 }
-

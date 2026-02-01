@@ -3,24 +3,24 @@
  * Draws a vertical line at a specific time
  */
 
-import { 
-  ISeriesPrimitivePaneView, 
+import {
+  ISeriesPrimitivePaneView,
   SeriesPrimitivePaneViewZOrder,
   Time,
-} from 'lightweight-charts';
-import { 
-  BasePrimitive, 
-  BasePaneRenderer, 
+} from "lightweight-charts";
+import {
+  BasePrimitive,
+  BasePaneRenderer,
   BasePaneView,
   DrawingRenderData,
-} from './base-primitive';
-import { 
-  VerticalLineOptions, 
-  ChartPoint, 
-  ScreenPoint, 
+} from "./base-primitive";
+import {
+  VerticalLineOptions,
+  ChartPoint,
+  ScreenPoint,
   AnchorPosition,
   DEFAULT_DRAWING_OPTIONS,
-} from './types';
+} from "./types";
 
 // ============================================
 // VERTICAL LINE RENDERER
@@ -28,10 +28,10 @@ import {
 
 class VerticalLineRenderer extends BasePaneRenderer {
   protected drawImpl(
-    ctx: CanvasRenderingContext2D, 
-    hpr: number, 
-    vpr: number, 
-    size: { width: number; height: number }
+    ctx: CanvasRenderingContext2D,
+    hpr: number,
+    vpr: number,
+    size: { width: number; height: number },
   ): void {
     const data = this._data!;
     if (data.points.length === 0) return;
@@ -40,10 +40,10 @@ class VerticalLineRenderer extends BasePaneRenderer {
     const options = data.options as VerticalLineOptions;
 
     // Set line style
-    ctx.strokeStyle = options.color || '#2962ff';
+    ctx.strokeStyle = options.color || "#2962ff";
     ctx.lineWidth = (options.lineWidth || 2) * hpr;
-    ctx.lineCap = 'round';
-    
+    ctx.lineCap = "round";
+
     // Set dash pattern
     const dash = this.getLineDash(options.lineStyle, hpr);
     ctx.setLineDash(dash);
@@ -68,26 +68,26 @@ class VerticalLineRenderer extends BasePaneRenderer {
     data: DrawingRenderData,
     hpr: number,
     vpr: number,
-    canvasHeight: number
+    canvasHeight: number,
   ): void {
     const x = data.points[0].x * hpr;
     const options = data.options;
-    
+
     const y = canvasHeight / 2;
     const anchorRadius = (data.isSelected ? 6 : 4) * hpr;
     const borderWidth = 2 * hpr;
-    
-    ctx.fillStyle = '#ffffff';
+
+    ctx.fillStyle = "#ffffff";
     ctx.beginPath();
     ctx.arc(x, y, anchorRadius, 0, Math.PI * 2);
     ctx.fill();
-    
-    ctx.strokeStyle = options.color || '#2962ff';
+
+    ctx.strokeStyle = options.color || "#2962ff";
     ctx.lineWidth = borderWidth;
     ctx.stroke();
-    
+
     if (data.isSelected) {
-      ctx.fillStyle = options.color || '#2962ff';
+      ctx.fillStyle = options.color || "#2962ff";
       ctx.beginPath();
       ctx.arc(x, y, anchorRadius * 0.4, 0, Math.PI * 2);
       ctx.fill();
@@ -105,7 +105,7 @@ class VerticalLinePaneView extends BasePaneView {
   }
 
   zOrder(): SeriesPrimitivePaneViewZOrder {
-    return 'normal';
+    return "normal";
   }
 }
 
@@ -117,13 +117,13 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
   constructor(options: Partial<VerticalLineOptions> & { time: Time }) {
     const fullOptions: VerticalLineOptions = {
       ...DEFAULT_DRAWING_OPTIONS,
+      ...options,
       id: options.id || `vline_${Date.now()}`,
       time: options.time,
       showTime: options.showTime ?? false,
-      ...options,
     } as VerticalLineOptions;
-    
-    super('vertical-line', fullOptions);
+
+    super("vertical-line", fullOptions);
   }
 
   protected createPaneViews(): ISeriesPrimitivePaneView[] {
@@ -133,9 +133,9 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
   getRenderData(): DrawingRenderData {
     const x = this.timeToX(this._options.time);
     const points: ScreenPoint[] = x !== null ? [{ x, y: 0 }] : [];
-    
+
     const size = this.getCanvasSize();
-    
+
     return {
       points,
       chartPoints: [{ time: this._options.time, price: 0 }],
@@ -153,10 +153,10 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
 
   hitTest(point: ScreenPoint): boolean {
     if (!this._options.visible) return false;
-    
+
     const x = this.timeToX(this._options.time);
     if (x === null) return false;
-    
+
     const threshold = 10;
     return Math.abs(point.x - x) < threshold;
   }
@@ -164,22 +164,25 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
   getAnchorPoints(): ScreenPoint[] {
     const x = this.timeToX(this._options.time);
     if (x === null) return [];
-    
+
     const size = this.getCanvasSize();
     return [{ x, y: size.height / 2 }];
   }
 
-  getAnchorAtPoint(point: ScreenPoint, threshold: number = 15): AnchorPosition | null {
+  getAnchorAtPoint(
+    point: ScreenPoint,
+    threshold: number = 15,
+  ): AnchorPosition | null {
     const x = this.timeToX(this._options.time);
     if (x === null) return null;
-    
+
     const size = this.getCanvasSize();
     const anchor = { x, y: size.height / 2 };
-    
+
     if (this.distanceToPoint(point, anchor) < threshold) {
-      return 'center';
+      return "center";
     }
-    
+
     return null;
   }
 
@@ -189,7 +192,7 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
     this.requestUpdate();
   }
 
-  move(_deltaPrice: number, deltaTime: number): void {
+  move(_deltaPrice: number, _deltaTime: number): void {
     if (this._options.locked) return;
     // Vertical lines move by time, not price
     // For now, just request update (time-based movement is complex)

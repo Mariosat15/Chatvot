@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Credit Wallet for users to buy credits and enter competitions/challenges
 export interface ICreditWallet extends Document {
@@ -12,15 +12,15 @@ export interface ICreditWallet extends Document {
   totalWonFromChallenges: number; // Total winnings from 1v1 challenges
   totalSpentOnMarketplace: number; // Total spent on marketplace purchases
   isActive: boolean; // Wallet status
-  
+
   // KYC Fields
   kycVerified: boolean; // KYC verification status (required for withdrawals)
-  kycStatus: 'none' | 'pending' | 'approved' | 'declined' | 'expired';
+  kycStatus: "none" | "pending" | "approved" | "declined" | "expired";
   kycVerifiedAt?: Date;
   kycExpiresAt?: Date;
   kycAttempts: number;
   lastKYCSessionId?: string;
-  
+
   withdrawalEnabled: boolean; // Can user withdraw?
   createdAt: Date;
   updatedAt: Date;
@@ -93,8 +93,8 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
     },
     kycStatus: {
       type: String,
-      enum: ['none', 'pending', 'approved', 'declined', 'expired'],
-      default: 'none',
+      enum: ["none", "pending", "approved", "declined", "expired"],
+      default: "none",
     },
     kycVerifiedAt: {
       type: Date,
@@ -117,7 +117,7 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
@@ -125,12 +125,12 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
 CreditWalletSchema.index({ isActive: 1 });
 
 // Virtual for total profit/loss
-CreditWalletSchema.virtual('totalProfitLoss').get(function () {
+CreditWalletSchema.virtual("totalProfitLoss").get(function () {
   return this.totalWonFromCompetitions - this.totalSpentOnCompetitions;
 });
 
 // Virtual for ROI
-CreditWalletSchema.virtual('roi').get(function () {
+CreditWalletSchema.virtual("roi").get(function () {
   if (this.totalSpentOnCompetitions === 0) return 0;
   return (
     ((this.totalWonFromCompetitions - this.totalSpentOnCompetitions) /
@@ -140,7 +140,7 @@ CreditWalletSchema.virtual('roi').get(function () {
 });
 
 const CreditWallet =
-  models?.CreditWallet || model<ICreditWallet>('CreditWallet', CreditWalletSchema);
+  models?.CreditWallet ||
+  model<ICreditWallet>("CreditWallet", CreditWalletSchema);
 
 export default CreditWallet;
-

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Activity,
   AlertTriangle,
@@ -15,12 +15,12 @@ import {
   Clock,
   TrendingUp,
   Camera,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface SymbolHealth {
   symbol: string;
-  status: 'healthy' | 'degraded' | 'critical';
+  status: "healthy" | "degraded" | "critical";
   lastUpdate: number;
   staleDuration: number;
   isStale: boolean;
@@ -32,7 +32,7 @@ interface SymbolHealth {
 interface Alert {
   id: string;
   type: string;
-  severity: 'warning' | 'error' | 'critical';
+  severity: "warning" | "error" | "critical";
   symbol?: string;
   message: string;
   timestamp: string;
@@ -41,8 +41,8 @@ interface Alert {
 
 interface PriceHealthData {
   timestamp: string;
-  overallStatus: 'healthy' | 'degraded' | 'critical' | 'unknown';
-  connectionStatus: 'connected' | 'reconnecting' | 'disconnected' | 'unknown';
+  overallStatus: "healthy" | "degraded" | "critical" | "unknown";
+  connectionStatus: "connected" | "reconnecting" | "disconnected" | "unknown";
   reconnectAttempts: number;
   healthyCount: number;
   degradedCount: number;
@@ -61,7 +61,9 @@ interface SnapshotStatus {
 
 export default function PriceHealthWidget() {
   const [healthData, setHealthData] = useState<PriceHealthData | null>(null);
-  const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus | null>(null);
+  const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAllSymbols, setShowAllSymbols] = useState(false);
@@ -69,15 +71,15 @@ export default function PriceHealthWidget() {
 
   const fetchHealth = useCallback(async () => {
     try {
-      const response = await fetch('/api/price-health');
-      if (!response.ok) throw new Error('Failed to fetch health data');
-      
+      const response = await fetch("/api/price-health");
+      if (!response.ok) throw new Error("Failed to fetch health data");
+
       const data = await response.json();
       setHealthData(data.health);
       setSnapshotStatus(data.snapshot);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch');
+      setError(err instanceof Error ? err.message : "Failed to fetch");
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function PriceHealthWidget() {
 
   useEffect(() => {
     fetchHealth();
-    
+
     // Poll every 10 seconds
     const interval = setInterval(fetchHealth, 10000);
     return () => clearInterval(interval);
@@ -94,57 +96,84 @@ export default function PriceHealthWidget() {
   const acknowledgeAlert = async (alertId: string) => {
     try {
       // Use the admin's API which proxies to the main app securely
-      const response = await fetch('/api/price-health', {
-        method: 'POST',
+      const response = await fetch("/api/price-health", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action: 'acknowledge', alertId, acknowledgedBy: 'admin' }),
+        body: JSON.stringify({
+          action: "acknowledge",
+          alertId,
+          acknowledgedBy: "admin",
+        }),
       });
 
       if (response.ok) {
-        toast.success('Alert acknowledged');
+        toast.success("Alert acknowledged");
         fetchHealth();
       } else {
         const data = await response.json().catch(() => ({}));
-        toast.error(data.error || 'Failed to acknowledge alert');
+        toast.error(data.error || "Failed to acknowledge alert");
       }
     } catch {
-      toast.error('Failed to acknowledge alert');
+      toast.error("Failed to acknowledge alert");
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'bg-green-500';
-      case 'degraded': return 'bg-yellow-500';
-      case 'critical': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case "healthy":
+        return "bg-green-500";
+      case "degraded":
+        return "bg-yellow-500";
+      case "critical":
+        return "bg-red-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><CheckCircle className="h-3 w-3 mr-1" />Healthy</Badge>;
-      case 'degraded':
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>;
-      case 'critical':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="h-3 w-3 mr-1" />Critical</Badge>;
+      case "healthy":
+        return (
+          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Healthy
+          </Badge>
+        );
+      case "degraded":
+        return (
+          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Degraded
+          </Badge>
+        );
+      case "critical":
+        return (
+          <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+            <XCircle className="h-3 w-3 mr-1" />
+            Critical
+          </Badge>
+        );
       default:
-        return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Unknown</Badge>;
+        return (
+          <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">
+            Unknown
+          </Badge>
+        );
     }
   };
 
   const getConnectionIcon = () => {
     if (!healthData) return <WifiOff className="h-5 w-5 text-gray-500" />;
-    
+
     switch (healthData.connectionStatus) {
-      case 'connected':
+      case "connected":
         return <Wifi className="h-5 w-5 text-green-500" />;
-      case 'reconnecting':
+      case "reconnecting":
         return <RefreshCw className="h-5 w-5 text-yellow-500 animate-spin" />;
-      case 'disconnected':
+      case "disconnected":
         return <WifiOff className="h-5 w-5 text-red-500" />;
       default:
         return <WifiOff className="h-5 w-5 text-gray-500" />;
@@ -157,7 +186,8 @@ export default function PriceHealthWidget() {
     return `${Math.round(ms / 60000)}m`;
   };
 
-  const unacknowledgedAlerts = healthData?.alerts.filter(a => !a.acknowledged) || [];
+  const unacknowledgedAlerts =
+    healthData?.alerts.filter((a) => !a.acknowledged) || [];
 
   if (loading) {
     return (
@@ -177,10 +207,10 @@ export default function PriceHealthWidget() {
             <AlertTriangle className="h-5 w-5" />
             {error}
           </div>
-          <Button 
-            onClick={fetchHealth} 
-            variant="outline" 
-            size="sm" 
+          <Button
+            onClick={fetchHealth}
+            variant="outline"
+            size="sm"
             className="mt-4"
           >
             Retry
@@ -208,15 +238,21 @@ export default function PriceHealthWidget() {
         {/* Status Summary */}
         <div className="grid grid-cols-4 gap-3">
           <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-green-400">{healthData?.healthyCount || 0}</div>
+            <div className="text-2xl font-bold text-green-400">
+              {healthData?.healthyCount || 0}
+            </div>
             <div className="text-xs text-gray-500">Healthy</div>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-400">{healthData?.degradedCount || 0}</div>
+            <div className="text-2xl font-bold text-yellow-400">
+              {healthData?.degradedCount || 0}
+            </div>
             <div className="text-xs text-gray-500">Degraded</div>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-red-400">{healthData?.criticalCount || 0}</div>
+            <div className="text-2xl font-bold text-red-400">
+              {healthData?.criticalCount || 0}
+            </div>
             <div className="text-xs text-gray-500">Critical</div>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-3 text-center">
@@ -235,15 +271,21 @@ export default function PriceHealthWidget() {
               <span className="text-sm text-gray-300">Price Snapshots</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              <span className={snapshotStatus.isRunning ? 'text-green-400' : 'text-red-400'}>
-                {snapshotStatus.isRunning ? 'Running' : 'Stopped'}
+              <span
+                className={
+                  snapshotStatus.isRunning ? "text-green-400" : "text-red-400"
+                }
+              >
+                {snapshotStatus.isRunning ? "Running" : "Stopped"}
               </span>
               <span className="text-gray-500">
                 {snapshotStatus.snapshotCount} snapshots
               </span>
               {snapshotStatus.lastSnapshotTime > 0 && (
                 <span className="text-gray-500">
-                  Last: {formatDuration(Date.now() - snapshotStatus.lastSnapshotTime)} ago
+                  Last:{" "}
+                  {formatDuration(Date.now() - snapshotStatus.lastSnapshotTime)}{" "}
+                  ago
                 </span>
               )}
             </div>
@@ -259,24 +301,31 @@ export default function PriceHealthWidget() {
             >
               <span className="text-sm font-medium text-red-400 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                {unacknowledgedAlerts.length} Unacknowledged Alert{unacknowledgedAlerts.length > 1 ? 's' : ''}
+                {unacknowledgedAlerts.length} Unacknowledged Alert
+                {unacknowledgedAlerts.length > 1 ? "s" : ""}
               </span>
-              <span className="text-gray-500 text-xs">{showAlerts ? 'Hide' : 'Show'}</span>
+              <span className="text-gray-500 text-xs">
+                {showAlerts ? "Hide" : "Show"}
+              </span>
             </button>
-            
+
             {showAlerts && (
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {unacknowledgedAlerts.map(alert => (
+                {unacknowledgedAlerts.map((alert) => (
                   <div
                     key={alert.id}
                     className={`p-2 rounded-lg text-sm flex items-start justify-between gap-2 ${
-                      alert.severity === 'critical' ? 'bg-red-500/10 border border-red-500/30' :
-                      alert.severity === 'error' ? 'bg-orange-500/10 border border-orange-500/30' :
-                      'bg-yellow-500/10 border border-yellow-500/30'
+                      alert.severity === "critical"
+                        ? "bg-red-500/10 border border-red-500/30"
+                        : alert.severity === "error"
+                          ? "bg-orange-500/10 border border-orange-500/30"
+                          : "bg-yellow-500/10 border border-yellow-500/30"
                     }`}
                   >
                     <div className="flex-1">
-                      <div className="font-medium text-gray-200">{alert.message}</div>
+                      <div className="font-medium text-gray-200">
+                        {alert.message}
+                      </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {new Date(alert.timestamp).toLocaleTimeString()}
                         {alert.symbol && ` • ${alert.symbol}`}
@@ -307,12 +356,14 @@ export default function PriceHealthWidget() {
               <TrendingUp className="h-4 w-4" />
               Symbol Status
             </span>
-            <span className="text-gray-500 text-xs">{showAllSymbols ? 'Hide' : 'Show'}</span>
+            <span className="text-gray-500 text-xs">
+              {showAllSymbols ? "Hide" : "Show"}
+            </span>
           </button>
-          
+
           {showAllSymbols && healthData?.symbols && (
             <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-              {healthData.symbols.map(symbol => (
+              {healthData.symbols.map((symbol) => (
                 <div
                   key={symbol.symbol}
                   className="flex items-center justify-between bg-gray-800/30 rounded px-2 py-1"
@@ -320,9 +371,13 @@ export default function PriceHealthWidget() {
                   <span className="text-sm text-gray-300">{symbol.symbol}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">
-                      {symbol.lastPrice.toFixed(symbol.symbol.includes('JPY') ? 3 : 5)}
+                      {symbol.lastPrice.toFixed(
+                        symbol.symbol.includes("JPY") ? 3 : 5,
+                      )}
                     </span>
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(symbol.status)}`} />
+                    <div
+                      className={`w-2 h-2 rounded-full ${getStatusColor(symbol.status)}`}
+                    />
                   </div>
                 </div>
               ))}
@@ -334,7 +389,10 @@ export default function PriceHealthWidget() {
         <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-800">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            Last updated: {healthData?.timestamp ? new Date(healthData.timestamp).toLocaleTimeString() : 'N/A'}
+            Last updated:{" "}
+            {healthData?.timestamp
+              ? new Date(healthData.timestamp).toLocaleTimeString()
+              : "N/A"}
           </div>
           <Button
             variant="ghost"

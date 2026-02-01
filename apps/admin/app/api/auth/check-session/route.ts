@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { Admin } from '@/database/models/admin.model';
-import { jwtVerify } from 'jose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { Admin } from "@/database/models/admin.model";
+import { jwtVerify } from "jose";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
-);
+const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
 
 /**
  * Session Check Endpoint
- * 
+ *
  * Called periodically by the client to verify session validity.
  * Returns { valid: false } if:
  * - Token is invalid/expired
@@ -19,10 +18,10 @@ const SECRET_KEY = new TextEncoder().encode(
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('admin_token')?.value;
+    const token = request.cookies.get("admin_token")?.value;
 
     if (!token) {
-      return NextResponse.json({ valid: false, reason: 'no_token' });
+      return NextResponse.json({ valid: false, reason: "no_token" });
     }
 
     // Verify JWT
@@ -31,36 +30,38 @@ export async function GET(request: NextRequest) {
       const verified = await jwtVerify(token, SECRET_KEY);
       payload = verified.payload;
     } catch {
-      return NextResponse.json({ valid: false, reason: 'invalid_token' });
+      return NextResponse.json({ valid: false, reason: "invalid_token" });
     }
 
     await connectToDatabase();
 
     // Get admin from database
     const admin = await Admin.findById(payload.adminId).select(
-      'status forceLogoutAt passwordChangedAt isLockedOut'
+      "status forceLogoutAt passwordChangedAt isLockedOut",
     );
 
     if (!admin) {
-      return NextResponse.json({ valid: false, reason: 'admin_not_found' });
+      return NextResponse.json({ valid: false, reason: "admin_not_found" });
     }
 
     // Check if account is disabled
-    if (admin.status === 'disabled') {
-      return NextResponse.json({ 
-        valid: false, 
-        reason: 'account_disabled',
-        message: 'Your account has been suspended. Please contact the administrator.'
+    if (admin.status === "disabled") {
+      return NextResponse.json({
+        valid: false,
+        reason: "account_disabled",
+        message:
+          "Your account has been suspended. Please contact the administrator.",
       });
     }
 
     // Check if account is locked out (toggle-based)
     // IMPORTANT: Treat undefined as false (not locked out)
     if ((admin as any).isLockedOut === true) {
-      return NextResponse.json({ 
-        valid: false, 
-        reason: 'locked_out',
-        message: 'You have been logged out by an administrator. Contact the administrator to regain access.'
+      return NextResponse.json({
+        valid: false,
+        reason: "locked_out",
+        message:
+          "You have been logged out by an administrator. Contact the administrator to regain access.",
       });
     }
 
@@ -68,10 +69,10 @@ export async function GET(request: NextRequest) {
     if (admin.forceLogoutAt) {
       const tokenIssuedAt = new Date((payload.iat || 0) * 1000);
       if (tokenIssuedAt < new Date(admin.forceLogoutAt)) {
-        return NextResponse.json({ 
-          valid: false, 
-          reason: 'force_logout',
-          message: 'Your session has been terminated by an administrator.'
+        return NextResponse.json({
+          valid: false,
+          reason: "force_logout",
+          message: "Your session has been terminated by an administrator.",
         });
       }
     }
@@ -80,10 +81,10 @@ export async function GET(request: NextRequest) {
     if (admin.passwordChangedAt) {
       const tokenIssuedAt = new Date((payload.iat || 0) * 1000);
       if (tokenIssuedAt < new Date(admin.passwordChangedAt)) {
-        return NextResponse.json({ 
-          valid: false, 
-          reason: 'password_changed',
-          message: 'Your password was changed. Please log in again.'
+        return NextResponse.json({
+          valid: false,
+          reason: "password_changed",
+          message: "Your password was changed. Please log in again.",
         });
       }
     }
@@ -91,13 +92,12 @@ export async function GET(request: NextRequest) {
     // Update last activity
     await Admin.updateOne(
       { _id: payload.adminId },
-      { lastActivity: new Date(), isOnline: true }
+      { lastActivity: new Date(), isOnline: true },
     );
 
     return NextResponse.json({ valid: true });
   } catch (error) {
-    console.error('Session check error:', error);
-    return NextResponse.json({ valid: false, reason: 'error' });
+    console.error("Session check error:", error);
+    return NextResponse.json({ valid: false, reason: "error" });
   }
 }
-

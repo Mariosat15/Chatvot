@@ -1,14 +1,14 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { getRealPrice, fetchRealForexPrices } from '@/lib/services/real-forex-prices.service';
-import type { ForexSymbol } from '@/lib/services/pnl-calculator.service';
-import mongoose from 'mongoose';
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
+import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
+import mongoose from "mongoose";
 
 /**
  * End a competition and distribute prizes
@@ -24,20 +24,23 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`🏁 Starting competition finalization for: ${competitionId}`);
 
     // Get competition
-    const competition = await Competition.findById(competitionId).session(session);
+    const competition =
+      await Competition.findById(competitionId).session(session);
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
-    if (competition.status !== 'active') {
-      console.log(`⚠️ Competition ${competitionId} is not active (status: ${competition.status}), skipping`);
+    if (competition.status !== "active") {
+      console.log(
+        `⚠️ Competition ${competitionId} is not active (status: ${competition.status}), skipping`,
+      );
       await session.abortTransaction();
-      return { success: false, message: 'Competition is not active' };
+      return { success: false, message: "Competition is not active" };
     }
 
     // STEP 1: Close all open positions AND calculate P&L in memory
     console.log(`📊 Closing all open positions and calculating P&L...`);
-    
+
     // First, get all participants to track their stats
     // NOTE: competitionId in schema is String, so we must convert ObjectId to string
     const allParticipants = await CompetitionParticipant.find({
@@ -67,27 +70,33 @@ export async function finalizeCompetition(competitionId: string) {
       competitionId: competition._id.toString(),
     }).session(session);
 
-    console.log(`Found ${allPositions.length} total positions (open and closed)`);
+    console.log(
+      `Found ${allPositions.length} total positions (open and closed)`,
+    );
 
     // First, process already-closed positions
     // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
-      if (position.status === 'closed' || position.status === 'liquidated') {
+      if (position.status === "closed" || position.status === "liquidated") {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
           // Calculate P&L from entry/exit prices
           // Use exitPrice if available (set when position was closed), otherwise use currentPrice
           // FOREX: contractSize = 100,000 units per standard lot
-          const exitPrice = position.exitPrice ?? position.currentPrice ?? position.entryPrice;
-          const priceDiff = position.side === 'long'
-            ? exitPrice - position.entryPrice
-            : position.entryPrice - exitPrice;
+          const exitPrice =
+            position.exitPrice ?? position.currentPrice ?? position.entryPrice;
+          const priceDiff =
+            position.side === "long"
+              ? exitPrice - position.entryPrice
+              : position.entryPrice - exitPrice;
           const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
-          
+
           // Debug logging for position PNL calculation
-          console.log(`    📈 Position ${position._id}: entry=${position.entryPrice}, exit=${exitPrice}, side=${position.side}, qty=${position.quantity}, PNL=$${positionPnL.toFixed(2)}`);
-          
+          console.log(
+            `    📈 Position ${position._id}: entry=${position.entryPrice}, exit=${exitPrice}, side=${position.side}, qty=${position.quantity}, PNL=$${positionPnL.toFixed(2)}`,
+          );
+
           stats.totalPnL += positionPnL;
           stats.currentCapital += positionPnL;
           stats.closedPositionsCount++;
@@ -100,61 +109,92 @@ export async function finalizeCompetition(competitionId: string) {
         }
       }
     }
-    
-    console.log(`Processed ${allPositions.filter(p => p.status === 'closed' || p.status === 'liquidated').length} already-closed positions`);
+
+    console.log(
+      `Processed ${allPositions.filter((p) => p.status === "closed" || p.status === "liquidated").length} already-closed positions`,
+    );
 
     // Import required models
-    const TradeHistory = (await import('@/database/models/trading/trade-history.model')).default;
-    const TradingOrder = (await import('@/database/models/trading/trading-order.model')).default;
+    const TradeHistory = (
+      await import("@/database/models/trading/trade-history.model")
+    ).default;
+    const TradingOrder = (
+      await import("@/database/models/trading/trading-order.model")
+    ).default;
 
     // Now, close open positions and calculate their P&L
-    const openPositions = allPositions.filter(p => p.status === 'open');
+    const openPositions = allPositions.filter((p) => p.status === "open");
     console.log(`Closing ${openPositions.length} open positions...`);
 
     // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
     // This reduces price fetch from 15+ seconds to <1 second
-    const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
-    console.log(`Fetching prices for ${uniqueSymbols.length} unique symbols: ${uniqueSymbols.join(', ')}`);
-    
+    const uniqueSymbols = [
+      ...new Set(openPositions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    console.log(
+      `Fetching prices for ${uniqueSymbols.length} unique symbols: ${uniqueSymbols.join(", ")}`,
+    );
+
     // 🏥 PRE-FINALIZATION HEALTH CHECK
     // Verify price feed is healthy before finalizing
-    let pricesMap: Map<ForexSymbol, { bid: number; ask: number; mid: number; spread: number; timestamp: number }> = new Map();
+    let pricesMap: Map<
+      ForexSymbol,
+      {
+        bid: number;
+        ask: number;
+        mid: number;
+        spread: number;
+        timestamp: number;
+      }
+    > = new Map();
     let usedSnapshotPrices = false;
-    
+
     // Price health check - only runs in main app context
     // Uses dynamic path to prevent Turbopack from analyzing imports in admin app build
-    const PRICE_HEALTH_SERVICE = '@/lib/services/price-health-monitor.service';
-    const PRICE_SNAPSHOT_SERVICE = '@/lib/services/price-snapshot.service';
-    const INCIDENT_MODEL = '@/database/models/incident.model';
-    
+    const PRICE_HEALTH_SERVICE = "@/lib/services/price-health-monitor.service";
+    const PRICE_SNAPSHOT_SERVICE = "@/lib/services/price-snapshot.service";
+    const INCIDENT_MODEL = "@/database/models/incident.model";
+
     try {
       // Dynamic import that prevents static analysis
-      const priceHealthModule = await import(/* webpackIgnore: true */ PRICE_HEALTH_SERVICE).catch(() => null);
+      const priceHealthModule = await import(
+        /* webpackIgnore: true */ PRICE_HEALTH_SERVICE
+      ).catch(() => null);
       if (!priceHealthModule) {
-        console.log(`ℹ️ [FINALIZATION] Price health service not available in this context - will use live prices`);
-        throw new Error('Price health service not initialized');
+        console.log(
+          `ℹ️ [FINALIZATION] Price health service not available in this context - will use live prices`,
+        );
+        throw new Error("Price health service not initialized");
       }
-      
+
       const { priceHealthMonitor } = priceHealthModule;
-      const healthCheck = priceHealthMonitor.arePricesSafeForFinalization(uniqueSymbols);
-      
+      const healthCheck =
+        priceHealthMonitor.arePricesSafeForFinalization(uniqueSymbols);
+
       if (!healthCheck.safe) {
         console.warn(`⚠️ [FINALIZATION] Price health check FAILED!`);
         for (const issue of healthCheck.issues) {
           console.warn(`   ${issue.symbol}: ${issue.issue}`);
         }
-        
+
         // Try to use last healthy snapshot instead
-        console.log(`📸 Attempting to use last healthy snapshot for finalization...`);
-        const snapshotModule = await import(/* webpackIgnore: true */ PRICE_SNAPSHOT_SERVICE).catch(() => null);
-        
+        console.log(
+          `📸 Attempting to use last healthy snapshot for finalization...`,
+        );
+        const snapshotModule = await import(
+          /* webpackIgnore: true */ PRICE_SNAPSHOT_SERVICE
+        ).catch(() => null);
+
         if (snapshotModule) {
           const { priceSnapshotService } = snapshotModule;
-          const lastHealthy = await priceSnapshotService.getLastHealthySnapshot(competitionId);
-          
+          const lastHealthy =
+            await priceSnapshotService.getLastHealthySnapshot(competitionId);
+
           if (lastHealthy && lastHealthy.prices.size > 0) {
-            console.log(`✅ Using snapshot from ${lastHealthy.timestamp.toISOString()}`);
-            
+            console.log(
+              `✅ Using snapshot from ${lastHealthy.timestamp.toISOString()}`,
+            );
+
             // Convert snapshot prices to the expected format
             pricesMap = new Map();
             for (const symbol of uniqueSymbols) {
@@ -169,37 +209,48 @@ export async function finalizeCompetition(competitionId: string) {
                 });
               }
             }
-            
+
             // Mark snapshot as used
-            await priceSnapshotService.markSnapshotAsUsed(lastHealthy.snapshotId, competitionId);
-            
+            await priceSnapshotService.markSnapshotAsUsed(
+              lastHealthy.snapshotId,
+              competitionId,
+            );
+
             // Update competition with snapshot info
             competition.usedSnapshotId = lastHealthy.snapshotId;
             usedSnapshotPrices = true;
-            
+
             console.log(`📸 Loaded ${pricesMap.size} prices from snapshot`);
           } else {
             // No healthy snapshot - log critical warning but try to proceed with current prices
-            console.error(`❌ [FINALIZATION] No healthy snapshot available! Proceeding with potentially stale prices.`);
-            console.error(`   This may result in unfair finalization. Consider manual intervention.`);
-            
+            console.error(
+              `❌ [FINALIZATION] No healthy snapshot available! Proceeding with potentially stale prices.`,
+            );
+            console.error(
+              `   This may result in unfair finalization. Consider manual intervention.`,
+            );
+
             // Log incident - try to import dynamically
             try {
-              const incidentModule = await import(/* webpackIgnore: true */ INCIDENT_MODEL).catch(() => null);
+              const incidentModule = await import(
+                /* webpackIgnore: true */ INCIDENT_MODEL
+              ).catch(() => null);
               if (incidentModule) {
                 const Incident = incidentModule.default;
                 await Incident.create({
                   competitionId,
-                  type: 'price_feed_failure',
-                  severity: 'critical',
-                  status: 'open',
-                  title: 'Price Feed Failure During Finalization',
+                  type: "price_feed_failure",
+                  severity: "critical",
+                  status: "open",
+                  title: "Price Feed Failure During Finalization",
                   description: `Price health check failed during finalization. No healthy snapshot available. Proceeded with potentially stale prices.`,
-                  affectedUsers: allParticipants.map(p => p.userId.toString()),
+                  affectedUsers: allParticipants.map((p) =>
+                    p.userId.toString(),
+                  ),
                   evidence: {
                     healthIssues: healthCheck.issues,
                   },
-                  createdBy: 'system',
+                  createdBy: "system",
                 });
               }
             } catch {
@@ -212,21 +263,25 @@ export async function finalizeCompetition(competitionId: string) {
       console.warn(`⚠️ [FINALIZATION] Health check unavailable:`, healthError);
       // Continue with normal price fetch
     }
-    
+
     // Fetch current prices if not using snapshot
     if (!pricesMap || pricesMap.size === 0) {
       pricesMap = await fetchRealForexPrices(uniqueSymbols);
     }
-    
-    console.log(`Got ${pricesMap.size} prices ${usedSnapshotPrices ? '(from snapshot)' : '(live)'} in single batch`);
-    
+
+    console.log(
+      `Got ${pricesMap.size} prices ${usedSnapshotPrices ? "(from snapshot)" : "(live)"} in single batch`,
+    );
+
     // Log which prices we have
     if (pricesMap.size > 0) {
       for (const [symbol, price] of pricesMap.entries()) {
         console.log(`  ✅ ${symbol}: bid=${price.bid}, ask=${price.ask}`);
       }
     } else {
-      console.error(`  ❌ WARNING: No prices available! This will prevent position closing.`);
+      console.error(
+        `  ❌ WARNING: No prices available! This will prevent position closing.`,
+      );
     }
 
     for (const position of openPositions) {
@@ -234,20 +289,28 @@ export async function finalizeCompetition(competitionId: string) {
         // Get price from pre-fetched batch (instant!)
         const priceData = pricesMap.get(position.symbol as ForexSymbol);
         if (!priceData) {
-          console.error(`  ❌ Could not get price for ${position.symbol}, skipping`);
+          console.error(
+            `  ❌ Could not get price for ${position.symbol}, skipping`,
+          );
           continue;
         }
-        const exitPrice = position.side === 'long' ? priceData.bid : priceData.ask;
+        const exitPrice =
+          position.side === "long" ? priceData.bid : priceData.ask;
 
-        console.log(`  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`);
+        console.log(
+          `  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`,
+        );
 
         // Calculate P&L for this position (FOREX: contractSize = 100,000 units per lot)
-        const priceDiff = position.side === 'long'
-          ? exitPrice - position.entryPrice
-          : position.entryPrice - exitPrice;
+        const priceDiff =
+          position.side === "long"
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
         const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
 
-        console.log(`    Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`);
+        console.log(
+          `    Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
+        );
 
         // Create a close order for this position
         const closeOrder = await TradingOrder.create(
@@ -257,22 +320,22 @@ export async function finalizeCompetition(competitionId: string) {
               userId: position.userId,
               participantId: position.participantId,
               symbol: position.symbol,
-              side: position.side === 'long' ? 'sell' : 'buy', // Opposite of position
-              orderType: 'market',
+              side: position.side === "long" ? "sell" : "buy", // Opposite of position
+              orderType: "market",
               quantity: position.quantity,
               executedPrice: exitPrice,
               slippage: 0,
               leverage: position.leverage,
               marginRequired: position.marginUsed,
-              status: 'filled',
+              status: "filled",
               filledQuantity: position.quantity,
               remainingQuantity: 0,
               placedAt: new Date(),
               executedAt: new Date(),
-              orderSource: 'system',
+              orderSource: "system",
             },
           ],
-          { session }
+          { session },
         );
 
         // Update position in database
@@ -280,19 +343,21 @@ export async function finalizeCompetition(competitionId: string) {
           position._id,
           {
             $set: {
-              status: 'closed',
+              status: "closed",
               exitPrice: exitPrice,
               profitLoss: positionPnL,
               closedAt: new Date(),
-              closeReason: 'competition_end',
+              closeReason: "competition_end",
               closeOrderId: closeOrder[0]._id.toString(),
             },
           },
-          { session }
+          { session },
         );
 
         // Create TradeHistory record (CRITICAL: This was missing!)
-        const holdingTime = Math.floor((Date.now() - position.openedAt.getTime()) / 1000);
+        const holdingTime = Math.floor(
+          (Date.now() - position.openedAt.getTime()) / 1000,
+        );
         await TradeHistory.create(
           [
             {
@@ -302,7 +367,7 @@ export async function finalizeCompetition(competitionId: string) {
               symbol: position.symbol,
               side: position.side,
               quantity: position.quantity,
-              orderType: 'market',
+              orderType: "market",
               entryPrice: position.entryPrice,
               exitPrice: exitPrice,
               priceChange: priceDiff,
@@ -312,7 +377,7 @@ export async function finalizeCompetition(competitionId: string) {
               openedAt: position.openedAt,
               closedAt: new Date(),
               holdingTimeSeconds: holdingTime,
-              closeReason: 'competition_end',
+              closeReason: "competition_end",
               leverage: position.leverage,
               marginUsed: position.marginUsed,
               hadStopLoss: !!position.stopLoss,
@@ -325,7 +390,7 @@ export async function finalizeCompetition(competitionId: string) {
               isWinner: positionPnL > 0,
             },
           ],
-          { session }
+          { session },
         );
 
         // Update participant stats in memory
@@ -342,12 +407,15 @@ export async function finalizeCompetition(competitionId: string) {
             stats.largestWin = Math.max(stats.largestWin || 0, positionPnL);
           } else if (positionPnL < 0) {
             stats.losingTrades++;
-            stats.totalLossAmount = (stats.totalLossAmount || 0) + Math.abs(positionPnL);
+            stats.totalLossAmount =
+              (stats.totalLossAmount || 0) + Math.abs(positionPnL);
             stats.largestLoss = Math.min(stats.largestLoss || 0, positionPnL);
           }
         }
 
-        console.log(`  ✅ Position closed & TradeHistory created: P&L = $${positionPnL.toFixed(2)}`);
+        console.log(
+          `  ✅ Position closed & TradeHistory created: P&L = $${positionPnL.toFixed(2)}`,
+        );
       } catch (error) {
         console.error(`  ❌ Error closing position ${position._id}:`, error);
         // Continue with other positions even if one fails
@@ -356,22 +424,26 @@ export async function finalizeCompetition(competitionId: string) {
 
     // STEP 1.5: Update all participant records with calculated stats
     console.log(`🔄 Updating participant statistics...`);
-    for (const [userId, stats] of participantStats.entries()) {
-      const pnlPercentage = stats.participant.startingCapital > 0 
-        ? (stats.totalPnL / stats.participant.startingCapital) * 100 
-        : 0;
+    for (const [_userId, stats] of participantStats.entries()) {
+      const pnlPercentage =
+        stats.participant.startingCapital > 0
+          ? (stats.totalPnL / stats.participant.startingCapital) * 100
+          : 0;
 
-      const winRate = stats.closedPositionsCount > 0 
-        ? (stats.winningTrades / stats.closedPositionsCount) * 100 
-        : 0;
+      const winRate =
+        stats.closedPositionsCount > 0
+          ? (stats.winningTrades / stats.closedPositionsCount) * 100
+          : 0;
 
-      const averageWin = stats.winningTrades > 0 
-        ? (stats.totalWinAmount || 0) / stats.winningTrades 
-        : 0;
+      const averageWin =
+        stats.winningTrades > 0
+          ? (stats.totalWinAmount || 0) / stats.winningTrades
+          : 0;
 
-      const averageLoss = stats.losingTrades > 0 
-        ? (stats.totalLossAmount || 0) / stats.losingTrades 
-        : 0;
+      const averageLoss =
+        stats.losingTrades > 0
+          ? (stats.totalLossAmount || 0) / stats.losingTrades
+          : 0;
 
       await CompetitionParticipant.findByIdAndUpdate(
         stats.participant._id,
@@ -395,10 +467,12 @@ export async function finalizeCompetition(competitionId: string) {
             currentOpenPositions: 0, // CRITICAL: Set to 0!
           },
         },
-        { session }
+        { session },
       );
 
-      console.log(`  ✅ ${stats.participant.username}: Capital=$${stats.currentCapital.toFixed(2)}, P&L=$${stats.totalPnL.toFixed(2)}, Win Rate=${winRate.toFixed(2)}% (${stats.closedPositionsCount} trades)`);
+      console.log(
+        `  ✅ ${stats.participant.username}: Capital=$${stats.currentCapital.toFixed(2)}, P&L=$${stats.totalPnL.toFixed(2)}, Win Rate=${winRate.toFixed(2)}% (${stats.closedPositionsCount} trades)`,
+      );
     }
 
     // STEP 2: Calculate final rankings using new rules system
@@ -412,14 +486,13 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`Found ${participants.length} participants`);
 
     // Import ranking service
-    const { calculateRankings, distributePrizesWithTies } = await import(
-      '@/lib/services/competition-ranking.service'
-    );
+    const { calculateRankings, distributePrizesWithTies } =
+      await import("@/lib/services/competition-ranking.service");
 
     // Prepare participant data for ranking
     const participantData = participants.map((p) => ({
       userId: p.userId,
-      username: p.username || 'Anonymous',
+      username: p.username || "Anonymous",
       currentCapital: p.currentCapital,
       pnl: p.pnl,
       pnlPercentage: p.pnlPercentage,
@@ -434,11 +507,11 @@ export async function finalizeCompetition(competitionId: string) {
 
     // Use competition rules merged with defaults (ensure all required fields exist)
     const defaultRules = {
-      rankingMethod: 'pnl' as const,
-      tieBreaker1: 'win_rate' as const,
-      tieBreaker2: 'join_time' as const, // Secondary tiebreaker to ensure ranking
+      rankingMethod: "pnl" as const,
+      tieBreaker1: "win_rate" as const,
+      tieBreaker2: "join_time" as const, // Secondary tiebreaker to ensure ranking
       minimumTrades: 0,
-      tiePrizeDistribution: 'split_equally' as const,
+      tiePrizeDistribution: "split_equally" as const,
       disqualifyOnLiquidation: true,
     };
     const rules = {
@@ -449,7 +522,7 @@ export async function finalizeCompetition(competitionId: string) {
     // Calculate rankings with tie-breaking
     // IMPORTANT: Pass 'completed' status to check minimum trades for final ranking
     const rankedParticipants = calculateRankings(participantData, rules, {
-      competitionStatus: 'completed',
+      competitionStatus: "completed",
     });
 
     console.log(`📊 Rankings calculated with rules:`, {
@@ -489,10 +562,12 @@ export async function finalizeCompetition(competitionId: string) {
       competition.prizeDistribution || [],
       prizePool, // Pass GROSS prize pool, not net
       rules,
-      platformFeePercentage // Pass platform fee to deduct from each prize
+      platformFeePercentage, // Pass platform fee to deduct from each prize
     );
 
-    console.log(`💎 Calculated ${prizeDistributions.length} prize distributions (including ties)`);
+    console.log(
+      `💎 Calculated ${prizeDistributions.length} prize distributions (including ties)`,
+    );
 
     let totalDistributed = 0;
     const winnerTransactions = [];
@@ -500,16 +575,20 @@ export async function finalizeCompetition(competitionId: string) {
     // Distribute to each winner
     for (const dist of prizeDistributions) {
       const winner = leaderboard.find((l) => l.userId === dist.userId);
-      
+
       if (winner) {
         const prizeAmount = dist.prizeAmount;
         winner.prizeAmount = prizeAmount;
         totalDistributed += prizeAmount;
 
-        console.log(`  🏆 Rank ${dist.rank}${dist.isTied ? ' (TIED)' : ''}: ${winner.username} wins ${prizeAmount} credits`);
+        console.log(
+          `  🏆 Rank ${dist.rank}${dist.isTied ? " (TIED)" : ""}: ${winner.username} wins ${prizeAmount} credits`,
+        );
 
         // Get winner's wallet (or create if doesn't exist)
-        let winnerWallet = await CreditWallet.findOne({ userId: winner.userId }).session(session);
+        let winnerWallet = await CreditWallet.findOne({
+          userId: winner.userId,
+        }).session(session);
         if (!winnerWallet) {
           winnerWallet = await CreditWallet.create(
             [
@@ -525,7 +604,7 @@ export async function finalizeCompetition(competitionId: string) {
                 withdrawalEnabled: false,
               },
             ],
-            { session }
+            { session },
           );
           winnerWallet = winnerWallet[0];
         }
@@ -542,7 +621,7 @@ export async function finalizeCompetition(competitionId: string) {
               totalWonFromCompetitions: prizeAmount,
             },
           },
-          { session }
+          { session },
         );
 
         // Create transaction record
@@ -550,12 +629,12 @@ export async function finalizeCompetition(competitionId: string) {
           [
             {
               userId: winner.userId,
-              transactionType: 'competition_win',
+              transactionType: "competition_win",
               amount: prizeAmount,
               balanceBefore,
               balanceAfter,
               competitionId: competition._id,
-              status: 'completed',
+              status: "completed",
               description: dist.isTied
                 ? `🏆 Prize for Rank ${winner.rank} (Tied) in ${competition.name}`
                 : `🏆 Prize for Rank ${winner.rank} in ${competition.name}`,
@@ -569,7 +648,7 @@ export async function finalizeCompetition(competitionId: string) {
               },
             },
           ],
-          { session }
+          { session },
         );
 
         winnerTransactions.push(transaction[0]);
@@ -581,10 +660,12 @@ export async function finalizeCompetition(competitionId: string) {
 
     // STEP 4: Calculate platform fee
     // IMPORTANT: Platform fee is ONLY the % taken, NOT the entire pool when no winners
-    const qualifiedWinners = rankedParticipants.filter(p => p.qualificationStatus === 'qualified');
+    const qualifiedWinners = rankedParticipants.filter(
+      (p) => p.qualificationStatus === "qualified",
+    );
     const expectedWinners = competition.prizeDistribution?.length || 0;
     const actualWinners = prizeDistributions.length;
-    
+
     // Calculate the ACTUAL platform fee (only the percentage portion)
     // When winners exist: fee = prizePool - totalDistributed (the % taken from each winner)
     // When NO winners: fee = prizePool * feePercentage (still only the % portion, not the entire pool)
@@ -597,34 +678,44 @@ export async function finalizeCompetition(competitionId: string) {
       // The remaining goes to unclaimed pools, not to platform fee
       actualPlatformFee = prizePool * platformFeePercentage;
     }
-    
-    console.log(`💼 Platform fee calculated: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}% of pool)`);
-    
+
+    console.log(
+      `💼 Platform fee calculated: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}% of pool)`,
+    );
+
     // NOTE: Platform fee is recorded ONLY in PlatformTransaction (via PlatformFinancialsService)
     // We do NOT create a WalletTransaction for platform fees to avoid duplicate records
 
     // STEP 4.5: Record unclaimed pool funds and platform earnings in financials
-    const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
-    
+    const { PlatformFinancialsService } =
+      await import("@/lib/services/platform-financials.service");
+
     // ONLY record unclaimed pool when NO winners at all received prizes
     // When actualWinners > 0, all funds are distributed/redistributed - nothing is unclaimed
     if (actualWinners === 0 && prizePool > 0) {
       // All funds (minus platform fee) are unclaimed because no one got any prizes
       const unclaimedNet = prizePool * (1 - platformFeePercentage); // Pool minus the fee portion
-      
+
       // Determine reason for unclaimed
-      let unclaimedReason: 'no_participants' | 'all_disqualified' | 'no_qualified_winners';
+      let unclaimedReason:
+        | "no_participants"
+        | "all_disqualified"
+        | "no_qualified_winners";
       if (participants.length === 0) {
-        unclaimedReason = 'no_participants';
+        unclaimedReason = "no_participants";
       } else if (qualifiedWinners.length === 0) {
-        unclaimedReason = 'all_disqualified';
+        unclaimedReason = "all_disqualified";
       } else {
-        unclaimedReason = 'no_qualified_winners';
+        unclaimedReason = "no_qualified_winners";
       }
-      
-      console.log(`💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`);
-      console.log(`   Platform fee: ${actualPlatformFee.toFixed(2)} + Unclaimed: ${unclaimedNet.toFixed(2)} = ${prizePool.toFixed(2)} (total pool)`);
-      
+
+      console.log(
+        `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
+      );
+      console.log(
+        `   Platform fee: ${actualPlatformFee.toFixed(2)} + Unclaimed: ${unclaimedNet.toFixed(2)} = ${prizePool.toFixed(2)} (total pool)`,
+      );
+
       await PlatformFinancialsService.recordUnclaimedPool({
         competitionId: competition._id.toString(),
         competitionName: competition.name,
@@ -632,18 +723,22 @@ export async function finalizeCompetition(competitionId: string) {
         reason: unclaimedReason,
         winnersCount: 0,
         expectedWinnersCount: expectedWinners,
-        description: `Unclaimed pool from ${competition.name}: ${unclaimedReason.replace(/_/g, ' ')} - No prizes awarded`,
+        description: `Unclaimed pool from ${competition.name}: ${unclaimedReason.replace(/_/g, " ")} - No prizes awarded`,
       });
     } else if (actualWinners > 0 && actualWinners < expectedWinners) {
       // Log that prizes were redistributed (not unclaimed)
-      console.log(`📊 Prize redistribution: ${actualWinners} winners received ${expectedWinners} prize positions worth of prizes`);
-      console.log(`   Extra prize %s were redistributed as bonus to existing winners - no unclaimed funds`);
+      console.log(
+        `📊 Prize redistribution: ${actualWinners} winners received ${expectedWinners} prize positions worth of prizes`,
+      );
+      console.log(
+        `   Extra prize %s were redistributed as bonus to existing winners - no unclaimed funds`,
+      );
     }
-    
+
     // STEP 4.6: Calculate Game Master referral fees FIRST (before recording platform fee)
     // GM fees come FROM the platform fee, so we need to calculate them first
     console.log(`🎮 Calculating Game Master referral fees...`);
-    
+
     let totalGmEarnings = 0; // Track total GM earnings to subtract from platform fee
     const gmPayments: Array<{
       gmId: string;
@@ -652,105 +747,133 @@ export async function finalizeCompetition(competitionId: string) {
       feePercentage: number;
       totalEarning: number;
     }> = [];
-    
+
     try {
       const db = mongoose.connection.db;
       if (db) {
         // Get participant user IDs
-        const participantUserIds = participants.map(p => p.userId);
-        
+        const participantUserIds = participants.map((p) => p.userId);
+
         // DEBUG: Log participant userIds being searched
-        console.log(`   🔍 Searching for referrals with userIds: ${participantUserIds.join(', ')}`);
-        
+        console.log(
+          `   🔍 Searching for referrals with userIds: ${participantUserIds.join(", ")}`,
+        );
+
         // Use UserReferral collection as source of truth for referral relationships
         // This is more reliable than user.referredByGameMasterId field
-        const userReferrals = await db.collection('userreferrals').find({
-          userId: { $in: participantUserIds },
-          isActive: true,
-          gameMasterId: { $exists: true, $ne: null },
-        }).toArray();
-        
-        console.log(`   Found ${userReferrals.length} referred participants (via UserReferral collection)`);
-        
+        const userReferrals = await db
+          .collection("userreferrals")
+          .find({
+            userId: { $in: participantUserIds },
+            isActive: true,
+            gameMasterId: { $exists: true, $ne: null },
+          })
+          .toArray();
+
+        console.log(
+          `   Found ${userReferrals.length} referred participants (via UserReferral collection)`,
+        );
+
         // DEBUG: Log each found referral
         for (const ref of userReferrals) {
-          console.log(`   📋 UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`);
+          console.log(
+            `   📋 UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`,
+          );
         }
-        
+
         // Also check user.referredByGameMasterId as fallback
-        const referredParticipantsFromUser = await db.collection('user').find({
-          id: { $in: participantUserIds },
-          referredByGameMasterId: { $exists: true, $ne: null },
-        }).toArray();
-        
-        console.log(`   Found ${referredParticipantsFromUser.length} referred participants (via user.referredByGameMasterId)`);
-        
+        const referredParticipantsFromUser = await db
+          .collection("user")
+          .find({
+            id: { $in: participantUserIds },
+            referredByGameMasterId: { $exists: true, $ne: null },
+          })
+          .toArray();
+
+        console.log(
+          `   Found ${referredParticipantsFromUser.length} referred participants (via user.referredByGameMasterId)`,
+        );
+
         // Create a merged map of userId -> gameMasterId (UserReferral takes precedence)
-        const referralMap = new Map<string, { gmId: string; userName: string; userEmail: string }>();
-        
+        const referralMap = new Map<
+          string,
+          { gmId: string; userName: string; userEmail: string }
+        >();
+
         // First add from user collection (fallback)
         for (const user of referredParticipantsFromUser) {
           referralMap.set(user.id, {
             gmId: user.referredByGameMasterId,
-            userName: user.name || 'Unknown',
+            userName: user.name || "Unknown",
             userEmail: user.email,
           });
         }
-        
+
         // Then add/override from UserReferral collection (source of truth)
         for (const ref of userReferrals) {
           referralMap.set(ref.userId, {
             gmId: ref.gameMasterId,
-            userName: ref.userName || 'Unknown',
+            userName: ref.userName || "Unknown",
             userEmail: ref.userEmail,
           });
         }
-        
-        console.log(`   Total unique referred participants: ${referralMap.size}`);
-        
+
+        console.log(
+          `   Total unique referred participants: ${referralMap.size}`,
+        );
+
         // DEBUG: Log referralMap contents
         for (const [userId, refData] of referralMap) {
-          console.log(`   📍 referralMap: userId=${userId} -> gmId=${refData.gmId}, userName=${refData.userName}`);
+          console.log(
+            `   📍 referralMap: userId=${userId} -> gmId=${refData.gmId}, userName=${refData.userName}`,
+          );
         }
-        
+
         // Group by game master
-        const gmEarningsMap = new Map<string, { 
-          gmId: string; 
-          users: { userId: string; userName: string; userEmail: string }[];
-          totalEntryFees: number;
-        }>();
-        
+        const gmEarningsMap = new Map<
+          string,
+          {
+            gmId: string;
+            users: { userId: string; userName: string; userEmail: string }[];
+            totalEntryFees: number;
+          }
+        >();
+
         for (const [userId, refData] of referralMap) {
           const gmId = refData.gmId;
-          const participant = participants.find(p => p.userId === userId);
+          const participant = participants.find((p) => p.userId === userId);
           if (!participant || !gmId) {
-            console.log(`   ⚠️ Skipping userId=${userId}: participant found=${!!participant}, gmId=${gmId}`);
+            console.log(
+              `   ⚠️ Skipping userId=${userId}: participant found=${!!participant}, gmId=${gmId}`,
+            );
             continue;
           }
-          
+
           if (!gmEarningsMap.has(gmId)) {
-            gmEarningsMap.set(gmId, { 
-              gmId, 
-              users: [], 
-              totalEntryFees: 0 
+            gmEarningsMap.set(gmId, {
+              gmId,
+              users: [],
+              totalEntryFees: 0,
             });
           }
-          
+
           const gmData = gmEarningsMap.get(gmId)!;
-          gmData.users.push({ 
-            userId, 
-            userName: refData.userName, 
-            userEmail: refData.userEmail 
+          gmData.users.push({
+            userId,
+            userName: refData.userName,
+            userEmail: refData.userEmail,
           });
           gmData.totalEntryFees += competition.entryFee;
         }
-        
+
         // DEBUG: Log gmEarningsMap contents
         console.log(`   📊 gmEarningsMap has ${gmEarningsMap.size} GM(s):`);
         for (const [gmId, data] of gmEarningsMap) {
-          console.log(`   📊 GM ${gmId}: ${data.users.length} user(s), totalEntryFees=${data.totalEntryFees}`);
+          console.log(
+            `   📊 GM ${gmId}: ${data.users.length} user(s), totalEntryFees=${data.totalEntryFees}`,
+          );
         }
-        
+
         // Calculate earnings for each game master (but don't pay yet)
         // Also track inactive GM fees for platform reconciliation
         const inactiveGmFees: Array<{
@@ -761,59 +884,89 @@ export async function finalizeCompetition(competitionId: string) {
           feePercentage: number;
           subscriptionStatus: string;
         }> = [];
-        
+
         for (const [gmId, gmData] of gmEarningsMap) {
           // First check if there's ANY subscription (active or not)
-          const anySubscription = await db.collection('gamemastersubscriptions').findOne({
-            userId: gmId,
-          });
-          
+          const anySubscription = await db
+            .collection("gamemastersubscriptions")
+            .findOne({
+              userId: gmId,
+            });
+
           // Check for ACTIVE and NOT PAUSED subscription
-          const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
-            userId: gmId,
-            status: 'active',
-            isPaused: { $ne: true }, // Must NOT be paused
-          });
-          
+          const gmSubscription = await db
+            .collection("gamemastersubscriptions")
+            .findOne({
+              userId: gmId,
+              status: "active",
+              isPaused: { $ne: true }, // Must NOT be paused
+            });
+
           // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
           // This ensures if admin changes package settings, all GMs with that package see the update
           let currentFeePercentage = 5; // Default fallback
           if (gmSubscription?.packageId) {
             try {
-              const currentPackage = await db.collection('marketplaceitems').findOne({
-                _id: new mongoose.Types.ObjectId(gmSubscription.packageId),
-              });
-              if (currentPackage?.gameMasterConfig?.referralFeePercentage !== undefined) {
-                currentFeePercentage = currentPackage.gameMasterConfig.referralFeePercentage;
-                console.log(`   📦 Using current package settings: ${currentFeePercentage}% from "${currentPackage.name}"`);
+              const currentPackage = await db
+                .collection("marketplaceitems")
+                .findOne({
+                  _id: new mongoose.Types.ObjectId(gmSubscription.packageId),
+                });
+              if (
+                currentPackage?.gameMasterConfig?.referralFeePercentage !==
+                undefined
+              ) {
+                currentFeePercentage =
+                  currentPackage.gameMasterConfig.referralFeePercentage;
+                console.log(
+                  `   📦 Using current package settings: ${currentFeePercentage}% from "${currentPackage.name}"`,
+                );
               } else {
                 // Fallback to cached subscription limits if package not found
-                currentFeePercentage = gmSubscription.limits?.referralFeePercentage || 5;
-                console.log(`   ⚠️ Package not found, using cached subscription limits: ${currentFeePercentage}%`);
+                currentFeePercentage =
+                  gmSubscription.limits?.referralFeePercentage || 5;
+                console.log(
+                  `   ⚠️ Package not found, using cached subscription limits: ${currentFeePercentage}%`,
+                );
               }
-            } catch (pkgError) {
+            } catch {
               // Fallback to cached subscription limits
-              currentFeePercentage = gmSubscription?.limits?.referralFeePercentage || 5;
-              console.log(`   ⚠️ Error fetching package, using cached: ${currentFeePercentage}%`);
+              currentFeePercentage =
+                gmSubscription?.limits?.referralFeePercentage || 5;
+              console.log(
+                `   ⚠️ Error fetching package, using cached: ${currentFeePercentage}%`,
+              );
             }
           } else if (gmSubscription) {
-            currentFeePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+            currentFeePercentage =
+              gmSubscription.limits?.referralFeePercentage || 5;
           }
-          
+
           if (!gmSubscription) {
             // GM has no active subscription OR is paused - record this for platform reconciliation
             const defaultFeePercentage = currentFeePercentage;
-            const wouldHaveEarned = gmData.users.length * competition.entryFee * (defaultFeePercentage / 100);
-            let subscriptionStatus = anySubscription?.status || 'no_subscription';
-            
+            const wouldHaveEarned =
+              gmData.users.length *
+              competition.entryFee *
+              (defaultFeePercentage / 100);
+            let subscriptionStatus =
+              anySubscription?.status || "no_subscription";
+
             // Check if specifically paused
-            if (anySubscription?.status === 'active' && anySubscription?.isPaused) {
-              subscriptionStatus = 'paused';
+            if (
+              anySubscription?.status === "active" &&
+              anySubscription?.isPaused
+            ) {
+              subscriptionStatus = "paused";
             }
-            
-            console.log(`   ⚠️ Game master ${gmId} has no earning-eligible subscription (status: ${subscriptionStatus}), retaining fee for platform`);
-            console.log(`   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${gmData.users.length} referrals`);
-            
+
+            console.log(
+              `   ⚠️ Game master ${gmId} has no earning-eligible subscription (status: ${subscriptionStatus}), retaining fee for platform`,
+            );
+            console.log(
+              `   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${gmData.users.length} referrals`,
+            );
+
             inactiveGmFees.push({
               gmId,
               gmEmail: anySubscription?.userEmail,
@@ -824,10 +977,11 @@ export async function finalizeCompetition(competitionId: string) {
             });
             continue;
           }
-          
+
           const feePercentage = currentFeePercentage;
-          const totalEarning = gmData.users.length * competition.entryFee * (feePercentage / 100);
-          
+          const totalEarning =
+            gmData.users.length * competition.entryFee * (feePercentage / 100);
+
           totalGmEarnings += totalEarning;
           gmPayments.push({
             gmId,
@@ -836,17 +990,21 @@ export async function finalizeCompetition(competitionId: string) {
             feePercentage,
             totalEarning,
           });
-          
-          console.log(`   📊 GM ${gmId}: ${gmData.users.length} referrals × €${competition.entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`);
+
+          console.log(
+            `   📊 GM ${gmId}: ${gmData.users.length} referrals × €${competition.entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`,
+          );
         }
-        
+
         // Record retained GM fees for platform reconciliation
         if (inactiveGmFees.length > 0) {
-          console.log(`   📊 Recording ${inactiveGmFees.length} inactive GM fee(s) for reconciliation...`);
+          console.log(
+            `   📊 Recording ${inactiveGmFees.length} inactive GM fee(s) for reconciliation...`,
+          );
           for (const inactiveGm of inactiveGmFees) {
             try {
               await PlatformFinancialsService.recordRetainedGmFee({
-                sourceType: 'competition',
+                sourceType: "competition",
                 sourceId: competition._id.toString(),
                 sourceName: competition.name,
                 gameMasterId: inactiveGm.gmId,
@@ -855,26 +1013,33 @@ export async function finalizeCompetition(competitionId: string) {
                 amount: inactiveGm.wouldHaveEarned,
                 originalFeePercentage: inactiveGm.feePercentage,
                 subscriptionStatus: inactiveGm.subscriptionStatus,
-                referredUserIds: inactiveGm.users.map(u => u.userId),
+                referredUserIds: inactiveGm.users.map((u) => u.userId),
               });
             } catch (recordError) {
-              console.error(`   ⚠️ Failed to record retained GM fee for ${inactiveGm.gmId}:`, recordError);
+              console.error(
+                `   ⚠️ Failed to record retained GM fee for ${inactiveGm.gmId}:`,
+                recordError,
+              );
             }
           }
         }
       }
     } catch (gmCalcError) {
-      console.error('   ⚠️ Error calculating Game Master fees:', gmCalcError);
+      console.error("   ⚠️ Error calculating Game Master fees:", gmCalcError);
       // Continue without GM fees if calculation fails
     }
-    
+
     // SAFEGUARD: Cap total GM earnings at the gross platform fee
     // This prevents platform from losing money if GM referral % > platform fee %
     let actualGmEarnings = totalGmEarnings;
     if (totalGmEarnings > actualPlatformFee) {
-      console.warn(`   ⚠️ WARNING: Total GM earnings (${totalGmEarnings.toFixed(2)}) exceed platform fee (${actualPlatformFee.toFixed(2)})`);
-      console.warn(`   ⚠️ Capping GM earnings at platform fee to prevent platform loss`);
-      
+      console.warn(
+        `   ⚠️ WARNING: Total GM earnings (${totalGmEarnings.toFixed(2)}) exceed platform fee (${actualPlatformFee.toFixed(2)})`,
+      );
+      console.warn(
+        `   ⚠️ Capping GM earnings at platform fee to prevent platform loss`,
+      );
+
       // Scale down all GM payments proportionally
       const scaleFactor = actualPlatformFee / totalGmEarnings;
       for (const payment of gmPayments) {
@@ -882,23 +1047,29 @@ export async function finalizeCompetition(competitionId: string) {
       }
       actualGmEarnings = actualPlatformFee; // Cap at platform fee
     }
-    
+
     // Calculate NET platform fee (platform fee minus GM referral fees)
     const netPlatformFee = Math.max(0, actualPlatformFee - actualGmEarnings);
-    
+
     console.log(`💼 Platform fee breakdown:`);
-    console.log(`   Gross platform fee: €${actualPlatformFee.toFixed(2)} (${competition.platformFeePercentage}%)`);
-    console.log(`   GM referral fees:   €${actualGmEarnings.toFixed(2)} (from ${gmPayments.reduce((sum, p) => sum + p.users.length, 0)} referrals)`);
+    console.log(
+      `   Gross platform fee: €${actualPlatformFee.toFixed(2)} (${competition.platformFeePercentage}%)`,
+    );
+    console.log(
+      `   GM referral fees:   €${actualGmEarnings.toFixed(2)} (from ${gmPayments.reduce((sum, p) => sum + p.users.length, 0)} referrals)`,
+    );
     if (totalGmEarnings !== actualGmEarnings) {
-      console.log(`   (Capped from €${totalGmEarnings.toFixed(2)} to prevent platform loss)`);
+      console.log(
+        `   (Capped from €${totalGmEarnings.toFixed(2)} to prevent platform loss)`,
+      );
     }
     console.log(`   NET platform fee:   €${netPlatformFee.toFixed(2)}`);
-    
+
     // Record NET platform fee in financials (after subtracting GM fees)
     if (netPlatformFee > 0) {
       await PlatformFinancialsService.recordPlatformFee({
         amount: netPlatformFee,
-        sourceType: 'competition',
+        sourceType: "competition",
         sourceId: competition._id.toString(),
         sourceName: competition.name,
         description: `Platform fee (${competition.platformFeePercentage}% - ${totalGmEarnings.toFixed(2)} GM fees) from ${competition.name}`,
@@ -911,11 +1082,12 @@ export async function finalizeCompetition(competitionId: string) {
       const db = mongoose.connection.db;
       if (db && gmPayments.length > 0) {
         for (const payment of gmPayments) {
-          const { gmId, gmSubscription, users, feePercentage, totalEarning } = payment;
-          
+          const { gmId, gmSubscription, users, feePercentage, totalEarning } =
+            payment;
+
           // Calculate per-user earning from the (potentially scaled) totalEarning
           const perUserEarning = totalEarning / users.length;
-          
+
           // Create earning records for each referred user
           for (const user of users) {
             const entryFee = competition.entryFee;
@@ -925,12 +1097,12 @@ export async function finalizeCompetition(competitionId: string) {
             const netEarning = grossEarning - platformFee;
             // Calculate effective percentage (may be lower than package rate if capped)
             const effectivePercentage = (perUserEarning / entryFee) * 100;
-            
+
             // Create GameMasterEarning record
-            await db.collection('gamemasterearnings').insertOne({
+            await db.collection("gamemasterearnings").insertOne({
               gameMasterId: gmId,
               gameMasterEmail: gmSubscription.userEmail,
-              sourceType: 'competition',
+              sourceType: "competition",
               sourceId: competition._id.toString(),
               sourceName: competition.name,
               referredUserId: user.userId,
@@ -942,7 +1114,7 @@ export async function finalizeCompetition(competitionId: string) {
               grossEarning,
               platformFee,
               netEarning,
-              status: 'pending',
+              status: "pending",
               eventStartTime: competition.startTime,
               eventEndTime: competition.endTime,
               participantCount: participants.length,
@@ -950,106 +1122,119 @@ export async function finalizeCompetition(competitionId: string) {
               createdAt: new Date(),
               updatedAt: new Date(),
             });
-            
-            console.log(`   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}${effectivePercentage < feePercentage ? ' (capped)' : ''}`);
+
+            console.log(
+              `   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}${effectivePercentage < feePercentage ? " (capped)" : ""}`,
+            );
           }
-          
+
           // Update game master subscription stats (totalEarning already calculated in payment object)
-          await db.collection('gamemastersubscriptions').updateOne(
+          await db.collection("gamemastersubscriptions").updateOne(
             { _id: gmSubscription._id },
-            { 
-              $inc: { 
+            {
+              $inc: {
                 totalEarnings: totalEarning,
                 pendingEarnings: totalEarning,
               },
-              $set: { updatedAt: new Date() }
-            }
+              $set: { updatedAt: new Date() },
+            },
           );
-          
+
           // Credit to game master's wallet
-          let gmWallet = await CreditWallet.findOne({ userId: gmId }).session(session);
+          let gmWallet = await CreditWallet.findOne({ userId: gmId }).session(
+            session,
+          );
           if (!gmWallet) {
             gmWallet = await CreditWallet.create(
-              [{
-                userId: gmId,
-                creditBalance: 0,
-                totalDeposited: 0,
-                totalWithdrawn: 0,
-                totalSpentOnCompetitions: 0,
-                totalWonFromCompetitions: 0,
-                isActive: true,
-                kycVerified: false,
-                withdrawalEnabled: false,
-              }],
-              { session }
+              [
+                {
+                  userId: gmId,
+                  creditBalance: 0,
+                  totalDeposited: 0,
+                  totalWithdrawn: 0,
+                  totalSpentOnCompetitions: 0,
+                  totalWonFromCompetitions: 0,
+                  isActive: true,
+                  kycVerified: false,
+                  withdrawalEnabled: false,
+                },
+              ],
+              { session },
             );
             gmWallet = gmWallet[0];
           }
-          
+
           const balanceBefore = gmWallet.creditBalance || 0;
           const balanceAfter = balanceBefore + totalEarning;
-          
+
           await CreditWallet.findOneAndUpdate(
             { userId: gmId },
             { $inc: { creditBalance: totalEarning } },
-            { session }
+            { session },
           );
-          
+
           // Create wallet transaction
           await WalletTransaction.create(
-            [{
-              userId: gmId,
-              transactionType: 'gamemaster_earning',
-              amount: totalEarning,
-              balanceBefore,
-              balanceAfter,
-              competitionId: competition._id,
-              status: 'completed',
-              description: `🎮 Game Master referral earnings from ${competition.name} (${users.length} referred users)`,
-              metadata: {
-                competitionId: competition._id.toString(),
-                competitionName: competition.name,
-                referredUsersCount: users.length,
-                feePercentage,
+            [
+              {
+                userId: gmId,
+                transactionType: "gamemaster_earning",
+                amount: totalEarning,
+                balanceBefore,
+                balanceAfter,
+                competitionId: competition._id,
+                status: "completed",
+                description: `🎮 Game Master referral earnings from ${competition.name} (${users.length} referred users)`,
+                metadata: {
+                  competitionId: competition._id.toString(),
+                  competitionName: competition.name,
+                  referredUsersCount: users.length,
+                  feePercentage,
+                },
               },
-            }],
-            { session }
+            ],
+            { session },
           );
-          
+
           // Update earnings status to paid
-          await db.collection('gamemasterearnings').updateMany(
+          await db.collection("gamemasterearnings").updateMany(
             {
               gameMasterId: gmId,
               sourceId: competition._id.toString(),
-              sourceType: 'competition',
+              sourceType: "competition",
             },
             {
               $set: {
-                status: 'paid',
+                status: "paid",
                 paidAt: new Date(),
               },
-            }
+            },
           );
-          
+
           // Update subscription pending earnings
-          await db.collection('gamemastersubscriptions').updateOne(
+          await db.collection("gamemastersubscriptions").updateOne(
             { _id: gmSubscription._id },
-            { 
-              $inc: { pendingEarnings: -totalEarning }
-            }
+            {
+              $inc: { pendingEarnings: -totalEarning },
+            },
           );
-          
-          console.log(`   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${users.length} referrals`);
+
+          console.log(
+            `   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${users.length} referrals`,
+          );
         }
       }
     } catch (gmError) {
-      console.error('   ⚠️ Error processing Game Master fees (non-blocking):', gmError);
+      console.error(
+        "   ⚠️ Error processing Game Master fees (non-blocking):",
+        gmError,
+      );
       // Don't fail the competition finalization for GM fee errors
     }
 
     // STEP 5: Update competition and participant statuses
     console.log(`🎯 Updating competition status...`);
-    competition.status = 'completed';
+    competition.status = "completed";
     competition.winnerId = leaderboard[0]?.userId;
     competition.winnerPnL = leaderboard[0]?.pnl;
     competition.finalLeaderboard = leaderboard;
@@ -1060,14 +1245,16 @@ export async function finalizeCompetition(competitionId: string) {
     const participantUpdateResult = await CompetitionParticipant.updateMany(
       {
         competitionId: competition._id,
-        status: 'active', // Only update active participants
+        status: "active", // Only update active participants
       },
       {
-        $set: { status: 'completed' },
+        $set: { status: "completed" },
       },
-      { session }
+      { session },
     );
-    console.log(`   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`);
+    console.log(
+      `   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`,
+    );
 
     await session.commitTransaction();
     // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
@@ -1076,107 +1263,159 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
     console.log(`   Winners: ${winnerTransactions.length}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);
-    console.log(`   Gross Platform Fee: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}%)`);
-    console.log(`   GM Referral Fees: ${actualGmEarnings.toFixed(2)} credits (paid to Game Masters)`);
-    console.log(`   Net Platform Fee: ${netPlatformFee.toFixed(2)} credits (platform keeps)`);
-    console.log(`   Platform Net Earned: ${(prizePool - totalDistributed - actualGmEarnings).toFixed(2)} credits`);
+    console.log(
+      `   Gross Platform Fee: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}%)`,
+    );
+    console.log(
+      `   GM Referral Fees: ${actualGmEarnings.toFixed(2)} credits (paid to Game Masters)`,
+    );
+    console.log(
+      `   Net Platform Fee: ${netPlatformFee.toFixed(2)} credits (platform keeps)`,
+    );
+    console.log(
+      `   Platform Net Earned: ${(prizePool - totalDistributed - actualGmEarnings).toFixed(2)} credits`,
+    );
 
     // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
     try {
-      const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-      const uniqueUserIds = [...new Set(participants.map(p => p.userId.toString()))];
-      
-      console.log(`🏅 Evaluating badges for ${uniqueUserIds.length} participants...`);
-      
+      const { evaluateUserBadges } =
+        await import("@/lib/services/badge-evaluation.service");
+      const uniqueUserIds = [
+        ...new Set(participants.map((p) => p.userId.toString())),
+      ];
+
+      console.log(
+        `🏅 Evaluating badges for ${uniqueUserIds.length} participants...`,
+      );
+
       // Evaluate badges for each participant (don't wait for all to complete)
-      uniqueUserIds.forEach(userId => {
-        evaluateUserBadges(userId).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User ${userId} earned ${result.newBadges.length} new badges after competition ended`);
-          }
-        }).catch(err => console.error(`Error evaluating badges for user ${userId}:`, err));
+      uniqueUserIds.forEach((userId) => {
+        evaluateUserBadges(userId)
+          .then((result) => {
+            if (result.newBadges.length > 0) {
+              console.log(
+                `🏅 User ${userId} earned ${result.newBadges.length} new badges after competition ended`,
+              );
+            }
+          })
+          .catch((err) =>
+            console.error(`Error evaluating badges for user ${userId}:`, err),
+          );
       });
     } catch (error) {
-      console.error('Error importing badge service:', error);
+      console.error("Error importing badge service:", error);
     }
 
     // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {
       // Import the module and get the default export (the notificationService instance)
-      const notificationModule = await import('@/lib/services/notification.service');
-      const notificationService = notificationModule.notificationService || notificationModule.default;
-      
-      if (!notificationService || typeof notificationService.notifyCompetitionWon !== 'function') {
-        console.error('❌ notificationService not properly loaded, skipping notifications');
-        throw new Error('notificationService methods not available');
+      const notificationModule =
+        await import("@/lib/services/notification.service");
+      const notificationService =
+        notificationModule.notificationService || notificationModule.default;
+
+      if (
+        !notificationService ||
+        typeof notificationService.notifyCompetitionWon !== "function"
+      ) {
+        console.error(
+          "❌ notificationService not properly loaded, skipping notifications",
+        );
+        throw new Error("notificationService methods not available");
       }
-      
+
       console.log(`🔔 Sending competition end notifications...`);
-      
+
       // Notify winners (rank 1 gets special notification) - non-blocking
       for (const dist of prizeDistributions) {
         const winner = leaderboard.find((l) => l.userId === dist.userId);
         if (winner) {
           if (dist.rank === 1) {
             // Winner notification - signature: (userId, competitionName, prize, position)
-            notificationService.notifyCompetitionWon(
-              winner.userId,
-              competition.name,
-              dist.prizeAmount,
-              dist.rank
-            ).catch((e: Error) => console.error('Failed to send winner notification:', e));
+            notificationService
+              .notifyCompetitionWon(
+                winner.userId,
+                competition.name,
+                dist.prizeAmount,
+                dist.rank,
+              )
+              .catch((e: Error) =>
+                console.error("Failed to send winner notification:", e),
+              );
           } else if (dist.rank <= 3) {
             // Podium notification - signature: (userId, competitionName, prize, position)
-            notificationService.notifyPodiumFinish(
+            notificationService
+              .notifyPodiumFinish(
+                winner.userId,
+                competition.name,
+                dist.prizeAmount,
+                dist.rank,
+              )
+              .catch((e: Error) =>
+                console.error("Failed to send podium notification:", e),
+              );
+          }
+
+          // Send prize received notification to all winners - signature: (userId, competitionName, prize)
+          notificationService
+            .notifyPrizeReceived(
               winner.userId,
               competition.name,
               dist.prizeAmount,
-              dist.rank
-            ).catch((e: Error) => console.error('Failed to send podium notification:', e));
-          }
-          
-          // Send prize received notification to all winners - signature: (userId, competitionName, prize)
-          notificationService.notifyPrizeReceived(
-            winner.userId,
-            competition.name,
-            dist.prizeAmount
-          ).catch((e: Error) => console.error('Failed to send prize notification:', e));
+            )
+            .catch((e: Error) =>
+              console.error("Failed to send prize notification:", e),
+            );
         }
       }
-      
+
       // Notify disqualified participants - non-blocking
-      const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
+      const disqualifiedParticipants = leaderboard.filter(
+        (p) => p.qualificationStatus === "disqualified",
+      );
       const sendNotification = notificationModule.sendNotification;
-      if (typeof sendNotification === 'function') {
+      if (typeof sendNotification === "function") {
         for (const participant of disqualifiedParticipants) {
           sendNotification({
             userId: participant.userId,
-            type: 'competition_disqualified',
+            type: "competition_disqualified",
             metadata: {
               competitionId: competition._id.toString(),
               competitionName: competition.name,
-              reason: participant.disqualificationReason || 'Did not meet competition requirements',
+              reason:
+                participant.disqualificationReason ||
+                "Did not meet competition requirements",
             },
-          }).catch((e: Error) => console.error('Failed to send disqualification notification:', e));
+          }).catch((e: Error) =>
+            console.error("Failed to send disqualification notification:", e),
+          );
         }
         if (disqualifiedParticipants.length > 0) {
-          console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);
+          console.log(
+            `🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`,
+          );
         }
       }
 
       // Notify all participants about competition end - non-blocking
       // Signature: (userId, competitionName, finalPosition)
       for (const participant of leaderboard) {
-        notificationService.notifyCompetitionEnded(
-          participant.userId,
-          competition.name,
-          participant.rank || 0
-        ).catch((e: Error) => console.error('Failed to send competition end notification:', e));
+        notificationService
+          .notifyCompetitionEnded(
+            participant.userId,
+            competition.name,
+            participant.rank || 0,
+          )
+          .catch((e: Error) =>
+            console.error("Failed to send competition end notification:", e),
+          );
       }
-      
-      console.log(`🔔 Queued ${leaderboard.length} competition end notifications`);
+
+      console.log(
+        `🔔 Queued ${leaderboard.length} competition end notifications`,
+      );
     } catch (error) {
-      console.error('Error sending competition end notifications:', error);
+      console.error("Error sending competition end notifications:", error);
     }
 
     const finalPlatformFee2 = prizePool - totalDistributed;
@@ -1199,7 +1438,7 @@ export async function finalizeCompetition(competitionId: string) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
-    console.error('❌ Error finalizing competition:', error);
+    console.error("❌ Error finalizing competition:", error);
     throw error;
   } finally {
     // End session if it hasn't been ended yet (for error cases)
@@ -1220,11 +1459,13 @@ export async function checkAndFinalizeCompetitions() {
     await connectToDatabase();
 
     const now = new Date();
-    console.log(`🔍 Checking for competitions to finalize at ${now.toISOString()}`);
+    console.log(
+      `🔍 Checking for competitions to finalize at ${now.toISOString()}`,
+    );
 
     // Find all active competitions that have ended
     const competitionsToEnd = await Competition.find({
-      status: 'active',
+      status: "active",
       endTime: { $lte: now },
     });
 
@@ -1234,7 +1475,7 @@ export async function checkAndFinalizeCompetitions() {
 
     for (const competition of competitionsToEnd) {
       console.log(`\n🏁 Finalizing: ${competition.name} (${competition._id})`);
-      
+
       try {
         const result = await finalizeCompetition(competition._id.toString());
         results.push(result);
@@ -1244,7 +1485,7 @@ export async function checkAndFinalizeCompetitions() {
           success: false,
           competitionId: competition._id.toString(),
           competitionName: competition.name,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
@@ -1255,11 +1496,10 @@ export async function checkAndFinalizeCompetitions() {
       results,
     };
   } catch (error) {
-    console.error('❌ Error in checkAndFinalizeCompetitions:', error);
+    console.error("❌ Error in checkAndFinalizeCompetitions:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
-

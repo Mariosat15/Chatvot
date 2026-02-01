@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import KYCSession from '@/database/models/kyc-session.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import { getAdminSession } from '@/lib/admin/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import KYCSession from "@/database/models/kyc-session.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import { getAdminSession } from "@/lib/admin/auth";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId } = await params;
@@ -29,27 +29,30 @@ export async function GET(
       sessions,
       kycStatus: {
         verified: wallet?.kycVerified || false,
-        status: wallet?.kycStatus || 'none',
+        status: wallet?.kycStatus || "none",
         verifiedAt: wallet?.kycVerifiedAt,
         expiresAt: wallet?.kycExpiresAt,
         attempts: wallet?.kycAttempts || 0,
       },
     });
   } catch (error) {
-    console.error('Error fetching user KYC:', error);
-    return NextResponse.json({ error: 'Failed to fetch KYC data' }, { status: 500 });
+    console.error("Error fetching user KYC:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch KYC data" },
+      { status: 500 },
+    );
   }
 }
 
 // Manual KYC status update by admin
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId } = await params;
@@ -59,7 +62,7 @@ export async function PUT(
     console.log(`📋 [Admin KYC] Updating KYC for user ${userId}:`, body);
 
     const updateFields: Record<string, any> = {};
-    
+
     if (body.kycVerified !== undefined) {
       updateFields.kycVerified = body.kycVerified;
     }
@@ -90,7 +93,7 @@ export async function PUT(
         totalDeposited: 0,
         totalWithdrawn: 0,
         kycVerified: updateFields.kycVerified || false,
-        kycStatus: updateFields.kycStatus || 'none',
+        kycStatus: updateFields.kycStatus || "none",
         kycVerifiedAt: updateFields.kycVerifiedAt,
         kycExpiresAt: updateFields.kycExpiresAt,
         kycAttempts: 0,
@@ -100,7 +103,7 @@ export async function PUT(
       wallet = await CreditWallet.findOneAndUpdate(
         { userId },
         { $set: updateFields },
-        { new: true }
+        { new: true },
       );
     }
 
@@ -110,16 +113,17 @@ export async function PUT(
     });
 
     // Create audit log
-    const AuditLog = (await import('@/database/models/audit-log.model')).default;
+    const AuditLog = (await import("@/database/models/audit-log.model"))
+      .default;
     await AuditLog.logAction({
       userId: session.id,
-      userName: session.name || 'Admin',
-      userEmail: session.email || 'admin@system',
-      userRole: 'admin',
-      action: 'kyc_status_update',
-      actionCategory: 'security',
-      description: `Updated KYC status for user ${userId} to ${body.kycStatus || 'updated'}`,
-      targetType: 'user',
+      userName: session.name || "Admin",
+      userEmail: session.email || "admin@system",
+      userRole: "admin",
+      action: "kyc_status_update",
+      actionCategory: "security",
+      description: `Updated KYC status for user ${userId} to ${body.kycStatus || "updated"}`,
+      targetType: "user",
       targetId: userId,
       metadata: {
         previousStatus: wallet.kycStatus,
@@ -127,7 +131,7 @@ export async function PUT(
         kycVerified: body.kycVerified,
         resetAttempts: body.resetAttempts,
       },
-      status: 'success',
+      status: "success",
     });
 
     return NextResponse.json({
@@ -140,8 +144,10 @@ export async function PUT(
       },
     });
   } catch (error) {
-    console.error('Error updating user KYC:', error);
-    return NextResponse.json({ error: 'Failed to update KYC status' }, { status: 500 });
+    console.error("Error updating user KYC:", error);
+    return NextResponse.json(
+      { error: "Failed to update KYC status" },
+      { status: 500 },
+    );
   }
 }
-

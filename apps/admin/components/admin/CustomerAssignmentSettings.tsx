@@ -1,26 +1,32 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from "@/components/ui/tooltip";
 import {
   Users,
   Settings,
@@ -41,8 +47,8 @@ import {
   HelpCircle,
   Trash2,
   Lock,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface AssignmentSettings {
   autoAssignEnabled: boolean;
@@ -68,11 +74,36 @@ interface AvailableRole {
 }
 
 const STRATEGIES = [
-  { value: 'least_customers', label: 'Least Customers First', description: 'Balance workload evenly', icon: '⚖️' },
-  { value: 'round_robin', label: 'Round Robin', description: 'Rotate assignments A→B→C', icon: '🔄' },
-  { value: 'newest_employee', label: 'Newest Employee First', description: 'Good for training', icon: '🆕' },
-  { value: 'oldest_employee', label: 'Oldest Employee First', description: 'Experience priority', icon: '👴' },
-  { value: 'random', label: 'Random', description: 'Random selection', icon: '🎲' },
+  {
+    value: "least_customers",
+    label: "Least Customers First",
+    description: "Balance workload evenly",
+    icon: "⚖️",
+  },
+  {
+    value: "round_robin",
+    label: "Round Robin",
+    description: "Rotate assignments A→B→C",
+    icon: "🔄",
+  },
+  {
+    value: "newest_employee",
+    label: "Newest Employee First",
+    description: "Good for training",
+    icon: "🆕",
+  },
+  {
+    value: "oldest_employee",
+    label: "Oldest Employee First",
+    description: "Experience priority",
+    icon: "👴",
+  },
+  {
+    value: "random",
+    label: "Random",
+    description: "Random selection",
+    icon: "🎲",
+  },
 ];
 
 // Toggle Setting Row Component
@@ -82,7 +113,7 @@ function SettingToggle({
   checked,
   onCheckedChange,
   icon: Icon,
-  iconColor = 'text-gray-400',
+  iconColor = "text-gray-400",
   disabled = false,
 }: {
   label: string;
@@ -94,7 +125,9 @@ function SettingToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between py-3 px-4 rounded-lg bg-gray-800/50 border border-gray-700/50 ${disabled ? 'opacity-50' : ''}`}>
+    <div
+      className={`flex items-center justify-between py-3 px-4 rounded-lg bg-gray-800/50 border border-gray-700/50 ${disabled ? "opacity-50" : ""}`}
+    >
       <div className="flex items-start gap-3">
         {Icon && <Icon className={`h-5 w-5 mt-0.5 ${iconColor}`} />}
         <div>
@@ -124,12 +157,14 @@ function SectionHeader({
   iconColor: string;
   title: string;
   description: string;
-  badge?: { text: string; variant: 'success' | 'warning' | 'info' };
+  badge?: { text: string; variant: "success" | "warning" | "info" };
 }) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div className="flex items-start gap-4">
-        <div className={`p-3 rounded-xl ${iconColor.replace('text-', 'bg-').replace('400', '500/20')}`}>
+        <div
+          className={`p-3 rounded-xl ${iconColor.replace("text-", "bg-").replace("400", "500/20")}`}
+        >
           <Icon className={`h-6 w-6 ${iconColor}`} />
         </div>
         <div>
@@ -138,12 +173,12 @@ function SectionHeader({
         </div>
       </div>
       {badge && (
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={`
-            ${badge.variant === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : ''}
-            ${badge.variant === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : ''}
-            ${badge.variant === 'info' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : ''}
+            ${badge.variant === "success" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : ""}
+            ${badge.variant === "warning" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : ""}
+            ${badge.variant === "info" ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : ""}
           `}
         >
           {badge.text}
@@ -159,7 +194,8 @@ export function CustomerAssignmentSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [originalSettings, setOriginalSettings] = useState<AssignmentSettings | null>(null);
+  const [originalSettings, setOriginalSettings] =
+    useState<AssignmentSettings | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -167,14 +203,16 @@ export function CustomerAssignmentSettings() {
 
   useEffect(() => {
     if (settings && originalSettings) {
-      setHasChanges(JSON.stringify(settings) !== JSON.stringify(originalSettings));
+      setHasChanges(
+        JSON.stringify(settings) !== JSON.stringify(originalSettings),
+      );
     }
   }, [settings, originalSettings]);
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/customer-assignments/settings');
+      const response = await fetch("/api/customer-assignments/settings");
       const data = await response.json();
 
       if (data.success) {
@@ -184,11 +222,11 @@ export function CustomerAssignmentSettings() {
           setAvailableRoles(data.availableRoles);
         }
       } else {
-        toast.error(data.error || 'Failed to fetch settings');
+        toast.error(data.error || "Failed to fetch settings");
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Failed to fetch settings');
+      console.error("Error fetching settings:", error);
+      toast.error("Failed to fetch settings");
     } finally {
       setLoading(false);
     }
@@ -199,27 +237,27 @@ export function CustomerAssignmentSettings() {
 
     try {
       setSaving(true);
-      const response = await fetch('/api/customer-assignments/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/customer-assignments/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Settings saved successfully');
+        toast.success("Settings saved successfully");
         setOriginalSettings(data.settings);
         setHasChanges(false);
         if (data.availableRoles) {
           setAvailableRoles(data.availableRoles);
         }
       } else {
-        toast.error(data.error || 'Failed to save settings');
+        toast.error(data.error || "Failed to save settings");
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      console.error("Error saving settings:", error);
+      toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -227,7 +265,7 @@ export function CustomerAssignmentSettings() {
 
   const updateSetting = <K extends keyof AssignmentSettings>(
     key: K,
-    value: AssignmentSettings[K]
+    value: AssignmentSettings[K],
   ) => {
     if (!settings) return;
     setSettings({ ...settings, [key]: value });
@@ -237,9 +275,12 @@ export function CustomerAssignmentSettings() {
     if (!settings) return;
     const roles = settings.assignableRoles || [];
     if (roles.includes(role)) {
-      updateSetting('assignableRoles', roles.filter(r => r !== role));
+      updateSetting(
+        "assignableRoles",
+        roles.filter((r) => r !== role),
+      );
     } else {
-      updateSetting('assignableRoles', [...roles, role]);
+      updateSetting("assignableRoles", [...roles, role]);
     }
   };
 
@@ -277,13 +318,20 @@ export function CustomerAssignmentSettings() {
               <UserPlus className="h-8 w-8 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Customer Assignment Settings</h1>
-              <p className="text-gray-400 mt-1">Configure how customers are assigned to employees</p>
+              <h1 className="text-2xl font-bold text-white">
+                Customer Assignment Settings
+              </h1>
+              <p className="text-gray-400 mt-1">
+                Configure how customers are assigned to employees
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             {hasChanges && (
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse">
+              <Badge
+                variant="outline"
+                className="bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
+              >
                 <AlertCircle className="h-3 w-3 mr-1" />
                 Unsaved Changes
               </Badge>
@@ -311,10 +359,8 @@ export function CustomerAssignmentSettings() {
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
         {/* LEFT COLUMN */}
         <div className="space-y-6">
-          
           {/* Auto-Assignment Section */}
           <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
             <CardContent className="p-6">
@@ -323,9 +369,13 @@ export function CustomerAssignmentSettings() {
                 iconColor="text-emerald-400"
                 title="Auto-Assignment"
                 description="Automatically assign new customers"
-                badge={settings.autoAssignEnabled ? { text: 'Enabled', variant: 'success' } : { text: 'Disabled', variant: 'warning' }}
+                badge={
+                  settings.autoAssignEnabled
+                    ? { text: "Enabled", variant: "success" }
+                    : { text: "Disabled", variant: "warning" }
+                }
               />
-              
+
               <div className="space-y-4">
                 <SettingToggle
                   icon={Shuffle}
@@ -333,7 +383,9 @@ export function CustomerAssignmentSettings() {
                   label="Enable Auto-Assignment"
                   description="Automatically assign new customers when they register"
                   checked={settings.autoAssignEnabled}
-                  onCheckedChange={(checked) => updateSetting('autoAssignEnabled', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoAssignEnabled", checked)
+                  }
                 />
 
                 {settings.autoAssignEnabled && (
@@ -346,14 +398,20 @@ export function CustomerAssignmentSettings() {
                         </Label>
                         <Select
                           value={settings.assignmentStrategy}
-                          onValueChange={(value) => updateSetting('assignmentStrategy', value)}
+                          onValueChange={(value) =>
+                            updateSetting("assignmentStrategy", value)
+                          }
                         >
                           <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-gray-800 border-gray-700">
                             {STRATEGIES.map((strategy) => (
-                              <SelectItem key={strategy.value} value={strategy.value} className="text-white">
+                              <SelectItem
+                                key={strategy.value}
+                                value={strategy.value}
+                                className="text-white"
+                              >
                                 <div className="flex items-center gap-2">
                                   <span>{strategy.icon}</span>
                                   <span>{strategy.label}</span>
@@ -363,7 +421,11 @@ export function CustomerAssignmentSettings() {
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-gray-500">
-                          {STRATEGIES.find(s => s.value === settings.assignmentStrategy)?.description}
+                          {
+                            STRATEGIES.find(
+                              (s) => s.value === settings.assignmentStrategy,
+                            )?.description
+                          }
                         </p>
                       </div>
 
@@ -377,11 +439,18 @@ export function CustomerAssignmentSettings() {
                             type="number"
                             min="0"
                             value={settings.maxCustomersPerEmployee}
-                            onChange={(e) => updateSetting('maxCustomersPerEmployee', parseInt(e.target.value) || 0)}
+                            onChange={(e) =>
+                              updateSetting(
+                                "maxCustomersPerEmployee",
+                                parseInt(e.target.value) || 0,
+                              )
+                            }
                             className="bg-gray-800 border-gray-600 text-white w-24"
                           />
                           <span className="text-sm text-gray-400">
-                            {settings.maxCustomersPerEmployee === 0 ? '(Unlimited)' : 'customers max'}
+                            {settings.maxCustomersPerEmployee === 0
+                              ? "(Unlimited)"
+                              : "customers max"}
                           </span>
                         </div>
                       </div>
@@ -398,49 +467,62 @@ export function CustomerAssignmentSettings() {
                               <HelpCircle className="h-4 w-4 text-gray-500" />
                             </TooltipTrigger>
                             <TooltipContent className="bg-gray-800 border-gray-700">
-                              <p className="max-w-xs">Select which employee roles can be assigned customers. Roles come from your Employee Role Templates.</p>
+                              <p className="max-w-xs">
+                                Select which employee roles can be assigned
+                                customers. Roles come from your Employee Role
+                                Templates.
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </Label>
-                      
+
                       {availableRoles.length === 0 ? (
                         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
                           <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5" />
                           <div>
-                            <p className="text-sm text-amber-400 font-medium">No role templates found</p>
-                            <p className="text-xs text-amber-400/70">Create role templates in the Employees section first.</p>
+                            <p className="text-sm text-amber-400 font-medium">
+                              No role templates found
+                            </p>
+                            <p className="text-xs text-amber-400/70">
+                              Create role templates in the Employees section
+                              first.
+                            </p>
                           </div>
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {availableRoles.map((role) => {
-                            const isSelected = settings.assignableRoles?.includes(role.name);
+                            const isSelected =
+                              settings.assignableRoles?.includes(role.name);
                             return (
                               <Badge
                                 key={role.name}
                                 variant="outline"
                                 className={`cursor-pointer transition-all duration-200 ${
                                   isSelected
-                                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-sm shadow-blue-500/20'
-                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600'
+                                    ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-sm shadow-blue-500/20"
+                                    : "bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600"
                                 }`}
                                 onClick={() => toggleRole(role.name)}
                                 title={role.description}
                               >
-                                {isSelected && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {isSelected && (
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                )}
                                 {role.name}
                               </Badge>
                             );
                           })}
                         </div>
                       )}
-                      
-                      {settings.assignableRoles?.length === 0 && availableRoles.length > 0 && (
-                        <p className="text-xs text-amber-400">
-                          ⚠️ No roles selected. Auto-assignment won't work.
-                        </p>
-                      )}
+
+                      {settings.assignableRoles?.length === 0 &&
+                        availableRoles.length > 0 && (
+                          <p className="text-xs text-amber-400">
+                            ⚠️ No roles selected. Auto-assignment won't work.
+                          </p>
+                        )}
                     </div>
                   </>
                 )}
@@ -457,7 +539,7 @@ export function CustomerAssignmentSettings() {
                 title="Employee Deletion Handling"
                 description="What happens when an employee is deleted"
               />
-              
+
               <div className="space-y-4">
                 <SettingToggle
                   icon={ArrowUpDown}
@@ -465,7 +547,9 @@ export function CustomerAssignmentSettings() {
                   label="Auto-Reassign Customers"
                   description="Automatically reassign customers when their employee is deleted"
                   checked={settings.autoReassignOnEmployeeDelete}
-                  onCheckedChange={(checked) => updateSetting('autoReassignOnEmployeeDelete', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoReassignOnEmployeeDelete", checked)
+                  }
                 />
 
                 {settings.autoReassignOnEmployeeDelete && (
@@ -476,14 +560,20 @@ export function CustomerAssignmentSettings() {
                     </Label>
                     <Select
                       value={settings.reassignmentStrategy}
-                      onValueChange={(value) => updateSetting('reassignmentStrategy', value)}
+                      onValueChange={(value) =>
+                        updateSetting("reassignmentStrategy", value)
+                      }
                     >
                       <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
                         {STRATEGIES.map((strategy) => (
-                          <SelectItem key={strategy.value} value={strategy.value} className="text-white">
+                          <SelectItem
+                            key={strategy.value}
+                            value={strategy.value}
+                            className="text-white"
+                          >
                             <div className="flex items-center gap-2">
                               <span>{strategy.icon}</span>
                               <span>{strategy.label}</span>
@@ -499,7 +589,8 @@ export function CustomerAssignmentSettings() {
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5" />
                     <p className="text-sm text-amber-400">
-                      When disabled, customers will become unassigned when their employee is deleted
+                      When disabled, customers will become unassigned when their
+                      employee is deleted
                     </p>
                   </div>
                 )}
@@ -516,7 +607,7 @@ export function CustomerAssignmentSettings() {
                 title="Self-Assignment"
                 description="Allow employees to claim customers themselves"
               />
-              
+
               <div className="space-y-4">
                 <SettingToggle
                   icon={UserPlus}
@@ -524,7 +615,9 @@ export function CustomerAssignmentSettings() {
                   label="Allow Self-Assignment"
                   description="Employees can claim unassigned customers"
                   checked={settings.allowSelfAssignment}
-                  onCheckedChange={(checked) => updateSetting('allowSelfAssignment', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("allowSelfAssignment", checked)
+                  }
                 />
 
                 {settings.allowSelfAssignment && (
@@ -535,7 +628,9 @@ export function CustomerAssignmentSettings() {
                       label="Require Admin Approval"
                       description="Self-assignments need admin approval before becoming active"
                       checked={settings.requireApprovalForSelfAssign}
-                      onCheckedChange={(checked) => updateSetting('requireApprovalForSelfAssign', checked)}
+                      onCheckedChange={(checked) =>
+                        updateSetting("requireApprovalForSelfAssign", checked)
+                      }
                     />
                   </div>
                 )}
@@ -546,7 +641,6 @@ export function CustomerAssignmentSettings() {
 
         {/* RIGHT COLUMN */}
         <div className="space-y-6">
-          
           {/* Notifications Section */}
           <Card className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border-blue-500/30 overflow-hidden">
             <CardContent className="p-6">
@@ -555,9 +649,9 @@ export function CustomerAssignmentSettings() {
                 iconColor="text-blue-400"
                 title="Notifications"
                 description="Configure assignment notifications"
-                badge={{ text: 'Important', variant: 'info' }}
+                badge={{ text: "Important", variant: "info" }}
               />
-              
+
               <div className="space-y-4">
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <div className="flex items-start gap-3">
@@ -567,21 +661,29 @@ export function CustomerAssignmentSettings() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="text-white font-medium">Employee Notifications</h4>
+                          <h4 className="text-white font-medium">
+                            Employee Notifications
+                          </h4>
                           <p className="text-sm text-gray-400 mt-1">
-                            Send email notification when a customer is assigned to an employee
+                            Send email notification when a customer is assigned
+                            to an employee
                           </p>
                         </div>
                         <Switch
                           checked={settings.notifyEmployeeOnAssignment}
-                          onCheckedChange={(checked) => updateSetting('notifyEmployeeOnAssignment', checked)}
+                          onCheckedChange={(checked) =>
+                            updateSetting("notifyEmployeeOnAssignment", checked)
+                          }
                           className="data-[state=checked]:bg-blue-600"
                         />
                       </div>
                       {settings.notifyEmployeeOnAssignment && (
                         <div className="mt-3 flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-emerald-400" />
-                          <span className="text-xs text-emerald-400">Employees will receive email when assigned a customer</span>
+                          <span className="text-xs text-emerald-400">
+                            Employees will receive email when assigned a
+                            customer
+                          </span>
                         </div>
                       )}
                     </div>
@@ -596,21 +698,29 @@ export function CustomerAssignmentSettings() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="text-white font-medium">Customer Notifications</h4>
+                          <h4 className="text-white font-medium">
+                            Customer Notifications
+                          </h4>
                           <p className="text-sm text-gray-400 mt-1">
-                            Send email to customer when they are assigned a dedicated agent
+                            Send email to customer when they are assigned a
+                            dedicated agent
                           </p>
                         </div>
                         <Switch
                           checked={settings.notifyCustomerOnAssignment}
-                          onCheckedChange={(checked) => updateSetting('notifyCustomerOnAssignment', checked)}
+                          onCheckedChange={(checked) =>
+                            updateSetting("notifyCustomerOnAssignment", checked)
+                          }
                           className="data-[state=checked]:bg-purple-600"
                         />
                       </div>
                       {settings.notifyCustomerOnAssignment && (
                         <div className="mt-3 flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-emerald-400" />
-                          <span className="text-xs text-emerald-400">Customers will receive email about their assigned agent</span>
+                          <span className="text-xs text-emerald-400">
+                            Customers will receive email about their assigned
+                            agent
+                          </span>
                         </div>
                       )}
                     </div>
@@ -620,8 +730,10 @@ export function CustomerAssignmentSettings() {
                 <div className="bg-gray-800/50 rounded-lg p-3 flex items-start gap-2">
                   <Info className="h-4 w-4 text-gray-400 mt-0.5" />
                   <p className="text-xs text-gray-400">
-                    Notification emails use the templates configured in Settings → Email Templates. 
-                    Make sure you have templates for "customer_assigned_employee" and "customer_assigned_customer".
+                    Notification emails use the templates configured in Settings
+                    → Email Templates. Make sure you have templates for
+                    "customer_assigned_employee" and
+                    "customer_assigned_customer".
                   </p>
                 </div>
               </div>
@@ -637,7 +749,7 @@ export function CustomerAssignmentSettings() {
                 title="Access Control"
                 description="Control who can access customer data"
               />
-              
+
               <div className="space-y-4">
                 <SettingToggle
                   icon={Users}
@@ -645,7 +757,9 @@ export function CustomerAssignmentSettings() {
                   label="Backoffice: Edit Only Own Customers"
                   description="Backoffice employees can only edit customers assigned to them"
                   checked={settings.backofficeCanOnlyEditOwn}
-                  onCheckedChange={(checked) => updateSetting('backofficeCanOnlyEditOwn', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("backofficeCanOnlyEditOwn", checked)
+                  }
                 />
 
                 <Separator className="bg-gray-700/50" />
@@ -656,21 +770,26 @@ export function CustomerAssignmentSettings() {
                     Department Bypass Rules
                   </Label>
                   <p className="text-xs text-gray-500 -mt-1">
-                    Allow certain departments to process any customer regardless of assignment
+                    Allow certain departments to process any customer regardless
+                    of assignment
                   </p>
-                  
+
                   <SettingToggle
                     label="Finance: Process Any Customer"
                     description="Finance can process payments for any customer"
                     checked={settings.financeBypassAssignment}
-                    onCheckedChange={(checked) => updateSetting('financeBypassAssignment', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("financeBypassAssignment", checked)
+                    }
                   />
 
                   <SettingToggle
                     label="Compliance: Process Any Customer"
                     description="Compliance can review KYC for any customer"
                     checked={settings.complianceBypassAssignment}
-                    onCheckedChange={(checked) => updateSetting('complianceBypassAssignment', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSetting("complianceBypassAssignment", checked)
+                    }
                   />
                 </div>
               </div>
@@ -686,7 +805,7 @@ export function CustomerAssignmentSettings() {
                 title="Display Settings"
                 description="Configure how assignments appear in the UI"
               />
-              
+
               <div className="space-y-4">
                 <SettingToggle
                   icon={ArrowUpDown}
@@ -694,7 +813,9 @@ export function CustomerAssignmentSettings() {
                   label="Show Unassigned First"
                   description="Display unassigned customers at the top of user lists"
                   checked={settings.showUnassignedFirst}
-                  onCheckedChange={(checked) => updateSetting('showUnassignedFirst', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("showUnassignedFirst", checked)
+                  }
                 />
 
                 <SettingToggle
@@ -703,7 +824,9 @@ export function CustomerAssignmentSettings() {
                   label="Highlight Unassigned"
                   description="Visually highlight customers who need to be assigned"
                   checked={settings.highlightUnassigned}
-                  onCheckedChange={(checked) => updateSetting('highlightUnassigned', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("highlightUnassigned", checked)
+                  }
                 />
               </div>
             </CardContent>

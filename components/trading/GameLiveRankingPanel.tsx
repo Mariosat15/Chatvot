@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { cn } from '@/lib/utils';
-import Image from 'next/image';
-import { Skull, Target, Swords, Crown, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from "react";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { Skull, Target, Swords, Crown, Loader2 } from "lucide-react";
 
 interface RankingEntry {
   rank: number;
@@ -26,41 +26,43 @@ interface GameLiveRankingPanelProps {
   className?: string;
 }
 
-export default function GameLiveRankingPanel({ 
-  competitionId, 
+export default function GameLiveRankingPanel({
+  competitionId,
   userId,
-  className 
+  className,
 }: GameLiveRankingPanelProps) {
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [prizePool, setPrizePool] = useState(0);
-  const [rankingMethod, setRankingMethod] = useState<string>('pnl');
+  const [rankingMethod, setRankingMethod] = useState<string>("pnl");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchRankings = useCallback(async () => {
     try {
-      const response = await fetch(`/api/competitions/${competitionId}/live-ranking`);
+      const response = await fetch(
+        `/api/competitions/${competitionId}/live-ranking`,
+      );
       if (!response.ok) {
         const data = await response.json();
-        if (data.status === 'completed' || data.status === 'cancelled') {
-          setError('Competition ended');
+        if (data.status === "completed" || data.status === "cancelled") {
+          setError("Competition ended");
           return;
         }
-        throw new Error(data.error || 'Failed to fetch');
+        throw new Error(data.error || "Failed to fetch");
       }
-      
+
       const data = await response.json();
       setRankings(data.rankings || []);
       setUserRank(data.userRank);
       setTotalParticipants(data.totalParticipants || 0);
       setPrizePool(data.prizePool || 0);
-      setRankingMethod(data.rankingMethod || 'pnl');
+      setRankingMethod(data.rankingMethod || "pnl");
       setError(null);
     } catch (err) {
-      console.error('Error fetching rankings:', err);
-      setError('Failed to load');
+      console.error("Error fetching rankings:", err);
+      setError("Failed to load");
     } finally {
       setLoading(false);
     }
@@ -75,28 +77,35 @@ export default function GameLiveRankingPanel({
   // Get ranking method label
   const getRankingLabel = () => {
     switch (rankingMethod) {
-      case 'pnl': return 'P&L';
-      case 'roi': return 'ROI';
-      case 'total_capital': return 'Equity';
-      case 'win_rate': return 'Win %';
-      case 'total_wins': return 'Wins';
-      case 'profit_factor': return 'PF';
-      default: return 'P&L';
+      case "pnl":
+        return "P&L";
+      case "roi":
+        return "ROI";
+      case "total_capital":
+        return "Equity";
+      case "win_rate":
+        return "Win %";
+      case "total_wins":
+        return "Wins";
+      case "profit_factor":
+        return "PF";
+      default:
+        return "P&L";
     }
   };
 
   // Format display value based on ranking method
   const formatDisplayValue = (value: number) => {
     switch (rankingMethod) {
-      case 'roi':
-      case 'win_rate':
-        return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
-      case 'total_wins':
+      case "roi":
+      case "win_rate":
+        return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+      case "total_wins":
         return value.toString();
-      case 'profit_factor':
+      case "profit_factor":
         return value.toFixed(2);
       default:
-        return `${value >= 0 ? '+' : ''}$${Math.abs(value).toFixed(0)}`;
+        return `${value >= 0 ? "+" : ""}$${Math.abs(value).toFixed(0)}`;
     }
   };
 
@@ -104,10 +113,10 @@ export default function GameLiveRankingPanel({
   const formatDistance = (value: number) => {
     if (value === 0) return null;
     switch (rankingMethod) {
-      case 'roi':
-      case 'win_rate':
+      case "roi":
+      case "win_rate":
         return `${value.toFixed(1)}%`;
-      case 'total_wins':
+      case "total_wins":
         return value.toString();
       default:
         return `$${Math.abs(value).toFixed(0)}`;
@@ -120,10 +129,16 @@ export default function GameLiveRankingPanel({
       return <Skull className="w-4 h-4 text-red-500" />;
     }
     switch (rank) {
-      case 1: return <span className="text-lg">🥇</span>;
-      case 2: return <span className="text-lg">🥈</span>;
-      case 3: return <span className="text-lg">🥉</span>;
-      default: return <span className="text-xs font-bold text-purple-300">#{rank}</span>;
+      case 1:
+        return <span className="text-lg">🥇</span>;
+      case 2:
+        return <span className="text-lg">🥈</span>;
+      case 3:
+        return <span className="text-lg">🥉</span>;
+      default:
+        return (
+          <span className="text-xs font-bold text-purple-300">#{rank}</span>
+        );
     }
   };
 
@@ -147,10 +162,12 @@ export default function GameLiveRankingPanel({
   }
 
   return (
-    <div className={cn(
-      "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/50 overflow-hidden",
-      className
-    )}>
+    <div
+      className={cn(
+        "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/50 overflow-hidden",
+        className,
+      )}
+    >
       {/* Gaming Header */}
       <div className="bg-gradient-to-r from-yellow-600 via-orange-500 to-red-500 p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -159,7 +176,9 @@ export default function GameLiveRankingPanel({
         </div>
         <div className="flex items-center gap-1.5">
           <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
-          <span className="text-white/90 text-xs font-medium">{totalParticipants} warriors</span>
+          <span className="text-white/90 text-xs font-medium">
+            {totalParticipants} warriors
+          </span>
         </div>
       </div>
 
@@ -187,7 +206,7 @@ export default function GameLiveRankingPanel({
           const isCurrentUser = entry.userId === userId;
           const displayValue = entry.displayValue ?? entry.profitPercent;
           const distanceStr = formatDistance(entry.distanceToFirst);
-          
+
           // Separator for user outside top 10
           if (entry.isSeparator && index > 0) {
             return (
@@ -231,10 +250,12 @@ export default function GameLiveRankingPanel({
               <Swords className="w-4 h-4" />
               Your Position:
             </span>
-            <span className={cn(
-              "font-black text-lg",
-              userRank <= 3 ? "text-yellow-400" : "text-purple-300"
-            )}>
+            <span
+              className={cn(
+                "font-black text-lg",
+                userRank <= 3 ? "text-yellow-400" : "text-purple-300",
+              )}
+            >
               #{userRank} of {totalParticipants}
             </span>
           </div>
@@ -246,7 +267,13 @@ export default function GameLiveRankingPanel({
         <div className="p-3 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 border-t-2 border-yellow-500/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image src="/game-icons/treasure.png" alt="Prize" width={24} height={24} className="drop-shadow-lg" />
+              <Image
+                src="/game-icons/treasure.png"
+                alt="Prize"
+                width={24}
+                height={24}
+                className="drop-shadow-lg"
+              />
               <span className="text-yellow-300 font-bold">Prize Pool</span>
             </div>
             <span className="text-2xl font-black text-yellow-400 drop-shadow-lg">
@@ -260,14 +287,14 @@ export default function GameLiveRankingPanel({
 }
 
 // Ranking Row Component
-function RankingRow({ 
-  entry, 
+function RankingRow({
+  entry,
   isCurrentUser,
   displayValue,
   distanceStr,
   formatDisplayValue,
   getRankDisplay,
-}: { 
+}: {
   entry: RankingEntry;
   isCurrentUser: boolean;
   displayValue: number;
@@ -276,15 +303,15 @@ function RankingRow({
   getRankDisplay: (rank: number, isDisqualified: boolean) => React.ReactNode;
 }) {
   return (
-    <div 
+    <div
       className={cn(
         "grid grid-cols-12 gap-1 items-center px-4 py-2.5 transition-all border-b border-purple-500/10",
-        isCurrentUser 
-          ? "bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-l-purple-500" 
+        isCurrentUser
+          ? "bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-l-purple-500"
           : entry.rank <= 3 && !entry.isDisqualified
             ? "bg-gradient-to-r from-yellow-500/10 to-orange-500/5"
             : "hover:bg-purple-500/10",
-        entry.isDisqualified && "opacity-60"
+        entry.isDisqualified && "opacity-60",
       )}
     >
       {/* Rank */}
@@ -294,22 +321,29 @@ function RankingRow({
 
       {/* Username */}
       <div className="col-span-4 min-w-0">
-        <p className={cn(
-          "text-sm font-bold truncate",
-          isCurrentUser ? "text-purple-300" : "text-white",
-          entry.isDisqualified && "text-red-400 line-through"
-        )}>
-          {isCurrentUser ? '⚔️ You' : entry.username}
+        <p
+          className={cn(
+            "text-sm font-bold truncate",
+            isCurrentUser ? "text-purple-300" : "text-white",
+            entry.isDisqualified && "text-red-400 line-through",
+          )}
+        >
+          {isCurrentUser ? "⚔️ You" : entry.username}
         </p>
       </div>
 
       {/* Display Value */}
       <div className="col-span-2 text-right">
-        <span className={cn(
-          "text-sm font-bold tabular-nums",
-          displayValue > 0 ? "text-green-400" : 
-          displayValue < 0 ? "text-red-400" : "text-gray-400"
-        )}>
+        <span
+          className={cn(
+            "text-sm font-bold tabular-nums",
+            displayValue > 0
+              ? "text-green-400"
+              : displayValue < 0
+                ? "text-red-400"
+                : "text-gray-400",
+          )}
+        >
           {formatDisplayValue(displayValue)}
         </span>
       </div>

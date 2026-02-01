@@ -1,15 +1,15 @@
 /**
  * Early End Check Job
- * 
+ *
  * Checks for competitions/challenges that should end early because:
  * - All participants are eliminated (liquidated) or disqualified
  * - In challenges: one player is out while the other wins by default
- * 
+ *
  * This runs every minute alongside other jobs.
  */
 
-import mongoose from 'mongoose';
-import { connectToDatabase } from '../config/database';
+import mongoose from "mongoose";
+import { connectToDatabase } from "../config/database";
 
 export interface EarlyEndCheckResult {
   competitionsEnded: number;
@@ -29,42 +29,55 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
     const db = mongoose.connection.db;
     if (!db) {
-      throw new Error('Database not connected');
+      throw new Error("Database not connected");
     }
 
-    const competitionsCollection = db.collection('competitions');
-    const participantsCollection = db.collection('competitionparticipants');
-    const challengesCollection = db.collection('challenges');
-    const challengeParticipantsCollection = db.collection('challengeparticipants');
+    const competitionsCollection = db.collection("competitions");
+    const participantsCollection = db.collection("competitionparticipants");
+    const challengesCollection = db.collection("challenges");
+    const challengeParticipantsCollection = db.collection(
+      "challengeparticipants",
+    );
 
     const now = new Date();
 
     // ============================================
     // 1. CHECK COMPETITIONS FOR EARLY END
     // ============================================
-    const activeCompetitions = await competitionsCollection.find({
-      status: 'active',
-      endTime: { $gt: now }, // Still has time remaining
-      isTest: { $ne: true }, // Skip test data
-      testRunId: { $exists: false }, // Skip test run data
-    }).toArray();
+    const activeCompetitions = await competitionsCollection
+      .find({
+        status: "active",
+        endTime: { $gt: now }, // Still has time remaining
+        isTest: { $ne: true }, // Skip test data
+        testRunId: { $exists: false }, // Skip test run data
+      })
+      .toArray();
 
     for (const competition of activeCompetitions) {
       try {
         // Get all participants for this competition
-        const participants = await participantsCollection.find({
-          competitionId: competition._id,
-        }).toArray();
+        const participants = await participantsCollection
+          .find({
+            competitionId: competition._id,
+          })
+          .toArray();
 
         if (participants.length === 0) continue;
 
         // Check if disqualifyOnLiquidation is enabled for this competition
-        const disqualifyOnLiquidation = competition.rules?.disqualifyOnLiquidation !== false; // Default true
+        const disqualifyOnLiquidation =
+          competition.rules?.disqualifyOnLiquidation !== false; // Default true
 
         // Count by status
-        const activeCount = participants.filter(p => p.status === 'active').length;
-        const liquidatedCount = participants.filter(p => p.status === 'liquidated').length;
-        const disqualifiedCount = participants.filter(p => p.status === 'disqualified').length;
+        const activeCount = participants.filter(
+          (p) => p.status === "active",
+        ).length;
+        const liquidatedCount = participants.filter(
+          (p) => p.status === "liquidated",
+        ).length;
+        const disqualifiedCount = participants.filter(
+          (p) => p.status === "disqualified",
+        ).length;
 
         // If disqualifyOnLiquidation is OFF, liquidated players can still win
         // Only end early if NO players can win (all explicitly disqualified)
@@ -79,26 +92,36 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         }
 
         // All players are out - need to end early
-        console.log(`\n   🏁 [EARLY END] Competition "${competition.name}" - All players eliminated!`);
-        console.log(`      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`);
-        console.log(`      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`);
+        console.log(
+          `\n   🏁 [EARLY END] Competition "${competition.name}" - All players eliminated!`,
+        );
+        console.log(
+          `      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`,
+        );
+        console.log(
+          `      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`,
+        );
 
         if (disqualifiedCount === participants.length) {
           // ALL players disqualified - prize pool goes to platform (unclaimed pools)
-          console.log(`      ❌ All players disqualified - prize goes to unclaimed pools`);
-          
+          console.log(
+            `      ❌ All players disqualified - prize goes to unclaimed pools`,
+          );
+
           // Record unclaimed pool for platform
           const prizePool = competition.prizePool || 0;
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection('platformtransactions');
+            const platformTransactionsCollection = db.collection(
+              "platformtransactions",
+            );
             await platformTransactionsCollection.insertOne({
-              transactionType: 'unclaimed_pool',
+              transactionType: "unclaimed_pool",
               amount: prizePool,
               amountEUR: prizePool, // Simplified - in production use conversion rate
-              sourceType: 'competition',
+              sourceType: "competition",
               sourceId: competition._id.toString(),
               sourceName: competition.name,
-              unclaimedReason: 'all_disqualified',
+              unclaimedReason: "all_disqualified",
               originalPoolAmount: prizePool,
               winnersCount: 0,
               expectedWinnersCount: competition.prizeDistribution?.length || 3,
@@ -106,83 +129,100 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               createdAt: now,
               updatedAt: now,
             });
-            console.log(`      💰 Recorded ${prizePool} credits to unclaimed pools`);
+            console.log(
+              `      💰 Recorded ${prizePool} credits to unclaimed pools`,
+            );
           }
-          
+
           await competitionsCollection.updateOne(
             { _id: competition._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
-                earlyEndReason: 'All participants disqualified - prize to platform',
+                earlyEndReason:
+                  "All participants disqualified - prize to platform",
                 noWinners: true,
-              }
-            }
+              },
+            },
           );
           result.competitionsEnded++;
         } else {
           // Some or all players liquidated - finalize normally to rank by equity
-          console.log(`      🏆 Finalizing competition to rank liquidated players by equity`);
-          
+          console.log(
+            `      🏆 Finalizing competition to rank liquidated players by equity`,
+          );
+
           // Import and call finalize function
-          const { finalizeCompetition } = await import('../../lib/actions/trading/competition-end.actions');
-          const finalizeResult = await finalizeCompetition(competition._id.toString());
-          
+          const { finalizeCompetition } =
+            await import("../../lib/actions/trading/competition-end.actions");
+          const finalizeResult = await finalizeCompetition(
+            competition._id.toString(),
+          );
+
           if (finalizeResult?.success) {
             // Update with early end reason
             await competitionsCollection.updateOne(
               { _id: competition._id },
               {
                 $set: {
-                  earlyEndReason: 'All participants eliminated before end time',
-                }
-              }
+                  earlyEndReason: "All participants eliminated before end time",
+                },
+              },
             );
             result.competitionsEnded++;
           } else {
-            result.errors.push(`Competition ${competition._id}: ${finalizeResult?.message || 'Failed to finalize'}`);
+            result.errors.push(
+              `Competition ${competition._id}: ${finalizeResult?.message || "Failed to finalize"}`,
+            );
           }
         }
       } catch (error) {
-        result.errors.push(`Competition ${competition._id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        result.errors.push(
+          `Competition ${competition._id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
       }
     }
 
     // ============================================
     // 2. CHECK CHALLENGES FOR EARLY END
     // ============================================
-    const activeChallenges = await challengesCollection.find({
-      status: 'active',
-      endTime: { $gt: now }, // Still has time remaining
-      isTest: { $ne: true }, // Skip test data
-      testRunId: { $exists: false }, // Skip test run data
-    }).toArray();
+    const activeChallenges = await challengesCollection
+      .find({
+        status: "active",
+        endTime: { $gt: now }, // Still has time remaining
+        isTest: { $ne: true }, // Skip test data
+        testRunId: { $exists: false }, // Skip test run data
+      })
+      .toArray();
 
     for (const challenge of activeChallenges) {
       try {
         // Get both participants
-        const participants = await challengeParticipantsCollection.find({
-          challengeId: challenge._id,
-        }).toArray();
+        const participants = await challengeParticipantsCollection
+          .find({
+            challengeId: challenge._id,
+          })
+          .toArray();
 
         if (participants.length !== 2) continue;
 
-        const challenger = participants.find(p => p.role === 'challenger');
-        const opponent = participants.find(p => p.role === 'challenged');
+        const challenger = participants.find((p) => p.role === "challenger");
+        const opponent = participants.find((p) => p.role === "challenged");
 
         if (!challenger || !opponent) continue;
 
         // Check if disqualifyOnLiquidation is enabled for this challenge
-        const disqualifyOnLiquidation = challenge.rules?.disqualifyOnLiquidation !== false; // Default true
+        const disqualifyOnLiquidation =
+          challenge.rules?.disqualifyOnLiquidation !== false; // Default true
 
         // Check statuses
-        const challengerActive = challenger.status === 'active';
-        const opponentActive = opponent.status === 'active';
-        const challengerLiquidated = challenger.status === 'liquidated';
-        const opponentLiquidated = opponent.status === 'liquidated';
-        const challengerDisqualified = challenger.status === 'disqualified';
-        const opponentDisqualified = opponent.status === 'disqualified';
+        const challengerActive = challenger.status === "active";
+        const opponentActive = opponent.status === "active";
+        const challengerLiquidated = challenger.status === "liquidated";
+        const opponentLiquidated = opponent.status === "liquidated";
+        const challengerDisqualified = challenger.status === "disqualified";
+        const opponentDisqualified = opponent.status === "disqualified";
 
         // If both still active, continue normally
         if (challengerActive && opponentActive) continue;
@@ -193,90 +233,123 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           // Treat liquidated as still eligible
           const challengerCanWin = challengerActive || challengerLiquidated;
           const opponentCanWin = opponentActive || opponentLiquidated;
-          
+
           // If both can still win, let the challenge run until end time
           if (challengerCanWin && opponentCanWin) continue;
-          
+
           // If neither is disqualified but both are out somehow, continue
           if (!challengerDisqualified && !opponentDisqualified) continue;
         }
 
         console.log(`\n   ⚔️ [EARLY END] Challenge ${challenge._id}`);
-        console.log(`      Challenger: ${challenger.status}, Opponent: ${opponent.status}`);
-        console.log(`      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`);
+        console.log(
+          `      Challenger: ${challenger.status}, Opponent: ${opponent.status}`,
+        );
+        console.log(
+          `      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`,
+        );
 
         let winnerId: string | null = null;
-        let winnerRole: 'challenger' | 'challenged' | null = null;
-        let endReason = '';
+        let winnerRole: "challenger" | "challenged" | null = null;
+        let endReason = "";
         let noWinner = false;
 
         // Determine winner based on scenarios
         // Key: If disqualifyOnLiquidation is OFF, liquidated players DON'T auto-lose
-        
+
         if (challengerDisqualified && opponentDisqualified) {
           // Both explicitly disqualified - prize pool goes to platform
-          endReason = 'Both players disqualified - prize to platform';
+          endReason = "Both players disqualified - prize to platform";
           noWinner = true;
-          console.log(`      ❌ Both disqualified - prize goes to unclaimed pools`);
-        } else if (challengerDisqualified && (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))) {
+          console.log(
+            `      ❌ Both disqualified - prize goes to unclaimed pools`,
+          );
+        } else if (
+          challengerDisqualified &&
+          (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))
+        ) {
           // Challenger disqualified, opponent wins (opponent is active OR liquidated when disqualifyOnLiquidation=false)
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
-          endReason = 'Challenger disqualified';
+          winnerRole = "challenged";
+          endReason = "Challenger disqualified";
           console.log(`      🏆 Opponent wins (challenger disqualified)`);
-        } else if (opponentDisqualified && (challengerActive || (!disqualifyOnLiquidation && challengerLiquidated))) {
+        } else if (
+          opponentDisqualified &&
+          (challengerActive ||
+            (!disqualifyOnLiquidation && challengerLiquidated))
+        ) {
           // Opponent disqualified, challenger wins
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
-          endReason = 'Opponent disqualified';
+          winnerRole = "challenger";
+          endReason = "Opponent disqualified";
           console.log(`      🏆 Challenger wins (opponent disqualified)`);
-        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentActive) {
+        } else if (
+          disqualifyOnLiquidation &&
+          challengerLiquidated &&
+          opponentActive
+        ) {
           // Only if disqualifyOnLiquidation is ON: Challenger liquidated = out, opponent wins
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
-          endReason = 'Challenger liquidated (disqualifyOnLiquidation enabled)';
+          winnerRole = "challenged";
+          endReason = "Challenger liquidated (disqualifyOnLiquidation enabled)";
           console.log(`      🏆 Opponent wins (challenger liquidated)`);
-        } else if (disqualifyOnLiquidation && opponentLiquidated && challengerActive) {
+        } else if (
+          disqualifyOnLiquidation &&
+          opponentLiquidated &&
+          challengerActive
+        ) {
           // Only if disqualifyOnLiquidation is ON: Opponent liquidated = out, challenger wins
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
-          endReason = 'Opponent liquidated (disqualifyOnLiquidation enabled)';
+          winnerRole = "challenger";
+          endReason = "Opponent liquidated (disqualifyOnLiquidation enabled)";
           console.log(`      🏆 Challenger wins (opponent liquidated)`);
-        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentLiquidated) {
+        } else if (
+          disqualifyOnLiquidation &&
+          challengerLiquidated &&
+          opponentLiquidated
+        ) {
           // Both liquidated with disqualifyOnLiquidation ON - compare final equity
-          const challengerEquity = challenger.currentCapital + (challenger.unrealizedPnl || 0);
-          const opponentEquity = opponent.currentCapital + (opponent.unrealizedPnl || 0);
-          
+          const challengerEquity =
+            challenger.currentCapital + (challenger.unrealizedPnl || 0);
+          const opponentEquity =
+            opponent.currentCapital + (opponent.unrealizedPnl || 0);
+
           if (challengerEquity > opponentEquity) {
             winnerId = challenger.userId.toString();
-            winnerRole = 'challenger';
+            winnerRole = "challenger";
             endReason = `Both liquidated - challenger had higher equity ($${challengerEquity.toFixed(2)} vs $${opponentEquity.toFixed(2)})`;
           } else if (opponentEquity > challengerEquity) {
             winnerId = opponent.userId.toString();
-            winnerRole = 'challenged';
+            winnerRole = "challenged";
             endReason = `Both liquidated - opponent had higher equity ($${opponentEquity.toFixed(2)} vs $${challengerEquity.toFixed(2)})`;
           } else {
             // Tie - no winner (very rare)
-            endReason = 'Both liquidated with equal equity';
+            endReason = "Both liquidated with equal equity";
             noWinner = true;
           }
-          console.log(`      ${noWinner ? '❌' : '🏆'} Both liquidated - ${endReason}`);
+          console.log(
+            `      ${noWinner ? "❌" : "🏆"} Both liquidated - ${endReason}`,
+          );
         } else if (challengerLiquidated && opponentDisqualified) {
           // Challenger liquidated but played fair, opponent explicitly disqualified
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
-          endReason = 'Opponent disqualified (challenger liquidated but played fair)';
+          winnerRole = "challenger";
+          endReason =
+            "Opponent disqualified (challenger liquidated but played fair)";
           console.log(`      🏆 Challenger wins (liquidated > disqualified)`);
         } else if (opponentLiquidated && challengerDisqualified) {
           // Opponent liquidated but played fair, challenger explicitly disqualified
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
-          endReason = 'Challenger disqualified (opponent liquidated but played fair)';
+          winnerRole = "challenged";
+          endReason =
+            "Challenger disqualified (opponent liquidated but played fair)";
           console.log(`      🏆 Opponent wins (liquidated > disqualified)`);
         } else {
           // No early end condition met - let challenge continue
           // This happens when disqualifyOnLiquidation is OFF and both are liquidated (wait for end time)
-          console.log(`      ⏳ No early end - challenge continues to end time`);
+          console.log(
+            `      ⏳ No early end - challenge continues to end time`,
+          );
           continue;
         }
 
@@ -284,17 +357,19 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         if (noWinner) {
           // Both disqualified - prize pool goes to platform (NO refund)
           const prizePool = (challenge.entryFee || 0) * 2;
-          
+
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection('platformtransactions');
+            const platformTransactionsCollection = db.collection(
+              "platformtransactions",
+            );
             await platformTransactionsCollection.insertOne({
-              transactionType: 'unclaimed_pool',
+              transactionType: "unclaimed_pool",
               amount: prizePool,
               amountEUR: prizePool, // Simplified - in production use conversion rate
-              sourceType: 'challenge',
+              sourceType: "challenge",
               sourceId: challenge._id.toString(),
-              sourceName: `${challenge.challengerName || 'Challenger'} vs ${challenge.challengedName || 'Opponent'}`,
-              unclaimedReason: 'all_disqualified',
+              sourceName: `${challenge.challengerName || "Challenger"} vs ${challenge.challengedName || "Opponent"}`,
+              unclaimedReason: "all_disqualified",
               originalPoolAmount: prizePool,
               winnersCount: 0,
               expectedWinnersCount: 1,
@@ -302,59 +377,65 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               createdAt: now,
               updatedAt: now,
             });
-            console.log(`      💰 Recorded ${prizePool} credits to unclaimed pools`);
+            console.log(
+              `      💰 Recorded ${prizePool} credits to unclaimed pools`,
+            );
           }
-          
+
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
                 earlyEndReason: endReason,
                 noWinner: true,
-              }
-            }
+              },
+            },
           );
         } else if (winnerId && winnerRole) {
           // Award winner the prize pool
           const prizePool = (challenge.entryFee || 0) * 2;
-          const walletsCollection = db.collection('creditwallets');
-          
+          const walletsCollection = db.collection("creditwallets");
+
           await walletsCollection.updateOne(
             { userId: winnerId }, // userId is stored as string in schema
-            { $inc: { creditBalance: prizePool } }
+            { $inc: { creditBalance: prizePool } },
           );
-          
+
           // Update challenge
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
                 winnerId: new mongoose.Types.ObjectId(winnerId),
                 winnerRole: winnerRole,
                 earlyEndReason: endReason,
-              }
-            }
+              },
+            },
           );
-          
+
           // Update participants
           await challengeParticipantsCollection.updateOne(
             { challengeId: challenge._id, role: winnerRole },
-            { $set: { isWinner: true } }
+            { $set: { isWinner: true } },
           );
-          
+
           console.log(`      💰 Awarded ${prizePool} credits to winner`);
-          
+
           // Send notifications
           try {
-            const { sendNotification } = await import('../../lib/services/notification.service');
+            const { sendNotification } =
+              await import("../../lib/services/notification.service");
             await sendNotification({
               userId: winnerId,
-              type: 'challenge_won',
-              metadata: { challengeId: challenge._id.toString(), prize: prizePool },
+              type: "challenge_won",
+              metadata: {
+                challengeId: challenge._id.toString(),
+                prize: prizePool,
+              },
             });
           } catch {
             // Notification failure is not critical
@@ -363,7 +444,9 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
         result.challengesEnded++;
       } catch (error) {
-        result.errors.push(`Challenge ${challenge._id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        result.errors.push(
+          `Challenge ${challenge._id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
       }
     }
 
@@ -378,7 +461,9 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
  * Test-specific version that processes ONLY competitions/challenges
  * with the given testRunId. Used by the admin test panel.
  */
-export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyEndCheckResult> {
+export async function runEarlyEndCheckForTest(
+  testRunId: string,
+): Promise<EarlyEndCheckResult> {
   const result: EarlyEndCheckResult = {
     competitionsEnded: 0,
     challengesEnded: 0,
@@ -390,35 +475,48 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
 
     const db = mongoose.connection.db;
     if (!db) {
-      throw new Error('Database not connected');
+      throw new Error("Database not connected");
     }
 
-    const competitionsCollection = db.collection('competitions');
-    const participantsCollection = db.collection('competitionparticipants');
-    const challengesCollection = db.collection('challenges');
-    const challengeParticipantsCollection = db.collection('challengeparticipants');
+    const competitionsCollection = db.collection("competitions");
+    const participantsCollection = db.collection("competitionparticipants");
+    const challengesCollection = db.collection("challenges");
+    const challengeParticipantsCollection = db.collection(
+      "challengeparticipants",
+    );
 
     const now = new Date();
 
     // Process ONLY competitions with this testRunId
-    const testCompetitions = await competitionsCollection.find({
-      status: 'active',
-      testRunId,
-    }).toArray();
+    const testCompetitions = await competitionsCollection
+      .find({
+        status: "active",
+        testRunId,
+      })
+      .toArray();
 
     for (const competition of testCompetitions) {
       try {
         // Query using string ID to match schema (competitionId is stored as string)
-        const participants = await participantsCollection.find({
-          competitionId: competition._id.toString(),
-        }).toArray();
+        const participants = await participantsCollection
+          .find({
+            competitionId: competition._id.toString(),
+          })
+          .toArray();
 
         if (participants.length === 0) continue;
 
-        const disqualifyOnLiquidation = competition.rules?.disqualifyOnLiquidation !== false;
-        const activeCount = participants.filter(p => p.status === 'active').length;
-        const liquidatedCount = participants.filter(p => p.status === 'liquidated').length;
-        const disqualifiedCount = participants.filter(p => p.status === 'disqualified').length;
+        const disqualifyOnLiquidation =
+          competition.rules?.disqualifyOnLiquidation !== false;
+        const activeCount = participants.filter(
+          (p) => p.status === "active",
+        ).length;
+        const liquidatedCount = participants.filter(
+          (p) => p.status === "liquidated",
+        ).length;
+        const disqualifiedCount = participants.filter(
+          (p) => p.status === "disqualified",
+        ).length;
 
         // Same logic as regular early end check
         if (!disqualifyOnLiquidation) {
@@ -427,21 +525,27 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
           if (activeCount > 0) continue;
         }
 
-        console.log(`\n   🧪 [TEST EARLY END] Competition "${competition.name}"`);
-        console.log(`      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`);
+        console.log(
+          `\n   🧪 [TEST EARLY END] Competition "${competition.name}"`,
+        );
+        console.log(
+          `      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`,
+        );
 
         if (disqualifiedCount === participants.length) {
           const prizePool = competition.prizePool || 0;
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection('platformtransactions');
+            const platformTransactionsCollection = db.collection(
+              "platformtransactions",
+            );
             await platformTransactionsCollection.insertOne({
-              transactionType: 'unclaimed_pool',
+              transactionType: "unclaimed_pool",
               amount: prizePool,
               amountEUR: prizePool,
-              sourceType: 'competition',
+              sourceType: "competition",
               sourceId: competition._id.toString(),
               sourceName: competition.name,
-              unclaimedReason: 'all_disqualified',
+              unclaimedReason: "all_disqualified",
               originalPoolAmount: prizePool,
               winnersCount: 0,
               expectedWinnersCount: competition.prizeDistribution?.length || 1,
@@ -451,66 +555,81 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
               updatedAt: now,
             });
           }
-          
+
           await competitionsCollection.updateOne(
             { _id: competition._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
-                earlyEndReason: 'All participants disqualified - prize to platform',
+                earlyEndReason:
+                  "All participants disqualified - prize to platform",
                 noWinners: true,
-              }
-            }
+              },
+            },
           );
           result.competitionsEnded++;
         } else {
           // Finalize normally
-          const { finalizeCompetition } = await import('../../lib/actions/trading/competition-end.actions');
-          const finalizeResult = await finalizeCompetition(competition._id.toString());
-          
+          const { finalizeCompetition } =
+            await import("../../lib/actions/trading/competition-end.actions");
+          const finalizeResult = await finalizeCompetition(
+            competition._id.toString(),
+          );
+
           if (finalizeResult?.success) {
             await competitionsCollection.updateOne(
               { _id: competition._id },
-              { $set: { earlyEndReason: 'All participants eliminated (test)' } }
+              {
+                $set: { earlyEndReason: "All participants eliminated (test)" },
+              },
             );
             result.competitionsEnded++;
           } else {
-            result.errors.push(`Competition ${competition._id}: ${finalizeResult?.message || 'Failed'}`);
+            result.errors.push(
+              `Competition ${competition._id}: ${finalizeResult?.message || "Failed"}`,
+            );
           }
         }
       } catch (error) {
-        result.errors.push(`Competition ${competition._id}: ${error instanceof Error ? error.message : 'Error'}`);
+        result.errors.push(
+          `Competition ${competition._id}: ${error instanceof Error ? error.message : "Error"}`,
+        );
       }
     }
 
     // Process ONLY challenges with this testRunId
-    const testChallenges = await challengesCollection.find({
-      status: 'active',
-      testRunId,
-    }).toArray();
+    const testChallenges = await challengesCollection
+      .find({
+        status: "active",
+        testRunId,
+      })
+      .toArray();
 
     for (const challenge of testChallenges) {
       try {
         // Query using string ID to match schema (challengeId is stored as string)
-        const participants = await challengeParticipantsCollection.find({
-          challengeId: challenge._id.toString(),
-        }).toArray();
+        const participants = await challengeParticipantsCollection
+          .find({
+            challengeId: challenge._id.toString(),
+          })
+          .toArray();
 
         if (participants.length !== 2) continue;
 
-        const challenger = participants.find(p => p.role === 'challenger');
-        const opponent = participants.find(p => p.role === 'challenged');
+        const challenger = participants.find((p) => p.role === "challenger");
+        const opponent = participants.find((p) => p.role === "challenged");
         if (!challenger || !opponent) continue;
 
-        const disqualifyOnLiquidation = challenge.rules?.disqualifyOnLiquidation !== false;
+        const disqualifyOnLiquidation =
+          challenge.rules?.disqualifyOnLiquidation !== false;
 
-        const challengerActive = challenger.status === 'active';
-        const opponentActive = opponent.status === 'active';
-        const challengerLiquidated = challenger.status === 'liquidated';
-        const opponentLiquidated = opponent.status === 'liquidated';
-        const challengerDisqualified = challenger.status === 'disqualified';
-        const opponentDisqualified = opponent.status === 'disqualified';
+        const challengerActive = challenger.status === "active";
+        const opponentActive = opponent.status === "active";
+        const challengerLiquidated = challenger.status === "liquidated";
+        const opponentLiquidated = opponent.status === "liquidated";
+        const challengerDisqualified = challenger.status === "disqualified";
+        const opponentDisqualified = opponent.status === "disqualified";
 
         if (challengerActive && opponentActive) continue;
 
@@ -524,40 +643,59 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
         console.log(`\n   🧪 [TEST EARLY END] Challenge ${challenge._id}`);
 
         let winnerId: string | null = null;
-        let winnerRole: 'challenger' | 'challenged' | null = null;
+        let winnerRole: "challenger" | "challenged" | null = null;
         let noWinner = false;
 
         // Determine winner (same logic as main function)
         if (challengerDisqualified && opponentDisqualified) {
           noWinner = true;
-        } else if (challengerDisqualified && (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))) {
+        } else if (
+          challengerDisqualified &&
+          (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))
+        ) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
-        } else if (opponentDisqualified && (challengerActive || (!disqualifyOnLiquidation && challengerLiquidated))) {
+          winnerRole = "challenged";
+        } else if (
+          opponentDisqualified &&
+          (challengerActive ||
+            (!disqualifyOnLiquidation && challengerLiquidated))
+        ) {
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
-        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentActive) {
+          winnerRole = "challenger";
+        } else if (
+          disqualifyOnLiquidation &&
+          challengerLiquidated &&
+          opponentActive
+        ) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
-        } else if (disqualifyOnLiquidation && opponentLiquidated && challengerActive) {
+          winnerRole = "challenged";
+        } else if (
+          disqualifyOnLiquidation &&
+          opponentLiquidated &&
+          challengerActive
+        ) {
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
-        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentLiquidated) {
+          winnerRole = "challenger";
+        } else if (
+          disqualifyOnLiquidation &&
+          challengerLiquidated &&
+          opponentLiquidated
+        ) {
           const challengerEquity = challenger.currentCapital;
           const opponentEquity = opponent.currentCapital;
           if (challengerEquity >= opponentEquity) {
             winnerId = challenger.userId.toString();
-            winnerRole = 'challenger';
+            winnerRole = "challenger";
           } else {
             winnerId = opponent.userId.toString();
-            winnerRole = 'challenged';
+            winnerRole = "challenged";
           }
         } else if (challengerLiquidated && opponentDisqualified) {
           winnerId = challenger.userId.toString();
-          winnerRole = 'challenger';
+          winnerRole = "challenger";
         } else if (opponentLiquidated && challengerDisqualified) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'challenged';
+          winnerRole = "challenged";
         } else {
           continue; // No early end condition
         }
@@ -566,15 +704,17 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
 
         if (noWinner) {
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection('platformtransactions');
+            const platformTransactionsCollection = db.collection(
+              "platformtransactions",
+            );
             await platformTransactionsCollection.insertOne({
-              transactionType: 'unclaimed_pool',
+              transactionType: "unclaimed_pool",
               amount: prizePool,
               amountEUR: prizePool,
-              sourceType: 'challenge',
+              sourceType: "challenge",
               sourceId: challenge._id.toString(),
               sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-              unclaimedReason: 'all_disqualified',
+              unclaimedReason: "all_disqualified",
               originalPoolAmount: prizePool,
               winnersCount: 0,
               expectedWinnersCount: 1,
@@ -584,45 +724,47 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
               updatedAt: now,
             });
           }
-          
+
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
                 noWinner: true,
-              }
-            }
+              },
+            },
           );
         } else if (winnerId && winnerRole) {
-          const walletsCollection = db.collection('creditwallets');
+          const walletsCollection = db.collection("creditwallets");
           await walletsCollection.updateOne(
             { userId: winnerId }, // userId is stored as string in schema
-            { $inc: { creditBalance: prizePool } }
+            { $inc: { creditBalance: prizePool } },
           );
-          
+
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
-                status: 'completed',
+                status: "completed",
                 completedAt: now,
                 winnerId: new mongoose.Types.ObjectId(winnerId),
                 winnerRole,
-              }
-            }
+              },
+            },
           );
-          
+
           await challengeParticipantsCollection.updateOne(
             { challengeId: challenge._id, role: winnerRole },
-            { $set: { isWinner: true } }
+            { $set: { isWinner: true } },
           );
         }
 
         result.challengesEnded++;
       } catch (error) {
-        result.errors.push(`Challenge ${challenge._id}: ${error instanceof Error ? error.message : 'Error'}`);
+        result.errors.push(
+          `Challenge ${challenge._id}: ${error instanceof Error ? error.message : "Error"}`,
+        );
       }
     }
 

@@ -1,11 +1,11 @@
 /**
  * Profile Sync Service
- * 
+ *
  * Syncs user profile data (name, avatar) across all related collections
  * when a user updates their profile.
  */
 
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 interface ProfileSyncData {
   userId: string;
@@ -20,18 +20,18 @@ async function notifyProfileUpdate(
   userId: string,
   name: string | undefined,
   avatar: string | undefined,
-  affectedUserIds: string[]
+  affectedUserIds: string[],
 ): Promise<void> {
   if (affectedUserIds.length === 0) return;
-  
+
   try {
-    const wsHost = process.env.WEBSOCKET_HOST || 'localhost';
-    const wsPort = process.env.WEBSOCKET_PORT || '3003';
+    const wsHost = process.env.WEBSOCKET_HOST || "localhost";
+    const wsPort = process.env.WEBSOCKET_PORT || "3003";
     const wsUrl = `http://${wsHost}:${wsPort}/internal/profile-updated`;
-    
+
     await fetch(wsUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId,
         name,
@@ -39,10 +39,15 @@ async function notifyProfileUpdate(
         affectedUserIds: [...new Set(affectedUserIds)], // Deduplicate
       }),
     });
-    
-    console.log(`[ProfileSync] WebSocket notification sent to ${affectedUserIds.length} users`);
+
+    console.log(
+      `[ProfileSync] WebSocket notification sent to ${affectedUserIds.length} users`,
+    );
   } catch (error) {
-    console.error('[ProfileSync] Failed to send WebSocket notification:', error);
+    console.error(
+      "[ProfileSync] Failed to send WebSocket notification:",
+      error,
+    );
     // Don't throw - WebSocket notification is optional
   }
 }
@@ -61,9 +66,9 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
 }> {
   const { userId, name, avatar } = data;
   const db = mongoose.connection.db;
-  
+
   if (!db) {
-    throw new Error('Database not connected');
+    throw new Error("Database not connected");
   }
 
   const results = {
@@ -76,13 +81,16 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
   // Build update fields for different contexts
   const hasNameUpdate = name !== undefined;
   const hasAvatarUpdate = avatar !== undefined;
-  
+
   if (!hasNameUpdate && !hasAvatarUpdate) {
     console.log(`[ProfileSync] No changes to sync for user ${userId}`);
     return { success: true, updated: results };
   }
 
-  console.log(`[ProfileSync] Syncing profile for user ${userId}`, { name, avatar: avatar ? '(updated)' : undefined });
+  console.log(`[ProfileSync] Syncing profile for user ${userId}`, {
+    name,
+    avatar: avatar ? "(updated)" : undefined,
+  });
 
   // Collect all affected user IDs for WebSocket notification
   const affectedUserIds: string[] = [];
@@ -92,17 +100,18 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
     if (hasNameUpdate || hasAvatarUpdate) {
       const friendshipUpdateFields: Record<string, any> = {};
       if (hasNameUpdate) {
-        friendshipUpdateFields['userDetails.$.userName'] = name;
+        friendshipUpdateFields["userDetails.$.userName"] = name;
       }
       if (hasAvatarUpdate) {
-        friendshipUpdateFields['userDetails.$.userAvatar'] = avatar;
+        friendshipUpdateFields["userDetails.$.userAvatar"] = avatar;
       }
 
       // Get friendships to collect friend IDs for notification
-      const friendships = await db.collection('friendships').find(
-        { 'userDetails.userId': userId }
-      ).toArray();
-      
+      const friendships = await db
+        .collection("friendships")
+        .find({ "userDetails.userId": userId })
+        .toArray();
+
       // Collect friend IDs
       for (const friendship of friendships) {
         for (const detail of friendship.userDetails || []) {
@@ -112,10 +121,12 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
         }
       }
 
-      const friendshipResult = await db.collection('friendships').updateMany(
-        { 'userDetails.userId': userId },
-        { $set: friendshipUpdateFields }
-      );
+      const friendshipResult = await db
+        .collection("friendships")
+        .updateMany(
+          { "userDetails.userId": userId },
+          { $set: friendshipUpdateFields },
+        );
       results.friendships = friendshipResult.modifiedCount;
       console.log(`[ProfileSync] Updated ${results.friendships} friendships`);
     }
@@ -127,40 +138,44 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
       if (hasNameUpdate) fromUserUpdate.fromUserName = name;
       if (hasAvatarUpdate) fromUserUpdate.fromUserAvatar = avatar;
 
-      const fromResult = await db.collection('friend_requests').updateMany(
-        { fromUserId: userId },
-        { $set: fromUserUpdate }
-      );
+      const fromResult = await db
+        .collection("friend_requests")
+        .updateMany({ fromUserId: userId }, { $set: fromUserUpdate });
 
       // Update as receiver (toUser)
       const toUserUpdate: Record<string, any> = {};
       if (hasNameUpdate) toUserUpdate.toUserName = name;
       if (hasAvatarUpdate) toUserUpdate.toUserAvatar = avatar;
 
-      const toResult = await db.collection('friend_requests').updateMany(
-        { toUserId: userId },
-        { $set: toUserUpdate }
-      );
+      const toResult = await db
+        .collection("friend_requests")
+        .updateMany({ toUserId: userId }, { $set: toUserUpdate });
 
-      results.friendRequests = fromResult.modifiedCount + toResult.modifiedCount;
-      console.log(`[ProfileSync] Updated ${results.friendRequests} friend requests`);
+      results.friendRequests =
+        fromResult.modifiedCount + toResult.modifiedCount;
+      console.log(
+        `[ProfileSync] Updated ${results.friendRequests} friend requests`,
+      );
     }
 
     // 3. Update Conversations - participants array and customerName
     if (hasNameUpdate || hasAvatarUpdate) {
       // First, get all conversations where user is a participant
-      const conversations = await db.collection('conversations').find({
-        'participants.id': userId
-      }).toArray();
+      const conversations = await db
+        .collection("conversations")
+        .find({
+          "participants.id": userId,
+        })
+        .toArray();
 
       for (const conv of conversations) {
         const updateDoc: Record<string, any> = {};
-        
+
         // Update the participant in the array
         const participantIndex = conv.participants.findIndex(
-          (p: { id: string }) => p.id === userId
+          (p: { id: string }) => p.id === userId,
         );
-        
+
         if (participantIndex !== -1) {
           if (hasNameUpdate) {
             updateDoc[`participants.${participantIndex}.name`] = name;
@@ -172,7 +187,11 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
 
         // Collect other participant IDs for notification
         for (const participant of conv.participants || []) {
-          if (participant.id && participant.id !== userId && participant.type === 'user') {
+          if (
+            participant.id &&
+            participant.id !== userId &&
+            participant.type === "user"
+          ) {
             affectedUserIds.push(participant.id);
           }
         }
@@ -184,19 +203,20 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
 
         // Update lastMessage.senderName if they were the last sender
         if (hasNameUpdate && conv.lastMessage?.senderId === userId) {
-          updateDoc['lastMessage.senderName'] = name;
+          updateDoc["lastMessage.senderName"] = name;
         }
 
         if (Object.keys(updateDoc).length > 0) {
-          await db.collection('conversations').updateOne(
-            { _id: conv._id },
-            { $set: updateDoc }
-          );
+          await db
+            .collection("conversations")
+            .updateOne({ _id: conv._id }, { $set: updateDoc });
         }
       }
 
       results.conversations = conversations.length;
-      console.log(`[ProfileSync] Updated ${results.conversations} conversations`);
+      console.log(
+        `[ProfileSync] Updated ${results.conversations} conversations`,
+      );
     }
 
     // 4. Update recent Messages (last 30 days only to avoid massive updates)
@@ -208,12 +228,12 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
       if (hasNameUpdate) messageUpdateFields.senderName = name;
       if (hasAvatarUpdate) messageUpdateFields.senderAvatar = avatar;
 
-      const messageResult = await db.collection('messages').updateMany(
+      const messageResult = await db.collection("messages").updateMany(
         {
           senderId: userId,
-          createdAt: { $gte: thirtyDaysAgo }
+          createdAt: { $gte: thirtyDaysAgo },
         },
-        { $set: messageUpdateFields }
+        { $set: messageUpdateFields },
       );
       results.messages = messageResult.modifiedCount;
       console.log(`[ProfileSync] Updated ${results.messages} recent messages`);
@@ -224,10 +244,16 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
       await notifyProfileUpdate(userId, name, avatar, affectedUserIds);
     }
 
-    console.log(`[ProfileSync] ✅ Profile sync completed for user ${userId}`, results);
+    console.log(
+      `[ProfileSync] ✅ Profile sync completed for user ${userId}`,
+      results,
+    );
     return { success: true, updated: results };
   } catch (error) {
-    console.error(`[ProfileSync] ❌ Error syncing profile for user ${userId}:`, error);
+    console.error(
+      `[ProfileSync] ❌ Error syncing profile for user ${userId}:`,
+      error,
+    );
     throw error;
   }
 }
@@ -248,9 +274,9 @@ export async function syncEmployeeProfile(data: {
 }> {
   const { employeeId, name, avatar } = data;
   const db = mongoose.connection.db;
-  
+
   if (!db) {
-    throw new Error('Database not connected');
+    throw new Error("Database not connected");
   }
 
   const results = {
@@ -260,7 +286,7 @@ export async function syncEmployeeProfile(data: {
 
   const hasNameUpdate = name !== undefined;
   const hasAvatarUpdate = avatar !== undefined;
-  
+
   if (!hasNameUpdate && !hasAvatarUpdate) {
     return { success: true, updated: results };
   }
@@ -270,33 +296,40 @@ export async function syncEmployeeProfile(data: {
   try {
     // Update assignedEmployeeName in conversations
     if (hasNameUpdate) {
-      const convResult = await db.collection('conversations').updateMany(
-        { assignedEmployeeId: new mongoose.Types.ObjectId(employeeId) },
-        { $set: { assignedEmployeeName: name } }
-      );
-      
+      const convResult = await db
+        .collection("conversations")
+        .updateMany(
+          { assignedEmployeeId: new mongoose.Types.ObjectId(employeeId) },
+          { $set: { assignedEmployeeName: name } },
+        );
+
       // Also update in originalEmployeeName if redirected
-      await db.collection('conversations').updateMany(
-        { originalEmployeeId: new mongoose.Types.ObjectId(employeeId) },
-        { $set: { originalEmployeeName: name } }
-      );
-      
+      await db
+        .collection("conversations")
+        .updateMany(
+          { originalEmployeeId: new mongoose.Types.ObjectId(employeeId) },
+          { $set: { originalEmployeeName: name } },
+        );
+
       results.conversations = convResult.modifiedCount;
     }
 
     // Update employee as participant in conversations
     if (hasNameUpdate || hasAvatarUpdate) {
-      const conversations = await db.collection('conversations').find({
-        'participants.id': employeeId,
-        'participants.type': 'employee'
-      }).toArray();
+      const conversations = await db
+        .collection("conversations")
+        .find({
+          "participants.id": employeeId,
+          "participants.type": "employee",
+        })
+        .toArray();
 
       for (const conv of conversations) {
         const updateDoc: Record<string, any> = {};
         const participantIndex = conv.participants.findIndex(
-          (p: { id: string }) => p.id === employeeId
+          (p: { id: string }) => p.id === employeeId,
         );
-        
+
         if (participantIndex !== -1) {
           if (hasNameUpdate) {
             updateDoc[`participants.${participantIndex}.name`] = name;
@@ -307,14 +340,13 @@ export async function syncEmployeeProfile(data: {
         }
 
         if (hasNameUpdate && conv.lastMessage?.senderId === employeeId) {
-          updateDoc['lastMessage.senderName'] = name;
+          updateDoc["lastMessage.senderName"] = name;
         }
 
         if (Object.keys(updateDoc).length > 0) {
-          await db.collection('conversations').updateOne(
-            { _id: conv._id },
-            { $set: updateDoc }
-          );
+          await db
+            .collection("conversations")
+            .updateOne({ _id: conv._id }, { $set: updateDoc });
         }
       }
     }
@@ -328,13 +360,13 @@ export async function syncEmployeeProfile(data: {
       if (hasNameUpdate) messageUpdateFields.senderName = name;
       if (hasAvatarUpdate) messageUpdateFields.senderAvatar = avatar;
 
-      const messageResult = await db.collection('messages').updateMany(
+      const messageResult = await db.collection("messages").updateMany(
         {
           senderId: employeeId,
-          senderType: 'employee',
-          createdAt: { $gte: thirtyDaysAgo }
+          senderType: "employee",
+          createdAt: { $gte: thirtyDaysAgo },
         },
-        { $set: messageUpdateFields }
+        { $set: messageUpdateFields },
       );
       results.messages = messageResult.modifiedCount;
     }

@@ -1,14 +1,26 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +28,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -24,8 +36,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { toast } from 'sonner';
+} from "@/components/ui/table";
+import { toast } from "sonner";
 import {
   CreditCard,
   Plus,
@@ -49,7 +61,7 @@ import {
   ExternalLink,
   Check,
   Building2,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface VendorSubscription {
   _id: string;
@@ -58,7 +70,7 @@ interface VendorSubscription {
   description?: string;
   amount: number;
   currency: string;
-  billingCycle: 'monthly' | 'quarterly' | 'yearly' | 'one-time';
+  billingCycle: "monthly" | "quarterly" | "yearly" | "one-time";
   nextPaymentDate: string;
   lastPaymentDate?: string;
   reminderDaysBefore: number;
@@ -72,7 +84,7 @@ interface VendorSubscription {
   paymentHistory?: Array<{
     date: string;
     amount: number;
-    status: 'paid' | 'pending' | 'failed';
+    status: "paid" | "pending" | "failed";
     reference?: string;
   }>;
   createdAt: string;
@@ -102,52 +114,84 @@ const SERVICE_TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
-  database: 'Database',
-  ai: 'AI / ML',
-  email: 'Email',
-  hosting: 'Hosting / VPS',
-  domain: 'Domain',
-  api: 'API Service',
-  storage: 'Storage',
-  analytics: 'Analytics',
-  security: 'Security',
-  other: 'Other',
+  database: "Database",
+  ai: "AI / ML",
+  email: "Email",
+  hosting: "Hosting / VPS",
+  domain: "Domain",
+  api: "API Service",
+  storage: "Storage",
+  analytics: "Analytics",
+  security: "Security",
+  other: "Other",
 };
 
 const BILLING_CYCLE_LABELS: Record<string, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
-  'one-time': 'One-time',
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+  "one-time": "One-time",
 };
 
 const PRESET_VENDORS = [
-  { name: 'MongoDB Atlas', serviceType: 'database', vendorUrl: 'https://cloud.mongodb.com/v2' },
-  { name: 'OpenAI', serviceType: 'ai', vendorUrl: 'https://platform.openai.com/usage' },
-  { name: 'Google Workspace', serviceType: 'email', vendorUrl: 'https://admin.google.com/ac/billing' },
-  { name: 'Hostinger', serviceType: 'hosting', vendorUrl: 'https://hpanel.hostinger.com/billing' },
-  { name: 'Massive.com', serviceType: 'api', vendorUrl: 'https://massive.com' },
-  { name: 'Cloudflare', serviceType: 'security', vendorUrl: 'https://dash.cloudflare.com' },
-  { name: 'AWS', serviceType: 'hosting', vendorUrl: 'https://console.aws.amazon.com/billing' },
-  { name: 'Vercel', serviceType: 'hosting', vendorUrl: 'https://vercel.com/dashboard' },
-  { name: 'Stripe', serviceType: 'api', vendorUrl: 'https://dashboard.stripe.com' },
+  {
+    name: "MongoDB Atlas",
+    serviceType: "database",
+    vendorUrl: "https://cloud.mongodb.com/v2",
+  },
+  {
+    name: "OpenAI",
+    serviceType: "ai",
+    vendorUrl: "https://platform.openai.com/usage",
+  },
+  {
+    name: "Google Workspace",
+    serviceType: "email",
+    vendorUrl: "https://admin.google.com/ac/billing",
+  },
+  {
+    name: "Hostinger",
+    serviceType: "hosting",
+    vendorUrl: "https://hpanel.hostinger.com/billing",
+  },
+  { name: "Massive.com", serviceType: "api", vendorUrl: "https://massive.com" },
+  {
+    name: "Cloudflare",
+    serviceType: "security",
+    vendorUrl: "https://dash.cloudflare.com",
+  },
+  {
+    name: "AWS",
+    serviceType: "hosting",
+    vendorUrl: "https://console.aws.amazon.com/billing",
+  },
+  {
+    name: "Vercel",
+    serviceType: "hosting",
+    vendorUrl: "https://vercel.com/dashboard",
+  },
+  {
+    name: "Stripe",
+    serviceType: "api",
+    vendorUrl: "https://dashboard.stripe.com",
+  },
 ];
 
 const emptyVendor: Partial<VendorSubscription> = {
-  name: '',
-  serviceType: 'other',
-  description: '',
+  name: "",
+  serviceType: "other",
+  description: "",
   amount: 0,
-  currency: 'EUR',
-  billingCycle: 'monthly',
-  nextPaymentDate: new Date().toISOString().split('T')[0],
+  currency: "EUR",
+  billingCycle: "monthly",
+  nextPaymentDate: new Date().toISOString().split("T")[0],
   reminderDaysBefore: 7,
   isActive: true,
   autoRenew: true,
-  vendorUrl: '',
-  accountEmail: '',
-  accountId: '',
-  notes: '',
+  vendorUrl: "",
+  accountEmail: "",
+  accountId: "",
+  notes: "",
 };
 
 export default function VendorSubscriptionsSection() {
@@ -155,44 +199,48 @@ export default function VendorSubscriptionsSection() {
   const [summary, setSummary] = useState<VendorSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   // Filters
-  const [filterServiceType, setFilterServiceType] = useState('all');
-  const [filterActive, setFilterActive] = useState('all');
-  
+  const [filterServiceType, setFilterServiceType] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
+
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingVendor, setEditingVendor] = useState<Partial<VendorSubscription>>(emptyVendor);
+  const [editingVendor, setEditingVendor] =
+    useState<Partial<VendorSubscription>>(emptyVendor);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [vendorToDelete, setVendorToDelete] = useState<VendorSubscription | null>(null);
-  
+  const [vendorToDelete, setVendorToDelete] =
+    useState<VendorSubscription | null>(null);
+
   // Mark paid dialog
   const [markPaidDialogOpen, setMarkPaidDialogOpen] = useState(false);
-  const [vendorToMarkPaid, setVendorToMarkPaid] = useState<VendorSubscription | null>(null);
-  const [paymentReference, setPaymentReference] = useState('');
+  const [vendorToMarkPaid, setVendorToMarkPaid] =
+    useState<VendorSubscription | null>(null);
+  const [paymentReference, setPaymentReference] = useState("");
 
   const fetchVendors = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterServiceType !== 'all') params.set('serviceType', filterServiceType);
-      if (filterActive !== 'all') params.set('isActive', filterActive);
-      
+      if (filterServiceType !== "all")
+        params.set("serviceType", filterServiceType);
+      if (filterActive !== "all") params.set("isActive", filterActive);
+
       const response = await fetch(`/api/vendors?${params}`);
       const data = await response.json();
-      
+
       if (data.success) {
         setVendors(data.vendors);
         setSummary(data.summary);
       } else {
-        toast.error(data.error || 'Failed to fetch vendors');
+        toast.error(data.error || "Failed to fetch vendors");
       }
     } catch (error) {
-      console.error('Error fetching vendors:', error);
-      toast.error('Failed to fetch vendors');
+      console.error("Error fetching vendors:", error);
+      toast.error("Failed to fetch vendors");
     } finally {
       setLoading(false);
     }
@@ -206,9 +254,11 @@ export default function VendorSubscriptionsSection() {
     if (vendor) {
       setEditingVendor({
         ...vendor,
-        nextPaymentDate: new Date(vendor.nextPaymentDate).toISOString().split('T')[0],
-        lastPaymentDate: vendor.lastPaymentDate 
-          ? new Date(vendor.lastPaymentDate).toISOString().split('T')[0] 
+        nextPaymentDate: new Date(vendor.nextPaymentDate)
+          .toISOString()
+          .split("T")[0],
+        lastPaymentDate: vendor.lastPaymentDate
+          ? new Date(vendor.lastPaymentDate).toISOString().split("T")[0]
           : undefined,
       });
       setIsEditing(true);
@@ -221,16 +271,16 @@ export default function VendorSubscriptionsSection() {
 
   const handleSave = async () => {
     if (!editingVendor.name || !editingVendor.amount) {
-      toast.error('Name and amount are required');
+      toast.error("Name and amount are required");
       return;
     }
 
     setSaving(true);
     try {
-      const method = isEditing ? 'PUT' : 'POST';
-      const response = await fetch('/api/vendors', {
+      const method = isEditing ? "PUT" : "POST";
+      const response = await fetch("/api/vendors", {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingVendor),
       });
 
@@ -241,11 +291,11 @@ export default function VendorSubscriptionsSection() {
         setDialogOpen(false);
         fetchVendors();
       } else {
-        toast.error(data.error || 'Failed to save vendor');
+        toast.error(data.error || "Failed to save vendor");
       }
     } catch (error) {
-      console.error('Error saving vendor:', error);
-      toast.error('Failed to save vendor');
+      console.error("Error saving vendor:", error);
+      toast.error("Failed to save vendor");
     } finally {
       setSaving(false);
     }
@@ -256,22 +306,22 @@ export default function VendorSubscriptionsSection() {
 
     try {
       const response = await fetch(`/api/vendors?id=${vendorToDelete._id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Vendor deleted successfully');
+        toast.success("Vendor deleted successfully");
         setDeleteDialogOpen(false);
         setVendorToDelete(null);
         fetchVendors();
       } else {
-        toast.error(data.error || 'Failed to delete vendor');
+        toast.error(data.error || "Failed to delete vendor");
       }
     } catch (error) {
-      console.error('Error deleting vendor:', error);
-      toast.error('Failed to delete vendor');
+      console.error("Error deleting vendor:", error);
+      toast.error("Failed to delete vendor");
     }
   };
 
@@ -279,11 +329,14 @@ export default function VendorSubscriptionsSection() {
     if (!vendorToMarkPaid) return;
 
     try {
-      const response = await fetch(`/api/vendors/${vendorToMarkPaid._id}/mark-paid`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: paymentReference }),
-      });
+      const response = await fetch(
+        `/api/vendors/${vendorToMarkPaid._id}/mark-paid`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference: paymentReference }),
+        },
+      );
 
       const data = await response.json();
 
@@ -291,19 +344,19 @@ export default function VendorSubscriptionsSection() {
         toast.success(data.message);
         setMarkPaidDialogOpen(false);
         setVendorToMarkPaid(null);
-        setPaymentReference('');
+        setPaymentReference("");
         fetchVendors();
       } else {
-        toast.error(data.error || 'Failed to mark payment');
+        toast.error(data.error || "Failed to mark payment");
       }
     } catch (error) {
-      console.error('Error marking payment:', error);
-      toast.error('Failed to mark payment');
+      console.error("Error marking payment:", error);
+      toast.error("Failed to mark payment");
     }
   };
 
-  const selectPresetVendor = (preset: typeof PRESET_VENDORS[0]) => {
-    setEditingVendor(prev => ({
+  const selectPresetVendor = (preset: (typeof PRESET_VENDORS)[0]) => {
+    setEditingVendor((prev) => ({
       ...prev,
       name: preset.name,
       serviceType: preset.serviceType,
@@ -316,20 +369,38 @@ export default function VendorSubscriptionsSection() {
     today.setHours(0, 0, 0, 0);
     const dueDate = new Date(dateStr);
     dueDate.setHours(0, 0, 0, 0);
-    return Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
   };
 
   const getPaymentStatusBadge = (vendor: VendorSubscription) => {
     const days = getDaysUntilPayment(vendor.nextPaymentDate);
-    
+
     if (days < 0) {
-      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Overdue</Badge>;
+      return (
+        <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+          Overdue
+        </Badge>
+      );
     } else if (days === 0) {
-      return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Due Today</Badge>;
+      return (
+        <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+          Due Today
+        </Badge>
+      );
     } else if (days <= vendor.reminderDaysBefore) {
-      return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Due Soon</Badge>;
+      return (
+        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+          Due Soon
+        </Badge>
+      );
     } else {
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Upcoming</Badge>;
+      return (
+        <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+          Upcoming
+        </Badge>
+      );
     }
   };
 
@@ -344,9 +415,12 @@ export default function VendorSubscriptionsSection() {
                 <CreditCard className="h-6 w-6 text-purple-400" />
               </div>
               <div>
-                <CardTitle className="text-white">Vendor Subscriptions</CardTitle>
+                <CardTitle className="text-white">
+                  Vendor Subscriptions
+                </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Track and manage your third-party service subscriptions and payments
+                  Track and manage your third-party service subscriptions and
+                  payments
                 </CardDescription>
               </div>
             </div>
@@ -358,7 +432,9 @@ export default function VendorSubscriptionsSection() {
                 disabled={loading}
                 className="border-gray-600"
               >
-                <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               <Button
@@ -382,7 +458,9 @@ export default function VendorSubscriptionsSection() {
                 <Building2 className="h-8 w-8 text-blue-400" />
                 <div>
                   <p className="text-sm text-gray-400">Active Subscriptions</p>
-                  <p className="text-2xl font-bold text-white">{summary.active}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {summary.active}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -394,7 +472,9 @@ export default function VendorSubscriptionsSection() {
                 <DollarSign className="h-8 w-8 text-green-400" />
                 <div>
                   <p className="text-sm text-gray-400">Monthly Cost</p>
-                  <p className="text-2xl font-bold text-green-400">€{summary.totalMonthly.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    €{summary.totalMonthly.toFixed(2)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -406,19 +486,27 @@ export default function VendorSubscriptionsSection() {
                 <Calendar className="h-8 w-8 text-purple-400" />
                 <div>
                   <p className="text-sm text-gray-400">Yearly Cost</p>
-                  <p className="text-2xl font-bold text-purple-400">€{summary.totalYearly.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-purple-400">
+                    €{summary.totalYearly.toFixed(2)}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={`bg-gray-800/50 ${summary.paymentsDueSoon > 0 ? 'border-yellow-500/50' : 'border-gray-700'}`}>
+          <Card
+            className={`bg-gray-800/50 ${summary.paymentsDueSoon > 0 ? "border-yellow-500/50" : "border-gray-700"}`}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <AlertTriangle className={`h-8 w-8 ${summary.paymentsDueSoon > 0 ? 'text-yellow-400' : 'text-gray-400'}`} />
+                <AlertTriangle
+                  className={`h-8 w-8 ${summary.paymentsDueSoon > 0 ? "text-yellow-400" : "text-gray-400"}`}
+                />
                 <div>
                   <p className="text-sm text-gray-400">Payments Due Soon</p>
-                  <p className={`text-2xl font-bold ${summary.paymentsDueSoon > 0 ? 'text-yellow-400' : 'text-white'}`}>
+                  <p
+                    className={`text-2xl font-bold ${summary.paymentsDueSoon > 0 ? "text-yellow-400" : "text-white"}`}
+                  >
                     {summary.paymentsDueSoon}
                   </p>
                 </div>
@@ -434,7 +522,10 @@ export default function VendorSubscriptionsSection() {
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <Label className="text-gray-400">Service Type:</Label>
-              <Select value={filterServiceType} onValueChange={setFilterServiceType}>
+              <Select
+                value={filterServiceType}
+                onValueChange={setFilterServiceType}
+              >
                 <SelectTrigger className="w-[150px] bg-gray-900 border-gray-600">
                   <SelectValue />
                 </SelectTrigger>
@@ -479,8 +570,13 @@ export default function VendorSubscriptionsSection() {
             <div className="text-center py-12">
               <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-600" />
               <p className="text-gray-400">No vendor subscriptions found</p>
-              <p className="text-sm text-gray-500 mt-1">Add your first vendor to track payments</p>
-              <Button onClick={() => handleOpenDialog()} className="mt-4 bg-purple-600 hover:bg-purple-700">
+              <p className="text-sm text-gray-500 mt-1">
+                Add your first vendor to track payments
+              </p>
+              <Button
+                onClick={() => handleOpenDialog()}
+                className="mt-4 bg-purple-600 hover:bg-purple-700"
+              >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Vendor
               </Button>
@@ -494,59 +590,92 @@ export default function VendorSubscriptionsSection() {
                     <TableHead className="text-gray-400">Type</TableHead>
                     <TableHead className="text-gray-400">Amount</TableHead>
                     <TableHead className="text-gray-400">Billing</TableHead>
-                    <TableHead className="text-gray-400">Next Payment</TableHead>
+                    <TableHead className="text-gray-400">
+                      Next Payment
+                    </TableHead>
                     <TableHead className="text-gray-400">Status</TableHead>
-                    <TableHead className="text-gray-400 text-right">Actions</TableHead>
+                    <TableHead className="text-gray-400 text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vendors.map((vendor) => {
-                    const daysUntil = getDaysUntilPayment(vendor.nextPaymentDate);
+                    const daysUntil = getDaysUntilPayment(
+                      vendor.nextPaymentDate,
+                    );
                     return (
-                      <TableRow key={vendor._id} className="border-gray-700 hover:bg-gray-800/30">
+                      <TableRow
+                        key={vendor._id}
+                        className="border-gray-700 hover:bg-gray-800/30"
+                      >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${vendor.isActive ? 'bg-gray-700' : 'bg-gray-800'}`}>
-                              {SERVICE_TYPE_ICONS[vendor.serviceType] || <Building2 className="h-4 w-4" />}
+                            <div
+                              className={`p-2 rounded-lg ${vendor.isActive ? "bg-gray-700" : "bg-gray-800"}`}
+                            >
+                              {SERVICE_TYPE_ICONS[vendor.serviceType] || (
+                                <Building2 className="h-4 w-4" />
+                              )}
                             </div>
                             <div>
-                              <p className={`font-medium ${vendor.isActive ? 'text-white' : 'text-gray-500'}`}>
+                              <p
+                                className={`font-medium ${vendor.isActive ? "text-white" : "text-gray-500"}`}
+                              >
                                 {vendor.name}
                               </p>
                               {vendor.description && (
-                                <p className="text-xs text-gray-500 truncate max-w-[200px]">{vendor.description}</p>
+                                <p className="text-xs text-gray-500 truncate max-w-[200px]">
+                                  {vendor.description}
+                                </p>
                               )}
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="border-gray-600 text-gray-300">
-                            {SERVICE_TYPE_LABELS[vendor.serviceType] || vendor.serviceType}
+                          <Badge
+                            variant="outline"
+                            className="border-gray-600 text-gray-300"
+                          >
+                            {SERVICE_TYPE_LABELS[vendor.serviceType] ||
+                              vendor.serviceType}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <span className="text-white font-mono">
-                            {vendor.currency === 'EUR' ? '€' : vendor.currency === 'USD' ? '$' : vendor.currency}
+                            {vendor.currency === "EUR"
+                              ? "€"
+                              : vendor.currency === "USD"
+                                ? "$"
+                                : vendor.currency}
                             {vendor.amount.toFixed(2)}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-gray-300">{BILLING_CYCLE_LABELS[vendor.billingCycle]}</span>
+                          <span className="text-gray-300">
+                            {BILLING_CYCLE_LABELS[vendor.billingCycle]}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div>
                             <p className="text-white">
-                              {new Date(vendor.nextPaymentDate).toLocaleDateString()}
+                              {new Date(
+                                vendor.nextPaymentDate,
+                              ).toLocaleDateString()}
                             </p>
-                            <p className={`text-xs ${
-                              daysUntil < 0 ? 'text-red-400' : 
-                              daysUntil <= 7 ? 'text-yellow-400' : 
-                              'text-gray-500'
-                            }`}>
-                              {daysUntil < 0 
-                                ? `${Math.abs(daysUntil)} days overdue` 
-                                : daysUntil === 0 
-                                  ? 'Due today' 
+                            <p
+                              className={`text-xs ${
+                                daysUntil < 0
+                                  ? "text-red-400"
+                                  : daysUntil <= 7
+                                    ? "text-yellow-400"
+                                    : "text-gray-500"
+                              }`}
+                            >
+                              {daysUntil < 0
+                                ? `${Math.abs(daysUntil)} days overdue`
+                                : daysUntil === 0
+                                  ? "Due today"
                                   : `${daysUntil} days`}
                             </p>
                           </div>
@@ -555,7 +684,9 @@ export default function VendorSubscriptionsSection() {
                           <div className="flex flex-col gap-1">
                             {getPaymentStatusBadge(vendor)}
                             {!vendor.isActive && (
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Inactive</Badge>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">
+                                Inactive
+                              </Badge>
                             )}
                           </div>
                         </TableCell>
@@ -565,7 +696,16 @@ export default function VendorSubscriptionsSection() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(vendor.vendorUrl, '_blank')}
+                                onClick={() => {
+                                  try {
+                                    const url = new URL(vendor.vendorUrl);
+                                    if (url.protocol === "https:" || url.protocol === "http:") {
+                                      window.open(vendor.vendorUrl, "_blank", "noopener,noreferrer");
+                                    }
+                                  } catch {
+                                    // Invalid URL, don't open
+                                  }
+                                }}
                                 className="text-gray-400 hover:text-white"
                               >
                                 <ExternalLink className="h-4 w-4" />
@@ -619,11 +759,17 @@ export default function VendorSubscriptionsSection() {
         <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              {isEditing ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-              {isEditing ? 'Edit Vendor' : 'Add Vendor Subscription'}
+              {isEditing ? (
+                <Pencil className="h-5 w-5" />
+              ) : (
+                <Plus className="h-5 w-5" />
+              )}
+              {isEditing ? "Edit Vendor" : "Add Vendor Subscription"}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              {isEditing ? 'Update the vendor subscription details' : 'Add a new vendor subscription to track'}
+              {isEditing
+                ? "Update the vendor subscription details"
+                : "Add a new vendor subscription to track"}
             </DialogDescription>
           </DialogHeader>
 
@@ -631,7 +777,9 @@ export default function VendorSubscriptionsSection() {
             {/* Preset Vendors */}
             {!isEditing && (
               <div>
-                <Label className="text-gray-400 text-sm">Quick Add (click to fill):</Label>
+                <Label className="text-gray-400 text-sm">
+                  Quick Add (click to fill):
+                </Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {PRESET_VENDORS.map((preset) => (
                     <Button
@@ -640,7 +788,9 @@ export default function VendorSubscriptionsSection() {
                       size="sm"
                       onClick={() => selectPresetVendor(preset)}
                       className={`border-gray-600 text-gray-300 hover:bg-gray-800 ${
-                        editingVendor.name === preset.name ? 'bg-gray-800 border-purple-500' : ''
+                        editingVendor.name === preset.name
+                          ? "bg-gray-800 border-purple-500"
+                          : ""
                       }`}
                     >
                       {SERVICE_TYPE_ICONS[preset.serviceType]}
@@ -656,8 +806,10 @@ export default function VendorSubscriptionsSection() {
               <div className="space-y-2">
                 <Label className="text-gray-300">Vendor Name *</Label>
                 <Input
-                  value={editingVendor.name || ''}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, name: e.target.value })}
+                  value={editingVendor.name || ""}
+                  onChange={(e) =>
+                    setEditingVendor({ ...editingVendor, name: e.target.value })
+                  }
                   placeholder="e.g., MongoDB Atlas"
                   className="bg-gray-800 border-gray-600"
                 />
@@ -665,21 +817,25 @@ export default function VendorSubscriptionsSection() {
               <div className="space-y-2">
                 <Label className="text-gray-300">Service Type</Label>
                 <Select
-                  value={editingVendor.serviceType || 'other'}
-                  onValueChange={(value) => setEditingVendor({ ...editingVendor, serviceType: value })}
+                  value={editingVendor.serviceType || "other"}
+                  onValueChange={(value) =>
+                    setEditingVendor({ ...editingVendor, serviceType: value })
+                  }
                 >
                   <SelectTrigger className="bg-gray-800 border-gray-600">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(SERVICE_TYPE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        <span className="flex items-center gap-2">
-                          {SERVICE_TYPE_ICONS[value]}
-                          {label}
-                        </span>
-                      </SelectItem>
-                    ))}
+                    {Object.entries(SERVICE_TYPE_LABELS).map(
+                      ([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          <span className="flex items-center gap-2">
+                            {SERVICE_TYPE_ICONS[value]}
+                            {label}
+                          </span>
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -688,8 +844,13 @@ export default function VendorSubscriptionsSection() {
             <div className="space-y-2">
               <Label className="text-gray-300">Description</Label>
               <Input
-                value={editingVendor.description || ''}
-                onChange={(e) => setEditingVendor({ ...editingVendor, description: e.target.value })}
+                value={editingVendor.description || ""}
+                onChange={(e) =>
+                  setEditingVendor({
+                    ...editingVendor,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="What is this service used for?"
                 className="bg-gray-800 border-gray-600"
               />
@@ -701,8 +862,13 @@ export default function VendorSubscriptionsSection() {
                 <Label className="text-gray-300">Amount *</Label>
                 <Input
                   type="number"
-                  value={editingVendor.amount || ''}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, amount: parseFloat(e.target.value) || 0 })}
+                  value={editingVendor.amount || ""}
+                  onChange={(e) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      amount: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   placeholder="0.00"
                   min="0"
                   step="0.01"
@@ -712,8 +878,10 @@ export default function VendorSubscriptionsSection() {
               <div className="space-y-2">
                 <Label className="text-gray-300">Currency</Label>
                 <Select
-                  value={editingVendor.currency || 'EUR'}
-                  onValueChange={(value) => setEditingVendor({ ...editingVendor, currency: value })}
+                  value={editingVendor.currency || "EUR"}
+                  onValueChange={(value) =>
+                    setEditingVendor({ ...editingVendor, currency: value })
+                  }
                 >
                   <SelectTrigger className="bg-gray-800 border-gray-600">
                     <SelectValue />
@@ -728,16 +896,25 @@ export default function VendorSubscriptionsSection() {
               <div className="space-y-2">
                 <Label className="text-gray-300">Billing Cycle</Label>
                 <Select
-                  value={editingVendor.billingCycle || 'monthly'}
-                  onValueChange={(value) => setEditingVendor({ ...editingVendor, billingCycle: value as any })}
+                  value={editingVendor.billingCycle || "monthly"}
+                  onValueChange={(value) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      billingCycle: value as any,
+                    })
+                  }
                 >
                   <SelectTrigger className="bg-gray-800 border-gray-600">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(BILLING_CYCLE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
+                    {Object.entries(BILLING_CYCLE_LABELS).map(
+                      ([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -749,8 +926,13 @@ export default function VendorSubscriptionsSection() {
                 <Label className="text-gray-300">Next Payment Date *</Label>
                 <Input
                   type="date"
-                  value={editingVendor.nextPaymentDate || ''}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, nextPaymentDate: e.target.value })}
+                  value={editingVendor.nextPaymentDate || ""}
+                  onChange={(e) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      nextPaymentDate: e.target.value,
+                    })
+                  }
                   className="bg-gray-800 border-gray-600"
                 />
               </div>
@@ -759,7 +941,12 @@ export default function VendorSubscriptionsSection() {
                 <Input
                   type="number"
                   value={editingVendor.reminderDaysBefore || 7}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, reminderDaysBefore: parseInt(e.target.value) || 7 })}
+                  onChange={(e) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      reminderDaysBefore: parseInt(e.target.value) || 7,
+                    })
+                  }
                   min="1"
                   max="30"
                   className="bg-gray-800 border-gray-600"
@@ -772,8 +959,13 @@ export default function VendorSubscriptionsSection() {
               <div className="space-y-2">
                 <Label className="text-gray-300">Vendor Dashboard URL</Label>
                 <Input
-                  value={editingVendor.vendorUrl || ''}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, vendorUrl: e.target.value })}
+                  value={editingVendor.vendorUrl || ""}
+                  onChange={(e) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      vendorUrl: e.target.value,
+                    })
+                  }
                   placeholder="https://..."
                   className="bg-gray-800 border-gray-600"
                 />
@@ -782,8 +974,13 @@ export default function VendorSubscriptionsSection() {
                 <Label className="text-gray-300">Account Email</Label>
                 <Input
                   type="email"
-                  value={editingVendor.accountEmail || ''}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, accountEmail: e.target.value })}
+                  value={editingVendor.accountEmail || ""}
+                  onChange={(e) =>
+                    setEditingVendor({
+                      ...editingVendor,
+                      accountEmail: e.target.value,
+                    })
+                  }
                   placeholder="account@example.com"
                   className="bg-gray-800 border-gray-600"
                 />
@@ -795,14 +992,18 @@ export default function VendorSubscriptionsSection() {
               <div className="flex items-center gap-2">
                 <Switch
                   checked={editingVendor.isActive ?? true}
-                  onCheckedChange={(checked) => setEditingVendor({ ...editingVendor, isActive: checked })}
+                  onCheckedChange={(checked) =>
+                    setEditingVendor({ ...editingVendor, isActive: checked })
+                  }
                 />
                 <Label className="text-gray-300">Active</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={editingVendor.autoRenew ?? true}
-                  onCheckedChange={(checked) => setEditingVendor({ ...editingVendor, autoRenew: checked })}
+                  onCheckedChange={(checked) =>
+                    setEditingVendor({ ...editingVendor, autoRenew: checked })
+                  }
                 />
                 <Label className="text-gray-300">Auto-renew</Label>
               </div>
@@ -812,8 +1013,10 @@ export default function VendorSubscriptionsSection() {
             <div className="space-y-2">
               <Label className="text-gray-300">Notes</Label>
               <Textarea
-                value={editingVendor.notes || ''}
-                onChange={(e) => setEditingVendor({ ...editingVendor, notes: e.target.value })}
+                value={editingVendor.notes || ""}
+                onChange={(e) =>
+                  setEditingVendor({ ...editingVendor, notes: e.target.value })
+                }
                 placeholder="Additional notes..."
                 className="bg-gray-800 border-gray-600 min-h-[80px]"
               />
@@ -821,19 +1024,25 @@ export default function VendorSubscriptionsSection() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-600">
+            <Button
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+              className="border-gray-600"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (
-                <>
-                  {isEditing ? 'Update' : 'Create'}
-                </>
+                <>{isEditing ? "Update" : "Create"}</>
               )}
             </Button>
           </DialogFooter>
@@ -849,14 +1058,22 @@ export default function VendorSubscriptionsSection() {
               Delete Vendor
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              Are you sure you want to delete "{vendorToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{vendorToDelete?.name}"? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="border-gray-600">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              className="border-gray-600"
+            >
               Cancel
             </Button>
-            <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+            <Button
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
               Delete
             </Button>
           </DialogFooter>
@@ -872,12 +1089,16 @@ export default function VendorSubscriptionsSection() {
               Mark Payment as Paid
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              Record payment for "{vendorToMarkPaid?.name}" ({vendorToMarkPaid?.currency} {vendorToMarkPaid?.amount?.toFixed(2)})
+              Record payment for "{vendorToMarkPaid?.name}" (
+              {vendorToMarkPaid?.currency}{" "}
+              {vendorToMarkPaid?.amount?.toFixed(2)})
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label className="text-gray-300">Payment Reference (optional)</Label>
+              <Label className="text-gray-300">
+                Payment Reference (optional)
+              </Label>
               <Input
                 value={paymentReference}
                 onChange={(e) => setPaymentReference(e.target.value)}
@@ -886,25 +1107,40 @@ export default function VendorSubscriptionsSection() {
               />
             </div>
             <p className="text-sm text-gray-400">
-              This will record the payment and automatically advance the next payment date to{' '}
+              This will record the payment and automatically advance the next
+              payment date to{" "}
               <span className="text-white">
-                {vendorToMarkPaid && (() => {
-                  const next = new Date(vendorToMarkPaid.nextPaymentDate);
-                  switch (vendorToMarkPaid.billingCycle) {
-                    case 'monthly': next.setMonth(next.getMonth() + 1); break;
-                    case 'quarterly': next.setMonth(next.getMonth() + 3); break;
-                    case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
-                  }
-                  return next.toLocaleDateString();
-                })()}
+                {vendorToMarkPaid &&
+                  (() => {
+                    const next = new Date(vendorToMarkPaid.nextPaymentDate);
+                    switch (vendorToMarkPaid.billingCycle) {
+                      case "monthly":
+                        next.setMonth(next.getMonth() + 1);
+                        break;
+                      case "quarterly":
+                        next.setMonth(next.getMonth() + 3);
+                        break;
+                      case "yearly":
+                        next.setFullYear(next.getFullYear() + 1);
+                        break;
+                    }
+                    return next.toLocaleDateString();
+                  })()}
               </span>
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMarkPaidDialogOpen(false)} className="border-gray-600">
+            <Button
+              variant="outline"
+              onClick={() => setMarkPaidDialogOpen(false)}
+              className="border-gray-600"
+            >
               Cancel
             </Button>
-            <Button onClick={handleMarkPaid} className="bg-green-600 hover:bg-green-700">
+            <Button
+              onClick={handleMarkPaid}
+              className="bg-green-600 hover:bg-green-700"
+            >
               <Check className="h-4 w-4 mr-2" />
               Mark as Paid
             </Button>

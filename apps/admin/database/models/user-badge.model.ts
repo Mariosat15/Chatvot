@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 export interface IUserBadge extends Document {
   userId: string;
@@ -42,13 +42,13 @@ const UserBadgeSchema = new Schema<IUserBadge>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index for userId + badgeId to prevent duplicates
 UserBadgeSchema.index({ userId: 1, badgeId: 1 }, { unique: true });
 
-const UserBadge = models.UserBadge || model<IUserBadge>('UserBadge', UserBadgeSchema);
+const UserBadge =
+  models.UserBadge || model<IUserBadge>("UserBadge", UserBadgeSchema);
 
 export default UserBadge;
-

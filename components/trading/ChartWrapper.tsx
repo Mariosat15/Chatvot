@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useTradingMode } from './TradingInterface';
-import LightweightTradingChart from './LightweightTradingChart';
-import GameModeChart from './GameModeChart';
+import { useTradingMode } from "./TradingInterface";
+import LightweightTradingChart from "./LightweightTradingChart";
+import GameModeChart from "./GameModeChart";
 
 interface Position {
   _id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   quantity: number;
   unrealizedPnl: number;
@@ -19,7 +19,7 @@ interface Position {
 interface PendingOrder {
   _id: string;
   symbol: string;
-  side: 'buy' | 'sell';
+  side: "buy" | "sell";
   requestedPrice: number;
   quantity: number;
 }
@@ -49,15 +49,20 @@ interface ChartWrapperProps {
   tradingProps?: TradingProps;
 }
 
-export default function ChartWrapper({ competitionId, positions = [], pendingOrders = [], tradingProps }: ChartWrapperProps) {
+export default function ChartWrapper({
+  competitionId,
+  positions = [],
+  pendingOrders = [],
+  tradingProps,
+}: ChartWrapperProps) {
   const { mode } = useTradingMode();
 
   return (
     <>
-      {mode === 'professional' ? (
-        <LightweightTradingChart 
-          competitionId={competitionId} 
-          positions={positions} 
+      {mode === "professional" ? (
+        <LightweightTradingChart
+          competitionId={competitionId}
+          positions={positions}
           pendingOrders={pendingOrders}
           tradingProps={tradingProps}
         />
@@ -67,4 +72,3 @@ export default function ChartWrapper({ competitionId, positions = [], pendingOrd
     </>
   );
 }
-

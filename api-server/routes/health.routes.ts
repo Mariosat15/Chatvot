@@ -1,22 +1,22 @@
 /**
  * Health Check Routes
- * 
+ *
  * Used by load balancers and monitoring tools to check server status.
  */
 
-import { Router, Request, Response } from 'express';
-import { bcryptPool } from '../workers/worker-pool';
-import { getConnectionStatus } from '../config/database';
+import { Router, Request, Response } from "express";
+import { bcryptPool } from "../workers/worker-pool";
+import { getConnectionStatus } from "../config/database";
 
 const router = Router();
 
 /**
  * Basic health check
  */
-router.get('/', (req: Request, res: Response) => {
+router.get("/", (req: Request, res: Response) => {
   res.json({
-    status: 'healthy',
-    server: 'chartvolt-api',
+    status: "healthy",
+    server: "chartvolt-api",
     timestamp: new Date().toISOString(),
   });
 });
@@ -24,26 +24,26 @@ router.get('/', (req: Request, res: Response) => {
 /**
  * Detailed health check with dependencies
  */
-router.get('/detailed', (req: Request, res: Response) => {
+router.get("/detailed", (req: Request, res: Response) => {
   const workerStats = bcryptPool.getStats();
   const dbConnected = getConnectionStatus();
 
   // Use isReady instead of initialized - isReady verifies workers.length > 0
   // initialized can be true even when zero workers were created
-  const status = dbConnected && workerStats.isReady ? 'healthy' : 'degraded';
+  const status = dbConnected && workerStats.isReady ? "healthy" : "degraded";
 
   res.json({
     status,
-    server: 'chartvolt-api',
+    server: "chartvolt-api",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-      unit: 'MB',
+      unit: "MB",
     },
     dependencies: {
-      database: dbConnected ? 'connected' : 'disconnected',
+      database: dbConnected ? "connected" : "disconnected",
       workerPool: workerStats,
     },
   });
@@ -52,7 +52,7 @@ router.get('/detailed', (req: Request, res: Response) => {
 /**
  * Readiness check (for Kubernetes/load balancers)
  */
-router.get('/ready', (req: Request, res: Response) => {
+router.get("/ready", (req: Request, res: Response) => {
   const dbConnected = getConnectionStatus();
   const workerStats = bcryptPool.getStats();
 
@@ -61,7 +61,7 @@ router.get('/ready', (req: Request, res: Response) => {
   if (dbConnected && workerStats.isReady) {
     res.status(200).json({ ready: true });
   } else {
-    res.status(503).json({ 
+    res.status(503).json({
       ready: false,
       database: dbConnected,
       workers: workerStats.isReady,
@@ -74,9 +74,8 @@ router.get('/ready', (req: Request, res: Response) => {
 /**
  * Liveness check (for Kubernetes)
  */
-router.get('/live', (req: Request, res: Response) => {
+router.get("/live", (req: Request, res: Response) => {
   res.status(200).json({ alive: true });
 });
 
 export default router;
-

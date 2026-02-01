@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '../../../../../../database/mongoose';
-import SimulatorConfig from '../../../../../../database/models/simulator/simulator-config.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "../../../../../../database/mongoose";
+import SimulatorConfig from "../../../../../../database/models/simulator/simulator-config.model";
 
 /**
  * GET /api/simulator/config
@@ -15,12 +15,12 @@ export async function GET() {
     // Create default config if none exists
     if (!config) {
       config = await SimulatorConfig.create({
-        name: 'Default Configuration',
-        scale: 'small',
+        name: "Default Configuration",
+        scale: "small",
         virtualUsers: 100,
         userRegistrationRate: 10,
         competitions: 5,
-        competitionTypes: ['standard', 'knockout', 'tournament', 'league'],
+        competitionTypes: ["standard", "knockout", "tournament", "league"],
         tradersPerCompetition: 20,
         challenges: 50,
         challengeStakes: [10, 25, 50, 100],
@@ -56,10 +56,10 @@ export async function GET() {
       config: configWithDefaults,
     });
   } catch (error) {
-    console.error('Error fetching simulator config:', error);
+    console.error("Error fetching simulator config:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch configuration' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch configuration" },
+      { status: 500 },
     );
   }
 }
@@ -92,11 +92,10 @@ export async function POST(request: NextRequest) {
       config,
     });
   } catch (error) {
-    console.error('Error saving simulator config:', error);
+    console.error("Error saving simulator config:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to save configuration' },
-      { status: 500 }
+      { success: false, error: "Failed to save configuration" },
+      { status: 500 },
     );
   }
 }
-

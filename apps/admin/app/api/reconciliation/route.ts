@@ -1,19 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { verifyAdminAuth } from '@/lib/admin/auth';
-import { auditLogService } from '@/lib/services/audit-log.service';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import WithdrawalRequest from '@/database/models/withdrawal-request.model';
-import { PlatformTransaction } from '@/database/models/platform-financials.model';
-import ReconciliationLog from '@/database/models/reconciliation-log.model';
-import mongoose from 'mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { verifyAdminAuth } from "@/lib/admin/auth";
+import { auditLogService } from "@/lib/services/audit-log.service";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
+import { PlatformTransaction } from "@/database/models/platform-financials.model";
+import ReconciliationLog from "@/database/models/reconciliation-log.model";
+import mongoose from "mongoose";
 
 interface ReconciliationIssue {
-  type: 'balance_mismatch' | 'deposit_total_mismatch' | 'withdrawal_total_mismatch' | 
-        'orphan_transaction' | 'orphan_withdrawal' | 'duplicate_transaction' |
-        'missing_platform_transaction' | 'orphan_wallet' | string;
-  severity: 'critical' | 'warning' | 'info';
+  type:
+    | "balance_mismatch"
+    | "deposit_total_mismatch"
+    | "withdrawal_total_mismatch"
+    | "orphan_transaction"
+    | "orphan_withdrawal"
+    | "duplicate_transaction"
+    | "missing_platform_transaction"
+    | "orphan_wallet"
+    | string;
+  severity: "critical" | "warning" | "info";
   userId?: string;
   userEmail?: string;
   details: {
@@ -70,8 +77,8 @@ interface UserReconciliationDetail {
     manualCredits: number;
     platformFees: number;
     gmCompetitionEarnings: number; // GM earnings from competition referrals
-    gmChallengeEarnings: number;   // GM earnings from challenge referrals
-    refunds: number;  // Legacy: sum of all refunds
+    gmChallengeEarnings: number; // GM earnings from challenge referrals
+    refunds: number; // Legacy: sum of all refunds
     other: number;
   };
   isGameMaster?: boolean; // Flag if user is a GM
@@ -91,27 +98,27 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action') || 'run';
+    const action = searchParams.get("action") || "run";
 
     // GET HISTORY
-    if (action === 'history') {
-      const limit = parseInt(searchParams.get('limit') || '50');
-      const search = searchParams.get('search') || '';
-      const statusFilter = searchParams.get('status') || 'all';
-      const severityFilter = searchParams.get('severity') || 'all';
+    if (action === "history") {
+      const limit = parseInt(searchParams.get("limit") || "50");
+      const search = searchParams.get("search") || "";
+      const statusFilter = searchParams.get("status") || "all";
+      const severityFilter = searchParams.get("severity") || "all";
 
       // Build query
       const query: any = {};
-      
-      if (statusFilter === 'healthy') {
+
+      if (statusFilter === "healthy") {
         query.healthy = true;
-      } else if (statusFilter === 'issues') {
+      } else if (statusFilter === "issues") {
         query.healthy = false;
       }
 
@@ -123,25 +130,27 @@ export async function GET(request: NextRequest) {
       // Filter by search (user email in issues)
       if (search) {
         const searchLower = search.toLowerCase();
-        history = history.filter(h => 
-          h.runByEmail?.toLowerCase().includes(searchLower) ||
-          h.issues?.some((i: any) => 
-            i.userEmail?.toLowerCase().includes(searchLower) ||
-            i.userId?.toLowerCase().includes(searchLower)
-          )
+        history = history.filter(
+          (h) =>
+            h.runByEmail?.toLowerCase().includes(searchLower) ||
+            h.issues?.some(
+              (i: any) =>
+                i.userEmail?.toLowerCase().includes(searchLower) ||
+                i.userId?.toLowerCase().includes(searchLower),
+            ),
         );
       }
 
       // Filter by severity (in issues)
-      if (severityFilter !== 'all') {
-        history = history.filter(h => 
-          h.issues?.some((i: any) => i.severity === severityFilter)
+      if (severityFilter !== "all") {
+        history = history.filter((h) =>
+          h.issues?.some((i: any) => i.severity === severityFilter),
         );
       }
 
       return NextResponse.json({
         success: true,
-        history: history.map(h => ({
+        history: history.map((h) => ({
           _id: h._id,
           runAt: h.runAt,
           runBy: h.runBy,
@@ -163,13 +172,13 @@ export async function GET(request: NextRequest) {
     const userDetails: UserReconciliationDetail[] = [];
 
     // Get actual users from the user collection (Better Auth users)
-    const userCollection = mongoose.connection.collection('user');
+    const userCollection = mongoose.connection.collection("user");
     const allUsers = await userCollection.find({}).toArray();
-    
+
     // Also get wallets to find orphans
     const wallets = await CreditWallet.find({}).lean();
-    const walletUserIds = new Set(wallets.map(w => w.userId.toString()));
-    const userIds = new Set(allUsers.map(u => u._id.toString()));
+    const walletUserIds = new Set(wallets.map((w) => w.userId.toString()));
+    const userIds = new Set(allUsers.map((u) => u._id.toString()));
 
     let totalTransactions = 0;
     let totalWithdrawals = 0;
@@ -179,29 +188,40 @@ export async function GET(request: NextRequest) {
     // Check each actual user
     for (const user of allUsers) {
       const userId = user._id.toString();
-      const userEmail = user.email || 'Unknown Email';
-      const userName = user.name || user.email?.split('@')[0] || 'Unknown Name';
-      
-      const userDetail = await getDetailedUserReconciliation(userId, userEmail, userName);
-      
+      const userEmail = user.email || "Unknown Email";
+      const userName = user.name || user.email?.split("@")[0] || "Unknown Name";
+
+      const userDetail = await getDetailedUserReconciliation(
+        userId,
+        userEmail,
+        userName,
+      );
+
       userDetails.push(userDetail);
       issues.push(...userDetail.issues);
-      totalTransactions += Object.values(userDetail.transactionBreakdown).reduce((a, b) => a + b, 0);
+      totalTransactions += Object.values(
+        userDetail.transactionBreakdown,
+      ).reduce((a, b) => a + b, 0);
 
       if (!userDetail.healthy) {
         usersWithMismatch++;
         // Use expectedBalance which accounts for pending withdrawals
-        const diff = Math.abs(userDetail.wallet.creditBalance - userDetail.calculated.expectedBalance);
+        const diff = Math.abs(
+          userDetail.wallet.creditBalance -
+            userDetail.calculated.expectedBalance,
+        );
         totalDiscrepancy += diff;
       }
     }
 
     // Check for orphan wallets (wallets without users)
-    const orphanWallets = wallets.filter(w => !userIds.has(w.userId.toString()));
+    const orphanWallets = wallets.filter(
+      (w) => !userIds.has(w.userId.toString()),
+    );
     if (orphanWallets.length > 0) {
       issues.push({
-        type: 'orphan_wallet',
-        severity: 'warning',
+        type: "orphan_wallet",
+        severity: "warning",
         details: {
           description: `Found ${orphanWallets.length} orphan wallets (wallets without existing users). These will be cleaned on next database reset.`,
         },
@@ -218,14 +238,16 @@ export async function GET(request: NextRequest) {
     issues.push(...duplicateIssues);
 
     const duration = Date.now() - startTime;
-    const criticalIssues = issues.filter(i => i.severity === 'critical').length;
-    const warningIssues = issues.filter(i => i.severity === 'warning').length;
-    const infoIssues = issues.filter(i => i.severity === 'info').length;
+    const criticalIssues = issues.filter(
+      (i) => i.severity === "critical",
+    ).length;
+    const warningIssues = issues.filter((i) => i.severity === "warning").length;
+    const infoIssues = issues.filter((i) => i.severity === "info").length;
 
     const reconciliationResult = {
       runAt: new Date(),
-      runBy: admin.adminId || 'unknown',
-      runByEmail: admin.email || 'unknown',
+      runBy: admin.adminId || "unknown",
+      runByEmail: admin.email || "unknown",
       duration,
       summary: {
         totalUsersChecked: allUsers.length,
@@ -244,7 +266,7 @@ export async function GET(request: NextRequest) {
       issues,
       userDetails, // Include detailed per-user breakdown
       healthy: criticalIssues === 0,
-      status: 'completed' as const,
+      status: "completed" as const,
     };
 
     // Save to history (without userDetails to save space - they can be regenerated)
@@ -254,10 +276,17 @@ export async function GET(request: NextRequest) {
 
     // Log the reconciliation run
     await auditLogService.logSystemAction(
-      { id: admin.adminId || 'unknown', email: admin.email || 'unknown' },
-      'reconciliation_run',
+      { id: admin.adminId || "unknown", email: admin.email || "unknown" },
+      "reconciliation_run",
       `Ran system reconciliation: ${allUsers.length} users, ${issues.length} issues found (${criticalIssues} critical)`,
-      { issuesFound: issues.length, criticalIssues, warningIssues, infoIssues, usersChecked: allUsers.length, orphanWallets: orphanWallets.length }
+      {
+        issuesFound: issues.length,
+        criticalIssues,
+        warningIssues,
+        infoIssues,
+        usersChecked: allUsers.length,
+        orphanWallets: orphanWallets.length,
+      },
     );
 
     return NextResponse.json({
@@ -271,10 +300,10 @@ export async function GET(request: NextRequest) {
       healthy: criticalIssues === 0,
     });
   } catch (error) {
-    console.error('Error running reconciliation:', error);
+    console.error("Error running reconciliation:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to run reconciliation' },
-      { status: 500 }
+      { success: false, error: "Failed to run reconciliation" },
+      { status: 500 },
     );
   }
 }
@@ -291,7 +320,7 @@ export async function POST(request: NextRequest) {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
       await session.abortTransaction();
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Safely parse JSON body
@@ -304,8 +333,8 @@ export async function POST(request: NextRequest) {
     } catch {
       await session.abortTransaction();
       return NextResponse.json(
-        { success: false, error: 'Invalid JSON body' },
-        { status: 400 }
+        { success: false, error: "Invalid JSON body" },
+        { status: 400 },
       );
     }
 
@@ -314,8 +343,8 @@ export async function POST(request: NextRequest) {
     if (!issueType || !userId) {
       await session.abortTransaction();
       return NextResponse.json(
-        { success: false, error: 'Missing issueType or userId' },
-        { status: 400 }
+        { success: false, error: "Missing issueType or userId" },
+        { status: 400 },
       );
     }
 
@@ -324,20 +353,23 @@ export async function POST(request: NextRequest) {
     let result: { success: boolean; message: string };
 
     switch (issueType) {
-      case 'balance_mismatch': {
+      case "balance_mismatch": {
         const transactions = await WalletTransaction.find({
           userId,
-          status: 'completed',
+          status: "completed",
         }).session(session);
 
-        const correctBalance = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        const correctBalance = transactions.reduce(
+          (sum, tx) => sum + (tx.amount || 0),
+          0,
+        );
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousBalance = wallet?.creditBalance || 0;
 
         await CreditWallet.updateOne(
           { userId },
           { $set: { creditBalance: Math.round(correctBalance * 100) / 100 } },
-          { session }
+          { session },
         );
 
         result = {
@@ -347,19 +379,22 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'deposit_total_mismatch': {
+      case "deposit_total_mismatch": {
         const depositTx = await WalletTransaction.find({
           userId,
-          transactionType: 'deposit',
-          status: 'completed',
+          transactionType: "deposit",
+          status: "completed",
         }).session(session);
 
-        const correctTotal = depositTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = depositTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
 
         await CreditWallet.updateOne(
           { userId },
           { $set: { totalDeposited: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          { session },
         );
 
         result = {
@@ -369,18 +404,21 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'withdrawal_total_mismatch': {
+      case "withdrawal_total_mismatch": {
         const completedWithdrawals = await WithdrawalRequest.find({
           userId,
-          status: 'completed',
+          status: "completed",
         }).session(session);
 
-        const correctTotal = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
+        const correctTotal = completedWithdrawals.reduce(
+          (sum, w) => sum + (w.amountCredits || 0),
+          0,
+        );
 
         await CreditWallet.updateOne(
           { userId },
           { $set: { totalWithdrawn: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          { session },
         );
 
         result = {
@@ -390,19 +428,26 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'marketplace_spent_mismatch': {
+      case "marketplace_spent_mismatch": {
         const marketplaceTx = await WalletTransaction.find({
           userId,
-          transactionType: 'marketplace_purchase',
-          status: 'completed',
+          transactionType: "marketplace_purchase",
+          status: "completed",
         }).session(session);
 
-        const correctTotal = marketplaceTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = marketplaceTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { totalSpentOnMarketplace: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          {
+            $set: {
+              totalSpentOnMarketplace: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
         );
 
         result = {
@@ -412,22 +457,29 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'competition_win_mismatch': {
+      case "competition_win_mismatch": {
         // Include competition_win and competition_refund (both are credits received)
         const competitionWinTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ['competition_win', 'competition_refund'] },
-          status: 'completed',
+          transactionType: { $in: ["competition_win", "competition_refund"] },
+          status: "completed",
         }).session(session);
 
-        const correctTotal = competitionWinTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = competitionWinTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalWonFromCompetitions || 0;
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { totalWonFromCompetitions: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          {
+            $set: {
+              totalWonFromCompetitions: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
         );
 
         result = {
@@ -437,22 +489,29 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'challenge_win_mismatch': {
+      case "challenge_win_mismatch": {
         // Include challenge_win and challenge_refund (both are credits received)
         const challengeWinTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ['challenge_win', 'challenge_refund'] },
-          status: 'completed',
+          transactionType: { $in: ["challenge_win", "challenge_refund"] },
+          status: "completed",
         }).session(session);
 
-        const correctTotal = challengeWinTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = challengeWinTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalWonFromChallenges || 0;
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { totalWonFromChallenges: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          {
+            $set: {
+              totalWonFromChallenges: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
         );
 
         result = {
@@ -462,21 +521,28 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'competition_spent_mismatch': {
+      case "competition_spent_mismatch": {
         const competitionSpentTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ['competition_entry'] },
-          status: 'completed',
+          transactionType: { $in: ["competition_entry"] },
+          status: "completed",
         }).session(session);
 
-        const correctTotal = competitionSpentTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = competitionSpentTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalSpentOnCompetitions || 0;
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { totalSpentOnCompetitions: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          {
+            $set: {
+              totalSpentOnCompetitions: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
         );
 
         result = {
@@ -486,21 +552,28 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'challenge_spent_mismatch': {
+      case "challenge_spent_mismatch": {
         const challengeSpentTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ['challenge_entry'] },
-          status: 'completed',
+          transactionType: { $in: ["challenge_entry"] },
+          status: "completed",
         }).session(session);
 
-        const correctTotal = challengeSpentTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const correctTotal = challengeSpentTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalSpentOnChallenges || 0;
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { totalSpentOnChallenges: Math.round(correctTotal * 100) / 100 } },
-          { session }
+          {
+            $set: {
+              totalSpentOnChallenges: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
         );
 
         result = {
@@ -513,8 +586,11 @@ export async function POST(request: NextRequest) {
       default:
         await session.abortTransaction();
         return NextResponse.json(
-          { success: false, error: `Auto-fix not available for issue type: ${issueType}` },
-          { status: 400 }
+          {
+            success: false,
+            error: `Auto-fix not available for issue type: ${issueType}`,
+          },
+          { status: 400 },
         );
     }
 
@@ -522,19 +598,19 @@ export async function POST(request: NextRequest) {
 
     // Log the fix
     await auditLogService.logSystemAction(
-      { id: admin.adminId || 'unknown', email: admin.email || 'unknown' },
-      'reconciliation_fix',
+      { id: admin.adminId || "unknown", email: admin.email || "unknown" },
+      "reconciliation_fix",
       `Fixed ${issueType} for user ${userId}: ${result.message}`,
-      { issueType, userId }
+      { issueType, userId },
     );
 
     return NextResponse.json(result);
   } catch (error) {
     await session.abortTransaction();
-    console.error('Error fixing reconciliation issue:', error);
+    console.error("Error fixing reconciliation issue:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fix reconciliation issue' },
-      { status: 500 }
+      { success: false, error: "Failed to fix reconciliation issue" },
+      { status: 500 },
     );
   } finally {
     session.endSession();
@@ -553,17 +629,21 @@ async function verifyUserWallet(userId: string, userEmail: string) {
 
   const transactions = await WalletTransaction.find({
     userId,
-    status: 'completed',
+    status: "completed",
   }).lean();
 
   // Check balance
-  const calculatedBalance = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const balanceDifference = Math.round((wallet.creditBalance - calculatedBalance) * 100) / 100;
+  const calculatedBalance = transactions.reduce(
+    (sum, tx) => sum + (tx.amount || 0),
+    0,
+  );
+  const balanceDifference =
+    Math.round((wallet.creditBalance - calculatedBalance) * 100) / 100;
 
   if (Math.abs(balanceDifference) > 0.01) {
     issues.push({
-      type: 'balance_mismatch',
-      severity: 'critical',
+      type: "balance_mismatch",
+      severity: "critical",
       userId,
       userEmail,
       details: {
@@ -576,19 +656,27 @@ async function verifyUserWallet(userId: string, userEmail: string) {
   }
 
   // Check deposit total
-  const depositTx = transactions.filter(tx => tx.transactionType === 'deposit');
-  const calculatedDeposits = depositTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+  const depositTx = transactions.filter(
+    (tx) => tx.transactionType === "deposit",
+  );
+  const calculatedDeposits = depositTx.reduce(
+    (sum, tx) => sum + Math.abs(tx.amount || 0),
+    0,
+  );
 
   if (Math.abs((wallet.totalDeposited || 0) - calculatedDeposits) > 0.01) {
     issues.push({
-      type: 'deposit_total_mismatch',
-      severity: 'warning',
+      type: "deposit_total_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(calculatedDeposits * 100) / 100,
         actual: wallet.totalDeposited || 0,
-        difference: Math.round(((wallet.totalDeposited || 0) - calculatedDeposits) * 100) / 100,
+        difference:
+          Math.round(
+            ((wallet.totalDeposited || 0) - calculatedDeposits) * 100,
+          ) / 100,
         description: `totalDeposited mismatch`,
       },
     });
@@ -597,20 +685,26 @@ async function verifyUserWallet(userId: string, userEmail: string) {
   // Check withdrawal total
   const completedWithdrawals = await WithdrawalRequest.find({
     userId,
-    status: 'completed',
+    status: "completed",
   }).lean();
-  const calculatedWithdrawals = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
+  const calculatedWithdrawals = completedWithdrawals.reduce(
+    (sum, w) => sum + (w.amountCredits || 0),
+    0,
+  );
 
   if (Math.abs((wallet.totalWithdrawn || 0) - calculatedWithdrawals) > 0.01) {
     issues.push({
-      type: 'withdrawal_total_mismatch',
-      severity: 'warning',
+      type: "withdrawal_total_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(calculatedWithdrawals * 100) / 100,
         actual: wallet.totalWithdrawn || 0,
-        difference: Math.round(((wallet.totalWithdrawn || 0) - calculatedWithdrawals) * 100) / 100,
+        difference:
+          Math.round(
+            ((wallet.totalWithdrawn || 0) - calculatedWithdrawals) * 100,
+          ) / 100,
         description: `totalWithdrawn mismatch`,
       },
     });
@@ -629,16 +723,19 @@ async function verifyWithdrawalRequests() {
 
   for (const withdrawal of withdrawals) {
     // Check completed withdrawals have platform transaction
-    if (withdrawal.status === 'completed' && (withdrawal.platformFee || 0) > 0) {
+    if (
+      withdrawal.status === "completed" &&
+      (withdrawal.platformFee || 0) > 0
+    ) {
       const platformTx = await PlatformTransaction.findOne({
-        transactionType: 'withdrawal_fee',
+        transactionType: "withdrawal_fee",
         sourceId: withdrawal._id.toString(),
       }).lean();
 
       if (!platformTx) {
         issues.push({
-          type: 'missing_platform_transaction',
-          severity: 'warning',
+          type: "missing_platform_transaction",
+          severity: "warning",
           userId: withdrawal.userId,
           userEmail: withdrawal.userEmail,
           details: {
@@ -657,7 +754,7 @@ async function verifyPlatformTransactions() {
   const issues: ReconciliationIssue[] = [];
 
   const depositFees = await PlatformTransaction.find({
-    transactionType: 'deposit_fee',
+    transactionType: "deposit_fee",
     sourceId: { $exists: true, $ne: null },
   }).lean();
 
@@ -666,8 +763,8 @@ async function verifyPlatformTransactions() {
       const deposit = await WalletTransaction.findById(fee.sourceId).lean();
       if (!deposit) {
         issues.push({
-          type: 'orphan_transaction',
-          severity: 'info',
+          type: "orphan_transaction",
+          severity: "info",
           details: {
             transactionId: fee._id.toString(),
             description: `Deposit fee references non-existent deposit ${fee.sourceId}`,
@@ -684,17 +781,25 @@ async function checkDuplicateTransactions() {
   const issues: ReconciliationIssue[] = [];
 
   const duplicates = await WalletTransaction.aggregate([
-    { $match: { paymentId: { $exists: true, $ne: null, $ne: '' } } },
-    { $group: { _id: '$paymentId', count: { $sum: 1 }, docs: { $push: '$_id' } } },
+    { $match: { paymentId: { $exists: true, $ne: null, $ne: "" } } },
+    {
+      $group: {
+        _id: "$paymentId",
+        count: { $sum: 1 },
+        docs: { $push: "$_id" },
+      },
+    },
     { $match: { count: { $gt: 1 } } },
   ]);
 
   for (const dup of duplicates) {
     issues.push({
-      type: 'duplicate_transaction',
-      severity: 'critical',
+      type: "duplicate_transaction",
+      severity: "critical",
       details: {
-        transactionId: dup.docs.map((d: mongoose.Types.ObjectId) => d.toString()).join(', '),
+        transactionId: dup.docs
+          .map((d: mongoose.Types.ObjectId) => d.toString())
+          .join(", "),
         description: `Duplicate paymentId: ${dup._id} (${dup.count} records)`,
       },
     });
@@ -706,11 +811,11 @@ async function checkDuplicateTransactions() {
 /**
  * Get detailed reconciliation for a single user
  * Returns actual values for comparison
- * 
+ *
  * CORRECT BALANCE CALCULATION:
  * The TRUE expected balance is the SUM of all completed transaction amounts.
  * Each transaction has a signed amount (+/-) that reflects credits in/out.
- * 
+ *
  * Transaction Types and their effect:
  * - deposit: +credits (user deposits)
  * - manual_deposit_credit: +credits (admin credits for failed deposit)
@@ -726,19 +831,19 @@ async function checkDuplicateTransactions() {
  * - admin_adjustment: +/- credits (manual adjustment)
  * - marketplace_purchase: -credits (item purchased)
  * - platform_fee: -credits (fee deducted from winnings)
- * 
+ *
  * Future: chargeback: -credits (bank reversed the payment)
  */
 async function getDetailedUserReconciliation(
   userId: string,
   userEmail: string,
-  userName: string
+  userName: string,
 ): Promise<UserReconciliationDetail> {
   const issues: ReconciliationIssue[] = [];
 
   // Get wallet with correct field names
   const wallet = await CreditWallet.findOne({ userId }).lean();
-  
+
   const walletData = {
     creditBalance: wallet?.creditBalance || 0,
     totalDeposited: wallet?.totalDeposited || 0,
@@ -753,38 +858,40 @@ async function getDetailedUserReconciliation(
   // Get all completed transactions
   const transactions = await WalletTransaction.find({
     userId,
-    status: 'completed',
+    status: "completed",
   }).lean();
 
   // Get pending withdrawal requests (credits already deducted from wallet but not in completed transactions)
   const pendingWithdrawalRequests = await WithdrawalRequest.find({
     userId,
-    status: { $in: ['pending', 'approved', 'processing'] },
+    status: { $in: ["pending", "approved", "processing"] },
   }).lean();
   const pendingWithdrawalCredits = pendingWithdrawalRequests.reduce(
-    (sum, w) => sum + (w.amountCredits || 0), 0
+    (sum, w) => sum + (w.amountCredits || 0),
+    0,
   );
 
   // Get pending deposits (not yet credited to wallet)
   const pendingDepositTx = await WalletTransaction.find({
     userId,
-    transactionType: 'deposit',
-    status: 'pending',
+    transactionType: "deposit",
+    status: "pending",
   }).lean();
   const pendingDepositCredits = pendingDepositTx.reduce(
-    (sum, tx) => sum + Math.abs(tx.amount || 0), 0
+    (sum, tx) => sum + Math.abs(tx.amount || 0),
+    0,
   );
 
   // Calculate totals from transactions - IMPORTANT: Use signed amounts for accurate balance
-  let depositTotal = 0;           // All deposit-type credits
-  let withdrawalTxTotal = 0;      // Withdrawal debits
-  let competitionWinTotal = 0;    // Includes wins AND refunds (both are credits)
-  let challengeWinTotal = 0;      // Includes wins AND refunds (both are credits)
-  let competitionSpentTotal = 0;  // Entry fees (NET of refunds)
-  let challengeSpentTotal = 0;    // Entry fees (NET of refunds)
+  let depositTotal = 0; // All deposit-type credits
+  let withdrawalTxTotal = 0; // Withdrawal debits
+  let competitionWinTotal = 0; // Includes wins AND refunds (both are credits)
+  let challengeWinTotal = 0; // Includes wins AND refunds (both are credits)
+  let competitionSpentTotal = 0; // Entry fees (NET of refunds)
+  let challengeSpentTotal = 0; // Entry fees (NET of refunds)
   let marketplaceSpentTotal = 0;
-  let adminAdjustmentTotal = 0;   // Track admin adjustments separately
-  let otherCreditsTotal = 0;      // withdrawal_refund, manual_deposit_credit, etc.
+  let adminAdjustmentTotal = 0; // Track admin adjustments separately
+  let otherCreditsTotal = 0; // withdrawal_refund, manual_deposit_credit, etc.
 
   // Transaction breakdown by type
   const breakdown = {
@@ -792,20 +899,20 @@ async function getDetailedUserReconciliation(
     withdrawals: 0,
     competitionJoins: 0,
     competitionWins: 0,
-    competitionRefunds: 0,        // NEW: Track refunds separately
+    competitionRefunds: 0, // NEW: Track refunds separately
     challengeJoins: 0,
     challengeWins: 0,
-    challengeRefunds: 0,          // NEW: Track refunds separately
+    challengeRefunds: 0, // NEW: Track refunds separately
     marketplacePurchases: 0,
     adminAdjustments: 0,
-    withdrawalRefunds: 0,         // NEW: Track withdrawal refunds
-    manualCredits: 0,             // NEW: Track manual credits
-    platformFees: 0,              // NEW: Track platform fees
-    gmCompetitionEarnings: 0,     // GM earnings from competition referrals
-    gmChallengeEarnings: 0,       // GM earnings from challenge referrals
+    withdrawalRefunds: 0, // NEW: Track withdrawal refunds
+    manualCredits: 0, // NEW: Track manual credits
+    platformFees: 0, // NEW: Track platform fees
+    gmCompetitionEarnings: 0, // GM earnings from competition referrals
+    gmChallengeEarnings: 0, // GM earnings from challenge referrals
     other: 0,
   };
-  
+
   // Track GM earnings separately
   let gmEarningsTotal = 0;
 
@@ -820,96 +927,96 @@ async function getDetailedUserReconciliation(
     balanceFromAllTransactions += amount;
 
     switch (type) {
-      case 'deposit':
+      case "deposit":
         depositTotal += Math.abs(amount);
         breakdown.deposits++;
         break;
-        
-      case 'manual_deposit_credit':
+
+      case "manual_deposit_credit":
         // Admin credited user for failed deposit - this is like a deposit
         depositTotal += Math.abs(amount);
         otherCreditsTotal += Math.abs(amount);
         breakdown.manualCredits++;
         break;
-        
-      case 'withdrawal':
+
+      case "withdrawal":
         withdrawalTxTotal += Math.abs(amount);
         breakdown.withdrawals++;
         break;
-        
-      case 'withdrawal_fee':
+
+      case "withdrawal_fee":
         // Fee charged on withdrawal - already deducted
         breakdown.platformFees++;
         break;
-        
-      case 'withdrawal_refund':
+
+      case "withdrawal_refund":
         // Withdrawal failed/cancelled - credits returned
         otherCreditsTotal += Math.abs(amount);
         breakdown.withdrawalRefunds++;
         break;
-        
-      case 'competition_entry':
+
+      case "competition_entry":
         competitionSpentTotal += Math.abs(amount);
         breakdown.competitionJoins++;
         break;
-        
-      case 'competition_win':
+
+      case "competition_win":
         competitionWinTotal += Math.abs(amount);
         breakdown.competitionWins++;
         break;
-        
-      case 'competition_refund':
+
+      case "competition_refund":
         // Competition cancelled - entry fee returned
         // This REDUCES the net spent on competitions
         competitionWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
         breakdown.competitionRefunds++;
         break;
-        
-      case 'challenge_entry':
+
+      case "challenge_entry":
         challengeSpentTotal += Math.abs(amount);
         breakdown.challengeJoins++;
         break;
-        
-      case 'challenge_win':
+
+      case "challenge_win":
         challengeWinTotal += Math.abs(amount);
         breakdown.challengeWins++;
         break;
-        
-      case 'challenge_refund':
+
+      case "challenge_refund":
         // Challenge cancelled/declined - entry fee returned
         // This REDUCES the net spent on challenges
         challengeWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
         breakdown.challengeRefunds++;
         break;
-        
-      case 'marketplace_purchase':
+
+      case "marketplace_purchase":
         marketplaceSpentTotal += Math.abs(amount);
         breakdown.marketplacePurchases++;
         break;
-        
-      case 'admin_adjustment':
+
+      case "admin_adjustment":
         // Can be positive or negative
         adminAdjustmentTotal += amount; // Keep sign for net adjustment
         breakdown.adminAdjustments++;
         break;
-        
-      case 'platform_fee':
+
+      case "platform_fee":
         // Fee deducted from winnings
         breakdown.platformFees++;
         break;
-        
-      case 'gamemaster_earning':
+
+      case "gamemaster_earning":
         // GM earned from competition referral
         gmEarningsTotal += Math.abs(amount);
         breakdown.gmCompetitionEarnings++;
         break;
-        
-      case 'gamemaster_challenge_referral':
+
+      case "gamemaster_challenge_referral":
         // GM earned from challenge referral
         gmEarningsTotal += Math.abs(amount);
         breakdown.gmChallengeEarnings++;
         break;
-        
+
       default:
         breakdown.other++;
     }
@@ -918,22 +1025,28 @@ async function getDetailedUserReconciliation(
   // Get completed withdrawals from WithdrawalRequest (source of truth for withdrawals)
   const completedWithdrawals = await WithdrawalRequest.find({
     userId,
-    status: 'completed',
+    status: "completed",
   }).lean();
-  const withdrawalFromRequests = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
+  const withdrawalFromRequests = completedWithdrawals.reduce(
+    (sum, w) => sum + (w.amountCredits || 0),
+    0,
+  );
 
   // The TRUE expected balance is the sum of all completed transaction amounts
   // This accounts for EVERYTHING: deposits, withdrawals, wins, refunds, admin adjustments, etc.
-  const expectedFromTransactions = Math.round(balanceFromAllTransactions * 100) / 100;
+  const expectedFromTransactions =
+    Math.round(balanceFromAllTransactions * 100) / 100;
 
   // Check for balance mismatch - CRITICAL CHECK
   // Compare actual wallet balance with what transactions say it should be
-  const balanceDiff = Math.abs(walletData.creditBalance - expectedFromTransactions);
-  
+  const balanceDiff = Math.abs(
+    walletData.creditBalance - expectedFromTransactions,
+  );
+
   if (balanceDiff > 0.01) {
     // Build explanation of what might be causing the mismatch
     let explanation = `Balance mismatch: stored ${walletData.creditBalance}, calculated from transactions ${expectedFromTransactions}.`;
-    
+
     if (pendingWithdrawalCredits > 0) {
       explanation += ` Note: ${pendingWithdrawalCredits} credits in pending withdrawals.`;
     }
@@ -941,7 +1054,7 @@ async function getDetailedUserReconciliation(
       explanation += ` Note: ${pendingDepositCredits} credits in pending deposits.`;
     }
     if (adminAdjustmentTotal !== 0) {
-      explanation += ` Admin adjustments: ${adminAdjustmentTotal > 0 ? '+' : ''}${adminAdjustmentTotal}.`;
+      explanation += ` Admin adjustments: ${adminAdjustmentTotal > 0 ? "+" : ""}${adminAdjustmentTotal}.`;
     }
     if (breakdown.competitionRefunds > 0) {
       explanation += ` Competition refunds: ${breakdown.competitionRefunds}.`;
@@ -952,16 +1065,19 @@ async function getDetailedUserReconciliation(
     if (breakdown.withdrawalRefunds > 0) {
       explanation += ` Withdrawal refunds: ${breakdown.withdrawalRefunds}.`;
     }
-    
+
     issues.push({
-      type: 'balance_mismatch',
-      severity: 'critical',
+      type: "balance_mismatch",
+      severity: "critical",
       userId,
       userEmail,
       details: {
         expected: expectedFromTransactions,
         actual: walletData.creditBalance,
-        difference: Math.round((walletData.creditBalance - expectedFromTransactions) * 100) / 100,
+        difference:
+          Math.round(
+            (walletData.creditBalance - expectedFromTransactions) * 100,
+          ) / 100,
         description: explanation,
       },
     });
@@ -971,32 +1087,41 @@ async function getDetailedUserReconciliation(
   const depositDiff = Math.abs(walletData.totalDeposited - depositTotal);
   if (depositDiff > 0.01) {
     issues.push({
-      type: 'deposit_total_mismatch',
-      severity: 'warning',
+      type: "deposit_total_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(depositTotal * 100) / 100,
         actual: walletData.totalDeposited,
-        difference: Math.round((walletData.totalDeposited - depositTotal) * 100) / 100,
-        description: `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(depositTotal * 100) / 100}` +
-          (breakdown.manualCredits > 0 ? ` (includes ${breakdown.manualCredits} manual credits)` : ''),
+        difference:
+          Math.round((walletData.totalDeposited - depositTotal) * 100) / 100,
+        description:
+          `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(depositTotal * 100) / 100}` +
+          (breakdown.manualCredits > 0
+            ? ` (includes ${breakdown.manualCredits} manual credits)`
+            : ""),
       },
     });
   }
 
   // Check withdrawal total against WithdrawalRequest (more reliable)
-  const withdrawalDiff = Math.abs(walletData.totalWithdrawn - withdrawalFromRequests);
+  const withdrawalDiff = Math.abs(
+    walletData.totalWithdrawn - withdrawalFromRequests,
+  );
   if (withdrawalDiff > 0.01) {
     issues.push({
-      type: 'withdrawal_total_mismatch',
-      severity: 'warning',
+      type: "withdrawal_total_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(withdrawalFromRequests * 100) / 100,
         actual: walletData.totalWithdrawn,
-        difference: Math.round((walletData.totalWithdrawn - withdrawalFromRequests) * 100) / 100,
+        difference:
+          Math.round(
+            (walletData.totalWithdrawn - withdrawalFromRequests) * 100,
+          ) / 100,
         description: `Withdrawal total mismatch: stored ${walletData.totalWithdrawn}, from requests ${Math.round(withdrawalFromRequests * 100) / 100}`,
       },
     });
@@ -1004,94 +1129,128 @@ async function getDetailedUserReconciliation(
 
   // Check competition wins (includes refunds - both are credits received)
   // Note: The wallet's totalWonFromCompetitions should include refunds if properly tracked
-  const compWinDiff = Math.abs(walletData.totalWonFromCompetitions - competitionWinTotal);
+  const compWinDiff = Math.abs(
+    walletData.totalWonFromCompetitions - competitionWinTotal,
+  );
   if (compWinDiff > 0.01) {
     issues.push({
-      type: 'competition_win_mismatch',
-      severity: 'warning',
+      type: "competition_win_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(competitionWinTotal * 100) / 100,
         actual: walletData.totalWonFromCompetitions,
-        difference: Math.round((walletData.totalWonFromCompetitions - competitionWinTotal) * 100) / 100,
-        description: `Competition credits mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}` +
-          (breakdown.competitionRefunds > 0 ? ` (includes ${breakdown.competitionRefunds} refunds from cancelled competitions)` : ''),
+        difference:
+          Math.round(
+            (walletData.totalWonFromCompetitions - competitionWinTotal) * 100,
+          ) / 100,
+        description:
+          `Competition credits mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}` +
+          (breakdown.competitionRefunds > 0
+            ? ` (includes ${breakdown.competitionRefunds} refunds from cancelled competitions)`
+            : ""),
       },
     });
   }
 
   // Check challenge wins (includes refunds)
-  const chalWinDiff = Math.abs(walletData.totalWonFromChallenges - challengeWinTotal);
+  const chalWinDiff = Math.abs(
+    walletData.totalWonFromChallenges - challengeWinTotal,
+  );
   if (chalWinDiff > 0.01) {
     issues.push({
-      type: 'challenge_win_mismatch',
-      severity: 'warning',
+      type: "challenge_win_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(challengeWinTotal * 100) / 100,
         actual: walletData.totalWonFromChallenges,
-        difference: Math.round((walletData.totalWonFromChallenges - challengeWinTotal) * 100) / 100,
-        description: `Challenge credits mismatch: stored ${walletData.totalWonFromChallenges}, calculated ${Math.round(challengeWinTotal * 100) / 100}` +
-          (breakdown.challengeRefunds > 0 ? ` (includes ${breakdown.challengeRefunds} refunds)` : ''),
+        difference:
+          Math.round(
+            (walletData.totalWonFromChallenges - challengeWinTotal) * 100,
+          ) / 100,
+        description:
+          `Challenge credits mismatch: stored ${walletData.totalWonFromChallenges}, calculated ${Math.round(challengeWinTotal * 100) / 100}` +
+          (breakdown.challengeRefunds > 0
+            ? ` (includes ${breakdown.challengeRefunds} refunds)`
+            : ""),
       },
     });
   }
 
   // Check competition spent (entry fees only, not affected by refunds in this field)
-  const compSpentDiff = Math.abs(walletData.totalSpentOnCompetitions - competitionSpentTotal);
+  const compSpentDiff = Math.abs(
+    walletData.totalSpentOnCompetitions - competitionSpentTotal,
+  );
   if (compSpentDiff > 0.01) {
     issues.push({
-      type: 'competition_spent_mismatch',
-      severity: 'warning',
+      type: "competition_spent_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(competitionSpentTotal * 100) / 100,
         actual: walletData.totalSpentOnCompetitions,
-        difference: Math.round((walletData.totalSpentOnCompetitions - competitionSpentTotal) * 100) / 100,
+        difference:
+          Math.round(
+            (walletData.totalSpentOnCompetitions - competitionSpentTotal) * 100,
+          ) / 100,
         description: `Competition spent mismatch: stored ${walletData.totalSpentOnCompetitions}, calculated ${Math.round(competitionSpentTotal * 100) / 100}`,
       },
     });
   }
 
   // Check challenge spent
-  const chalSpentDiff = Math.abs(walletData.totalSpentOnChallenges - challengeSpentTotal);
+  const chalSpentDiff = Math.abs(
+    walletData.totalSpentOnChallenges - challengeSpentTotal,
+  );
   if (chalSpentDiff > 0.01) {
     issues.push({
-      type: 'challenge_spent_mismatch',
-      severity: 'warning',
+      type: "challenge_spent_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(challengeSpentTotal * 100) / 100,
         actual: walletData.totalSpentOnChallenges,
-        difference: Math.round((walletData.totalSpentOnChallenges - challengeSpentTotal) * 100) / 100,
+        difference:
+          Math.round(
+            (walletData.totalSpentOnChallenges - challengeSpentTotal) * 100,
+          ) / 100,
         description: `Challenge spent mismatch: stored ${walletData.totalSpentOnChallenges}, calculated ${Math.round(challengeSpentTotal * 100) / 100}`,
       },
     });
   }
 
   // Check marketplace spent
-  const marketSpentDiff = Math.abs(walletData.totalSpentOnMarketplace - marketplaceSpentTotal);
+  const marketSpentDiff = Math.abs(
+    walletData.totalSpentOnMarketplace - marketplaceSpentTotal,
+  );
   if (marketSpentDiff > 0.01) {
     issues.push({
-      type: 'marketplace_spent_mismatch',
-      severity: 'warning',
+      type: "marketplace_spent_mismatch",
+      severity: "warning",
       userId,
       userEmail,
       details: {
         expected: Math.round(marketplaceSpentTotal * 100) / 100,
         actual: walletData.totalSpentOnMarketplace,
-        difference: Math.round((walletData.totalSpentOnMarketplace - marketplaceSpentTotal) * 100) / 100,
+        difference:
+          Math.round(
+            (walletData.totalSpentOnMarketplace - marketplaceSpentTotal) * 100,
+          ) / 100,
         description: `Marketplace spent mismatch: stored ${walletData.totalSpentOnMarketplace}, calculated ${Math.round(marketplaceSpentTotal * 100) / 100}`,
       },
     });
   }
 
   // Check if user is a Game Master (has GM earnings)
-  const isGameMaster = gmEarningsTotal > 0 || breakdown.gmCompetitionEarnings > 0 || breakdown.gmChallengeEarnings > 0;
+  const isGameMaster =
+    gmEarningsTotal > 0 ||
+    breakdown.gmCompetitionEarnings > 0 ||
+    breakdown.gmChallengeEarnings > 0;
 
   return {
     userId,
@@ -1113,17 +1272,20 @@ async function getDetailedUserReconciliation(
       challengeSpentTotal: Math.round(challengeSpentTotal * 100) / 100,
       marketplaceSpentTotal: Math.round(marketplaceSpentTotal * 100) / 100,
       gmEarningsTotal: Math.round(gmEarningsTotal * 100) / 100,
-      pendingWithdrawalCredits: Math.round(pendingWithdrawalCredits * 100) / 100,
+      pendingWithdrawalCredits:
+        Math.round(pendingWithdrawalCredits * 100) / 100,
       pendingDepositCredits: Math.round(pendingDepositCredits * 100) / 100,
     },
     transactionBreakdown: {
       ...breakdown,
       // Legacy fields for backwards compatibility
-      refunds: breakdown.competitionRefunds + breakdown.challengeRefunds + breakdown.withdrawalRefunds,
+      refunds:
+        breakdown.competitionRefunds +
+        breakdown.challengeRefunds +
+        breakdown.withdrawalRefunds,
     },
     isGameMaster,
     issues,
-    healthy: issues.filter(i => i.severity === 'critical').length === 0,
+    healthy: issues.filter((i) => i.severity === "critical").length === 0,
   };
 }
-

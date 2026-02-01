@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
-import UserReferral from '@/database/models/user-referral.model';
-import mongoose from 'mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
+import UserReferral from "@/database/models/user-referral.model";
+import mongoose from "mongoose";
 
 /**
  * GET /api/gamemaster/referrals
@@ -13,39 +13,45 @@ import mongoose from 'mongoose';
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
-    
+
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     const userId = session.user.id;
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const status = searchParams.get('status'); // 'active' or 'inactive'
-    const search = searchParams.get('search');
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const status = searchParams.get("status"); // 'active' or 'inactive'
+    const search = searchParams.get("search");
 
     // Check if user is a Game Master
     const subscription = await GameMasterSubscription.findOne({ userId });
     if (!subscription) {
-      return NextResponse.json({ success: false, error: 'Not a Game Master' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Not a Game Master" },
+        { status: 403 },
+      );
     }
 
     // Build query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { gameMasterId: userId };
-    
-    if (status === 'active') {
+
+    if (status === "active") {
       query.isActive = true;
-    } else if (status === 'inactive') {
+    } else if (status === "inactive") {
       query.isActive = false;
     }
-    
+
     if (search) {
       query.$or = [
-        { userEmail: { $regex: search, $options: 'i' } },
-        { userName: { $regex: search, $options: 'i' } },
+        { userEmail: { $regex: search, $options: "i" } },
+        { userName: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -61,25 +67,31 @@ export async function GET(request: NextRequest) {
 
     // Get MongoDB connection for aggregations
     const db = mongoose.connection.db;
-    
+
     // Get earnings data from gamemasterearnings collection (source of truth)
-    let earningsByUser: Map<string, { totalEntryFees: number; totalEarnings: number }> = new Map();
+    let earningsByUser: Map<
+      string,
+      { totalEntryFees: number; totalEarnings: number }
+    > = new Map();
     let totalEntryFees = 0;
     let totalEarningsGenerated = 0;
-    
+
     if (db) {
       // Get earnings grouped by referred user
-      const earningsData = await db.collection('gamemasterearnings').aggregate([
-        { $match: { gameMasterId: userId } },
-        { 
-          $group: { 
-            _id: '$referredUserId',
-            totalEntryFees: { $sum: '$entryFeeAmount' },
-            totalEarnings: { $sum: '$netEarning' },
-          } 
-        }
-      ]).toArray();
-      
+      const earningsData = await db
+        .collection("gamemasterearnings")
+        .aggregate([
+          { $match: { gameMasterId: userId } },
+          {
+            $group: {
+              _id: "$referredUserId",
+              totalEntryFees: { $sum: "$entryFeeAmount" },
+              totalEarnings: { $sum: "$netEarning" },
+            },
+          },
+        ])
+        .toArray();
+
       for (const e of earningsData) {
         earningsByUser.set(e._id, {
           totalEntryFees: e.totalEntryFees || 0,
@@ -91,8 +103,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich referrals with actual earnings data
-    const enrichedReferrals = referrals.map(r => {
-      const earnings = earningsByUser.get(r.userId) || { totalEntryFees: 0, totalEarnings: 0 };
+    const enrichedReferrals = referrals.map((r) => {
+      const earnings = earningsByUser.get(r.userId) || {
+        totalEntryFees: 0,
+        totalEarnings: 0,
+      };
       return {
         ...r,
         totalEntryFees: earnings.totalEntryFees,
@@ -101,16 +116,19 @@ export async function GET(request: NextRequest) {
     });
 
     // Count stats from UserReferral
-    const allReferrals = await UserReferral.find({ gameMasterId: userId }).lean();
+    const allReferrals = await UserReferral.find({
+      gameMasterId: userId,
+    }).lean();
     const totalReferred = allReferrals.length;
-    const activeUsers = allReferrals.filter(r => r.isActive).length;
-    
+    const activeUsers = allReferrals.filter((r) => r.isActive).length;
+
     const stats = {
       totalReferred,
       activeUsers,
       totalEntryFees,
       totalEarningsGenerated,
-      avgEarningsPerUser: totalReferred > 0 ? totalEarningsGenerated / totalReferred : 0,
+      avgEarningsPerUser:
+        totalReferred > 0 ? totalEarningsGenerated / totalReferred : 0,
     };
 
     return NextResponse.json({
@@ -127,10 +145,13 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching GM referrals:', error);
+    console.error("Error fetching GM referrals:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }

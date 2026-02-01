@@ -1,11 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Camera, Calendar, ChevronDown, Sparkles, Trophy, Swords, TrendingUp, Verified, Crown } from 'lucide-react';
-import { useUserProfileImage } from '@/hooks/useUserProfileImage';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import AvatarWithFrame from '@/components/ui/AvatarWithFrame';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Camera,
+  Calendar,
+  ChevronDown,
+  Sparkles,
+  Trophy,
+  Swords,
+  TrendingUp,
+  Verified,
+  Crown,
+} from "lucide-react";
+import { useUserProfileImage } from "@/hooks/useUserProfileImage";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import AvatarWithFrame from "@/components/ui/AvatarWithFrame";
 
 interface ProfileHeaderProps {
   session: {
@@ -56,23 +66,25 @@ export default function ProfileHeader({
   const { settings } = useAppSettings();
   const [showQuickStats, setShowQuickStats] = useState(true);
   const [isGameMaster, setIsGameMaster] = useState(false);
-  const [gmPackageName, setGmPackageName] = useState('');
+  const [gmPackageName, setGmPackageName] = useState("");
 
-  const displayName = session.user.name || 'Trader';
+  const displayName = session.user.name || "Trader";
   const memberSince = new Date().getFullYear(); // Would come from user data
 
   // Calculate total wins
-  const totalWins = (competitionStats?.competitionsWon || 0) + (challengeStats?.totalChallengesWon || 0);
+  const totalWins =
+    (competitionStats?.competitionsWon || 0) +
+    (challengeStats?.totalChallengesWon || 0);
 
   // Check Game Master status
   useEffect(() => {
     const checkGameMasterStatus = async () => {
       try {
-        const response = await fetch('/api/gamemaster/status');
+        const response = await fetch("/api/gamemaster/status");
         const data = await response.json();
         if (data.success && data.isGameMaster) {
           setIsGameMaster(true);
-          setGmPackageName(data.subscription?.packageName || 'Game Master');
+          setGmPackageName(data.subscription?.packageName || "Game Master");
         }
       } catch {
         // Silently fail
@@ -91,12 +103,12 @@ export default function ProfileHeader({
           <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         </div>
         {/* Grid Pattern */}
-        <div 
+        <div
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
                              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-            backgroundSize: '50px 50px'
+            backgroundSize: "50px 50px",
           }}
         />
       </div>
@@ -110,11 +122,13 @@ export default function ProfileHeader({
             <div className="relative flex-shrink-0">
               <div className="relative group">
                 {/* Animated Ring */}
-                <div 
+                <div
                   className="absolute -inset-1 rounded-full opacity-75 blur-sm group-hover:opacity-100 transition-opacity duration-300"
-                  style={{ background: `conic-gradient(from 0deg, ${levelData.currentColor}, transparent, ${levelData.currentColor})` }}
+                  style={{
+                    background: `conic-gradient(from 0deg, ${levelData.currentColor}, transparent, ${levelData.currentColor})`,
+                  }}
                 />
-                
+
                 {/* Avatar with Frame */}
                 <div className="relative">
                   <div className="w-28 h-28 sm:w-32 sm:h-32 ring-4 ring-gray-800 rounded-full">
@@ -126,7 +140,7 @@ export default function ProfileHeader({
                       className="w-full h-full"
                     />
                   </div>
-                  
+
                   {/* Camera Overlay - only show when no frame */}
                   {!frameUrl && (
                     <button className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
@@ -136,11 +150,13 @@ export default function ProfileHeader({
                 </div>
 
                 {/* Level Badge */}
-                <div 
+                <div
                   className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-gray-800 z-20"
                   style={{ backgroundColor: levelData.currentColor }}
                 >
-                  <span className="text-white drop-shadow">{levelData.currentIcon}</span>
+                  <span className="text-white drop-shadow">
+                    {levelData.currentIcon}
+                  </span>
                 </div>
 
                 {/* Verified Badge */}
@@ -158,19 +174,21 @@ export default function ProfileHeader({
                 <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">
                   {displayName}
                 </h1>
-                
+
                 {/* Title Badge */}
-                <div 
+                <div
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold w-fit"
-                  style={{ 
-                    backgroundColor: levelData.currentColor + '20',
+                  style={{
+                    backgroundColor: levelData.currentColor + "20",
                     color: levelData.currentColor,
-                    border: `1px solid ${levelData.currentColor}40`
+                    border: `1px solid ${levelData.currentColor}40`,
                   }}
                 >
                   <span>{levelData.currentIcon}</span>
                   <span>{levelData.currentTitle}</span>
-                  <span className="text-xs opacity-70">Lv.{levelData.currentLevel}</span>
+                  <span className="text-xs opacity-70">
+                    Lv.{levelData.currentLevel}
+                  </span>
                 </div>
 
                 {/* Game Master Badge */}
@@ -184,7 +202,9 @@ export default function ProfileHeader({
                 )}
               </div>
 
-              <p className="text-gray-400 mb-4 text-sm sm:text-base">{session.user.email}</p>
+              <p className="text-gray-400 mb-4 text-sm sm:text-base">
+                {session.user.email}
+              </p>
 
               {/* Meta Info */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
@@ -201,7 +221,10 @@ export default function ProfileHeader({
                   <span>{totalWins} Wins</span>
                 </div>
                 {isGameMaster && (
-                  <Link href="/gamemaster" className="flex items-center gap-1.5 text-yellow-400 hover:text-yellow-300 transition-colors">
+                  <Link
+                    href="/gamemaster"
+                    className="flex items-center gap-1.5 text-yellow-400 hover:text-yellow-300 transition-colors"
+                  >
                     <Crown className="w-4 h-4" />
                     <span>Game Master Dashboard</span>
                   </Link>
@@ -212,33 +235,46 @@ export default function ProfileHeader({
             {/* Quick Balance Card */}
             <div className="lg:text-right">
               <div className="inline-flex flex-col items-start lg:items-end bg-gray-800/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50">
-                <span className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Balance</span>
+                <span className="text-xs text-gray-400 mb-1 uppercase tracking-wider">
+                  Balance
+                </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold text-white tabular-nums">
-                    {(walletData?.currentBalance || 0).toLocaleString(undefined, { 
-                      minimumFractionDigits: settings?.credits.decimals || 0,
-                      maximumFractionDigits: settings?.credits.decimals || 0
-                    })}
+                    {(walletData?.currentBalance || 0).toLocaleString(
+                      undefined,
+                      {
+                        minimumFractionDigits: settings?.credits.decimals || 0,
+                        maximumFractionDigits: settings?.credits.decimals || 0,
+                      },
+                    )}
                   </span>
-                  <span className="text-yellow-500 text-xl">{settings?.credits.symbol || '⚡'}</span>
+                  <span className="text-yellow-500 text-xl">
+                    {settings?.credits.symbol || "⚡"}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Quick Stats Toggle */}
-          <button 
+          <button
             onClick={() => setShowQuickStats(!showQuickStats)}
             className="mt-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
           >
             <span>Quick Stats</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${showQuickStats ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${showQuickStats ? "rotate-180" : ""}`}
+            />
           </button>
 
           {/* Quick Stats Row */}
-          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 transition-all duration-300 ${
-            showQuickStats ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 overflow-hidden'
-          }`}>
+          <div
+            className={`grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 transition-all duration-300 ${
+              showQuickStats
+                ? "opacity-100 max-h-40"
+                : "opacity-0 max-h-0 overflow-hidden"
+            }`}
+          >
             <QuickStatCard
               icon={<TrendingUp className="w-4 h-4" />}
               label="Total Trades"
@@ -260,7 +296,7 @@ export default function ProfileHeader({
             <QuickStatCard
               icon={<Swords className="w-4 h-4" />}
               label="Challenges"
-              value={challengeStats?.totalChallengesEntered?.toString() || '0'}
+              value={challengeStats?.totalChallengesEntered?.toString() || "0"}
               color="text-orange-400"
             />
           </div>
@@ -270,15 +306,15 @@ export default function ProfileHeader({
   );
 }
 
-function QuickStatCard({ 
-  icon, 
-  label, 
-  value, 
-  color 
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  value: string; 
+function QuickStatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
   color: string;
 }) {
   return (
@@ -291,4 +327,3 @@ function QuickStatCard({
     </div>
   );
 }
-

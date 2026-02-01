@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 import {
   Shield,
   RefreshCw,
@@ -17,25 +17,25 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 interface KYCSession {
   _id: string;
@@ -69,24 +69,31 @@ interface KYCSession {
   decisionTime?: string;
 }
 
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ComponentType<any>; label: string }> = {
-  created: { color: 'bg-gray-500', icon: Clock, label: 'Created' },
-  started: { color: 'bg-blue-500', icon: Clock, label: 'Started' },
-  submitted: { color: 'bg-yellow-500', icon: Clock, label: 'Submitted' },
-  approved: { color: 'bg-green-500', icon: CheckCircle, label: 'Approved' },
-  declined: { color: 'bg-red-500', icon: XCircle, label: 'Declined' },
-  resubmission_requested: { color: 'bg-orange-500', icon: AlertTriangle, label: 'Resubmission Required' },
-  expired: { color: 'bg-gray-600', icon: Clock, label: 'Expired' },
-  abandoned: { color: 'bg-gray-700', icon: XCircle, label: 'Abandoned' },
+const STATUS_CONFIG: Record<
+  string,
+  { color: string; icon: React.ComponentType<any>; label: string }
+> = {
+  created: { color: "bg-gray-500", icon: Clock, label: "Created" },
+  started: { color: "bg-blue-500", icon: Clock, label: "Started" },
+  submitted: { color: "bg-yellow-500", icon: Clock, label: "Submitted" },
+  approved: { color: "bg-green-500", icon: CheckCircle, label: "Approved" },
+  declined: { color: "bg-red-500", icon: XCircle, label: "Declined" },
+  resubmission_requested: {
+    color: "bg-orange-500",
+    icon: AlertTriangle,
+    label: "Resubmission Required",
+  },
+  expired: { color: "bg-gray-600", icon: Clock, label: "Expired" },
+  abandoned: { color: "bg-gray-700", icon: XCircle, label: "Abandoned" },
 };
 
 export default function KYCHistorySection() {
   const [sessions, setSessions] = useState<KYCSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -107,13 +114,13 @@ export default function KYCHistorySection() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: "20",
       });
 
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (dateFrom) params.append('dateFrom', dateFrom);
-      if (dateTo) params.append('dateTo', dateTo);
-      if (searchQuery) params.append('search', searchQuery);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
+      if (searchQuery) params.append("search", searchQuery);
 
       const response = await fetch(`/api/kyc-history?${params}`);
       const data = await response.json();
@@ -125,8 +132,8 @@ export default function KYCHistorySection() {
         setStats(data.stats);
       }
     } catch (error) {
-      console.error('Error fetching KYC history:', error);
-      toast.error('Failed to load KYC history');
+      console.error("Error fetching KYC history:", error);
+      toast.error("Failed to load KYC history");
     } finally {
       setLoading(false);
     }
@@ -141,23 +148,31 @@ export default function KYCHistorySection() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Date', 'User', 'Email', 'Status', 'Document Type', 'Country', 'Verification ID'];
+    const headers = [
+      "Date",
+      "User",
+      "Email",
+      "Status",
+      "Document Type",
+      "Country",
+      "Verification ID",
+    ];
     const rows = sessions.map((s) => [
       formatDate(s.createdAt),
       s.userName,
       s.userEmail,
       s.status,
-      s.documentData?.type || '',
-      s.documentData?.country || '',
+      s.documentData?.type || "",
+      s.documentData?.country || "",
       s.veriffSessionId,
     ]);
 
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `kyc-history-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `kyc-history-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
   };
 
@@ -170,8 +185,12 @@ export default function KYCHistorySection() {
             <Shield className="h-6 w-6 text-green-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">KYC Verification History</h2>
-            <p className="text-sm text-gray-400">View all identity verification attempts</p>
+            <h2 className="text-xl font-bold text-white">
+              KYC Verification History
+            </h2>
+            <p className="text-sm text-gray-400">
+              View all identity verification attempts
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -180,7 +199,9 @@ export default function KYCHistorySection() {
             Export CSV
           </Button>
           <Button variant="outline" size="sm" onClick={fetchHistory}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
         </div>
@@ -196,25 +217,33 @@ export default function KYCHistorySection() {
         </Card>
         <Card className="bg-green-500/10 border-green-500/30">
           <CardContent className="pt-4">
-            <div className="text-2xl font-bold text-green-400">{stats.approved}</div>
+            <div className="text-2xl font-bold text-green-400">
+              {stats.approved}
+            </div>
             <p className="text-sm text-gray-400">Approved</p>
           </CardContent>
         </Card>
         <Card className="bg-red-500/10 border-red-500/30">
           <CardContent className="pt-4">
-            <div className="text-2xl font-bold text-red-400">{stats.declined}</div>
+            <div className="text-2xl font-bold text-red-400">
+              {stats.declined}
+            </div>
             <p className="text-sm text-gray-400">Declined</p>
           </CardContent>
         </Card>
         <Card className="bg-yellow-500/10 border-yellow-500/30">
           <CardContent className="pt-4">
-            <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
+            <div className="text-2xl font-bold text-yellow-400">
+              {stats.pending}
+            </div>
             <p className="text-sm text-gray-400">Pending</p>
           </CardContent>
         </Card>
         <Card className="bg-gray-500/10 border-gray-500/30">
           <CardContent className="pt-4">
-            <div className="text-2xl font-bold text-gray-400">{stats.expired}</div>
+            <div className="text-2xl font-bold text-gray-400">
+              {stats.expired}
+            </div>
             <p className="text-sm text-gray-400">Expired</p>
           </CardContent>
         </Card>
@@ -287,17 +316,30 @@ export default function KYCHistorySection() {
               <table className="w-full">
                 <thead className="bg-gray-900/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">User</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Document</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Country</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      User
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Document
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Country
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   {sessions.map((session) => {
-                    const statusConfig = STATUS_CONFIG[session.status] || STATUS_CONFIG.created;
+                    const statusConfig =
+                      STATUS_CONFIG[session.status] || STATUS_CONFIG.created;
                     const StatusIcon = statusConfig.icon;
 
                     return (
@@ -316,8 +358,12 @@ export default function KYCHistorySection() {
                               <User className="h-4 w-4 text-gray-300" />
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-white">{session.userName}</div>
-                              <div className="text-xs text-gray-400">{session.userEmail}</div>
+                              <div className="text-sm font-medium text-white">
+                                {session.userName}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {session.userEmail}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -332,7 +378,7 @@ export default function KYCHistorySection() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-white">
-                            {session.documentData?.type || '—'}
+                            {session.documentData?.type || "—"}
                           </div>
                           {session.documentData?.number && (
                             <div className="text-xs text-gray-400">
@@ -342,14 +388,18 @@ export default function KYCHistorySection() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-white">
-                            {session.documentData?.country || session.addressData?.country || '—'}
+                            {session.documentData?.country ||
+                              session.addressData?.country ||
+                              "—"}
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDetailDialog({ open: true, session })}
+                            onClick={() =>
+                              setDetailDialog({ open: true, session })
+                            }
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View
@@ -367,7 +417,8 @@ export default function KYCHistorySection() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-700">
               <div className="text-sm text-gray-400">
-                Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, total)} of {total} results
+                Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, total)} of{" "}
+                {total} results
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -396,7 +447,10 @@ export default function KYCHistorySection() {
       </Card>
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialog.open} onOpenChange={(open) => setDetailDialog({ ...detailDialog, open })}>
+      <Dialog
+        open={detailDialog.open}
+        onOpenChange={(open) => setDetailDialog({ ...detailDialog, open })}
+      >
         <DialogContent className="bg-gray-800 border-gray-700 max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
@@ -412,14 +466,17 @@ export default function KYCHistorySection() {
                   <p className="text-sm text-gray-400">Status</p>
                   <Badge
                     variant="secondary"
-                    className={`${STATUS_CONFIG[detailDialog.session.status]?.color || 'bg-gray-500'} text-white mt-1`}
+                    className={`${STATUS_CONFIG[detailDialog.session.status]?.color || "bg-gray-500"} text-white mt-1`}
                   >
-                    {STATUS_CONFIG[detailDialog.session.status]?.label || detailDialog.session.status}
+                    {STATUS_CONFIG[detailDialog.session.status]?.label ||
+                      detailDialog.session.status}
                   </Badge>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Verification ID</p>
-                  <p className="text-xs font-mono text-white">{detailDialog.session.veriffSessionId}</p>
+                  <p className="text-xs font-mono text-white">
+                    {detailDialog.session.veriffSessionId}
+                  </p>
                 </div>
               </div>
 
@@ -427,12 +484,18 @@ export default function KYCHistorySection() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-900/50 rounded-lg">
                   <p className="text-xs text-gray-400 mb-1">User</p>
-                  <p className="text-white font-medium">{detailDialog.session.userName}</p>
-                  <p className="text-sm text-gray-400">{detailDialog.session.userEmail}</p>
+                  <p className="text-white font-medium">
+                    {detailDialog.session.userName}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {detailDialog.session.userEmail}
+                  </p>
                 </div>
                 <div className="p-4 bg-gray-900/50 rounded-lg">
                   <p className="text-xs text-gray-400 mb-1">User ID</p>
-                  <p className="text-xs font-mono text-white break-all">{detailDialog.session.userId}</p>
+                  <p className="text-xs font-mono text-white break-all">
+                    {detailDialog.session.userId}
+                  </p>
                 </div>
               </div>
 
@@ -447,25 +510,33 @@ export default function KYCHistorySection() {
                     {detailDialog.session.personData.firstName && (
                       <div>
                         <p className="text-xs text-gray-400">First Name</p>
-                        <p className="text-white">{detailDialog.session.personData.firstName}</p>
+                        <p className="text-white">
+                          {detailDialog.session.personData.firstName}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.personData.lastName && (
                       <div>
                         <p className="text-xs text-gray-400">Last Name</p>
-                        <p className="text-white">{detailDialog.session.personData.lastName}</p>
+                        <p className="text-white">
+                          {detailDialog.session.personData.lastName}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.personData.dateOfBirth && (
                       <div>
                         <p className="text-xs text-gray-400">Date of Birth</p>
-                        <p className="text-white">{detailDialog.session.personData.dateOfBirth}</p>
+                        <p className="text-white">
+                          {detailDialog.session.personData.dateOfBirth}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.personData.nationality && (
                       <div>
                         <p className="text-xs text-gray-400">Nationality</p>
-                        <p className="text-white">{detailDialog.session.personData.nationality}</p>
+                        <p className="text-white">
+                          {detailDialog.session.personData.nationality}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -483,25 +554,34 @@ export default function KYCHistorySection() {
                     {detailDialog.session.documentData.type && (
                       <div>
                         <p className="text-xs text-gray-400">Document Type</p>
-                        <p className="text-white">{detailDialog.session.documentData.type}</p>
+                        <p className="text-white">
+                          {detailDialog.session.documentData.type}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.documentData.number && (
                       <div>
                         <p className="text-xs text-gray-400">Document Number</p>
-                        <p className="text-white font-mono">****{detailDialog.session.documentData.number.slice(-4)}</p>
+                        <p className="text-white font-mono">
+                          ****
+                          {detailDialog.session.documentData.number.slice(-4)}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.documentData.country && (
                       <div>
                         <p className="text-xs text-gray-400">Country</p>
-                        <p className="text-white">{detailDialog.session.documentData.country}</p>
+                        <p className="text-white">
+                          {detailDialog.session.documentData.country}
+                        </p>
                       </div>
                     )}
                     {detailDialog.session.documentData.validUntil && (
                       <div>
                         <p className="text-xs text-gray-400">Valid Until</p>
-                        <p className="text-white">{detailDialog.session.documentData.validUntil}</p>
+                        <p className="text-white">
+                          {detailDialog.session.documentData.validUntil}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -511,10 +591,16 @@ export default function KYCHistorySection() {
               {/* Verification Result */}
               {detailDialog.session.verificationReason && (
                 <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <h4 className="text-sm font-medium text-red-400 mb-2">Verification Result</h4>
-                  <p className="text-white">{detailDialog.session.verificationReason}</p>
+                  <h4 className="text-sm font-medium text-red-400 mb-2">
+                    Verification Result
+                  </h4>
+                  <p className="text-white">
+                    {detailDialog.session.verificationReason}
+                  </p>
                   {detailDialog.session.verificationCode && (
-                    <p className="text-xs text-gray-400 mt-1">Code: {detailDialog.session.verificationCode}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Code: {detailDialog.session.verificationCode}
+                    </p>
                   )}
                 </div>
               )}
@@ -523,12 +609,16 @@ export default function KYCHistorySection() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-400">Created</p>
-                  <p className="text-white">{formatDate(detailDialog.session.createdAt)}</p>
+                  <p className="text-white">
+                    {formatDate(detailDialog.session.createdAt)}
+                  </p>
                 </div>
                 {detailDialog.session.completedAt && (
                   <div>
                     <p className="text-gray-400">Completed</p>
-                    <p className="text-white">{formatDate(detailDialog.session.completedAt)}</p>
+                    <p className="text-white">
+                      {formatDate(detailDialog.session.completedAt)}
+                    </p>
                   </div>
                 )}
               </div>
@@ -539,4 +629,3 @@ export default function KYCHistorySection() {
     </div>
   );
 }
-

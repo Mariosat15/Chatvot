@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import FraudSettings, { DEFAULT_FRAUD_SETTINGS } from '@/database/models/fraud/fraud-settings.model';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import FraudSettings, {
+  DEFAULT_FRAUD_SETTINGS,
+} from "@/database/models/fraud/fraud-settings.model";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin/fraud/settings
@@ -14,23 +16,23 @@ export async function GET() {
 
     // Get settings (create default if doesn't exist)
     let settings = await FraudSettings.findOne();
-    
+
     if (!settings) {
       settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
     }
 
     return NextResponse.json({
       success: true,
-      settings: JSON.parse(JSON.stringify(settings))
+      settings: JSON.parse(JSON.stringify(settings)),
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching fraud settings:', error);
+    console.error("Error fetching fraud settings:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch settings' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch settings" },
+      { status: 500 },
     );
   }
 }
@@ -48,7 +50,7 @@ export async function PUT(request: Request) {
 
     // Get or create settings
     let settings = await FraudSettings.findOne();
-    
+
     if (!settings) {
       settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
     }
@@ -58,37 +60,37 @@ export async function PUT(request: Request) {
       ...body,
       updatedAt: new Date(),
       // TODO: Get admin user ID from session
-      updatedBy: 'admin'
+      updatedBy: "admin",
     });
 
     await settings.save();
 
-    console.log('✅ Fraud settings updated:', {
+    console.log("✅ Fraud settings updated:", {
       deviceFingerprinting: settings.deviceFingerprintingEnabled,
       vpnDetection: settings.vpnDetectionEnabled,
       multiAccountDetectionEnabled: settings.multiAccountDetectionEnabled,
       maxAccountsPerDevice: settings.maxAccountsPerDevice, // Log this important setting
-      entryBlockThreshold: settings.entryBlockThreshold
+      entryBlockThreshold: settings.entryBlockThreshold,
     });
 
     // Note: The main app has a 30-second cache, so changes may take up to 30 seconds to take effect
     return NextResponse.json({
       success: true,
       settings: JSON.parse(JSON.stringify(settings)),
-      message: 'Settings updated successfully. Changes will take effect within 30 seconds.',
-      cacheNote: 'Main app refreshes settings cache every 30 seconds'
+      message:
+        "Settings updated successfully. Changes will take effect within 30 seconds.",
+      cacheNote: "Main app refreshes settings cache every 30 seconds",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error updating fraud settings:', error);
+    console.error("Error updating fraud settings:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update settings' },
-      { status: 500 }
+      { success: false, error: "Failed to update settings" },
+      { status: 500 },
     );
   }
 }
 
 // Note: POST for reset is now at /api/fraud/settings/reset/route.ts
-

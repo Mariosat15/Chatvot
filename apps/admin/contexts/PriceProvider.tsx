@@ -1,12 +1,22 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 // Disable debug logging in production
 const DEBUG = false;
-const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
+const log = (...args: unknown[]): void => {
+  if (DEBUG) console.log(...args);
+};
 
 // Price quote structure
 interface PriceQuote {
@@ -26,7 +36,7 @@ function normalizePriceQuote(quote: PriceQuote): PriceQuote {
   const mid = (quote.bid + quote.ask) / 2;
   const spread = quote.ask - quote.bid;
   const safeMid = Math.max(quote.bid, Math.min(quote.ask, mid));
-  
+
   return {
     ...quote,
     mid: Number(safeMid.toFixed(5)),
@@ -37,7 +47,10 @@ function normalizePriceQuote(quote: PriceQuote): PriceQuote {
 /**
  * Check if a price has meaningfully changed (avoids unnecessary re-renders)
  */
-function priceChanged(oldPrice: PriceQuote | undefined, newPrice: PriceQuote): boolean {
+function priceChanged(
+  oldPrice: PriceQuote | undefined,
+  newPrice: PriceQuote,
+): boolean {
   if (!oldPrice) return true;
   // Only trigger update if bid, ask, or mid changed by at least 0.00001
   const threshold = 0.00001;
@@ -75,11 +88,13 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     prices: new Map(),
     isConnected: false,
     marketOpen: true,
-    marketStatus: 'Connecting...',
+    marketStatus: "Connecting...",
   });
 
-  const [subscriptions, setSubscriptions] = useState<Set<ForexSymbol>>(new Set());
-  
+  const [subscriptions, setSubscriptions] = useState<Set<ForexSymbol>>(
+    new Set(),
+  );
+
   // Track if fetch is in progress to prevent overlapping requests
   const fetchingRef = useRef(false);
   // Track last successful fetch time
@@ -108,7 +123,9 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   // Fetch prices effect with visibility awareness
   useEffect(() => {
     if (subscriptions.size === 0) {
-      setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
+      setState((prev) =>
+        prev.isConnected ? { ...prev, isConnected: false } : prev,
+      );
       return;
     }
 
@@ -119,13 +136,13 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchPrices = async () => {
       // Skip if tab is hidden - save resources
       if (document.hidden) {
-        log('⏸️ Skipping fetch - tab is hidden');
+        log("⏸️ Skipping fetch - tab is hidden");
         return;
       }
 
       // Prevent overlapping requests
       if (fetchingRef.current) {
-        log('⏳ Skipping fetch - previous request still in progress');
+        log("⏳ Skipping fetch - previous request still in progress");
         return;
       }
 
@@ -133,31 +150,31 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const symbolsArray = Array.from(subscriptions);
-        log('🔄 Fetching REAL prices for:', symbolsArray);
-        
-        const response = await fetch('/api/trading/prices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        log("🔄 Fetching REAL prices for:", symbolsArray);
+
+        const response = await fetch("/api/trading/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ symbols: symbolsArray }),
-          cache: 'no-store',
+          cache: "no-store",
         });
 
         if (response.ok) {
           const data = await response.json();
-          log('💰 Received REAL prices:', data.prices.length, 'quotes');
-          
+          log("💰 Received REAL prices:", data.prices.length, "quotes");
+
           lastFetchRef.current = Date.now();
 
           // BATCHED STATE UPDATE - single setState call
-          setState(prev => {
+          setState((prev) => {
             // Check if anything actually changed
             let hasChanges = false;
             const newPrices = new Map(prev.prices);
-            
+
             data.prices.forEach((quote: PriceQuote) => {
               const normalized = normalizePriceQuote(quote);
               const existing = prev.prices.get(quote.symbol);
-              
+
               // Only update if price actually changed
               if (priceChanged(existing, normalized)) {
                 newPrices.set(quote.symbol, normalized);
@@ -166,10 +183,12 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
             });
 
             // If nothing changed, return same state (no re-render)
-            if (!hasChanges && 
-                prev.isConnected === true && 
-                prev.marketOpen === data.marketOpen && 
-                prev.marketStatus === data.status) {
+            if (
+              !hasChanges &&
+              prev.isConnected === true &&
+              prev.marketOpen === data.marketOpen &&
+              prev.marketStatus === data.status
+            ) {
               return prev;
             }
 
@@ -181,16 +200,20 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
             };
           });
         } else if (response.status === 404) {
-          setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
+          setState((prev) =>
+            prev.isConnected ? { ...prev, isConnected: false } : prev,
+          );
         } else {
-          setState(prev => ({ 
-            ...prev, 
-            marketStatus: '⚠️ Connection Error' 
+          setState((prev) => ({
+            ...prev,
+            marketStatus: "⚠️ Connection Error",
           }));
         }
       } catch {
         // Fail silently if not on a page that uses prices
-        setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
+        setState((prev) =>
+          prev.isConnected ? { ...prev, isConnected: false } : prev,
+        );
       } finally {
         fetchingRef.current = false;
       }
@@ -200,10 +223,10 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         isTabVisible = false;
-        log('👁️ Tab hidden - pausing price updates');
+        log("👁️ Tab hidden - pausing price updates");
       } else {
         isTabVisible = true;
-        log('👁️ Tab visible - resuming price updates');
+        log("👁️ Tab visible - resuming price updates");
         fetchPrices(); // Fetch immediately when tab becomes visible
       }
     };
@@ -215,31 +238,36 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     intervalId = setInterval(fetchPrices, POLLING_INTERVAL);
 
     // Listen for visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [subscriptions]);
 
   // Memoize context value - only changes when state changes
-  const value = useMemo<PriceContextValue>(() => ({
-    prices: state.prices,
-    subscribe,
-    unsubscribe,
-    isConnected: state.isConnected,
-    marketOpen: state.marketOpen,
-    marketStatus: state.marketStatus,
-  }), [state, subscribe, unsubscribe]);
+  const value = useMemo<PriceContextValue>(
+    () => ({
+      prices: state.prices,
+      subscribe,
+      unsubscribe,
+      isConnected: state.isConnected,
+      marketOpen: state.marketOpen,
+      marketStatus: state.marketStatus,
+    }),
+    [state, subscribe, unsubscribe],
+  );
 
-  return <PriceContext.Provider value={value}>{children}</PriceContext.Provider>;
+  return (
+    <PriceContext.Provider value={value}>{children}</PriceContext.Provider>
+  );
 };
 
 export const usePrices = () => {
   const context = useContext(PriceContext);
   if (context === undefined) {
-    throw new Error('usePrices must be used within a PriceProvider');
+    throw new Error("usePrices must be used within a PriceProvider");
   }
   return context;
 };

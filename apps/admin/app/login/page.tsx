@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { Shield } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Shield } from "lucide-react";
 
 export default function AdminLogin() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -20,34 +20,37 @@ export default function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    console.log('🔐 [CLIENT] Login attempt:', { email: formData.email, passwordLength: formData.password.length });
+    console.log("🔐 [CLIENT] Login attempt:", {
+      email: formData.email,
+      passwordLength: formData.password.length,
+    });
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      console.log('🔐 [CLIENT] Response status:', response.status);
+      console.log("🔐 [CLIENT] Response status:", response.status);
       const data = await response.json();
-      console.log('🔐 [CLIENT] Response data:', data);
+      console.log("🔐 [CLIENT] Response data:", data);
 
       if (response.ok) {
-        toast.success('Login successful!');
-        
+        toast.success("Login successful!");
+
         if (data.isFirstLogin) {
-          router.push('/dashboard?firstLogin=true');
+          router.push("/dashboard?firstLogin=true");
         } else {
-          router.push('/dashboard');
+          router.push("/dashboard");
         }
       } else {
-        console.error('🔐 [CLIENT] Login failed:', data.error, data.details);
-        toast.error(data.error || 'Login failed');
+        console.error("🔐 [CLIENT] Login failed:", data.error, data.details);
+        toast.error(data.error || "Login failed");
       }
     } catch (error) {
-      console.error('🔐 [CLIENT] Network/fetch error:', error);
-      toast.error('An error occurred');
+      console.error("🔐 [CLIENT] Network/fetch error:", error);
+      toast.error("An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -62,9 +65,7 @@ export default function AdminLogin() {
             <div className="h-16 w-16 bg-yellow-500 rounded-full flex items-center justify-center mb-4">
               <Shield className="h-8 w-8 text-gray-900" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-100">
-              Admin Panel
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-100">Admin Panel</h1>
             <p className="text-gray-400 text-sm mt-2">
               Sign in to access the dashboard
             </p>
@@ -111,7 +112,7 @@ export default function AdminLogin() {
               disabled={isLoading}
               className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
@@ -129,4 +130,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-

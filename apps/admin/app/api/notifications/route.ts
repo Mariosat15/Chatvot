@@ -1,30 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
-import { notificationService } from '@/lib/services/notification.service';
-import { auditLogService } from '@/lib/services/audit-log.service';
-import { checkAndSeedTemplates } from '@/lib/services/notification-seed.service';
-import NotificationTemplate from '@/database/models/notification-template.model';
-import Notification from '@/database/models/notification.model';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { notificationService } from "@/lib/services/notification.service";
+import { auditLogService } from "@/lib/services/audit-log.service";
+import { checkAndSeedTemplates } from "@/lib/services/notification-seed.service";
+import NotificationTemplate from "@/database/models/notification-template.model";
+import Notification from "@/database/models/notification.model";
 
 // GET - Get notification templates and stats
 export async function GET(request: NextRequest) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
-    
+
     // Auto-seed templates if none exist
     await checkAndSeedTemplates();
 
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    const category = searchParams.get('category');
+    const action = searchParams.get("action");
+    const category = searchParams.get("category");
 
-    if (action === 'stats') {
+    if (action === "stats") {
       // Get notification statistics
       const stats = await notificationService.getNotificationStats();
       const templateCount = await NotificationTemplate.countDocuments();
-      const enabledCount = await NotificationTemplate.countDocuments({ isEnabled: true });
+      const enabledCount = await NotificationTemplate.countDocuments({
+        isEnabled: true,
+      });
 
       return NextResponse.json({
         ...stats,
@@ -33,10 +35,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (action === 'history') {
+    if (action === "history") {
       // Get sent notifications history
-      const limit = parseInt(searchParams.get('limit') || '100');
-      const offset = parseInt(searchParams.get('offset') || '0');
+      const limit = parseInt(searchParams.get("limit") || "100");
+      const offset = parseInt(searchParams.get("offset") || "0");
 
       const [notifications, total] = await Promise.all([
         Notification.find()
@@ -52,27 +54,30 @@ export async function GET(request: NextRequest) {
 
     // Default: Get templates
     const templates = await notificationService.getTemplates(
-      category as any || undefined
+      (category as any) || undefined,
     );
 
     // Group by category
-    const grouped = templates.reduce((acc, template) => {
-      if (!acc[template.category]) {
-        acc[template.category] = [];
-      }
-      acc[template.category].push(template);
-      return acc;
-    }, {} as Record<string, typeof templates>);
+    const grouped = templates.reduce(
+      (acc, template) => {
+        if (!acc[template.category]) {
+          acc[template.category] = [];
+        }
+        acc[template.category].push(template);
+        return acc;
+      },
+      {} as Record<string, typeof templates>,
+    );
 
     return NextResponse.json({ templates, grouped });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error fetching notifications:', error);
+    console.error("Error fetching notifications:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch notifications' },
-      { status: 500 }
+      { error: "Failed to fetch notifications" },
+      { status: 500 },
     );
   }
 }
@@ -87,57 +92,75 @@ export async function POST(request: NextRequest) {
     const { action } = body;
     const admin = await getAdminSession();
 
-    if (action === 'send_instant') {
+    if (action === "send_instant") {
       // Send instant notification to users
-      const { userId, title, message, category, priority, icon, color, actionUrl, actionText } = body;
-
-      if (!title || !message) {
-        return NextResponse.json(
-          { error: 'Title and message are required' },
-          { status: 400 }
-        );
-      }
-
-      const result = await notificationService.sendInstant({
-        userId: userId || 'all',
+      const {
+        userId,
         title,
         message,
-        category: category || 'admin',
-        priority: priority || 'normal',
+        category,
+        priority,
         icon,
         color,
         actionUrl,
         actionText,
-        sentBy: admin ? { adminId: admin.id, adminEmail: admin.email } : undefined,
+      } = body;
+
+      if (!title || !message) {
+        return NextResponse.json(
+          { error: "Title and message are required" },
+          { status: 400 },
+        );
+      }
+
+      const result = await notificationService.sendInstant({
+        userId: userId || "all",
+        title,
+        message,
+        category: category || "admin",
+        priority: priority || "normal",
+        icon,
+        color,
+        actionUrl,
+        actionText,
+        sentBy: admin
+          ? { adminId: admin.id, adminEmail: admin.email }
+          : undefined,
       });
 
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_sent',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_sent",
           null,
-          { type: 'instant', to: userId || 'all', title }
+          { type: "instant", to: userId || "all", title },
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: userId === 'all' 
-          ? 'Notification broadcast to all users'
-          : 'Notification sent',
+        message:
+          userId === "all"
+            ? "Notification broadcast to all users"
+            : "Notification sent",
         count: Array.isArray(result) ? result.length : 1,
       });
     }
 
-    if (action === 'send_template') {
+    if (action === "send_template") {
       // Send notification using template
       const { templateId, userIds, variables } = body;
 
-      if (!templateId || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      if (
+        !templateId ||
+        !userIds ||
+        !Array.isArray(userIds) ||
+        userIds.length === 0
+      ) {
         return NextResponse.json(
-          { error: 'Template ID and user IDs are required' },
-          { status: 400 }
+          { error: "Template ID and user IDs are required" },
+          { status: 400 },
         );
       }
 
@@ -150,10 +173,10 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_sent',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_sent",
           null,
-          { type: 'template', templateId, count }
+          { type: "template", templateId, count },
         );
       }
 
@@ -164,14 +187,29 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (action === 'create_template') {
+    if (action === "create_template") {
       // Create custom template
-      const { templateId, name, description, category, title, message, icon, priority, color, actionUrl, actionText } = body;
+      const {
+        templateId,
+        name,
+        description,
+        category,
+        title,
+        message,
+        icon,
+        priority,
+        color,
+        actionUrl,
+        actionText,
+      } = body;
 
       if (!templateId || !name || !title || !message || !category) {
         return NextResponse.json(
-          { error: 'Template ID, name, category, title, and message are required' },
-          { status: 400 }
+          {
+            error:
+              "Template ID, name, category, title, and message are required",
+          },
+          { status: 400 },
         );
       }
 
@@ -179,8 +217,8 @@ export async function POST(request: NextRequest) {
       const existing = await NotificationTemplate.findOne({ templateId });
       if (existing) {
         return NextResponse.json(
-          { error: 'Template ID already exists' },
-          { status: 400 }
+          { error: "Template ID already exists" },
+          { status: 400 },
         );
       }
 
@@ -201,67 +239,70 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_template_created',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_template_created",
           null,
-          { templateId, name }
+          { templateId, name },
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Custom template created',
+        message: "Custom template created",
         template,
       });
     }
 
-    if (action === 'seed_defaults') {
+    if (action === "seed_defaults") {
       // Seed default templates
       await notificationService.seedDefaultTemplates();
 
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_templates_seeded',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_templates_seeded",
           null,
-          { action: 'Seeded default notification templates' }
+          { action: "Seeded default notification templates" },
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Default templates seeded',
+        message: "Default templates seeded",
       });
     }
 
-    if (action === 'reset_template') {
+    if (action === "reset_template") {
       // Reset a specific template to its default values
       const { templateId } = body;
-      
+
       if (!templateId) {
         return NextResponse.json(
-          { error: 'Template ID is required' },
-          { status: 400 }
+          { error: "Template ID is required" },
+          { status: 400 },
         );
       }
 
       // Get default templates
-      const { getDefaultTemplates } = await import('@/database/models/notification-template.model');
+      const { getDefaultTemplates } =
+        await import("@/database/models/notification-template.model");
       const defaults = getDefaultTemplates();
-      const defaultTemplate = defaults.find((t: any) => t.templateId === templateId);
-      
+      const defaultTemplate = defaults.find(
+        (t: any) => t.templateId === templateId,
+      );
+
       if (!defaultTemplate) {
         return NextResponse.json(
-          { error: 'No default template found for this ID' },
-          { status: 404 }
+          { error: "No default template found for this ID" },
+          { status: 404 },
         );
       }
 
       // Update with default values (overwrite)
       const updated = await NotificationTemplate.findOneAndUpdate(
         { templateId },
-        { 
+        {
           $set: {
             name: defaultTemplate.name,
             description: defaultTemplate.description,
@@ -275,18 +316,18 @@ export async function POST(request: NextRequest) {
             channels: defaultTemplate.channels,
             actionUrl: defaultTemplate.actionUrl,
             actionText: defaultTemplate.actionText,
-          }
+          },
         },
-        { new: true, upsert: true }
+        { new: true, upsert: true },
       );
 
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_template_reset',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_template_reset",
           null,
-          { templateId }
+          { templateId },
         );
       }
 
@@ -297,18 +338,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(
-      { error: 'Invalid action' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error in notification action:', error);
+    console.error("Error in notification action:", error);
     return NextResponse.json(
-      { error: 'Failed to process notification action' },
-      { status: 500 }
+      { error: "Failed to process notification action" },
+      { status: 500 },
     );
   }
 }
@@ -324,84 +362,90 @@ export async function PUT(request: NextRequest) {
 
     if (!templateId) {
       return NextResponse.json(
-        { error: 'Template ID is required' },
-        { status: 400 }
+        { error: "Template ID is required" },
+        { status: 400 },
       );
     }
 
     const admin = await getAdminSession();
 
-    if (updateAction === 'toggle') {
+    if (updateAction === "toggle") {
       // Toggle single template
-      const template = await notificationService.toggleTemplate(templateId, updates.isEnabled);
+      const template = await notificationService.toggleTemplate(
+        templateId,
+        updates.isEnabled,
+      );
 
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_template_toggled',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_template_toggled",
           null,
-          { templateId, enabled: updates.isEnabled }
+          { templateId, enabled: updates.isEnabled },
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: `Template ${updates.isEnabled ? 'enabled' : 'disabled'}`,
+        message: `Template ${updates.isEnabled ? "enabled" : "disabled"}`,
         template,
       });
     }
 
-    if (updateAction === 'toggle_all') {
+    if (updateAction === "toggle_all") {
       // Toggle all templates
       await notificationService.toggleAllTemplates(updates.isEnabled);
 
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          { id: admin.id, email: admin.email || 'admin', name: admin.name },
-          'notification_templates_toggled_all',
+          { id: admin.id, email: admin.email || "admin", name: admin.name },
+          "notification_templates_toggled_all",
           null,
-          { enabled: updates.isEnabled }
+          { enabled: updates.isEnabled },
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: `All templates ${updates.isEnabled ? 'enabled' : 'disabled'}`,
+        message: `All templates ${updates.isEnabled ? "enabled" : "disabled"}`,
       });
     }
 
     // Default: Update template
-    const template = await notificationService.updateTemplate(templateId, updates);
+    const template = await notificationService.updateTemplate(
+      templateId,
+      updates,
+    );
 
     if (!template) {
       return NextResponse.json(
-        { error: 'Template not found' },
-        { status: 404 }
+        { error: "Template not found" },
+        { status: 404 },
       );
     }
 
     if (admin) {
       await auditLogService.logSettingsUpdated(
-        { id: admin.id, email: admin.email || 'admin', name: admin.name },
-        'notification_template_updated',
+        { id: admin.id, email: admin.email || "admin", name: admin.name },
+        "notification_template_updated",
         null,
-        { templateId, updates: Object.keys(updates) }
+        { templateId, updates: Object.keys(updates) },
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Template updated',
+      message: "Template updated",
       template,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error updating template:', error);
+    console.error("Error updating template:", error);
     return NextResponse.json(
-      { error: 'Failed to update template' },
-      { status: 500 }
+      { error: "Failed to update template" },
+      { status: 500 },
     );
   }
 }
@@ -413,12 +457,12 @@ export async function DELETE(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const templateId = searchParams.get('templateId');
+    const templateId = searchParams.get("templateId");
 
     if (!templateId) {
       return NextResponse.json(
-        { error: 'Template ID is required' },
-        { status: 400 }
+        { error: "Template ID is required" },
+        { status: 400 },
       );
     }
 
@@ -426,34 +470,36 @@ export async function DELETE(request: NextRequest) {
 
     if (!deleted) {
       return NextResponse.json(
-        { error: 'Template not found or cannot be deleted (only custom templates can be deleted)' },
-        { status: 404 }
+        {
+          error:
+            "Template not found or cannot be deleted (only custom templates can be deleted)",
+        },
+        { status: 404 },
       );
     }
 
     const admin = await getAdminSession();
     if (admin) {
       await auditLogService.logSettingsUpdated(
-        { id: admin.id, email: admin.email || 'admin', name: admin.name },
-        'notification_template_deleted',
+        { id: admin.id, email: admin.email || "admin", name: admin.name },
+        "notification_template_deleted",
         null,
-        { templateId }
+        { templateId },
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Template deleted',
+      message: "Template deleted",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('Error deleting template:', error);
+    console.error("Error deleting template:", error);
     return NextResponse.json(
-      { error: 'Failed to delete template' },
-      { status: 500 }
+      { error: "Failed to delete template" },
+      { status: 500 },
     );
   }
 }
-

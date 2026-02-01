@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { LandingTheme } from '@/lib/themes/landing-themes';
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LandingTheme } from "@/lib/themes/landing-themes";
 
 interface FinalCTAProps {
   theme?: LandingTheme;
@@ -27,33 +27,33 @@ export default function FinalCTA({
   effectiveHeadingFont: propFont,
   title = "Ready to Start Winning?",
   subtitle = "Join thousands of traders competing for real prizes. Sign up now and get your welcome bonus!",
-  primaryCTA = { text: 'Start Trading Now', href: '/sign-up' },
-  secondaryCTA = { text: 'View Competitions', href: '/competitions' },
+  primaryCTA = { text: "Start Trading Now", href: "/sign-up" },
+  secondaryCTA = { text: "View Competitions", href: "/competitions" },
 }: FinalCTAProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#00f0ff',
-    secondary: propColors?.secondary || '#ff00ff',
-    accent: propColors?.accent || '#ffd700',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#00f0ff",
+    secondary: propColors?.secondary || "#ff00ff",
+    accent: propColors?.accent || "#ffd700",
+    text: propColors?.text || "#ffffff",
   };
-  const effectiveHeadingFont = propFont || 'inherit';
+  const effectiveHeadingFont = propFont || "inherit";
   return (
     <motion.section
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
       className="relative py-24 md:py-32 overflow-hidden"
-      style={{ 
+      style={{
         background: `linear-gradient(135deg, ${effectiveColors.primary}15 0%, ${effectiveColors.secondary}15 50%, ${effectiveColors.accent}15 100%)`,
       }}
     >
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none">
-        <div 
+        <div
           className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-[150px] opacity-30"
           style={{ backgroundColor: effectiveColors.primary }}
         />
-        <div 
+        <div
           className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-[150px] opacity-30"
           style={{ backgroundColor: effectiveColors.secondary }}
         />
@@ -66,7 +66,7 @@ export default function FinalCTA({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-8"
-          style={{ 
+          style={{
             background: theme?.effects?.gradientStyle,
             color: theme?.colors?.background,
           }}
@@ -82,7 +82,10 @@ export default function FinalCTA({
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
           className="text-4xl md:text-6xl font-black mb-6"
-          style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+          style={{
+            color: effectiveColors.text,
+            fontFamily: effectiveHeadingFont,
+          }}
         >
           {title}
         </motion.h2>
@@ -108,10 +111,10 @@ export default function FinalCTA({
           className="flex flex-col sm:flex-row justify-center gap-4"
         >
           <Link href={primaryCTA.href}>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="font-bold text-lg px-8 py-6 hover:scale-105 transition-all group"
-              style={{ 
+              style={{
                 background: theme?.effects?.gradientStyle,
                 color: theme?.colors?.background,
                 boxShadow: `0 20px 50px ${effectiveColors.primary}40`,
@@ -121,13 +124,13 @@ export default function FinalCTA({
               <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
-          
+
           <Link href={secondaryCTA.href}>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="outline"
               className="font-bold text-lg px-8 py-6 hover:scale-105 transition-all"
-              style={{ 
+              style={{
                 borderColor: effectiveColors.primary,
                 color: effectiveColors.primary,
               }}

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 export interface Column<T> {
   key: string;
@@ -18,7 +18,7 @@ export interface Column<T> {
   // Only show on mobile (e.g., for combined data)
   mobileOnly?: boolean;
   // Alignment
-  align?: 'left' | 'center' | 'right';
+  align?: "left" | "center" | "right";
 }
 
 export interface ResponsiveTableProps<T> {
@@ -63,24 +63,30 @@ export default function ResponsiveTable<T>({
   loading = false,
   loadingRows = 5,
 }: ResponsiveTableProps<T>) {
-  const desktopColumns = columns.filter(col => !col.mobileOnly);
-  const mobileColumns = columns.filter(col => !col.hideOnMobile);
+  const desktopColumns = columns.filter((col) => !col.mobileOnly);
+  const mobileColumns = columns.filter((col) => !col.hideOnMobile);
 
-  const getAlignment = (align?: 'left' | 'center' | 'right') => {
+  const getAlignment = (align?: "left" | "center" | "right") => {
     switch (align) {
-      case 'center': return 'text-center';
-      case 'right': return 'text-right';
-      default: return 'text-left';
+      case "center":
+        return "text-center";
+      case "right":
+        return "text-right";
+      default:
+        return "text-left";
     }
   };
 
   if (loading) {
     return (
-      <div className={cn('space-y-4', className)}>
+      <div className={cn("space-y-4", className)}>
         {/* Mobile loading */}
         <div className="lg:hidden space-y-3">
           {Array.from({ length: loadingRows }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-gray-800/50 p-4 animate-pulse">
+            <div
+              key={i}
+              className="rounded-xl bg-gray-800/50 p-4 animate-pulse"
+            >
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-lg bg-gray-700" />
                 <div className="flex-1">
@@ -89,7 +95,7 @@ export default function ResponsiveTable<T>({
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 3].map(j => (
+                {[1, 2, 3].map((j) => (
                   <div key={j} className="h-8 bg-gray-700/50 rounded" />
                 ))}
               </div>
@@ -101,7 +107,10 @@ export default function ResponsiveTable<T>({
         <div className="hidden lg:block rounded-xl bg-gray-800/50 overflow-hidden">
           <div className="h-12 bg-gray-900/50" />
           {Array.from({ length: loadingRows }).map((_, i) => (
-            <div key={i} className="h-16 border-t border-gray-700/50 animate-pulse">
+            <div
+              key={i}
+              className="h-16 border-t border-gray-700/50 animate-pulse"
+            >
               <div className="h-full px-6 flex items-center gap-4">
                 <div className="h-8 w-20 bg-gray-700/50 rounded" />
                 <div className="h-4 flex-1 bg-gray-700/30 rounded" />
@@ -115,7 +124,12 @@ export default function ResponsiveTable<T>({
 
   if (data.length === 0) {
     return (
-      <div className={cn('rounded-xl bg-gray-800/30 border border-gray-700/50 p-8 text-center', className)}>
+      <div
+        className={cn(
+          "rounded-xl bg-gray-800/30 border border-gray-700/50 p-8 text-center",
+          className,
+        )}
+      >
         {emptyState || (
           <div className="text-gray-400">
             <p className="text-lg font-medium">No data available</p>
@@ -131,17 +145,19 @@ export default function ResponsiveTable<T>({
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-2">
         {data.map((item, index) => {
-          const cardClasses = typeof cardClassName === 'function' 
-            ? cardClassName(item, index) 
-            : cardClassName;
+          const cardClasses =
+            typeof cardClassName === "function"
+              ? cardClassName(item, index)
+              : cardClassName;
 
           return (
             <div
               key={keyExtractor(item)}
               className={cn(
-                'rounded-xl p-3 bg-gray-800/50 border border-gray-700/50 transition-all',
-                onRowClick && 'cursor-pointer hover:bg-gray-800/70 active:scale-[0.99]',
-                cardClasses
+                "rounded-xl p-3 bg-gray-800/50 border border-gray-700/50 transition-all",
+                onRowClick &&
+                  "cursor-pointer hover:bg-gray-800/70 active:scale-[0.99]",
+                cardClasses,
               )}
               onClick={() => onRowClick?.(item, index)}
             >
@@ -151,9 +167,11 @@ export default function ResponsiveTable<T>({
               ) : (
                 <div className="flex items-center gap-3 mb-3">
                   {/* Default: First two columns as primary */}
-                  {mobileColumns.slice(0, 2).map(col => (
+                  {mobileColumns.slice(0, 2).map((col) => (
                     <div key={col.key} className="flex-shrink-0">
-                      {col.mobileRender ? col.mobileRender(item, index) : col.render(item, index)}
+                      {col.mobileRender
+                        ? col.mobileRender(item, index)
+                        : col.render(item, index)}
                     </div>
                   ))}
                 </div>
@@ -164,13 +182,21 @@ export default function ResponsiveTable<T>({
                 cardSecondaryContent(item, index)
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-center">
-                  {mobileColumns.slice(2).map(col => (
-                    <div key={col.key} className="bg-gray-900/30 rounded-lg py-2 px-1">
+                  {mobileColumns.slice(2).map((col) => (
+                    <div
+                      key={col.key}
+                      className="bg-gray-900/30 rounded-lg py-2 px-1"
+                    >
                       <p className="text-xs font-medium text-white tabular-nums truncate">
-                        {col.mobileRender ? col.mobileRender(item, index) : col.render(item, index)}
+                        {col.mobileRender
+                          ? col.mobileRender(item, index)
+                          : col.render(item, index)}
                       </p>
                       <p className="text-[9px] text-gray-500 truncate">
-                        {col.mobileLabel || (typeof col.header === 'string' ? col.header : col.key)}
+                        {col.mobileLabel ||
+                          (typeof col.header === "string"
+                            ? col.header
+                            : col.key)}
                       </p>
                     </div>
                   ))}
@@ -189,18 +215,28 @@ export default function ResponsiveTable<T>({
       </div>
 
       {/* Desktop Table View */}
-      <div className={cn('hidden lg:block rounded-xl bg-gray-800/50 border border-gray-700/50 overflow-hidden', tableClassName)}>
+      <div
+        className={cn(
+          "hidden lg:block rounded-xl bg-gray-800/50 border border-gray-700/50 overflow-hidden",
+          tableClassName,
+        )}
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className={cn('bg-gray-900/50 border-b border-gray-700/50', headerClassName)}>
+            <thead
+              className={cn(
+                "bg-gray-900/50 border-b border-gray-700/50",
+                headerClassName,
+              )}
+            >
               <tr>
-                {desktopColumns.map(col => (
+                {desktopColumns.map((col) => (
                   <th
                     key={col.key}
                     className={cn(
-                      'px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider',
+                      "px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider",
                       getAlignment(col.align),
-                      col.headerClassName
+                      col.headerClassName,
                     )}
                   >
                     {col.header}
@@ -210,24 +246,25 @@ export default function ResponsiveTable<T>({
             </thead>
             <tbody className="divide-y divide-gray-700/50">
               {data.map((item, index) => {
-                const rowClasses = typeof rowClassName === 'function' 
-                  ? rowClassName(item, index) 
-                  : rowClassName;
+                const rowClasses =
+                  typeof rowClassName === "function"
+                    ? rowClassName(item, index)
+                    : rowClassName;
 
                 return (
                   <tr
                     key={keyExtractor(item)}
                     className={cn(
-                      'transition-colors hover:bg-gray-800/50',
-                      onRowClick && 'cursor-pointer',
-                      rowClasses
+                      "transition-colors hover:bg-gray-800/50",
+                      onRowClick && "cursor-pointer",
+                      rowClasses,
                     )}
                     onClick={() => onRowClick?.(item, index)}
                   >
-                    {desktopColumns.map(col => (
+                    {desktopColumns.map((col) => (
                       <td
                         key={col.key}
-                        className={cn('px-4 py-3', getAlignment(col.align))}
+                        className={cn("px-4 py-3", getAlignment(col.align))}
                       >
                         {col.render(item, index)}
                       </td>
@@ -244,30 +281,33 @@ export default function ResponsiveTable<T>({
 }
 
 // Utility sub-components for common patterns
-export function TableBadge({ 
-  children, 
-  variant = 'default',
-  className 
-}: { 
-  children: ReactNode; 
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'premium';
+export function TableBadge({
+  children,
+  variant = "default",
+  className,
+}: {
+  children: ReactNode;
+  variant?: "default" | "success" | "warning" | "danger" | "info" | "premium";
   className?: string;
 }) {
   const variants = {
-    default: 'bg-gray-700/50 text-gray-300 border-gray-600/50',
-    success: 'bg-green-500/20 text-green-400 border-green-500/30',
-    warning: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    danger: 'bg-red-500/20 text-red-400 border-red-500/30',
-    info: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    premium: 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30',
+    default: "bg-gray-700/50 text-gray-300 border-gray-600/50",
+    success: "bg-green-500/20 text-green-400 border-green-500/30",
+    warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    danger: "bg-red-500/20 text-red-400 border-red-500/30",
+    info: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    premium:
+      "bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30",
   };
 
   return (
-    <span className={cn(
-      'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border',
-      variants[variant],
-      className
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
+        variants[variant],
+        className,
+      )}
+    >
       {children}
     </span>
   );
@@ -288,16 +328,17 @@ export function TableValue({
   negative?: boolean;
   className?: string;
 }) {
-  const colorClass = positive 
-    ? 'text-green-400' 
-    : negative 
-      ? 'text-red-400' 
-      : 'text-white';
+  const colorClass = positive
+    ? "text-green-400"
+    : negative
+      ? "text-red-400"
+      : "text-white";
 
   return (
-    <span className={cn('font-medium tabular-nums', colorClass, className)}>
-      {prefix}{value}{suffix}
+    <span className={cn("font-medium tabular-nums", colorClass, className)}>
+      {prefix}
+      {value}
+      {suffix}
     </span>
   );
 }
-

@@ -1,21 +1,21 @@
 /**
  * User Stats Service
- * 
+ *
  * SINGLE SOURCE OF TRUTH for all user trading statistics.
  * Used by:
  * - Customer Dashboard
  * - Admin Trading History
  * - Profile Page
  * - Leaderboard
- * 
+ *
  * ALL stats are computed from TradeHistory collection to ensure consistency.
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import mongoose from 'mongoose';
+import { connectToDatabase } from "@/database/mongoose";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import mongoose from "mongoose";
 
 export interface UserTradingStats {
   userId: string;
@@ -37,7 +37,7 @@ export interface UserTradingStats {
 
 export interface ContestStats {
   contestId: string;
-  contestType: 'competition' | 'challenge';
+  contestType: "competition" | "challenge";
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
@@ -57,8 +57,8 @@ export async function getUserTradingStats(
   options?: {
     dateFrom?: Date;
     dateTo?: Date;
-    contestType?: 'all' | 'competition' | 'challenge';
-  }
+    contestType?: "all" | "competition" | "challenge";
+  },
 ): Promise<UserTradingStats> {
   await connectToDatabase();
 
@@ -76,10 +76,10 @@ export async function getUserTradingStats(
   }
 
   // Contest type filter
-  if (options?.contestType === 'competition') {
+  if (options?.contestType === "competition") {
     matchQuery.competitionId = { $ne: null };
     matchQuery.challengeId = null;
-  } else if (options?.contestType === 'challenge') {
+  } else if (options?.contestType === "challenge") {
     matchQuery.challengeId = { $ne: null };
     matchQuery.competitionId = null;
   }
@@ -89,27 +89,33 @@ export async function getUserTradingStats(
     { $match: matchQuery },
     {
       $group: {
-        _id: '$userId',
+        _id: "$userId",
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
-        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
-        totalPnL: { $sum: '$realizedPnl' },
+        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
-          $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] }
+          $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
         },
         grossLoss: {
-          $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] }
+          $sum: {
+            $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0],
+          },
         },
-        largestWin: { $max: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-        largestLoss: { $min: { $cond: [{ $lt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-      }
-    }
+        largestWin: {
+          $max: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+        largestLoss: {
+          $min: { $cond: [{ $lt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+      },
+    },
   ]);
 
   // Get competition and challenge counts
   const [competitionCount, challengeCount] = await Promise.all([
     CompetitionParticipant.countDocuments({ userId }),
-    ChallengeParticipant.countDocuments({ userId })
+    ChallengeParticipant.countDocuments({ userId }),
   ]);
 
   // Calculate derived stats
@@ -124,21 +130,21 @@ export async function getUserTradingStats(
     largestLoss: 0,
   };
 
-  const winRate = stats.totalTrades > 0 
-    ? (stats.winningTrades / stats.totalTrades) * 100 
-    : 0;
+  const winRate =
+    stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
 
-  const averageWin = stats.winningTrades > 0 
-    ? stats.grossProfit / stats.winningTrades 
-    : 0;
+  const averageWin =
+    stats.winningTrades > 0 ? stats.grossProfit / stats.winningTrades : 0;
 
-  const averageLoss = stats.losingTrades > 0 
-    ? -(stats.grossLoss / stats.losingTrades) 
-    : 0;
+  const averageLoss =
+    stats.losingTrades > 0 ? -(stats.grossLoss / stats.losingTrades) : 0;
 
-  const profitFactor = stats.grossLoss > 0 
-    ? stats.grossProfit / stats.grossLoss 
-    : stats.winningTrades > 0 ? Infinity : 0;
+  const profitFactor =
+    stats.grossLoss > 0
+      ? stats.grossProfit / stats.grossLoss
+      : stats.winningTrades > 0
+        ? Infinity
+        : 0;
 
   // Calculate win streak (optional - can be expensive for many trades)
   const { winStreak, currentStreak } = await calculateWinStreak(userId);
@@ -168,12 +174,12 @@ export async function getUserTradingStats(
 export async function getContestStats(
   userId: string,
   contestId: string,
-  contestType: 'competition' | 'challenge'
+  contestType: "competition" | "challenge",
 ): Promise<ContestStats> {
   await connectToDatabase();
 
   const matchQuery: Record<string, unknown> = { userId };
-  if (contestType === 'competition') {
+  if (contestType === "competition") {
     matchQuery.competitionId = new mongoose.Types.ObjectId(contestId);
   } else {
     matchQuery.challengeId = new mongoose.Types.ObjectId(contestId);
@@ -185,14 +191,18 @@ export async function getContestStats(
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
-        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
-        totalPnL: { $sum: '$realizedPnl' },
-        totalHoldingTime: { $sum: '$holdingTimeSeconds' },
-        largestWin: { $max: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-        largestLoss: { $min: { $cond: [{ $lt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
-      }
-    }
+        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        totalPnL: { $sum: "$realizedPnl" },
+        totalHoldingTime: { $sum: "$holdingTimeSeconds" },
+        largestWin: {
+          $max: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+        largestLoss: {
+          $min: { $cond: [{ $lt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+        },
+      },
+    },
   ]);
 
   const result = stats || {
@@ -211,9 +221,13 @@ export async function getContestStats(
     totalTrades: result.totalTrades,
     winningTrades: result.winningTrades,
     losingTrades: result.losingTrades,
-    winRate: result.totalTrades > 0 ? (result.winningTrades / result.totalTrades) * 100 : 0,
+    winRate:
+      result.totalTrades > 0
+        ? (result.winningTrades / result.totalTrades) * 100
+        : 0,
     totalPnL: result.totalPnL,
-    averageHoldingTime: result.totalTrades > 0 ? result.totalHoldingTime / result.totalTrades : 0,
+    averageHoldingTime:
+      result.totalTrades > 0 ? result.totalHoldingTime / result.totalTrades : 0,
     largestWin: result.largestWin || 0,
     largestLoss: result.largestLoss || 0,
   };
@@ -222,10 +236,12 @@ export async function getContestStats(
 /**
  * Calculate win streak for a user
  */
-async function calculateWinStreak(userId: string): Promise<{ winStreak: number; currentStreak: number }> {
+async function calculateWinStreak(
+  userId: string,
+): Promise<{ winStreak: number; currentStreak: number }> {
   const trades = await TradeHistory.find({ userId })
     .sort({ closedAt: -1 })
-    .select('isWinner')
+    .select("isWinner")
     .lean();
 
   if (trades.length === 0) {
@@ -268,18 +284,16 @@ async function calculateWinStreak(userId: string): Promise<{ winStreak: number; 
 /**
  * Get stats for multiple users (for admin trading history)
  */
-export async function getBulkUserStats(
-  options?: {
-    search?: string;
-    contestType?: 'all' | 'competition' | 'challenge';
-    dateFrom?: Date;
-    dateTo?: Date;
-    sortBy?: 'trades' | 'pnl' | 'winrate';
-    sortOrder?: 'asc' | 'desc';
-    page?: number;
-    limit?: number;
-  }
-): Promise<{
+export async function getBulkUserStats(options?: {
+  search?: string;
+  contestType?: "all" | "competition" | "challenge";
+  dateFrom?: Date;
+  dateTo?: Date;
+  sortBy?: "trades" | "pnl" | "winrate";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}): Promise<{
   users: Array<UserTradingStats & { email: string; name: string }>;
   total: number;
   totalPages: number;
@@ -300,10 +314,10 @@ export async function getBulkUserStats(
   }
 
   // Contest type filter
-  if (options?.contestType === 'competition') {
+  if (options?.contestType === "competition") {
     matchQuery.competitionId = { $ne: null };
     matchQuery.challengeId = null;
-  } else if (options?.contestType === 'challenge') {
+  } else if (options?.contestType === "challenge") {
     matchQuery.challengeId = { $ne: null };
     matchQuery.competitionId = null;
   }
@@ -313,46 +327,48 @@ export async function getBulkUserStats(
     { $match: matchQuery },
     {
       $group: {
-        _id: '$userId',
+        _id: "$userId",
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
-        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
-        totalPnL: { $sum: '$realizedPnl' },
+        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
-          $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] }
+          $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
         },
         grossLoss: {
-          $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] }
+          $sum: {
+            $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0],
+          },
         },
-      }
-    }
+      },
+    },
   ]);
 
   // Get user info
   const db = mongoose.connection.db;
-  if (!db) throw new Error('Database not connected');
+  if (!db) throw new Error("Database not connected");
 
-  const userIds = userStats.map(u => u._id);
-  
+  const userIds = userStats.map((u) => u._id);
+
   // Build user search query
   let userSearchQuery: Record<string, unknown> = {};
   if (options?.search) {
     userSearchQuery = {
       $or: [
-        { email: { $regex: options.search, $options: 'i' } },
-        { name: { $regex: options.search, $options: 'i' } },
+        { email: { $regex: options.search, $options: "i" } },
+        { name: { $regex: options.search, $options: "i" } },
         { id: options.search },
       ],
     };
   }
 
-  const allUsers = await db.collection('user').find(userSearchQuery).toArray();
+  const allUsers = await db.collection("user").find(userSearchQuery).toArray();
   const userMap = new Map<string, { email: string; name: string }>();
-  
+
   allUsers.forEach((u: any) => {
     const id = u.id || u._id?.toString();
     if (userIds.includes(id)) {
-      userMap.set(id, { email: u.email, name: u.name || '' });
+      userMap.set(id, { email: u.email, name: u.name || "" });
     }
   });
 
@@ -360,68 +376,85 @@ export async function getBulkUserStats(
   const [competitionCounts, challengeCounts] = await Promise.all([
     CompetitionParticipant.aggregate([
       { $match: { userId: { $in: userIds } } },
-      { $group: { _id: '$userId', count: { $sum: 1 } } }
+      { $group: { _id: "$userId", count: { $sum: 1 } } },
     ]),
     ChallengeParticipant.aggregate([
       { $match: { userId: { $in: userIds } } },
-      { $group: { _id: '$userId', count: { $sum: 1 } } }
-    ])
+      { $group: { _id: "$userId", count: { $sum: 1 } } },
+    ]),
   ]);
 
-  const compMap = new Map(competitionCounts.map(c => [c._id, c.count]));
-  const challMap = new Map(challengeCounts.map(c => [c._id, c.count]));
+  const compMap = new Map(competitionCounts.map((c) => [c._id, c.count]));
+  const challMap = new Map(challengeCounts.map((c) => [c._id, c.count]));
 
   // Combine data
-  let results: Array<UserTradingStats & { email: string; name: string }> = userStats
-    .filter(stats => userMap.has(stats._id))
-    .map(stats => {
-      const user = userMap.get(stats._id)!;
-      const winRate = stats.totalTrades > 0 
-        ? (stats.winningTrades / stats.totalTrades) * 100 
-        : 0;
-      const profitFactor = stats.grossLoss > 0 
-        ? stats.grossProfit / stats.grossLoss 
-        : stats.winningTrades > 0 ? 9999 : 0;
+  let results: Array<UserTradingStats & { email: string; name: string }> =
+    userStats
+      .filter((stats) => userMap.has(stats._id))
+      .map((stats) => {
+        const user = userMap.get(stats._id)!;
+        const winRate =
+          stats.totalTrades > 0
+            ? (stats.winningTrades / stats.totalTrades) * 100
+            : 0;
+        const profitFactor =
+          stats.grossLoss > 0
+            ? stats.grossProfit / stats.grossLoss
+            : stats.winningTrades > 0
+              ? 9999
+              : 0;
 
-      return {
-        userId: stats._id,
-        email: user.email,
-        name: user.name,
-        totalTrades: stats.totalTrades,
-        winningTrades: stats.winningTrades,
-        losingTrades: stats.losingTrades,
-        winRate,
-        totalPnL: stats.totalPnL,
-        averageWin: stats.winningTrades > 0 ? stats.grossProfit / stats.winningTrades : 0,
-        averageLoss: stats.losingTrades > 0 ? -(stats.grossLoss / stats.losingTrades) : 0,
-        profitFactor,
-        largestWin: 0,
-        largestLoss: 0,
-        competitions: compMap.get(stats._id) || 0,
-        challenges: challMap.get(stats._id) || 0,
-        winStreak: 0,
-        currentStreak: 0,
-      };
-    });
+        return {
+          userId: stats._id,
+          email: user.email,
+          name: user.name,
+          totalTrades: stats.totalTrades,
+          winningTrades: stats.winningTrades,
+          losingTrades: stats.losingTrades,
+          winRate,
+          totalPnL: stats.totalPnL,
+          averageWin:
+            stats.winningTrades > 0
+              ? stats.grossProfit / stats.winningTrades
+              : 0,
+          averageLoss:
+            stats.losingTrades > 0
+              ? -(stats.grossLoss / stats.losingTrades)
+              : 0,
+          profitFactor,
+          largestWin: 0,
+          largestLoss: 0,
+          competitions: compMap.get(stats._id) || 0,
+          challenges: challMap.get(stats._id) || 0,
+          winStreak: 0,
+          currentStreak: 0,
+        };
+      });
 
   // Filter by contest type
-  if (options?.contestType === 'competition') {
-    results = results.filter(r => r.competitions > 0);
-  } else if (options?.contestType === 'challenge') {
-    results = results.filter(r => r.challenges > 0);
+  if (options?.contestType === "competition") {
+    results = results.filter((r) => r.competitions > 0);
+  } else if (options?.contestType === "challenge") {
+    results = results.filter((r) => r.challenges > 0);
   }
 
   // Sort
-  const sortBy = options?.sortBy || 'trades';
-  const sortOrder = options?.sortOrder || 'desc';
+  const sortBy = options?.sortBy || "trades";
+  const sortOrder = options?.sortOrder || "desc";
   results.sort((a, b) => {
     let comparison = 0;
     switch (sortBy) {
-      case 'trades': comparison = a.totalTrades - b.totalTrades; break;
-      case 'pnl': comparison = a.totalPnL - b.totalPnL; break;
-      case 'winrate': comparison = a.winRate - b.winRate; break;
+      case "trades":
+        comparison = a.totalTrades - b.totalTrades;
+        break;
+      case "pnl":
+        comparison = a.totalPnL - b.totalPnL;
+        break;
+      case "winrate":
+        comparison = a.winRate - b.winRate;
+        break;
     }
-    return sortOrder === 'desc' ? -comparison : comparison;
+    return sortOrder === "desc" ? -comparison : comparison;
   });
 
   // Pagination
@@ -444,47 +477,55 @@ export async function getBulkUserStats(
  */
 export async function syncParticipantStats(
   participantId: string,
-  participantType: 'competition' | 'challenge'
+  participantType: "competition" | "challenge",
 ): Promise<void> {
   await connectToDatabase();
 
-  const Model = participantType === 'competition' 
-    ? CompetitionParticipant 
-    : ChallengeParticipant;
+  const Model =
+    participantType === "competition"
+      ? CompetitionParticipant
+      : ChallengeParticipant;
 
   const participant = await Model.findById(participantId);
   if (!participant) return;
 
-  const contestField = participantType === 'competition' ? 'competitionId' : 'challengeId';
-  
+  const contestField =
+    participantType === "competition" ? "competitionId" : "challengeId";
+
   const [stats] = await TradeHistory.aggregate([
-    { 
-      $match: { 
+    {
+      $match: {
         userId: participant.userId,
-        [contestField]: participant[contestField === 'competitionId' ? 'competitionId' : 'challengeId']
-      } 
+        [contestField]:
+          participant[
+            contestField === "competitionId" ? "competitionId" : "challengeId"
+          ],
+      },
     },
     {
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
-        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
-        totalPnL: { $sum: '$realizedPnl' },
+        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
-          $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] }
+          $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
         },
         grossLoss: {
-          $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] }
+          $sum: {
+            $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0],
+          },
         },
-      }
-    }
+      },
+    },
   ]);
 
   if (stats) {
-    const winRate = stats.totalTrades > 0 
-      ? (stats.winningTrades / stats.totalTrades) * 100 
-      : 0;
+    const winRate =
+      stats.totalTrades > 0
+        ? (stats.winningTrades / stats.totalTrades) * 100
+        : 0;
 
     await Model.findByIdAndUpdate(participantId, {
       totalTrades: stats.totalTrades,
@@ -492,8 +533,10 @@ export async function syncParticipantStats(
       losingTrades: stats.losingTrades,
       winRate,
       pnl: stats.totalPnL,
-      averageWin: stats.winningTrades > 0 ? stats.grossProfit / stats.winningTrades : 0,
-      averageLoss: stats.losingTrades > 0 ? -(stats.grossLoss / stats.losingTrades) : 0,
+      averageWin:
+        stats.winningTrades > 0 ? stats.grossProfit / stats.winningTrades : 0,
+      averageLoss:
+        stats.losingTrades > 0 ? -(stats.grossLoss / stats.losingTrades) : 0,
     });
   }
 }

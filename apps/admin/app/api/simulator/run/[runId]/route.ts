@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '../../../../../../../database/mongoose';
-import SimulatorRun from '../../../../../../../database/models/simulator/simulator-run.model';
-import { analyzeSimulationResults } from '../../../../../../../lib/services/simulator/ai-analyzer.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "../../../../../../../database/mongoose";
+import SimulatorRun from "../../../../../../../database/models/simulator/simulator-run.model";
+import { analyzeSimulationResults } from "../../../../../../../lib/services/simulator/ai-analyzer.service";
 
 /**
  * GET /api/simulator/run/[runId]
@@ -9,28 +9,28 @@ import { analyzeSimulationResults } from '../../../../../../../lib/services/simu
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ runId: string }> }
+  { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
     await connectToDatabase();
 
     const { runId } = await params;
     const { searchParams } = new URL(request.url);
-    const includeDetails = searchParams.get('details') === 'true';
+    const includeDetails = searchParams.get("details") === "true";
 
     let query = SimulatorRun.findById(runId);
 
     // Optionally exclude large arrays for performance
     if (!includeDetails) {
-      query = query.select('-logs -hardwareMetrics');
+      query = query.select("-logs -hardwareMetrics");
     }
 
     const run = await query.lean();
 
     if (!run) {
       return NextResponse.json(
-        { success: false, error: 'Run not found' },
-        { status: 404 }
+        { success: false, error: "Run not found" },
+        { status: 404 },
       );
     }
 
@@ -39,10 +39,10 @@ export async function GET(
       run,
     });
   } catch (error) {
-    console.error('Error fetching simulation run:', error);
+    console.error("Error fetching simulation run:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch run' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch run" },
+      { status: 500 },
     );
   }
 }
@@ -53,7 +53,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ runId: string }> }
+  { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
     await connectToDatabase();
@@ -65,12 +65,12 @@ export async function POST(
     const run = await SimulatorRun.findById(runId);
     if (!run) {
       return NextResponse.json(
-        { success: false, error: 'Run not found' },
-        { status: 404 }
+        { success: false, error: "Run not found" },
+        { status: 404 },
       );
     }
 
-    if (action === 'analyze') {
+    if (action === "analyze") {
       // Run AI analysis
       const analysis = await analyzeSimulationResults(run);
       run.aiAnalysis = analysis;
@@ -82,30 +82,30 @@ export async function POST(
       });
     }
 
-    if (action === 'cleanup') {
+    if (action === "cleanup") {
       // Clean up test data
       const cleanupResult = await cleanupTestData(run);
-      
+
       run.cleanedUp = true;
       run.cleanedUpAt = new Date();
       await run.save();
 
       return NextResponse.json({
         success: true,
-        message: 'Test data cleaned up',
+        message: "Test data cleaned up",
         cleanupResult,
       });
     }
 
     return NextResponse.json(
       { success: false, error: 'Invalid action. Use "analyze" or "cleanup"' },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (error) {
-    console.error('Error performing action on run:', error);
+    console.error("Error performing action on run:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to perform action' },
-      { status: 500 }
+      { success: false, error: "Failed to perform action" },
+      { status: 500 },
     );
   }
 }
@@ -116,20 +116,20 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ runId: string }> }
+  { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
     await connectToDatabase();
 
     const { runId } = await params;
     const { searchParams } = new URL(request.url);
-    const cleanupData = searchParams.get('cleanup') === 'true';
+    const cleanupData = searchParams.get("cleanup") === "true";
 
     const run = await SimulatorRun.findById(runId);
     if (!run) {
       return NextResponse.json(
-        { success: false, error: 'Run not found' },
-        { status: 404 }
+        { success: false, error: "Run not found" },
+        { status: 404 },
       );
     }
 
@@ -143,13 +143,13 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Run deleted',
+      message: "Run deleted",
     });
   } catch (error) {
-    console.error('Error deleting run:', error);
+    console.error("Error deleting run:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete run' },
-      { status: 500 }
+      { success: false, error: "Failed to delete run" },
+      { status: 500 },
     );
   }
 }
@@ -157,7 +157,9 @@ export async function DELETE(
 /**
  * Clean up test data created during simulation
  */
-async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Record<string, number>> {
+async function cleanupTestData(
+  run: typeof SimulatorRun.prototype,
+): Promise<Record<string, number>> {
   const result: Record<string, number> = {
     users: 0,
     competitions: 0,
@@ -168,16 +170,16 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
 
   try {
     // Import models dynamically to avoid circular dependencies
-    const mongoose = await import('mongoose');
+    const mongoose = await import("mongoose");
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      throw new Error('Database connection not available');
+      throw new Error("Database connection not available");
     }
 
     // Delete test users (those with simulator email pattern)
     if (run.testDataIds.users.length > 0) {
-      const userResult = await db.collection('user').deleteMany({
+      const userResult = await db.collection("user").deleteMany({
         $or: [
           { id: { $in: run.testDataIds.users } },
           { email: { $regex: /@test\.simulator$/ } },
@@ -192,15 +194,15 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
       const compIds = run.testDataIds.competitions
         .filter((id: string) => ObjectId.isValid(id))
         .map((id: string) => new ObjectId(id));
-      
+
       if (compIds.length > 0) {
-        const compResult = await db.collection('competitions').deleteMany({
+        const compResult = await db.collection("competitions").deleteMany({
           _id: { $in: compIds },
         });
         result.competitions = compResult.deletedCount;
 
         // Also delete related participants
-        await db.collection('competitionparticipants').deleteMany({
+        await db.collection("competitionparticipants").deleteMany({
           competitionId: { $in: compIds },
         });
       }
@@ -212,9 +214,9 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
       const chalIds = run.testDataIds.challenges
         .filter((id: string) => ObjectId.isValid(id))
         .map((id: string) => new ObjectId(id));
-      
+
       if (chalIds.length > 0) {
-        const chalResult = await db.collection('challenges').deleteMany({
+        const chalResult = await db.collection("challenges").deleteMany({
           _id: { $in: chalIds },
         });
         result.challenges = chalResult.deletedCount;
@@ -227,9 +229,9 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
       const posIds = run.testDataIds.positions
         .filter((id: string) => ObjectId.isValid(id))
         .map((id: string) => new ObjectId(id));
-      
+
       if (posIds.length > 0) {
-        const posResult = await db.collection('tradingpositions').deleteMany({
+        const posResult = await db.collection("tradingpositions").deleteMany({
           _id: { $in: posIds },
         });
         result.positions = posResult.deletedCount;
@@ -242,9 +244,9 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
       const txIds = run.testDataIds.transactions
         .filter((id: string) => ObjectId.isValid(id))
         .map((id: string) => new ObjectId(id));
-      
+
       if (txIds.length > 0) {
-        const txResult = await db.collection('wallettransactions').deleteMany({
+        const txResult = await db.collection("wallettransactions").deleteMany({
           _id: { $in: txIds },
         });
         result.transactions = txResult.deletedCount;
@@ -252,20 +254,19 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
     }
 
     // Clean up any simulator-related data by pattern
-    await db.collection('devicefingerprints').deleteMany({
+    await db.collection("devicefingerprints").deleteMany({
       fingerprintId: { $regex: /^sim_fingerprint_/ },
     });
 
-    await db.collection('session').deleteMany({
-      'user.email': { $regex: /@test\.simulator$/ },
+    await db.collection("session").deleteMany({
+      "user.email": { $regex: /@test\.simulator$/ },
     });
 
-    console.log('✅ Simulator cleanup completed:', result);
+    console.log("✅ Simulator cleanup completed:", result);
   } catch (error) {
-    console.error('Error during cleanup:', error);
+    console.error("Error during cleanup:", error);
     throw error;
   }
 
   return result;
 }
-

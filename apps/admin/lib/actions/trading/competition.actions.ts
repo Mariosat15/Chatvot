@@ -1,21 +1,21 @@
-'use server';
+"use server";
 
-import { revalidatePath } from 'next/cache';
-import { getAdminSession } from '@/lib/admin/auth';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
-import mongoose from 'mongoose';
+import { revalidatePath } from "next/cache";
+import { getAdminSession } from "@/lib/admin/auth";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import mongoose from "mongoose";
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
-  status?: 'upcoming' | 'active' | 'completed' | 'cancelled';
+  status?: "upcoming" | "active" | "completed" | "cancelled";
   limit?: number;
 }) => {
   try {
@@ -34,33 +34,33 @@ export const getCompetitions = async (filters?: {
 
     return JSON.parse(JSON.stringify(competitions));
   } catch (error) {
-    console.error('Error getting competitions:', error);
-    throw new Error('Failed to get competitions');
+    console.error("Error getting competitions:", error);
+    throw new Error("Failed to get competitions");
   }
 };
 
 // Get single competition by ID
 export const getCompetitionById = async (competitionId: string) => {
-  'use no memo'; // CRITICAL: Disable Next.js caching for real-time data
-  
+  "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
+
   try {
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error('Invalid competition ID format');
+      throw new Error("Invalid competition ID format");
     }
 
     await connectToDatabase();
 
-    let competition = await Competition.findById(competitionId).lean() as any;
+    let competition = (await Competition.findById(competitionId).lean()) as any;
 
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
     // Get participant count
     const participantCount = await CompetitionParticipant.countDocuments({
       competitionId: competitionId,
-      status: 'active',
+      status: "active",
     });
 
     const now = new Date();
@@ -69,61 +69,77 @@ export const getCompetitionById = async (competitionId: string) => {
 
     // CRITICAL: Check if competition should be cancelled due to insufficient participants
     // This is a backup check in case Inngest cron isn't running
-    if (competition.status === 'upcoming' && startTime <= now) {
-      const actualParticipants = competition.currentParticipants || participantCount;
-      
+    if (competition.status === "upcoming" && startTime <= now) {
+      const actualParticipants =
+        competition.currentParticipants || participantCount;
+
       if (actualParticipants < minParticipants) {
         // Cancel the competition and refund all participants
-        console.log(`🚫 AUTO-CANCELLING "${competition.name}" - only ${actualParticipants}/${minParticipants} participants`);
-        
+        console.log(
+          `🚫 AUTO-CANCELLING "${competition.name}" - only ${actualParticipants}/${minParticipants} participants`,
+        );
+
         try {
-          const { cancelCompetitionAndRefund } = await import('@/lib/actions/trading/competition-cancel.actions');
+          const { cancelCompetitionAndRefund } =
+            await import("@/lib/actions/trading/competition-cancel.actions");
           await cancelCompetitionAndRefund(
             competitionId,
-            `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`
+            `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`,
           );
-          
+
           // Refresh the competition data
-          competition = await Competition.findById(competitionId).lean() as any;
+          competition = (await Competition.findById(
+            competitionId,
+          ).lean()) as any;
         } catch (cancelError) {
-          console.error('Error cancelling competition:', cancelError);
+          console.error("Error cancelling competition:", cancelError);
         }
       } else {
         // Start the competition - it has enough participants
-        console.log(`✅ AUTO-STARTING "${competition.name}" - ${actualParticipants}/${minParticipants} participants`);
-        await Competition.findByIdAndUpdate(competitionId, { $set: { status: 'active' } });
-        competition = await Competition.findById(competitionId).lean() as any;
+        console.log(
+          `✅ AUTO-STARTING "${competition.name}" - ${actualParticipants}/${minParticipants} participants`,
+        );
+        await Competition.findByIdAndUpdate(competitionId, {
+          $set: { status: "active" },
+        });
+        competition = (await Competition.findById(competitionId).lean()) as any;
       }
     }
 
     // Also check if an 'active' competition should have been cancelled (edge case)
     // This catches competitions that were incorrectly started without meeting min participants
-    if (competition.status === 'active') {
-      const actualParticipants = competition.currentParticipants || participantCount;
-      
+    if (competition.status === "active") {
+      const actualParticipants =
+        competition.currentParticipants || participantCount;
+
       // If competition doesn't meet minimum participants, cancel it regardless of how long it's been active
       // This is a safety check - competitions should NEVER start without meeting minimum
       if (actualParticipants < minParticipants) {
-        console.log(`🚫 CANCELLING ACTIVE "${competition.name}" - only ${actualParticipants}/${minParticipants} participants (should never have started!)`);
-        
+        console.log(
+          `🚫 CANCELLING ACTIVE "${competition.name}" - only ${actualParticipants}/${minParticipants} participants (should never have started!)`,
+        );
+
         try {
-          const { cancelCompetitionAndRefund } = await import('@/lib/actions/trading/competition-cancel.actions');
+          const { cancelCompetitionAndRefund } =
+            await import("@/lib/actions/trading/competition-cancel.actions");
           await cancelCompetitionAndRefund(
             competitionId,
-            `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`
+            `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`,
           );
-          
-          competition = await Competition.findById(competitionId).lean() as any;
+
+          competition = (await Competition.findById(
+            competitionId,
+          ).lean()) as any;
         } catch (cancelError) {
-          console.error('Error cancelling active competition:', cancelError);
+          console.error("Error cancelling active competition:", cancelError);
         }
       }
     }
 
     return JSON.parse(JSON.stringify({ ...competition, participantCount }));
   } catch (error) {
-    console.error('Error getting competition:', error);
-    throw new Error('Failed to get competition');
+    console.error("Error getting competition:", error);
+    throw new Error("Failed to get competition");
   }
 };
 
@@ -137,18 +153,36 @@ export const createCompetition = async (competitionData: {
   maxParticipants: number;
   startTime: Date;
   endTime: Date;
-  assetClasses: ('stocks' | 'forex' | 'crypto')[];
+  assetClasses: ("stocks" | "forex" | "crypto")[];
   allowedSymbols?: string[];
   leverageAllowed?: number;
   prizeDistribution: { rank: number; percentage: number }[];
   platformFeePercentage: number;
   rules?: {
-    rankingMethod: 'pnl' | 'roi' | 'total_capital' | 'win_rate' | 'total_wins' | 'profit_factor';
-    tieBreaker1: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
-    tieBreaker2?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
+    rankingMethod:
+      | "pnl"
+      | "roi"
+      | "total_capital"
+      | "win_rate"
+      | "total_wins"
+      | "profit_factor";
+    tieBreaker1:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
+    tieBreaker2?:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
     minimumTrades: number;
     minimumWinRate?: number;
-    tiePrizeDistribution: 'split_equally' | 'split_weighted' | 'first_gets_all';
+    tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
     disqualifyOnLiquidation: boolean;
   };
   levelRequirement?: {
@@ -164,13 +198,18 @@ export const createCompetition = async (competitionData: {
     equityDrawdownPercent: number;
   };
   difficulty?: {
-    mode: 'auto' | 'manual';
-    manualLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'extreme';
+    mode: "auto" | "manual";
+    manualLevel?:
+      | "beginner"
+      | "intermediate"
+      | "advanced"
+      | "expert"
+      | "extreme";
   };
 }) => {
   try {
     const admin = await getAdminSession();
-    if (!admin) redirect('/sign-in');
+    if (!admin) redirect("/sign-in");
 
     await connectToDatabase();
 
@@ -180,16 +219,18 @@ export const createCompetition = async (competitionData: {
       if (MASSIVE_API_KEY) {
         const statusRes = await fetch(
           `https://api.massive.com/v1/marketstatus/now?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`,
-          { headers: { 'Accept': 'application/json' } }
+          { headers: { Accept: "application/json" } },
         );
-        
+
         if (statusRes.ok) {
           const statusData = await statusRes.json();
-          const fxStatus = statusData?.currencies?.fx || 'unknown';
-          const isOpen = fxStatus.toLowerCase() === 'open';
-          
+          const fxStatus = statusData?.currencies?.fx || "unknown";
+          const isOpen = fxStatus.toLowerCase() === "open";
+
           if (!isOpen) {
-            throw new Error(`Cannot create competition: Forex market is currently ${fxStatus}. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).`);
+            throw new Error(
+              `Cannot create competition: Forex market is currently ${fxStatus}. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).`,
+            );
           }
         }
       } else {
@@ -197,61 +238,76 @@ export const createCompetition = async (competitionData: {
         const now = new Date();
         const utcDay = now.getUTCDay();
         const utcHour = now.getUTCHours();
-        const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
-        
+        const isClosed =
+          utcDay === 6 ||
+          (utcDay === 0 && utcHour < 22) ||
+          (utcDay === 5 && utcHour >= 22);
+
         if (isClosed) {
-          throw new Error('Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).');
+          throw new Error(
+            "Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).",
+          );
         }
       }
     } catch (marketError) {
-      if (marketError instanceof Error && marketError.message.includes('Cannot create competition')) {
+      if (
+        marketError instanceof Error &&
+        marketError.message.includes("Cannot create competition")
+      ) {
         throw marketError; // Re-throw our custom error
       }
-      console.warn('⚠️ Market status check failed:', marketError);
+      console.warn("⚠️ Market status check failed:", marketError);
       // Use fallback time-based check
       const now = new Date();
       const utcDay = now.getUTCDay();
       const utcHour = now.getUTCHours();
-      const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
-      
+      const isClosed =
+        utcDay === 6 ||
+        (utcDay === 0 && utcHour < 22) ||
+        (utcDay === 5 && utcHour >= 22);
+
       if (isClosed) {
-        throw new Error('Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).');
+        throw new Error(
+          "Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).",
+        );
       }
     }
 
     // Validate prize distribution totals 100%
     const totalPrizePercentage = competitionData.prizeDistribution.reduce(
       (sum, prize) => sum + prize.percentage,
-      0
+      0,
     );
 
     if (Math.abs(totalPrizePercentage - 100) > 0.01) {
-      throw new Error('Prize distribution must total 100%');
+      throw new Error("Prize distribution must total 100%");
     }
 
     // ⏰ CHECK MARKET HOLIDAYS - Warn if competition overlaps with market closures
     try {
       const startDate = new Date(competitionData.startTime);
       const endDate = new Date(competitionData.endTime);
-      
+
       // Fetch upcoming holidays from Massive.com API
       const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
       if (MASSIVE_API_KEY) {
         const holidaysRes = await fetch(
           `https://api.massive.com/v1/marketstatus/upcoming?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`,
-          { headers: { 'Accept': 'application/json' } }
+          { headers: { Accept: "application/json" } },
         );
-        
+
         if (holidaysRes.ok) {
           const holidaysData = await holidaysRes.json();
           const holidays = holidaysData?.response || [];
-          
+
           // Check for forex market closures during competition period
           for (const holiday of holidays) {
-            if (holiday.status === 'closed') {
+            if (holiday.status === "closed") {
               const holidayDate = new Date(holiday.date);
               if (holidayDate >= startDate && holidayDate <= endDate) {
-                console.warn(`⚠️ Competition "${competitionData.name}" overlaps with market holiday: ${holiday.name} on ${holiday.date}`);
+                console.warn(
+                  `⚠️ Competition "${competitionData.name}" overlaps with market holiday: ${holiday.name} on ${holiday.date}`,
+                );
                 // Note: We warn but don't block - admin can decide to proceed
               }
             }
@@ -259,28 +315,30 @@ export const createCompetition = async (competitionData: {
         }
       }
     } catch (holidayError) {
-      console.warn('⚠️ Could not check market holidays:', holidayError);
+      console.warn("⚠️ Could not check market holidays:", holidayError);
       // Non-blocking - continue with competition creation
     }
 
     // Validate dates
     if (new Date(competitionData.startTime) <= new Date()) {
-      throw new Error('Start time must be in the future');
+      throw new Error("Start time must be in the future");
     }
 
-    if (new Date(competitionData.endTime) <= new Date(competitionData.startTime)) {
-      throw new Error('End time must be after start time');
+    if (
+      new Date(competitionData.endTime) <= new Date(competitionData.startTime)
+    ) {
+      throw new Error("End time must be after start time");
     }
 
     // Generate slug from name with auto-increment for duplicates
     const baseSlug = competitionData.name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
     let slug = baseSlug;
     let counter = 1;
-    
+
     // Check for existing slugs and increment if needed
     while (await Competition.findOne({ slug })) {
       counter++;
@@ -305,8 +363,11 @@ export const createCompetition = async (competitionData: {
       maxOpenPositions: riskSettings.maxOpenPositions,
       maxPositionSize: riskSettings.maxPositionSize,
     };
-    
-    console.log('📊 Using trading risk settings for competition:', tradingRiskDefaults);
+
+    console.log(
+      "📊 Using trading risk settings for competition:",
+      tradingRiskDefaults,
+    );
 
     const competition = await Competition.create({
       name: competitionData.name,
@@ -320,7 +381,7 @@ export const createCompetition = async (competitionData: {
       startTime: competitionData.startTime,
       endTime: competitionData.endTime,
       registrationDeadline,
-      status: 'upcoming',
+      status: "upcoming",
       assetClasses: competitionData.assetClasses,
       allowedSymbols: competitionData.allowedSymbols || [],
       blockedSymbols: [],
@@ -330,15 +391,15 @@ export const createCompetition = async (competitionData: {
         max: tradingRiskDefaults.maxLeverage,
         default: tradingRiskDefaults.defaultLeverage,
       },
-      competitionType: 'time_based',
+      competitionType: "time_based",
       prizePool: 0,
       platformFeePercentage: competitionData.platformFeePercentage,
       prizeDistribution: competitionData.prizeDistribution,
       rules: competitionData.rules || {
-        rankingMethod: 'pnl',
-        tieBreaker1: 'trades_count',
+        rankingMethod: "pnl",
+        tieBreaker1: "trades_count",
         minimumTrades: 0,
-        tiePrizeDistribution: 'split_equally',
+        tiePrizeDistribution: "split_equally",
         disqualifyOnLiquidation: true,
       },
       levelRequirement: competitionData.levelRequirement || {
@@ -364,20 +425,24 @@ export const createCompetition = async (competitionData: {
         enabled: false,
       },
       difficulty: competitionData.difficulty || {
-        mode: 'auto',
+        mode: "auto",
       },
       createdBy: admin.id,
     });
 
-    revalidatePath('/competitions');
-    revalidatePath('/competitions');
+    revalidatePath("/competitions");
+    revalidatePath("/competitions");
 
-    console.log(`✅ Competition created: ${competition.name} (ID: ${competition._id})`);
+    console.log(
+      `✅ Competition created: ${competition.name} (ID: ${competition._id})`,
+    );
 
     return JSON.parse(JSON.stringify(competition));
   } catch (error) {
-    console.error('Error creating competition:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to create competition');
+    console.error("Error creating competition:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to create competition",
+    );
   }
 };
 
@@ -386,26 +451,34 @@ export const enterCompetition = async (competitionId: string) => {
   try {
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error('Invalid competition ID format');
+      throw new Error("Invalid competition ID format");
     }
 
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
     // ✅ CHECK USER RESTRICTIONS
-    console.log(`🔐 Checking competition entry restrictions for user ${session.user.id}`);
-    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-    const restrictionCheck = await canUserPerformAction(session.user.id, 'enterCompetition');
-    
+    console.log(
+      `🔐 Checking competition entry restrictions for user ${session.user.id}`,
+    );
+    const { canUserPerformAction } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictionCheck = await canUserPerformAction(
+      session.user.id,
+      "enterCompetition",
+    );
+
     console.log(`   Restriction check result:`, restrictionCheck);
-    
+
     if (!restrictionCheck.allowed) {
       console.log(`   ❌ Entry blocked due to restrictions`);
-      throw new Error(restrictionCheck.reason || 'You are not allowed to enter competitions');
+      throw new Error(
+        restrictionCheck.reason || "You are not allowed to enter competitions",
+      );
     }
-    
+
     console.log(`   ✅ User allowed to enter competition`);
 
     // Start MongoDB transaction
@@ -414,20 +487,24 @@ export const enterCompetition = async (competitionId: string) => {
 
     try {
       // Get competition
-      const competition = await Competition.findById(competitionId).session(mongoSession);
-      
+      const competition =
+        await Competition.findById(competitionId).session(mongoSession);
+
       if (!competition) {
-        throw new Error('Competition not found');
+        throw new Error("Competition not found");
       }
 
       // Validate competition status
-      if (competition.status !== 'upcoming' && competition.status !== 'active') {
-        throw new Error('Competition is not open for entries');
+      if (
+        competition.status !== "upcoming" &&
+        competition.status !== "active"
+      ) {
+        throw new Error("Competition is not open for entries");
       }
 
       // Check if competition is full
       if (competition.currentParticipants >= competition.maxParticipants) {
-        throw new Error('Competition is full');
+        throw new Error("Competition is full");
       }
 
       // Check if user already entered
@@ -437,47 +514,58 @@ export const enterCompetition = async (competitionId: string) => {
       }).session(mongoSession);
 
       if (existingParticipant) {
-        throw new Error('You are already in this competition');
+        throw new Error("You are already in this competition");
       }
 
       // Check level requirement
-      if (competition.levelRequirement && competition.levelRequirement.enabled) {
-        const { getUserLevel } = await import('@/lib/services/xp-level.service');
-        const { getTitleByXP, TITLE_LEVELS } = await import('@/lib/constants/levels');
-        
+      if (
+        competition.levelRequirement &&
+        competition.levelRequirement.enabled
+      ) {
+        const { getUserLevel } =
+          await import("@/lib/services/xp-level.service");
+        const { getTitleByXP, TITLE_LEVELS } =
+          await import("@/lib/constants/levels");
+
         const userLevel = await getUserLevel(session.user.id);
         const userTitleLevel = getTitleByXP((userLevel as any).currentXP || 0);
-        
+
         // Check if user meets minimum level
         if (userTitleLevel.level < competition.levelRequirement.minLevel) {
-          const requiredTitle = TITLE_LEVELS[competition.levelRequirement.minLevel - 1];
+          const requiredTitle =
+            TITLE_LEVELS[competition.levelRequirement.minLevel - 1];
           throw new Error(
-            `This competition requires ${requiredTitle.icon} ${requiredTitle.title} or higher. You are currently ${userTitleLevel.icon} ${userTitleLevel.title}.`
+            `This competition requires ${requiredTitle.icon} ${requiredTitle.title} or higher. You are currently ${userTitleLevel.icon} ${userTitleLevel.title}.`,
           );
         }
-        
+
         // Check if user is below maximum level (if set)
         if (
           competition.levelRequirement.maxLevel &&
           userTitleLevel.level > competition.levelRequirement.maxLevel
         ) {
-          const maxTitle = TITLE_LEVELS[competition.levelRequirement.maxLevel - 1];
+          const maxTitle =
+            TITLE_LEVELS[competition.levelRequirement.maxLevel - 1];
           throw new Error(
-            `This competition is only for traders up to ${maxTitle.icon} ${maxTitle.title}. You are ${userTitleLevel.icon} ${userTitleLevel.title}.`
+            `This competition is only for traders up to ${maxTitle.icon} ${maxTitle.title}. You are ${userTitleLevel.icon} ${userTitleLevel.title}.`,
           );
         }
       }
 
       // Get user wallet
-      const wallet = await CreditWallet.findOne({ userId: session.user.id }).session(mongoSession);
-      
+      const wallet = await CreditWallet.findOne({
+        userId: session.user.id,
+      }).session(mongoSession);
+
       if (!wallet) {
-        throw new Error('Wallet not found');
+        throw new Error("Wallet not found");
       }
 
       // Check balance
       if (wallet.creditBalance < competition.entryFee) {
-        throw new Error(`Insufficient balance. Need €${competition.entryFee}, have €${wallet.creditBalance}`);
+        throw new Error(
+          `Insufficient balance. Need €${competition.entryFee}, have €${wallet.creditBalance}`,
+        );
       }
 
       // Deduct entry fee from wallet
@@ -489,7 +577,7 @@ export const enterCompetition = async (competitionId: string) => {
             totalSpentOnCompetitions: competition.entryFee,
           },
         },
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
       // Create transaction record
@@ -497,17 +585,17 @@ export const enterCompetition = async (competitionId: string) => {
         [
           {
             userId: session.user.id,
-            transactionType: 'competition_entry',
+            transactionType: "competition_entry",
             amount: -competition.entryFee,
             balanceBefore: wallet.creditBalance,
             balanceAfter: wallet.creditBalance - competition.entryFee,
-            currency: 'CREDITS',
-            status: 'completed',
+            currency: "CREDITS",
+            status: "completed",
             referenceId: competitionId,
             description: `Entry fee for ${competition.name}`,
           },
         ],
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
       // Create competition participant
@@ -532,10 +620,10 @@ export const enterCompetition = async (competitionId: string) => {
             winRate: 0,
             currentOpenPositions: 0,
             currentRank: 0,
-            status: 'active',
+            status: "active",
           },
         ],
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
       // Update competition (increment participants and prize pool)
@@ -547,93 +635,118 @@ export const enterCompetition = async (competitionId: string) => {
             prizePool: competition.entryFee,
           },
         },
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
       // Commit transaction
       await mongoSession.commitTransaction();
 
-      console.log(`✅ User ${session.user.id} entered competition ${competition.name}`);
+      console.log(
+        `✅ User ${session.user.id} entered competition ${competition.name}`,
+      );
       console.log(`   Entry fee: €${competition.entryFee}`);
       console.log(`   Starting capital: $${competition.startingCapital}`);
 
       // Evaluate badges for the user (fire and forget - don't wait)
       try {
-        const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-        evaluateUserBadges(session.user.id).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after entering competition`);
-          }
-        }).catch(err => console.error('Error evaluating badges:', err));
+        const { evaluateUserBadges } =
+          await import("@/lib/services/badge-evaluation.service");
+        evaluateUserBadges(session.user.id)
+          .then((result) => {
+            if (result.newBadges.length > 0) {
+              console.log(
+                `🏅 User earned ${result.newBadges.length} new badges after entering competition`,
+              );
+            }
+          })
+          .catch((err) => console.error("Error evaluating badges:", err));
       } catch (error) {
-        console.error('Error importing badge service:', error);
+        console.error("Error importing badge service:", error);
       }
 
       // Send notification about competition entry (fire and forget)
       try {
-        const { notificationService } = await import('@/lib/services/notification.service');
+        const { notificationService } =
+          await import("@/lib/services/notification.service");
         await notificationService.notifyCompetitionJoined(
           session.user.id,
           competitionId,
           competition.name,
-          competition.entryFee
+          competition.entryFee,
         );
-        console.log(`🔔 Competition joined notification sent to user ${session.user.id}`);
+        console.log(
+          `🔔 Competition joined notification sent to user ${session.user.id}`,
+        );
       } catch (error) {
-        console.error('Error sending competition joined notification:', error);
+        console.error("Error sending competition joined notification:", error);
       }
 
       // Track competition entry for coordination detection (fire and forget)
       try {
-        const { CoordinationDetectionService } = await import('@/lib/services/fraud/coordination-detection.service');
-        const { BehavioralAnalysisService } = await import('@/lib/services/fraud/behavioral-analysis.service');
-        
+        const { CoordinationDetectionService } =
+          await import("@/lib/services/fraud/coordination-detection.service");
+        const { BehavioralAnalysisService } =
+          await import("@/lib/services/fraud/behavioral-analysis.service");
+
         const entryTime = new Date();
-        
+
         // Track entry in user's profile
         BehavioralAnalysisService.recordCompetitionEntry(session.user.id)
-          .then(() => console.log('📝 Competition entry recorded in profile'))
-          .catch(err => console.error('Error recording competition entry:', err));
-        
+          .then(() => console.log("📝 Competition entry recorded in profile"))
+          .catch((err) =>
+            console.error("Error recording competition entry:", err),
+          );
+
         // Get recent entries for this competition (use createdAt, not joinedAt)
         CompetitionParticipant.find({
           competitionId: competitionId,
-          createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
-        }).select('userId createdAt').lean()
+          createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) }, // Last 5 minutes
+        })
+          .select("userId createdAt")
+          .lean()
           .then(async (recentEntries) => {
-            console.log(`🎯 Found ${recentEntries.length} entries in last 5 minutes for competition ${competitionId}`);
-            
+            console.log(
+              `🎯 Found ${recentEntries.length} entries in last 5 minutes for competition ${competitionId}`,
+            );
+
             // Include current user in the entries
-            const entries = recentEntries.map(e => ({
+            const entries = recentEntries.map((e) => ({
               userId: e.userId.toString(),
-              entryTime: new Date(e.createdAt)
+              entryTime: new Date(e.createdAt),
             }));
-            
+
             // Add current entry if not already in list
-            if (!entries.some(e => e.userId === session.user.id)) {
+            if (!entries.some((e) => e.userId === session.user.id)) {
               entries.push({ userId: session.user.id, entryTime });
             }
-            
+
             console.log(`🎯 Total entries to check: ${entries.length}`);
-            
+
             // Need at least 2 entries for coordination detection
             if (entries.length >= 2) {
-              console.log(`🎯 Running coordination detection for ${entries.length} entries`);
-              await CoordinationDetectionService.detectCoordinatedEntry(competitionId, entries);
+              console.log(
+                `🎯 Running coordination detection for ${entries.length} entries`,
+              );
+              await CoordinationDetectionService.detectCoordinatedEntry(
+                competitionId,
+                entries,
+              );
             }
           })
-          .catch(err => console.error('Error checking coordinated entries:', err));
+          .catch((err) =>
+            console.error("Error checking coordinated entries:", err),
+          );
       } catch (error) {
-        console.error('Error in coordination detection:', error);
+        console.error("Error in coordination detection:", error);
       }
 
-      revalidatePath('/competitions');
+      revalidatePath("/competitions");
       revalidatePath(`/competitions/${competitionId}`);
-      revalidatePath('/wallet');
+      revalidatePath("/wallet");
 
       return {
         success: true,
-        message: 'Successfully entered competition',
+        message: "Successfully entered competition",
         participant: JSON.parse(JSON.stringify(participant[0])),
       };
     } catch (error) {
@@ -644,44 +757,52 @@ export const enterCompetition = async (competitionId: string) => {
       mongoSession.endSession();
     }
   } catch (error) {
-    console.error('Error entering competition:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to enter competition');
+    console.error("Error entering competition:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to enter competition",
+    );
   }
 };
 
 // Get competition leaderboard
-export const getCompetitionLeaderboard = async (competitionId: string, limit: number = 100) => {
-  'use no memo'; // CRITICAL: Disable Next.js caching for real-time data
-  
+export const getCompetitionLeaderboard = async (
+  competitionId: string,
+  limit: number = 100,
+) => {
+  "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
+
   try {
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error('Invalid competition ID format');
+      throw new Error("Invalid competition ID format");
     }
 
     await connectToDatabase();
 
     // Get competition to access rules
-    const competition = await Competition.findById(competitionId).lean() as any;
+    const competition = (await Competition.findById(
+      competitionId,
+    ).lean()) as any;
     if (!competition) {
-      throw new Error('Competition not found');
+      throw new Error("Competition not found");
     }
 
     const participants = await CompetitionParticipant.find({
       competitionId: competitionId,
-    })
-      .lean();
+    }).lean();
 
     // Import ranking service and level service
-    const { calculateRankings } = await import('@/lib/services/competition-ranking.service');
-    const { getUsersWithTitles } = await import('@/lib/services/xp-level.service');
-    const { getTitleByXP } = await import('@/lib/constants/levels');
+    const { calculateRankings } =
+      await import("@/lib/services/competition-ranking.service");
+    const { getUsersWithTitles } =
+      await import("@/lib/services/xp-level.service");
+    const { getTitleByXP } = await import("@/lib/constants/levels");
 
     // Prepare participant data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const participantData = participants.map((p: any) => ({
       userId: p.userId,
-      username: p.username || 'Anonymous',
+      username: p.username || "Anonymous",
       currentCapital: p.currentCapital,
       pnl: p.pnl,
       pnlPercentage: p.pnlPercentage,
@@ -696,31 +817,37 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
 
     // Use competition rules or defaults
     const rules = competition.rules || {
-      rankingMethod: 'pnl' as const,
-      tieBreaker1: 'trades_count' as const,
+      rankingMethod: "pnl" as const,
+      tieBreaker1: "trades_count" as const,
       minimumTrades: 0,
-      tiePrizeDistribution: 'split_equally' as const,
+      tiePrizeDistribution: "split_equally" as const,
       disqualifyOnLiquidation: true,
     };
 
     // Calculate rankings with tie-breaking
     // Only check minimum trades when competition is completed
     const rankedParticipants = calculateRankings(participantData, rules, {
-      competitionStatus: competition.status as 'upcoming' | 'active' | 'completed' | 'cancelled',
+      competitionStatus: competition.status as
+        | "upcoming"
+        | "active"
+        | "completed"
+        | "cancelled",
     });
 
     // Limit results
     const limitedParticipants = rankedParticipants.slice(0, limit);
 
     // Get user titles for all participants
-    const userIds = limitedParticipants.map(p => p.userId);
+    const userIds = limitedParticipants.map((p) => p.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
     // Map to include tie information and titles
     const result = limitedParticipants.map((p) => {
-      const originalParticipant = participants.find(orig => orig.userId === p.userId);
+      const originalParticipant = participants.find(
+        (orig) => orig.userId === p.userId,
+      );
       const userLevel = userLevels.get(p.userId);
-      
+
       // Get title info - always show at least default level
       let titleLevel;
       if (userLevel) {
@@ -745,16 +872,16 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
 
     return JSON.parse(JSON.stringify(result));
   } catch (error) {
-    console.error('Error getting leaderboard:', error);
-    throw new Error('Failed to get leaderboard');
+    console.error("Error getting leaderboard:", error);
+    throw new Error("Failed to get leaderboard");
   }
 };
 
 // Get user's competitions
-export const getUserCompetitions = async (status?: 'active' | 'completed') => {
+export const getUserCompetitions = async (status?: "active" | "completed") => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
@@ -778,7 +905,7 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
     const userCompetitions = participants.map((participant) => {
       const competition = competitions.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (c: any) => c._id.toString() === participant.competitionId
+        (c: any) => c._id.toString() === participant.competitionId,
       );
       return {
         ...participant,
@@ -788,8 +915,8 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
 
     return JSON.parse(JSON.stringify(userCompetitions));
   } catch (error) {
-    console.error('Error getting user competitions:', error);
-    throw new Error('Failed to get user competitions');
+    console.error("Error getting user competitions:", error);
+    throw new Error("Failed to get user competitions");
   }
 };
 
@@ -813,7 +940,7 @@ export const isUserInCompetition = async (competitionId: string) => {
 
     return !!participant;
   } catch (error) {
-    console.error('Error checking user in competition:', error);
+    console.error("Error checking user in competition:", error);
     return false;
   }
 };
@@ -827,7 +954,7 @@ export const getUserParticipant = async (competitionId: string) => {
     }
 
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
@@ -842,8 +969,8 @@ export const getUserParticipant = async (competitionId: string) => {
 
     return JSON.parse(JSON.stringify(participant));
   } catch (error) {
-    console.error('Error getting user participant:', error);
-    throw new Error('Failed to get participant data');
+    console.error("Error getting user participant:", error);
+    throw new Error("Failed to get participant data");
   }
 };
 
@@ -868,7 +995,9 @@ export const getUserStreak = async (competitionId: string) => {
     if (!participant) return 0;
 
     // Get recent closed trades (most recent first)
-    const TradeHistory = (await import('@/database/models/trading/trade-history.model')).default;
+    const TradeHistory = (
+      await import("@/database/models/trading/trade-history.model")
+    ).default;
     const participantId = String((participant as any)._id);
     const recentTrades = await TradeHistory.find({
       participantId,
@@ -891,7 +1020,7 @@ export const getUserStreak = async (competitionId: string) => {
 
     return streak;
   } catch (error) {
-    console.error('Error getting user streak:', error);
+    console.error("Error getting user streak:", error);
     return 0;
   }
 };
@@ -899,30 +1028,26 @@ export const getUserStreak = async (competitionId: string) => {
 // Update competition status (admin/system)
 export const updateCompetitionStatus = async (
   competitionId: string,
-  status: 'upcoming' | 'active' | 'completed' | 'cancelled'
+  status: "upcoming" | "active" | "completed" | "cancelled",
 ) => {
   try {
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error('Invalid competition ID format');
+      throw new Error("Invalid competition ID format");
     }
 
     await connectToDatabase();
 
     await Competition.findByIdAndUpdate(competitionId, { status });
 
-    revalidatePath('/competitions');
+    revalidatePath("/competitions");
     revalidatePath(`/competitions/${competitionId}`);
 
     console.log(`✅ Competition ${competitionId} status updated to ${status}`);
 
     return { success: true };
   } catch (error) {
-    console.error('Error updating competition status:', error);
-    throw new Error('Failed to update competition status');
+    console.error("Error updating competition status:", error);
+    throw new Error("Failed to update competition status");
   }
 };
-
-
-
-

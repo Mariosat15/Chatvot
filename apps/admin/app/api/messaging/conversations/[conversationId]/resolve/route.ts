@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verify } from 'jsonwebtoken';
-import mongoose, { Types } from 'mongoose';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verify } from "jsonwebtoken";
+import mongoose, { Types } from "mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
+const JWT_SECRET = getAdminJwtSecret();
 
 /**
  * POST /api/messaging/conversations/[conversationId]/resolve
@@ -12,14 +13,14 @@ const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
+  { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
+    const token = cookieStore.get("admin_token")?.value;
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const decoded = verify(token, JWT_SECRET) as {
@@ -34,41 +35,57 @@ export async function POST(
 
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     let convObjectId;
     try {
       convObjectId = new Types.ObjectId(conversationId);
     } catch {
-      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid conversation ID" },
+        { status: 400 },
+      );
     }
 
-    const conversation = await db.collection('conversations').findOne({ _id: convObjectId });
+    const conversation = await db
+      .collection("conversations")
+      .findOne({ _id: convObjectId });
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 },
+      );
     }
 
     // Only support conversations can be resolved
-    if (conversation.type !== 'user-to-support') {
-      return NextResponse.json({ error: 'Only support conversations can be resolved' }, { status: 400 });
+    if (conversation.type !== "user-to-support") {
+      return NextResponse.json(
+        { error: "Only support conversations can be resolved" },
+        { status: 400 },
+      );
     }
 
-    console.log(`✅ [Resolve] Archiving conversation/ticket ${conversationId} by ${decoded.email}`);
+    console.log(
+      `✅ [Resolve] Archiving conversation/ticket ${conversationId} by ${decoded.email}`,
+    );
 
     // Update conversation to ARCHIVED state - this conversation is now closed
     // Customer will get a NEW ticket when they send a new message
     const ticketNumber = conversation.ticketNumber || 1;
-    
-    await db.collection('conversations').updateOne(
+
+    await db.collection("conversations").updateOne(
       { _id: convObjectId },
       {
         $set: {
           // Mark as resolved AND archived
           isResolved: true,
           isArchived: true,
-          status: 'archived', // Change status from 'active' to 'archived'
+          status: "archived", // Change status from 'active' to 'archived'
           resolvedAt: new Date(),
           archivedAt: new Date(),
           resolvedBy: decoded.adminId,
@@ -77,18 +94,18 @@ export async function POST(
           isAIHandled: false,
           updatedAt: new Date(),
         },
-      }
+      },
     );
 
     // Add system message about resolution
     const systemMessage = {
       conversationId: convObjectId,
-      senderId: 'system',
-      senderType: 'system',
-      senderName: 'System',
-      messageType: 'system',
+      senderId: "system",
+      senderType: "system",
+      senderName: "System",
+      messageType: "system",
       content: `✅ Ticket #${ticketNumber} resolved and archived by ${decoded.name || decoded.email}. For new inquiries, please start a new conversation.`,
-      status: 'sent',
+      status: "sent",
       readBy: [],
       deliveredTo: [],
       isDeleted: false,
@@ -96,42 +113,44 @@ export async function POST(
       updatedAt: new Date(),
     };
 
-    await db.collection('messages').insertOne(systemMessage);
+    await db.collection("messages").insertOne(systemMessage);
 
     // Update last message
-    await db.collection('conversations').updateOne(
+    await db.collection("conversations").updateOne(
       { _id: convObjectId },
       {
         $set: {
           lastMessage: {
             messageId: systemMessage.conversationId,
-            content: 'Conversation resolved',
-            senderId: 'system',
-            senderName: 'System',
-            senderType: 'system',
+            content: "Conversation resolved",
+            senderId: "system",
+            senderName: "System",
+            senderType: "system",
             timestamp: new Date(),
           },
         },
-      }
+      },
     );
 
     // Log to customer audit trail
-    const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+    const userParticipant = conversation.participants?.find(
+      (p: any) => p.type === "user",
+    );
     if (userParticipant?.id) {
-      await db.collection('customer_audit_trails').insertOne({
+      await db.collection("customer_audit_trails").insertOne({
         customerId: userParticipant.id,
-        action: 'ticket_resolved',
-        category: 'messaging',
+        action: "ticket_resolved",
+        category: "messaging",
         performedBy: {
           id: decoded.adminId,
           email: decoded.email,
           name: decoded.name || decoded.email,
-          type: 'employee',
+          type: "employee",
         },
         details: {
           conversationId,
           ticketNumber,
-          action: 'archived',
+          action: "archived",
         },
         timestamp: new Date(),
         createdAt: new Date(),
@@ -140,11 +159,12 @@ export async function POST(
 
     // Notify via WebSocket (use internal URL for server-to-server)
     try {
-      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
-      
+      const wsInternalUrl =
+        process.env.WS_INTERNAL_URL || "http://localhost:3003";
+
       await fetch(`${wsInternalUrl}/internal/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
           message: {
@@ -155,18 +175,18 @@ export async function POST(
         }),
       });
     } catch (wsError) {
-      console.warn('WebSocket notification failed:', wsError);
+      console.warn("WebSocket notification failed:", wsError);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Ticket #${ticketNumber} has been resolved and archived. Customer will get a new ticket for new inquiries.` 
+    return NextResponse.json({
+      success: true,
+      message: `Ticket #${ticketNumber} has been resolved and archived. Customer will get a new ticket for new inquiries.`,
     });
   } catch (error) {
-    console.error('Error resolving conversation:', error);
+    console.error("Error resolving conversation:", error);
     return NextResponse.json(
-      { error: 'Failed to resolve conversation' },
-      { status: 500 }
+      { error: "Failed to resolve conversation" },
+      { status: 500 },
     );
   }
 }
@@ -178,14 +198,14 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
+  { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
+    const token = cookieStore.get("admin_token")?.value;
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const decoded = verify(token, JWT_SECRET) as {
@@ -200,33 +220,46 @@ export async function DELETE(
 
     const db = mongoose.connection.db;
     if (!db) {
-      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database not connected" },
+        { status: 500 },
+      );
     }
 
     let convObjectId;
     try {
       convObjectId = new Types.ObjectId(conversationId);
     } catch {
-      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid conversation ID" },
+        { status: 400 },
+      );
     }
 
-    const conversation = await db.collection('conversations').findOne({ _id: convObjectId });
-    
+    const conversation = await db
+      .collection("conversations")
+      .findOne({ _id: convObjectId });
+
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 },
+      );
     }
 
     const ticketNumber = conversation.ticketNumber || 1;
 
-    console.log(`🔄 [Reopen] Reopening ticket #${ticketNumber} (${conversationId}) by ${decoded.email}`);
+    console.log(
+      `🔄 [Reopen] Reopening ticket #${ticketNumber} (${conversationId}) by ${decoded.email}`,
+    );
 
-    await db.collection('conversations').updateOne(
+    await db.collection("conversations").updateOne(
       { _id: convObjectId },
       {
         $set: {
           isResolved: false,
           isArchived: false,
-          status: 'active',
+          status: "active",
           isAIHandled: false,
           assignedEmployeeId: new Types.ObjectId(decoded.adminId),
           assignedEmployeeName: decoded.name || decoded.email,
@@ -241,18 +274,18 @@ export async function DELETE(
           resolvedByName: 1,
           archivedAt: 1,
         },
-      }
+      },
     );
 
     // Add system message
-    await db.collection('messages').insertOne({
+    await db.collection("messages").insertOne({
       conversationId: convObjectId,
-      senderId: 'system',
-      senderType: 'system',
-      senderName: 'System',
-      messageType: 'system',
+      senderId: "system",
+      senderType: "system",
+      senderName: "System",
+      messageType: "system",
       content: `🔄 Ticket #${ticketNumber} reopened by ${decoded.name || decoded.email}`,
-      status: 'sent',
+      status: "sent",
       readBy: [],
       deliveredTo: [],
       isDeleted: false,
@@ -261,17 +294,19 @@ export async function DELETE(
     });
 
     // Log to audit trail
-    const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+    const userParticipant = conversation.participants?.find(
+      (p: any) => p.type === "user",
+    );
     if (userParticipant?.id) {
-      await db.collection('customer_audit_trails').insertOne({
+      await db.collection("customer_audit_trails").insertOne({
         customerId: userParticipant.id,
-        action: 'ticket_reopened',
-        category: 'messaging',
+        action: "ticket_reopened",
+        category: "messaging",
         performedBy: {
           id: decoded.adminId,
           email: decoded.email,
           name: decoded.name || decoded.email,
-          type: 'employee',
+          type: "employee",
         },
         details: {
           conversationId,
@@ -282,16 +317,15 @@ export async function DELETE(
       });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Ticket #${ticketNumber} reopened. You are now handling this conversation.` 
+    return NextResponse.json({
+      success: true,
+      message: `Ticket #${ticketNumber} reopened. You are now handling this conversation.`,
     });
   } catch (error) {
-    console.error('Error reopening conversation:', error);
+    console.error("Error reopening conversation:", error);
     return NextResponse.json(
-      { error: 'Failed to reopen conversation' },
-      { status: 500 }
+      { error: "Failed to reopen conversation" },
+      { status: 500 },
     );
   }
 }
-

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
 interface RiskSettings {
   defaultLeverage: number;
@@ -26,22 +26,23 @@ const DEFAULT_SETTINGS: RiskSettings = {
 
 /**
  * Hook to automatically poll for risk settings updates
- * 
+ *
  * @param pollInterval - How often to check for updates (in milliseconds)
  * @returns Current risk settings that update automatically
  */
-export function useRiskSettings(pollInterval = 10000) { // Poll every 10 seconds
+export function useRiskSettings(pollInterval = 10000) {
+  // Poll every 10 seconds
   const [settings, setSettings] = useState<RiskSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/trading/risk-settings', {
-        method: 'GET',
-        cache: 'no-store', // Never cache
+      const response = await fetch("/api/trading/risk-settings", {
+        method: "GET",
+        cache: "no-store", // Never cache
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          "Cache-Control": "no-cache, no-store, must-revalidate",
         },
       });
 
@@ -56,7 +57,7 @@ export function useRiskSettings(pollInterval = 10000) { // Poll every 10 seconds
         setSettings(DEFAULT_SETTINGS);
         setError(null);
       }
-    } catch (err) {
+    } catch {
       // Fail silently if not on a page that uses risk settings - use defaults
       setSettings(DEFAULT_SETTINGS);
       setError(null);
@@ -78,4 +79,3 @@ export function useRiskSettings(pollInterval = 10000) { // Poll every 10 seconds
 
   return { settings, isLoading, error, refetch: fetchSettings };
 }
-

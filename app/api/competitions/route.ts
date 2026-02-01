@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import { auth } from '@/lib/better-auth/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { auth } from "@/lib/better-auth/auth";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all non-draft competitions
-    const competitions = await Competition.find({ 
-      status: { $ne: 'draft' } 
+    const competitions = await Competition.find({
+      status: { $ne: "draft" },
     })
       .sort({ startTime: -1 })
       .lean();
@@ -31,10 +31,14 @@ export async function GET(request: NextRequest) {
     if (userId) {
       const participations = await CompetitionParticipant.find({
         userId,
-        status: { $in: ['active', 'completed'] }
-      }).select('competitionId').lean();
-      
-      userInCompetitionIds = participations.map((p: any) => p.competitionId.toString());
+        status: { $in: ["active", "completed"] },
+      })
+        .select("competitionId")
+        .lean();
+
+      userInCompetitionIds = participations.map((p: any) =>
+        p.competitionId.toString(),
+      );
     }
 
     return NextResponse.json({
@@ -42,11 +46,10 @@ export async function GET(request: NextRequest) {
       userInCompetitionIds,
     });
   } catch (error) {
-    console.error('Error fetching competitions:', error);
+    console.error("Error fetching competitions:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch competitions' },
-      { status: 500 }
+      { error: "Failed to fetch competitions" },
+      { status: 500 },
     );
   }
 }
-

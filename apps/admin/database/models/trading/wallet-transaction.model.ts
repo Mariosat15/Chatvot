@@ -1,33 +1,33 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Track all credit wallet transactions
 export interface IWalletTransaction extends Document {
   userId: string; // Reference to Better Auth user ID
   transactionType:
-    | 'deposit' // User deposits EUR → gets credits
-    | 'withdrawal' // User withdraws credits → gets EUR
-    | 'withdrawal_fee' // Fee charged on withdrawal
-    | 'withdrawal_refund' // Withdrawal failed/cancelled (refund credits)
-    | 'manual_deposit_credit' // Admin manually credits user for failed deposit
-    | 'competition_entry' // User enters competition (deduct credits)
-    | 'competition_win' // User wins competition (add credits)
-    | 'competition_refund' // Competition cancelled (refund entry fee)
-    | 'challenge_entry' // User enters 1v1 challenge (deduct credits)
-    | 'challenge_win' // User wins 1v1 challenge (add credits)
-    | 'challenge_refund' // Challenge cancelled/declined (refund entry fee)
-    | 'platform_fee' // Platform fee deducted from winnings
-    | 'admin_adjustment' // Manual adjustment by admin
-    | 'marketplace_purchase' // User purchases item from marketplace
-    | 'gamemaster_subscription' // Game master monthly subscription fee
-    | 'gamemaster_subscription_refund' // Refund if subscription cancelled
-    | 'gamemaster_earning' // Game master earnings from referred users
-    | 'gamemaster_challenge_referral'; // Game master challenge referral earnings
+    | "deposit" // User deposits EUR → gets credits
+    | "withdrawal" // User withdraws credits → gets EUR
+    | "withdrawal_fee" // Fee charged on withdrawal
+    | "withdrawal_refund" // Withdrawal failed/cancelled (refund credits)
+    | "manual_deposit_credit" // Admin manually credits user for failed deposit
+    | "competition_entry" // User enters competition (deduct credits)
+    | "competition_win" // User wins competition (add credits)
+    | "competition_refund" // Competition cancelled (refund entry fee)
+    | "challenge_entry" // User enters 1v1 challenge (deduct credits)
+    | "challenge_win" // User wins 1v1 challenge (add credits)
+    | "challenge_refund" // Challenge cancelled/declined (refund entry fee)
+    | "platform_fee" // Platform fee deducted from winnings
+    | "admin_adjustment" // Manual adjustment by admin
+    | "marketplace_purchase" // User purchases item from marketplace
+    | "gamemaster_subscription" // Game master monthly subscription fee
+    | "gamemaster_subscription_refund" // Refund if subscription cancelled
+    | "gamemaster_earning" // Game master earnings from referred users
+    | "gamemaster_challenge_referral"; // Game master challenge referral earnings
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
   currency: string; // EUR, USD, etc.
   exchangeRate: number; // Exchange rate (1 credit = X EUR)
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  status: "pending" | "completed" | "failed" | "cancelled";
   paymentMethod?: string; // stripe, paypal, bank_transfer
   paymentId?: string; // Stripe payment ID, etc.
   paymentIntentId?: string; // Stripe Payment Intent ID (for fraud detection)
@@ -50,24 +50,24 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
       type: String,
       required: true,
       enum: [
-        'deposit',
-        'withdrawal',
-        'withdrawal_fee',
-        'withdrawal_refund',
-        'manual_deposit_credit',
-        'competition_entry',
-        'competition_win',
-        'competition_refund',
-        'challenge_entry',
-        'challenge_win',
-        'challenge_refund',
-        'platform_fee',
-        'admin_adjustment',
-        'marketplace_purchase',
-        'gamemaster_subscription',
-        'gamemaster_subscription_refund',
-        'gamemaster_earning',
-        'gamemaster_challenge_referral',
+        "deposit",
+        "withdrawal",
+        "withdrawal_fee",
+        "withdrawal_refund",
+        "manual_deposit_credit",
+        "competition_entry",
+        "competition_win",
+        "competition_refund",
+        "challenge_entry",
+        "challenge_win",
+        "challenge_refund",
+        "platform_fee",
+        "admin_adjustment",
+        "marketplace_purchase",
+        "gamemaster_subscription",
+        "gamemaster_subscription_refund",
+        "gamemaster_earning",
+        "gamemaster_challenge_referral",
       ],
     },
     amount: {
@@ -87,7 +87,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     currency: {
       type: String,
       required: true,
-      default: 'EUR',
+      default: "EUR",
     },
     exchangeRate: {
       type: Number,
@@ -97,8 +97,8 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     status: {
       type: String,
       required: true,
-      enum: ['pending', 'completed', 'failed', 'cancelled'],
-      default: 'pending',
+      enum: ["pending", "completed", "failed", "cancelled"],
+      default: "pending",
     },
     paymentMethod: {
       type: String,
@@ -128,7 +128,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
@@ -139,7 +139,6 @@ WalletTransactionSchema.index({ transactionType: 1, createdAt: -1 });
 
 const WalletTransaction =
   models?.WalletTransaction ||
-  model<IWalletTransaction>('WalletTransaction', WalletTransactionSchema);
+  model<IWalletTransaction>("WalletTransaction", WalletTransactionSchema);
 
 export default WalletTransaction;
-

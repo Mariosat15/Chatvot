@@ -1,8 +1,8 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 /**
  * Price Log Model
- * 
+ *
  * Stores bid/ask/mid/spread snapshots at the time of trade execution.
  * Used for auditing and validating that trades were executed at correct prices.
  */
@@ -14,23 +14,23 @@ export interface IPriceLog extends Document {
   mid: number;
   spread: number;
   timestamp: Date;
-  
+
   // Optional reference to the trade that triggered this log
   tradeId?: string;
   orderId?: string;
-  tradeType?: 'entry' | 'exit';
-  tradeSide?: 'long' | 'short';
-  
+  tradeType?: "entry" | "exit";
+  tradeSide?: "long" | "short";
+
   // The actual execution price for comparison
   executionPrice?: number;
   expectedPrice?: number; // What we expected (ASK for buy, BID for sell)
-  
+
   // Validation status
   priceMatchesExpected?: boolean;
   slippagePips?: number;
-  
+
   // Source of the price data
-  priceSource?: 'websocket' | 'rest' | 'cache';
+  priceSource?: "websocket" | "rest" | "cache";
 }
 
 const PriceLogSchema: Schema = new Schema(
@@ -62,7 +62,7 @@ const PriceLogSchema: Schema = new Schema(
       default: Date.now,
       index: true,
     },
-    
+
     // Trade reference
     tradeId: {
       type: String,
@@ -74,29 +74,29 @@ const PriceLogSchema: Schema = new Schema(
     },
     tradeType: {
       type: String,
-      enum: ['entry', 'exit'],
+      enum: ["entry", "exit"],
     },
     tradeSide: {
       type: String,
-      enum: ['long', 'short'],
+      enum: ["long", "short"],
     },
-    
+
     // Execution details
     executionPrice: Number,
     expectedPrice: Number,
     priceMatchesExpected: Boolean,
     slippagePips: Number,
-    
+
     // Price source
     priceSource: {
       type: String,
-      enum: ['websocket', 'rest', 'cache'],
+      enum: ["websocket", "rest", "cache"],
     },
   },
   {
     timestamps: true,
-    collection: 'pricelogs',
-  }
+    collection: "pricelogs",
+  },
 );
 
 // Compound indexes for efficient querying
@@ -107,7 +107,8 @@ PriceLogSchema.index({ tradeId: 1, tradeType: 1 });
 // Uncomment if you want automatic cleanup:
 // PriceLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
-const PriceLog = mongoose.models.PriceLog || mongoose.model<IPriceLog>('PriceLog', PriceLogSchema);
+const PriceLog =
+  mongoose.models.PriceLog ||
+  mongoose.model<IPriceLog>("PriceLog", PriceLogSchema);
 
 export default PriceLog;
-

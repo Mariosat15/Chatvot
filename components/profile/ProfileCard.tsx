@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import {
   X,
   Trophy,
@@ -12,20 +12,63 @@ import {
   Award,
   BarChart3,
   Loader2,
-} from 'lucide-react';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 // Level info - should match your app's level config
-const LEVEL_INFO: Record<number, { label: string; color: string; bgColor: string; icon: string }> = {
-  1: { label: 'Beginner', color: 'text-gray-400', bgColor: 'bg-gray-500/20', icon: '🌱' },
-  2: { label: 'Apprentice', color: 'text-green-400', bgColor: 'bg-green-500/20', icon: '📈' },
-  3: { label: 'Intermediate', color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: '📊' },
-  4: { label: 'Advanced', color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: '💹' },
-  5: { label: 'Expert', color: 'text-orange-400', bgColor: 'bg-orange-500/20', icon: '🔥' },
-  6: { label: 'Master', color: 'text-red-400', bgColor: 'bg-red-500/20', icon: '⚡' },
-  7: { label: 'Grandmaster', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: '👑' },
-  8: { label: 'Legend', color: 'text-pink-400', bgColor: 'bg-pink-500/20', icon: '🏆' },
+const LEVEL_INFO: Record<
+  number,
+  { label: string; color: string; bgColor: string; icon: string }
+> = {
+  1: {
+    label: "Beginner",
+    color: "text-gray-400",
+    bgColor: "bg-gray-500/20",
+    icon: "🌱",
+  },
+  2: {
+    label: "Apprentice",
+    color: "text-green-400",
+    bgColor: "bg-green-500/20",
+    icon: "📈",
+  },
+  3: {
+    label: "Intermediate",
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/20",
+    icon: "📊",
+  },
+  4: {
+    label: "Advanced",
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/20",
+    icon: "💹",
+  },
+  5: {
+    label: "Expert",
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/20",
+    icon: "🔥",
+  },
+  6: {
+    label: "Master",
+    color: "text-red-400",
+    bgColor: "bg-red-500/20",
+    icon: "⚡",
+  },
+  7: {
+    label: "Grandmaster",
+    color: "text-yellow-400",
+    bgColor: "bg-yellow-500/20",
+    icon: "👑",
+  },
+  8: {
+    label: "Legend",
+    color: "text-pink-400",
+    bgColor: "bg-pink-500/20",
+    icon: "🏆",
+  },
 };
 
 interface ProfileCardStats {
@@ -72,14 +115,20 @@ export default function ProfileCard({
   const getLevelFromTitle = (title?: string): number => {
     if (!title) return 3;
     const titleLower = title.toLowerCase();
-    if (titleLower.includes('beginner') || titleLower.includes('newbie')) return 1;
-    if (titleLower.includes('apprentice')) return 2;
-    if (titleLower.includes('intermediate') || titleLower.includes('trader')) return 3;
-    if (titleLower.includes('advanced') || titleLower.includes('skilled')) return 4;
-    if (titleLower.includes('expert') || titleLower.includes('veteran')) return 5;
-    if (titleLower.includes('master')) return 6;
-    if (titleLower.includes('grandmaster') || titleLower.includes('elite')) return 7;
-    if (titleLower.includes('legend') || titleLower.includes('champion')) return 8;
+    if (titleLower.includes("beginner") || titleLower.includes("newbie"))
+      return 1;
+    if (titleLower.includes("apprentice")) return 2;
+    if (titleLower.includes("intermediate") || titleLower.includes("trader"))
+      return 3;
+    if (titleLower.includes("advanced") || titleLower.includes("skilled"))
+      return 4;
+    if (titleLower.includes("expert") || titleLower.includes("veteran"))
+      return 5;
+    if (titleLower.includes("master")) return 6;
+    if (titleLower.includes("grandmaster") || titleLower.includes("elite"))
+      return 7;
+    if (titleLower.includes("legend") || titleLower.includes("champion"))
+      return 8;
     return 3;
   };
 
@@ -100,7 +149,7 @@ export default function ProfileCard({
             setBio(data.bio || null);
           }
         } catch (error) {
-          console.error('Error fetching profile:', error);
+          console.error("Error fetching profile:", error);
         } finally {
           setLoading(false);
         }
@@ -123,7 +172,7 @@ export default function ProfileCard({
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className="relative w-full max-w-md bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl border border-gray-700/50 shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -166,19 +215,23 @@ export default function ProfileCard({
             {/* User Info */}
             <div className="px-6 pt-4 text-center">
               <h2 className="text-2xl font-bold text-white">{username}</h2>
-              
+
               {/* Title & Level */}
               <div className="flex items-center justify-center gap-2 mt-2">
                 {stats?.userTitle && (
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${stats.userTitleColor || 'text-purple-400'} bg-gray-800/80 border border-gray-700`}>
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-semibold ${stats.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
+                  >
                     {stats.userTitleIcon} {stats.userTitle}
                   </span>
                 )}
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1",
-                  levelInfo.bgColor,
-                  levelInfo.color
-                )}>
+                <span
+                  className={cn(
+                    "px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1",
+                    levelInfo.bgColor,
+                    levelInfo.color,
+                  )}
+                >
                   <span>{levelInfo.icon}</span>
                   {levelInfo.label}
                 </span>
@@ -187,14 +240,20 @@ export default function ProfileCard({
               {/* Rank Badge */}
               {stats?.rank && (
                 <div className="flex justify-center mt-3">
-                  <div className={cn(
-                    "px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2",
-                    stats.rank === 1 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' :
-                    stats.rank === 2 ? 'bg-gray-300/20 text-gray-300 border border-gray-300/50' :
-                    stats.rank === 3 ? 'bg-amber-600/20 text-amber-600 border border-amber-600/50' :
-                    stats.rank <= 10 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50' :
-                    'bg-gray-700/20 text-gray-400 border border-gray-700/50'
-                  )}>
+                  <div
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2",
+                      stats.rank === 1
+                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                        : stats.rank === 2
+                          ? "bg-gray-300/20 text-gray-300 border border-gray-300/50"
+                          : stats.rank === 3
+                            ? "bg-amber-600/20 text-amber-600 border border-amber-600/50"
+                            : stats.rank <= 10
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/50"
+                              : "bg-gray-700/20 text-gray-400 border border-gray-700/50",
+                    )}
+                  >
                     <Trophy className="h-4 w-4" />
                     Rank #{stats.rank}
                   </div>
@@ -221,14 +280,18 @@ export default function ProfileCard({
                 <StatCard
                   icon={<BarChart3 className="h-4 w-4 text-blue-400" />}
                   label="Total Trades"
-                  value={stats?.totalTrades?.toString() || '0'}
+                  value={stats?.totalTrades?.toString() || "0"}
                   color="text-blue-400"
                 />
                 <StatCard
                   icon={<TrendingUp className="h-4 w-4 text-purple-400" />}
                   label="Total P&L"
-                  value={`${(stats?.totalPnl || 0) >= 0 ? '+' : ''}${(stats?.totalPnl || 0).toFixed(0)}`}
-                  color={(stats?.totalPnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                  value={`${(stats?.totalPnl || 0) >= 0 ? "+" : ""}${(stats?.totalPnl || 0).toFixed(0)}`}
+                  color={
+                    (stats?.totalPnl || 0) >= 0
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }
                 />
                 <StatCard
                   icon={<Trophy className="h-4 w-4 text-yellow-400" />}
@@ -245,7 +308,7 @@ export default function ProfileCard({
                 <StatCard
                   icon={<Award className="h-4 w-4 text-pink-400" />}
                   label="Badges"
-                  value={stats?.totalBadges?.toString() || '0'}
+                  value={stats?.totalBadges?.toString() || "0"}
                   color="text-pink-400"
                 />
               </div>
@@ -298,4 +361,3 @@ function StatCard({
     </div>
   );
 }
-

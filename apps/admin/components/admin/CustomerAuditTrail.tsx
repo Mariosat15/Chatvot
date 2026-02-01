@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -21,11 +21,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { 
-  RefreshCw, 
-  Filter, 
-  ChevronDown, 
+} from "@/components/ui/dialog";
+import {
+  RefreshCw,
+  Filter,
+  ChevronDown,
   ChevronUp,
   Clock,
   User,
@@ -40,8 +40,8 @@ import {
   Plus,
   Download,
   ArrowUpDown,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface AuditEntry {
   _id: string;
@@ -91,32 +91,34 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  assignment: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  profile: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  financial: 'bg-green-500/20 text-green-400 border-green-500/30',
-  kyc: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  fraud: 'bg-red-500/20 text-red-400 border-red-500/30',
-  trading: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  restriction: 'bg-red-500/20 text-red-400 border-red-500/30',
-  badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  note: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  other: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  assignment: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  profile: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  financial: "bg-green-500/20 text-green-400 border-green-500/30",
+  kyc: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  fraud: "bg-red-500/20 text-red-400 border-red-500/30",
+  trading: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  restriction: "bg-red-500/20 text-red-400 border-red-500/30",
+  badge: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  note: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  other: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
-export function CustomerAuditTrail({ 
-  customerId, 
+export function CustomerAuditTrail({
+  customerId,
   customerEmail,
   customerName,
-  className = '' 
+  className = "",
 }: CustomerAuditTrailProps) {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [categories, setCategories] = useState<AuditCategory[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(
+    new Set(),
+  );
   const [showAddNote, setShowAddNote] = useState(false);
-  const [noteText, setNoteText] = useState('');
+  const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [page, setPage] = useState(0);
   const limit = 20;
@@ -129,9 +131,9 @@ export function CustomerAuditTrail({
         limit: limit.toString(),
         skip: (page * limit).toString(),
       });
-      
-      if (selectedCategory !== 'all') {
-        params.append('category', selectedCategory);
+
+      if (selectedCategory !== "all") {
+        params.append("category", selectedCategory);
       }
 
       const response = await fetch(`/api/customer-audit?${params}`);
@@ -144,11 +146,11 @@ export function CustomerAuditTrail({
           setCategories(data.categories);
         }
       } else {
-        toast.error(data.error || 'Failed to fetch audit trail');
+        toast.error(data.error || "Failed to fetch audit trail");
       }
     } catch (error) {
-      console.error('Error fetching audit trail:', error);
-      toast.error('Failed to fetch audit trail');
+      console.error("Error fetching audit trail:", error);
+      toast.error("Failed to fetch audit trail");
     } finally {
       setLoading(false);
     }
@@ -160,15 +162,15 @@ export function CustomerAuditTrail({
 
   const handleAddNote = async () => {
     if (!noteText.trim()) {
-      toast.error('Please enter a note');
+      toast.error("Please enter a note");
       return;
     }
 
     try {
       setAddingNote(true);
-      const response = await fetch('/api/customer-audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/customer-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId,
           customerEmail,
@@ -179,15 +181,15 @@ export function CustomerAuditTrail({
 
       const data = await response.json();
       if (data.success) {
-        toast.success('Note added successfully');
-        setNoteText('');
+        toast.success("Note added successfully");
+        setNoteText("");
         setShowAddNote(false);
         fetchAuditTrail();
       } else {
-        toast.error(data.error || 'Failed to add note');
+        toast.error(data.error || "Failed to add note");
       }
     } catch (error) {
-      toast.error('Failed to add note');
+      toast.error("Failed to add note");
     } finally {
       setAddingNote(false);
     }
@@ -205,37 +207,47 @@ export function CustomerAuditTrail({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const exportAuditTrail = () => {
     const csvContent = [
-      ['Date', 'Category', 'Action', 'Description', 'Performed By', 'Role', 'Department'].join(','),
-      ...entries.map(entry => [
-        formatDate(entry.timestamp),
-        entry.actionCategory,
-        entry.action,
-        `"${entry.description.replace(/"/g, '""')}"`,
-        entry.performedBy.employeeName,
-        entry.performedBy.employeeRole,
-        entry.performedBy.department,
-      ].join(','))
-    ].join('\n');
+      [
+        "Date",
+        "Category",
+        "Action",
+        "Description",
+        "Performed By",
+        "Role",
+        "Department",
+      ].join(","),
+      ...entries.map((entry) =>
+        [
+          formatDate(entry.timestamp),
+          entry.actionCategory,
+          entry.action,
+          `"${entry.description.replace(/"/g, '""')}"`,
+          entry.performedBy.employeeName,
+          entry.performedBy.employeeRole,
+          entry.performedBy.department,
+        ].join(","),
+      ),
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `audit-trail-${customerId}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `audit-trail-${customerId}-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Audit trail exported');
+    toast.success("Audit trail exported");
   };
 
   return (
@@ -290,7 +302,7 @@ export function CustomerAuditTrail({
                     onClick={handleAddNote}
                     disabled={addingNote || !noteText.trim()}
                   >
-                    {addingNote ? 'Adding...' : 'Add Note'}
+                    {addingNote ? "Adding..." : "Add Note"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -301,23 +313,34 @@ export function CustomerAuditTrail({
               onClick={fetchAuditTrail}
               disabled={loading}
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
             </Button>
           </div>
         </div>
-        
+
         {/* Filters */}
         <div className="flex items-center gap-4 mt-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400" />
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+            >
               <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700 text-white">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
-                <SelectItem value="all" className="text-white">All Categories</SelectItem>
+                <SelectItem value="all" className="text-white">
+                  All Categories
+                </SelectItem>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id} className="text-white">
+                  <SelectItem
+                    key={cat.id}
+                    value={cat.id}
+                    className="text-white"
+                  >
                     <span className="flex items-center gap-2">
                       {cat.icon} {cat.label}
                     </span>
@@ -328,7 +351,7 @@ export function CustomerAuditTrail({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         {loading && entries.length === 0 ? (
           <div className="flex items-center justify-center py-8">
@@ -338,7 +361,9 @@ export function CustomerAuditTrail({
           <div className="text-center py-8 text-gray-400">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No audit entries found</p>
-            <p className="text-sm mt-1">Actions on this customer will appear here</p>
+            <p className="text-sm mt-1">
+              Actions on this customer will appear here
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -353,10 +378,13 @@ export function CustomerAuditTrail({
                 >
                   <div className="flex items-start gap-3">
                     {/* Category Icon */}
-                    <div className={`p-2 rounded-lg ${CATEGORY_COLORS[entry.actionCategory] || CATEGORY_COLORS.other}`}>
-                      {CATEGORY_ICONS[entry.actionCategory] || CATEGORY_ICONS.other}
+                    <div
+                      className={`p-2 rounded-lg ${CATEGORY_COLORS[entry.actionCategory] || CATEGORY_COLORS.other}`}
+                    >
+                      {CATEGORY_ICONS[entry.actionCategory] ||
+                        CATEGORY_ICONS.other}
                     </div>
-                    
+
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -375,15 +403,21 @@ export function CustomerAuditTrail({
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={`text-xs ${CATEGORY_COLORS[entry.actionCategory] || ''}`}>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${CATEGORY_COLORS[entry.actionCategory] || ""}`}
+                        >
                           {entry.actionCategory}
                         </Badge>
                         <span className="text-xs text-gray-400">
                           by {entry.performedBy.employeeName}
                           {entry.performedBy.isSuperAdmin && (
-                            <Badge variant="outline" className="ml-1 text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">
+                            <Badge
+                              variant="outline"
+                              className="ml-1 text-xs bg-purple-500/10 text-purple-400 border-purple-500/30"
+                            >
                               Super Admin
                             </Badge>
                           )}
@@ -392,49 +426,65 @@ export function CustomerAuditTrail({
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Expanded Details */}
                 {expandedEntries.has(entry._id) && (
                   <div className="px-3 pb-3 pt-0 border-t border-gray-700/50 mt-2">
                     <div className="grid grid-cols-2 gap-4 text-sm pt-3">
                       <div>
-                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Performed By</p>
-                        <p className="text-white">{entry.performedBy.employeeName}</p>
-                        <p className="text-gray-400 text-xs">{entry.performedBy.employeeEmail}</p>
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+                          Performed By
+                        </p>
+                        <p className="text-white">
+                          {entry.performedBy.employeeName}
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          {entry.performedBy.employeeEmail}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Role / Department</p>
-                        <p className="text-white">{entry.performedBy.employeeRole}</p>
-                        <p className="text-gray-400 text-xs">{entry.performedBy.department}</p>
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+                          Role / Department
+                        </p>
+                        <p className="text-white">
+                          {entry.performedBy.employeeRole}
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          {entry.performedBy.department}
+                        </p>
                       </div>
                     </div>
-                    
-                    {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">Details</p>
-                        <div className="bg-gray-900/50 rounded p-2 text-xs">
-                          <pre className="text-gray-300 whitespace-pre-wrap">
-                            {JSON.stringify(entry.metadata, null, 2)}
-                          </pre>
+
+                    {entry.metadata &&
+                      Object.keys(entry.metadata).length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
+                            Details
+                          </p>
+                          <div className="bg-gray-900/50 rounded p-2 text-xs">
+                            <pre className="text-gray-300 whitespace-pre-wrap">
+                              {JSON.stringify(entry.metadata, null, 2)}
+                            </pre>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 )}
               </div>
             ))}
-            
+
             {/* Pagination */}
             {total > limit && (
               <div className="flex items-center justify-between pt-4">
                 <p className="text-sm text-gray-400">
-                  Showing {page * limit + 1} - {Math.min((page + 1) * limit, total)} of {total}
+                  Showing {page * limit + 1} -{" "}
+                  {Math.min((page + 1) * limit, total)} of {total}
                 </p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
                   >
                     Previous
@@ -442,7 +492,7 @@ export function CustomerAuditTrail({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(p => p + 1)}
+                    onClick={() => setPage((p) => p + 1)}
                     disabled={(page + 1) * limit >= total}
                   >
                     Next
@@ -458,4 +508,3 @@ export function CustomerAuditTrail({
 }
 
 export default CustomerAuditTrail;
-

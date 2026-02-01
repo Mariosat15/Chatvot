@@ -4,13 +4,19 @@
  * Documentation: https://massive.com/docs/rest/forex/aggregates/custom-bars
  */
 
-import { ForexSymbol } from './pnl-calculator.service';
+import { ForexSymbol } from "./pnl-calculator.service";
 
 // Disable debug logging in production
-const DEBUG = process.env.NODE_ENV === 'development' && false;
-const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
-const warn = (...args: unknown[]): void => { if (DEBUG) console.warn(...args); };
-const error = (...args: unknown[]): void => { if (DEBUG) console.error(...args); };
+const DEBUG = process.env.NODE_ENV === "development" && false;
+const log = (...args: unknown[]): void => {
+  if (DEBUG) console.log(...args);
+};
+const warn = (...args: unknown[]): void => {
+  if (DEBUG) console.warn(...args);
+};
+const error = (...args: unknown[]): void => {
+  if (DEBUG) console.error(...args);
+};
 
 export interface OHLCCandle {
   time: number; // Unix timestamp in seconds (required by lightweight-charts)
@@ -21,28 +27,42 @@ export interface OHLCCandle {
   volume?: number;
 }
 
-export type Timeframe = '1' | '5' | '15' | '30' | '60' | '120' | '240' | 'D' | 'W' | 'M';
+export type Timeframe =
+  | "1"
+  | "5"
+  | "15"
+  | "30"
+  | "60"
+  | "120"
+  | "240"
+  | "D"
+  | "W"
+  | "M";
 
-const MASSIVE_API_BASE_URL = 'https://api.massive.com';
-const MASSIVE_API_KEY = process.env.NEXT_PUBLIC_MASSIVE_API_KEY || process.env.MASSIVE_API_KEY;
+const MASSIVE_API_BASE_URL = "https://api.massive.com";
+const MASSIVE_API_KEY =
+  process.env.NEXT_PUBLIC_MASSIVE_API_KEY || process.env.MASSIVE_API_KEY;
 
 // Map timeframes to Massive.com format
-const TIMEFRAME_MAP: Record<Timeframe, { multiplier: number; timespan: string }> = {
-  '1': { multiplier: 1, timespan: 'minute' },
-  '5': { multiplier: 5, timespan: 'minute' },
-  '15': { multiplier: 15, timespan: 'minute' },
-  '30': { multiplier: 30, timespan: 'minute' },
-  '60': { multiplier: 1, timespan: 'hour' },
-  '120': { multiplier: 2, timespan: 'hour' },
-  '240': { multiplier: 4, timespan: 'hour' },
-  'D': { multiplier: 1, timespan: 'day' },
-  'W': { multiplier: 1, timespan: 'week' },
-  'M': { multiplier: 1, timespan: 'month' },
+const TIMEFRAME_MAP: Record<
+  Timeframe,
+  { multiplier: number; timespan: string }
+> = {
+  "1": { multiplier: 1, timespan: "minute" },
+  "5": { multiplier: 5, timespan: "minute" },
+  "15": { multiplier: 15, timespan: "minute" },
+  "30": { multiplier: 30, timespan: "minute" },
+  "60": { multiplier: 1, timespan: "hour" },
+  "120": { multiplier: 2, timespan: "hour" },
+  "240": { multiplier: 4, timespan: "hour" },
+  D: { multiplier: 1, timespan: "day" },
+  W: { multiplier: 1, timespan: "week" },
+  M: { multiplier: 1, timespan: "month" },
 };
 
 // Convert our symbol format (EUR/USD) to Massive.com format (C:EURUSD)
 function symbolToMassiveFormat(symbol: ForexSymbol): string {
-  const cleanSymbol = symbol.replace('/', '');
+  const cleanSymbol = symbol.replace("/", "");
   return `C:${cleanSymbol}`;
 }
 
@@ -53,19 +73,19 @@ export async function fetchHistoricalCandles(
   symbol: ForexSymbol,
   timeframe: Timeframe,
   from: Date,
-  to: Date
+  to: Date,
 ): Promise<OHLCCandle[]> {
   if (!MASSIVE_API_KEY) {
-    error('❌ MASSIVE_API_KEY is not set');
-    throw new Error('MASSIVE_API_KEY is required for historical data');
+    error("❌ MASSIVE_API_KEY is not set");
+    throw new Error("MASSIVE_API_KEY is required for historical data");
   }
 
   const ticker = symbolToMassiveFormat(symbol);
   const { multiplier, timespan } = TIMEFRAME_MAP[timeframe];
-  
+
   // Format dates as YYYY-MM-DD
-  const fromDate = from.toISOString().split('T')[0];
-  const toDate = to.toISOString().split('T')[0];
+  const fromDate = from.toISOString().split("T")[0];
+  const toDate = to.toISOString().split("T")[0];
 
   const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromDate}/${toDate}`;
   const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=5000&apiKey=${MASSIVE_API_KEY}`;
@@ -75,13 +95,15 @@ export async function fetchHistoricalCandles(
 
   try {
     const response = await fetch(url, {
-      method: 'GET',
-      next: { revalidate: 60 } // Cache for 1 minute
+      method: "GET",
+      next: { revalidate: 60 }, // Cache for 1 minute
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      error(`❌ Historical data fetch failed: ${response.status} - ${errorText}`);
+      error(
+        `❌ Historical data fetch failed: ${response.status} - ${errorText}`,
+      );
       throw new Error(`Failed to fetch historical data: ${response.status}`);
     }
 
@@ -89,14 +111,16 @@ export async function fetchHistoricalCandles(
 
     // Handle empty response (common when market is closed on weekends)
     if (!data.results || data.results.length === 0) {
-      warn(`⚠️ No historical data available for ${symbol} - market may be closed (weekend)`);
+      warn(
+        `⚠️ No historical data available for ${symbol} - market may be closed (weekend)`,
+      );
       warn(`   Response:`, JSON.stringify(data).substring(0, 200));
       // Return empty array instead of throwing - UI will show "No data available"
       return [];
     }
 
-    if (data.status !== 'OK') {
-      error('❌ Invalid response status from Massive.com:', data.status);
+    if (data.status !== "OK") {
+      error("❌ Invalid response status from Massive.com:", data.status);
       warn(`⚠️ Returning empty data - market may be closed`);
       return [];
     }
@@ -115,7 +139,10 @@ export async function fetchHistoricalCandles(
     log(`✅ Fetched ${candles.length} candles for ${symbol}`);
     return candles;
   } catch (err) {
-    error('❌ Error fetching historical candles:', err instanceof Error ? err.message : 'Unknown error');
+    error(
+      "❌ Error fetching historical candles:",
+      err instanceof Error ? err.message : "Unknown error",
+    );
     // Return empty array on error instead of crashing - more graceful for UI
     warn(`⚠️ Returning empty data due to error - market may be closed`);
     return [];
@@ -125,10 +152,10 @@ export async function fetchHistoricalCandles(
 /**
  * Fetch candles for an EXACT time range using millisecond timestamps
  * This is designed for gap filling - fetches only the specific period needed
- * 
+ *
  * Based on Massive.com Custom Bars API:
  * GET /v2/aggs/ticker/{forexTicker}/range/{multiplier}/{timespan}/{from}/{to}
- * 
+ *
  * According to docs:
  * - from/to accept millisecond timestamps
  * - Basic plan: 2 years history
@@ -139,61 +166,74 @@ export async function fetchCandlesForRange(
   symbol: ForexSymbol,
   timeframe: Timeframe,
   fromTimestampMs: number,
-  toTimestampMs: number
+  toTimestampMs: number,
 ): Promise<OHLCCandle[]> {
   if (!MASSIVE_API_KEY) {
-    console.error('❌ MASSIVE_API_KEY is not set');
+    console.error("❌ MASSIVE_API_KEY is not set");
     return [];
   }
 
   const ticker = symbolToMassiveFormat(symbol);
   const { multiplier, timespan } = TIMEFRAME_MAP[timeframe];
-  
+
   // Use millisecond timestamps for precise range queries
   const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromTimestampMs}/${toTimestampMs}`;
   const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
 
-  console.log(`📊 [Gap Fill] Fetching ${symbol} candles from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+  console.log(
+    `📊 [Gap Fill] Fetching ${symbol} candles from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`,
+  );
 
   try {
     const response = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store' // Don't cache gap fill requests
+      method: "GET",
+      cache: "no-store", // Don't cache gap fill requests
     });
 
     if (!response.ok) {
-      console.error(`❌ [Gap Fill] API error: ${response.status} ${response.statusText}`);
+      console.error(
+        `❌ [Gap Fill] API error: ${response.status} ${response.statusText}`,
+      );
       return [];
     }
 
     const data = await response.json();
-    
+
     if (!data.results || data.results.length === 0) {
-      console.log(`⚠️ [Gap Fill] No data available for ${symbol} in requested range`);
+      console.log(
+        `⚠️ [Gap Fill] No data available for ${symbol} in requested range`,
+      );
       return [];
     }
 
     // Convert to our format - Massive returns time in milliseconds
-    const candles: OHLCCandle[] = data.results.map((bar: {
-      t: number;
-      o: number;
-      h: number;
-      l: number;
-      c: number;
-      v?: number;
-    }) => ({
-      time: bar.t, // Keep in milliseconds, caller will convert if needed
-      open: bar.o,
-      high: bar.h,
-      low: bar.l,
-      close: bar.c,
-      volume: bar.v || 0,
-    }));
+    const candles: OHLCCandle[] = data.results.map(
+      (bar: {
+        t: number;
+        o: number;
+        h: number;
+        l: number;
+        c: number;
+        v?: number;
+      }) => ({
+        time: bar.t, // Keep in milliseconds, caller will convert if needed
+        open: bar.o,
+        high: bar.h,
+        low: bar.l,
+        close: bar.c,
+        volume: bar.v || 0,
+      }),
+    );
 
-    console.log(`✅ [Gap Fill] Fetched ${candles.length} candles for ${symbol}`);
+    console.log(
+      `✅ [Gap Fill] Fetched ${candles.length} candles for ${symbol}`,
+    );
     return candles;
   } catch (err) {
-    console.error('❌ [Gap Fill] Error:', err instanceof Error ? err.message : 'Unknown error');
+    console.error(
+      "❌ [Gap Fill] Error:",
+      err instanceof Error ? err.message : "Unknown error",
+    );
     return [];
   }
 }
@@ -207,41 +247,41 @@ export async function getRecentCandles(
   symbol: ForexSymbol,
   timeframe: Timeframe,
   bars: number = 300,
-  maxDaysBack?: number
+  maxDaysBack?: number,
 ): Promise<OHLCCandle[]> {
   const now = new Date();
   const from = new Date(now);
 
   // Calculate how far back to fetch based on timeframe and desired bar count
   switch (timeframe) {
-    case '1':
+    case "1":
       from.setHours(from.getHours() - Math.ceil(bars / 60)); // bars in minutes
       break;
-    case '5':
+    case "5":
       from.setHours(from.getHours() - Math.ceil((bars * 5) / 60));
       break;
-    case '15':
+    case "15":
       from.setHours(from.getHours() - Math.ceil((bars * 15) / 60));
       break;
-    case '30':
+    case "30":
       from.setHours(from.getHours() - Math.ceil((bars * 30) / 60));
       break;
-    case '60':
+    case "60":
       from.setHours(from.getHours() - bars);
       break;
-    case '120':
+    case "120":
       from.setHours(from.getHours() - bars * 2);
       break;
-    case '240':
+    case "240":
       from.setHours(from.getHours() - bars * 4);
       break;
-    case 'D':
+    case "D":
       from.setDate(from.getDate() - bars);
       break;
-    case 'W':
+    case "W":
       from.setDate(from.getDate() - bars * 7);
       break;
-    case 'M':
+    case "M":
       from.setMonth(from.getMonth() - bars);
       break;
   }
@@ -250,50 +290,52 @@ export async function getRecentCandles(
   // If maxDaysBack is provided from admin settings, use that
   // Otherwise use default limits per timeframe
   const minDaysBack = new Date(now);
-  
+
   if (maxDaysBack && maxDaysBack > 0) {
     // Use admin-configured limit (applies to all timeframes)
     minDaysBack.setDate(minDaysBack.getDate() - maxDaysBack);
   } else {
     // Default limits per timeframe (backwards compatibility)
     switch (timeframe) {
-      case '1':
-      case '5':
-      case '15':
-      case '30':
+      case "1":
+      case "5":
+      case "15":
+      case "30":
         // Intraday: Default 2 days back
         minDaysBack.setDate(minDaysBack.getDate() - 2);
         break;
-      case '60':
-      case '120':
+      case "60":
+      case "120":
         // 1h/2h: Default 7 days back
         minDaysBack.setDate(minDaysBack.getDate() - 7);
         break;
-      case '240':
+      case "240":
         // 4h: Default 30 days back
         minDaysBack.setDate(minDaysBack.getDate() - 30);
         break;
-      case 'D':
+      case "D":
         // Daily: Default 2 years back
         minDaysBack.setDate(minDaysBack.getDate() - 730);
         break;
-      case 'W':
+      case "W":
         // Weekly: Default 5 years back
         minDaysBack.setDate(minDaysBack.getDate() - 1825);
         break;
-      case 'M':
+      case "M":
         // Monthly: Default 10 years back
         minDaysBack.setDate(minDaysBack.getDate() - 3650);
         break;
     }
   }
-  
+
   // Don't fetch older than the minimum for this timeframe
   if (from < minDaysBack) {
     from.setTime(minDaysBack.getTime());
   }
 
-  log(`📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe}, maxDays=${maxDaysBack || 'default'})`);
+  log(
+    `📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe}, maxDays=${maxDaysBack || "default"})`,
+  );
   return fetchHistoricalCandles(symbol, timeframe, from, now);
 }
 
@@ -304,12 +346,11 @@ export async function getRecentCandles(
 export function priceToCandle(
   bid: number,
   ask: number,
-  timestamp: number
-): Pick<OHLCCandle, 'time' | 'close'> {
+  timestamp: number,
+): Pick<OHLCCandle, "time" | "close"> {
   const mid = (bid + ask) / 2;
   return {
     time: Math.floor(timestamp / 1000), // Convert to seconds
     close: Number(mid.toFixed(5)),
   };
 }
-

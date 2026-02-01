@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
-const DEFAULT_PROFILE_IMAGE = '/assets/images/PROFILE.png';
+const DEFAULT_PROFILE_IMAGE = "/assets/images/PROFILE.png";
 
 /**
  * Hook to fetch and manage the current user's profile image and frame
@@ -15,10 +15,10 @@ export function useUserProfileImage() {
 
   const fetchProfileImage = useCallback(async () => {
     try {
-      const response = await fetch('/api/user/profile', {
-        cache: 'no-store',
+      const response = await fetch("/api/user/profile", {
+        cache: "no-store",
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         const userImage = data.user?.profileImage || data.profileImage;
@@ -30,7 +30,7 @@ export function useUserProfileImage() {
         setFrameUrl(null);
       }
     } catch (error) {
-      console.error('Failed to fetch user profile image:', error);
+      console.error("Failed to fetch user profile image:", error);
       setProfileImage(null);
       setFrameUrl(null);
     } finally {
@@ -45,13 +45,12 @@ export function useUserProfileImage() {
   // Return the actual image or default if none exists
   const displayImage = profileImage || DEFAULT_PROFILE_IMAGE;
 
-  return { 
-    profileImage: displayImage, 
+  return {
+    profileImage: displayImage,
     frameUrl,
     hasCustomImage: !!profileImage,
     hasFrame: !!frameUrl,
-    loading, 
-    refresh: fetchProfileImage 
+    loading,
+    refresh: fetchProfileImage,
   };
 }
-

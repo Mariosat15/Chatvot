@@ -1,15 +1,21 @@
 /**
  * Performance Simulator Service
- * 
+ *
  * Orchestrates comprehensive load testing and performance simulation
  * for the trading platform.
  */
 
-import { Types } from 'mongoose';
-import os from 'os';
-import SimulatorConfig, { ISimulatorConfig } from '../../../database/models/simulator/simulator-config.model';
-import SimulatorRun, { ISimulatorRun, ITestCaseResult, IHardwareMetrics, TestStatus } from '../../../database/models/simulator/simulator-run.model';
-import { connectToDatabase } from '../../../database/mongoose';
+import { Types } from "mongoose";
+import os from "os";
+import SimulatorConfig, {
+  ISimulatorConfig,
+} from "../../../database/models/simulator/simulator-config.model";
+import SimulatorRun, {
+  ISimulatorRun,
+  IHardwareMetrics,
+  TestStatus,
+} from "../../../database/models/simulator/simulator-run.model";
+import { connectToDatabase } from "../../../database/mongoose";
 
 // Test case definition
 interface TestCase {
@@ -47,8 +53,17 @@ interface SimulationContext {
   testCompetitions: { id: string; name: string; type: string }[];
   testChallenges: { id: string; challengerId: string; challengedId: string }[];
   adminToken?: string;
-  log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, details?: Record<string, unknown>) => void;
-  updateProgress: (phase: string, step: number, total: number, message: string) => Promise<void>;
+  log: (
+    level: "info" | "warn" | "error" | "debug",
+    message: string,
+    details?: Record<string, unknown>,
+  ) => void;
+  updateProgress: (
+    phase: string,
+    step: number,
+    total: number,
+    message: string,
+  ) => Promise<void>;
   aiGeneratePattern?: (type: string) => Promise<Record<string, unknown>>;
 }
 
@@ -65,10 +80,10 @@ let activeSimulation: {
 const TEST_CASES: TestCase[] = [
   // ========== USER LIFECYCLE ==========
   {
-    id: 'user-registration',
-    category: 'User Lifecycle',
-    name: 'User Registration',
-    description: 'Test user registration with varying loads',
+    id: "user-registration",
+    category: "User Lifecycle",
+    name: "User Registration",
+    description: "Test user registration with varying loads",
     run: async (ctx) => {
       const results: TestCaseRunResult = {
         success: true,
@@ -79,61 +94,95 @@ const TEST_CASES: TestCase[] = [
         createdIds: { users: [] },
       };
 
-      ctx.log('info', `Starting registration of ${ctx.config.virtualUsers} virtual users`);
-      
+      ctx.log(
+        "info",
+        `Starting registration of ${ctx.config.virtualUsers} virtual users`,
+      );
+
       // Check if concurrent mode is enabled
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
-      
+
       // Log the mode for debugging
-      console.log(`🔧 [SIMULATOR] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`);
-      console.log(`🔧 [SIMULATOR] Config concurrentBatchSize: ${ctx.config.concurrentBatchSize}, resolved: ${concurrentBatchSize}`);
+      console.log(
+        `🔧 [SIMULATOR] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`,
+      );
+      console.log(
+        `🔧 [SIMULATOR] Config concurrentBatchSize: ${ctx.config.concurrentBatchSize}, resolved: ${concurrentBatchSize}`,
+      );
 
       if (concurrentMode) {
         // ⚡ CONCURRENT MODE: Fire all requests in parallel batches
-        console.log(`🚀 [SIMULATOR] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`);
-        ctx.log('info', `🚀 CONCURRENT MODE: Running ${concurrentBatchSize} parallel requests`);
-        
-        const allUserBatches: { email: string; password: string; name: string }[][] = [];
+        console.log(
+          `🚀 [SIMULATOR] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`,
+        );
+        ctx.log(
+          "info",
+          `🚀 CONCURRENT MODE: Running ${concurrentBatchSize} parallel requests`,
+        );
+
+        const allUserBatches: {
+          email: string;
+          password: string;
+          name: string;
+        }[][] = [];
         const batchSize = Math.min(20, ctx.config.virtualUsers);
-        
+
         // Prepare all batches
         for (let i = 0; i < ctx.config.virtualUsers; i += batchSize) {
           const batch = [];
-          for (let j = i; j < Math.min(i + batchSize, ctx.config.virtualUsers); j++) {
+          for (
+            let j = i;
+            j < Math.min(i + batchSize, ctx.config.virtualUsers);
+            j++
+          ) {
             batch.push({
               email: `simuser_${Date.now()}_${j}@test.simulator`,
-              password: 'SimTest123!',
+              password: "SimTest123!",
               name: `Sim User ${j}`,
             });
           }
           allUserBatches.push(batch);
         }
-        
+
         // Process in concurrent waves
-        for (let wave = 0; wave < allUserBatches.length; wave += concurrentBatchSize) {
-          const waveBatches = allUserBatches.slice(wave, wave + concurrentBatchSize);
-          
+        for (
+          let wave = 0;
+          wave < allUserBatches.length;
+          wave += concurrentBatchSize
+        ) {
+          const waveBatches = allUserBatches.slice(
+            wave,
+            wave + concurrentBatchSize,
+          );
+
           const promises = waveBatches.map(async (batchUsers) => {
             const start = Date.now();
             const url = `${ctx.baseUrl}/api/simulator/users`;
-            
+
             try {
               const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Simulator-Mode": "true",
+                },
                 body: JSON.stringify({ batch: batchUsers }),
               });
-              
+
               const elapsed = Date.now() - start;
               results.responseTimes.push(elapsed);
-              
+
               if (response.ok) {
                 const data = await response.json();
                 if (data.users && Array.isArray(data.users)) {
                   for (const userResult of data.users) {
                     if (userResult.success && userResult.userId) {
-                      ctx.testUsers.push({ id: userResult.userId, email: userResult.email, password: 'SimTest123!' });
+                      ctx.testUsers.push({
+                        id: userResult.userId,
+                        email: userResult.email,
+                        password: "SimTest123!",
+                      });
                       results.createdIds!.users!.push(userResult.userId);
                       results.successCount++;
                     } else {
@@ -144,19 +193,24 @@ const TEST_CASES: TestCase[] = [
               } else {
                 results.failureCount += batchUsers.length;
               }
-            } catch (error) {
+            } catch {
               results.failureCount += batchUsers.length;
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           // Fire all requests in this wave concurrently
           await Promise.all(promises);
-          
-          await ctx.updateProgress('User Registration (Concurrent)', 
-            Math.min((wave + concurrentBatchSize) * 20, ctx.config.virtualUsers), 
+
+          await ctx.updateProgress(
+            "User Registration (Concurrent)",
+            Math.min(
+              (wave + concurrentBatchSize) * 20,
+              ctx.config.virtualUsers,
+            ),
             ctx.config.virtualUsers,
-            `Registered ${results.successCount} users (${results.failureCount} failed)`);
+            `Registered ${results.successCount} users (${results.failureCount} failed)`,
+          );
         }
       } else {
         // SEQUENTIAL MODE (original behavior)
@@ -165,33 +219,38 @@ const TEST_CASES: TestCase[] = [
 
         for (let batch = 0; batch < batches; batch++) {
           const startIdx = batch * batchSize;
-          const endIdx = Math.min(startIdx + batchSize, ctx.config.virtualUsers);
+          const endIdx = Math.min(
+            startIdx + batchSize,
+            ctx.config.virtualUsers,
+          );
 
           // Create batch of users
           const batchUsers = [];
           for (let i = startIdx; i < endIdx; i++) {
             batchUsers.push({
               email: `simuser_${Date.now()}_${i}@test.simulator`,
-              password: 'SimTest123!',
+              password: "SimTest123!",
               name: `Sim User ${i}`,
             });
           }
 
           const start = Date.now();
           const url = `${ctx.baseUrl}/api/simulator/users`;
-          console.log(`🧪 [SIMULATOR] Calling ${url} with ${batchUsers.length} users`);
-          
+          console.log(
+            `🧪 [SIMULATOR] Calling ${url} with ${batchUsers.length} users`,
+          );
+
           try {
             // Use the dedicated simulator users endpoint
             const response = await fetch(url, {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
-                'X-Simulator-Mode': 'true',
+                "Content-Type": "application/json",
+                "X-Simulator-Mode": "true",
               },
               body: JSON.stringify({ batch: batchUsers }),
             });
-            
+
             console.log(`🧪 [SIMULATOR] Response status: ${response.status}`);
 
             const elapsed = Date.now() - start;
@@ -199,14 +258,14 @@ const TEST_CASES: TestCase[] = [
 
             if (response.ok) {
               const data = await response.json();
-              
+
               if (data.users && Array.isArray(data.users)) {
                 for (const userResult of data.users) {
                   if (userResult.success && userResult.userId) {
                     ctx.testUsers.push({
                       id: userResult.userId,
                       email: userResult.email,
-                      password: 'SimTest123!',
+                      password: "SimTest123!",
                     });
                     results.createdIds!.users!.push(userResult.userId);
                     results.successCount++;
@@ -217,39 +276,58 @@ const TEST_CASES: TestCase[] = [
               }
             } else {
               const errorData = await response.text();
-              console.log(`🧪 [SIMULATOR] Batch failed: ${response.status} - ${errorData}`);
-              ctx.log('error', `Batch registration failed: ${errorData}`);
+              console.log(
+                `🧪 [SIMULATOR] Batch failed: ${response.status} - ${errorData}`,
+              );
+              ctx.log("error", `Batch registration failed: ${errorData}`);
               results.failureCount += batchUsers.length;
             }
           } catch (error) {
             console.log(`🧪 [SIMULATOR] Fetch error:`, error);
-            ctx.log('error', `Registration error: ${error instanceof Error ? error.message : 'Unknown'}`);
+            ctx.log(
+              "error",
+              `Registration error: ${error instanceof Error ? error.message : "Unknown"}`,
+            );
             results.failureCount += batchUsers.length;
             results.responseTimes.push(Date.now() - start);
           }
 
-          await ctx.updateProgress('User Registration', endIdx, ctx.config.virtualUsers, 
-            `Registered ${results.successCount} users (${results.failureCount} failed)`);
+          await ctx.updateProgress(
+            "User Registration",
+            endIdx,
+            ctx.config.virtualUsers,
+            `Registered ${results.successCount} users (${results.failureCount} failed)`,
+          );
 
           // Rate limiting delay between batches
           if (ctx.config.userRegistrationRate > 0 && batch < batches - 1) {
-            await sleep(Math.max(100, 1000 / ctx.config.userRegistrationRate * batchSize));
+            await sleep(
+              Math.max(
+                100,
+                (1000 / ctx.config.userRegistrationRate) * batchSize,
+              ),
+            );
           }
         }
       }
 
-      results.success = results.successCount > 0 && results.failureCount < results.iterations * 0.5;
-      ctx.log('info', `Registration complete: ${results.successCount} succeeded, ${results.failureCount} failed`);
+      results.success =
+        results.successCount > 0 &&
+        results.failureCount < results.iterations * 0.5;
+      ctx.log(
+        "info",
+        `Registration complete: ${results.successCount} succeeded, ${results.failureCount} failed`,
+      );
       return results;
     },
   },
 
   {
-    id: 'user-login',
-    category: 'User Lifecycle',
-    name: 'User Login',
-    description: 'Test user authentication under load',
-    dependencies: ['user-registration'],
+    id: "user-login",
+    category: "User Lifecycle",
+    name: "User Login",
+    description: "Test user authentication under load",
+    dependencies: ["user-registration"],
     run: async (ctx) => {
       const results: TestCaseRunResult = {
         success: true,
@@ -260,34 +338,42 @@ const TEST_CASES: TestCase[] = [
       };
 
       if (ctx.testUsers.length === 0) {
-        ctx.log('warn', 'No test users to authenticate');
+        ctx.log("warn", "No test users to authenticate");
         results.success = true; // Skip if no users
         return results;
       }
 
-      ctx.log('info', `Testing login for ${ctx.testUsers.length} users`);
+      ctx.log("info", `Testing login for ${ctx.testUsers.length} users`);
 
       // Since users were created via better-auth, they are already "logged in"
       // We'll mark them as authenticated and skip actual login calls
       // This avoids issues with session management during load testing
-      
+
       for (let i = 0; i < ctx.testUsers.length; i++) {
         const start = Date.now();
         const user = ctx.testUsers[i];
-        
+
         // Mark user as authenticated (already done during registration)
         user.token = `simulator_token_${user.id}`;
         results.successCount++;
         results.responseTimes.push(Date.now() - start);
 
         if (i % 50 === 0) {
-          await ctx.updateProgress('User Login', i, ctx.testUsers.length, 
-            `Verified ${i} user authentications`);
+          await ctx.updateProgress(
+            "User Login",
+            i,
+            ctx.testUsers.length,
+            `Verified ${i} user authentications`,
+          );
         }
       }
 
-      await ctx.updateProgress('User Login', ctx.testUsers.length, ctx.testUsers.length, 
-        `All ${ctx.testUsers.length} users authenticated`);
+      await ctx.updateProgress(
+        "User Login",
+        ctx.testUsers.length,
+        ctx.testUsers.length,
+        `All ${ctx.testUsers.length} users authenticated`,
+      );
 
       results.success = true;
       return results;
@@ -296,11 +382,11 @@ const TEST_CASES: TestCase[] = [
 
   // ========== DEPOSITS & PAYMENTS ==========
   {
-    id: 'deposit-simulation',
-    category: 'Payments',
-    name: 'Deposit Simulation',
-    description: 'Simulate credit purchases/deposits',
-    dependencies: ['user-registration'],
+    id: "deposit-simulation",
+    category: "Payments",
+    name: "Deposit Simulation",
+    description: "Simulate credit purchases/deposits",
+    dependencies: ["user-registration"],
     run: async (ctx) => {
       const results: TestCaseRunResult = {
         success: true,
@@ -311,7 +397,7 @@ const TEST_CASES: TestCase[] = [
         createdIds: { transactions: [] },
       };
 
-      ctx.log('info', `Simulating deposits for ${ctx.testUsers.length} users`);
+      ctx.log("info", `Simulating deposits for ${ctx.testUsers.length} users`);
 
       const amounts = [500, 1000, 2000, 5000];
       const concurrentMode = ctx.config.concurrentMode || false;
@@ -321,20 +407,27 @@ const TEST_CASES: TestCase[] = [
         // ⚡ CONCURRENT MODE
         for (let i = 0; i < ctx.testUsers.length; i += concurrentBatchSize) {
           const batch = ctx.testUsers.slice(i, i + concurrentBatchSize);
-          
+
           const promises = batch.map(async (user) => {
             const amount = amounts[Math.floor(Math.random() * amounts.length)];
             const start = Date.now();
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/deposit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
-                body: JSON.stringify({ userId: user.id, amount }),
-              });
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/deposit`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify({ userId: user.id, amount }),
+                },
+              );
               results.responseTimes.push(Date.now() - start);
               if (response.ok) {
                 const data = await response.json();
-                if (data.transactionId) results.createdIds!.transactions!.push(data.transactionId);
+                if (data.transactionId)
+                  results.createdIds!.transactions!.push(data.transactionId);
                 results.successCount++;
               } else {
                 results.failureCount++;
@@ -344,9 +437,14 @@ const TEST_CASES: TestCase[] = [
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          await ctx.updateProgress('Deposits (Concurrent)', Math.min(i + concurrentBatchSize, ctx.testUsers.length), ctx.testUsers.length, `Processed ${results.successCount} deposits`);
+          await ctx.updateProgress(
+            "Deposits (Concurrent)",
+            Math.min(i + concurrentBatchSize, ctx.testUsers.length),
+            ctx.testUsers.length,
+            `Processed ${results.successCount} deposits`,
+          );
         }
       } else {
         // SEQUENTIAL MODE
@@ -355,15 +453,22 @@ const TEST_CASES: TestCase[] = [
           const amount = amounts[Math.floor(Math.random() * amounts.length)];
           const start = Date.now();
           try {
-            const response = await fetch(`${ctx.baseUrl}/api/simulator/deposit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
-              body: JSON.stringify({ userId: user.id, amount }),
-            });
+            const response = await fetch(
+              `${ctx.baseUrl}/api/simulator/deposit`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Simulator-Mode": "true",
+                },
+                body: JSON.stringify({ userId: user.id, amount }),
+              },
+            );
             results.responseTimes.push(Date.now() - start);
             if (response.ok) {
               const data = await response.json();
-              if (data.transactionId) results.createdIds!.transactions!.push(data.transactionId);
+              if (data.transactionId)
+                results.createdIds!.transactions!.push(data.transactionId);
               results.successCount++;
             } else {
               results.failureCount++;
@@ -373,7 +478,12 @@ const TEST_CASES: TestCase[] = [
             results.responseTimes.push(Date.now() - start);
           }
           if (i % 100 === 0) {
-            await ctx.updateProgress('Deposits', i, ctx.testUsers.length, `Processed ${i} deposit requests`);
+            await ctx.updateProgress(
+              "Deposits",
+              i,
+              ctx.testUsers.length,
+              `Processed ${i} deposit requests`,
+            );
           }
         }
       }
@@ -385,10 +495,10 @@ const TEST_CASES: TestCase[] = [
 
   // ========== COMPETITIONS ==========
   {
-    id: 'competition-creation',
-    category: 'Competitions',
-    name: 'Competition Creation',
-    description: 'Create various types of competitions',
+    id: "competition-creation",
+    category: "Competitions",
+    name: "Competition Creation",
+    description: "Create various types of competitions",
     run: async (ctx) => {
       const results: TestCaseRunResult = {
         success: true,
@@ -399,47 +509,66 @@ const TEST_CASES: TestCase[] = [
         createdIds: { competitions: [] },
       };
 
-      ctx.log('info', `Creating ${ctx.config.competitions} competitions`);
+      ctx.log("info", `Creating ${ctx.config.competitions} competitions`);
 
       const types = ctx.config.competitionTypes;
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
       // Prepare all competition data
-      const allCompetitions = Array.from({ length: ctx.config.competitions }, (_, i) => ({
-        index: i,
-        type: types[i % types.length],
-        name: `Sim Competition ${i + 1} - ${types[i % types.length]}`,
-        entryFee: [10, 25, 50, 100][Math.floor(Math.random() * 4)],
-      }));
+      const allCompetitions = Array.from(
+        { length: ctx.config.competitions },
+        (_, i) => ({
+          index: i,
+          type: types[i % types.length],
+          name: `Sim Competition ${i + 1} - ${types[i % types.length]}`,
+          entryFee: [10, 25, 50, 100][Math.floor(Math.random() * 4)],
+        }),
+      );
 
       if (concurrentMode) {
         // ⚡ CONCURRENT MODE
         for (let i = 0; i < allCompetitions.length; i += concurrentBatchSize) {
           const batch = allCompetitions.slice(i, i + concurrentBatchSize);
-          
+
           const promises = batch.map(async (comp) => {
             const start = Date.now();
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/competitions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
-                body: JSON.stringify({
-                  name: comp.name,
-                  description: `Simulator test competition (${comp.type})`,
-                  type: comp.type,
-                  entryFee: comp.entryFee,
-                  maxParticipants: ctx.config.tradersPerCompetition,
-                  startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-                  endDate: new Date(Date.now() + ctx.config.tradingDuration * 60 * 1000 + 10 * 60 * 1000).toISOString(),
-                }),
-              });
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/competitions`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify({
+                    name: comp.name,
+                    description: `Simulator test competition (${comp.type})`,
+                    type: comp.type,
+                    entryFee: comp.entryFee,
+                    maxParticipants: ctx.config.tradersPerCompetition,
+                    startDate: new Date(
+                      Date.now() + 5 * 60 * 1000,
+                    ).toISOString(),
+                    endDate: new Date(
+                      Date.now() +
+                        ctx.config.tradingDuration * 60 * 1000 +
+                        10 * 60 * 1000,
+                    ).toISOString(),
+                  }),
+                },
+              );
               results.responseTimes.push(Date.now() - start);
               if (response.ok) {
                 const data = await response.json();
                 const compId = data.competition?._id || data._id;
                 if (compId) {
-                  ctx.testCompetitions.push({ id: compId, name: comp.name, type: comp.type });
+                  ctx.testCompetitions.push({
+                    id: compId,
+                    name: comp.name,
+                    type: comp.type,
+                  });
                   results.createdIds!.competitions!.push(compId);
                 }
                 results.successCount++;
@@ -451,34 +580,53 @@ const TEST_CASES: TestCase[] = [
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          await ctx.updateProgress('Competition Creation (Concurrent)', Math.min(i + concurrentBatchSize, ctx.config.competitions), ctx.config.competitions, `Created ${results.successCount} competitions`);
+          await ctx.updateProgress(
+            "Competition Creation (Concurrent)",
+            Math.min(i + concurrentBatchSize, ctx.config.competitions),
+            ctx.config.competitions,
+            `Created ${results.successCount} competitions`,
+          );
         }
       } else {
         // SEQUENTIAL MODE
         for (const comp of allCompetitions) {
           const start = Date.now();
           try {
-            const response = await fetch(`${ctx.baseUrl}/api/simulator/competitions`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
-              body: JSON.stringify({
-                name: comp.name,
-                description: `Simulator test competition (${comp.type})`,
-                type: comp.type,
-                entryFee: comp.entryFee,
-                maxParticipants: ctx.config.tradersPerCompetition,
-                startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-                endDate: new Date(Date.now() + ctx.config.tradingDuration * 60 * 1000 + 10 * 60 * 1000).toISOString(),
-              }),
-            });
+            const response = await fetch(
+              `${ctx.baseUrl}/api/simulator/competitions`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Simulator-Mode": "true",
+                },
+                body: JSON.stringify({
+                  name: comp.name,
+                  description: `Simulator test competition (${comp.type})`,
+                  type: comp.type,
+                  entryFee: comp.entryFee,
+                  maxParticipants: ctx.config.tradersPerCompetition,
+                  startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+                  endDate: new Date(
+                    Date.now() +
+                      ctx.config.tradingDuration * 60 * 1000 +
+                      10 * 60 * 1000,
+                  ).toISOString(),
+                }),
+              },
+            );
             results.responseTimes.push(Date.now() - start);
             if (response.ok) {
               const data = await response.json();
               const compId = data.competition?._id || data._id;
               if (compId) {
-                ctx.testCompetitions.push({ id: compId, name: comp.name, type: comp.type });
+                ctx.testCompetitions.push({
+                  id: compId,
+                  name: comp.name,
+                  type: comp.type,
+                });
                 results.createdIds!.competitions!.push(compId);
               }
               results.successCount++;
@@ -489,7 +637,12 @@ const TEST_CASES: TestCase[] = [
             results.failureCount++;
             results.responseTimes.push(Date.now() - start);
           }
-          await ctx.updateProgress('Competition Creation', comp.index + 1, ctx.config.competitions, `Created ${comp.index + 1} competitions`);
+          await ctx.updateProgress(
+            "Competition Creation",
+            comp.index + 1,
+            ctx.config.competitions,
+            `Created ${comp.index + 1} competitions`,
+          );
         }
       }
 
@@ -499,11 +652,15 @@ const TEST_CASES: TestCase[] = [
   },
 
   {
-    id: 'competition-join',
-    category: 'Competitions',
-    name: 'Competition Join',
-    description: 'Users joining competitions',
-    dependencies: ['user-registration', 'competition-creation', 'deposit-simulation'],
+    id: "competition-join",
+    category: "Competitions",
+    name: "Competition Join",
+    description: "Users joining competitions",
+    dependencies: [
+      "user-registration",
+      "competition-creation",
+      "deposit-simulation",
+    ],
     run: async (ctx) => {
       // Each user joins all competitions - realistic for stress test
       const totalJoins = ctx.testUsers.length * ctx.testCompetitions.length;
@@ -515,7 +672,10 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Processing ${totalJoins} competition joins (${ctx.testUsers.length} users × ${ctx.testCompetitions.length} competitions)`);
+      ctx.log(
+        "info",
+        `Processing ${totalJoins} competition joins (${ctx.testUsers.length} users × ${ctx.testCompetitions.length} competitions)`,
+      );
 
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
@@ -532,14 +692,21 @@ const TEST_CASES: TestCase[] = [
         // ⚡ CONCURRENT MODE
         for (let i = 0; i < allJoins.length; i += concurrentBatchSize) {
           const batch = allJoins.slice(i, i + concurrentBatchSize);
-          
+
           const promises = batch.map(async (join) => {
             const start = Date.now();
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/competitions/${join.compId}/join`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': join.userId, 'X-Simulator-Mode': 'true' },
-              });
+              const response = await fetch(
+                `${ctx.baseUrl}/api/competitions/${join.compId}/join`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-User-Id": join.userId,
+                    "X-Simulator-Mode": "true",
+                  },
+                },
+              );
               results.responseTimes.push(Date.now() - start);
               if (response.ok) results.successCount++;
               else results.failureCount++;
@@ -548,9 +715,14 @@ const TEST_CASES: TestCase[] = [
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          await ctx.updateProgress('Competition Join (Concurrent)', Math.min(i + concurrentBatchSize, totalJoins), totalJoins, `${results.successCount} joins completed`);
+          await ctx.updateProgress(
+            "Competition Join (Concurrent)",
+            Math.min(i + concurrentBatchSize, totalJoins),
+            totalJoins,
+            `${results.successCount} joins completed`,
+          );
         }
       } else {
         // SEQUENTIAL MODE
@@ -558,10 +730,17 @@ const TEST_CASES: TestCase[] = [
         for (const join of allJoins) {
           const start = Date.now();
           try {
-            const response = await fetch(`${ctx.baseUrl}/api/competitions/${join.compId}/join`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': join.userId, 'X-Simulator-Mode': 'true' },
-            });
+            const response = await fetch(
+              `${ctx.baseUrl}/api/competitions/${join.compId}/join`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Simulator-User-Id": join.userId,
+                  "X-Simulator-Mode": "true",
+                },
+              },
+            );
             results.responseTimes.push(Date.now() - start);
             if (response.ok) results.successCount++;
             else results.failureCount++;
@@ -571,7 +750,12 @@ const TEST_CASES: TestCase[] = [
           }
           joinCount++;
           if (joinCount % 50 === 0) {
-            await ctx.updateProgress('Competition Join', joinCount, totalJoins, `${joinCount} joins completed`);
+            await ctx.updateProgress(
+              "Competition Join",
+              joinCount,
+              totalJoins,
+              `${joinCount} joins completed`,
+            );
           }
         }
       }
@@ -583,11 +767,11 @@ const TEST_CASES: TestCase[] = [
 
   // ========== CHALLENGES ==========
   {
-    id: 'challenge-creation',
-    category: 'Challenges',
-    name: 'Challenge Creation',
-    description: 'Create 1v1 challenges between users',
-    dependencies: ['user-registration', 'deposit-simulation'],
+    id: "challenge-creation",
+    category: "Challenges",
+    name: "Challenge Creation",
+    description: "Create 1v1 challenges between users",
+    dependencies: ["user-registration", "deposit-simulation"],
     run: async (ctx) => {
       const results: TestCaseRunResult = {
         success: true,
@@ -598,49 +782,58 @@ const TEST_CASES: TestCase[] = [
         createdIds: { challenges: [] },
       };
 
-      ctx.log('info', `Creating ${ctx.config.challenges} challenges`);
+      ctx.log("info", `Creating ${ctx.config.challenges} challenges`);
 
       const stakes = ctx.config.challengeStakes;
-      
+
       // PERFORMANCE FIX: Generate unique challenger/challenged pairs
       // Previous logic: i*2 % length caused duplicate pairs after length/2 iterations
       // New logic: Round-robin pairing that guarantees unique pairs
       const generateUniquePairs = () => {
-        const pairs: Array<{ challengerIdx: number; challengedIdx: number }> = [];
+        const pairs: Array<{ challengerIdx: number; challengedIdx: number }> =
+          [];
         const userCount = ctx.testUsers.length;
-        
+
         // Generate all possible unique pairs (N choose 2)
         for (let a = 0; a < userCount; a++) {
           for (let b = a + 1; b < userCount; b++) {
             pairs.push({ challengerIdx: a, challengedIdx: b });
           }
         }
-        
+
         // Shuffle pairs for randomness
         for (let i = pairs.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
         }
-        
+
         return pairs;
       };
-      
+
       const uniquePairs = generateUniquePairs();
-      const maxChallenges = Math.min(ctx.config.challenges, uniquePairs.length, ctx.testUsers.length - 1);
+      const maxChallenges = Math.min(
+        ctx.config.challenges,
+        uniquePairs.length,
+        ctx.testUsers.length - 1,
+      );
 
       // PERFORMANCE: Use bulk creation for challenges (single DB roundtrip)
       const BULK_BATCH_SIZE = 50; // Process in batches of 50
-      
-      for (let batchStart = 0; batchStart < maxChallenges; batchStart += BULK_BATCH_SIZE) {
+
+      for (
+        let batchStart = 0;
+        batchStart < maxChallenges;
+        batchStart += BULK_BATCH_SIZE
+      ) {
         const batchEnd = Math.min(batchStart + BULK_BATCH_SIZE, maxChallenges);
         const batchChallenges = [];
-        
+
         for (let i = batchStart; i < batchEnd; i++) {
           const pair = uniquePairs[i];
           const challenger = ctx.testUsers[pair.challengerIdx];
           const challenged = ctx.testUsers[pair.challengedIdx];
           const stake = stakes[Math.floor(Math.random() * stakes.length)];
-          
+
           batchChallenges.push({
             challengerId: challenger.id,
             challengedId: challenged.id,
@@ -653,14 +846,17 @@ const TEST_CASES: TestCase[] = [
 
         try {
           // Try bulk endpoint first (much faster)
-          const response = await fetch(`${ctx.baseUrl}/api/simulator/challenges`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-Mode': 'true',
+          const response = await fetch(
+            `${ctx.baseUrl}/api/simulator/challenges`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Simulator-Mode": "true",
+              },
+              body: JSON.stringify({ challenges: batchChallenges }),
             },
-            body: JSON.stringify({ challenges: batchChallenges }),
-          });
+          );
 
           const elapsed = Date.now() - start;
           results.responseTimes.push(elapsed);
@@ -670,39 +866,49 @@ const TEST_CASES: TestCase[] = [
             const created = data.created || 0;
             results.successCount += created;
             results.failureCount += batchChallenges.length - created;
-            
+
             // Track created challenge IDs
             if (data.challenges && Array.isArray(data.challenges)) {
               for (const c of data.challenges) {
-                ctx.testChallenges.push({ 
-                  id: c._id, 
-                  challengerId: c.challengerId, 
-                  challengedId: c.challengedId 
+                ctx.testChallenges.push({
+                  id: c._id,
+                  challengerId: c.challengerId,
+                  challengedId: c.challengedId,
                 });
                 results.createdIds!.challenges!.push(c._id);
               }
             }
           } else {
             // Fallback: create one by one (slower but more compatible)
-            ctx.log('warn', 'Bulk endpoint failed, falling back to individual creation');
+            ctx.log(
+              "warn",
+              "Bulk endpoint failed, falling back to individual creation",
+            );
             for (const c of batchChallenges) {
               const singleStart = Date.now();
               try {
-                const singleResponse = await fetch(`${ctx.baseUrl}/api/challenges`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Simulator-User-Id': c.challengerId,
-                    'X-Simulator-Mode': 'true',
+                const singleResponse = await fetch(
+                  `${ctx.baseUrl}/api/challenges`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "X-Simulator-User-Id": c.challengerId,
+                      "X-Simulator-Mode": "true",
+                    },
+                    body: JSON.stringify(c),
                   },
-                  body: JSON.stringify(c),
-                });
+                );
                 results.responseTimes.push(Date.now() - singleStart);
                 if (singleResponse.ok) {
                   const data = await singleResponse.json();
                   const chalId = data.challenge?._id || data._id;
                   if (chalId) {
-                    ctx.testChallenges.push({ id: chalId, challengerId: c.challengerId, challengedId: c.challengedId });
+                    ctx.testChallenges.push({
+                      id: chalId,
+                      challengerId: c.challengerId,
+                      challengedId: c.challengedId,
+                    });
                     results.createdIds!.challenges!.push(chalId);
                   }
                   results.successCount++;
@@ -719,8 +925,12 @@ const TEST_CASES: TestCase[] = [
           results.responseTimes.push(Date.now() - start);
         }
 
-        await ctx.updateProgress('Challenge Creation', batchEnd, maxChallenges, 
-          `Created ${results.successCount} challenges`);
+        await ctx.updateProgress(
+          "Challenge Creation",
+          batchEnd,
+          maxChallenges,
+          `Created ${results.successCount} challenges`,
+        );
       }
 
       // Update iterations to reflect actual attempts
@@ -732,11 +942,11 @@ const TEST_CASES: TestCase[] = [
 
   // ========== TRADING ==========
   {
-    id: 'trading-execution',
-    category: 'Trading',
-    name: 'Trade Execution',
-    description: 'Execute trades with varying parameters',
-    dependencies: ['user-registration', 'competition-join'],
+    id: "trading-execution",
+    category: "Trading",
+    name: "Trade Execution",
+    description: "Execute trades with varying parameters",
+    dependencies: ["user-registration", "competition-join"],
     run: async (ctx) => {
       const totalTrades = ctx.testUsers.length * ctx.config.tradesPerUser;
       const results: TestCaseRunResult = {
@@ -748,65 +958,95 @@ const TEST_CASES: TestCase[] = [
         createdIds: { positions: [] },
       };
 
-      ctx.log('info', `Executing ${totalTrades} trades`);
+      ctx.log("info", `Executing ${totalTrades} trades`);
 
       // Use correct format with slashes to match FOREX_PAIRS and price cache
-      const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD'];
-      
+      const symbols = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD"];
+
       // Check if concurrent mode is enabled
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
-      
-      console.log(`🔧 [SIMULATOR TRADING] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`);
+
+      console.log(
+        `🔧 [SIMULATOR TRADING] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`,
+      );
 
       if (concurrentMode) {
         // ⚡ CONCURRENT MODE: Prepare all trades then fire in parallel batches
-        console.log(`🚀 [SIMULATOR TRADING] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`);
-        ctx.log('info', `🚀 CONCURRENT MODE: Executing trades with ${concurrentBatchSize} parallel requests`);
-        
+        console.log(
+          `🚀 [SIMULATOR TRADING] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`,
+        );
+        ctx.log(
+          "info",
+          `🚀 CONCURRENT MODE: Executing trades with ${concurrentBatchSize} parallel requests`,
+        );
+
         // Prepare all trade requests
-        const allTradeRequests: { userId: string; symbol: string; side: string; lotSize: string; competitionId?: string; takeProfit?: number; stopLoss?: number }[] = [];
-        
+        const allTradeRequests: {
+          userId: string;
+          symbol: string;
+          side: string;
+          lotSize: string;
+          competitionId?: string;
+          takeProfit?: number;
+          stopLoss?: number;
+        }[] = [];
+
         for (const user of ctx.testUsers) {
           const userComp = ctx.testCompetitions[0];
-          
+
           for (let t = 0; t < ctx.config.tradesPerUser; t++) {
             const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-            const side = Math.random() > 0.5 ? 'long' : 'short';
+            const side = Math.random() > 0.5 ? "long" : "short";
             const lotSize = (Math.random() * 0.9 + 0.1).toFixed(2);
             const hasTPSL = Math.random() < ctx.config.tpSlPercentage / 100;
-            
+
             allTradeRequests.push({
               userId: user.id,
               symbol,
               side,
               lotSize,
               competitionId: userComp?.id,
-              ...(hasTPSL ? { 
-                takeProfit: side === 'long' ? 1.005 : 0.995,
-                stopLoss: side === 'long' ? 0.995 : 1.005 
-              } : {}),
+              ...(hasTPSL
+                ? {
+                    takeProfit: side === "long" ? 1.005 : 0.995,
+                    stopLoss: side === "long" ? 0.995 : 1.005,
+                  }
+                : {}),
             });
           }
         }
-        
+
         // Execute in concurrent waves
-        for (let wave = 0; wave < allTradeRequests.length; wave += concurrentBatchSize) {
-          const waveTrades = allTradeRequests.slice(wave, wave + concurrentBatchSize);
-          
+        for (
+          let wave = 0;
+          wave < allTradeRequests.length;
+          wave += concurrentBatchSize
+        ) {
+          const waveTrades = allTradeRequests.slice(
+            wave,
+            wave + concurrentBatchSize,
+          );
+
           const promises = waveTrades.map(async (tradeParams) => {
             const start = Date.now();
-            
+
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/orders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
-                body: JSON.stringify(tradeParams),
-              });
-              
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/orders`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify(tradeParams),
+                },
+              );
+
               const elapsed = Date.now() - start;
               results.responseTimes.push(elapsed);
-              
+
               if (response.ok) {
                 const data = await response.json();
                 if (data.position?._id) {
@@ -821,13 +1061,15 @@ const TEST_CASES: TestCase[] = [
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          
-          await ctx.updateProgress('Trading (Concurrent)', 
-            Math.min(wave + concurrentBatchSize, totalTrades), 
+
+          await ctx.updateProgress(
+            "Trading (Concurrent)",
+            Math.min(wave + concurrentBatchSize, totalTrades),
             totalTrades,
-            `Executed ${results.successCount + results.failureCount} trades`);
+            `Executed ${results.successCount + results.failureCount} trades`,
+          );
         }
       } else {
         // SEQUENTIAL MODE (original behavior)
@@ -839,38 +1081,48 @@ const TEST_CASES: TestCase[] = [
 
           for (let t = 0; t < ctx.config.tradesPerUser; t++) {
             const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-            const side = Math.random() > 0.5 ? 'long' : 'short';
+            const side = Math.random() > 0.5 ? "long" : "short";
             const lotSize = (Math.random() * 0.9 + 0.1).toFixed(2); // 0.1 to 1.0
 
             // AI-generated trading pattern if enabled
-            let tradeParams: Record<string, unknown> = { symbol, side, lotSize };
+            let tradeParams: Record<string, unknown> = {
+              symbol,
+              side,
+              lotSize,
+            };
             if (ctx.config.useAIPatterns && ctx.aiGeneratePattern) {
-              tradeParams = { ...tradeParams, ...(await ctx.aiGeneratePattern('trade_params')) };
+              tradeParams = {
+                ...tradeParams,
+                ...(await ctx.aiGeneratePattern("trade_params")),
+              };
             }
 
             // Add TP/SL based on config
             const hasTPSL = Math.random() < ctx.config.tpSlPercentage / 100;
             if (hasTPSL) {
-              tradeParams.takeProfit = side === 'long' ? 1.005 : 0.995; // Simplified
-              tradeParams.stopLoss = side === 'long' ? 0.995 : 1.005;
+              tradeParams.takeProfit = side === "long" ? 1.005 : 0.995; // Simplified
+              tradeParams.stopLoss = side === "long" ? 0.995 : 1.005;
             }
 
             const start = Date.now();
 
             try {
               // Use simulator endpoint for order creation
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/orders`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Simulator-Mode': 'true',
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/orders`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify({
+                    userId: user.id,
+                    ...tradeParams,
+                    competitionId: userComp?.id,
+                  }),
                 },
-                body: JSON.stringify({
-                  userId: user.id,
-                  ...tradeParams,
-                  competitionId: userComp?.id,
-                }),
-              });
+              );
 
               const elapsed = Date.now() - start;
               results.responseTimes.push(elapsed);
@@ -891,8 +1143,12 @@ const TEST_CASES: TestCase[] = [
 
             tradeCount++;
             if (tradeCount % 500 === 0) {
-              await ctx.updateProgress('Trading', tradeCount, totalTrades, 
-                `Executed ${tradeCount} trades`);
+              await ctx.updateProgress(
+                "Trading",
+                tradeCount,
+                totalTrades,
+                `Executed ${tradeCount} trades`,
+              );
             }
           }
         }
@@ -904,15 +1160,15 @@ const TEST_CASES: TestCase[] = [
   },
 
   {
-    id: 'tpsl-management',
-    category: 'Trading',
-    name: 'TP/SL Management',
-    description: 'Test modifying take profit and stop loss',
-    dependencies: ['trading-execution'],
+    id: "tpsl-management",
+    category: "Trading",
+    name: "TP/SL Management",
+    description: "Test modifying take profit and stop loss",
+    dependencies: ["trading-execution"],
     run: async (ctx) => {
       // Actual iterations = min(100, users) - fix the mismatch that caused 10% false rate
       const actualIterations = Math.min(100, ctx.testUsers.length);
-      
+
       const results: TestCaseRunResult = {
         success: true,
         iterations: actualIterations, // Must match actual loop iterations
@@ -921,7 +1177,10 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Testing TP/SL modifications on ${actualIterations} users`);
+      ctx.log(
+        "info",
+        `Testing TP/SL modifications on ${actualIterations} users`,
+      );
 
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
@@ -931,26 +1190,43 @@ const TEST_CASES: TestCase[] = [
         // ⚡ CONCURRENT MODE
         for (let i = 0; i < usersToTest.length; i += concurrentBatchSize) {
           const batch = usersToTest.slice(i, i + concurrentBatchSize);
-          
+
           const promises = batch.map(async (user) => {
             const start = Date.now();
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/positions/tpsl`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': user.id, 'X-Simulator-Mode': 'true' },
-                body: JSON.stringify({ userId: user.id, takeProfit: 1.01, stopLoss: 0.99 }),
-              });
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/positions/tpsl`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Simulator-User-Id": user.id,
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify({
+                    userId: user.id,
+                    takeProfit: 1.01,
+                    stopLoss: 0.99,
+                  }),
+                },
+              );
               results.responseTimes.push(Date.now() - start);
-              if (response.ok || response.status === 404) results.successCount++;
+              if (response.ok || response.status === 404)
+                results.successCount++;
               else results.failureCount++;
             } catch {
               results.failureCount++;
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          await ctx.updateProgress('TP/SL Management (Concurrent)', Math.min(i + concurrentBatchSize, actualIterations), actualIterations, `Modified ${results.successCount} positions`);
+          await ctx.updateProgress(
+            "TP/SL Management (Concurrent)",
+            Math.min(i + concurrentBatchSize, actualIterations),
+            actualIterations,
+            `Modified ${results.successCount} positions`,
+          );
         }
       } else {
         // SEQUENTIAL MODE
@@ -958,11 +1234,22 @@ const TEST_CASES: TestCase[] = [
           const user = ctx.testUsers[i];
           const start = Date.now();
           try {
-            const response = await fetch(`${ctx.baseUrl}/api/simulator/positions/tpsl`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': user.id, 'X-Simulator-Mode': 'true' },
-              body: JSON.stringify({ userId: user.id, takeProfit: 1.01, stopLoss: 0.99 }),
-            });
+            const response = await fetch(
+              `${ctx.baseUrl}/api/simulator/positions/tpsl`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Simulator-User-Id": user.id,
+                  "X-Simulator-Mode": "true",
+                },
+                body: JSON.stringify({
+                  userId: user.id,
+                  takeProfit: 1.01,
+                  stopLoss: 0.99,
+                }),
+              },
+            );
             results.responseTimes.push(Date.now() - start);
             if (response.ok || response.status === 404) results.successCount++;
             else results.failureCount++;
@@ -980,11 +1267,11 @@ const TEST_CASES: TestCase[] = [
 
   // ========== ADMIN ACTIONS ==========
   {
-    id: 'admin-payment-approval',
-    category: 'Admin Actions',
-    name: 'Payment Approval',
-    description: 'Admin approving pending payments',
-    dependencies: ['deposit-simulation'],
+    id: "admin-payment-approval",
+    category: "Admin Actions",
+    name: "Payment Approval",
+    description: "Admin approving pending payments",
+    dependencies: ["deposit-simulation"],
     run: async (ctx) => {
       if (!ctx.config.simulateAdminActions) {
         return {
@@ -1004,7 +1291,7 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', 'Admin approving payments');
+      ctx.log("info", "Admin approving payments");
 
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
@@ -1013,15 +1300,25 @@ const TEST_CASES: TestCase[] = [
         // ⚡ CONCURRENT MODE
         for (let i = 0; i < ctx.testUsers.length; i += concurrentBatchSize) {
           const batch = ctx.testUsers.slice(i, i + concurrentBatchSize);
-          
+
           const promises = batch.map(async (user) => {
             const start = Date.now();
             try {
-              const response = await fetch(`${ctx.baseUrl}/api/simulator/payments/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ctx.adminToken || '', 'X-Simulator-Mode': 'true' },
-                body: JSON.stringify({ userId: user.id, simulatorMode: true }),
-              });
+              const response = await fetch(
+                `${ctx.baseUrl}/api/simulator/payments/approve`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Admin-Token": ctx.adminToken || "",
+                    "X-Simulator-Mode": "true",
+                  },
+                  body: JSON.stringify({
+                    userId: user.id,
+                    simulatorMode: true,
+                  }),
+                },
+              );
               results.responseTimes.push(Date.now() - start);
               if (response.ok) results.successCount++;
               else results.failureCount++;
@@ -1030,9 +1327,14 @@ const TEST_CASES: TestCase[] = [
               results.responseTimes.push(Date.now() - start);
             }
           });
-          
+
           await Promise.all(promises);
-          await ctx.updateProgress('Payment Approval (Concurrent)', Math.min(i + concurrentBatchSize, ctx.testUsers.length), ctx.testUsers.length, `Approved ${results.successCount} payments`);
+          await ctx.updateProgress(
+            "Payment Approval (Concurrent)",
+            Math.min(i + concurrentBatchSize, ctx.testUsers.length),
+            ctx.testUsers.length,
+            `Approved ${results.successCount} payments`,
+          );
         }
       } else {
         // SEQUENTIAL MODE
@@ -1040,11 +1342,21 @@ const TEST_CASES: TestCase[] = [
           await sleep(ctx.config.paymentApprovalDelay * 10);
           const start = Date.now();
           try {
-            const response = await fetch(`${ctx.baseUrl}/api/simulator/payments/approve`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ctx.adminToken || '', 'X-Simulator-Mode': 'true' },
-              body: JSON.stringify({ userId: ctx.testUsers[i].id, simulatorMode: true }),
-            });
+            const response = await fetch(
+              `${ctx.baseUrl}/api/simulator/payments/approve`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Admin-Token": ctx.adminToken || "",
+                  "X-Simulator-Mode": "true",
+                },
+                body: JSON.stringify({
+                  userId: ctx.testUsers[i].id,
+                  simulatorMode: true,
+                }),
+              },
+            );
             results.responseTimes.push(Date.now() - start);
             if (response.ok) results.successCount++;
             else results.failureCount++;
@@ -1053,7 +1365,12 @@ const TEST_CASES: TestCase[] = [
             results.responseTimes.push(Date.now() - start);
           }
           if (i % 100 === 0) {
-            await ctx.updateProgress('Payment Approval', i, ctx.testUsers.length, `Approved ${i} payments`);
+            await ctx.updateProgress(
+              "Payment Approval",
+              i,
+              ctx.testUsers.length,
+              `Approved ${i} payments`,
+            );
           }
         }
       }
@@ -1064,11 +1381,11 @@ const TEST_CASES: TestCase[] = [
   },
 
   {
-    id: 'admin-user-management',
-    category: 'Admin Actions',
-    name: 'User Management',
-    description: 'Test ban/unban/suspend operations',
-    dependencies: ['user-registration'],
+    id: "admin-user-management",
+    category: "Admin Actions",
+    name: "User Management",
+    description: "Test ban/unban/suspend operations",
+    dependencies: ["user-registration"],
     run: async (ctx) => {
       if (!ctx.config.simulateAdminActions) {
         return {
@@ -1088,24 +1405,24 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', 'Testing user management actions');
+      ctx.log("info", "Testing user management actions");
 
-      const actions = ['ban', 'suspend', 'unban'];
-      
+      const actions = ["ban", "suspend", "unban"];
+
       for (let i = 0; i < 10; i++) {
         for (const action of actions) {
           if (i >= ctx.testUsers.length) break;
-          
+
           const user = ctx.testUsers[i];
           const start = Date.now();
 
           try {
             // Use simulator endpoint for admin actions
             const response = await fetch(`${ctx.baseUrl}/api/simulator/admin`, {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
-                'X-Simulator-Mode': 'true',
+                "Content-Type": "application/json",
+                "X-Simulator-Mode": "true",
               },
               body: JSON.stringify({
                 action,
@@ -1136,11 +1453,11 @@ const TEST_CASES: TestCase[] = [
 
   // ========== FRAUD DETECTION ==========
   {
-    id: 'fraud-simulation',
-    category: 'Fraud Detection',
-    name: 'Fraud Simulation',
-    description: 'Test fraud detection with suspicious patterns',
-    dependencies: ['user-registration'],
+    id: "fraud-simulation",
+    category: "Fraud Detection",
+    name: "Fraud Simulation",
+    description: "Test fraud detection with suspicious patterns",
+    dependencies: ["user-registration"],
     run: async (ctx) => {
       if (!ctx.config.simulateFraud) {
         return {
@@ -1152,7 +1469,9 @@ const TEST_CASES: TestCase[] = [
         };
       }
 
-      const fraudUserCount = Math.ceil(ctx.testUsers.length * ctx.config.fraudPercentage / 100);
+      const fraudUserCount = Math.ceil(
+        (ctx.testUsers.length * ctx.config.fraudPercentage) / 100,
+      );
       const results: TestCaseRunResult = {
         success: true,
         iterations: fraudUserCount,
@@ -1161,7 +1480,7 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Simulating ${fraudUserCount} fraudulent users`);
+      ctx.log("info", `Simulating ${fraudUserCount} fraudulent users`);
 
       // Simulate multi-accounting (same device fingerprint)
       const sharedFingerprint = `sim_fingerprint_${Date.now()}`;
@@ -1173,17 +1492,17 @@ const TEST_CASES: TestCase[] = [
         try {
           // Use simulator endpoint for fraud testing
           const response = await fetch(`${ctx.baseUrl}/api/simulator/fraud`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-Mode': 'true',
+              "Content-Type": "application/json",
+              "X-Simulator-Mode": "true",
             },
             body: JSON.stringify({
               userId: user.id,
               fingerprintId: sharedFingerprint, // All fraud users share same fingerprint
-              browser: 'SimBrowser',
-              os: 'SimOS',
-              screenResolution: '1920x1080',
+              browser: "SimBrowser",
+              os: "SimOS",
+              screenResolution: "1920x1080",
             }),
           });
 
@@ -1208,10 +1527,10 @@ const TEST_CASES: TestCase[] = [
 
   // ========== HARDWARE STRESS ==========
   {
-    id: 'hardware-cpu-stress',
-    category: 'Hardware Stress',
-    name: 'CPU Stress Test',
-    description: 'Stress test CPU with compute-intensive operations',
+    id: "hardware-cpu-stress",
+    category: "Hardware Stress",
+    name: "CPU Stress Test",
+    description: "Stress test CPU with compute-intensive operations",
     run: async (ctx) => {
       if (!ctx.config.enableHardwareStress) {
         return {
@@ -1231,7 +1550,10 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Running CPU stress at level ${ctx.config.cpuStressLevel}`);
+      ctx.log(
+        "info",
+        `Running CPU stress at level ${ctx.config.cpuStressLevel}`,
+      );
 
       const iterations = ctx.config.cpuStressLevel * 1000;
       const start = Date.now();
@@ -1239,15 +1561,19 @@ const TEST_CASES: TestCase[] = [
       // CPU-intensive calculations
       for (let i = 0; i < iterations; i++) {
         // Simulate complex calculation
-        let result = 0;
+        let _result = 0;
         for (let j = 0; j < 10000; j++) {
-          result += Math.sqrt(j) * Math.sin(j);
+          _result += Math.sqrt(j) * Math.sin(j);
         }
         results.successCount++;
 
         if (i % 100 === 0) {
-          await ctx.updateProgress('CPU Stress', i, iterations, 
-            `Completed ${i} iterations`);
+          await ctx.updateProgress(
+            "CPU Stress",
+            i,
+            iterations,
+            `Completed ${i} iterations`,
+          );
         }
       }
 
@@ -1257,10 +1583,10 @@ const TEST_CASES: TestCase[] = [
   },
 
   {
-    id: 'hardware-memory-stress',
-    category: 'Hardware Stress',
-    name: 'Memory Stress Test',
-    description: 'Test memory allocation and garbage collection',
+    id: "hardware-memory-stress",
+    category: "Hardware Stress",
+    name: "Memory Stress Test",
+    description: "Test memory allocation and garbage collection",
     run: async (ctx) => {
       if (!ctx.config.enableHardwareStress) {
         return {
@@ -1280,7 +1606,10 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Running memory stress at level ${ctx.config.memoryStressLevel}`);
+      ctx.log(
+        "info",
+        `Running memory stress at level ${ctx.config.memoryStressLevel}`,
+      );
 
       const mbToAllocate = ctx.config.memoryStressLevel * 10; // 10-100 MB
       const start = Date.now();
@@ -1293,8 +1622,12 @@ const TEST_CASES: TestCase[] = [
           results.successCount++;
 
           if (i % 10 === 0) {
-            await ctx.updateProgress('Memory Stress', i, mbToAllocate, 
-              `Allocated ${i} MB`);
+            await ctx.updateProgress(
+              "Memory Stress",
+              i,
+              mbToAllocate,
+              `Allocated ${i} MB`,
+            );
           }
         }
 
@@ -1302,7 +1635,8 @@ const TEST_CASES: TestCase[] = [
         arrays.length = 0;
       } catch (error) {
         results.failureCount++;
-        results.errorMessage = error instanceof Error ? error.message : 'Memory allocation failed';
+        results.errorMessage =
+          error instanceof Error ? error.message : "Memory allocation failed";
       }
 
       results.responseTimes.push(Date.now() - start);
@@ -1312,10 +1646,10 @@ const TEST_CASES: TestCase[] = [
   },
 
   {
-    id: 'database-stress',
-    category: 'Hardware Stress',
-    name: 'Database Stress Test',
-    description: 'Test database connection pool and query performance',
+    id: "database-stress",
+    category: "Hardware Stress",
+    name: "Database Stress Test",
+    description: "Test database connection pool and query performance",
     run: async (ctx) => {
       if (!ctx.config.enableHardwareStress) {
         return {
@@ -1336,7 +1670,7 @@ const TEST_CASES: TestCase[] = [
         responseTimes: [],
       };
 
-      ctx.log('info', `Running ${queryCount} database queries`);
+      ctx.log("info", `Running ${queryCount} database queries`);
 
       // Parallel database queries
       const batchSize = 50;
@@ -1344,15 +1678,15 @@ const TEST_CASES: TestCase[] = [
 
       for (let batch = 0; batch < batches; batch++) {
         const promises = [];
-        
+
         for (let i = 0; i < batchSize; i++) {
           promises.push(
             (async () => {
               const start = Date.now();
               try {
                 const response = await fetch(`${ctx.baseUrl}/api/health/db`, {
-                  method: 'GET',
-                  headers: { 'X-Simulator-Mode': 'true' },
+                  method: "GET",
+                  headers: { "X-Simulator-Mode": "true" },
                 });
 
                 const elapsed = Date.now() - start;
@@ -1367,13 +1701,17 @@ const TEST_CASES: TestCase[] = [
                 results.failureCount++;
                 results.responseTimes.push(Date.now() - start);
               }
-            })()
+            })(),
           );
         }
 
         await Promise.all(promises);
-        await ctx.updateProgress('DB Stress', (batch + 1) * batchSize, queryCount, 
-          `Completed ${(batch + 1) * batchSize} queries`);
+        await ctx.updateProgress(
+          "DB Stress",
+          (batch + 1) * batchSize,
+          queryCount,
+          `Completed ${(batch + 1) * batchSize} queries`,
+        );
       }
 
       results.success = results.failureCount < queryCount * 0.1;
@@ -1396,53 +1734,62 @@ function percentile(arr: number[], p: number): number {
  * Sleep helper
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Fetch with automatic retry on transient errors
  * Handles WriteConflict, NetworkTimeout, and other temporary failures
  */
-async function fetchWithRetry(
+async function _fetchWithRetry(
   url: string,
   options: RequestInit,
-  maxRetries = 3
+  maxRetries = 3,
 ): Promise<Response> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
-      
+
       // Retry on server errors that might be transient (502, 503, 504)
-      if (response.status >= 502 && response.status <= 504 && attempt < maxRetries) {
-        console.warn(`⚠️ [Fetch Retry] ${url} returned ${response.status}, attempt ${attempt}/${maxRetries}`);
+      if (
+        response.status >= 502 &&
+        response.status <= 504 &&
+        attempt < maxRetries
+      ) {
+        console.warn(
+          `⚠️ [Fetch Retry] ${url} returned ${response.status}, attempt ${attempt}/${maxRetries}`,
+        );
         await sleep(100 * Math.pow(2, attempt - 1) + Math.random() * 50);
         continue;
       }
-      
+
       return response;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       // Retry on network errors
       if (attempt < maxRetries) {
-        const isNetworkError = lastError.message.includes('fetch') || 
-                               lastError.message.includes('ECONNRESET') ||
-                               lastError.message.includes('socket');
-        
+        const isNetworkError =
+          lastError.message.includes("fetch") ||
+          lastError.message.includes("ECONNRESET") ||
+          lastError.message.includes("socket");
+
         if (isNetworkError) {
-          console.warn(`⚠️ [Fetch Retry] ${url} network error, attempt ${attempt}/${maxRetries}: ${lastError.message}`);
+          console.warn(
+            `⚠️ [Fetch Retry] ${url} network error, attempt ${attempt}/${maxRetries}: ${lastError.message}`,
+          );
           await sleep(100 * Math.pow(2, attempt - 1) + Math.random() * 50);
           continue;
         }
       }
-      
+
       throw lastError;
     }
   }
-  
-  throw lastError || new Error('Unknown fetch error');
+
+  throw lastError || new Error("Unknown fetch error");
 }
 
 /**
@@ -1483,10 +1830,10 @@ class SaveQueue {
           await this.doc!.save();
         } catch (error) {
           // Log but don't throw - simulation should continue
-          console.error('Save error (non-fatal):', error);
+          console.error("Save error (non-fatal):", error);
         } finally {
           this.saving = false;
-          
+
           // If more saves were requested, do one more
           if (this.pendingSave) {
             this.pendingSave = false;
@@ -1551,9 +1898,9 @@ async function collectHardwareMetrics(): Promise<IHardwareMetrics> {
   const cpuUsage = 100 - (totalIdle / totalTick) * 100;
 
   // Try to get MongoDB connection stats
-  let dbMetrics: IHardwareMetrics['database'] = undefined;
+  let dbMetrics: IHardwareMetrics["database"] = undefined;
   try {
-    const mongoose = await import('mongoose');
+    const mongoose = await import("mongoose");
     if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
       const serverStatus = await mongoose.connection.db.admin().serverStatus();
       dbMetrics = {
@@ -1588,23 +1935,23 @@ async function collectHardwareMetrics(): Promise<IHardwareMetrics> {
 export async function startSimulation(
   configId: string,
   baseUrl: string,
-  adminToken?: string
+  adminToken?: string,
 ): Promise<{ runId: string }> {
   await connectToDatabase();
 
   // Check for existing active simulation
   if (activeSimulation) {
-    throw new Error('A simulation is already running');
+    throw new Error("A simulation is already running");
   }
 
   // Load config
   const config = await SimulatorConfig.findById(configId);
   if (!config) {
-    throw new Error('Configuration not found');
+    throw new Error("Configuration not found");
   }
 
   // Apply preset if scale is not custom
-  if (config.scale !== 'custom') {
+  if (config.scale !== "custom") {
     const preset = config.presets[config.scale];
     config.virtualUsers = preset.users;
     config.competitions = preset.competitions;
@@ -1616,20 +1963,20 @@ export async function startSimulation(
   const run = await SimulatorRun.create({
     configId: new Types.ObjectId(configId),
     configSnapshot: config.toObject(),
-    status: 'pending',
+    status: "pending",
     progress: {
-      phase: 'Initializing',
+      phase: "Initializing",
       currentStep: 0,
       totalSteps: TEST_CASES.length,
       percentage: 0,
-      message: 'Preparing simulation...',
+      message: "Preparing simulation...",
     },
-    testCases: TEST_CASES.map(tc => ({
+    testCases: TEST_CASES.map((tc) => ({
       id: tc.id,
       category: tc.category,
       name: tc.name,
       description: tc.description,
-      status: 'pending' as TestStatus,
+      status: "pending" as TestStatus,
       iterations: 0,
       successCount: 0,
       failureCount: 0,
@@ -1652,8 +1999,9 @@ export async function startSimulation(
   };
 
   // Start the simulation in background
-  runSimulation(run, config, baseUrl, adminToken, abortController.signal)
-    .catch(console.error);
+  runSimulation(run, config, baseUrl, adminToken, abortController.signal).catch(
+    console.error,
+  );
 
   return { runId: run._id.toString() };
 }
@@ -1666,7 +2014,7 @@ async function runSimulation(
   config: ISimulatorConfig,
   baseUrl: string,
   adminToken: string | undefined,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<void> {
   // Create save queue to prevent parallel save errors
   const saveQueue = new SaveQueue();
@@ -1712,7 +2060,7 @@ async function runSimulation(
       if (metrics.memory.percentage > run.peakMetrics.maxMemoryUsage) {
         run.peakMetrics.maxMemoryUsage = metrics.memory.percentage;
       }
-      
+
       // Update database peak metrics if available
       if (metrics.database) {
         if (metrics.database.connections > run.peakMetrics.maxDbConnections) {
@@ -1726,16 +2074,19 @@ async function runSimulation(
       // Use debounced save
       saveQueue.save().catch(() => {});
     } catch (error) {
-      console.error('Error collecting hardware metrics:', error);
+      console.error("Error collecting hardware metrics:", error);
     }
   }, 5000); // Every 5 seconds
 
   try {
-    run.status = 'running';
+    run.status = "running";
     run.startTime = new Date();
     await saveQueue.saveNow(); // Force immediate save for status change
 
-    context.log('info', 'Simulation started', { config: config.name, scale: config.scale });
+    context.log("info", "Simulation started", {
+      config: config.name,
+      scale: config.scale,
+    });
 
     // Run test cases
     let completedTests = 0;
@@ -1743,39 +2094,40 @@ async function runSimulation(
 
     for (const testCase of TEST_CASES) {
       if (signal.aborted) {
-        throw new Error('Simulation cancelled');
+        throw new Error("Simulation cancelled");
       }
 
       // Check dependencies
       if (testCase.dependencies) {
-        const depsFailed = testCase.dependencies.some(depId => {
-          const depResult = run.testCases.find(tc => tc.id === depId);
-          return depResult && depResult.status === 'failed';
+        const depsFailed = testCase.dependencies.some((depId) => {
+          const depResult = run.testCases.find((tc) => tc.id === depId);
+          return depResult && depResult.status === "failed";
         });
 
         if (depsFailed) {
-          const tcResult = run.testCases.find(tc => tc.id === testCase.id)!;
-          tcResult.status = 'skipped';
-          tcResult.errorMessage = 'Dependencies failed';
+          const tcResult = run.testCases.find((tc) => tc.id === testCase.id)!;
+          tcResult.status = "skipped";
+          tcResult.errorMessage = "Dependencies failed";
           continue;
         }
       }
 
       // Update test case status
-      const tcResult = run.testCases.find(tc => tc.id === testCase.id)!;
-      tcResult.status = 'running';
+      const tcResult = run.testCases.find((tc) => tc.id === testCase.id)!;
+      tcResult.status = "running";
       tcResult.startTime = new Date();
       await saveQueue.saveNow(); // Immediate save for test case start
 
-      context.log('info', `Starting test: ${testCase.name}`);
+      context.log("info", `Starting test: ${testCase.name}`);
 
       try {
         const result = await testCase.run(context);
 
         // Update test case result
         tcResult.endTime = new Date();
-        tcResult.duration = tcResult.endTime.getTime() - tcResult.startTime!.getTime();
-        tcResult.status = result.success ? 'passed' : 'failed';
+        tcResult.duration =
+          tcResult.endTime.getTime() - tcResult.startTime!.getTime();
+        tcResult.status = result.success ? "passed" : "failed";
         tcResult.iterations = result.iterations;
         tcResult.successCount = result.successCount;
         tcResult.failureCount = result.failureCount;
@@ -1785,13 +2137,18 @@ async function runSimulation(
         // Calculate metrics
         if (result.responseTimes.length > 0) {
           tcResult.metrics = {
-            avgResponseTime: result.responseTimes.reduce((a, b) => a + b, 0) / result.responseTimes.length,
+            avgResponseTime:
+              result.responseTimes.reduce((a, b) => a + b, 0) /
+              result.responseTimes.length,
             minResponseTime: Math.min(...result.responseTimes),
             maxResponseTime: Math.max(...result.responseTimes),
             p95ResponseTime: percentile(result.responseTimes, 95),
             p99ResponseTime: percentile(result.responseTimes, 99),
             throughput: result.iterations / (tcResult.duration / 1000),
-            errorRate: result.iterations > 0 ? (result.failureCount / result.iterations) * 100 : 0,
+            errorRate:
+              result.iterations > 0
+                ? (result.failureCount / result.iterations) * 100
+                : 0,
           };
           allResponseTimes.push(...result.responseTimes);
         }
@@ -1802,7 +2159,9 @@ async function runSimulation(
             run.testDataIds.users.push(...result.createdIds.users);
           }
           if (result.createdIds.competitions) {
-            run.testDataIds.competitions.push(...result.createdIds.competitions);
+            run.testDataIds.competitions.push(
+              ...result.createdIds.competitions,
+            );
           }
           if (result.createdIds.challenges) {
             run.testDataIds.challenges.push(...result.createdIds.challenges);
@@ -1811,7 +2170,9 @@ async function runSimulation(
             run.testDataIds.positions.push(...result.createdIds.positions);
           }
           if (result.createdIds.transactions) {
-            run.testDataIds.transactions.push(...result.createdIds.transactions);
+            run.testDataIds.transactions.push(
+              ...result.createdIds.transactions,
+            );
           }
         }
 
@@ -1825,31 +2186,37 @@ async function runSimulation(
         run.metrics.tradesExecuted = run.testDataIds.positions.length;
         run.metrics.depositsProcessed = run.testDataIds.transactions.length;
 
-        context.log('info', `Completed: ${testCase.name}`, {
+        context.log("info", `Completed: ${testCase.name}`, {
           status: tcResult.status,
           success: result.successCount,
           failed: result.failureCount,
         });
-
       } catch (error) {
         tcResult.endTime = new Date();
-        tcResult.duration = tcResult.endTime.getTime() - tcResult.startTime!.getTime();
-        tcResult.status = 'failed';
-        tcResult.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        tcResult.duration =
+          tcResult.endTime.getTime() - tcResult.startTime!.getTime();
+        tcResult.status = "failed";
+        tcResult.errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         tcResult.errorStack = error instanceof Error ? error.stack : undefined;
 
-        context.log('error', `Failed: ${testCase.name}`, { error: tcResult.errorMessage });
+        context.log("error", `Failed: ${testCase.name}`, {
+          error: tcResult.errorMessage,
+        });
       }
 
       completedTests++;
       run.progress.currentStep = completedTests;
-      run.progress.percentage = Math.round((completedTests / TEST_CASES.length) * 100);
+      run.progress.percentage = Math.round(
+        (completedTests / TEST_CASES.length) * 100,
+      );
       saveQueue.save().catch(() => {}); // Debounced save for progress
     }
 
     // Calculate final aggregate metrics
     if (allResponseTimes.length > 0) {
-      run.metrics.avgResponseTime = allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length;
+      run.metrics.avgResponseTime =
+        allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length;
       run.metrics.minResponseTime = Math.min(...allResponseTimes);
       run.metrics.maxResponseTime = Math.max(...allResponseTimes);
       run.metrics.p95ResponseTime = percentile(allResponseTimes, 95);
@@ -1861,36 +2228,36 @@ async function runSimulation(
       run.metrics.requestsPerSecond = run.metrics.totalRequests / durationSec;
     }
 
-    run.metrics.errorRate = run.metrics.totalRequests > 0
-      ? (run.metrics.failedRequests / run.metrics.totalRequests) * 100
-      : 0;
+    run.metrics.errorRate =
+      run.metrics.totalRequests > 0
+        ? (run.metrics.failedRequests / run.metrics.totalRequests) * 100
+        : 0;
 
-    run.status = 'completed';
+    run.status = "completed";
     run.endTime = new Date();
     run.duration = run.endTime.getTime() - run.startTime!.getTime();
-    run.progress.phase = 'Completed';
+    run.progress.phase = "Completed";
     run.progress.percentage = 100;
-    run.progress.message = 'Simulation completed successfully';
+    run.progress.message = "Simulation completed successfully";
 
-    context.log('info', 'Simulation completed', {
+    context.log("info", "Simulation completed", {
       duration: run.duration,
       totalRequests: run.metrics.totalRequests,
       errorRate: run.metrics.errorRate,
     });
 
-    console.log('🎉 [SIMULATOR] Simulation completed successfully!');
-
+    console.log("🎉 [SIMULATOR] Simulation completed successfully!");
   } catch (error) {
-    run.status = signal.aborted ? 'cancelled' : 'failed';
+    run.status = signal.aborted ? "cancelled" : "failed";
     run.endTime = new Date();
     if (run.startTime) {
       run.duration = run.endTime.getTime() - run.startTime.getTime();
     }
-    run.progress.message = error instanceof Error ? error.message : 'Simulation failed';
+    run.progress.message =
+      error instanceof Error ? error.message : "Simulation failed";
 
-    context.log('error', 'Simulation failed', { error: run.progress.message });
-    console.error('❌ [SIMULATOR] Simulation failed:', run.progress.message);
-
+    context.log("error", "Simulation failed", { error: run.progress.message });
+    console.error("❌ [SIMULATOR] Simulation failed:", run.progress.message);
   } finally {
     // Stop metrics collection
     if (activeSimulation?.metricsInterval) {
@@ -1901,11 +2268,11 @@ async function runSimulation(
     // Cleanup save queue and do final save
     saveQueue.cleanup();
     try {
-      console.log('💾 [SIMULATOR] Saving final state with status:', run.status);
+      console.log("💾 [SIMULATOR] Saving final state with status:", run.status);
       await run.save();
-      console.log('✅ [SIMULATOR] Final save completed');
+      console.log("✅ [SIMULATOR] Final save completed");
     } catch (saveError) {
-      console.error('❌ [SIMULATOR] Final save error:', saveError);
+      console.error("❌ [SIMULATOR] Final save error:", saveError);
     }
   }
 }
@@ -1926,7 +2293,9 @@ export async function stopSimulation(): Promise<void> {
 /**
  * Get simulation status
  */
-export async function getSimulationStatus(runId: string): Promise<ISimulatorRun | null> {
+export async function getSimulationStatus(
+  runId: string,
+): Promise<ISimulatorRun | null> {
   await connectToDatabase();
   return SimulatorRun.findById(runId);
 }
@@ -1944,4 +2313,3 @@ export function isSimulationRunning(): boolean {
 export function getActiveRunId(): string | null {
   return activeSimulation?.runId || null;
 }
-

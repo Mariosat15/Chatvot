@@ -1,4 +1,4 @@
-import { Schema, model, models, type Document, type Model } from 'mongoose';
+import { Schema, model, models, type Document, type Model } from "mongoose";
 
 export interface IEmployeeEmailTemplate extends Document {
   templateId: string;
@@ -35,9 +35,11 @@ const EmployeeEmailTemplateSchema = new Schema<IEmployeeEmailTemplate>(
       type: String,
       required: true,
     },
-    variables: [{
-      type: String,
-    }],
+    variables: [
+      {
+        type: String,
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,
@@ -45,19 +47,25 @@ const EmployeeEmailTemplateSchema = new Schema<IEmployeeEmailTemplate>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export const EmployeeEmailTemplate: Model<IEmployeeEmailTemplate> =
-  (models?.EmployeeEmailTemplate as Model<IEmployeeEmailTemplate>) || 
-  model<IEmployeeEmailTemplate>('EmployeeEmailTemplate', EmployeeEmailTemplateSchema);
+  (models?.EmployeeEmailTemplate as Model<IEmployeeEmailTemplate>) ||
+  model<IEmployeeEmailTemplate>(
+    "EmployeeEmailTemplate",
+    EmployeeEmailTemplateSchema,
+  );
 
 // Default employee email templates
-export const DEFAULT_EMPLOYEE_EMAIL_TEMPLATES: Omit<IEmployeeEmailTemplate, keyof Document>[] = [
+export const DEFAULT_EMPLOYEE_EMAIL_TEMPLATES: Omit<
+  IEmployeeEmailTemplate,
+  keyof Document
+>[] = [
   {
-    templateId: 'employee_welcome',
-    name: 'Employee Welcome & Credentials',
-    subject: 'Welcome to {{companyName}} Admin Panel - Your Login Credentials',
+    templateId: "employee_welcome",
+    name: "Employee Welcome & Credentials",
+    subject: "Welcome to {{companyName}} Admin Panel - Your Login Credentials",
     htmlBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -146,13 +154,23 @@ If you have any questions, please contact the administrator.
 
 Best regards,
 {{companyName}} Team`,
-    variables: ['companyName', 'name', 'role', 'adminUrl', 'email', 'password', 'sections', 'sectionsText', 'year'],
+    variables: [
+      "companyName",
+      "name",
+      "role",
+      "adminUrl",
+      "email",
+      "password",
+      "sections",
+      "sectionsText",
+      "year",
+    ],
     isActive: true,
   },
   {
-    templateId: 'employee_password_reset',
-    name: 'Employee Password Reset',
-    subject: '{{companyName}} Admin - Password Reset',
+    templateId: "employee_password_reset",
+    name: "Employee Password Reset",
+    subject: "{{companyName}} Admin - Password Reset",
     htmlBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -207,13 +225,13 @@ Login URL: {{adminUrl}}
 If you did not request this reset, please contact the administrator immediately.
 
 © {{year}} {{companyName}}`,
-    variables: ['companyName', 'name', 'adminUrl', 'password', 'year'],
+    variables: ["companyName", "name", "adminUrl", "password", "year"],
     isActive: true,
   },
   {
-    templateId: 'employee_account_disabled',
-    name: 'Employee Account Disabled',
-    subject: '{{companyName}} Admin - Account Disabled',
+    templateId: "employee_account_disabled",
+    name: "Employee Account Disabled",
+    subject: "{{companyName}} Admin - Account Disabled",
     htmlBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -251,8 +269,7 @@ If you believe this is an error, please contact the administrator.
 
 Best regards,
 {{companyName}} Team`,
-    variables: ['companyName', 'name', 'year'],
+    variables: ["companyName", "name", "year"],
     isActive: true,
   },
 ];
-

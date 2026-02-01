@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { writeFile, mkdir, access, stat } from 'fs/promises';
-import { constants } from 'fs';
-import path from 'path';
-import sharp from 'sharp';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { writeFile, mkdir, access, stat } from "fs/promises";
+import { constants } from "fs";
+import path from "path";
+import sharp from "sharp";
 
 // Image optimization settings based on cosmetic type
 const IMAGE_SETTINGS = {
@@ -21,95 +21,107 @@ export async function POST(request: NextRequest) {
     await requireAdminAuth();
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const itemSlug = formData.get('slug') as string;
-    const cosmeticType = formData.get('cosmeticType') as string || 'avatar';
+    const file = formData.get("file") as File;
+    const itemSlug = formData.get("slug") as string;
+    const cosmeticType = (formData.get("cosmeticType") as string) || "avatar";
 
-    console.log(`📤 [Marketplace Upload] Received upload for slug: ${itemSlug}, type: ${cosmeticType}, file: ${file?.name}, size: ${file?.size}`);
+    console.log(
+      `📤 [Marketplace Upload] Received upload for slug: ${itemSlug}, type: ${cosmeticType}, file: ${file?.name}, size: ${file?.size}`,
+    );
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       return NextResponse.json(
-        { error: 'File must be an image' },
-        { status: 400 }
+        { error: "File must be an image" },
+        { status: 400 },
       );
     }
 
     // Validate file size (10MB max for input - will be compressed)
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'File size must be less than 10MB' },
-        { status: 400 }
+        { error: "File size must be less than 10MB" },
+        { status: 400 },
       );
     }
 
     // Get optimization settings for this cosmetic type
-    const settings = IMAGE_SETTINGS[cosmeticType as keyof typeof IMAGE_SETTINGS] || IMAGE_SETTINGS.default;
-    
+    const settings =
+      IMAGE_SETTINGS[cosmeticType as keyof typeof IMAGE_SETTINGS] ||
+      IMAGE_SETTINGS.default;
+
     // Generate filename - always output as WebP for best compression
     const timestamp = Date.now();
-    const safeSlug = (itemSlug || 'item').replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+    const safeSlug = (itemSlug || "item")
+      .replace(/[^a-z0-9-]/gi, "-")
+      .toLowerCase();
     const filename = `${cosmeticType}-${safeSlug}-${timestamp}.webp`;
-    
+
     // Create upload directory for marketplace cosmetics
     // Try multiple paths for monorepo compatibility
     const possibleUploadDirs = [
       // Production: /var/www/chartvolt/public/uploads/marketplace
-      path.join('/var/www/chartvolt', 'public', 'uploads', 'marketplace'),
+      path.join("/var/www/chartvolt", "public", "uploads", "marketplace"),
       // Monorepo local dev: from apps/admin up to root's public
-      path.join(process.cwd(), '..', '..', 'public', 'uploads', 'marketplace'),
+      path.join(process.cwd(), "..", "..", "public", "uploads", "marketplace"),
       // Fallback: current app's public folder
-      path.join(process.cwd(), 'public', 'uploads', 'marketplace'),
+      path.join(process.cwd(), "public", "uploads", "marketplace"),
     ];
-    
+
     console.log(`📁 [Marketplace Upload] cwd: ${process.cwd()}`);
-    console.log(`📁 [Marketplace Upload] Trying directories:`, possibleUploadDirs);
-    
+    console.log(
+      `📁 [Marketplace Upload] Trying directories:`,
+      possibleUploadDirs,
+    );
+
     // Find the first writable directory or create it
     let uploadDir: string | null = null;
     for (const dir of possibleUploadDirs) {
       try {
         await mkdir(dir, { recursive: true });
         // Verify we can write to this directory
-        const testFile = path.join(dir, '.write-test');
-        await writeFile(testFile, 'test');
+        const testFile = path.join(dir, ".write-test");
+        await writeFile(testFile, "test");
         // Clean up test file (ignore errors)
-        try { await import('fs/promises').then(fs => fs.unlink(testFile)); } catch {}
+        try {
+          await import("fs/promises").then((fs) => fs.unlink(testFile));
+        } catch {}
         uploadDir = dir;
-        console.log(`✅ [Marketplace Upload] Using writable directory: ${uploadDir}`);
+        console.log(
+          `✅ [Marketplace Upload] Using writable directory: ${uploadDir}`,
+        );
         break;
       } catch (e) {
         console.warn(`❌ [Marketplace Upload] Cannot use directory ${dir}:`, e);
         continue;
       }
     }
-    
+
     if (!uploadDir) {
       console.error(`❌ [Marketplace Upload] No writable directory found!`);
       return NextResponse.json(
-        { error: 'No writable upload directory available' },
-        { status: 500 }
+        { error: "No writable upload directory available" },
+        { status: 500 },
       );
     }
 
     // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const inputBuffer = Buffer.from(bytes);
-    console.log(`📦 [Marketplace Upload] Original size: ${inputBuffer.length} bytes`);
+    console.log(
+      `📦 [Marketplace Upload] Original size: ${inputBuffer.length} bytes`,
+    );
 
     // Optimize image using Sharp
     let optimizedBuffer: Buffer;
     try {
       optimizedBuffer = await sharp(inputBuffer)
         .resize(settings.width, settings.height, {
-          fit: 'inside', // Maintain aspect ratio, fit within bounds
+          fit: "inside", // Maintain aspect ratio, fit within bounds
           withoutEnlargement: true, // Don't upscale small images
         })
         .webp({
@@ -117,11 +129,19 @@ export async function POST(request: NextRequest) {
           effort: 4, // Balance between speed and compression
         })
         .toBuffer();
-      
-      const compressionRatio = ((1 - optimizedBuffer.length / inputBuffer.length) * 100).toFixed(1);
-      console.log(`🗜️ [Marketplace Upload] Optimized: ${inputBuffer.length} → ${optimizedBuffer.length} bytes (${compressionRatio}% smaller)`);
+
+      const compressionRatio = (
+        (1 - optimizedBuffer.length / inputBuffer.length) *
+        100
+      ).toFixed(1);
+      console.log(
+        `🗜️ [Marketplace Upload] Optimized: ${inputBuffer.length} → ${optimizedBuffer.length} bytes (${compressionRatio}% smaller)`,
+      );
     } catch (sharpError) {
-      console.error(`⚠️ [Marketplace Upload] Sharp optimization failed, using original:`, sharpError);
+      console.error(
+        `⚠️ [Marketplace Upload] Sharp optimization failed, using original:`,
+        sharpError,
+      );
       optimizedBuffer = inputBuffer;
     }
 
@@ -129,17 +149,22 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadDir, filename);
     await writeFile(filePath, optimizedBuffer);
     console.log(`💾 [Marketplace Upload] File written to: ${filePath}`);
-    
+
     // Verify the file was written
     try {
       await access(filePath, constants.R_OK);
       const fileStats = await stat(filePath);
-      console.log(`✅ [Marketplace Upload] File verified: ${filePath}, size: ${fileStats.size} bytes`);
+      console.log(
+        `✅ [Marketplace Upload] File verified: ${filePath}, size: ${fileStats.size} bytes`,
+      );
     } catch (verifyError) {
-      console.error(`❌ [Marketplace Upload] File verification failed:`, verifyError);
+      console.error(
+        `❌ [Marketplace Upload] File verification failed:`,
+        verifyError,
+      );
       return NextResponse.json(
-        { error: 'File was not saved correctly' },
-        { status: 500 }
+        { error: "File was not saved correctly" },
+        { status: 500 },
       );
     }
 
@@ -158,13 +183,17 @@ export async function POST(request: NextRequest) {
       compressionRatio: `${((1 - optimizedBuffer.length / inputBuffer.length) * 100).toFixed(1)}%`,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error('❌ [Marketplace Upload] Error:', error);
+    console.error("❌ [Marketplace Upload] Error:", error);
     return NextResponse.json(
-      { error: 'Failed to upload file: ' + (error instanceof Error ? error.message : 'Unknown error') },
-      { status: 500 }
+      {
+        error:
+          "Failed to upload file: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      },
+      { status: 500 },
     );
   }
 }

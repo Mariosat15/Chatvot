@@ -1,18 +1,18 @@
-import mongoose, { Schema, Document, Model, Types } from 'mongoose';
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-export type EmployeeNotificationType = 
-  | 'customer_assigned'
-  | 'customer_unassigned'
-  | 'customer_transferred_in'
-  | 'customer_transferred_out'
-  | 'password_changed'
-  | 'profile_updated'
-  | 'role_changed'
-  | 'sections_updated'
-  | 'account_suspended'
-  | 'account_activated'
-  | 'forced_logout'
-  | 'system_message';
+export type EmployeeNotificationType =
+  | "customer_assigned"
+  | "customer_unassigned"
+  | "customer_transferred_in"
+  | "customer_transferred_out"
+  | "password_changed"
+  | "profile_updated"
+  | "role_changed"
+  | "sections_updated"
+  | "account_suspended"
+  | "account_activated"
+  | "forced_logout"
+  | "system_message";
 
 export interface IEmployeeNotification extends Document {
   employeeId: Types.ObjectId;
@@ -37,25 +37,25 @@ const EmployeeNotificationSchema = new Schema<IEmployeeNotification>(
   {
     employeeId: {
       type: Schema.Types.ObjectId,
-      ref: 'Admin',
+      ref: "Admin",
       required: true,
       index: true,
     },
     type: {
       type: String,
       enum: [
-        'customer_assigned',
-        'customer_unassigned',
-        'customer_transferred_in',
-        'customer_transferred_out',
-        'password_changed',
-        'profile_updated',
-        'role_changed',
-        'sections_updated',
-        'account_suspended',
-        'account_activated',
-        'forced_logout',
-        'system_message',
+        "customer_assigned",
+        "customer_unassigned",
+        "customer_transferred_in",
+        "customer_transferred_out",
+        "password_changed",
+        "profile_updated",
+        "role_changed",
+        "sections_updated",
+        "account_suspended",
+        "account_activated",
+        "forced_logout",
+        "system_message",
       ],
       required: true,
     },
@@ -81,8 +81,8 @@ const EmployeeNotificationSchema = new Schema<IEmployeeNotification>(
   },
   {
     timestamps: true,
-    collection: 'employee_notifications',
-  }
+    collection: "employee_notifications",
+  },
 );
 
 // Index for efficient queries
@@ -90,12 +90,12 @@ EmployeeNotificationSchema.index({ employeeId: 1, isRead: 1, createdAt: -1 });
 EmployeeNotificationSchema.index({ createdAt: -1 });
 
 // Static method to create notification
-EmployeeNotificationSchema.statics.createNotification = async function(
+EmployeeNotificationSchema.statics.createNotification = async function (
   employeeId: string,
   type: EmployeeNotificationType,
   title: string,
   message: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ): Promise<IEmployeeNotification> {
   return this.create({
     employeeId: new Types.ObjectId(employeeId),
@@ -108,8 +108,8 @@ EmployeeNotificationSchema.statics.createNotification = async function(
 };
 
 // Static method to get unread count
-EmployeeNotificationSchema.statics.getUnreadCount = async function(
-  employeeId: string
+EmployeeNotificationSchema.statics.getUnreadCount = async function (
+  employeeId: string,
 ): Promise<number> {
   return this.countDocuments({
     employeeId: new Types.ObjectId(employeeId),
@@ -118,12 +118,12 @@ EmployeeNotificationSchema.statics.getUnreadCount = async function(
 };
 
 // Static method to mark all as read
-EmployeeNotificationSchema.statics.markAllAsRead = async function(
-  employeeId: string
+EmployeeNotificationSchema.statics.markAllAsRead = async function (
+  employeeId: string,
 ): Promise<void> {
   await this.updateMany(
     { employeeId: new Types.ObjectId(employeeId), isRead: false },
-    { isRead: true, readAt: new Date() }
+    { isRead: true, readAt: new Date() },
   );
 };
 
@@ -133,14 +133,17 @@ interface EmployeeNotificationModel extends Model<IEmployeeNotification> {
     type: EmployeeNotificationType,
     title: string,
     message: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<IEmployeeNotification>;
   getUnreadCount(employeeId: string): Promise<number>;
   markAllAsRead(employeeId: string): Promise<void>;
 }
 
-export const EmployeeNotification = mongoose.models.EmployeeNotification || 
-  mongoose.model<IEmployeeNotification, EmployeeNotificationModel>('EmployeeNotification', EmployeeNotificationSchema);
+export const EmployeeNotification =
+  mongoose.models.EmployeeNotification ||
+  mongoose.model<IEmployeeNotification, EmployeeNotificationModel>(
+    "EmployeeNotification",
+    EmployeeNotificationSchema,
+  );
 
 export default EmployeeNotification;
-

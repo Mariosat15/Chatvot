@@ -1,10 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { XCircle, Clock, AlertTriangle, Loader2, Pause, Play, ShieldAlert, Settings2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  XCircle,
+  Clock,
+  AlertTriangle,
+  Loader2,
+  Pause,
+  Play,
+  ShieldAlert,
+  Settings2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -13,10 +22,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 interface CompetitionAdminActionsProps {
   competitionId: string;
@@ -37,30 +46,31 @@ export default function CompetitionAdminActions({
   endTime,
   participantCount,
   isPaused: initialIsPaused = false,
-  pauseReason: initialPauseReason = '',
+  pauseReason: initialPauseReason = "",
 }: CompetitionAdminActionsProps) {
   const router = useRouter();
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [countdown, setCountdown] = useState('');
-  
+  const [cancelReason, setCancelReason] = useState("");
+  const [countdown, setCountdown] = useState("");
+
   // Emergency controls state
   const [isPaused, setIsPaused] = useState(initialIsPaused);
   const [pauseReason, setPauseReason] = useState(initialPauseReason);
   const [isPausing, setIsPausing] = useState(false);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
-  const [newPauseReason, setNewPauseReason] = useState('');
-  
-  const [emergencyCancelDialogOpen, setEmergencyCancelDialogOpen] = useState(false);
-  const [emergencyCancelReason, setEmergencyCancelReason] = useState('');
+  const [newPauseReason, setNewPauseReason] = useState("");
+
+  const [emergencyCancelDialogOpen, setEmergencyCancelDialogOpen] =
+    useState(false);
+  const [emergencyCancelReason, setEmergencyCancelReason] = useState("");
   const [isEmergencyCancelling, setIsEmergencyCancelling] = useState(false);
 
-  const isUpcoming = status === 'upcoming';
-  const isActive = status === 'active';
-  const isCancelled = status === 'cancelled';
-  const isCompleted = status === 'completed';
-  const isEmergencyEnded = status === 'emergency_ended';
+  const isUpcoming = status === "upcoming";
+  const isActive = status === "active";
+  const isCancelled = status === "cancelled";
+  const isCompleted = status === "completed";
+  const isEmergencyEnded = status === "emergency_ended";
 
   // Live countdown
   useEffect(() => {
@@ -70,12 +80,14 @@ export default function CompetitionAdminActions({
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setCountdown(isUpcoming ? 'Starting...' : 'Ended');
+        setCountdown(isUpcoming ? "Starting..." : "Ended");
         return;
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -98,29 +110,36 @@ export default function CompetitionAdminActions({
 
   const handleCancelCompetition = async () => {
     if (!cancelReason.trim()) {
-      toast.error('Please provide a reason for cancellation');
+      toast.error("Please provide a reason for cancellation");
       return;
     }
 
     setIsCancelling(true);
     try {
-      const response = await fetch(`/api/competitions/${competitionId}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: cancelReason }),
-      });
+      const response = await fetch(
+        `/api/competitions/${competitionId}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: cancelReason }),
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel competition');
+        throw new Error(data.error || "Failed to cancel competition");
       }
 
-      toast.success(`Competition cancelled! ${data.refundedCount} participants refunded.`);
+      toast.success(
+        `Competition cancelled! ${data.refundedCount} participants refunded.`,
+      );
       setCancelDialogOpen(false);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to cancel competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel competition",
+      );
     } finally {
       setIsCancelling(false);
     }
@@ -129,32 +148,34 @@ export default function CompetitionAdminActions({
   // Pause/Resume handlers
   const handlePauseCompetition = async () => {
     if (!newPauseReason.trim()) {
-      toast.error('Please provide a reason for pausing');
+      toast.error("Please provide a reason for pausing");
       return;
     }
 
     setIsPausing(true);
     try {
       const response = await fetch(`/api/competitions/${competitionId}/pause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pause', reason: newPauseReason }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pause", reason: newPauseReason }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to pause competition');
+        throw new Error(data.error || "Failed to pause competition");
       }
 
-      toast.success('Competition paused! Trading is now frozen.');
+      toast.success("Competition paused! Trading is now frozen.");
       setIsPaused(true);
       setPauseReason(newPauseReason);
       setPauseDialogOpen(false);
-      setNewPauseReason('');
+      setNewPauseReason("");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to pause competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to pause competition",
+      );
     } finally {
       setIsPausing(false);
     }
@@ -164,23 +185,27 @@ export default function CompetitionAdminActions({
     setIsPausing(true);
     try {
       const response = await fetch(`/api/competitions/${competitionId}/pause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resume' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume" }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to resume competition');
+        throw new Error(data.error || "Failed to resume competition");
       }
 
-      toast.success(`Competition resumed! End time extended by ${Math.round(data.extensionMinutes)} minutes.`);
+      toast.success(
+        `Competition resumed! End time extended by ${Math.round(data.extensionMinutes)} minutes.`,
+      );
       setIsPaused(false);
-      setPauseReason('');
+      setPauseReason("");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to resume competition');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resume competition",
+      );
     } finally {
       setIsPausing(false);
     }
@@ -189,29 +214,38 @@ export default function CompetitionAdminActions({
   // Emergency Cancel (for active competitions)
   const handleEmergencyCancel = async () => {
     if (!emergencyCancelReason.trim()) {
-      toast.error('Please provide a reason for emergency cancellation');
+      toast.error("Please provide a reason for emergency cancellation");
       return;
     }
 
     setIsEmergencyCancelling(true);
     try {
-      const response = await fetch(`/api/competitions/${competitionId}/emergency-cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: emergencyCancelReason }),
-      });
+      const response = await fetch(
+        `/api/competitions/${competitionId}/emergency-cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: emergencyCancelReason }),
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to emergency cancel competition');
+        throw new Error(data.error || "Failed to emergency cancel competition");
       }
 
-      toast.success(`Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`);
+      toast.success(
+        `Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`,
+      );
       setEmergencyCancelDialogOpen(false);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to emergency cancel competition');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to emergency cancel competition",
+      );
     } finally {
       setIsEmergencyCancelling(false);
     }
@@ -221,18 +255,26 @@ export default function CompetitionAdminActions({
     <div className="space-y-4">
       {/* Live Countdown */}
       {(isUpcoming || isActive) && (
-        <div className={`p-4 rounded-xl border ${
-          isUpcoming 
-            ? 'bg-yellow-500/10 border-yellow-500/30' 
-            : 'bg-blue-500/10 border-blue-500/30'
-        }`}>
+        <div
+          className={`p-4 rounded-xl border ${
+            isUpcoming
+              ? "bg-yellow-500/10 border-yellow-500/30"
+              : "bg-blue-500/10 border-blue-500/30"
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <Clock className={`h-5 w-5 ${isUpcoming ? 'text-yellow-400' : 'text-blue-400'} animate-pulse`} />
+            <Clock
+              className={`h-5 w-5 ${isUpcoming ? "text-yellow-400" : "text-blue-400"} animate-pulse`}
+            />
             <div>
-              <p className={`text-xs font-semibold ${isUpcoming ? 'text-yellow-400' : 'text-blue-400'}`}>
-                {isUpcoming ? '⏳ STARTS IN' : '⏱️ TIME REMAINING'}
+              <p
+                className={`text-xs font-semibold ${isUpcoming ? "text-yellow-400" : "text-blue-400"}`}
+              >
+                {isUpcoming ? "⏳ STARTS IN" : "⏱️ TIME REMAINING"}
               </p>
-              <p className={`text-2xl font-black tabular-nums ${isUpcoming ? 'text-yellow-300' : 'text-blue-300'}`}>
+              <p
+                className={`text-2xl font-black tabular-nums ${isUpcoming ? "text-yellow-300" : "text-blue-300"}`}
+              >
                 {countdown}
               </p>
             </div>
@@ -247,7 +289,9 @@ export default function CompetitionAdminActions({
             <XCircle className="h-5 w-5 text-red-400" />
             <div>
               <p className="text-sm font-semibold text-red-400">CANCELLED</p>
-              <p className="text-xs text-red-300/70">All participants have been refunded</p>
+              <p className="text-xs text-red-300/70">
+                All participants have been refunded
+              </p>
             </div>
           </div>
         </div>
@@ -270,8 +314,8 @@ export default function CompetitionAdminActions({
       {isUpcoming && (
         <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               className="w-full bg-red-600 hover:bg-red-700"
             >
               <XCircle className="h-4 w-4 mr-2" />
@@ -285,7 +329,11 @@ export default function CompetitionAdminActions({
                 Cancel Competition
               </DialogTitle>
               <DialogDescription className="text-gray-400">
-                Are you sure you want to cancel <span className="text-white font-semibold">"{competitionName}"</span>?
+                Are you sure you want to cancel{" "}
+                <span className="text-white font-semibold">
+                  "{competitionName}"
+                </span>
+                ?
               </DialogDescription>
             </DialogHeader>
 
@@ -296,7 +344,10 @@ export default function CompetitionAdminActions({
                 </p>
                 <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
                   <li>Immediately cancel the competition</li>
-                  <li>Refund <strong>{participantCount}</strong> participant(s) their full entry fees</li>
+                  <li>
+                    Refund <strong>{participantCount}</strong> participant(s)
+                    their full entry fees
+                  </li>
                   <li>Send notification to all participants</li>
                   <li>This action cannot be undone</li>
                 </ul>
@@ -363,9 +414,13 @@ export default function CompetitionAdminActions({
             <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
               <div className="flex items-center gap-2 mb-1">
                 <Pause className="h-4 w-4 text-yellow-400" />
-                <span className="text-sm font-semibold text-yellow-400">PAUSED</span>
+                <span className="text-sm font-semibold text-yellow-400">
+                  PAUSED
+                </span>
               </div>
-              <p className="text-xs text-yellow-300/70">{pauseReason || 'Trading is frozen'}</p>
+              <p className="text-xs text-yellow-300/70">
+                {pauseReason || "Trading is frozen"}
+              </p>
             </div>
           )}
 
@@ -373,7 +428,7 @@ export default function CompetitionAdminActions({
           {!isPaused ? (
             <Dialog open={pauseDialogOpen} onOpenChange={setPauseDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
+                <Button
                   variant="outline"
                   className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
                 >
@@ -449,7 +504,7 @@ export default function CompetitionAdminActions({
               </DialogContent>
             </Dialog>
           ) : (
-            <Button 
+            <Button
               onClick={handleResumeCompetition}
               disabled={isPausing}
               className="w-full bg-green-500 hover:bg-green-600"
@@ -469,10 +524,13 @@ export default function CompetitionAdminActions({
           )}
 
           {/* Emergency Cancel */}
-          <Dialog open={emergencyCancelDialogOpen} onOpenChange={setEmergencyCancelDialogOpen}>
+          <Dialog
+            open={emergencyCancelDialogOpen}
+            onOpenChange={setEmergencyCancelDialogOpen}
+          >
             <DialogTrigger asChild>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 className="w-full bg-red-600 hover:bg-red-700"
               >
                 <ShieldAlert className="h-4 w-4 mr-2" />
@@ -486,7 +544,8 @@ export default function CompetitionAdminActions({
                   Emergency Cancel Competition
                 </DialogTitle>
                 <DialogDescription className="text-gray-400">
-                  This is for critical situations only. All positions will be closed at current prices.
+                  This is for critical situations only. All positions will be
+                  closed at current prices.
                 </DialogDescription>
               </DialogHeader>
 
@@ -496,7 +555,10 @@ export default function CompetitionAdminActions({
                     <strong>⚠️ CRITICAL ACTION:</strong> This will:
                   </p>
                   <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
-                    <li>Immediately close ALL open positions at current market prices</li>
+                    <li>
+                      Immediately close ALL open positions at current market
+                      prices
+                    </li>
                     <li>Calculate and record all P&L</li>
                     <li>Refund all participants their FULL entry fees</li>
                     <li>Mark competition as emergency cancelled</li>
@@ -505,7 +567,10 @@ export default function CompetitionAdminActions({
                 </div>
 
                 <div>
-                  <Label htmlFor="emergencyCancelReason" className="text-gray-300">
+                  <Label
+                    htmlFor="emergencyCancelReason"
+                    className="text-gray-300"
+                  >
                     Reason for emergency cancellation *
                   </Label>
                   <Textarea
@@ -530,7 +595,9 @@ export default function CompetitionAdminActions({
                 <Button
                   variant="destructive"
                   onClick={handleEmergencyCancel}
-                  disabled={isEmergencyCancelling || !emergencyCancelReason.trim()}
+                  disabled={
+                    isEmergencyCancelling || !emergencyCancelReason.trim()
+                  }
                   className="bg-red-600 hover:bg-red-700"
                 >
                   {isEmergencyCancelling ? (
@@ -557,8 +624,12 @@ export default function CompetitionAdminActions({
           <div className="flex items-center gap-3">
             <ShieldAlert className="h-5 w-5 text-orange-400" />
             <div>
-              <p className="text-sm font-semibold text-orange-400">EMERGENCY ENDED</p>
-              <p className="text-xs text-orange-300/70">Competition was terminated due to critical issues</p>
+              <p className="text-sm font-semibold text-orange-400">
+                EMERGENCY ENDED
+              </p>
+              <p className="text-xs text-orange-300/70">
+                Competition was terminated due to critical issues
+              </p>
             </div>
           </div>
         </div>
@@ -566,4 +637,3 @@ export default function CompetitionAdminActions({
     </div>
   );
 }
-

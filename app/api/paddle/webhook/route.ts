@@ -1,16 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { getPaddleConfig } from '@/lib/paddle/config';
-import { completeDeposit, cancelDeposit } from '@/lib/actions/trading/wallet.actions';
-import { connectToDatabase } from '@/database/mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { getPaddleConfig } from "@/lib/paddle/config";
+import {
+  completeDeposit,
+  cancelDeposit,
+} from "@/lib/actions/trading/wallet.actions";
+import { connectToDatabase } from "@/database/mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 /**
  * Paddle Webhook Handler
- * 
+ *
  * Paddle automatically sends webhooks when transactions complete.
  * The webhook URL is auto-configured in Paddle Dashboard.
- * 
+ *
  * Paddle webhook events we handle:
  * - transaction.completed → Add credits to user
  * - transaction.payment_failed → Mark as failed
@@ -20,41 +23,51 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
-    const signature = req.headers.get('paddle-signature');
+    const signature = req.headers.get("paddle-signature");
 
     // Get Paddle config
     const paddleConfig = await getPaddleConfig();
-    
+
     if (!paddleConfig) {
-      console.error('❌ Paddle webhook received but Paddle not configured');
-      return NextResponse.json({ error: 'Paddle not configured' }, { status: 400 });
+      console.error("❌ Paddle webhook received but Paddle not configured");
+      return NextResponse.json(
+        { error: "Paddle not configured" },
+        { status: 400 },
+      );
     }
 
     // Verify webhook signature (if secret is configured)
     if (paddleConfig.webhookSecret && signature) {
-      const isValid = verifyPaddleWebhook(body, signature, paddleConfig.webhookSecret);
+      const isValid = verifyPaddleWebhook(
+        body,
+        signature,
+        paddleConfig.webhookSecret,
+      );
       if (!isValid) {
-        console.error('❌ Paddle webhook signature verification failed');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+        console.error("❌ Paddle webhook signature verification failed");
+        return NextResponse.json(
+          { error: "Invalid signature" },
+          { status: 400 },
+        );
       }
     }
 
     // Parse the event
     const event = JSON.parse(body);
-    
+
     console.log(`📨 Paddle Webhook: ${event.event_type}`);
 
     // Handle different event types
     switch (event.event_type) {
-      case 'transaction.completed':
+      case "transaction.completed":
         await handleTransactionCompleted(event.data);
         break;
 
-      case 'transaction.payment_failed':
+      case "transaction.payment_failed":
         await handleTransactionFailed(event.data);
         break;
 
-      case 'transaction.refunded':
+      case "transaction.refunded":
         await handleTransactionRefunded(event.data);
         break;
 
@@ -64,10 +77,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('❌ Paddle webhook error:', error);
+    console.error("❌ Paddle webhook error:", error);
     return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
+      { error: "Webhook handler failed" },
+      { status: 500 },
     );
   }
 }
@@ -75,12 +88,16 @@ export async function POST(req: NextRequest) {
 /**
  * Verify Paddle webhook signature
  */
-function verifyPaddleWebhook(body: string, signature: string, secret: string): boolean {
+function verifyPaddleWebhook(
+  body: string,
+  signature: string,
+  secret: string,
+): boolean {
   try {
     // Paddle uses ts;h1 format for signature
-    const parts = signature.split(';');
-    const tsValue = parts.find(p => p.startsWith('ts='))?.split('=')[1];
-    const h1Value = parts.find(p => p.startsWith('h1='))?.split('=')[1];
+    const parts = signature.split(";");
+    const tsValue = parts.find((p) => p.startsWith("ts="))?.split("=")[1];
+    const h1Value = parts.find((p) => p.startsWith("h1="))?.split("=")[1];
 
     if (!tsValue || !h1Value) {
       return false;
@@ -89,13 +106,13 @@ function verifyPaddleWebhook(body: string, signature: string, secret: string): b
     // Create expected signature
     const signedPayload = `${tsValue}:${body}`;
     const expectedSignature = crypto
-      .createHmac('sha256', secret)
+      .createHmac("sha256", secret)
       .update(signedPayload)
-      .digest('hex');
+      .digest("hex");
 
     return crypto.timingSafeEqual(
       Buffer.from(h1Value),
-      Buffer.from(expectedSignature)
+      Buffer.from(expectedSignature),
     );
   } catch {
     return false;
@@ -109,9 +126,9 @@ function verifyPaddleWebhook(body: string, signature: string, secret: string): b
 async function handleTransactionCompleted(data: any) {
   try {
     const customData = data.custom_data;
-    
+
     if (!customData?.transaction_id || !customData?.user_id) {
-      console.error('❌ Paddle webhook missing custom_data:', data.id);
+      console.error("❌ Paddle webhook missing custom_data:", data.id);
       return;
     }
 
@@ -122,29 +139,35 @@ async function handleTransactionCompleted(data: any) {
     // IDEMPOTENCY CHECK: Verify transaction hasn't already been processed
     // This prevents duplicate credits if Paddle sends the same webhook multiple times
     await connectToDatabase();
-    
+
     // Check 1: By paymentId (Paddle transaction ID)
-    const existingByPaymentId = await WalletTransaction.findOne({
+    const existingByPaymentId = (await WalletTransaction.findOne({
       paymentId: paddleTransactionId,
-      status: 'completed',
-    }).lean();
-    
+      status: "completed",
+    }).lean()) as { _id: { toString(): string }; status?: string } | null;
+
     if (existingByPaymentId) {
-      console.log(`⚠️ IDEMPOTENCY: Paddle payment ${paddleTransactionId} already processed (found by paymentId)`);
+      console.log(
+        `⚠️ IDEMPOTENCY: Paddle payment ${paddleTransactionId} already processed (found by paymentId)`,
+      );
       console.log(`   Existing transaction: ${existingByPaymentId._id}`);
       return; // Already processed, skip
     }
 
     // Check 2: By transactionId and status
-    const existingTransaction = await WalletTransaction.findById(transactionId).lean();
-    
+    const existingTransaction = (await WalletTransaction.findById(
+      transactionId,
+    ).lean()) as { _id: { toString(): string }; status?: string } | null;
+
     if (!existingTransaction) {
       console.error(`❌ Transaction ${transactionId} not found in database`);
       return;
     }
-    
-    if (existingTransaction.status === 'completed') {
-      console.log(`⚠️ IDEMPOTENCY: Transaction ${transactionId} already completed`);
+
+    if (existingTransaction.status === "completed") {
+      console.log(
+        `⚠️ IDEMPOTENCY: Transaction ${transactionId} already completed`,
+      );
       return; // Already processed, skip
     }
 
@@ -153,20 +176,21 @@ async function handleTransactionCompleted(data: any) {
     console.log(`   Transaction: ${transactionId}`);
 
     // Complete the deposit - this adds credits to user's wallet
-    await completeDeposit(transactionId, paddleTransactionId, 'paddle');
+    await completeDeposit(transactionId, paddleTransactionId, "paddle");
 
     console.log(`✅ Credits added for transaction ${transactionId}`);
 
     // Send notification to user
     try {
-      const { notificationService } = await import('@/lib/services/notification.service');
+      const { notificationService } =
+        await import("@/lib/services/notification.service");
       const amount = parseFloat(customData.amount) || 0;
       await notificationService.notifyDepositCompleted(userId, amount, 0);
     } catch (notifyError) {
-      console.error('❌ Error sending notification:', notifyError);
+      console.error("❌ Error sending notification:", notifyError);
     }
   } catch (error) {
-    console.error('❌ Error handling Paddle transaction.completed:', error);
+    console.error("❌ Error handling Paddle transaction.completed:", error);
   }
 }
 
@@ -176,33 +200,41 @@ async function handleTransactionCompleted(data: any) {
 async function handleTransactionFailed(data: any) {
   try {
     const customData = data.custom_data;
-    
+
     if (!customData?.transaction_id) {
-      console.log('⚠️ Paddle payment_failed without transaction_id');
+      console.log("⚠️ Paddle payment_failed without transaction_id");
       return;
     }
 
     const transactionId = customData.transaction_id;
-    const reason = data.details?.reason || 'Payment failed';
+    const reason = data.details?.reason || "Payment failed";
 
     console.error(`❌ Paddle payment failed: ${data.id}`);
     console.error(`   Reason: ${reason}`);
 
     // Cancel the deposit
-    await cancelDeposit(transactionId, 'failed', reason);
+    await cancelDeposit(transactionId, "failed", reason);
 
     // Notify user
     if (customData?.user_id) {
       try {
-        const { notificationService } = await import('@/lib/services/notification.service');
+        const { notificationService } =
+          await import("@/lib/services/notification.service");
         const amount = parseFloat(customData.amount) || 0;
-        await notificationService.notifyDepositFailed(customData.user_id, amount, reason);
+        await notificationService.notifyDepositFailed(
+          customData.user_id,
+          amount,
+          reason,
+        );
       } catch (notifyError) {
-        console.error('❌ Error sending notification:', notifyError);
+        console.error("❌ Error sending notification:", notifyError);
       }
     }
   } catch (error) {
-    console.error('❌ Error handling Paddle transaction.payment_failed:', error);
+    console.error(
+      "❌ Error handling Paddle transaction.payment_failed:",
+      error,
+    );
   }
 }
 
@@ -212,25 +244,26 @@ async function handleTransactionFailed(data: any) {
 async function handleTransactionRefunded(data: any) {
   try {
     const customData = data.custom_data;
-    
+
     console.log(`💸 Paddle refund: ${data.id}`);
-    
+
     if (customData?.transaction_id) {
       // Update transaction status
       await connectToDatabase();
       await WalletTransaction.findByIdAndUpdate(customData.transaction_id, {
-        status: 'refunded',
-        'metadata.refundedAt': new Date(),
-        'metadata.paddleRefundId': data.id,
+        status: "refunded",
+        "metadata.refundedAt": new Date(),
+        "metadata.paddleRefundId": data.id,
       });
-      
-      console.log(`   Transaction ${customData.transaction_id} marked as refunded`);
-      
+
+      console.log(
+        `   Transaction ${customData.transaction_id} marked as refunded`,
+      );
+
       // TODO: Optionally auto-deduct credits when refund is issued
       // For now, admin handles credit adjustment manually
     }
   } catch (error) {
-    console.error('❌ Error handling Paddle transaction.refunded:', error);
+    console.error("❌ Error handling Paddle transaction.refunded:", error);
   }
 }
-

@@ -1,15 +1,39 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck, UserCog, ArrowLeftRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import {
+  Mail,
+  Save,
+  Send,
+  RefreshCw,
+  Eye,
+  Code,
+  Sparkles,
+  AlertCircle,
+  Check,
+  Plus,
+  Trash2,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  UserPlus,
+  MailCheck,
+  UserCog,
+  ArrowLeftRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
 interface EmailTemplate {
   _id?: string;
@@ -44,169 +68,236 @@ interface EmailTemplate {
   isActive: boolean;
 }
 
-type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification' | 'account_manager_assigned' | 'account_manager_changed';
+type TemplateType =
+  | "welcome"
+  | "deposit_completed"
+  | "withdrawal_completed"
+  | "email_verification"
+  | "account_manager_assigned"
+  | "account_manager_changed";
 
-const TEMPLATE_CONFIG: Record<TemplateType, {
-  title: string;
-  description: string;
-  icon: typeof Mail;
-  variables: string[];
-  defaults: Partial<EmailTemplate>;
-}> = {
+const TEMPLATE_CONFIG: Record<
+  TemplateType,
+  {
+    title: string;
+    description: string;
+    icon: typeof Mail;
+    variables: string[];
+    defaults: Partial<EmailTemplate>;
+  }
+> = {
   welcome: {
-    title: 'Welcome Email',
-    description: 'Sent to new users when they sign up',
+    title: "Welcome Email",
+    description: "Sent to new users when they sign up",
     icon: UserPlus,
-    variables: ['{{name}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    variables: [
+      "{{name}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+      "{{companyAddress}}",
+    ],
     defaults: {
-      templateType: 'welcome',
-      name: 'Welcome Email',
-      subject: 'Welcome to {{platformName}} - Start competing and win real prizes!',
-      headingText: 'Welcome aboard {{name}}',
-      introText: 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
+      templateType: "welcome",
+      name: "Welcome Email",
+      subject:
+        "Welcome to {{platformName}} - Start competing and win real prizes!",
+      headingText: "Welcome aboard {{name}}",
+      introText:
+        "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.",
       featureListLabel: "Here's what you can do right now:",
       featureItems: [
-        'Deposit credits to your wallet and enter trading competitions',
-        'Compete in live trading competitions with real-time market prices',
-        'Climb the leaderboard by trading smarter and win cash prizes',
+        "Deposit credits to your wallet and enter trading competitions",
+        "Compete in live trading competitions with real-time market prices",
+        "Climb the leaderboard by trading smarter and win cash prizes",
       ],
-      closingText: "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
-      ctaButtonText: 'View Competitions',
-      ctaButtonUrl: '{{baseUrl}}/competitions',
+      closingText:
+        "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+      ctaButtonText: "View Competitions",
+      ctaButtonUrl: "{{baseUrl}}/competitions",
     },
   },
   deposit_completed: {
-    title: 'Deposit Completed',
-    description: 'Sent when a user\'s deposit is processed successfully',
+    title: "Deposit Completed",
+    description: "Sent when a user's deposit is processed successfully",
     icon: ArrowDownToLine,
-    variables: ['{{name}}', '{{credits}}', '{{amount}}', '{{paymentMethod}}', '{{transactionId}}', '{{newBalance}}', '{{platformName}}'],
+    variables: [
+      "{{name}}",
+      "{{credits}}",
+      "{{amount}}",
+      "{{paymentMethod}}",
+      "{{transactionId}}",
+      "{{newBalance}}",
+      "{{platformName}}",
+    ],
     defaults: {
-      templateType: 'deposit_completed',
-      name: 'Deposit Completed Email',
-      subject: '✓ Deposit Confirmed - {{credits}} credits added to your account',
-      headingText: 'Deposit Successful!',
-      introText: 'Great news! Your deposit has been processed successfully and your credits are ready to use.',
+      templateType: "deposit_completed",
+      name: "Deposit Completed Email",
+      subject:
+        "✓ Deposit Confirmed - {{credits}} credits added to your account",
+      headingText: "Deposit Successful!",
+      introText:
+        "Great news! Your deposit has been processed successfully and your credits are ready to use.",
       featureListLabel: "What's Next?",
       featureItems: [
-        'Browse active competitions and join one that matches your style',
-        'Challenge other traders in head-to-head matches',
-        'Climb the leaderboard and win real prizes!',
+        "Browse active competitions and join one that matches your style",
+        "Challenge other traders in head-to-head matches",
+        "Climb the leaderboard and win real prizes!",
       ],
-      closingText: 'Start competing now and put your trading skills to the test!',
-      ctaButtonText: 'Start Competing Now',
-      ctaButtonUrl: '{{baseUrl}}/competitions',
+      closingText:
+        "Start competing now and put your trading skills to the test!",
+      ctaButtonText: "Start Competing Now",
+      ctaButtonUrl: "{{baseUrl}}/competitions",
     },
   },
   withdrawal_completed: {
-    title: 'Withdrawal Completed',
-    description: 'Sent when a user\'s withdrawal is processed successfully',
+    title: "Withdrawal Completed",
+    description: "Sent when a user's withdrawal is processed successfully",
     icon: ArrowUpFromLine,
-    variables: ['{{name}}', '{{credits}}', '{{netAmount}}', '{{fee}}', '{{paymentMethod}}', '{{withdrawalId}}', '{{remainingBalance}}', '{{platformName}}'],
+    variables: [
+      "{{name}}",
+      "{{credits}}",
+      "{{netAmount}}",
+      "{{fee}}",
+      "{{paymentMethod}}",
+      "{{withdrawalId}}",
+      "{{remainingBalance}}",
+      "{{platformName}}",
+    ],
     defaults: {
-      templateType: 'withdrawal_completed',
-      name: 'Withdrawal Completed Email',
-      subject: '💸 Withdrawal Processed - €{{netAmount}} on the way',
-      headingText: 'Withdrawal Processed',
-      introText: 'Your withdrawal request has been processed successfully. Here are the details of your transaction:',
-      featureListLabel: 'Timeline Information',
+      templateType: "withdrawal_completed",
+      name: "Withdrawal Completed Email",
+      subject: "💸 Withdrawal Processed - €{{netAmount}} on the way",
+      headingText: "Withdrawal Processed",
+      introText:
+        "Your withdrawal request has been processed successfully. Here are the details of your transaction:",
+      featureListLabel: "Timeline Information",
       featureItems: [
-        'Card refunds typically arrive in 3-5 business days',
-        'Bank transfers typically arrive in 3-5 business days',
-        'Processing times may vary depending on your bank or holidays',
+        "Card refunds typically arrive in 3-5 business days",
+        "Bank transfers typically arrive in 3-5 business days",
+        "Processing times may vary depending on your bank or holidays",
       ],
-      closingText: 'Thank you for being part of our trading community!',
-      ctaButtonText: 'View Transaction History',
-      ctaButtonUrl: '{{baseUrl}}/wallet',
+      closingText: "Thank you for being part of our trading community!",
+      ctaButtonText: "View Transaction History",
+      ctaButtonUrl: "{{baseUrl}}/wallet",
     },
   },
   email_verification: {
-    title: 'Email Verification',
-    description: 'Sent to users to verify their email address',
+    title: "Email Verification",
+    description: "Sent to users to verify their email address",
     icon: MailCheck,
-    variables: ['{{name}}', '{{verificationLink}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}', '{{expiryHours}}'],
+    variables: [
+      "{{name}}",
+      "{{verificationLink}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+      "{{companyAddress}}",
+      "{{expiryHours}}",
+    ],
     defaults: {
-      templateType: 'email_verification',
-      name: 'Email Verification',
-      subject: 'Verify your email address - {{platformName}}',
-      headingText: 'Verify Your Email',
-      introText: 'Thanks for signing up! Please verify your email address to activate your account and start trading.',
-      featureListLabel: 'After verification you can:',
+      templateType: "email_verification",
+      name: "Email Verification",
+      subject: "Verify your email address - {{platformName}}",
+      headingText: "Verify Your Email",
+      introText:
+        "Thanks for signing up! Please verify your email address to activate your account and start trading.",
+      featureListLabel: "After verification you can:",
       featureItems: [
-        'Access your account and wallet',
-        'Deposit funds and enter competitions',
-        'Compete with other traders and win prizes',
+        "Access your account and wallet",
+        "Deposit funds and enter competitions",
+        "Compete with other traders and win prizes",
       ],
-      closingText: 'This verification link will expire in {{expiryHours}} hours. If you didn\'t create an account, you can safely ignore this email.',
-      ctaButtonText: 'Verify Email Address',
-      ctaButtonUrl: '{{verificationLink}}',
+      closingText:
+        "This verification link will expire in {{expiryHours}} hours. If you didn't create an account, you can safely ignore this email.",
+      ctaButtonText: "Verify Email Address",
+      ctaButtonUrl: "{{verificationLink}}",
     },
   },
   account_manager_assigned: {
-    title: 'Account Manager Assigned',
-    description: 'Sent to customers when they are assigned an account manager',
+    title: "Account Manager Assigned",
+    description: "Sent to customers when they are assigned an account manager",
     icon: UserCog,
-    variables: ['{{customerName}}', '{{managerFirstName}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    variables: [
+      "{{customerName}}",
+      "{{managerFirstName}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+      "{{companyAddress}}",
+    ],
     defaults: {
-      templateType: 'account_manager_assigned',
-      name: 'Account Manager Assigned',
-      subject: '🎉 Meet Your Dedicated Account Manager at {{platformName}}',
-      headingText: '👋 Welcome to Personalized Support!',
-      introText: 'Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.',
-      featureListLabel: 'Your Account Manager',
+      templateType: "account_manager_assigned",
+      name: "Account Manager Assigned",
+      subject: "🎉 Meet Your Dedicated Account Manager at {{platformName}}",
+      headingText: "👋 Welcome to Personalized Support!",
+      introText:
+        "Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.",
+      featureListLabel: "Your Account Manager",
       featureItems: [
-        '{{managerFirstName}} will assist you with any questions about your account',
-        'Get personalized guidance for competitions and trading',
-        'Receive priority support whenever you need help',
+        "{{managerFirstName}} will assist you with any questions about your account",
+        "Get personalized guidance for competitions and trading",
+        "Receive priority support whenever you need help",
       ],
-      closingText: 'Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!',
-      ctaButtonText: 'Send a Message',
-      ctaButtonUrl: '{{baseUrl}}/messaging',
+      closingText:
+        "Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!",
+      ctaButtonText: "Send a Message",
+      ctaButtonUrl: "{{baseUrl}}/messaging",
     },
   },
   account_manager_changed: {
-    title: 'Account Manager Changed',
-    description: 'Sent to customers when their account manager is changed/reassigned',
+    title: "Account Manager Changed",
+    description:
+      "Sent to customers when their account manager is changed/reassigned",
     icon: ArrowLeftRight,
-    variables: ['{{customerName}}', '{{newManagerFirstName}}', '{{previousManagerName}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    variables: [
+      "{{customerName}}",
+      "{{newManagerFirstName}}",
+      "{{previousManagerName}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+      "{{companyAddress}}",
+    ],
     defaults: {
-      templateType: 'account_manager_changed',
-      name: 'Account Manager Changed',
-      subject: '🔄 Your Account Manager Has Changed at {{platformName}}',
-      headingText: '👋 Meet Your New Account Manager',
-      introText: 'We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.',
-      featureListLabel: 'Your New Account Manager',
+      templateType: "account_manager_changed",
+      name: "Account Manager Changed",
+      subject: "🔄 Your Account Manager Has Changed at {{platformName}}",
+      headingText: "👋 Meet Your New Account Manager",
+      introText:
+        "We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.",
+      featureListLabel: "Your New Account Manager",
       featureItems: [
-        '{{newManagerFirstName}} is now your dedicated point of contact',
-        'All your account history and preferences have been transferred',
-        'You can reach out anytime through the messaging feature',
+        "{{newManagerFirstName}} is now your dedicated point of contact",
+        "All your account history and preferences have been transferred",
+        "You can reach out anytime through the messaging feature",
       ],
-      closingText: '{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!',
-      ctaButtonText: 'Say Hello',
-      ctaButtonUrl: '{{baseUrl}}/messaging',
+      closingText:
+        "{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!",
+      ctaButtonText: "Say Hello",
+      ctaButtonUrl: "{{baseUrl}}/messaging",
     },
   },
 };
 
 const DEFAULT_TEMPLATE: EmailTemplate = {
-  templateType: 'welcome',
-  name: 'Welcome Email',
-  subject: 'Welcome to {{platformName}} - Start competing and win real prizes!',
-  fromName: '{{platformName}}',
-  headingText: 'Welcome aboard {{name}}',
-  introText: 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
+  templateType: "welcome",
+  name: "Welcome Email",
+  subject: "Welcome to {{platformName}} - Start competing and win real prizes!",
+  fromName: "{{platformName}}",
+  headingText: "Welcome aboard {{name}}",
+  introText:
+    "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.",
   featureListLabel: "Here's what you can do right now:",
   featureItems: [
-    'Deposit credits to your wallet and enter trading competitions',
-    'Compete in live trading competitions with real-time market prices',
-    'Climb the leaderboard by trading smarter and win cash prizes',
+    "Deposit credits to your wallet and enter trading competitions",
+    "Compete in live trading competitions with real-time market prices",
+    "Climb the leaderboard by trading smarter and win cash prizes",
   ],
-  closingText: "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
-  ctaButtonText: 'View Competitions',
-  ctaButtonUrl: '{{baseUrl}}/competitions',
-  footerAddress: '{{companyAddress}}',
+  closingText:
+    "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+  ctaButtonText: "View Competitions",
+  ctaButtonUrl: "{{baseUrl}}/competitions",
+  footerAddress: "{{companyAddress}}",
   footerLinks: {
-    unsubscribeUrl: '#',
-    websiteUrl: '{{baseUrl}}',
+    unsubscribeUrl: "#",
+    websiteUrl: "{{baseUrl}}",
   },
   useAIPersonalization: true,
   aiPersonalizationPrompt: `Generate a personalized welcome message for a new user joining a trading competition platform.
@@ -225,21 +316,22 @@ Requirements:
 - Do NOT start with "Welcome" (already in heading)
 
 Return only the message text, no HTML.`,
-  customHtmlTemplate: '',
+  customHtmlTemplate: "",
   useCustomHtml: false,
   isActive: true,
 };
 
 export default function EmailTemplatesSection() {
-  const [selectedTemplateType, setSelectedTemplateType] = useState<TemplateType>('welcome');
+  const [selectedTemplateType, setSelectedTemplateType] =
+    useState<TemplateType>("welcome");
   const [template, setTemplate] = useState<EmailTemplate>(DEFAULT_TEMPLATE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
-  const [testEmail, setTestEmail] = useState('');
+  const [testEmail, setTestEmail] = useState("");
   const [showTestDialog, setShowTestDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState('content');
-  const [newFeatureItem, setNewFeatureItem] = useState('');
+  const [activeTab, setActiveTab] = useState("content");
+  const [newFeatureItem, setNewFeatureItem] = useState("");
 
   useEffect(() => {
     fetchTemplate(selectedTemplateType);
@@ -253,8 +345,8 @@ export default function EmailTemplatesSection() {
         const data = await response.json();
         if (data.template) {
           const config = TEMPLATE_CONFIG[type];
-          setTemplate({ 
-            ...DEFAULT_TEMPLATE, 
+          setTemplate({
+            ...DEFAULT_TEMPLATE,
             ...config.defaults,
             ...data.template,
             templateType: type,
@@ -270,8 +362,8 @@ export default function EmailTemplatesSection() {
         }
       }
     } catch (error) {
-      console.error('Error fetching template:', error);
-      toast.error('Failed to load email template');
+      console.error("Error fetching template:", error);
+      toast.error("Failed to load email template");
     } finally {
       setLoading(false);
     }
@@ -280,9 +372,9 @@ export default function EmailTemplatesSection() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/email-templates', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/email-templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...template,
           templateType: selectedTemplateType,
@@ -290,12 +382,14 @@ export default function EmailTemplatesSection() {
       });
 
       if (response.ok) {
-        toast.success(`${TEMPLATE_CONFIG[selectedTemplateType].title} template updated successfully`);
+        toast.success(
+          `${TEMPLATE_CONFIG[selectedTemplateType].title} template updated successfully`,
+        );
       } else {
-        throw new Error('Failed to save');
+        throw new Error("Failed to save");
       }
     } catch (error) {
-      toast.error('Failed to save email template');
+      toast.error("Failed to save email template");
     } finally {
       setSaving(false);
     }
@@ -303,20 +397,20 @@ export default function EmailTemplatesSection() {
 
   const handleSendTestEmail = async () => {
     if (!testEmail) {
-      toast.error('Please enter a test email address');
+      toast.error("Please enter a test email address");
       return;
     }
 
     try {
       setSendingTest(true);
-      
+
       // First save the template
       await handleSave();
-      
+
       // Then send test email
-      const response = await fetch('/api/email-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/email-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           templateType: selectedTemplateType,
           testEmail,
@@ -328,10 +422,12 @@ export default function EmailTemplatesSection() {
         setShowTestDialog(false);
       } else {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to send test email');
+        throw new Error(data.error || "Failed to send test email");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to send test email');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send test email",
+      );
     } finally {
       setSendingTest(false);
     }
@@ -344,7 +440,7 @@ export default function EmailTemplatesSection() {
       ...config.defaults,
       templateType: selectedTemplateType,
     });
-    toast.info('Template reset to default values (not saved yet)');
+    toast.info("Template reset to default values (not saved yet)");
   };
 
   const addFeatureItem = () => {
@@ -353,7 +449,7 @@ export default function EmailTemplatesSection() {
         ...template,
         featureItems: [...template.featureItems, newFeatureItem.trim()],
       });
-      setNewFeatureItem('');
+      setNewFeatureItem("");
     }
   };
 
@@ -395,8 +491,8 @@ export default function EmailTemplatesSection() {
               onClick={() => setSelectedTemplateType(type)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
                 isActive
-                  ? 'bg-yellow-500 text-black font-medium'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? "bg-yellow-500 text-black font-medium"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -413,9 +509,7 @@ export default function EmailTemplatesSection() {
             <TemplateIcon className="h-6 w-6 text-yellow-500" />
             {currentConfig.title} Template
           </h2>
-          <p className="text-gray-400 mt-1">
-            {currentConfig.description}
-          </p>
+          <p className="text-gray-400 mt-1">{currentConfig.description}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -428,14 +522,19 @@ export default function EmailTemplatesSection() {
           </Button>
           <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-blue-600 text-blue-400 hover:bg-blue-950">
+              <Button
+                variant="outline"
+                className="border-blue-600 text-blue-400 hover:bg-blue-950"
+              >
                 <Send className="h-4 w-4 mr-2" />
                 Send Test
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-gray-900 border-gray-800">
               <DialogHeader>
-                <DialogTitle className="text-white">Send Test Email</DialogTitle>
+                <DialogTitle className="text-white">
+                  Send Test Email
+                </DialogTitle>
                 <DialogDescription className="text-gray-400">
                   Send a test welcome email to preview the template
                 </DialogDescription>
@@ -474,7 +573,11 @@ export default function EmailTemplatesSection() {
               </div>
             </DialogContent>
           </Dialog>
-          <Button onClick={handleSave} disabled={saving} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-yellow-500 hover:bg-yellow-600 text-black"
+          >
             {saving ? (
               <>
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -501,7 +604,10 @@ export default function EmailTemplatesSection() {
         <CardContent>
           <div className="flex flex-wrap gap-2 text-xs">
             {currentConfig.variables.map((variable) => (
-              <code key={variable} className="px-2 py-1 bg-gray-800 rounded text-yellow-400">
+              <code
+                key={variable}
+                className="px-2 py-1 bg-gray-800 rounded text-yellow-400"
+              >
                 {variable}
               </code>
             ))}
@@ -512,15 +618,24 @@ export default function EmailTemplatesSection() {
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-gray-800 border-gray-700">
-          <TabsTrigger value="content" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black">
+          <TabsTrigger
+            value="content"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+          >
             <Eye className="h-4 w-4 mr-2" />
             Content
           </TabsTrigger>
-          <TabsTrigger value="ai" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black">
+          <TabsTrigger
+            value="ai"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+          >
             <Sparkles className="h-4 w-4 mr-2" />
             AI Personalization
           </TabsTrigger>
-          <TabsTrigger value="advanced" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black">
+          <TabsTrigger
+            value="advanced"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+          >
             <Code className="h-4 w-4 mr-2" />
             Advanced
           </TabsTrigger>
@@ -542,7 +657,9 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">Email Subject</Label>
                   <Input
                     value={template.subject}
-                    onChange={(e) => setTemplate({ ...template, subject: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({ ...template, subject: e.target.value })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="Welcome to {{platformName}}!"
                   />
@@ -551,7 +668,9 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">From Name</Label>
                   <Input
                     value={template.fromName}
-                    onChange={(e) => setTemplate({ ...template, fromName: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({ ...template, fromName: e.target.value })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="{{platformName}}"
                   />
@@ -573,7 +692,9 @@ export default function EmailTemplatesSection() {
                 <Label className="text-gray-300">Welcome Heading</Label>
                 <Input
                   value={template.headingText}
-                  onChange={(e) => setTemplate({ ...template, headingText: e.target.value })}
+                  onChange={(e) =>
+                    setTemplate({ ...template, headingText: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white"
                   placeholder="Welcome aboard {{name}}"
                 />
@@ -588,7 +709,9 @@ export default function EmailTemplatesSection() {
                 </Label>
                 <Textarea
                   value={template.introText}
-                  onChange={(e) => setTemplate({ ...template, introText: e.target.value })}
+                  onChange={(e) =>
+                    setTemplate({ ...template, introText: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white min-h-[80px]"
                   placeholder="Thanks for joining! You now have the tools to track markets..."
                 />
@@ -598,7 +721,12 @@ export default function EmailTemplatesSection() {
                 <Label className="text-gray-300">Feature List Label</Label>
                 <Input
                   value={template.featureListLabel}
-                  onChange={(e) => setTemplate({ ...template, featureListLabel: e.target.value })}
+                  onChange={(e) =>
+                    setTemplate({
+                      ...template,
+                      featureListLabel: e.target.value,
+                    })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white"
                   placeholder="Here's what you can do right now:"
                 />
@@ -611,7 +739,9 @@ export default function EmailTemplatesSection() {
                     <div key={index} className="flex gap-2">
                       <Input
                         value={item}
-                        onChange={(e) => updateFeatureItem(index, e.target.value)}
+                        onChange={(e) =>
+                          updateFeatureItem(index, e.target.value)
+                        }
                         className="bg-gray-800 border-gray-700 text-white"
                       />
                       <Button
@@ -628,7 +758,7 @@ export default function EmailTemplatesSection() {
                     <Input
                       value={newFeatureItem}
                       onChange={(e) => setNewFeatureItem(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addFeatureItem()}
+                      onKeyDown={(e) => e.key === "Enter" && addFeatureItem()}
                       placeholder="Add new feature item..."
                       className="bg-gray-800 border-gray-700 text-white"
                     />
@@ -648,7 +778,9 @@ export default function EmailTemplatesSection() {
                 <Label className="text-gray-300">Closing Text</Label>
                 <Textarea
                   value={template.closingText}
-                  onChange={(e) => setTemplate({ ...template, closingText: e.target.value })}
+                  onChange={(e) =>
+                    setTemplate({ ...template, closingText: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white min-h-[80px]"
                   placeholder="We'll keep you informed with timely updates..."
                 />
@@ -670,7 +802,12 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">Button Text</Label>
                   <Input
                     value={template.ctaButtonText}
-                    onChange={(e) => setTemplate({ ...template, ctaButtonText: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({
+                        ...template,
+                        ctaButtonText: e.target.value,
+                      })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="Go to Dashboard"
                   />
@@ -679,7 +816,9 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">Button URL</Label>
                   <Input
                     value={template.ctaButtonUrl}
-                    onChange={(e) => setTemplate({ ...template, ctaButtonUrl: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({ ...template, ctaButtonUrl: e.target.value })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="{{baseUrl}}"
                   />
@@ -690,7 +829,9 @@ export default function EmailTemplatesSection() {
                 <Label className="text-gray-300">Footer Address</Label>
                 <Input
                   value={template.footerAddress}
-                  onChange={(e) => setTemplate({ ...template, footerAddress: e.target.value })}
+                  onChange={(e) =>
+                    setTemplate({ ...template, footerAddress: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white"
                   placeholder="{{companyAddress}}"
                 />
@@ -701,10 +842,15 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">Website URL</Label>
                   <Input
                     value={template.footerLinks.websiteUrl}
-                    onChange={(e) => setTemplate({
-                      ...template,
-                      footerLinks: { ...template.footerLinks, websiteUrl: e.target.value },
-                    })}
+                    onChange={(e) =>
+                      setTemplate({
+                        ...template,
+                        footerLinks: {
+                          ...template.footerLinks,
+                          websiteUrl: e.target.value,
+                        },
+                      })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="{{baseUrl}}"
                   />
@@ -713,10 +859,15 @@ export default function EmailTemplatesSection() {
                   <Label className="text-gray-300">Unsubscribe URL</Label>
                   <Input
                     value={template.footerLinks.unsubscribeUrl}
-                    onChange={(e) => setTemplate({
-                      ...template,
-                      footerLinks: { ...template.footerLinks, unsubscribeUrl: e.target.value },
-                    })}
+                    onChange={(e) =>
+                      setTemplate({
+                        ...template,
+                        footerLinks: {
+                          ...template.footerLinks,
+                          unsubscribeUrl: e.target.value,
+                        },
+                      })
+                    }
                     className="mt-1 bg-gray-800 border-gray-700 text-white"
                     placeholder="#"
                   />
@@ -741,14 +892,19 @@ export default function EmailTemplatesSection() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                 <div>
-                  <h4 className="text-white font-medium">Enable AI Personalization</h4>
+                  <h4 className="text-white font-medium">
+                    Enable AI Personalization
+                  </h4>
                   <p className="text-sm text-gray-400">
-                    Use AI to generate personalized intro text based on user profile
+                    Use AI to generate personalized intro text based on user
+                    profile
                   </p>
                 </div>
                 <Switch
                   checked={template.useAIPersonalization}
-                  onCheckedChange={(checked) => setTemplate({ ...template, useAIPersonalization: checked })}
+                  onCheckedChange={(checked) =>
+                    setTemplate({ ...template, useAIPersonalization: checked })
+                  }
                 />
               </div>
 
@@ -756,12 +912,19 @@ export default function EmailTemplatesSection() {
                 <div>
                   <Label className="text-gray-300">AI Prompt</Label>
                   <p className="text-xs text-gray-500 mb-2">
-                    This prompt is sent to the AI model to generate personalized intro text.
-                    Use <code className="text-yellow-400">{'{{userProfile}}'}</code> to include user data.
+                    This prompt is sent to the AI model to generate personalized
+                    intro text. Use{" "}
+                    <code className="text-yellow-400">{"{{userProfile}}"}</code>{" "}
+                    to include user data.
                   </p>
                   <Textarea
                     value={template.aiPersonalizationPrompt}
-                    onChange={(e) => setTemplate({ ...template, aiPersonalizationPrompt: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({
+                        ...template,
+                        aiPersonalizationPrompt: e.target.value,
+                      })
+                    }
                     className="bg-gray-800 border-gray-700 text-white font-mono text-sm min-h-[200px]"
                     placeholder="Generate a personalized welcome message..."
                   />
@@ -772,7 +935,8 @@ export default function EmailTemplatesSection() {
                 <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <p className="text-sm text-blue-400">
                     <AlertCircle className="h-4 w-4 inline mr-2" />
-                    AI personalization is disabled. The default intro text will be used for all users.
+                    AI personalization is disabled. The default intro text will
+                    be used for all users.
                   </p>
                 </div>
               )}
@@ -802,7 +966,9 @@ export default function EmailTemplatesSection() {
                 </div>
                 <Switch
                   checked={template.useCustomHtml}
-                  onCheckedChange={(checked) => setTemplate({ ...template, useCustomHtml: checked })}
+                  onCheckedChange={(checked) =>
+                    setTemplate({ ...template, useCustomHtml: checked })
+                  }
                 />
               </div>
 
@@ -810,17 +976,30 @@ export default function EmailTemplatesSection() {
                 <div>
                   <Label className="text-gray-300">Custom HTML Template</Label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Available variables: <code className="text-yellow-400">{'{{name}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{intro}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{platformName}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{baseUrl}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{logoUrl}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{dashboardPreviewUrl}}'}</code>,{' '}
-                    <code className="text-yellow-400">{'{{companyAddress}}'}</code>
+                    Available variables:{" "}
+                    <code className="text-yellow-400">{"{{name}}"}</code>,{" "}
+                    <code className="text-yellow-400">{"{{intro}}"}</code>,{" "}
+                    <code className="text-yellow-400">
+                      {"{{platformName}}"}
+                    </code>
+                    , <code className="text-yellow-400">{"{{baseUrl}}"}</code>,{" "}
+                    <code className="text-yellow-400">{"{{logoUrl}}"}</code>,{" "}
+                    <code className="text-yellow-400">
+                      {"{{dashboardPreviewUrl}}"}
+                    </code>
+                    ,{" "}
+                    <code className="text-yellow-400">
+                      {"{{companyAddress}}"}
+                    </code>
                   </p>
                   <Textarea
                     value={template.customHtmlTemplate}
-                    onChange={(e) => setTemplate({ ...template, customHtmlTemplate: e.target.value })}
+                    onChange={(e) =>
+                      setTemplate({
+                        ...template,
+                        customHtmlTemplate: e.target.value,
+                      })
+                    }
                     className="bg-gray-800 border-gray-700 text-white font-mono text-sm min-h-[400px]"
                     placeholder="<!DOCTYPE html>..."
                   />
@@ -831,7 +1010,8 @@ export default function EmailTemplatesSection() {
                 <div className="p-4 bg-gray-800/50 rounded-lg">
                   <p className="text-sm text-gray-400">
                     <Check className="h-4 w-4 inline mr-2 text-green-400" />
-                    Using the built-in responsive email template. Toggle above to use custom HTML.
+                    Using the built-in responsive email template. Toggle above
+                    to use custom HTML.
                   </p>
                 </div>
               )}
@@ -845,14 +1025,18 @@ export default function EmailTemplatesSection() {
             <CardContent>
               <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                 <div>
-                  <h4 className="text-white font-medium">Email Template Active</h4>
+                  <h4 className="text-white font-medium">
+                    Email Template Active
+                  </h4>
                   <p className="text-sm text-gray-400">
                     When disabled, no welcome emails will be sent
                   </p>
                 </div>
                 <Switch
                   checked={template.isActive}
-                  onCheckedChange={(checked) => setTemplate({ ...template, isActive: checked })}
+                  onCheckedChange={(checked) =>
+                    setTemplate({ ...template, isActive: checked })
+                  }
                 />
               </div>
             </CardContent>
@@ -862,4 +1046,3 @@ export default function EmailTemplatesSection() {
     </div>
   );
 }
-

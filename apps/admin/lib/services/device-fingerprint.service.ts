@@ -1,15 +1,15 @@
 /**
  * Device Fingerprinting Service (Client-Side)
- * 
+ *
  * This service generates unique device fingerprints to detect multi-accounting.
  * Uses FingerprintJS for accuracy, with ClientJS as fallback.
  */
 
-import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 interface DeviceFingerprintData {
   fingerprintId: string;
-  deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+  deviceType: "desktop" | "mobile" | "tablet" | "unknown";
   browser: string;
   browserVersion: string;
   os: string;
@@ -77,43 +77,47 @@ async function initFingerprint() {
 /**
  * Get device type from user agent (improved mobile detection)
  */
-function getDeviceType(): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
+function getDeviceType(): "desktop" | "mobile" | "tablet" | "unknown" {
   const ua = navigator.userAgent;
-  
+
   // Check for tablets first (iPad, Android tablets, etc.)
   if (/(iPad|tablet|playbook|silk)|(android(?!.*mobile))/i.test(ua)) {
-    return 'tablet';
+    return "tablet";
   }
-  
+
   // Check for mobile devices (comprehensive list)
-  if (/Mobile|iP(hone|od)|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini|Opera Mobi/i.test(ua)) {
-    return 'mobile';
+  if (
+    /Mobile|iP(hone|od)|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini|Opera Mobi/i.test(
+      ua,
+    )
+  ) {
+    return "mobile";
   }
-  
+
   // Check for specific mobile browsers
   if (/SamsungBrowser|UCBrowser|MiuiBrowser/i.test(ua)) {
     // These are typically mobile browsers
     if (!/tablet/i.test(ua)) {
-      return 'mobile';
+      return "mobile";
     }
   }
-  
+
   // Check for desktop OS
   if (/Windows NT|Macintosh|Mac OS X|Linux.*X11|CrOS/i.test(ua)) {
-    return 'desktop';
+    return "desktop";
   }
-  
+
   // Fallback: Check screen size as hint
-  if (typeof window !== 'undefined' && window.screen) {
+  if (typeof window !== "undefined" && window.screen) {
     const screenWidth = window.screen.width;
     if (screenWidth < 768) {
-      return 'mobile';
+      return "mobile";
     } else if (screenWidth >= 768 && screenWidth < 1024) {
-      return 'tablet';
+      return "tablet";
     }
   }
-  
-  return 'unknown';
+
+  return "unknown";
 }
 
 /**
@@ -121,87 +125,101 @@ function getDeviceType(): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
  */
 function parseUserAgent() {
   const ua = navigator.userAgent;
-  
+
   // Detect browser (order matters! Check specific browsers before generic ones)
-  let browser = 'Unknown';
-  let browserVersion = 'Unknown';
-  
-  if (ua.includes('Edg/') || ua.includes('Edge/')) {
+  let browser = "Unknown";
+  let browserVersion = "Unknown";
+
+  if (ua.includes("Edg/") || ua.includes("Edge/")) {
     // Microsoft Edge (Chromium-based)
-    browser = 'Edge';
-    browserVersion = ua.match(/Edg[e]?\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('OPR/') || ua.includes('Opera/')) {
+    browser = "Edge";
+    browserVersion = ua.match(/Edg[e]?\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("OPR/") || ua.includes("Opera/")) {
     // Opera
-    browser = 'Opera';
-    browserVersion = ua.match(/(?:OPR|Opera)\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Firefox/') && !ua.includes('Seamonkey')) {
+    browser = "Opera";
+    browserVersion = ua.match(/(?:OPR|Opera)\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("Firefox/") && !ua.includes("Seamonkey")) {
     // Firefox
-    browser = 'Firefox';
-    browserVersion = ua.match(/Firefox\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Chrome/') && !ua.includes('Edg') && !ua.includes('OPR')) {
+    browser = "Firefox";
+    browserVersion = ua.match(/Firefox\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (
+    ua.includes("Chrome/") &&
+    !ua.includes("Edg") &&
+    !ua.includes("OPR")
+  ) {
     // Chrome (check after Edge/Opera since they use Chrome engine)
-    browser = 'Chrome';
-    browserVersion = ua.match(/Chrome\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Safari/') && !ua.includes('Chrome') && !ua.includes('Edg')) {
+    browser = "Chrome";
+    browserVersion = ua.match(/Chrome\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (
+    ua.includes("Safari/") &&
+    !ua.includes("Chrome") &&
+    !ua.includes("Edg")
+  ) {
     // Safari (only if not Chrome or Edge)
-    browser = 'Safari';
-    browserVersion = ua.match(/Version\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Samsung')) {
+    browser = "Safari";
+    browserVersion = ua.match(/Version\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("Samsung")) {
     // Samsung Internet
-    browser = 'Samsung Internet';
-    browserVersion = ua.match(/SamsungBrowser\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('UCBrowser')) {
+    browser = "Samsung Internet";
+    browserVersion = ua.match(/SamsungBrowser\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("UCBrowser")) {
     // UC Browser
-    browser = 'UC Browser';
-    browserVersion = ua.match(/UCBrowser\/(\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('MSIE') || ua.includes('Trident/')) {
+    browser = "UC Browser";
+    browserVersion = ua.match(/UCBrowser\/(\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("MSIE") || ua.includes("Trident/")) {
     // Internet Explorer (legacy)
-    browser = 'Internet Explorer';
-    browserVersion = ua.match(/(?:MSIE |rv:)(\d+\.\d+)/)?.[1] || 'Unknown';
+    browser = "Internet Explorer";
+    browserVersion = ua.match(/(?:MSIE |rv:)(\d+\.\d+)/)?.[1] || "Unknown";
   }
-  
+
   // Detect OS (improved mobile detection)
-  let os = 'Unknown';
-  let osVersion = 'Unknown';
-  
-  if (ua.includes('Android')) {
+  let os = "Unknown";
+  let osVersion = "Unknown";
+
+  if (ua.includes("Android")) {
     // Android (check before Linux since Android uses Linux kernel)
-    os = 'Android';
-    osVersion = ua.match(/Android (\d+(?:\.\d+)?)/)?.[1] || 'Unknown';
-  } else if (ua.includes('iPhone') || ua.includes('iPad') || ua.includes('iPod')) {
+    os = "Android";
+    osVersion = ua.match(/Android (\d+(?:\.\d+)?)/)?.[1] || "Unknown";
+  } else if (
+    ua.includes("iPhone") ||
+    ua.includes("iPad") ||
+    ua.includes("iPod")
+  ) {
     // iOS
-    os = 'iOS';
-    osVersion = ua.match(/OS (\d+[._]\d+)/)?.[1]?.replace('_', '.') || 'Unknown';
-  } else if (ua.includes('Windows NT')) {
+    os = "iOS";
+    osVersion =
+      ua.match(/OS (\d+[._]\d+)/)?.[1]?.replace("_", ".") || "Unknown";
+  } else if (ua.includes("Windows NT")) {
     // Windows
-    os = 'Windows';
+    os = "Windows";
     const versionMap: { [key: string]: string } = {
-      '10.0': '10/11',
-      '6.3': '8.1',
-      '6.2': '8',
-      '6.1': '7',
-      '6.0': 'Vista',
-      '5.1': 'XP'
+      "10.0": "10/11",
+      "6.3": "8.1",
+      "6.2": "8",
+      "6.1": "7",
+      "6.0": "Vista",
+      "5.1": "XP",
     };
     const ntVersion = ua.match(/Windows NT (\d+\.\d+)/)?.[1];
-    osVersion = ntVersion ? (versionMap[ntVersion] || ntVersion) : 'Unknown';
-  } else if (ua.includes('Windows Phone')) {
+    osVersion = ntVersion ? versionMap[ntVersion] || ntVersion : "Unknown";
+  } else if (ua.includes("Windows Phone")) {
     // Windows Phone
-    os = 'Windows Phone';
-    osVersion = ua.match(/Windows Phone (\d+\.\d+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Mac OS X')) {
+    os = "Windows Phone";
+    osVersion = ua.match(/Windows Phone (\d+\.\d+)/)?.[1] || "Unknown";
+  } else if (ua.includes("Mac OS X")) {
     // macOS
-    os = 'macOS';
-    osVersion = ua.match(/Mac OS X (\d+[._]\d+)/)?.[1]?.replace('_', '.') || 'Unknown';
-  } else if (ua.includes('Linux')) {
+    os = "macOS";
+    osVersion =
+      ua.match(/Mac OS X (\d+[._]\d+)/)?.[1]?.replace("_", ".") || "Unknown";
+  } else if (ua.includes("Linux")) {
     // Linux (desktop)
-    os = 'Linux';
-  } else if (ua.includes('CrOS')) {
+    os = "Linux";
+  } else if (ua.includes("CrOS")) {
     // Chrome OS
-    os = 'Chrome OS';
-    osVersion = ua.match(/CrOS [^ ]+ (\d+\.\d+)/)?.[1] || 'Unknown';
+    os = "Chrome OS";
+    osVersion = ua.match(/CrOS [^ ]+ (\d+\.\d+)/)?.[1] || "Unknown";
   }
-  
+
   return { browser, browserVersion, os, osVersion };
 }
 
@@ -210,59 +228,66 @@ function parseUserAgent() {
  */
 function getCanvasFingerprint(): string {
   try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return 'unavailable';
-    
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "unavailable";
+
     canvas.width = 200;
     canvas.height = 50;
-    
-    ctx.textBaseline = 'top';
+
+    ctx.textBaseline = "top";
     ctx.font = '14px "Arial"';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#f60';
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#f60";
     ctx.fillRect(125, 1, 62, 20);
-    ctx.fillStyle = '#069';
-    ctx.fillText('Chartvolt 🔐', 2, 15);
-    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-    ctx.fillText('Chartvolt 🔐', 4, 17);
-    
+    ctx.fillStyle = "#069";
+    ctx.fillText("Chartvolt 🔐", 2, 15);
+    ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+    ctx.fillText("Chartvolt 🔐", 4, 17);
+
     return canvas.toDataURL();
   } catch (e) {
-    return 'error';
+    return "error";
   }
 }
 
 /**
  * Get WebGL fingerprint with GPU details
  */
-function getWebGLFingerprint(): { fingerprint: string; vendor?: string; renderer?: string; gpuInfo?: string } {
+function getWebGLFingerprint(): {
+  fingerprint: string;
+  vendor?: string;
+  renderer?: string;
+  gpuInfo?: string;
+} {
   try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext | null;
-    
-    if (!gl) return { fingerprint: 'unavailable' };
-    
-    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!debugInfo) return { fingerprint: 'unavailable' };
-    
+    const canvas = document.createElement("canvas");
+    const gl =
+      canvas.getContext("webgl") ||
+      (canvas.getContext("experimental-webgl") as WebGLRenderingContext | null);
+
+    if (!gl) return { fingerprint: "unavailable" };
+
+    const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+    if (!debugInfo) return { fingerprint: "unavailable" };
+
     const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
     const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-    
+
     // Extract GPU model from renderer string
-    let gpuInfo = renderer || 'Unknown GPU';
+    let gpuInfo = renderer || "Unknown GPU";
     // Clean up common patterns
-    gpuInfo = gpuInfo.replace(/ANGLE \(([^)]+)\)/, '$1');
-    gpuInfo = gpuInfo.replace(/Direct3D\d+/, '').trim();
-    
+    gpuInfo = gpuInfo.replace(/ANGLE \(([^)]+)\)/, "$1");
+    gpuInfo = gpuInfo.replace(/Direct3D\d+/, "").trim();
+
     return {
       fingerprint: `${vendor}~${renderer}`,
       vendor,
       renderer,
-      gpuInfo
+      gpuInfo,
     };
   } catch (e) {
-    return { fingerprint: 'error' };
+    return { fingerprint: "error" };
   }
 }
 
@@ -271,7 +296,7 @@ function getWebGLFingerprint(): { fingerprint: string; vendor?: string; renderer
  */
 function getHardwareInfo() {
   const nav = navigator as any;
-  
+
   return {
     cpuCores: nav.hardwareConcurrency || undefined,
     deviceMemory: nav.deviceMemory || undefined,
@@ -279,7 +304,7 @@ function getHardwareInfo() {
     hardwareConcurrency: nav.hardwareConcurrency || undefined,
     screenOrientation: screen.orientation?.type || undefined,
     pixelRatio: window.devicePixelRatio || 1,
-    touchSupport: 'ontouchstart' in window || nav.maxTouchPoints > 0,
+    touchSupport: "ontouchstart" in window || nav.maxTouchPoints > 0,
   };
 }
 
@@ -289,11 +314,11 @@ function getHardwareInfo() {
 async function getBatteryInfo() {
   try {
     const nav = navigator as any;
-    if ('getBattery' in nav) {
+    if ("getBattery" in nav) {
       const battery = await nav.getBattery();
       return {
         charging: battery.charging,
-        level: Math.round(battery.level * 100)
+        level: Math.round(battery.level * 100),
       };
     }
   } catch (e) {
@@ -308,28 +333,28 @@ async function getBatteryInfo() {
 function getMediaCapabilities() {
   const audioFormats: string[] = [];
   const videoFormats: string[] = [];
-  
-  const audio = document.createElement('audio');
-  const video = document.createElement('video');
-  
+
+  const audio = document.createElement("audio");
+  const video = document.createElement("video");
+
   // Check audio formats
-  ['audio/mp3', 'audio/ogg', 'audio/wav', 'audio/aac'].forEach(format => {
+  ["audio/mp3", "audio/ogg", "audio/wav", "audio/aac"].forEach((format) => {
     if (audio.canPlayType && audio.canPlayType(format)) {
-      audioFormats.push(format.split('/')[1]);
+      audioFormats.push(format.split("/")[1]);
     }
   });
-  
+
   // Check video formats
-  ['video/mp4', 'video/ogg', 'video/webm'].forEach(format => {
+  ["video/mp4", "video/ogg", "video/webm"].forEach((format) => {
     if (video.canPlayType && video.canPlayType(format)) {
-      videoFormats.push(format.split('/')[1]);
+      videoFormats.push(format.split("/")[1]);
     }
   });
-  
+
   return {
     audioFormats,
     videoFormats,
-    mediaDevices: 0 // Will be set later if available
+    mediaDevices: 0, // Will be set later if available
   };
 }
 
@@ -340,13 +365,13 @@ function getPlugins(): string[] {
   try {
     const plugins: string[] = [];
     const nav = navigator as any;
-    
+
     if (nav.plugins && nav.plugins.length > 0) {
       for (let i = 0; i < nav.plugins.length; i++) {
         plugins.push(nav.plugins[i].name);
       }
     }
-    
+
     return plugins.slice(0, 10); // Limit to first 10 plugins
   } catch (e) {
     return [];
@@ -358,10 +383,10 @@ function getPlugins(): string[] {
  */
 function getStorageInfo() {
   return {
-    localStorage: typeof localStorage !== 'undefined',
-    sessionStorage: typeof sessionStorage !== 'undefined',
-    indexedDB: typeof indexedDB !== 'undefined',
-    cookiesEnabled: navigator.cookieEnabled || false
+    localStorage: typeof localStorage !== "undefined",
+    sessionStorage: typeof sessionStorage !== "undefined",
+    indexedDB: typeof indexedDB !== "undefined",
+    cookiesEnabled: navigator.cookieEnabled || false,
   };
 }
 
@@ -370,14 +395,18 @@ function getStorageInfo() {
  */
 function getBrowserFeatures() {
   const win = window as any;
-  
+
   return {
-    webgl2: !!document.createElement('canvas').getContext('webgl2'),
-    webrtc: !!(win.RTCPeerConnection || win.webkitRTCPeerConnection || win.mozRTCPeerConnection),
-    geolocation: 'geolocation' in navigator,
-    notifications: 'Notification' in window,
-    serviceWorker: 'serviceWorker' in navigator,
-    webAssembly: typeof WebAssembly !== 'undefined'
+    webgl2: !!document.createElement("canvas").getContext("webgl2"),
+    webrtc: !!(
+      win.RTCPeerConnection ||
+      win.webkitRTCPeerConnection ||
+      win.mozRTCPeerConnection
+    ),
+    geolocation: "geolocation" in navigator,
+    notifications: "Notification" in window,
+    serviceWorker: "serviceWorker" in navigator,
+    webAssembly: typeof WebAssembly !== "undefined",
   };
 }
 
@@ -385,30 +414,39 @@ function getBrowserFeatures() {
  * Get list of installed fonts (sample check)
  */
 function getInstalledFonts(): string[] {
-  const baseFonts = ['monospace', 'sans-serif', 'serif'];
+  const baseFonts = ["monospace", "sans-serif", "serif"];
   const testFonts = [
-    'Arial', 'Verdana', 'Times New Roman', 'Courier New', 'Georgia',
-    'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS', 'Trebuchet MS',
-    'Impact', 'Lucida Console'
+    "Arial",
+    "Verdana",
+    "Times New Roman",
+    "Courier New",
+    "Georgia",
+    "Palatino",
+    "Garamond",
+    "Bookman",
+    "Comic Sans MS",
+    "Trebuchet MS",
+    "Impact",
+    "Lucida Console",
   ];
-  
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
   if (!ctx) return [];
-  
+
   const baseFontWidths: { [key: string]: number } = {};
-  baseFonts.forEach(font => {
+  baseFonts.forEach((font) => {
     ctx.font = `72px ${font}`;
-    baseFontWidths[font] = ctx.measureText('mmmmmmmmmmlli').width;
+    baseFontWidths[font] = ctx.measureText("mmmmmmmmmmlli").width;
   });
-  
+
   const detectedFonts: string[] = [];
-  
-  testFonts.forEach(font => {
+
+  testFonts.forEach((font) => {
     let detected = false;
-    baseFonts.forEach(baseFont => {
+    baseFonts.forEach((baseFont) => {
       ctx.font = `72px ${font}, ${baseFont}`;
-      const width = ctx.measureText('mmmmmmmmmmlli').width;
+      const width = ctx.measureText("mmmmmmmmmmlli").width;
       if (width !== baseFontWidths[baseFont]) {
         detected = true;
       }
@@ -417,7 +455,7 @@ function getInstalledFonts(): string[] {
       detectedFonts.push(font);
     }
   });
-  
+
   return detectedFonts;
 }
 
@@ -429,7 +467,7 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
     // Try FingerprintJS first (most accurate)
     const fp = await initFingerprint();
     const result = await fp.get();
-    
+
     const { browser, browserVersion, os, osVersion } = parseUserAgent();
     const webglData = getWebGLFingerprint();
     const hardwareInfo = getHardwareInfo();
@@ -438,7 +476,7 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
     const plugins = getPlugins();
     const storage = getStorageInfo();
     const features = getBrowserFeatures();
-    
+
     const fingerprintData = {
       fingerprintId: result.visitorId,
       deviceType: getDeviceType(),
@@ -460,23 +498,23 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
       confidence: result.confidence.score,
       hardware: {
         ...hardwareInfo,
-        battery: batteryInfo
+        battery: batteryInfo,
       },
       media: mediaInfo,
       plugins,
       storage,
-      features
+      features,
     };
 
     return fingerprintData;
   } catch (error) {
-    console.error('Error generating fingerprint:', error);
-    
+    console.error("Error generating fingerprint:", error);
+
     // Fallback: Create basic fingerprint from available data
     const { browser, browserVersion, os, osVersion } = parseUserAgent();
     const webglData = getWebGLFingerprint();
     const hardwareInfo = getHardwareInfo();
-    
+
     const basicFingerprint = [
       navigator.userAgent,
       screen.width,
@@ -485,17 +523,17 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
       navigator.language,
       new Date().getTimezoneOffset(),
       !!window.sessionStorage,
-      !!window.localStorage
-    ].join('|');
-    
+      !!window.localStorage,
+    ].join("|");
+
     // Create simple hash
     let hash = 0;
     for (let i = 0; i < basicFingerprint.length; i++) {
       const char = basicFingerprint.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
-    
+
     return {
       fingerprintId: `fallback_${Math.abs(hash).toString(36)}`,
       deviceType: getDeviceType(),
@@ -513,7 +551,7 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
       confidence: 0.5, // Lower confidence for fallback method
       hardware: hardwareInfo,
       storage: getStorageInfo(),
-      features: getBrowserFeatures()
+      features: getBrowserFeatures(),
     };
   }
 }
@@ -521,25 +559,28 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
 /**
  * Send fingerprint to server for tracking
  */
-export async function trackDeviceFingerprint(): Promise<{ success: boolean; suspicious?: boolean; message?: string }> {
+export async function trackDeviceFingerprint(): Promise<{
+  success: boolean;
+  suspicious?: boolean;
+  message?: string;
+}> {
   try {
     const fingerprint = await generateDeviceFingerprint();
-    
-    const response = await fetch('/api/fraud/track-device', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fingerprint)
+
+    const response = await fetch("/api/fraud/track-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fingerprint),
     });
-    
+
     if (!response.ok) {
-      throw new Error('Failed to track device');
+      throw new Error("Failed to track device");
     }
-    
+
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Error tracking device fingerprint:', error);
-    return { success: false, message: 'Failed to track device' };
+    console.error("Error tracking device fingerprint:", error);
+    return { success: false, message: "Failed to track device" };
   }
 }
-

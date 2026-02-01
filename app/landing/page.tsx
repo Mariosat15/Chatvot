@@ -1,8 +1,7 @@
-import LandingPageContent from './page-content';
+import LandingPageContent from "./page-content";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default function LandingPage() {
   return <LandingPageContent />;
 }
-

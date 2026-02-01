@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { getPaddleConfig, paddleRequest, getPaddleApiUrl } from '@/lib/paddle/config';
-import { initiateDeposit } from '@/lib/actions/trading/wallet.actions';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import {
+  getPaddleConfig,
+  paddleRequest,
+  getPaddleApiUrl,
+} from "@/lib/paddle/config";
+import { initiateDeposit } from "@/lib/actions/trading/wallet.actions";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * Create Paddle Checkout Session
- * 
+ *
  * Paddle is simpler than Stripe:
  * - No webhook configuration needed (auto-configured)
  * - Handles taxes automatically
@@ -19,28 +23,34 @@ export async function POST(req: NextRequest) {
   try {
     // Get authenticated user
     const session = await auth.api.getSession({ headers: await headers() });
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { amount, currency = 'EUR' } = await req.json();
+    const { amount, currency = "EUR" } = await req.json();
 
     // Validate amount
-    if (!amount || typeof amount !== 'number' || amount < 1) {
-      return NextResponse.json({ error: 'Invalid amount (min: €1)' }, { status: 400 });
+    if (!amount || typeof amount !== "number" || amount < 1) {
+      return NextResponse.json(
+        { error: "Invalid amount (min: €1)" },
+        { status: 400 },
+      );
     }
 
     if (amount > 10000) {
-      return NextResponse.json({ error: 'Maximum deposit is €10,000' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Maximum deposit is €10,000" },
+        { status: 400 },
+      );
     }
 
     // Check Paddle configuration
     const paddleConfig = await getPaddleConfig();
     if (!paddleConfig) {
       return NextResponse.json(
-        { error: 'Paddle is not configured. Contact administrator.' },
-        { status: 400 }
+        { error: "Paddle is not configured. Contact administrator." },
+        { status: 400 },
       );
     }
 
@@ -49,8 +59,8 @@ export async function POST(req: NextRequest) {
 
     // Create Paddle transaction
     // Using Paddle Billing API (v2)
-    const paddleTransaction = await paddleRequest<any>('/transactions', {
-      method: 'POST',
+    const paddleTransaction = await paddleRequest<any>("/transactions", {
+      method: "POST",
       body: {
         items: [
           {
@@ -72,7 +82,7 @@ export async function POST(req: NextRequest) {
         custom_data: {
           user_id: session.user.id,
           transaction_id: transaction._id.toString(),
-          type: 'deposit',
+          type: "deposit",
           amount: amount.toString(),
         },
         currency_code: currency.toUpperCase(),
@@ -83,8 +93,8 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     await WalletTransaction.findByIdAndUpdate(transaction._id, {
       paymentIntentId: paddleTransaction.data.id,
-      'metadata.paddleTransactionId': paddleTransaction.data.id,
-      'metadata.provider': 'paddle',
+      "metadata.paddleTransactionId": paddleTransaction.data.id,
+      "metadata.provider": "paddle",
     });
 
     console.log(`✅ Paddle transaction created: ${paddleTransaction.data.id}`);
@@ -105,12 +115,14 @@ export async function POST(req: NextRequest) {
       environment: paddleConfig.environment,
     });
   } catch (error) {
-    console.error('Error creating Paddle checkout:', error);
-    
+    console.error("Error creating Paddle checkout:", error);
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create checkout' },
-      { status: 500 }
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create checkout",
+      },
+      { status: 500 },
     );
   }
 }
-

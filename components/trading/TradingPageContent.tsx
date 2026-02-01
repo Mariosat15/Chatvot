@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useTradingMode } from './TradingInterface';
-import GameModeTradingPage from './GameModeTradingPage';
-import { ReactNode } from 'react';
+import { useTradingMode } from "./TradingInterface";
+import GameModeTradingPage from "./GameModeTradingPage";
+import { ReactNode } from "react";
 
 interface Position {
   _id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   quantity: number;
   unrealizedPnl: number;
@@ -67,9 +67,9 @@ export default function TradingPageContent({
   children,
 }: TradingPageContentProps) {
   const { mode } = useTradingMode();
-  
+
   // In game mode, use the gaming-styled layout
-  if (mode === 'game') {
+  if (mode === "game") {
     return (
       <GameModeTradingPage
         competition={competition}
@@ -84,7 +84,7 @@ export default function TradingPageContent({
       />
     );
   }
-  
+
   // In professional mode, render the existing layout (passed as children)
   return <>{children}</>;
 }

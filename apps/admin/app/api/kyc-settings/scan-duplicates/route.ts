@@ -1,30 +1,30 @@
-import { NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/admin/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
-import KYCSession from '@/database/models/kyc-session.model';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import FraudSettings from '@/database/models/fraud/fraud-settings.model';
-import UserRestriction from '@/database/models/user-restriction.model';
-import SuspicionScore from '@/database/models/fraud/suspicion-score.model';
-import AuditLog from '@/database/models/audit-log.model';
+import { NextResponse } from "next/server";
+import { getAdminSession } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
+import KYCSession from "@/database/models/kyc-session.model";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import FraudSettings from "@/database/models/fraud/fraud-settings.model";
+import UserRestriction from "@/database/models/user-restriction.model";
+import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
+import AuditLog from "@/database/models/audit-log.model";
 
 interface DuplicateGroup {
   key: string;
-  matchType: 'document_number' | 'id_number' | 'fingerprint' | 'name_dob';
+  matchType: "document_number" | "id_number" | "fingerprint" | "name_dob";
   sessions: any[];
 }
 
 function maskDocNumber(num: string): string {
-  if (num.length <= 4) return '****';
-  return num.slice(0, 2) + '*'.repeat(num.length - 4) + num.slice(-2);
+  if (num.length <= 4) return "****";
+  return num.slice(0, 2) + "*".repeat(num.length - 4) + num.slice(-2);
 }
 
 export async function POST() {
   try {
     const session = await getAdminSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -34,13 +34,13 @@ export async function POST() {
 
     // Get all approved KYC sessions
     const approvedSessions = await KYCSession.find({
-      status: 'approved',
+      status: "approved",
     }).lean();
 
     if (approvedSessions.length < 2) {
       return NextResponse.json({
         success: true,
-        message: 'Not enough sessions to have duplicates',
+        message: "Not enough sessions to have duplicates",
         stats: {
           sessionsScanned: approvedSessions.length,
           duplicateGroupsFound: 0,
@@ -59,14 +59,14 @@ export async function POST() {
     const byDocNumber: Record<string, any[]> = {};
     for (const sess of approvedSessions) {
       if (sess.documentData?.number && sess.documentData?.country) {
-        const key = `${sess.documentData.number.toUpperCase().replace(/\s/g, '')}|${sess.documentData.country.toUpperCase()}`;
+        const key = `${sess.documentData.number.toUpperCase().replace(/\s/g, "")}|${sess.documentData.country.toUpperCase()}`;
         if (!byDocNumber[key]) byDocNumber[key] = [];
         byDocNumber[key].push(sess);
       }
     }
     for (const [key, sessions] of Object.entries(byDocNumber)) {
       if (sessions.length > 1) {
-        duplicateGroups.push({ key, matchType: 'document_number', sessions });
+        duplicateGroups.push({ key, matchType: "document_number", sessions });
       }
     }
 
@@ -74,19 +74,19 @@ export async function POST() {
     const byIdNumber: Record<string, any[]> = {};
     for (const sess of approvedSessions) {
       if (sess.personData?.idNumber) {
-        const key = sess.personData.idNumber.toUpperCase().replace(/\s/g, '');
+        const key = sess.personData.idNumber.toUpperCase().replace(/\s/g, "");
         if (!byIdNumber[key]) byIdNumber[key] = [];
         byIdNumber[key].push(sess);
       }
     }
     for (const [key, sessions] of Object.entries(byIdNumber)) {
       if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some(g => {
-          const gUserIds = new Set(g.sessions.map(s => s.userId));
-          return sessions.every(s => gUserIds.has(s.userId));
+        const alreadyGrouped = duplicateGroups.some((g) => {
+          const gUserIds = new Set(g.sessions.map((s) => s.userId));
+          return sessions.every((s) => gUserIds.has(s.userId));
         });
         if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: 'id_number', sessions });
+          duplicateGroups.push({ key, matchType: "id_number", sessions });
         }
       }
     }
@@ -102,12 +102,12 @@ export async function POST() {
     }
     for (const [key, sessions] of Object.entries(byFingerprint)) {
       if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some(g => {
-          const gUserIds = new Set(g.sessions.map(s => s.userId));
-          return sessions.every(s => gUserIds.has(s.userId));
+        const alreadyGrouped = duplicateGroups.some((g) => {
+          const gUserIds = new Set(g.sessions.map((s) => s.userId));
+          return sessions.every((s) => gUserIds.has(s.userId));
         });
         if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: 'fingerprint', sessions });
+          duplicateGroups.push({ key, matchType: "fingerprint", sessions });
         }
       }
     }
@@ -115,7 +115,11 @@ export async function POST() {
     // Group 4: By name + date of birth
     const byNameDob: Record<string, any[]> = {};
     for (const sess of approvedSessions) {
-      if (sess.personData?.firstName && sess.personData?.lastName && sess.personData?.dateOfBirth) {
+      if (
+        sess.personData?.firstName &&
+        sess.personData?.lastName &&
+        sess.personData?.dateOfBirth
+      ) {
         const key = `${sess.personData.firstName.toUpperCase()}|${sess.personData.lastName.toUpperCase()}|${sess.personData.dateOfBirth}`;
         if (!byNameDob[key]) byNameDob[key] = [];
         byNameDob[key].push(sess);
@@ -123,12 +127,12 @@ export async function POST() {
     }
     for (const [key, sessions] of Object.entries(byNameDob)) {
       if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some(g => {
-          const gUserIds = new Set(g.sessions.map(s => s.userId));
-          return sessions.every(s => gUserIds.has(s.userId));
+        const alreadyGrouped = duplicateGroups.some((g) => {
+          const gUserIds = new Set(g.sessions.map((s) => s.userId));
+          return sessions.every((s) => gUserIds.has(s.userId));
         });
         if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: 'name_dob', sessions });
+          duplicateGroups.push({ key, matchType: "name_dob", sessions });
         }
       }
     }
@@ -139,13 +143,13 @@ export async function POST() {
     const duplicatesFound: any[] = [];
 
     for (const group of duplicateGroups) {
-      const userIds = [...new Set(group.sessions.map(s => s.userId))];
+      const userIds = [...new Set(group.sessions.map((s) => s.userId))];
 
       // Check if alert already exists
       const existingAlert = await FraudAlert.findOne({
-        alertType: 'duplicate_kyc',
+        alertType: "duplicate_kyc",
         suspiciousUserIds: { $all: userIds },
-        status: { $in: ['pending', 'investigating'] },
+        status: { $in: ["pending", "investigating"] },
       });
 
       if (existingAlert) {
@@ -161,40 +165,47 @@ export async function POST() {
       // Get document info from first session
       const firstSession = group.sessions[0];
       const docInfo = {
-        type: firstSession.documentData?.type || 'Unknown',
-        country: firstSession.documentData?.country || 'Unknown',
-        numberMasked: firstSession.documentData?.number 
+        type: firstSession.documentData?.type || "Unknown",
+        country: firstSession.documentData?.country || "Unknown",
+        numberMasked: firstSession.documentData?.number
           ? maskDocNumber(firstSession.documentData.number)
-          : 'Unknown',
+          : "Unknown",
       };
 
       // Create fraud alert
       const alert = await FraudAlert.create({
-        alertType: 'duplicate_kyc',
-        severity: 'critical',
-        status: 'pending',
+        alertType: "duplicate_kyc",
+        severity: "critical",
+        status: "pending",
         primaryUserId: userIds[0],
         suspiciousUserIds: userIds,
-        confidence: group.matchType === 'document_number' ? 0.95 
-          : group.matchType === 'id_number' ? 0.95 
-          : group.matchType === 'fingerprint' ? 0.90 
-          : 0.70,
-        evidence: [{
-          type: 'duplicate_document',
-          description: `Same identity document used across ${userIds.length} accounts`,
-          data: {
-            matchType: group.matchType,
-            documentInfo: docInfo,
-            accounts: group.sessions.map(s => ({
-              userId: s.userId,
-              userEmail: s.userEmail,
-              userName: s.userName,
-              verifiedAt: s.completedAt || s.createdAt,
-            })),
+        confidence:
+          group.matchType === "document_number"
+            ? 0.95
+            : group.matchType === "id_number"
+              ? 0.95
+              : group.matchType === "fingerprint"
+                ? 0.9
+                : 0.7,
+        evidence: [
+          {
+            type: "duplicate_document",
+            description: `Same identity document used across ${userIds.length} accounts`,
+            data: {
+              matchType: group.matchType,
+              documentInfo: docInfo,
+              accounts: group.sessions.map((s) => ({
+                userId: s.userId,
+                userEmail: s.userEmail,
+                userName: s.userName,
+                verifiedAt: s.completedAt || s.createdAt,
+              })),
+            },
           },
-        }],
-        title: '🚨 Duplicate KYC Document Detected',
-        description: `The same identity document was used to verify ${userIds.length} different accounts. ` +
+        ],
+        title: "🚨 Duplicate KYC Document Detected",
+        description:
+          `The same identity document was used to verify ${userIds.length} different accounts. ` +
           `Document: ${docInfo.type} from ${docInfo.country}. ` +
           `Match type: ${group.matchType}. ` +
           `This is a strong indicator of potential fraud or multi-accounting.`,
@@ -207,7 +218,7 @@ export async function POST() {
 
       // Update suspicion scores
       const evidenceText = `Duplicate KYC document detected with ${userIds.length - 1} other account(s). Match type: ${group.matchType}`;
-      
+
       for (const userId of userIds) {
         try {
           let score = await SuspicionScore.findOne({
@@ -218,18 +229,18 @@ export async function POST() {
             score = new SuspicionScore({
               userId: new mongoose.Types.ObjectId(userId),
               totalScore: 0,
-              riskLevel: 'low',
+              riskLevel: "low",
             });
           }
 
-          score.addPercentage('kycDuplicate', 50, evidenceText);
+          score.addPercentage("kycDuplicate", 50, evidenceText);
 
           for (const otherId of userIds) {
             if (otherId !== userId) {
               score.addLinkedAccount(
                 new mongoose.Types.ObjectId(otherId),
-                'kyc_duplicate',
-                0.95
+                "kyc_duplicate",
+                0.95,
               );
             }
           }
@@ -246,7 +257,7 @@ export async function POST() {
         for (const userId of userIds) {
           const existingRestriction = await UserRestriction.findOne({
             userId,
-            reason: 'kyc_fraud',
+            reason: "kyc_fraud",
             isActive: true,
           });
 
@@ -254,16 +265,18 @@ export async function POST() {
 
           await UserRestriction.create({
             userId,
-            restrictionType: 'suspended',
-            reason: 'kyc_fraud',
+            restrictionType: "suspended",
+            reason: "kyc_fraud",
             customReason: `Duplicate KYC detected. Found by admin scan. Alert ID: ${alert._id}`,
             canTrade: !(fraudSettings.duplicateKYCBlockTrading ?? true),
-            canEnterCompetitions: !(fraudSettings.duplicateKYCBlockCompetitions ?? true),
+            canEnterCompetitions: !(
+              fraudSettings.duplicateKYCBlockCompetitions ?? true
+            ),
             canDeposit: !(fraudSettings.duplicateKYCBlockDeposits ?? true),
             canWithdraw: fraudSettings.duplicateKYCAllowWithdrawals ?? true,
             restrictedBy: session.id,
             relatedFraudAlertId: alert._id.toString(),
-            relatedUserIds: userIds.filter(id => id !== userId),
+            relatedUserIds: userIds.filter((id) => id !== userId),
             isActive: true,
           });
 
@@ -283,14 +296,14 @@ export async function POST() {
     // Log the action
     await AuditLog.logAction({
       userId: session.id,
-      userName: session.name || 'Admin',
-      userEmail: session.email || 'admin@system',
-      userRole: 'admin',
-      action: 'kyc_duplicate_scan',
-      actionCategory: 'security',
+      userName: session.name || "Admin",
+      userEmail: session.email || "admin@system",
+      userRole: "admin",
+      action: "kyc_duplicate_scan",
+      actionCategory: "security",
       description: `Scanned ${approvedSessions.length} KYC sessions. Found ${duplicateGroups.length} duplicate groups. Created ${alertsCreated} alerts, suspended ${usersSuspended} users.`,
-      targetType: 'settings',
-      targetId: 'kyc',
+      targetType: "settings",
+      targetId: "kyc",
       metadata: {
         sessionsScanned: approvedSessions.length,
         duplicateGroupsFound: duplicateGroups.length,
@@ -298,14 +311,15 @@ export async function POST() {
         scoresUpdated,
         usersSuspended,
       },
-      status: 'success',
+      status: "success",
     });
 
     return NextResponse.json({
       success: true,
-      message: duplicateGroups.length > 0 
-        ? `Found ${duplicateGroups.length} duplicate group(s). Created ${alertsCreated} new alert(s).`
-        : 'No duplicates found. All KYC sessions are unique.',
+      message:
+        duplicateGroups.length > 0
+          ? `Found ${duplicateGroups.length} duplicate group(s). Created ${alertsCreated} new alert(s).`
+          : "No duplicates found. All KYC sessions are unique.",
       stats: {
         sessionsScanned: approvedSessions.length,
         duplicateGroupsFound: duplicateGroups.length,
@@ -315,13 +329,11 @@ export async function POST() {
       },
       duplicates: duplicatesFound,
     });
-
   } catch (error) {
-    console.error('Error scanning for duplicate KYC:', error);
+    console.error("Error scanning for duplicate KYC:", error);
     return NextResponse.json(
-      { error: 'Failed to scan for duplicates' },
-      { status: 500 }
+      { error: "Failed to scan for duplicates" },
+      { status: 500 },
     );
   }
 }
-

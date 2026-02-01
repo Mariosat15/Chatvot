@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { getAdminSession } from '@/lib/admin/auth';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getAdminSession } from "@/lib/admin/auth";
+import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * POST /api/admin/users/credit
@@ -12,23 +12,23 @@ import { auditLogService } from '@/lib/services/audit-log.service';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log('📥 Received credit request:', body);
-    
+    console.log("📥 Received credit request:", body);
+
     const { userId, amount, reason } = body;
 
     // Validation
     if (!userId) {
-      console.error('❌ User ID is missing from request body:', body);
+      console.error("❌ User ID is missing from request body:", body);
       return NextResponse.json(
-        { success: false, message: 'User ID is required', receivedBody: body },
-        { status: 400 }
+        { success: false, message: "User ID is required", receivedBody: body },
+        { status: 400 },
       );
     }
 
     if (!amount || amount === 0) {
       return NextResponse.json(
-        { success: false, message: 'Amount cannot be zero' },
-        { status: 400 }
+        { success: false, message: "Amount cannot be zero" },
+        { status: 400 },
       );
     }
 
@@ -55,51 +55,55 @@ export async function POST(request: Request) {
     // Check if removing credits would result in negative balance
     const previousBalance = wallet.creditBalance;
     const newBalance = previousBalance + amount;
-    
+
     if (newBalance < 0) {
       return NextResponse.json(
-        { 
-          success: false, 
-          message: `Cannot remove ${Math.abs(amount)} credits. User only has ${previousBalance.toFixed(2)} credits available.` 
+        {
+          success: false,
+          message: `Cannot remove ${Math.abs(amount)} credits. User only has ${previousBalance.toFixed(2)} credits available.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Update wallet balance
     wallet.creditBalance = newBalance;
-    
+
     // Only update totalDeposited/totalWithdrawn if adding/removing credits
     if (amount > 0) {
       wallet.totalDeposited += amount;
     } else {
       wallet.totalWithdrawn += Math.abs(amount);
     }
-    
+
     await wallet.save();
 
     // Create transaction record
     await WalletTransaction.create({
       userId,
-      transactionType: 'admin_adjustment',
+      transactionType: "admin_adjustment",
       amount,
       balanceBefore: previousBalance,
       balanceAfter: wallet.creditBalance,
-      currency: 'EUR',
+      currency: "EUR",
       exchangeRate: 1,
-      description: reason || `Admin ${amount > 0 ? 'added' : 'removed'} ${Math.abs(amount)} credits`,
-      status: 'completed',
+      description:
+        reason ||
+        `Admin ${amount > 0 ? "added" : "removed"} ${Math.abs(amount)} credits`,
+      status: "completed",
       processedAt: new Date(),
       metadata: {
-        source: 'admin',
+        source: "admin",
         adminAdjustment: true,
         adjustmentAmount: amount,
-        adjustmentType: amount > 0 ? 'credit' : 'debit',
+        adjustmentType: amount > 0 ? "credit" : "debit",
       },
     });
 
-    const actionText = amount > 0 ? 'added' : 'removed';
-    console.log(`✅ Admin ${actionText} ${Math.abs(amount)} credits ${amount > 0 ? 'to' : 'from'} user ${userId}`);
+    const actionText = amount > 0 ? "added" : "removed";
+    console.log(
+      `✅ Admin ${actionText} ${Math.abs(amount)} credits ${amount > 0 ? "to" : "from"} user ${userId}`,
+    );
 
     // Log audit action
     try {
@@ -109,18 +113,18 @@ export async function POST(request: Request) {
           {
             id: admin.id,
             email: admin.email,
-            name: admin.email.split('@')[0],
-            role: 'admin',
+            name: admin.email.split("@")[0],
+            role: "admin",
           },
           userId,
           userId,
           previousBalance,
           newBalance,
-          reason || `Admin ${actionText} ${Math.abs(amount)} credits`
+          reason || `Admin ${actionText} ${Math.abs(amount)} credits`,
         );
       }
     } catch (auditError) {
-      console.error('Failed to log audit action:', auditError);
+      console.error("Failed to log audit action:", auditError);
     }
 
     return NextResponse.json({
@@ -134,15 +138,14 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error('❌ Error crediting user:', error);
+    console.error("❌ Error crediting user:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to credit user',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Failed to credit user",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

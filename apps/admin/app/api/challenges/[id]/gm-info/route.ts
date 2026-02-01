@@ -1,23 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * GET - Fetch Game Master info for a challenge
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: challengeId } = await params;
     const { searchParams } = new URL(request.url);
-    const challengerId = searchParams.get('challengerId');
-    const challengedId = searchParams.get('challengedId');
+    const challengerId = searchParams.get("challengerId");
+    const challengedId = searchParams.get("challengedId");
 
     if (!challengerId || !challengedId) {
       return NextResponse.json(
-        { error: 'Missing challengerId or challengedId' },
-        { status: 400 }
+        { error: "Missing challengerId or challengedId" },
+        { status: 400 },
       );
     }
 
@@ -25,10 +25,13 @@ export async function GET(
     const db = connection.db;
 
     // Get GM earnings for this challenge
-    const gmEarnings = await db.collection('gamemasterearnings').find({
-      sourceId: challengeId,
-      sourceType: 'challenge',
-    }).toArray();
+    const gmEarnings = await db
+      .collection("gamemasterearnings")
+      .find({
+        sourceId: challengeId,
+        sourceType: "challenge",
+      })
+      .toArray();
 
     const result: {
       challenger?: {
@@ -60,10 +63,10 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching challenge GM info:', error);
+    console.error("Error fetching challenge GM info:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch GM info' },
-      { status: 500 }
+      { error: "Failed to fetch GM info" },
+      { status: 500 },
     );
   }
 }

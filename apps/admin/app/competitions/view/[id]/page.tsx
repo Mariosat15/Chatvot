@@ -1,48 +1,66 @@
-import { Trophy, Users, DollarSign, Calendar, ArrowLeft, Edit, Clock, Target, Award, User } from 'lucide-react';
-import { getCompetitionById, getCompetitionLeaderboard } from '@/lib/actions/trading/competition.actions';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { unstable_noStore as noStore } from 'next/cache';
-import { connectToDatabase } from '@/database/mongoose';
-import AppSettings from '@/database/models/app-settings.model';
-import CompetitionAdminActions from '@/components/admin/CompetitionAdminActions';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import {
+  Trophy,
+  Users,
+  DollarSign,
+  Calendar,
+  ArrowLeft,
+  Edit,
+  Clock,
+  Target,
+  Award,
+  User,
+} from "lucide-react";
+import {
+  getCompetitionById,
+  getCompetitionLeaderboard,
+} from "@/lib/actions/trading/competition.actions";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
+import { connectToDatabase } from "@/database/mongoose";
+import AppSettings from "@/database/models/app-settings.model";
+import CompetitionAdminActions from "@/components/admin/CompetitionAdminActions";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 interface AdminCompetitionViewPageProps {
   params: Promise<{ id: string }>;
 }
 
-const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProps) => {
+const AdminCompetitionViewPage = async ({
+  params,
+}: AdminCompetitionViewPageProps) => {
   // Disable cache to always show fresh competition data
   noStore();
-  
+
   const { id } = await params;
 
   // Get dynamic currency settings
   await connectToDatabase();
-  const appSettings = await AppSettings.findById('app-settings').lean() as any;
-  const creditName = appSettings?.credits?.name || 'Credits';
-  const _creditSymbol = appSettings?.credits?.symbol || '⚡';
-  const currencySymbol = appSettings?.currency?.symbol || '€';
-  const _currencyCode = appSettings?.currency?.code || 'EUR';
+  const appSettings = (await AppSettings.findById(
+    "app-settings",
+  ).lean()) as any;
+  const creditName = appSettings?.credits?.name || "Credits";
+  const _creditSymbol = appSettings?.credits?.symbol || "⚡";
+  const currencySymbol = appSettings?.currency?.symbol || "€";
+  const _currencyCode = appSettings?.currency?.code || "EUR";
 
   try {
     // Get competition data
     const competition = await getCompetitionById(id);
     const leaderboard = await getCompetitionLeaderboard(id, 100);
 
-    const isActive = competition.status === 'active';
-    const _isUpcoming = competition.status === 'upcoming';
-    const isCompleted = competition.status === 'completed';
-    const isCancelled = competition.status === 'cancelled';
+    const isActive = competition.status === "active";
+    const _isUpcoming = competition.status === "upcoming";
+    const isCompleted = competition.status === "completed";
+    const isCancelled = competition.status === "cancelled";
 
     // Get actual prizes won from database (WalletTransaction)
-    const prizeTransactions = await WalletTransaction.find({
+    const prizeTransactions = (await WalletTransaction.find({
       competitionId: id,
-      transactionType: 'competition_win',
-      status: 'completed',
-    }).lean() as any[];
+      transactionType: "competition_win",
+      status: "completed",
+    }).lean()) as any[];
 
     // Create a map of userId -> prize amount
     const prizeMap = new Map<string, number>();
@@ -52,13 +70,19 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
     // Get Game Master earnings for this competition
     const db = (await connectToDatabase()).connection.db;
-    const gmEarnings = await db.collection('gamemasterearnings').find({
-      sourceId: id,
-      sourceType: 'competition',
-    }).toArray();
+    const gmEarnings = await db
+      .collection("gamemasterearnings")
+      .find({
+        sourceId: id,
+        sourceType: "competition",
+      })
+      .toArray();
 
     // Create a map of referredUserId -> GM info
-    const gmMap = new Map<string, { gmId: string; gmEmail: string; gmEarning: number }>();
+    const gmMap = new Map<
+      string,
+      { gmId: string; gmEmail: string; gmEarning: number }
+    >();
     gmEarnings.forEach((earning: any) => {
       gmMap.set(earning.referredUserId, {
         gmId: earning.gameMasterId,
@@ -69,10 +93,10 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
     const formatUTCDate = (date: Date) => {
       const year = date.getUTCFullYear();
-      const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-      const day = date.getUTCDate().toString().padStart(2, '0');
-      const hours = date.getUTCHours().toString().padStart(2, '0');
-      const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+      const day = date.getUTCDate().toString().padStart(2, "0");
+      const hours = date.getUTCHours().toString().padStart(2, "0");
+      const minutes = date.getUTCMinutes().toString().padStart(2, "0");
       return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
     };
 
@@ -81,7 +105,7 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
       const end = new Date(competition.endTime);
       const diff = end.getTime() - now.getTime();
 
-      if (diff < 0) return 'Ended';
+      if (diff < 0) return "Ended";
 
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -95,16 +119,16 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
     const getStatusColor = (status: string) => {
       switch (status) {
-        case 'active':
-          return 'bg-green-500 text-white';
-        case 'upcoming':
-          return 'bg-blue-500 text-white';
-        case 'completed':
-          return 'bg-gray-500 text-white';
-        case 'cancelled':
-          return 'bg-red-500 text-white';
+        case "active":
+          return "bg-green-500 text-white";
+        case "upcoming":
+          return "bg-blue-500 text-white";
+        case "completed":
+          return "bg-gray-500 text-white";
+        case "cancelled":
+          return "bg-red-500 text-white";
         default:
-          return 'bg-gray-500 text-white';
+          return "bg-gray-500 text-white";
       }
     };
 
@@ -114,7 +138,10 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
           {/* Header Actions */}
           <div className="flex items-center justify-between gap-4">
             <Link href="/dashboard?activeTab=competitions">
-              <Button variant="ghost" className="text-gray-400 hover:text-gray-100">
+              <Button
+                variant="ghost"
+                className="text-gray-400 hover:text-gray-100"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Admin Dashboard
               </Button>
@@ -142,8 +169,12 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h1 className="text-3xl font-bold text-white">{competition.name}</h1>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(competition.status)}`}>
+                      <h1 className="text-3xl font-bold text-white">
+                        {competition.name}
+                      </h1>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(competition.status)}`}
+                      >
                         {competition.status.toUpperCase()}
                       </span>
                     </div>
@@ -164,7 +195,12 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 <div>
                   <p className="text-xs text-gray-500">Prize Pool</p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    {currencySymbol}{(competition.prizePool || competition.prizePoolCredits || 0).toLocaleString()}
+                    {currencySymbol}
+                    {(
+                      competition.prizePool ||
+                      competition.prizePoolCredits ||
+                      0
+                    ).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -178,7 +214,12 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 <div>
                   <p className="text-xs text-gray-500">Entry Fee</p>
                   <p className="text-2xl font-bold text-green-400">
-                    {currencySymbol}{(competition.entryFee || competition.entryFeeCredits || 0).toLocaleString()}
+                    {currencySymbol}
+                    {(
+                      competition.entryFee ||
+                      competition.entryFeeCredits ||
+                      0
+                    ).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -192,7 +233,8 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 <div>
                   <p className="text-xs text-gray-500">Participants</p>
                   <p className="text-2xl font-bold text-blue-400">
-                    {competition.currentParticipants}/{competition.maxParticipants}
+                    {competition.currentParticipants}/
+                    {competition.maxParticipants}
                   </p>
                 </div>
               </div>
@@ -200,17 +242,33 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
             <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-2">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                  isCancelled ? 'bg-red-500/20' : 'bg-purple-500/20'
-                }`}>
-                  <Clock className={`h-5 w-5 ${isCancelled ? 'text-red-400' : 'text-purple-400'}`} />
+                <div
+                  className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                    isCancelled ? "bg-red-500/20" : "bg-purple-500/20"
+                  }`}
+                >
+                  <Clock
+                    className={`h-5 w-5 ${isCancelled ? "text-red-400" : "text-purple-400"}`}
+                  />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">
-                    {isCancelled ? 'Status' : isActive ? 'Time Remaining' : isCompleted ? 'Status' : 'Starts In'}
+                    {isCancelled
+                      ? "Status"
+                      : isActive
+                        ? "Time Remaining"
+                        : isCompleted
+                          ? "Status"
+                          : "Starts In"}
                   </p>
-                  <p className={`text-2xl font-bold ${isCancelled ? 'text-red-400' : 'text-purple-400'}`}>
-                    {isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : getTimeRemaining()}
+                  <p
+                    className={`text-2xl font-bold ${isCancelled ? "text-red-400" : "text-purple-400"}`}
+                  >
+                    {isCancelled
+                      ? "Cancelled"
+                      : isCompleted
+                        ? "Completed"
+                        : getTimeRemaining()}
                   </p>
                 </div>
               </div>
@@ -229,9 +287,16 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">Starting Capital</p>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Starting Capital
+                    </p>
                     <p className="text-lg font-semibold text-gray-100">
-                      ${(competition.startingCapital || competition.startingTradingPoints || 0).toLocaleString()}
+                      $
+                      {(
+                        competition.startingCapital ||
+                        competition.startingTradingPoints ||
+                        0
+                      ).toLocaleString()}
                     </p>
                   </div>
 
@@ -274,13 +339,17 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                    <span className="text-sm text-gray-400">Start Time (UTC)</span>
+                    <span className="text-sm text-gray-400">
+                      Start Time (UTC)
+                    </span>
                     <span className="text-sm font-semibold text-gray-100">
                       {formatUTCDate(new Date(competition.startTime))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                    <span className="text-sm text-gray-400">End Time (UTC)</span>
+                    <span className="text-sm text-gray-400">
+                      End Time (UTC)
+                    </span>
                     <span className="text-sm font-semibold text-gray-100">
                       {formatUTCDate(new Date(competition.endTime))}
                     </span>
@@ -292,7 +361,7 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-yellow-400" />
-                  {isCompleted ? 'Final Results' : 'Current Leaderboard'}
+                  {isCompleted ? "Final Results" : "Current Leaderboard"}
                   <span className="text-sm font-normal text-gray-500">
                     ({leaderboard.length} participants)
                   </span>
@@ -300,7 +369,9 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
                 {(() => {
                   // Count qualified participants
-                  const qualifiedParticipants = leaderboard.filter((p: any) => p.qualificationStatus === 'qualified');
+                  const qualifiedParticipants = leaderboard.filter(
+                    (p: any) => p.qualificationStatus === "qualified",
+                  );
                   const qualifiedCount = qualifiedParticipants.length;
                   const disqualifiedCount = leaderboard.length - qualifiedCount;
                   const prizeDistribution = competition.prizeDistribution || [];
@@ -311,16 +382,22 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                         <div className="space-y-2 max-h-[500px] overflow-y-auto">
                           {leaderboard.map((participant: any) => {
                             // Use qualificationStatus from ranking service
-                            const isDisqualified = participant.qualificationStatus === 'disqualified';
+                            const isDisqualified =
+                              participant.qualificationStatus ===
+                              "disqualified";
                             const qualifiedRank = participant.currentRank || 0;
-                            const isWinner = isCompleted && !isDisqualified && qualifiedRank <= prizeDistribution.length;
-                            
+                            const isWinner =
+                              isCompleted &&
+                              !isDisqualified &&
+                              qualifiedRank <= prizeDistribution.length;
+
                             // Get ACTUAL prize from database (not calculated)
-                            const actualPrize = prizeMap.get(participant.userId) || 0;
-                            
+                            const actualPrize =
+                              prizeMap.get(participant.userId) || 0;
+
                             // Get GM info for this participant
                             const gmInfo = gmMap.get(participant.userId);
-                            
+
                             // Display rank
                             const displayRank = qualifiedRank;
 
@@ -329,26 +406,35 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                 key={participant._id}
                                 className={`flex items-center justify-between p-3 rounded-lg ${
                                   isDisqualified
-                                    ? 'bg-red-500/10 border border-red-500/30 opacity-75'
+                                    ? "bg-red-500/10 border border-red-500/30 opacity-75"
                                     : isWinner
-                                    ? 'bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/30'
-                                    : 'bg-gray-800/50 border border-gray-700'
+                                      ? "bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/30"
+                                      : "bg-gray-800/50 border border-gray-700"
                                 }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                                    isDisqualified ? 'bg-red-500/50 text-red-200' :
-                                    displayRank === 1 ? 'bg-yellow-500 text-gray-900' :
-                                    displayRank === 2 ? 'bg-gray-400 text-gray-900' :
-                                    displayRank === 3 ? 'bg-orange-600 text-white' :
-                                    'bg-gray-700 text-gray-300'
-                                  }`}>
-                                    {isDisqualified ? '✗' : displayRank}
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                                      isDisqualified
+                                        ? "bg-red-500/50 text-red-200"
+                                        : displayRank === 1
+                                          ? "bg-yellow-500 text-gray-900"
+                                          : displayRank === 2
+                                            ? "bg-gray-400 text-gray-900"
+                                            : displayRank === 3
+                                              ? "bg-orange-600 text-white"
+                                              : "bg-gray-700 text-gray-300"
+                                    }`}
+                                  >
+                                    {isDisqualified ? "✗" : displayRank}
                                   </div>
                                   <div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className={`text-sm font-semibold ${isDisqualified ? 'text-red-300 line-through' : 'text-gray-100'}`}>
-                                        {participant.username || participant.userId}
+                                      <p
+                                        className={`text-sm font-semibold ${isDisqualified ? "text-red-300 line-through" : "text-gray-100"}`}
+                                      >
+                                        {participant.username ||
+                                          participant.userId}
                                       </p>
                                       {isDisqualified && (
                                         <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-semibold rounded">
@@ -370,29 +456,43 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                     <p className="text-xs text-gray-500">
                                       {participant.totalTrades} trades
                                       {participant.disqualificationReason && (
-                                        <span className="text-red-400 ml-2">• {participant.disqualificationReason}</span>
+                                        <span className="text-red-400 ml-2">
+                                          • {participant.disqualificationReason}
+                                        </span>
                                       )}
                                     </p>
                                     {gmInfo && (
                                       <p className="text-xs text-purple-400 mt-1">
-                                        GM: {gmInfo.gmEmail} • Earned: {currencySymbol}{gmInfo.gmEarning.toFixed(2)}
+                                        GM: {gmInfo.gmEmail} • Earned:{" "}
+                                        {currencySymbol}
+                                        {gmInfo.gmEarning.toFixed(2)}
                                       </p>
                                     )}
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className={`text-sm font-bold ${
-                                    isDisqualified ? 'text-red-400' :
-                                    participant.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-                                  }`}>
-                                    {participant.pnl >= 0 ? '+' : ''}{participant.pnl?.toFixed(2) || '0.00'}
+                                  <p
+                                    className={`text-sm font-bold ${
+                                      isDisqualified
+                                        ? "text-red-400"
+                                        : participant.pnl >= 0
+                                          ? "text-green-400"
+                                          : "text-red-400"
+                                    }`}
+                                  >
+                                    {participant.pnl >= 0 ? "+" : ""}
+                                    {participant.pnl?.toFixed(2) || "0.00"}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {participant.pnlPercentage >= 0 ? '+' : ''}{participant.pnlPercentage?.toFixed(2) || '0.00'}%
+                                    {participant.pnlPercentage >= 0 ? "+" : ""}
+                                    {participant.pnlPercentage?.toFixed(2) ||
+                                      "0.00"}
+                                    %
                                   </p>
                                   {actualPrize > 0 && (
                                     <p className="text-xs text-yellow-400 font-semibold mt-1">
-                                      Won: {currencySymbol}{actualPrize.toFixed(2)}
+                                      Won: {currencySymbol}
+                                      {actualPrize.toFixed(2)}
                                     </p>
                                   )}
                                 </div>
@@ -411,16 +511,24 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                         <div className="mt-4 pt-4 border-t border-gray-700">
                           <div className="grid grid-cols-3 gap-4 text-center text-sm">
                             <div>
-                              <p className="text-gray-500">Total Participants</p>
-                              <p className="text-xl font-bold text-white">{leaderboard.length}</p>
+                              <p className="text-gray-500">
+                                Total Participants
+                              </p>
+                              <p className="text-xl font-bold text-white">
+                                {leaderboard.length}
+                              </p>
                             </div>
                             <div>
                               <p className="text-gray-500">Qualified</p>
-                              <p className="text-xl font-bold text-green-400">{qualifiedCount}</p>
+                              <p className="text-xl font-bold text-green-400">
+                                {qualifiedCount}
+                              </p>
                             </div>
                             <div>
                               <p className="text-gray-500">Disqualified</p>
-                              <p className="text-xl font-bold text-red-400">{disqualifiedCount}</p>
+                              <p className="text-xl font-bold text-red-400">
+                                {disqualifiedCount}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -468,45 +576,67 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 </div>
 
                 <div className="space-y-2">
-                  {competition.prizeDistribution?.map((prize: any, index: number) => {
-                    const prizePool = competition.prizePool || competition.prizePoolCredits || 0;
-                    const grossAmount = (prizePool * prize.percentage) / 100;
-                    const platformFeePercentage = (competition.platformFeePercentage || 0) / 100;
-                    const netAmount = grossAmount * (1 - platformFeePercentage);
-                    const feeAmount = grossAmount - netAmount;
-                    
-                    return (
-                      <div
-                        key={index}
-                        className="p-4 rounded-xl bg-gray-800/50 border border-gray-700"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {index === 0 && <Trophy className="h-5 w-5 text-yellow-500" />}
-                            {index === 1 && <Trophy className="h-5 w-5 text-gray-400" />}
-                            {index === 2 && <Trophy className="h-5 w-5 text-orange-600" />}
-                            {index > 2 && <Trophy className="h-5 w-5 text-gray-600" />}
-                            <span className="text-sm font-bold text-gray-300">Rank #{prize.rank}</span>
-                            <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
-                              {prize.percentage}%
-                            </span>
+                  {competition.prizeDistribution?.map(
+                    (prize: any, index: number) => {
+                      const prizePool =
+                        competition.prizePool ||
+                        competition.prizePoolCredits ||
+                        0;
+                      const grossAmount = (prizePool * prize.percentage) / 100;
+                      const platformFeePercentage =
+                        (competition.platformFeePercentage || 0) / 100;
+                      const netAmount =
+                        grossAmount * (1 - platformFeePercentage);
+                      const feeAmount = grossAmount - netAmount;
+
+                      return (
+                        <div
+                          key={index}
+                          className="p-4 rounded-xl bg-gray-800/50 border border-gray-700"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {index === 0 && (
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                              )}
+                              {index === 1 && (
+                                <Trophy className="h-5 w-5 text-gray-400" />
+                              )}
+                              {index === 2 && (
+                                <Trophy className="h-5 w-5 text-orange-600" />
+                              )}
+                              {index > 2 && (
+                                <Trophy className="h-5 w-5 text-gray-600" />
+                              )}
+                              <span className="text-sm font-bold text-gray-300">
+                                Rank #{prize.rank}
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
+                                {prize.percentage}%
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-black text-yellow-500">
+                                {netAmount.toFixed(2)}{" "}
+                                <span className="text-xs text-yellow-400">
+                                  {creditName}
+                                </span>
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-lg font-black text-yellow-500">
-                              {netAmount.toFixed(2)} <span className="text-xs text-yellow-400">{creditName}</span>
-                            </p>
-                          </div>
+
+                          {competition.platformFeePercentage > 0 && (
+                            <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700/50">
+                              <span>From pool: {grossAmount.toFixed(2)}</span>
+                              <span className="text-red-400">
+                                Fee: -{feeAmount.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        
-                        {competition.platformFeePercentage > 0 && (
-                          <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700/50">
-                            <span>From pool: {grossAmount.toFixed(2)}</span>
-                            <span className="text-red-400">Fee: -{feeAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    },
+                  )}
                 </div>
 
                 {competition.platformFeePercentage > 0 && (
@@ -514,8 +644,15 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                     <p className="text-xs text-blue-300 flex items-start gap-2">
                       <span className="text-blue-400 font-bold">ℹ️</span>
                       <span>
-                        Winners receive net amounts after {competition.platformFeePercentage}% platform fee. 
-                        Total pool: {(competition.prizePool || competition.prizePoolCredits || 0).toFixed(2)} {creditName}.
+                        Winners receive net amounts after{" "}
+                        {competition.platformFeePercentage}% platform fee. Total
+                        pool:{" "}
+                        {(
+                          competition.prizePool ||
+                          competition.prizePoolCredits ||
+                          0
+                        ).toFixed(2)}{" "}
+                        {creditName}.
                       </span>
                     </p>
                   </div>
@@ -523,7 +660,8 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
                 {competition.platformFeePercentage > 0 && (
                   <p className="text-xs text-gray-500 mt-4 hidden">
-                    * Platform fee: {competition.platformFeePercentage}% deducted
+                    * Platform fee: {competition.platformFeePercentage}%
+                    deducted
                   </p>
                 )}
               </div>
@@ -531,17 +669,25 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
               {/* Rules */}
               {competition.rules && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
-                  <h3 className="text-lg font-semibold text-gray-100 mb-4">Rules</h3>
+                  <h3 className="text-lg font-semibold text-gray-100 mb-4">
+                    Rules
+                  </h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between p-2 bg-gray-800/50 rounded">
                       <span className="text-gray-400">Ranking Method:</span>
                       <span className="text-gray-100 font-semibold">
-                        {competition.rules.rankingMethod === 'pnl' && 'Highest P&L'}
-                        {competition.rules.rankingMethod === 'roi' && 'Highest ROI %'}
-                        {competition.rules.rankingMethod === 'total_capital' && 'Highest Capital'}
-                        {competition.rules.rankingMethod === 'win_rate' && 'Highest Win Rate'}
-                        {competition.rules.rankingMethod === 'total_wins' && 'Most Wins'}
-                        {competition.rules.rankingMethod === 'profit_factor' && 'Best Profit Factor'}
+                        {competition.rules.rankingMethod === "pnl" &&
+                          "Highest P&L"}
+                        {competition.rules.rankingMethod === "roi" &&
+                          "Highest ROI %"}
+                        {competition.rules.rankingMethod === "total_capital" &&
+                          "Highest Capital"}
+                        {competition.rules.rankingMethod === "win_rate" &&
+                          "Highest Win Rate"}
+                        {competition.rules.rankingMethod === "total_wins" &&
+                          "Most Wins"}
+                        {competition.rules.rankingMethod === "profit_factor" &&
+                          "Best Profit Factor"}
                       </span>
                     </div>
                     {competition.rules.minimumTrades > 0 && (
@@ -569,10 +715,9 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
       </div>
     );
   } catch (error) {
-    console.error('Error loading competition:', error);
+    console.error("Error loading competition:", error);
     notFound();
   }
 };
 
 export default AdminCompetitionViewPage;
-

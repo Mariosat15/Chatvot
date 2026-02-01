@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import MessagingService from '@/lib/services/messaging/messaging.service';
-import { wsNotifier } from '@/lib/services/messaging/websocket-notifier';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import MessagingService from "@/lib/services/messaging/messaging.service";
+import { wsNotifier } from "@/lib/services/messaging/websocket-notifier";
 
 /**
  * POST /api/messaging/friends/requests/[requestId]
@@ -10,36 +10,37 @@ import { wsNotifier } from '@/lib/services/messaging/websocket-notifier';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ requestId: string }> }
+  { params }: { params: Promise<{ requestId: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { requestId } = await params;
     const body = await request.json();
     const { action } = body;
 
-    if (!action || !['accept', 'decline'].includes(action)) {
+    if (!action || !["accept", "decline"].includes(action)) {
       return NextResponse.json(
         { error: 'Action must be "accept" or "decline"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { request: friendRequest, friendship } = await MessagingService.respondToFriendRequest(
-      requestId,
-      action,
-      session.user.id
-    );
+    const { request: friendRequest, friendship } =
+      await MessagingService.respondToFriendRequest(
+        requestId,
+        action,
+        session.user.id,
+      );
 
     // Notify sender via WebSocket
     wsNotifier.notifyFriendRequest(
       friendRequest.fromUserId,
-      action === 'accept' ? 'accepted' : 'declined',
-      friendRequest
+      action === "accept" ? "accepted" : "declined",
+      friendRequest,
     );
 
     return NextResponse.json({
@@ -56,10 +57,10 @@ export async function POST(
         : null,
     });
   } catch (error: any) {
-    console.error('Error responding to friend request:', error);
+    console.error("Error responding to friend request:", error);
     return NextResponse.json(
-      { error: error.message || 'Failed to respond to friend request' },
-      { status: 500 }
+      { error: error.message || "Failed to respond to friend request" },
+      { status: 500 },
     );
   }
 }
@@ -70,26 +71,26 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ requestId: string }> }
+  { params }: { params: Promise<{ requestId: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { requestId } = await params;
 
     const cancelledRequest = await MessagingService.cancelFriendRequest(
       requestId,
-      session.user.id
+      session.user.id,
     );
 
     // Notify recipient that request was cancelled
     wsNotifier.notifyFriendRequest(
       cancelledRequest.toUserId,
-      'cancelled',
-      cancelledRequest
+      "cancelled",
+      cancelledRequest,
     );
 
     return NextResponse.json({
@@ -100,11 +101,10 @@ export async function DELETE(
       },
     });
   } catch (error: any) {
-    console.error('Error cancelling friend request:', error);
+    console.error("Error cancelling friend request:", error);
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel friend request' },
-      { status: 500 }
+      { error: error.message || "Failed to cancel friend request" },
+      { status: 500 },
     );
   }
 }
-

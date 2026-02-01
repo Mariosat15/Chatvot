@@ -1,40 +1,62 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { placeOrder } from '@/lib/actions/trading/order.actions';
-import { FOREX_PAIRS, ForexSymbol, calculateMarginRequired } from '@/lib/services/pnl-calculator.service';
-import { usePrices } from '@/contexts/PriceProvider';
-import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { useRiskSettings } from '@/hooks/useRiskSettings';
-import { toast } from 'sonner';
-import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { validateLimitOrderPrice, getPipValue } from '@/lib/utils/limit-order-validation';
-import LiveRankingPanel from './LiveRankingPanel';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { placeOrder } from "@/lib/actions/trading/order.actions";
+import {
+  FOREX_PAIRS,
+  ForexSymbol,
+  calculateMarginRequired,
+} from "@/lib/services/pnl-calculator.service";
+import { usePrices } from "@/contexts/PriceProvider";
+import { useChartSymbol } from "@/contexts/ChartSymbolContext";
+import { useRiskSettings } from "@/hooks/useRiskSettings";
+import { toast } from "sonner";
+import {
+  Loader2,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  validateLimitOrderPrice,
+  getPipValue,
+} from "@/lib/utils/limit-order-validation";
+import LiveRankingPanel from "./LiveRankingPanel";
 
 // Collapsible Section Component
-const CollapsibleSection = ({ 
-  title, 
-  icon, 
-  children, 
+const CollapsibleSection = ({
+  title,
+  icon,
+  children,
   defaultOpen = true,
-  className = ""
-}: { 
-  title: string; 
-  icon: string; 
-  children: React.ReactNode; 
+  className = "",
+}: {
+  title: string;
+  icon: string;
+  children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  
+
   return (
-    <div className={cn("bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl border border-dark-400/30 shadow-lg overflow-hidden", className)}>
+    <div
+      className={cn(
+        "bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl border border-dark-400/30 shadow-lg overflow-hidden",
+        className,
+      )}
+    >
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -49,13 +71,15 @@ const CollapsibleSection = ({
           <ChevronDown className="size-5 text-dark-600 transition-transform" />
         )}
       </button>
-      <div className={cn(
-        "transition-all duration-300 ease-in-out",
-        isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0 overflow-hidden"
-      )}>
-        <div className="p-4 pt-0 space-y-4">
-          {children}
-        </div>
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          isOpen
+            ? "max-h-[2000px] opacity-100"
+            : "max-h-0 opacity-0 overflow-hidden",
+        )}
+      >
+        <div className="p-4 pt-0 space-y-4">{children}</div>
       </div>
     </div>
   );
@@ -95,17 +119,20 @@ const OrderForm = ({
   disabledReason,
   userId,
 }: OrderFormProps) => {
-  const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
+  const { prices, subscribe, unsubscribe, marketOpen, marketStatus } =
+    usePrices();
   const { symbol, setSymbol: setChartSymbol } = useChartSymbol();
   const { settings: riskSettings } = useRiskSettings(10000); // Poll every 10 seconds
 
   // Form state
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [quantity, setQuantity] = useState('0.01');
-  const [limitPrice, setLimitPrice] = useState('');
-  const [limitPriceMode, setLimitPriceMode] = useState<'price' | 'pips'>('price');
-  const [limitPricePips, setLimitPricePips] = useState('');
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [quantity, setQuantity] = useState("0.01");
+  const [limitPrice, setLimitPrice] = useState("");
+  const [limitPriceMode, setLimitPriceMode] = useState<"price" | "pips">(
+    "price",
+  );
+  const [limitPricePips, setLimitPricePips] = useState("");
   const [limitValidation, setLimitValidation] = useState<{
     isValid: boolean;
     pipsAway: number;
@@ -116,20 +143,20 @@ const OrderForm = ({
   // Check which side (buy/sell) the limit price is valid for
   const [validForBuy, setValidForBuy] = useState(false);
   const [validForSell, setValidForSell] = useState(false);
-  const [stopLoss, setStopLoss] = useState('');
-  const [takeProfit, setTakeProfit] = useState('');
+  const [stopLoss, setStopLoss] = useState("");
+  const [takeProfit, setTakeProfit] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // TP/SL Enable/Disable toggles (default OFF)
   const [tpEnabled, setTpEnabled] = useState(false);
   const [slEnabled, setSlEnabled] = useState(false);
-  
+
   // TP/SL Input Modes
-  const [tpMode, setTpMode] = useState<'price' | 'pips'>('pips');
-  const [slMode, setSlMode] = useState<'price' | 'pips'>('pips');
-  const [takeProfitPips, setTakeProfitPips] = useState('50');
-  const [stopLossPips, setStopLossPips] = useState('30');
-  
+  const [tpMode, setTpMode] = useState<"price" | "pips">("pips");
+  const [slMode, setSlMode] = useState<"price" | "pips">("pips");
+  const [takeProfitPips, setTakeProfitPips] = useState("50");
+  const [stopLossPips, setStopLossPips] = useState("30");
+
   // Leverage is admin-controlled, not user-adjustable
   // Use real-time settings from admin, fallback to prop
   const leverage = riskSettings.defaultLeverage || defaultLeverage;
@@ -143,16 +170,16 @@ const OrderForm = ({
   // Real-time limit order validation - ONLY checks minimum pips distance
   useEffect(() => {
     const currentPrice = prices.get(symbol);
-    
-    if (orderType === 'limit' && currentPrice) {
+
+    if (orderType === "limit" && currentPrice) {
       const pipValue = getPipValue(symbol);
-      const MIN_DISTANCE_PIPS = symbol.includes('JPY') ? 10 : 10;
+      const MIN_DISTANCE_PIPS = symbol.includes("JPY") ? 10 : 10;
 
       // Calculate prices for BOTH buy and sell validation
       let buyLimitPrice: number | undefined;
       let sellLimitPrice: number | undefined;
 
-      if (limitPriceMode === 'price') {
+      if (limitPriceMode === "price") {
         // In PRICE mode: same price for both
         const price = limitPrice ? parseFloat(limitPrice) : undefined;
         if (price && !isNaN(price)) {
@@ -165,9 +192,9 @@ const OrderForm = ({
         if (pips && !isNaN(pips)) {
           const pip = FOREX_PAIRS[symbol].pip;
           // BUY limit: below current ASK (subtract pips)
-          buyLimitPrice = currentPrice.ask - (pips * pip);
+          buyLimitPrice = currentPrice.ask - pips * pip;
           // SELL limit: above current BID (add pips)
-          sellLimitPrice = currentPrice.bid + (pips * pip);
+          sellLimitPrice = currentPrice.bid + pips * pip;
         }
       }
 
@@ -199,7 +226,7 @@ const OrderForm = ({
       setValidForSell(isSellValid);
 
       // Set validation display for currently selected side
-      if (side === 'buy') {
+      if (side === "buy") {
         setLimitValidation({
           isValid: isBuyValid,
           pipsAway: buyPipsAway,
@@ -219,34 +246,42 @@ const OrderForm = ({
       setValidForBuy(false);
       setValidForSell(false);
     }
-  }, [orderType, limitPrice, limitPricePips, limitPriceMode, side, symbol, prices]);
+  }, [
+    orderType,
+    limitPrice,
+    limitPricePips,
+    limitPriceMode,
+    side,
+    symbol,
+    prices,
+  ]);
 
   // Get current price
   const currentPrice = prices.get(symbol);
   const displayPrice = currentPrice
-    ? side === 'buy'
+    ? side === "buy"
       ? currentPrice.ask
       : currentPrice.bid
     : 0;
 
   // TP/SL Helpers
   const pipValue = FOREX_PAIRS[symbol].pip;
-  
+
   const calculateTPFromPips = (pips: number): number => {
     // Round to 5 decimal places to avoid floating point precision issues
-    if (side === 'buy') {
-      return Math.round((displayPrice + (pips * pipValue)) * 100000) / 100000;
+    if (side === "buy") {
+      return Math.round((displayPrice + pips * pipValue) * 100000) / 100000;
     } else {
-      return Math.round((displayPrice - (pips * pipValue)) * 100000) / 100000;
+      return Math.round((displayPrice - pips * pipValue) * 100000) / 100000;
     }
   };
 
   const calculateSLFromPips = (pips: number): number => {
     // Round to 5 decimal places to avoid floating point precision issues
-    if (side === 'buy') {
-      return Math.round((displayPrice - (pips * pipValue)) * 100000) / 100000;
+    if (side === "buy") {
+      return Math.round((displayPrice - pips * pipValue) * 100000) / 100000;
     } else {
-      return Math.round((displayPrice + (pips * pipValue)) * 100000) / 100000;
+      return Math.round((displayPrice + pips * pipValue) * 100000) / 100000;
     }
   };
 
@@ -254,24 +289,24 @@ const OrderForm = ({
   const calculateLimitFromPips = (pips: number): number => {
     const currentPrice = prices.get(symbol);
     if (!currentPrice) return 0;
-    
-    if (side === 'buy') {
+
+    if (side === "buy") {
       // Buy limit must be BELOW current ASK
-      return currentPrice.ask - (pips * pipValue);
+      return currentPrice.ask - pips * pipValue;
     } else {
       // Sell limit must be ABOVE current BID
-      return currentPrice.bid + (pips * pipValue);
+      return currentPrice.bid + pips * pipValue;
     }
   };
 
   const getEffectiveLimitPrice = (): number | undefined => {
-    if (orderType !== 'limit') return undefined;
-    if (limitPriceMode === 'price') {
-      if (!limitPrice || limitPrice.trim() === '') return undefined;
+    if (orderType !== "limit") return undefined;
+    if (limitPriceMode === "price") {
+      if (!limitPrice || limitPrice.trim() === "") return undefined;
       const parsed = parseFloat(limitPrice);
       return isNaN(parsed) ? undefined : parsed;
     } else {
-      if (!limitPricePips || limitPricePips.trim() === '') return undefined;
+      if (!limitPricePips || limitPricePips.trim() === "") return undefined;
       const parsed = parseFloat(limitPricePips);
       if (isNaN(parsed)) return undefined;
       return calculateLimitFromPips(parsed);
@@ -281,20 +316,24 @@ const OrderForm = ({
   const getEffectiveTPPrice = (): number | undefined => {
     if (!tpEnabled) return undefined; // Don't send TP if disabled
     if (!takeProfit && !takeProfitPips) return undefined;
-    if (tpMode === 'price') {
+    if (tpMode === "price") {
       return takeProfit ? parseFloat(takeProfit) : undefined;
     } else {
-      return takeProfitPips ? calculateTPFromPips(parseFloat(takeProfitPips)) : undefined;
+      return takeProfitPips
+        ? calculateTPFromPips(parseFloat(takeProfitPips))
+        : undefined;
     }
   };
 
   const getEffectiveSLPrice = (): number | undefined => {
     if (!slEnabled) return undefined; // Don't send SL if disabled
     if (!stopLoss && !stopLossPips) return undefined;
-    if (slMode === 'price') {
+    if (slMode === "price") {
       return stopLoss ? parseFloat(stopLoss) : undefined;
     } else {
-      return stopLossPips ? calculateSLFromPips(parseFloat(stopLossPips)) : undefined;
+      return stopLossPips
+        ? calculateSLFromPips(parseFloat(stopLossPips))
+        : undefined;
     }
   };
 
@@ -305,27 +344,32 @@ const OrderForm = ({
           parseFloat(quantity),
           displayPrice,
           leverage,
-          symbol
+          symbol,
         )
       : 0;
 
   // Calculate CURRENT margin level
-  const currentMarginLevel = existingUsedMargin > 0 ? (currentEquity / existingUsedMargin) * 100 : Infinity;
-  
+  const currentMarginLevel =
+    existingUsedMargin > 0
+      ? (currentEquity / existingUsedMargin) * 100
+      : Infinity;
+
   // Calculate what margin level would be AFTER this trade
   const newTotalMargin = existingUsedMargin + marginRequired;
-  const marginLevelAfterTrade = newTotalMargin > 0 ? (currentEquity / newTotalMargin) * 100 : Infinity;
-  
+  const marginLevelAfterTrade =
+    newTotalMargin > 0 ? (currentEquity / newTotalMargin) * 100 : Infinity;
+
   // Get thresholds (default to 50%/100% if not provided)
   const stopoutThreshold = marginThresholds?.LIQUIDATION || 50;
   const marginCallThreshold = marginThresholds?.MARGIN_CALL || 100;
-  
+
   // Check if current margin is already below margin call (block ALL trades)
-  const currentlyBelowMarginCall = existingUsedMargin > 0 && currentMarginLevel < marginCallThreshold;
-  
+  const currentlyBelowMarginCall =
+    existingUsedMargin > 0 && currentMarginLevel < marginCallThreshold;
+
   // Check if trade would push margin below margin call
   const wouldCauseMarginCall = marginLevelAfterTrade < marginCallThreshold;
-  
+
   // Allow trade if:
   // 1. User has enough available capital
   // 2. Not at max positions
@@ -334,18 +378,21 @@ const OrderForm = ({
   // 5. Trading is not disabled (e.g., disqualified)
   const canPlaceOrder =
     !disabled &&
-    availableCapital >= marginRequired && 
-    openPositionsCount < maxPositions && 
+    availableCapital >= marginRequired &&
+    openPositionsCount < maxPositions &&
     !currentlyBelowMarginCall &&
     !wouldCauseMarginCall;
 
   // Calculate potential P&L for TP/SL preview
-  const calculatePotentialPnL = (targetPrice: number): { pnl: number; percentage: number } => {
+  const calculatePotentialPnL = (
+    targetPrice: number,
+  ): { pnl: number; percentage: number } => {
     const qty = parseFloat(quantity) || 0;
     if (!displayPrice || qty === 0) return { pnl: 0, percentage: 0 };
 
     const contractSize = FOREX_PAIRS[symbol].contractSize;
-    const priceDiff = side === 'buy' ? (targetPrice - displayPrice) : (displayPrice - targetPrice);
+    const priceDiff =
+      side === "buy" ? targetPrice - displayPrice : displayPrice - targetPrice;
     const pnl = priceDiff * contractSize * qty;
     const percentage = (pnl / marginRequired) * 100;
 
@@ -355,23 +402,29 @@ const OrderForm = ({
   const takeProfitPrice = getEffectiveTPPrice();
   const stopLossPrice = getEffectiveSLPrice();
 
-  const potentialProfit = takeProfitPrice ? calculatePotentialPnL(takeProfitPrice) : null;
-  const potentialLoss = stopLossPrice ? calculatePotentialPnL(stopLossPrice) : null;
+  const potentialProfit = takeProfitPrice
+    ? calculatePotentialPnL(takeProfitPrice)
+    : null;
+  const potentialLoss = stopLossPrice
+    ? calculatePotentialPnL(stopLossPrice)
+    : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Check if trading is disabled first
     if (disabled) {
-      toast.error('Trading Disabled', {
-        description: disabledReason || 'Trading is currently disabled for this competition.',
+      toast.error("Trading Disabled", {
+        description:
+          disabledReason ||
+          "Trading is currently disabled for this competition.",
       });
       return;
     }
 
     if (!canPlaceOrder) {
-      let errorMessage = 'Insufficient capital';
-      
+      let errorMessage = "Insufficient capital";
+
       if (openPositionsCount >= maxPositions) {
         errorMessage = `Maximum ${maxPositions} positions reached`;
       } else if (currentlyBelowMarginCall) {
@@ -379,21 +432,21 @@ const OrderForm = ({
       } else if (wouldCauseMarginCall) {
         errorMessage = `This trade would push your margin level to ${marginLevelAfterTrade.toFixed(1)}%, below the ${marginCallThreshold}% margin call threshold. Close some positions first or reduce trade size.`;
       }
-      
-      toast.error('Cannot place order', {
+
+      toast.error("Cannot place order", {
         description: errorMessage,
       });
       return;
     }
 
     // Validate limit orders (wait a moment for side state to update)
-    if (orderType === 'limit') {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
+    if (orderType === "limit") {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       const effectivePrice = getEffectiveLimitPrice();
       if (!effectivePrice) {
-        toast.error('Invalid limit price', {
-          description: 'Please enter a valid limit price',
+        toast.error("Invalid limit price", {
+          description: "Please enter a valid limit price",
         });
         return;
       }
@@ -401,15 +454,20 @@ const OrderForm = ({
       // Re-validate with current side
       const currentPrice = prices.get(symbol);
       if (!currentPrice) {
-        toast.error('Price unavailable', {
-          description: 'Cannot get current market price',
+        toast.error("Price unavailable", {
+          description: "Cannot get current market price",
         });
         return;
       }
 
-      const validation = validateLimitOrderPrice(side, effectivePrice, currentPrice, symbol);
+      const validation = validateLimitOrderPrice(
+        side,
+        effectivePrice,
+        currentPrice,
+        symbol,
+      );
       if (!validation.valid) {
-        toast.error('Invalid limit order', {
+        toast.error("Invalid limit order", {
           description: validation.error,
         });
         return;
@@ -421,12 +479,14 @@ const OrderForm = ({
     try {
       // 🔒 LOCK THE CURRENT PRICE at the moment user clicks trade
       const currentPrice = prices.get(symbol);
-      const lockedPrice = currentPrice && orderType === 'market' ? {
-        bid: currentPrice.bid,
-        ask: currentPrice.ask,
-        timestamp: Date.now(),
-      } : undefined;
-
+      const lockedPrice =
+        currentPrice && orderType === "market"
+          ? {
+              bid: currentPrice.bid,
+              ask: currentPrice.ask,
+              timestamp: Date.now(),
+            }
+          : undefined;
 
       const result = await placeOrder({
         competitionId,
@@ -443,45 +503,48 @@ const OrderForm = ({
 
       if (result.success) {
         // ⚡ IMMEDIATE UI UPDATE - dispatch position data for instant chart update
-        if (result.position && typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('positionOpened', { 
-            detail: result.position 
-          }));
+        if (result.position && typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("positionOpened", {
+              detail: result.position,
+            }),
+          );
         }
 
-        toast.success('Order placed!', {
+        toast.success("Order placed!", {
           description: result.message,
         });
 
         // Show loading toast for refresh (only if TP/SL)
         if (stopLoss || takeProfit || stopLossPips || takeProfitPips) {
-          toast.loading('Loading TP/SL on chart...', {
-            id: 'tpsl-refresh',
-            description: 'Updating positions with Take Profit and Stop Loss',
+          toast.loading("Loading TP/SL on chart...", {
+            id: "tpsl-refresh",
+            description: "Updating positions with Take Profit and Stop Loss",
           });
-          
+
           // Auto-dismiss after 2 seconds
           setTimeout(() => {
-            toast.dismiss('tpsl-refresh');
+            toast.dismiss("tpsl-refresh");
           }, 2500);
         }
 
         // Reset form
-        setQuantity('0.01');
-        setLimitPrice('');
-        setStopLoss('');
-        setTakeProfit('');
-        setTakeProfitPips('50');
-        setStopLossPips('30');
+        setQuantity("0.01");
+        setLimitPrice("");
+        setStopLoss("");
+        setTakeProfit("");
+        setTakeProfitPips("50");
+        setStopLossPips("30");
 
         // Dispatch event for other components to refresh
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('orderPlaced'));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("orderPlaced"));
         }
       }
     } catch (error) {
-      toast.error('Order failed', {
-        description: error instanceof Error ? error.message : 'Failed to place order',
+      toast.error("Order failed", {
+        description:
+          error instanceof Error ? error.message : "Failed to place order",
       });
     } finally {
       setIsSubmitting(false);
@@ -493,10 +556,7 @@ const OrderForm = ({
       {/* Section 1: Live Ranking */}
       <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={true}>
         {userId ? (
-          <LiveRankingPanel 
-            competitionId={competitionId} 
-            userId={userId} 
-          />
+          <LiveRankingPanel competitionId={competitionId} userId={userId} />
         ) : (
           <div className="text-center py-4 text-gray-500 text-xs">
             Loading ranking...
@@ -508,17 +568,22 @@ const OrderForm = ({
       <CollapsibleSection title="Order Setup" icon="⚙️" defaultOpen={true}>
         {/* Order Type Tabs */}
         <div>
-          <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">Order Type</Label>
-          <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
+          <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">
+            Order Type
+          </Label>
+          <Tabs
+            value={orderType}
+            onValueChange={(value) => setOrderType(value as "market" | "limit")}
+          >
             <TabsList className="grid grid-cols-2 w-full bg-dark-400 p-1">
-              <TabsTrigger 
-                value="market" 
+              <TabsTrigger
+                value="market"
                 className="data-[state=active]:bg-primary data-[state=active]:text-white font-semibold"
               >
                 ⚡ Market
               </TabsTrigger>
-              <TabsTrigger 
-                value="limit" 
+              <TabsTrigger
+                value="limit"
                 className="data-[state=active]:bg-blue-500 data-[state=active]:text-white font-semibold"
               >
                 📊 Limit
@@ -528,13 +593,30 @@ const OrderForm = ({
         </div>
 
         {/* Limit Price Configuration */}
-        {orderType === 'limit' && (
+        {orderType === "limit" && (
           <div className="bg-dark-400/30 rounded-lg p-3 border border-dark-500/30">
-            <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">Limit Price</Label>
-            <Tabs value={limitPriceMode} onValueChange={(value) => setLimitPriceMode(value as 'price' | 'pips')}>
+            <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">
+              Limit Price
+            </Label>
+            <Tabs
+              value={limitPriceMode}
+              onValueChange={(value) =>
+                setLimitPriceMode(value as "price" | "pips")
+              }
+            >
               <TabsList className="grid grid-cols-2 w-full mb-3 bg-dark-500">
-                <TabsTrigger value="pips" className="data-[state=active]:bg-primary">📏 Pips</TabsTrigger>
-                <TabsTrigger value="price" className="data-[state=active]:bg-primary">💰 Price</TabsTrigger>
+                <TabsTrigger
+                  value="pips"
+                  className="data-[state=active]:bg-primary"
+                >
+                  📏 Pips
+                </TabsTrigger>
+                <TabsTrigger
+                  value="price"
+                  className="data-[state=active]:bg-primary"
+                >
+                  💰 Price
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="pips" className="mt-0">
@@ -548,14 +630,18 @@ const OrderForm = ({
                 />
                 {limitPricePips && displayPrice > 0 && (
                   <div className="mt-2 bg-dark-500/50 rounded p-2 text-center">
-                    <p className="text-xs text-dark-600">Calculated Limit Price</p>
+                    <p className="text-xs text-dark-600">
+                      Calculated Limit Price
+                    </p>
                     <p className="text-sm font-bold text-primary">
-                      {calculateLimitFromPips(parseFloat(limitPricePips)).toFixed(5)}
+                      {calculateLimitFromPips(
+                        parseFloat(limitPricePips),
+                      ).toFixed(5)}
                     </p>
                   </div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="price" className="mt-0">
                 <Input
                   type="number"
@@ -572,7 +658,11 @@ const OrderForm = ({
       </CollapsibleSection>
 
       {/* Section 4: Trading Size */}
-      <CollapsibleSection title="Trade Size & Risk" icon="📐" defaultOpen={true}>
+      <CollapsibleSection
+        title="Trade Size & Risk"
+        icon="📐"
+        defaultOpen={true}
+      >
         {/* Quantity */}
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide flex items-center gap-2">
@@ -588,27 +678,40 @@ const OrderForm = ({
             className="bg-dark-400 border-dark-500 h-11 text-base font-bold"
             required
           />
-          <p className="text-xs text-dark-600 mt-1.5 text-center">Range: 0.01 - 100 lots</p>
+          <p className="text-xs text-dark-600 mt-1.5 text-center">
+            Range: 0.01 - 100 lots
+          </p>
         </div>
 
         {/* Leverage Display (Admin-controlled, read-only) */}
         <div className="bg-dark-300/50 border border-dark-400 rounded-lg p-3">
           <div className="flex items-center justify-between mb-1">
-            <Label className="text-xs text-dark-600">Leverage (Admin-controlled)</Label>
+            <Label className="text-xs text-dark-600">
+              Leverage (Admin-controlled)
+            </Label>
             <div className="flex items-center gap-1">
-              <RefreshCw className="size-3 text-green-500 animate-spin" style={{ animationDuration: '3s' }} />
+              <RefreshCw
+                className="size-3 text-green-500 animate-spin"
+                style={{ animationDuration: "3s" }}
+              />
               <span className="text-xs text-green-500">Live</span>
             </div>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-2xl font-bold text-gray-100">1:{leverage}</span>
+            <span className="text-2xl font-bold text-gray-100">
+              1:{leverage}
+            </span>
             <span className="text-xs text-dark-600">Auto-updates</span>
           </div>
         </div>
       </CollapsibleSection>
 
       {/* Section 5: Take Profit & Stop Loss */}
-      <CollapsibleSection title="Take Profit / Stop Loss" icon="🎯" defaultOpen={false}>
+      <CollapsibleSection
+        title="Take Profit / Stop Loss"
+        icon="🎯"
+        defaultOpen={false}
+      >
         {/* Take Profit Toggle & Input */}
         <div className="bg-dark-400/30 rounded-lg p-3 border border-dark-500/30 space-y-3">
           <div className="flex items-center justify-between">
@@ -616,27 +719,39 @@ const OrderForm = ({
               🎯 Take Profit
             </Label>
             <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-xs font-bold",
-                tpEnabled ? "text-green-400" : "text-dark-600"
-              )}>
-                {tpEnabled ? 'ON' : 'OFF'}
+              <span
+                className={cn(
+                  "text-xs font-bold",
+                  tpEnabled ? "text-green-400" : "text-dark-600",
+                )}
+              >
+                {tpEnabled ? "ON" : "OFF"}
               </span>
-              <Switch
-                checked={tpEnabled}
-                onCheckedChange={setTpEnabled}
-              />
+              <Switch checked={tpEnabled} onCheckedChange={setTpEnabled} />
             </div>
           </div>
-          
+
           {tpEnabled && (
             <>
-              <Tabs value={tpMode} onValueChange={(v) => setTpMode(v as 'price' | 'pips')}>
+              <Tabs
+                value={tpMode}
+                onValueChange={(v) => setTpMode(v as "price" | "pips")}
+              >
                 <TabsList className="grid w-full grid-cols-2 bg-dark-500">
-                  <TabsTrigger value="pips" className="text-xs data-[state=active]:bg-green-500">📏 Pips</TabsTrigger>
-                  <TabsTrigger value="price" className="text-xs data-[state=active]:bg-green-500">💰 Price</TabsTrigger>
+                  <TabsTrigger
+                    value="pips"
+                    className="text-xs data-[state=active]:bg-green-500"
+                  >
+                    📏 Pips
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="price"
+                    className="text-xs data-[state=active]:bg-green-500"
+                  >
+                    💰 Price
+                  </TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="pips" className="mt-2">
                   <Input
                     type="number"
@@ -649,12 +764,14 @@ const OrderForm = ({
                     <div className="mt-2 bg-green-500/10 rounded p-2 text-center">
                       <p className="text-xs text-dark-600">Target Price</p>
                       <p className="text-sm font-bold text-green-400">
-                        {calculateTPFromPips(parseFloat(takeProfitPips)).toFixed(5)}
+                        {calculateTPFromPips(
+                          parseFloat(takeProfitPips),
+                        ).toFixed(5)}
                       </p>
                     </div>
                   )}
                 </TabsContent>
-                
+
                 <TabsContent value="price" className="mt-2">
                   <Input
                     type="number"
@@ -665,27 +782,29 @@ const OrderForm = ({
                     className="bg-dark-500 border-dark-600 h-10 font-semibold"
                   />
                 </TabsContent>
-            </Tabs>
-            
-            {/* TP Potential Profit Preview */}
-            {potentialProfit && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-green-400">💰 Potential Profit:</span>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-green-400">
-                      +${potentialProfit.pnl.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-green-400/70">
-                      +{potentialProfit.percentage.toFixed(1)}%
+              </Tabs>
+
+              {/* TP Potential Profit Preview */}
+              {potentialProfit && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-400">
+                      💰 Potential Profit:
+                    </span>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-green-400">
+                        +${potentialProfit.pnl.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-green-400/70">
+                        +{potentialProfit.percentage.toFixed(1)}%
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Stop Loss Toggle & Input */}
         <div className="bg-dark-400/30 rounded-lg p-3 border border-dark-500/30 space-y-3">
@@ -694,27 +813,39 @@ const OrderForm = ({
               🛑 Stop Loss
             </Label>
             <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-xs font-bold",
-                slEnabled ? "text-red-400" : "text-dark-600"
-              )}>
-                {slEnabled ? 'ON' : 'OFF'}
+              <span
+                className={cn(
+                  "text-xs font-bold",
+                  slEnabled ? "text-red-400" : "text-dark-600",
+                )}
+              >
+                {slEnabled ? "ON" : "OFF"}
               </span>
-              <Switch
-                checked={slEnabled}
-                onCheckedChange={setSlEnabled}
-              />
+              <Switch checked={slEnabled} onCheckedChange={setSlEnabled} />
             </div>
           </div>
-          
+
           {slEnabled && (
             <>
-              <Tabs value={slMode} onValueChange={(v) => setSlMode(v as 'price' | 'pips')}>
+              <Tabs
+                value={slMode}
+                onValueChange={(v) => setSlMode(v as "price" | "pips")}
+              >
                 <TabsList className="grid w-full grid-cols-2 bg-dark-500">
-                  <TabsTrigger value="pips" className="text-xs data-[state=active]:bg-red-500">📏 Pips</TabsTrigger>
-                  <TabsTrigger value="price" className="text-xs data-[state=active]:bg-red-500">💰 Price</TabsTrigger>
+                  <TabsTrigger
+                    value="pips"
+                    className="text-xs data-[state=active]:bg-red-500"
+                  >
+                    📏 Pips
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="price"
+                    className="text-xs data-[state=active]:bg-red-500"
+                  >
+                    💰 Price
+                  </TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="pips" className="mt-2">
                   <Input
                     type="number"
@@ -727,12 +858,14 @@ const OrderForm = ({
                     <div className="mt-2 bg-red-500/10 rounded p-2 text-center">
                       <p className="text-xs text-dark-600">Stop Price</p>
                       <p className="text-sm font-bold text-red-400">
-                        {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(5)}
+                        {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(
+                          5,
+                        )}
                       </p>
                     </div>
                   )}
                 </TabsContent>
-                
+
                 <TabsContent value="price" className="mt-2">
                   <Input
                     type="number"
@@ -744,12 +877,14 @@ const OrderForm = ({
                   />
                 </TabsContent>
               </Tabs>
-              
+
               {/* SL Potential Loss Preview */}
               {potentialLoss && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 mt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-red-400 font-semibold">⚠️ Potential Loss:</span>
+                    <span className="text-xs text-red-400 font-semibold">
+                      ⚠️ Potential Loss:
+                    </span>
                     <div className="text-right">
                       <div className="text-sm font-bold text-red-400">
                         ${potentialLoss.pnl.toFixed(2)}
@@ -761,96 +896,122 @@ const OrderForm = ({
                   </div>
                 </div>
               )}
-              
+
               {/* Risk:Reward Ratio */}
               {potentialProfit && potentialLoss && (
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-blue-400">📊 Risk:Reward:</span>
-                  <span className="text-sm font-bold text-blue-400">
-                    1:{Math.abs(potentialProfit.pnl / potentialLoss.pnl).toFixed(2)}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-blue-400">
+                      📊 Risk:Reward:
+                    </span>
+                    <span className="text-sm font-bold text-blue-400">
+                      1:
+                      {Math.abs(
+                        potentialProfit.pnl / potentialLoss.pnl,
+                      ).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
         </div>
       </CollapsibleSection>
 
       {/* Limit Order Validation Status */}
-      {orderType === 'limit' && (
-        <div className={cn(
-          "p-3 rounded-lg border space-y-2 transition-all",
-          (side === 'buy' && validForBuy) || (side === 'sell' && validForSell)
-            ? "bg-green-500/10 border-green-500/50"
-            : "bg-dark-300 border-dark-400"
-        )}>
+      {orderType === "limit" && (
+        <div
+          className={cn(
+            "p-3 rounded-lg border space-y-2 transition-all",
+            (side === "buy" && validForBuy) || (side === "sell" && validForSell)
+              ? "bg-green-500/10 border-green-500/50"
+              : "bg-dark-300 border-dark-400",
+          )}
+        >
           {/* Quick Status - Which sides are valid */}
           <div className="flex gap-2 mb-2">
-            <div className={cn(
-              "flex-1 text-xs font-semibold py-1.5 px-2 rounded text-center transition-all",
-              validForBuy
-                ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                : "bg-dark-400 text-dark-600 border border-dark-500"
-            )}>
-              {validForBuy ? '✅' : '❌'} BUY
+            <div
+              className={cn(
+                "flex-1 text-xs font-semibold py-1.5 px-2 rounded text-center transition-all",
+                validForBuy
+                  ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                  : "bg-dark-400 text-dark-600 border border-dark-500",
+              )}
+            >
+              {validForBuy ? "✅" : "❌"} BUY
             </div>
-            <div className={cn(
-              "flex-1 text-xs font-semibold py-1.5 px-2 rounded text-center transition-all",
-              validForSell
-                ? "bg-red-500/20 text-red-400 border border-red-500/50"
-                : "bg-dark-400 text-dark-600 border border-dark-500"
-            )}>
-              {validForSell ? '✅' : '❌'} SELL
+            <div
+              className={cn(
+                "flex-1 text-xs font-semibold py-1.5 px-2 rounded text-center transition-all",
+                validForSell
+                  ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                  : "bg-dark-400 text-dark-600 border border-dark-500",
+              )}
+            >
+              {validForSell ? "✅" : "❌"} SELL
             </div>
           </div>
 
           {limitValidation && (
             <>
-              <div className={cn(
-                "text-xs font-semibold mb-2 flex items-center gap-2",
-                (side === 'buy' && validForBuy) || (side === 'sell' && validForSell)
-                  ? "text-green-400"
-                  : "text-dark-600"
-              )}>
-                {(side === 'buy' && validForBuy) && <CheckCircle2 className="size-4" />}
-                {(side === 'sell' && validForSell) && <CheckCircle2 className="size-4" />}
-                {!(validForBuy || validForSell) && <AlertCircle className="size-4 text-red-400" />}
+              <div
+                className={cn(
+                  "text-xs font-semibold mb-2 flex items-center gap-2",
+                  (side === "buy" && validForBuy) ||
+                    (side === "sell" && validForSell)
+                    ? "text-green-400"
+                    : "text-dark-600",
+                )}
+              >
+                {side === "buy" && validForBuy && (
+                  <CheckCircle2 className="size-4" />
+                )}
+                {side === "sell" && validForSell && (
+                  <CheckCircle2 className="size-4" />
+                )}
+                {!(validForBuy || validForSell) && (
+                  <AlertCircle className="size-4 text-red-400" />
+                )}
                 <span>
-                  {side === 'buy' ? 'BUY' : 'SELL'} Limit Validation
-                  {(side === 'buy' && validForBuy) && ' ✅'}
-                  {(side === 'sell' && validForSell) && ' ✅'}
+                  {side === "buy" ? "BUY" : "SELL"} Limit Validation
+                  {side === "buy" && validForBuy && " ✅"}
+                  {side === "sell" && validForSell && " ✅"}
                 </span>
               </div>
-          
-          {/* Pips Distance Check - ONLY validation rule */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-dark-600">Distance from Market:</span>
-            <div className="flex items-center gap-1">
-              {limitValidation.minDistanceValid ? (
-                <>
-                  <CheckCircle2 className="size-3 text-green-400" />
-                  <span className={cn(
-                    "text-xs font-semibold",
-                    (side === 'buy' && validForBuy) || (side === 'sell' && validForSell)
-                      ? "text-green-400"
-                      : "text-green-400"
-                  )}>
-                    ✅ {limitValidation.pipsAway.toFixed(1)} pips away (min: 10)
-                  </span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="size-3 text-red-400" />
-                  <span className="text-xs font-semibold text-red-400">
-                    ❌ {limitValidation.pipsAway.toFixed(1)} pips away (min: 10)
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
 
+              {/* Pips Distance Check - ONLY validation rule */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-dark-600">
+                  Distance from Market:
+                </span>
+                <div className="flex items-center gap-1">
+                  {limitValidation.minDistanceValid ? (
+                    <>
+                      <CheckCircle2 className="size-3 text-green-400" />
+                      <span
+                        className={cn(
+                          "text-xs font-semibold",
+                          (side === "buy" && validForBuy) ||
+                            (side === "sell" && validForSell)
+                            ? "text-green-400"
+                            : "text-green-400",
+                        )}
+                      >
+                        ✅ {limitValidation.pipsAway.toFixed(1)} pips away (min:
+                        10)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="size-3 text-red-400" />
+                      <span className="text-xs font-semibold text-red-400">
+                        ❌ {limitValidation.pipsAway.toFixed(1)} pips away (min:
+                        10)
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -868,34 +1029,46 @@ const OrderForm = ({
         </div>
         <div className="flex items-center justify-between mt-1">
           <span className="text-sm text-dark-600">Available:</span>
-          <span className={cn(
-            "text-sm font-semibold",
-            canPlaceOrder ? "text-green" : "text-red"
-          )}>
+          <span
+            className={cn(
+              "text-sm font-semibold",
+              canPlaceOrder ? "text-green" : "text-red",
+            )}
+          >
             ${availableCapital.toFixed(2)}
           </span>
         </div>
         {marginRequired > 0 && (
           <div className="mt-2 pt-2 border-t border-dark-400">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-dark-600">Margin Level After Trade:</span>
-              <span className={cn(
-                "text-sm font-bold",
-                wouldCauseMarginCall ? "text-red-500" : 
-                marginLevelAfterTrade < (marginThresholds?.WARNING || 150) ? "text-yellow-500" : 
-                "text-green-500"
-              )}>
-                {Number.isFinite(marginLevelAfterTrade) ? `${marginLevelAfterTrade.toFixed(1)}%` : 'N/A'}
+              <span className="text-xs text-dark-600">
+                Margin Level After Trade:
+              </span>
+              <span
+                className={cn(
+                  "text-sm font-bold",
+                  wouldCauseMarginCall
+                    ? "text-red-500"
+                    : marginLevelAfterTrade < (marginThresholds?.WARNING || 150)
+                      ? "text-yellow-500"
+                      : "text-green-500",
+                )}
+              >
+                {Number.isFinite(marginLevelAfterTrade)
+                  ? `${marginLevelAfterTrade.toFixed(1)}%`
+                  : "N/A"}
               </span>
             </div>
             {currentlyBelowMarginCall && (
               <p className="text-xs text-red-500 mt-1 font-semibold">
-                🚨 Current margin at {currentMarginLevel.toFixed(1)}% - below {marginCallThreshold}% margin call. Close positions to trade.
+                🚨 Current margin at {currentMarginLevel.toFixed(1)}% - below{" "}
+                {marginCallThreshold}% margin call. Close positions to trade.
               </p>
             )}
             {!currentlyBelowMarginCall && wouldCauseMarginCall && (
               <p className="text-xs text-red-500 mt-1">
-                ⚠️ Would drop below {marginCallThreshold}% margin call - trade blocked
+                ⚠️ Would drop below {marginCallThreshold}% margin call - trade
+                blocked
               </p>
             )}
           </div>
@@ -907,19 +1080,19 @@ const OrderForm = ({
         <Button
           type="submit"
           disabled={
-            isSubmitting || 
-            !canPlaceOrder || 
-            (orderType === 'limit' && !validForBuy)
+            isSubmitting ||
+            !canPlaceOrder ||
+            (orderType === "limit" && !validForBuy)
           }
-          onClick={() => setSide('buy')}
+          onClick={() => setSide("buy")}
           className={cn(
             "font-bold h-12 transition-all text-xl",
-            validForBuy && orderType === 'limit' 
-              ? "bg-green-500 hover:bg-green-600 text-white ring-2 ring-green-400" 
-              : "bg-[#26a69a] hover:bg-[#26a69a]/90 text-white"
+            validForBuy && orderType === "limit"
+              ? "bg-green-500 hover:bg-green-600 text-white ring-2 ring-green-400"
+              : "bg-[#26a69a] hover:bg-[#26a69a]/90 text-white",
           )}
         >
-          {isSubmitting && side === 'buy' ? (
+          {isSubmitting && side === "buy" ? (
             <Loader2 className="size-5 animate-spin" />
           ) : (
             <>
@@ -931,19 +1104,19 @@ const OrderForm = ({
         <Button
           type="submit"
           disabled={
-            isSubmitting || 
-            !canPlaceOrder || 
-            (orderType === 'limit' && !validForSell)
+            isSubmitting ||
+            !canPlaceOrder ||
+            (orderType === "limit" && !validForSell)
           }
-          onClick={() => setSide('sell')}
+          onClick={() => setSide("sell")}
           className={cn(
             "font-bold h-12 transition-all text-xl",
-            validForSell && orderType === 'limit'
+            validForSell && orderType === "limit"
               ? "bg-red-500 hover:bg-red-600 text-white ring-2 ring-red-400"
-              : "bg-[#ef5350] hover:bg-[#ef5350]/90 text-white"
+              : "bg-[#ef5350] hover:bg-[#ef5350]/90 text-white",
           )}
         >
-          {isSubmitting && side === 'sell' ? (
+          {isSubmitting && side === "sell" ? (
             <Loader2 className="size-5 animate-spin" />
           ) : (
             <>
@@ -957,21 +1130,24 @@ const OrderForm = ({
       {!canPlaceOrder && (
         <p className="text-xs text-red text-center">
           {disabled
-            ? (disabledReason || '🚫 Trading is disabled')
+            ? disabledReason || "🚫 Trading is disabled"
             : openPositionsCount >= maxPositions
-            ? `Maximum ${maxPositions} positions reached`
-            : 'Insufficient capital for this trade'}
+              ? `Maximum ${maxPositions} positions reached`
+              : "Insufficient capital for this trade"}
         </p>
       )}
-      
-      {orderType === 'limit' && !validForBuy && !validForSell && canPlaceOrder && limitValidation && (
-        <p className="text-xs text-red-400 text-center">
-          ⚠️ Price not valid for either BUY or SELL - adjust price or distance
-        </p>
-      )}
+
+      {orderType === "limit" &&
+        !validForBuy &&
+        !validForSell &&
+        canPlaceOrder &&
+        limitValidation && (
+          <p className="text-xs text-red-400 text-center">
+            ⚠️ Price not valid for either BUY or SELL - adjust price or distance
+          </p>
+        )}
     </form>
   );
 };
 
 export default OrderForm;
-

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { requireSectionAccess } from '@/lib/admin/auth';
-import mongoose from 'mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { requireSectionAccess } from "@/lib/admin/auth";
+import mongoose from "mongoose";
 
 /**
  * GET /api/gamemasters
@@ -9,39 +9,43 @@ import mongoose from 'mongoose';
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireSectionAccess('gamemaster-management');
-    
+    await requireSectionAccess("gamemaster-management");
+
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status');
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const search = searchParams.get("search") || "";
+    const status = searchParams.get("status");
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
     }
 
     // Build query
     const query: Record<string, unknown> = {};
-    
+
     if (status) {
       query.status = status;
     }
-    
+
     if (search) {
       query.$or = [
-        { userName: { $regex: search, $options: 'i' } },
-        { userEmail: { $regex: search, $options: 'i' } },
-        { referralCode: { $regex: search, $options: 'i' } },
+        { userName: { $regex: search, $options: "i" } },
+        { userEmail: { $regex: search, $options: "i" } },
+        { referralCode: { $regex: search, $options: "i" } },
       ];
     }
 
     // Get game masters with pagination
-    const gamemasters = await db.collection('gamemastersubscriptions')
+    const gamemasters = await db
+      .collection("gamemastersubscriptions")
       .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -49,58 +53,100 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     // Get total count
-    const total = await db.collection('gamemastersubscriptions').countDocuments(query);
+    const total = await db
+      .collection("gamemastersubscriptions")
+      .countDocuments(query);
 
     // Get summary stats
-    const stats = await db.collection('gamemastersubscriptions').aggregate([
-      {
-        $group: {
-          _id: null,
-          totalActive: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
-          totalExpired: { $sum: { $cond: [{ $eq: ['$status', 'expired'] }, 1, 0] } },
-          totalSuspended: { $sum: { $cond: [{ $eq: ['$status', 'suspended'] }, 1, 0] } },
-          totalEarnings: { $sum: '$totalEarnings' },
-          totalReferrals: { $sum: '$totalReferredUsers' },
-          totalCompetitions: { $sum: '$totalCompetitionsCreated' },
-        }
-      }
-    ]).toArray();
+    const stats = await db
+      .collection("gamemastersubscriptions")
+      .aggregate([
+        {
+          $group: {
+            _id: null,
+            totalActive: {
+              $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+            },
+            totalExpired: {
+              $sum: { $cond: [{ $eq: ["$status", "expired"] }, 1, 0] },
+            },
+            totalSuspended: {
+              $sum: { $cond: [{ $eq: ["$status", "suspended"] }, 1, 0] },
+            },
+            totalEarnings: { $sum: "$totalEarnings" },
+            totalReferrals: { $sum: "$totalReferredUsers" },
+            totalCompetitions: { $sum: "$totalCompetitionsCreated" },
+          },
+        },
+      ])
+      .toArray();
 
     // Get all unique package IDs and look up CURRENT package settings
-    const packageIds = [...new Set(gamemasters.map(gm => gm.packageId).filter(Boolean))];
-    const packages = await db.collection('marketplaceitems').find({
-      _id: { $in: packageIds.map(id => {
-        try { return new mongoose.Types.ObjectId(id); } catch { return null; }
-      }).filter(Boolean) }
-    }).toArray();
-    
+    const packageIds = [
+      ...new Set(gamemasters.map((gm) => gm.packageId).filter(Boolean)),
+    ];
+    const packages = await db
+      .collection("marketplaceitems")
+      .find({
+        _id: {
+          $in: packageIds
+            .map((id) => {
+              try {
+                return new mongoose.Types.ObjectId(id);
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean),
+        },
+      })
+      .toArray();
+
     // Create a map of package ID -> current settings
     const packageSettingsMap = new Map(
-      packages.map(pkg => [pkg._id.toString(), pkg.gameMasterConfig])
+      packages.map((pkg) => [pkg._id.toString(), pkg.gameMasterConfig]),
     );
-    
+
     // Get actual pending earnings from gamemasterearnings (source of truth)
-    const gmUserIds = gamemasters.map(gm => gm.userId);
-    const pendingEarningsAgg = await db.collection('gamemasterearnings').aggregate([
-      { $match: { gameMasterId: { $in: gmUserIds }, status: 'pending' } },
-      { $group: { _id: '$gameMasterId', pendingEarnings: { $sum: '$netEarning' } } }
-    ]).toArray();
-    const actualPendingEarnings = new Map(pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]));
+    const gmUserIds = gamemasters.map((gm) => gm.userId);
+    const pendingEarningsAgg = await db
+      .collection("gamemasterearnings")
+      .aggregate([
+        { $match: { gameMasterId: { $in: gmUserIds }, status: "pending" } },
+        {
+          $group: {
+            _id: "$gameMasterId",
+            pendingEarnings: { $sum: "$netEarning" },
+          },
+        },
+      ])
+      .toArray();
+    const actualPendingEarnings = new Map(
+      pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]),
+    );
 
     return NextResponse.json({
-      gamemasters: gamemasters.map(gm => {
+      gamemasters: gamemasters.map((gm) => {
         // Get CURRENT package settings (not cached subscription limits)
-        const currentPackageSettings = gm.packageId ? packageSettingsMap.get(gm.packageId.toString()) : null;
-        const currentLimits = currentPackageSettings ? {
-          maxCompetitionsPerDay: currentPackageSettings.maxCompetitionsPerDay,
-          maxUsersPerCompetition: currentPackageSettings.maxUsersPerCompetition,
-          referralFeePercentage: currentPackageSettings.referralFeePercentage,
-          canCreateCompetitions: currentPackageSettings.canCreateCompetitions !== false,
-        } : {
-          ...gm.limits,
-          canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
-        };
-        
+        const currentPackageSettings = gm.packageId
+          ? packageSettingsMap.get(gm.packageId.toString())
+          : null;
+        const currentLimits = currentPackageSettings
+          ? {
+              maxCompetitionsPerDay:
+                currentPackageSettings.maxCompetitionsPerDay,
+              maxUsersPerCompetition:
+                currentPackageSettings.maxUsersPerCompetition,
+              referralFeePercentage:
+                currentPackageSettings.referralFeePercentage,
+              canCreateCompetitions:
+                currentPackageSettings.canCreateCompetitions !== false,
+            }
+          : {
+              ...gm.limits,
+              canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
+            };
+
         return {
           id: gm._id.toString(),
           userId: gm.userId,
@@ -140,10 +186,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching game masters:', error);
+    console.error("Error fetching game masters:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unauthorized' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Unauthorized" },
+      { status: 500 },
     );
   }
 }

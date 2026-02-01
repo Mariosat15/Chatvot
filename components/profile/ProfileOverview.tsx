@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Trophy, 
-  Target, 
-  Award, 
-  BarChart3, 
-  Zap, 
-  Swords, 
+import { useState } from "react";
+import Link from "next/link";
+import {
+  TrendingUp,
+  TrendingDown,
+  Trophy,
+  Target,
+  Award,
+  BarChart3,
+  Zap,
+  Swords,
   Wallet,
   ArrowRight,
   ChevronDown,
   ChevronUp,
   Flame,
   Clock,
-  Users
-} from 'lucide-react';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { motion, AnimatePresence } from 'framer-motion';
+  Users,
+} from "lucide-react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ProfileOverviewProps {
@@ -30,14 +30,16 @@ interface ProfileOverviewProps {
   walletData: any;
 }
 
-export default function ProfileOverview({ 
-  combinedStats, 
-  competitionStats, 
-  challengeStats, 
-  walletData 
+export default function ProfileOverview({
+  combinedStats,
+  competitionStats,
+  challengeStats,
+  walletData,
 }: ProfileOverviewProps) {
   const { settings, creditsToEUR } = useAppSettings();
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({
     trading: true,
     wallet: true,
     competitions: false,
@@ -49,7 +51,7 @@ export default function ProfileOverview({
   if (!settings) return null;
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
   return (
@@ -67,13 +69,13 @@ export default function ProfileOverview({
           label="Win Rate"
           value={`${(combinedStats?.winRate || 0).toFixed(1)}%`}
           color="green"
-          trend={combinedStats?.winRate >= 50 ? 'up' : 'down'}
+          trend={combinedStats?.winRate >= 50 ? "up" : "down"}
         />
         <StatCard
           icon={<TrendingUp className="w-5 h-5" />}
           label="Total P&L"
-          value={`${(combinedStats?.totalPnL || 0) >= 0 ? '+' : ''}${(combinedStats?.totalPnL || 0).toFixed(2)}`}
-          color={(combinedStats?.totalPnL || 0) >= 0 ? 'green' : 'red'}
+          value={`${(combinedStats?.totalPnL || 0) >= 0 ? "+" : ""}${(combinedStats?.totalPnL || 0).toFixed(2)}`}
+          color={(combinedStats?.totalPnL || 0) >= 0 ? "green" : "red"}
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
@@ -88,9 +90,12 @@ export default function ProfileOverview({
         title="💰 Wallet"
         icon={<Wallet className="w-5 h-5 text-yellow-500" />}
         isOpen={expandedSections.wallet}
-        onToggle={() => toggleSection('wallet')}
+        onToggle={() => toggleSection("wallet")}
         action={
-          <Link href="/wallet" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
+          <Link
+            href="/wallet"
+            className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+          >
             View Details <ArrowRight className="w-4 h-4" />
           </Link>
         }
@@ -102,7 +107,11 @@ export default function ProfileOverview({
             symbol={settings.credits.symbol}
             decimals={settings.credits.decimals}
             variant="primary"
-            euroEquivalent={settings.credits.showEUREquivalent ? creditsToEUR(walletData?.currentBalance || 0) : undefined}
+            euroEquivalent={
+              settings.credits.showEUREquivalent
+                ? creditsToEUR(walletData?.currentBalance || 0)
+                : undefined
+            }
             currencySymbol={settings.currency.symbol}
           />
           <WalletStatCard
@@ -143,18 +152,58 @@ export default function ProfileOverview({
         title="📊 Trading Performance"
         icon={<BarChart3 className="w-5 h-5 text-blue-500" />}
         isOpen={expandedSections.trading}
-        onToggle={() => toggleSection('trading')}
+        onToggle={() => toggleSection("trading")}
         badge="All Activity"
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          <MiniStat label="Winning" value={combinedStats?.winningTrades || 0} color="text-green-400" />
-          <MiniStat label="Losing" value={combinedStats?.losingTrades || 0} color="text-red-400" />
-          <MiniStat label="Profit Factor" value={(combinedStats?.profitFactor === 999 ? '∞' : (combinedStats?.profitFactor || 0).toFixed(2))} color="text-purple-400" />
-          <MiniStat label="Avg Win" value={`+$${(combinedStats?.averageWin || 0).toFixed(2)}`} color="text-green-400" />
-          <MiniStat label="Avg Loss" value={`-$${(combinedStats?.averageLoss || 0).toFixed(2)}`} color="text-red-400" />
-          <MiniStat label="Largest Win" value={`+$${(combinedStats?.largestWin || 0).toFixed(2)}`} color="text-green-400" />
-          <MiniStat label="Largest Loss" value={`-$${Math.abs(combinedStats?.largestLoss || 0).toFixed(2)}`} color="text-red-400" />
-          <MiniStat label="ROI" value={`${(combinedStats?.totalPnLPercentage || 0) >= 0 ? '+' : ''}${(combinedStats?.totalPnLPercentage || 0).toFixed(2)}%`} color={(combinedStats?.totalPnLPercentage || 0) >= 0 ? 'text-green-400' : 'text-red-400'} />
+          <MiniStat
+            label="Winning"
+            value={combinedStats?.winningTrades || 0}
+            color="text-green-400"
+          />
+          <MiniStat
+            label="Losing"
+            value={combinedStats?.losingTrades || 0}
+            color="text-red-400"
+          />
+          <MiniStat
+            label="Profit Factor"
+            value={
+              combinedStats?.profitFactor === 999
+                ? "∞"
+                : (combinedStats?.profitFactor || 0).toFixed(2)
+            }
+            color="text-purple-400"
+          />
+          <MiniStat
+            label="Avg Win"
+            value={`+$${(combinedStats?.averageWin || 0).toFixed(2)}`}
+            color="text-green-400"
+          />
+          <MiniStat
+            label="Avg Loss"
+            value={`-$${(combinedStats?.averageLoss || 0).toFixed(2)}`}
+            color="text-red-400"
+          />
+          <MiniStat
+            label="Largest Win"
+            value={`+$${(combinedStats?.largestWin || 0).toFixed(2)}`}
+            color="text-green-400"
+          />
+          <MiniStat
+            label="Largest Loss"
+            value={`-$${Math.abs(combinedStats?.largestLoss || 0).toFixed(2)}`}
+            color="text-red-400"
+          />
+          <MiniStat
+            label="ROI"
+            value={`${(combinedStats?.totalPnLPercentage || 0) >= 0 ? "+" : ""}${(combinedStats?.totalPnLPercentage || 0).toFixed(2)}%`}
+            color={
+              (combinedStats?.totalPnLPercentage || 0) >= 0
+                ? "text-green-400"
+                : "text-red-400"
+            }
+          />
         </div>
       </CollapsibleSection>
 
@@ -163,7 +212,7 @@ export default function ProfileOverview({
         title="🏆 Competition Stats"
         icon={<Trophy className="w-5 h-5 text-yellow-500" />}
         isOpen={expandedSections.competitions}
-        onToggle={() => toggleSection('competitions')}
+        onToggle={() => toggleSection("competitions")}
         badge="Competitions Only"
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -186,7 +235,11 @@ export default function ProfileOverview({
           <HighlightCard
             icon={<BarChart3 className="w-5 h-5 text-purple-500" />}
             label="Best Rank"
-            value={competitionStats?.bestRank && competitionStats.bestRank > 0 ? `#${competitionStats.bestRank}` : 'N/A'}
+            value={
+              competitionStats?.bestRank && competitionStats.bestRank > 0
+                ? `#${competitionStats.bestRank}`
+                : "N/A"
+            }
             gradient="from-purple-500/20 to-purple-600/10"
             border="border-purple-500/30"
           />
@@ -202,12 +255,44 @@ export default function ProfileOverview({
 
         {/* Performance Grid */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-gray-800/30 rounded-xl p-3">
-          <MiniStat label="P&L" value={`${(competitionStats?.totalPnl || 0) >= 0 ? '+' : ''}${(competitionStats?.totalPnl || 0).toFixed(2)}`} color={(competitionStats?.totalPnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'} />
-          <MiniStat label="Avg ROI" value={`${(competitionStats?.averageRoi || 0) >= 0 ? '+' : ''}${(competitionStats?.averageRoi || 0).toFixed(2)}%`} color={(competitionStats?.averageRoi || 0) >= 0 ? 'text-green-400' : 'text-red-400'} />
-          <MiniStat label="Win Rate" value={`${(competitionStats?.overallWinRate || 0).toFixed(1)}%`} color="text-white" />
-          <MiniStat label="Trades" value={competitionStats?.totalTrades || 0} color="text-white" />
-          <MiniStat label="Best P&L" value={`+${(competitionStats?.bestPnl || 0).toFixed(2)}`} color="text-green-400" />
-          <MiniStat label="Best ROI" value={`+${(competitionStats?.bestRoi || 0).toFixed(2)}%`} color="text-green-400" />
+          <MiniStat
+            label="P&L"
+            value={`${(competitionStats?.totalPnl || 0) >= 0 ? "+" : ""}${(competitionStats?.totalPnl || 0).toFixed(2)}`}
+            color={
+              (competitionStats?.totalPnl || 0) >= 0
+                ? "text-green-400"
+                : "text-red-400"
+            }
+          />
+          <MiniStat
+            label="Avg ROI"
+            value={`${(competitionStats?.averageRoi || 0) >= 0 ? "+" : ""}${(competitionStats?.averageRoi || 0).toFixed(2)}%`}
+            color={
+              (competitionStats?.averageRoi || 0) >= 0
+                ? "text-green-400"
+                : "text-red-400"
+            }
+          />
+          <MiniStat
+            label="Win Rate"
+            value={`${(competitionStats?.overallWinRate || 0).toFixed(1)}%`}
+            color="text-white"
+          />
+          <MiniStat
+            label="Trades"
+            value={competitionStats?.totalTrades || 0}
+            color="text-white"
+          />
+          <MiniStat
+            label="Best P&L"
+            value={`+${(competitionStats?.bestPnl || 0).toFixed(2)}`}
+            color="text-green-400"
+          />
+          <MiniStat
+            label="Best ROI"
+            value={`+${(competitionStats?.bestRoi || 0).toFixed(2)}%`}
+            color="text-green-400"
+          />
         </div>
       </CollapsibleSection>
 
@@ -217,19 +302,26 @@ export default function ProfileOverview({
           title="📅 Recent Competitions"
           icon={<Clock className="w-5 h-5 text-gray-400" />}
           isOpen={expandedSections.recentComps}
-          onToggle={() => toggleSection('recentComps')}
+          onToggle={() => toggleSection("recentComps")}
           count={competitionStats.recentCompetitions.length}
         >
           <div className="space-y-2">
-            {competitionStats.recentCompetitions.slice(0, 5).map((comp: any) => (
-              <CompetitionRow key={comp.competitionId} comp={comp} settings={settings} />
-            ))}
+            {competitionStats.recentCompetitions
+              .slice(0, 5)
+              .map((comp: any) => (
+                <CompetitionRow
+                  key={comp.competitionId}
+                  comp={comp}
+                  settings={settings}
+                />
+              ))}
             {competitionStats.recentCompetitions.length > 5 && (
-              <Link 
-                href="/competitions?filter=participated" 
+              <Link
+                href="/competitions?filter=participated"
                 className="block text-center py-2 text-sm text-blue-400 hover:text-blue-300"
               >
-                View all {competitionStats.recentCompetitions.length} competitions
+                View all {competitionStats.recentCompetitions.length}{" "}
+                competitions
               </Link>
             )}
           </div>
@@ -242,7 +334,7 @@ export default function ProfileOverview({
           title="⚔️ 1v1 Challenge Stats"
           icon={<Swords className="w-5 h-5 text-orange-500" />}
           isOpen={expandedSections.challenges}
-          onToggle={() => toggleSection('challenges')}
+          onToggle={() => toggleSection("challenges")}
           badge="Challenges Only"
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -265,9 +357,17 @@ export default function ProfileOverview({
             <HighlightCard
               icon={<TrendingUp className="w-5 h-5" />}
               label="Total P&L"
-              value={`${(challengeStats?.totalPnl || 0) >= 0 ? '+' : ''}${(challengeStats?.totalPnl || 0).toFixed(2)}`}
-              gradient={(challengeStats?.totalPnl || 0) >= 0 ? 'from-green-500/20 to-green-600/10' : 'from-red-500/20 to-red-600/10'}
-              border={(challengeStats?.totalPnl || 0) >= 0 ? 'border-green-500/30' : 'border-red-500/30'}
+              value={`${(challengeStats?.totalPnl || 0) >= 0 ? "+" : ""}${(challengeStats?.totalPnl || 0).toFixed(2)}`}
+              gradient={
+                (challengeStats?.totalPnl || 0) >= 0
+                  ? "from-green-500/20 to-green-600/10"
+                  : "from-red-500/20 to-red-600/10"
+              }
+              border={
+                (challengeStats?.totalPnl || 0) >= 0
+                  ? "border-green-500/30"
+                  : "border-red-500/30"
+              }
             />
             <HighlightCard
               icon={<Zap className="w-5 h-5 text-yellow-500" />}
@@ -287,83 +387,102 @@ export default function ProfileOverview({
           title="⚔️ Recent Challenges"
           icon={<Clock className="w-5 h-5 text-gray-400" />}
           isOpen={expandedSections.recentChallenges}
-          onToggle={() => toggleSection('recentChallenges')}
+          onToggle={() => toggleSection("recentChallenges")}
           count={challengeStats.recentChallenges.length}
         >
           <div className="space-y-2">
-            {challengeStats.recentChallenges.slice(0, 5).map((challenge: any) => (
-              <ChallengeRow key={challenge.challengeId} challenge={challenge} settings={settings} />
-            ))}
+            {challengeStats.recentChallenges
+              .slice(0, 5)
+              .map((challenge: any) => (
+                <ChallengeRow
+                  key={challenge.challengeId}
+                  challenge={challenge}
+                  settings={settings}
+                />
+              ))}
           </div>
         </CollapsibleSection>
       )}
 
       {/* Empty State */}
-      {!competitionStats?.recentCompetitions?.length && !challengeStats?.recentChallenges?.length && (
-        <div className="bg-gray-800/30 rounded-2xl p-8 text-center border border-gray-700/50">
-          <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-white mb-2">No Activity Yet</h3>
-          <p className="text-gray-400 mb-4">Join competitions or challenge other traders to start building your record!</p>
-          <div className="flex justify-center gap-3">
-            <Link
-              href="/competitions"
-              className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 rounded-lg font-medium transition-colors"
-            >
-              Browse Competitions
-            </Link>
-            <Link
-              href="/challenges"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-            >
-              Find Challengers
-            </Link>
+      {!competitionStats?.recentCompetitions?.length &&
+        !challengeStats?.recentChallenges?.length && (
+          <div className="bg-gray-800/30 rounded-2xl p-8 text-center border border-gray-700/50">
+            <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-white mb-2">
+              No Activity Yet
+            </h3>
+            <p className="text-gray-400 mb-4">
+              Join competitions or challenge other traders to start building
+              your record!
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link
+                href="/competitions"
+                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 rounded-lg font-medium transition-colors"
+              >
+                Browse Competitions
+              </Link>
+              <Link
+                href="/challenges"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+              >
+                Find Challengers
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
 
 // Component: Stat Card
-function StatCard({ 
-  icon, 
-  label, 
-  value, 
+function StatCard({
+  icon,
+  label,
+  value,
   color,
-  trend
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  value: string | number; 
+  trend,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
   color: string;
-  trend?: 'up' | 'down';
+  trend?: "up" | "down";
 }) {
   const colorClasses: Record<string, string> = {
-    blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
-    green: 'from-green-500/20 to-green-600/10 border-green-500/30',
-    red: 'from-red-500/20 to-red-600/10 border-red-500/30',
-    yellow: 'from-yellow-500/20 to-amber-500/10 border-yellow-500/30',
-    purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+    blue: "from-blue-500/20 to-blue-600/10 border-blue-500/30",
+    green: "from-green-500/20 to-green-600/10 border-green-500/30",
+    red: "from-red-500/20 to-red-600/10 border-red-500/30",
+    yellow: "from-yellow-500/20 to-amber-500/10 border-yellow-500/30",
+    purple: "from-purple-500/20 to-purple-600/10 border-purple-500/30",
   };
 
   const iconColorClasses: Record<string, string> = {
-    blue: 'text-blue-400',
-    green: 'text-green-400',
-    red: 'text-red-400',
-    yellow: 'text-yellow-400',
-    purple: 'text-purple-400',
+    blue: "text-blue-400",
+    green: "text-green-400",
+    red: "text-red-400",
+    yellow: "text-yellow-400",
+    purple: "text-purple-400",
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-xl p-4 border ${colorClasses[color].split(' ')[2]} hover:scale-[1.02] transition-transform`}>
-      <div className={`flex items-center gap-2 ${iconColorClasses[color]} mb-2`}>
+    <div
+      className={`bg-gradient-to-br ${colorClasses[color]} rounded-xl p-4 border ${colorClasses[color].split(" ")[2]} hover:scale-[1.02] transition-transform`}
+    >
+      <div
+        className={`flex items-center gap-2 ${iconColorClasses[color]} mb-2`}
+      >
         {icon}
-        <span className="text-xs text-gray-400 uppercase tracking-wider">{label}</span>
-        {trend && (
-          trend === 'up' ? 
-            <TrendingUp className="w-3 h-3 text-green-400 ml-auto" /> : 
+        <span className="text-xs text-gray-400 uppercase tracking-wider">
+          {label}
+        </span>
+        {trend &&
+          (trend === "up" ? (
+            <TrendingUp className="w-3 h-3 text-green-400 ml-auto" />
+          ) : (
             <TrendingDown className="w-3 h-3 text-red-400 ml-auto" />
-        )}
+          ))}
       </div>
       <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
     </div>
@@ -371,59 +490,74 @@ function StatCard({
 }
 
 // Component: Wallet Stat Card
-function WalletStatCard({ 
-  label, 
-  value, 
-  symbol, 
-  decimals, 
+function WalletStatCard({
+  label,
+  value,
+  symbol,
+  decimals,
   variant,
-  prefix = '',
+  prefix = "",
   euroEquivalent,
-  currencySymbol
-}: { 
-  label: string; 
-  value: number; 
-  symbol: string; 
-  decimals: number; 
-  variant: 'primary' | 'blue' | 'green' | 'orange' | 'gray';
+  currencySymbol,
+}: {
+  label: string;
+  value: number;
+  symbol: string;
+  decimals: number;
+  variant: "primary" | "blue" | "green" | "orange" | "gray";
   prefix?: string;
   euroEquivalent?: number;
   currencySymbol?: string;
 }) {
   const variants: Record<string, string> = {
-    primary: 'bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border-yellow-500/30',
-    blue: 'bg-gray-800/50 border-blue-500/20 hover:border-blue-500/40',
-    green: 'bg-gray-800/50 border-green-500/20 hover:border-green-500/40',
-    orange: 'bg-gray-800/50 border-orange-500/20 hover:border-orange-500/40',
-    gray: 'bg-gray-800/50 border-gray-600/20 hover:border-gray-500/40',
+    primary:
+      "bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border-yellow-500/30",
+    blue: "bg-gray-800/50 border-blue-500/20 hover:border-blue-500/40",
+    green: "bg-gray-800/50 border-green-500/20 hover:border-green-500/40",
+    orange: "bg-gray-800/50 border-orange-500/20 hover:border-orange-500/40",
+    gray: "bg-gray-800/50 border-gray-600/20 hover:border-gray-500/40",
   };
 
   const textColors: Record<string, string> = {
-    primary: 'text-white',
-    blue: 'text-blue-400',
-    green: 'text-green-400',
-    orange: 'text-orange-400',
-    gray: 'text-gray-400',
+    primary: "text-white",
+    blue: "text-blue-400",
+    green: "text-green-400",
+    orange: "text-orange-400",
+    gray: "text-gray-400",
   };
 
   return (
-    <div className={`rounded-xl p-3 border ${variants[variant]} transition-all`}>
+    <div
+      className={`rounded-xl p-3 border ${variants[variant]} transition-all`}
+    >
       <p className="text-xs text-gray-400 mb-1">{label}</p>
       <div className="flex items-baseline gap-1">
         <p className={`text-lg font-bold tabular-nums ${textColors[variant]}`}>
-          {prefix}{value.toFixed(decimals)}
+          {prefix}
+          {value.toFixed(decimals)}
         </p>
         <span className="text-sm text-yellow-500">{symbol}</span>
       </div>
       {euroEquivalent !== undefined && currencySymbol && (
-        <p className="text-xs text-gray-500 mt-0.5">≈ {currencySymbol}{euroEquivalent.toFixed(2)}</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          ≈ {currencySymbol}
+          {euroEquivalent.toFixed(2)}
+        </p>
       )}
     </div>
   );
 }
 
 // Component: Mini Stat
-function MiniStat({ label, value, color }: { label: string; value: string | number; color: string }) {
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color: string;
+}) {
   return (
     <div className="text-center">
       <p className="text-xs text-gray-500 mb-0.5">{label}</p>
@@ -433,17 +567,17 @@ function MiniStat({ label, value, color }: { label: string; value: string | numb
 }
 
 // Component: Highlight Card
-function HighlightCard({ 
-  icon, 
-  label, 
-  value, 
+function HighlightCard({
+  icon,
+  label,
+  value,
   subtext,
   symbol,
   gradient,
-  border
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
+  border,
+}: {
+  icon: React.ReactNode;
+  label: string;
   value: string | number;
   subtext?: string;
   symbol?: string;
@@ -451,7 +585,9 @@ function HighlightCard({
   border: string;
 }) {
   return (
-    <div className={`bg-gradient-to-br ${gradient} rounded-xl p-4 border ${border}`}>
+    <div
+      className={`bg-gradient-to-br ${gradient} rounded-xl p-4 border ${border}`}
+    >
       <div className="flex items-center gap-2 mb-2">
         {icon}
         <span className="text-sm text-gray-300">{label}</span>
@@ -466,20 +602,20 @@ function HighlightCard({
 }
 
 // Component: Collapsible Section
-function CollapsibleSection({ 
-  title, 
-  icon, 
-  isOpen, 
-  onToggle, 
+function CollapsibleSection({
+  title,
+  icon,
+  isOpen,
+  onToggle,
   children,
   badge,
   action,
-  count
-}: { 
-  title: string; 
-  icon: React.ReactNode; 
-  isOpen: boolean; 
-  onToggle: () => void; 
+  count,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
   badge?: string;
   action?: React.ReactNode;
@@ -506,7 +642,7 @@ function CollapsibleSection({
           )}
         </div>
         <div className="flex items-center gap-3">
-          {action && <div onClick={e => e.stopPropagation()}>{action}</div>}
+          {action && <div onClick={(e) => e.stopPropagation()}>{action}</div>}
           {isOpen ? (
             <ChevronUp className="w-5 h-5 text-gray-400" />
           ) : (
@@ -518,7 +654,7 @@ function CollapsibleSection({
         {isOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
@@ -533,10 +669,10 @@ function CollapsibleSection({
 // Component: Competition Row
 function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
   const statusColors: Record<string, string> = {
-    active: 'bg-green-500/20 text-green-400 border-green-500/30',
-    completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    cancelled: 'bg-red-500/20 text-red-400 border-red-500/30',
-    upcoming: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    active: "bg-green-500/20 text-green-400 border-green-500/30",
+    completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
+    upcoming: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   };
 
   return (
@@ -549,11 +685,13 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
           <h3 className="font-medium text-white truncate group-hover:text-blue-400 transition-colors">
             {comp.competitionName}
           </h3>
-          <span className={`px-2 py-0.5 text-xs rounded-full border ${statusColors[comp.status] || statusColors.upcoming}`}>
-            {comp.status === 'active' && '🔴 LIVE'}
-            {comp.status === 'completed' && '✓ DONE'}
-            {comp.status === 'upcoming' && '⏳ SOON'}
-            {comp.status === 'cancelled' && '✕ CANCELLED'}
+          <span
+            className={`px-2 py-0.5 text-xs rounded-full border ${statusColors[comp.status] || statusColors.upcoming}`}
+          >
+            {comp.status === "active" && "🔴 LIVE"}
+            {comp.status === "completed" && "✓ DONE"}
+            {comp.status === "upcoming" && "⏳ SOON"}
+            {comp.status === "cancelled" && "✕ CANCELLED"}
           </span>
         </div>
         <p className="text-xs text-gray-400">
@@ -563,19 +701,25 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
       <div className="flex items-center gap-4 text-right text-sm">
         <div>
           <p className="text-xs text-gray-500">Rank</p>
-          <p className="font-semibold text-yellow-400">{comp.rank > 0 ? `#${comp.rank}` : '-'}</p>
+          <p className="font-semibold text-yellow-400">
+            {comp.rank > 0 ? `#${comp.rank}` : "-"}
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-500">P&L</p>
-          <p className={`font-semibold tabular-nums ${comp.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {comp.pnl >= 0 ? '+' : ''}{comp.pnl.toFixed(2)}
+          <p
+            className={`font-semibold tabular-nums ${comp.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+          >
+            {comp.pnl >= 0 ? "+" : ""}
+            {comp.pnl.toFixed(2)}
           </p>
         </div>
         {comp.prizeAmount > 0 && (
           <div>
             <p className="text-xs text-gray-500">Prize</p>
             <p className="font-semibold text-yellow-400 tabular-nums">
-              {comp.prizeAmount.toFixed(settings.credits.decimals)} {settings.credits.symbol}
+              {comp.prizeAmount.toFixed(settings.credits.decimals)}{" "}
+              {settings.credits.symbol}
             </p>
           </div>
         )}
@@ -585,7 +729,13 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
 }
 
 // Component: Challenge Row
-function ChallengeRow({ challenge, settings }: { challenge: any; settings: any }) {
+function ChallengeRow({
+  challenge,
+  settings,
+}: {
+  challenge: any;
+  settings: any;
+}) {
   return (
     <Link
       href={`/challenges/${challenge.challengeId}`}
@@ -596,18 +746,20 @@ function ChallengeRow({ challenge, settings }: { challenge: any; settings: any }
           <h3 className="font-medium text-white truncate group-hover:text-orange-400 transition-colors">
             vs {challenge.opponentName}
           </h3>
-          {challenge.status === 'active' && (
+          {challenge.status === "active" && (
             <span className="px-2 py-0.5 text-xs rounded-full border bg-green-500/20 text-green-400 border-green-500/30">
               🔴 LIVE
             </span>
           )}
-          {challenge.status === 'completed' && (
-            <span className={`px-2 py-0.5 text-xs rounded-full border ${
-              challenge.isWinner 
-                ? 'bg-green-500/20 text-green-400 border-green-500/30' 
-                : 'bg-red-500/20 text-red-400 border-red-500/30'
-            }`}>
-              {challenge.isWinner ? '🏆 WON' : '✕ LOST'}
+          {challenge.status === "completed" && (
+            <span
+              className={`px-2 py-0.5 text-xs rounded-full border ${
+                challenge.isWinner
+                  ? "bg-green-500/20 text-green-400 border-green-500/30"
+                  : "bg-red-500/20 text-red-400 border-red-500/30"
+              }`}
+            >
+              {challenge.isWinner ? "🏆 WON" : "✕ LOST"}
             </span>
           )}
         </div>
@@ -620,12 +772,14 @@ function ChallengeRow({ challenge, settings }: { challenge: any; settings: any }
         </div>
         <div>
           <p className="text-xs text-gray-500">P&L</p>
-          <p className={`font-semibold tabular-nums ${challenge.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {challenge.pnl >= 0 ? '+' : ''}{challenge.pnl.toFixed(2)}
+          <p
+            className={`font-semibold tabular-nums ${challenge.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+          >
+            {challenge.pnl >= 0 ? "+" : ""}
+            {challenge.pnl.toFixed(2)}
           </p>
         </div>
       </div>
     </Link>
   );
 }
-

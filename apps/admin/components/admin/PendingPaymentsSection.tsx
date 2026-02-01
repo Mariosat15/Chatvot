@@ -1,13 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   RefreshCw,
   CheckCircle2,
@@ -27,7 +39,7 @@ import {
   Calendar,
   Building2,
   Wallet,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface PaymentMetadata {
   eurAmount?: number;
@@ -56,7 +68,7 @@ interface Payment {
   userId: string;
   amount: number;
   currency: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  status: "pending" | "completed" | "failed" | "cancelled";
   transactionType: string;
   paymentIntentId?: string;
   paymentMethod?: string;
@@ -87,10 +99,10 @@ interface PaymentStats {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  failed: 'bg-red-500/20 text-red-300 border-red-500/30',
-  cancelled: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+  pending: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  failed: "bg-red-500/20 text-red-300 border-red-500/30",
+  cancelled: "bg-gray-500/20 text-gray-300 border-gray-500/30",
 };
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
@@ -100,16 +112,16 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   cancelled: <XCircle className="h-4 w-4" />,
 };
 
-type TabType = 'pending' | 'history';
+type TabType = "pending" | "history";
 
 export default function PendingPaymentsSection() {
-  const [activeTab, setActiveTab] = useState<TabType>('pending');
-  
+  const [activeTab, setActiveTab] = useState<TabType>("pending");
+
   // Pending tab state
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
-  
+
   // History tab state
   const [historyPayments, setHistoryPayments] = useState<Payment[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -117,21 +129,21 @@ export default function PendingPaymentsSection() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
-  
+
   // History filters
-  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
-  const [historyDateFrom, setHistoryDateFrom] = useState('');
-  const [historyDateTo, setHistoryDateTo] = useState('');
-  const [historyMinAmount, setHistoryMinAmount] = useState('');
-  const [historyMaxAmount, setHistoryMaxAmount] = useState('');
-  const [historyProviderFilter, setHistoryProviderFilter] = useState('all');
-  const [historyMethodFilter, setHistoryMethodFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyMinAmount, setHistoryMinAmount] = useState("");
+  const [historyMaxAmount, setHistoryMaxAmount] = useState("");
+  const [historyProviderFilter, setHistoryProviderFilter] = useState("all");
+  const [historyMethodFilter, setHistoryMethodFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Available filter options
   const [providers, setProviders] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  
+
   // Detail dialog state
   const [detailDialog, setDetailDialog] = useState<{
     open: boolean;
@@ -142,17 +154,17 @@ export default function PendingPaymentsSection() {
   const fetchPendingPayments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/pending-payments');
+      const response = await fetch("/api/pending-payments");
       const data = await response.json();
 
       if (data.success) {
         setPayments(data.payments);
       } else {
-        toast.error('Failed to fetch pending payments');
+        toast.error("Failed to fetch pending payments");
       }
     } catch (error) {
-      console.error('Error fetching pending payments:', error);
-      toast.error('Failed to fetch pending payments');
+      console.error("Error fetching pending payments:", error);
+      toast.error("Failed to fetch pending payments");
     } finally {
       setLoading(false);
     }
@@ -164,38 +176,38 @@ export default function PendingPaymentsSection() {
     try {
       const params = new URLSearchParams({
         page: historyPage.toString(),
-        limit: '20',
+        limit: "20",
       });
-      
-      if (historyStatusFilter !== 'all') {
-        params.set('status', historyStatusFilter);
+
+      if (historyStatusFilter !== "all") {
+        params.set("status", historyStatusFilter);
       }
-      
+
       if (historyDateFrom) {
-        params.set('dateFrom', historyDateFrom);
+        params.set("dateFrom", historyDateFrom);
       }
       if (historyDateTo) {
-        params.set('dateTo', historyDateTo);
+        params.set("dateTo", historyDateTo);
       }
       if (historyMinAmount) {
-        params.set('minAmount', historyMinAmount);
+        params.set("minAmount", historyMinAmount);
       }
       if (historyMaxAmount) {
-        params.set('maxAmount', historyMaxAmount);
+        params.set("maxAmount", historyMaxAmount);
       }
-      if (historyProviderFilter !== 'all') {
-        params.set('provider', historyProviderFilter);
+      if (historyProviderFilter !== "all") {
+        params.set("provider", historyProviderFilter);
       }
-      if (historyMethodFilter !== 'all') {
-        params.set('paymentMethod', historyMethodFilter);
+      if (historyMethodFilter !== "all") {
+        params.set("paymentMethod", historyMethodFilter);
       }
       if (searchQuery) {
-        params.set('search', searchQuery);
+        params.set("search", searchQuery);
       }
 
       const response = await fetch(`/api/payment-history?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      
+      if (!response.ok) throw new Error("Failed to fetch");
+
       const data = await response.json();
       setHistoryPayments(data.payments);
       setHistoryStats(data.stats);
@@ -204,7 +216,7 @@ export default function PendingPaymentsSection() {
       setProviders(data.providers || []);
       setPaymentMethods(data.paymentMethods || []);
     } catch (error) {
-      toast.error('Failed to load payment history');
+      toast.error("Failed to load payment history");
       console.error(error);
     } finally {
       setHistoryLoading(false);
@@ -213,49 +225,58 @@ export default function PendingPaymentsSection() {
 
   const completePayment = async (transactionId?: string) => {
     try {
-      setProcessing(transactionId || 'latest');
-      
-      const response = await fetch('/api/complete-pending-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      setProcessing(transactionId || "latest");
+
+      const response = await fetch("/api/complete-pending-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Payment completed successfully!');
+        toast.success("Payment completed successfully!");
         fetchPendingPayments();
-        if (activeTab === 'history') {
+        if (activeTab === "history") {
           fetchPaymentHistory();
         }
       } else {
         // Show specific error based on transaction status
-        if (data.transactionStatus === 'failed') {
-          toast.error(`❌ Cannot Complete: Payment FAILED\n${data.details || 'This payment was declined or encountered an error.'}`, {
-            duration: 6000,
-          });
-        } else if (data.transactionStatus === 'cancelled') {
-          toast.error(`🚫 Cannot Complete: Payment CANCELLED\n${data.details || 'User cancelled this transaction.'}`, {
-            duration: 6000,
-          });
-        } else if (data.transactionStatus === 'completed') {
-          toast.warning('Payment already completed', {
+        if (data.transactionStatus === "failed") {
+          toast.error(
+            `❌ Cannot Complete: Payment FAILED\n${data.details || "This payment was declined or encountered an error."}`,
+            {
+              duration: 6000,
+            },
+          );
+        } else if (data.transactionStatus === "cancelled") {
+          toast.error(
+            `🚫 Cannot Complete: Payment CANCELLED\n${data.details || "User cancelled this transaction."}`,
+            {
+              duration: 6000,
+            },
+          );
+        } else if (data.transactionStatus === "completed") {
+          toast.warning("Payment already completed", {
             duration: 4000,
           });
         } else if (data.nuveiStatus) {
-          toast.error(`❌ Nuvei Payment Not Approved\nStatus: ${data.nuveiStatus}\n${data.details || ''}`, {
-            duration: 6000,
-          });
+          toast.error(
+            `❌ Nuvei Payment Not Approved\nStatus: ${data.nuveiStatus}\n${data.details || ""}`,
+            {
+              duration: 6000,
+            },
+          );
         } else {
-          toast.error(data.error || 'Failed to complete payment');
+          toast.error(data.error || "Failed to complete payment");
         }
         // Refresh the list to show updated status
         fetchPendingPayments();
       }
     } catch (error) {
-      console.error('Error completing payment:', error);
-      toast.error('Failed to complete payment');
+      console.error("Error completing payment:", error);
+      toast.error("Failed to complete payment");
     } finally {
       setProcessing(null);
     }
@@ -268,7 +289,7 @@ export default function PendingPaymentsSection() {
 
     for (const payment of payments) {
       await completePayment(payment._id);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   };
 
@@ -277,12 +298,22 @@ export default function PendingPaymentsSection() {
     // No auto-refresh - user can manually refresh when needed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   useEffect(() => {
-    if (activeTab === 'history') {
+    if (activeTab === "history") {
       fetchPaymentHistory();
     }
-  }, [activeTab, historyStatusFilter, historyDateFrom, historyDateTo, historyMinAmount, historyMaxAmount, historyProviderFilter, historyMethodFilter, historyPage]);
+  }, [
+    activeTab,
+    historyStatusFilter,
+    historyDateFrom,
+    historyDateTo,
+    historyMinAmount,
+    historyMaxAmount,
+    historyProviderFilter,
+    historyMethodFilter,
+    historyPage,
+  ]);
 
   const handleHistorySearch = () => {
     setHistoryPage(1);
@@ -290,48 +321,63 @@ export default function PendingPaymentsSection() {
   };
 
   const clearHistoryFilters = () => {
-    setHistoryStatusFilter('all');
-    setHistoryDateFrom('');
-    setHistoryDateTo('');
-    setHistoryMinAmount('');
-    setHistoryMaxAmount('');
-    setHistoryProviderFilter('all');
-    setHistoryMethodFilter('all');
-    setSearchQuery('');
+    setHistoryStatusFilter("all");
+    setHistoryDateFrom("");
+    setHistoryDateTo("");
+    setHistoryMinAmount("");
+    setHistoryMaxAmount("");
+    setHistoryProviderFilter("all");
+    setHistoryMethodFilter("all");
+    setSearchQuery("");
     setHistoryPage(1);
   };
 
   const exportToCSV = () => {
-    const headers = ['Date', 'User', 'Email', 'Credits', 'EUR Amount', 'Status', 'Provider', 'Payment Method', 'Payment Intent'];
-    const rows = historyPayments.map(p => [
+    const headers = [
+      "Date",
+      "User",
+      "Email",
+      "Credits",
+      "EUR Amount",
+      "Status",
+      "Provider",
+      "Payment Method",
+      "Payment Intent",
+    ];
+    const rows = historyPayments.map((p) => [
       new Date(p.createdAt).toISOString(),
-      p.user?.name || 'Unknown',
-      p.user?.email || 'N/A',
+      p.user?.name || "Unknown",
+      p.user?.email || "N/A",
       p.amount.toFixed(2),
-      (p.metadata?.totalCharged || p.metadata?.eurAmount || p.amount).toFixed(2),
+      (p.metadata?.totalCharged || p.metadata?.eurAmount || p.amount).toFixed(
+        2,
+      ),
       p.status,
-      p.metadata?.paymentProvider || 'N/A',
-      p.paymentMethod || 'N/A',
-      p.paymentIntentId || 'N/A',
+      p.metadata?.paymentProvider || "N/A",
+      p.paymentMethod || "N/A",
+      p.paymentIntentId || "N/A",
     ]);
-    
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => r.map((c) => `"${c}"`).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `payment-history-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `payment-history-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -340,8 +386,8 @@ export default function PendingPaymentsSection() {
     const created = new Date(dateString);
     const diffMs = now.getTime() - created.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
+
+    if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -361,7 +407,7 @@ export default function PendingPaymentsSection() {
           {payment.user?.image ? (
             <img
               src={payment.user.image}
-              alt={payment.user.name || 'User'}
+              alt={payment.user.name || "User"}
               className="w-10 h-10 rounded-full flex-shrink-0"
             />
           ) : (
@@ -370,13 +416,22 @@ export default function PendingPaymentsSection() {
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-100 truncate" title={payment.user?.name || 'Unknown User'}>
-              {payment.user?.name || 'Unknown User'}
+            <p
+              className="text-sm font-semibold text-gray-100 truncate"
+              title={payment.user?.name || "Unknown User"}
+            >
+              {payment.user?.name || "Unknown User"}
             </p>
-            <p className="text-xs text-gray-400 truncate" title={payment.user?.email || 'No email'}>
-              {payment.user?.email || 'No email'}
+            <p
+              className="text-xs text-gray-400 truncate"
+              title={payment.user?.email || "No email"}
+            >
+              {payment.user?.email || "No email"}
             </p>
-            <p className="text-[10px] text-gray-500 font-mono truncate" title={payment.userId}>
+            <p
+              className="text-[10px] text-gray-500 font-mono truncate"
+              title={payment.userId}
+            >
               ID: {payment.userId?.slice(0, 12)}...
             </p>
           </div>
@@ -384,16 +439,21 @@ export default function PendingPaymentsSection() {
 
         {/* Amount */}
         <div className="text-right">
-          {(payment.status === 'failed' || payment.status === 'cancelled') ? (
+          {payment.status === "failed" || payment.status === "cancelled" ? (
             <>
               <p className="text-lg font-bold text-gray-500 line-through">
                 +{payment.amount.toFixed(2)} Credits
               </p>
               <p className="text-xs text-gray-600 line-through">
-                €{(payment.metadata?.totalCharged || payment.metadata?.eurAmount || payment.amount).toFixed(2)}
+                €
+                {(
+                  payment.metadata?.totalCharged ||
+                  payment.metadata?.eurAmount ||
+                  payment.amount
+                ).toFixed(2)}
               </p>
               <p className="text-[10px] text-red-400 mt-0.5">
-                {payment.status === 'cancelled' ? 'Not charged' : 'Declined'}
+                {payment.status === "cancelled" ? "Not charged" : "Declined"}
               </p>
             </>
           ) : (
@@ -402,7 +462,13 @@ export default function PendingPaymentsSection() {
                 +{payment.amount.toFixed(2)} Credits
               </p>
               <p className="text-xs text-gray-500">
-                €{(payment.metadata?.totalCharged || payment.metadata?.eurAmount || payment.amount).toFixed(2)} charged
+                €
+                {(
+                  payment.metadata?.totalCharged ||
+                  payment.metadata?.eurAmount ||
+                  payment.amount
+                ).toFixed(2)}{" "}
+                charged
               </p>
             </>
           )}
@@ -410,17 +476,31 @@ export default function PendingPaymentsSection() {
 
         {/* Status */}
         <div className="flex flex-col items-center gap-1">
-          <Badge className={`${STATUS_COLORS[payment.status]} flex items-center gap-1`}>
+          <Badge
+            className={`${STATUS_COLORS[payment.status]} flex items-center gap-1`}
+          >
             {STATUS_ICONS[payment.status]}
             <span className="capitalize">{payment.status}</span>
           </Badge>
           {/* Show failure/cancel reason */}
-          {(payment.status === 'failed' || payment.status === 'cancelled') && (
-            <p 
-              className="text-[10px] text-red-400 max-w-[140px] truncate text-center" 
-              title={payment.failureReason || payment.metadata?.cancelReason || payment.metadata?.clientErrorDescription || payment.metadata?.errorReason || 'No reason recorded'}
+          {(payment.status === "failed" || payment.status === "cancelled") && (
+            <p
+              className="text-[10px] text-red-400 max-w-[140px] truncate text-center"
+              title={
+                payment.failureReason ||
+                payment.metadata?.cancelReason ||
+                payment.metadata?.clientErrorDescription ||
+                payment.metadata?.errorReason ||
+                "No reason recorded"
+              }
             >
-              {payment.failureReason || payment.metadata?.cancelReason || payment.metadata?.clientErrorDescription || payment.metadata?.errorReason || (payment.status === 'cancelled' ? 'User cancelled' : 'Card declined')}
+              {payment.failureReason ||
+                payment.metadata?.cancelReason ||
+                payment.metadata?.clientErrorDescription ||
+                payment.metadata?.errorReason ||
+                (payment.status === "cancelled"
+                  ? "User cancelled"
+                  : "Card declined")}
             </p>
           )}
         </div>
@@ -429,11 +509,20 @@ export default function PendingPaymentsSection() {
         <div className="text-center w-36">
           <p className="text-xs text-gray-400">Provider</p>
           <p className="text-sm font-medium text-gray-200 capitalize">
-            {payment.provider || payment.metadata?.paymentProvider || payment.paymentMethod || 'Unknown'}
+            {payment.provider ||
+              payment.metadata?.paymentProvider ||
+              payment.paymentMethod ||
+              "Unknown"}
           </p>
           {(payment.providerTransactionId || payment.paymentIntentId) && (
-            <p className="text-[10px] text-gray-500 font-mono truncate" title={payment.providerTransactionId || payment.paymentIntentId}>
-              {(payment.providerTransactionId || payment.paymentIntentId)?.slice(0, 16)}...
+            <p
+              className="text-[10px] text-gray-500 font-mono truncate"
+              title={payment.providerTransactionId || payment.paymentIntentId}
+            >
+              {(
+                payment.providerTransactionId || payment.paymentIntentId
+              )?.slice(0, 16)}
+              ...
             </p>
           )}
         </div>
@@ -441,15 +530,22 @@ export default function PendingPaymentsSection() {
         {/* Transaction ID */}
         <div className="text-center w-28">
           <p className="text-xs text-gray-400">Txn ID</p>
-          <p className="text-[10px] text-gray-300 font-mono truncate" title={payment._id}>
+          <p
+            className="text-[10px] text-gray-300 font-mono truncate"
+            title={payment._id}
+          >
             {payment._id?.slice(0, 12)}...
           </p>
         </div>
 
         {/* Date */}
         <div className="text-right w-32">
-          <p className="text-xs text-gray-400">{getTimeSince(payment.createdAt)}</p>
-          <p className="text-xs text-gray-500">{formatDate(payment.createdAt)}</p>
+          <p className="text-xs text-gray-400">
+            {getTimeSince(payment.createdAt)}
+          </p>
+          <p className="text-xs text-gray-500">
+            {formatDate(payment.createdAt)}
+          </p>
         </div>
 
         {/* Actions */}
@@ -462,7 +558,7 @@ export default function PendingPaymentsSection() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          {showActions && payment.status === 'pending' && (
+          {showActions && payment.status === "pending" && (
             <Button
               onClick={() => completePayment(payment._id)}
               disabled={processing !== null}
@@ -486,11 +582,11 @@ export default function PendingPaymentsSection() {
       {/* Tabs */}
       <div className="flex items-center gap-4 border-b border-gray-700 pb-4">
         <button
-          onClick={() => setActiveTab('pending')}
+          onClick={() => setActiveTab("pending")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'pending'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            activeTab === "pending"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
           <Clock className="h-4 w-4" />
@@ -502,11 +598,11 @@ export default function PendingPaymentsSection() {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('history')}
+          onClick={() => setActiveTab("history")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'history'
-              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            activeTab === "history"
+              ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
           <History className="h-4 w-4" />
@@ -515,12 +611,14 @@ export default function PendingPaymentsSection() {
       </div>
 
       {/* Pending Tab */}
-      {activeTab === 'pending' && (
+      {activeTab === "pending" && (
         <>
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-100">Pending Payments</h2>
+              <h2 className="text-2xl font-bold text-gray-100">
+                Pending Payments
+              </h2>
               <p className="text-sm text-gray-400 mt-1">
                 Manually process pending purchases when webhooks are unavailable
               </p>
@@ -533,7 +631,9 @@ export default function PendingPaymentsSection() {
                 disabled={loading}
                 className="bg-gray-800 border-gray-700 hover:bg-gray-700"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               {payments.length > 0 && (
@@ -556,10 +656,13 @@ export default function PendingPaymentsSection() {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
               <div>
-                <h3 className="text-sm font-semibold text-blue-400">Manual Payment Processing</h3>
+                <h3 className="text-sm font-semibold text-blue-400">
+                  Manual Payment Processing
+                </h3>
                 <p className="text-xs text-gray-400 mt-1">
-                  Use this tool when Stripe webhooks are not set up or for testing in development.
-                  In production, webhooks should automatically process payments.
+                  Use this tool when Stripe webhooks are not set up or for
+                  testing in development. In production, webhooks should
+                  automatically process payments.
                 </p>
               </div>
             </div>
@@ -570,12 +673,16 @@ export default function PendingPaymentsSection() {
             {loading ? (
               <div className="p-12 text-center">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400 mb-3" />
-                <p className="text-sm text-gray-400">Loading pending payments...</p>
+                <p className="text-sm text-gray-400">
+                  Loading pending payments...
+                </p>
               </div>
             ) : payments.length === 0 ? (
               <div className="p-12 text-center">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-green-500 mb-3" />
-                <h3 className="text-lg font-semibold text-gray-100">No Pending Payments</h3>
+                <h3 className="text-lg font-semibold text-gray-100">
+                  No Pending Payments
+                </h3>
                 <p className="text-sm text-gray-400 mt-2">
                   All payments have been processed successfully!
                 </p>
@@ -592,12 +699,24 @@ export default function PendingPaymentsSection() {
             <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="text-2xl font-bold text-gray-100">{payments.length}</p>
+                  <p className="text-2xl font-bold text-gray-100">
+                    {payments.length}
+                  </p>
                   <p className="text-xs text-gray-400 mt-1">Pending Payments</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-100">
-                    €{payments.reduce((sum, p) => sum + (p.metadata?.totalCharged || p.metadata?.eurAmount || p.amount), 0).toFixed(2)}
+                    €
+                    {payments
+                      .reduce(
+                        (sum, p) =>
+                          sum +
+                          (p.metadata?.totalCharged ||
+                            p.metadata?.eurAmount ||
+                            p.amount),
+                        0,
+                      )
+                      .toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">Total Charged</p>
                 </div>
@@ -614,12 +733,14 @@ export default function PendingPaymentsSection() {
       )}
 
       {/* History Tab */}
-      {activeTab === 'history' && (
+      {activeTab === "history" && (
         <>
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-100">Payment History</h2>
+              <h2 className="text-2xl font-bold text-gray-100">
+                Payment History
+              </h2>
               <p className="text-sm text-gray-400 mt-1">
                 View and filter all deposit transactions
               </p>
@@ -632,7 +753,9 @@ export default function PendingPaymentsSection() {
                 disabled={historyLoading}
                 className="bg-gray-800 border-gray-700 hover:bg-gray-700"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${historyLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${historyLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               <Button
@@ -656,32 +779,48 @@ export default function PendingPaymentsSection() {
                   <Clock className="h-4 w-4 text-amber-400" />
                   <span className="text-sm text-amber-400">Pending</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{historyStats.pending.count}</p>
-                <p className="text-xs text-gray-400">{historyStats.pending.totalAmount.toFixed(0)} Credits</p>
+                <p className="text-2xl font-bold text-white">
+                  {historyStats.pending.count}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {historyStats.pending.totalAmount.toFixed(0)} Credits
+                </p>
               </div>
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                   <span className="text-sm text-emerald-400">Completed</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{historyStats.completed.count}</p>
-                <p className="text-xs text-gray-400">{historyStats.completed.totalAmount.toFixed(0)} Credits</p>
+                <p className="text-2xl font-bold text-white">
+                  {historyStats.completed.count}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {historyStats.completed.totalAmount.toFixed(0)} Credits
+                </p>
               </div>
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <XCircle className="h-4 w-4 text-red-400" />
                   <span className="text-sm text-red-400">Failed</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{historyStats.failed.count}</p>
-                <p className="text-xs text-gray-400">{historyStats.failed.totalAmount.toFixed(0)} Credits</p>
+                <p className="text-2xl font-bold text-white">
+                  {historyStats.failed.count}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {historyStats.failed.totalAmount.toFixed(0)} Credits
+                </p>
               </div>
               <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <XCircle className="h-4 w-4 text-gray-400" />
                   <span className="text-sm text-gray-400">Cancelled</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{historyStats.cancelled.count}</p>
-                <p className="text-xs text-gray-400">{historyStats.cancelled.totalAmount.toFixed(0)} Credits</p>
+                <p className="text-2xl font-bold text-white">
+                  {historyStats.cancelled.count}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {historyStats.cancelled.totalAmount.toFixed(0)} Credits
+                </p>
               </div>
             </div>
           )}
@@ -692,7 +831,7 @@ export default function PendingPaymentsSection() {
               <Filter className="h-4 w-4 text-gray-400" />
               <span className="text-sm font-medium text-gray-300">Filters</span>
             </div>
-            
+
             <div className="grid grid-cols-4 gap-4 mb-4">
               {/* Search */}
               <div className="space-y-1.5">
@@ -703,7 +842,9 @@ export default function PendingPaymentsSection() {
                     placeholder="Email, name, transaction ID, or payment intent..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleHistorySearch()}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleHistorySearch()
+                    }
                     className="pl-9 bg-gray-900 border-gray-700"
                   />
                 </div>
@@ -712,7 +853,10 @@ export default function PendingPaymentsSection() {
               {/* Status */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-gray-400">Status</Label>
-                <Select value={historyStatusFilter} onValueChange={setHistoryStatusFilter}>
+                <Select
+                  value={historyStatusFilter}
+                  onValueChange={setHistoryStatusFilter}
+                >
                   <SelectTrigger className="bg-gray-900 border-gray-700">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
@@ -729,14 +873,19 @@ export default function PendingPaymentsSection() {
               {/* Provider */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-gray-400">Provider</Label>
-                <Select value={historyProviderFilter} onValueChange={setHistoryProviderFilter}>
+                <Select
+                  value={historyProviderFilter}
+                  onValueChange={setHistoryProviderFilter}
+                >
                   <SelectTrigger className="bg-gray-900 border-gray-700">
                     <SelectValue placeholder="All providers" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Providers</SelectItem>
-                    {providers.map(p => (
-                      <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+                    {providers.map((p) => (
+                      <SelectItem key={p} value={p} className="capitalize">
+                        {p}
+                      </SelectItem>
                     ))}
                     {providers.length === 0 && (
                       <>
@@ -752,19 +901,26 @@ export default function PendingPaymentsSection() {
               {/* Payment Method */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-gray-400">Payment Method</Label>
-                <Select value={historyMethodFilter} onValueChange={setHistoryMethodFilter}>
+                <Select
+                  value={historyMethodFilter}
+                  onValueChange={setHistoryMethodFilter}
+                >
                   <SelectTrigger className="bg-gray-900 border-gray-700">
                     <SelectValue placeholder="All methods" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Methods</SelectItem>
-                    {paymentMethods.map(m => (
-                      <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>
+                    {paymentMethods.map((m) => (
+                      <SelectItem key={m} value={m} className="capitalize">
+                        {m}
+                      </SelectItem>
                     ))}
                     {paymentMethods.length === 0 && (
                       <>
                         <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="bank_transfer">
+                          Bank Transfer
+                        </SelectItem>
                       </>
                     )}
                   </SelectContent>
@@ -847,12 +1003,16 @@ export default function PendingPaymentsSection() {
             {historyLoading ? (
               <div className="p-12 text-center">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400 mb-3" />
-                <p className="text-sm text-gray-400">Loading payment history...</p>
+                <p className="text-sm text-gray-400">
+                  Loading payment history...
+                </p>
               </div>
             ) : historyPayments.length === 0 ? (
               <div className="p-12 text-center">
                 <Wallet className="h-12 w-12 mx-auto text-gray-500 mb-3" />
-                <h3 className="text-lg font-semibold text-gray-100">No Payments Found</h3>
+                <h3 className="text-lg font-semibold text-gray-100">
+                  No Payments Found
+                </h3>
                 <p className="text-sm text-gray-400 mt-2">
                   Try adjusting your filters or search query.
                 </p>
@@ -868,11 +1028,13 @@ export default function PendingPaymentsSection() {
           {historyTotalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-400">
-                Showing {((historyPage - 1) * 20) + 1} to {Math.min(historyPage * 20, historyTotal)} of {historyTotal} payments
+                Showing {(historyPage - 1) * 20 + 1} to{" "}
+                {Math.min(historyPage * 20, historyTotal)} of {historyTotal}{" "}
+                payments
               </p>
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
                   disabled={historyPage === 1}
                   variant="outline"
                   size="sm"
@@ -884,7 +1046,9 @@ export default function PendingPaymentsSection() {
                   Page {historyPage} of {historyTotalPages}
                 </span>
                 <Button
-                  onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
+                  onClick={() =>
+                    setHistoryPage((p) => Math.min(historyTotalPages, p + 1))
+                  }
                   disabled={historyPage === historyTotalPages}
                   variant="outline"
                   size="sm"
@@ -899,7 +1063,12 @@ export default function PendingPaymentsSection() {
       )}
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialog.open} onOpenChange={(open) => !open && setDetailDialog({ open: false, payment: null })}>
+      <Dialog
+        open={detailDialog.open}
+        onOpenChange={(open) =>
+          !open && setDetailDialog({ open: false, payment: null })
+        }
+      >
         <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl text-white flex items-center gap-2">
@@ -914,14 +1083,21 @@ export default function PendingPaymentsSection() {
           {detailDialog.payment && (
             <div className="space-y-6 mt-4">
               {/* Status Banner */}
-              <div className={`rounded-lg p-4 ${STATUS_COLORS[detailDialog.payment.status].replace('text-', 'bg-').replace('-300', '-500/10')}`}>
+              <div
+                className={`rounded-lg p-4 ${STATUS_COLORS[detailDialog.payment.status].replace("text-", "bg-").replace("-300", "-500/10")}`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {STATUS_ICONS[detailDialog.payment.status]}
-                    <span className="text-lg font-semibold capitalize">{detailDialog.payment.status}</span>
+                    <span className="text-lg font-semibold capitalize">
+                      {detailDialog.payment.status}
+                    </span>
                   </div>
                   <Badge className={STATUS_COLORS[detailDialog.payment.status]}>
-                    {detailDialog.payment.provider || detailDialog.payment.metadata?.paymentProvider || detailDialog.payment.paymentMethod || 'Unknown'}
+                    {detailDialog.payment.provider ||
+                      detailDialog.payment.metadata?.paymentProvider ||
+                      detailDialog.payment.paymentMethod ||
+                      "Unknown"}
                   </Badge>
                 </div>
               </div>
@@ -936,7 +1112,7 @@ export default function PendingPaymentsSection() {
                   {detailDialog.payment.user?.image ? (
                     <img
                       src={detailDialog.payment.user.image}
-                      alt={detailDialog.payment.user.name || 'User'}
+                      alt={detailDialog.payment.user.name || "User"}
                       className="w-14 h-14 rounded-full border-2 border-blue-500/30"
                     />
                   ) : (
@@ -949,13 +1125,14 @@ export default function PendingPaymentsSection() {
                       <div>
                         <p className="text-xs text-gray-500">Full Name</p>
                         <p className="font-semibold text-white">
-                          {detailDialog.payment.user?.name || 'Unknown User'}
+                          {detailDialog.payment.user?.name || "Unknown User"}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Email</p>
                         <p className="text-sm text-gray-300">
-                          {detailDialog.payment.user?.email || 'No email available'}
+                          {detailDialog.payment.user?.email ||
+                            "No email available"}
                         </p>
                       </div>
                       <div className="col-span-2">
@@ -978,31 +1155,59 @@ export default function PendingPaymentsSection() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Credits Purchased:</span>
-                    <span className="text-yellow-400 font-bold">{detailDialog.payment.amount.toFixed(2)} Credits</span>
+                    <span className="text-yellow-400 font-bold">
+                      {detailDialog.payment.amount.toFixed(2)} Credits
+                    </span>
                   </div>
                   {detailDialog.payment.metadata?.eurAmount && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Base Amount:</span>
-                      <span className="text-white">€{detailDialog.payment.metadata.eurAmount.toFixed(2)}</span>
+                      <span className="text-white">
+                        €{detailDialog.payment.metadata.eurAmount.toFixed(2)}
+                      </span>
                     </div>
                   )}
-                  {detailDialog.payment.metadata?.vatAmount && detailDialog.payment.metadata.vatAmount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">VAT ({detailDialog.payment.metadata.vatPercentage || 0}%):</span>
-                      <span className="text-orange-400">+€{detailDialog.payment.metadata.vatAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {detailDialog.payment.metadata?.platformFeeAmount && detailDialog.payment.metadata.platformFeeAmount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Platform Fee ({detailDialog.payment.metadata.platformDepositFeePercentage || 0}%):</span>
-                      <span className="text-orange-400">+€{detailDialog.payment.metadata.platformFeeAmount.toFixed(2)}</span>
-                    </div>
-                  )}
+                  {detailDialog.payment.metadata?.vatAmount &&
+                    detailDialog.payment.metadata.vatAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">
+                          VAT (
+                          {detailDialog.payment.metadata.vatPercentage || 0}%):
+                        </span>
+                        <span className="text-orange-400">
+                          +€{detailDialog.payment.metadata.vatAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  {detailDialog.payment.metadata?.platformFeeAmount &&
+                    detailDialog.payment.metadata.platformFeeAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">
+                          Platform Fee (
+                          {detailDialog.payment.metadata
+                            .platformDepositFeePercentage || 0}
+                          %):
+                        </span>
+                        <span className="text-orange-400">
+                          +€
+                          {detailDialog.payment.metadata.platformFeeAmount.toFixed(
+                            2,
+                          )}
+                        </span>
+                      </div>
+                    )}
                   <div className="border-t border-gray-700 pt-2 mt-2">
                     <div className="flex justify-between">
-                      <span className="text-white font-medium">Total Charged:</span>
+                      <span className="text-white font-medium">
+                        Total Charged:
+                      </span>
                       <span className="text-white font-bold">
-                        €{(detailDialog.payment.metadata?.totalCharged || detailDialog.payment.metadata?.eurAmount || detailDialog.payment.amount).toFixed(2)}
+                        €
+                        {(
+                          detailDialog.payment.metadata?.totalCharged ||
+                          detailDialog.payment.metadata?.eurAmount ||
+                          detailDialog.payment.amount
+                        ).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1010,7 +1215,8 @@ export default function PendingPaymentsSection() {
               </div>
 
               {/* Card Details */}
-              {(detailDialog.payment.metadata?.cardLast4 || detailDialog.payment.paymentMethod === 'card') && (
+              {(detailDialog.payment.metadata?.cardLast4 ||
+                detailDialog.payment.paymentMethod === "card") && (
                 <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                   <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
@@ -1022,12 +1228,16 @@ export default function PendingPaymentsSection() {
                     </div>
                     <div>
                       <p className="text-white font-medium capitalize">
-                        {detailDialog.payment.metadata?.cardBrand || 'Card'} •••• {detailDialog.payment.metadata?.cardLast4 || '****'}
+                        {detailDialog.payment.metadata?.cardBrand || "Card"}{" "}
+                        ••••{" "}
+                        {detailDialog.payment.metadata?.cardLast4 || "****"}
                       </p>
                       {detailDialog.payment.metadata?.cardExpMonth && (
                         <p className="text-xs text-gray-400">
-                          Expires {detailDialog.payment.metadata.cardExpMonth}/{detailDialog.payment.metadata.cardExpYear}
-                          {detailDialog.payment.metadata.cardCountry && ` • ${detailDialog.payment.metadata.cardCountry}`}
+                          Expires {detailDialog.payment.metadata.cardExpMonth}/
+                          {detailDialog.payment.metadata.cardExpYear}
+                          {detailDialog.payment.metadata.cardCountry &&
+                            ` • ${detailDialog.payment.metadata.cardCountry}`}
                         </p>
                       )}
                     </div>
@@ -1045,11 +1255,15 @@ export default function PendingPaymentsSection() {
                   {/* Our Transaction ID - Always show */}
                   <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-blue-400 font-medium">Our Transaction ID</span>
+                      <span className="text-blue-400 font-medium">
+                        Our Transaction ID
+                      </span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(detailDialog.payment._id);
-                          toast.success('Transaction ID copied!');
+                          navigator.clipboard.writeText(
+                            detailDialog.payment._id,
+                          );
+                          toast.success("Transaction ID copied!");
                         }}
                         className="text-blue-400 hover:text-blue-300 text-[10px] px-2 py-0.5 bg-blue-500/20 rounded"
                       >
@@ -1060,18 +1274,27 @@ export default function PendingPaymentsSection() {
                       {detailDialog.payment._id}
                     </code>
                   </div>
-                  
+
                   {/* Provider Transaction ID */}
-                  {(detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId) && (
+                  {(detailDialog.payment.providerTransactionId ||
+                    detailDialog.payment.metadata?.dmnTransactionId) && (
                     <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-purple-400 font-medium capitalize">
-                          {detailDialog.payment.provider || detailDialog.payment.metadata?.paymentProvider || 'Provider'} Transaction ID
+                          {detailDialog.payment.provider ||
+                            detailDialog.payment.metadata?.paymentProvider ||
+                            "Provider"}{" "}
+                          Transaction ID
                         </span>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId || '');
-                            toast.success('Provider Transaction ID copied!');
+                            navigator.clipboard.writeText(
+                              detailDialog.payment.providerTransactionId ||
+                                detailDialog.payment.metadata
+                                  ?.dmnTransactionId ||
+                                "",
+                            );
+                            toast.success("Provider Transaction ID copied!");
                           }}
                           className="text-purple-400 hover:text-purple-300 text-[10px] px-2 py-0.5 bg-purple-500/20 rounded"
                         >
@@ -1079,17 +1302,21 @@ export default function PendingPaymentsSection() {
                         </button>
                       </div>
                       <code className="text-gray-200 font-mono text-sm block break-all">
-                        {detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId}
+                        {detailDialog.payment.providerTransactionId ||
+                          detailDialog.payment.metadata?.dmnTransactionId}
                       </code>
                     </div>
                   )}
-                  
+
                   {/* Other IDs in a smaller format */}
                   <div className="space-y-2 font-mono pt-2 border-t border-gray-700">
                     {detailDialog.payment.paymentIntentId && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500">Payment Intent:</span>
-                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[280px]" title={detailDialog.payment.paymentIntentId}>
+                        <code
+                          className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[280px]"
+                          title={detailDialog.payment.paymentIntentId}
+                        >
                           {detailDialog.payment.paymentIntentId}
                         </code>
                       </div>
@@ -1097,19 +1324,25 @@ export default function PendingPaymentsSection() {
                     {detailDialog.payment.paymentId && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500">Payment ID:</span>
-                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.paymentId}</code>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">
+                          {detailDialog.payment.paymentId}
+                        </code>
                       </div>
                     )}
                     {detailDialog.payment.metadata?.orderId && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500">Order ID:</span>
-                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.metadata.orderId}</code>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">
+                          {detailDialog.payment.metadata.orderId}
+                        </code>
                       </div>
                     )}
                     {detailDialog.payment.metadata?.clientUniqueId && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500">Client Unique ID:</span>
-                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.metadata.clientUniqueId}</code>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">
+                          {detailDialog.payment.metadata.clientUniqueId}
+                        </code>
                       </div>
                     )}
                   </div>
@@ -1125,12 +1358,16 @@ export default function PendingPaymentsSection() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">Created</p>
-                    <p className="text-sm text-white">{formatDate(detailDialog.payment.createdAt)}</p>
+                    <p className="text-sm text-white">
+                      {formatDate(detailDialog.payment.createdAt)}
+                    </p>
                   </div>
                   {detailDialog.payment.processedAt && (
                     <div>
                       <p className="text-xs text-gray-500">Processed</p>
-                      <p className="text-sm text-white">{formatDate(detailDialog.payment.processedAt)}</p>
+                      <p className="text-sm text-white">
+                        {formatDate(detailDialog.payment.processedAt)}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1139,47 +1376,62 @@ export default function PendingPaymentsSection() {
               {/* Description */}
               {detailDialog.payment.description && (
                 <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                  <h4 className="text-sm font-medium text-gray-400 mb-2">Description</h4>
-                  <p className="text-sm text-white">{detailDialog.payment.description}</p>
+                  <h4 className="text-sm font-medium text-gray-400 mb-2">
+                    Description
+                  </h4>
+                  <p className="text-sm text-white">
+                    {detailDialog.payment.description}
+                  </p>
                 </div>
               )}
 
               {/* Failure Reason - Show for failed/cancelled transactions */}
-              {(detailDialog.payment.status === 'failed' || detailDialog.payment.status === 'cancelled') && (
+              {(detailDialog.payment.status === "failed" ||
+                detailDialog.payment.status === "cancelled") && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-red-400 mb-2 flex items-center gap-2">
                     <XCircle className="h-4 w-4" />
-                    {detailDialog.payment.status === 'failed' ? 'Payment Declined / Failed' : 'Payment Cancelled'}
+                    {detailDialog.payment.status === "failed"
+                      ? "Payment Declined / Failed"
+                      : "Payment Cancelled"}
                   </h4>
                   <div className="space-y-2">
                     {detailDialog.payment.failureReason && (
                       <p className="text-sm text-red-300">
-                        <span className="font-medium">Reason:</span> {detailDialog.payment.failureReason}
+                        <span className="font-medium">Reason:</span>{" "}
+                        {detailDialog.payment.failureReason}
                       </p>
                     )}
                     {detailDialog.payment.metadata?.clientErrorCode && (
                       <p className="text-xs text-red-400/80">
-                        <span className="font-medium">Error Code:</span> {detailDialog.payment.metadata.clientErrorCode}
+                        <span className="font-medium">Error Code:</span>{" "}
+                        {detailDialog.payment.metadata.clientErrorCode}
                       </p>
                     )}
                     {detailDialog.payment.metadata?.clientErrorDescription && (
                       <p className="text-xs text-red-400/80">
-                        <span className="font-medium">Error Description:</span> {detailDialog.payment.metadata.clientErrorDescription}
+                        <span className="font-medium">Error Description:</span>{" "}
+                        {detailDialog.payment.metadata.clientErrorDescription}
                       </p>
                     )}
                     {detailDialog.payment.metadata?.errorReason && (
                       <p className="text-xs text-red-400/80">
-                        <span className="font-medium">Provider Error:</span> {detailDialog.payment.metadata.errorReason}
+                        <span className="font-medium">Provider Error:</span>{" "}
+                        {detailDialog.payment.metadata.errorReason}
                       </p>
                     )}
                     {detailDialog.payment.metadata?.cancelReason && (
                       <p className="text-xs text-red-400/80">
-                        <span className="font-medium">Cancel Reason:</span> {detailDialog.payment.metadata.cancelReason}
+                        <span className="font-medium">Cancel Reason:</span>{" "}
+                        {detailDialog.payment.metadata.cancelReason}
                       </p>
                     )}
                     {detailDialog.payment.metadata?.cancelledAt && (
                       <p className="text-xs text-gray-500">
-                        Cancelled at: {new Date(detailDialog.payment.metadata.cancelledAt).toLocaleString()}
+                        Cancelled at:{" "}
+                        {new Date(
+                          detailDialog.payment.metadata.cancelledAt,
+                        ).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -1189,8 +1441,12 @@ export default function PendingPaymentsSection() {
               {/* Stripe Status Note */}
               {detailDialog.payment.stripeStatusNote && (
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-amber-400 mb-2">Note</h4>
-                  <p className="text-sm text-amber-300">{detailDialog.payment.stripeStatusNote}</p>
+                  <h4 className="text-sm font-medium text-amber-400 mb-2">
+                    Note
+                  </h4>
+                  <p className="text-sm text-amber-300">
+                    {detailDialog.payment.stripeStatusNote}
+                  </p>
                 </div>
               )}
             </div>

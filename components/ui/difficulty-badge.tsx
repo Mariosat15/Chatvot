@@ -1,14 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { calculateCompetitionDifficulty, DifficultyAnalysis, getAllDifficultyLevels } from '@/lib/utils/competition-difficulty';
-import { 
+import { useState } from "react";
+import {
+  calculateCompetitionDifficulty,
+  DifficultyAnalysis,
+  getAllDifficultyLevels,
+} from "@/lib/utils/competition-difficulty";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Info, ChevronDown, ChevronUp } from 'lucide-react';
+} from "@/components/ui/tooltip";
+import { Info, ChevronDown, ChevronUp } from "lucide-react";
 
 interface DifficultyBadgeProps {
   /** Pre-calculated difficulty analysis */
@@ -37,7 +41,7 @@ interface DifficultyBadgeProps {
   /** Show tooltip with details */
   showTooltip?: boolean;
   /** Size variant */
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   /** Show score */
   showScore?: boolean;
   /** Compact mode - just the emoji and level */
@@ -48,20 +52,22 @@ export function DifficultyBadge({
   difficulty: preCalculated,
   competitionParams,
   showTooltip = true,
-  size = 'md',
+  size = "md",
   showScore = false,
   compact = false,
 }: DifficultyBadgeProps) {
-  const difficulty = preCalculated || (competitionParams 
-    ? calculateCompetitionDifficulty(competitionParams) 
-    : null);
+  const difficulty =
+    preCalculated ||
+    (competitionParams
+      ? calculateCompetitionDifficulty(competitionParams)
+      : null);
 
   if (!difficulty) return null;
 
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm px-3 py-1',
-    lg: 'text-base px-4 py-1.5',
+    sm: "text-xs px-2 py-0.5",
+    md: "text-sm px-3 py-1",
+    lg: "text-base px-4 py-1.5",
   };
 
   const badge = (
@@ -84,11 +90,9 @@ export function DifficultyBadge({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          {badge}
-        </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent
+          side="top"
           className="max-w-xs bg-gray-900 border-gray-700 p-4"
         >
           <div className="space-y-3">
@@ -100,32 +104,43 @@ export function DifficultyBadge({
                 Score: {difficulty.score}/100
               </span>
             </div>
-            
+
             {/* Difficulty bar */}
             <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full transition-all duration-500 ${
-                  difficulty.score <= 20 ? 'bg-green-500' :
-                  difficulty.score <= 40 ? 'bg-blue-500' :
-                  difficulty.score <= 60 ? 'bg-yellow-500' :
-                  difficulty.score <= 80 ? 'bg-orange-500' :
-                  'bg-red-500'
+                  difficulty.score <= 20
+                    ? "bg-green-500"
+                    : difficulty.score <= 40
+                      ? "bg-blue-500"
+                      : difficulty.score <= 60
+                        ? "bg-yellow-500"
+                        : difficulty.score <= 80
+                          ? "bg-orange-500"
+                          : "bg-red-500"
                 }`}
                 style={{ width: `${difficulty.score}%` }}
               />
             </div>
-            
+
             {/* Factors */}
             {difficulty.factors && difficulty.factors.length > 0 && (
               <div className="space-y-1">
-                <span className="text-xs text-gray-400 uppercase font-medium">Why:</span>
+                <span className="text-xs text-gray-400 uppercase font-medium">
+                  Why:
+                </span>
                 <ul className="text-xs text-gray-300 space-y-0.5">
                   {difficulty.factors.slice(0, 4).map((factor, i) => (
                     <li key={i} className="flex items-center gap-1.5">
-                      <span className={`w-1 h-1 rounded-full ${
-                        factor.impact === 'high' ? 'bg-red-400' :
-                        factor.impact === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
-                      }`} />
+                      <span
+                        className={`w-1 h-1 rounded-full ${
+                          factor.impact === "high"
+                            ? "bg-red-400"
+                            : factor.impact === "medium"
+                              ? "bg-yellow-400"
+                              : "bg-green-400"
+                        }`}
+                      />
                       {factor.factor}
                     </li>
                   ))}
@@ -151,20 +166,25 @@ export function DifficultyBadge({
 
 interface DifficultyLegendProps {
   /** Show as horizontal or vertical */
-  orientation?: 'horizontal' | 'vertical';
+  orientation?: "horizontal" | "vertical";
   /** Size */
-  size?: 'sm' | 'md';
+  size?: "sm" | "md";
 }
 
-export function DifficultyLegend({ orientation = 'horizontal', size = 'sm' }: DifficultyLegendProps) {
+export function DifficultyLegend({
+  orientation = "horizontal",
+  size = "sm",
+}: DifficultyLegendProps) {
   const levels = getAllDifficultyLevels();
 
   return (
-    <div className={`flex ${orientation === 'vertical' ? 'flex-col gap-2' : 'flex-wrap gap-3'}`}>
+    <div
+      className={`flex ${orientation === "vertical" ? "flex-col gap-2" : "flex-wrap gap-3"}`}
+    >
       {levels.map((level) => (
-        <div 
+        <div
           key={level.value}
-          className={`flex items-center gap-1.5 ${size === 'sm' ? 'text-xs' : 'text-sm'}`}
+          className={`flex items-center gap-1.5 ${size === "sm" ? "text-xs" : "text-sm"}`}
         >
           <span
             className={`
@@ -174,9 +194,9 @@ export function DifficultyLegend({ orientation = 'horizontal', size = 'sm' }: Di
             `}
           >
             {level.emoji}
-            {orientation === 'vertical' && level.label}
+            {orientation === "vertical" && level.label}
           </span>
-          {orientation === 'horizontal' && (
+          {orientation === "horizontal" && (
             <span className={`${level.color} font-medium`}>{level.label}</span>
           )}
         </div>
@@ -190,11 +210,16 @@ interface DifficultyDetailsProps {
   expanded?: boolean;
 }
 
-export function DifficultyDetails({ difficulty, expanded: initialExpanded = false }: DifficultyDetailsProps) {
+export function DifficultyDetails({
+  difficulty,
+  expanded: initialExpanded = false,
+}: DifficultyDetailsProps) {
   const [expanded, setExpanded] = useState(initialExpanded);
 
   return (
-    <div className={`rounded-xl border ${difficulty.borderColor} ${difficulty.bgColor} p-4`}>
+    <div
+      className={`rounded-xl border ${difficulty.borderColor} ${difficulty.bgColor} p-4`}
+    >
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-left"
@@ -226,13 +251,17 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
               <span>{difficulty.score}%</span>
             </div>
             <div className="h-3 bg-gray-700/50 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  difficulty.score <= 20 ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                  difficulty.score <= 40 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
-                  difficulty.score <= 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                  difficulty.score <= 80 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
-                  'bg-gradient-to-r from-red-500 to-red-400'
+                  difficulty.score <= 20
+                    ? "bg-gradient-to-r from-green-500 to-green-400"
+                    : difficulty.score <= 40
+                      ? "bg-gradient-to-r from-blue-500 to-blue-400"
+                      : difficulty.score <= 60
+                        ? "bg-gradient-to-r from-yellow-500 to-yellow-400"
+                        : difficulty.score <= 80
+                          ? "bg-gradient-to-r from-orange-500 to-orange-400"
+                          : "bg-gradient-to-r from-red-500 to-red-400"
                 }`}
                 style={{ width: `${difficulty.score}%` }}
               />
@@ -242,14 +271,24 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
           {/* Factors */}
           {difficulty.factors && difficulty.factors.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-300 mb-2">Contributing Factors:</h4>
+              <h4 className="text-sm font-medium text-gray-300 mb-2">
+                Contributing Factors:
+              </h4>
               <ul className="space-y-1">
                 {difficulty.factors.map((factor, i) => (
-                  <li key={i} className="text-sm text-gray-400 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      factor.impact === 'high' ? 'bg-red-400' :
-                      factor.impact === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
-                    }`} />
+                  <li
+                    key={i}
+                    className="text-sm text-gray-400 flex items-center gap-2"
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        factor.impact === "high"
+                          ? "bg-red-400"
+                          : factor.impact === "medium"
+                            ? "bg-yellow-400"
+                            : "bg-green-400"
+                      }`}
+                    />
                     {factor.factor}
                   </li>
                 ))}
@@ -278,4 +317,3 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
     </div>
   );
 }
-

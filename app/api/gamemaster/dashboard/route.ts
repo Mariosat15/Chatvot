@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
-import GameMasterEarning from '@/database/models/gamemaster/gamemaster-earning.model';
-import UserReferral from '@/database/models/user-referral.model';
-import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
+import GameMasterEarning from "@/database/models/gamemaster/gamemaster-earning.model";
+import UserReferral from "@/database/models/user-referral.model";
+import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
 
 /**
  * GET /api/gamemaster/dashboard
@@ -14,20 +14,36 @@ import { headers } from 'next/headers';
 export async function GET() {
   try {
     await connectToDatabase();
-    
+
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
       );
     }
-    
+
     const userId = session.user.id;
-    
+
     // Get the user's Game Master subscription
-    const subscription = await GameMasterSubscription.findOne({ userId }).lean();
-    
+    const subscription = (await GameMasterSubscription.findOne({
+      userId,
+    }).lean()) as {
+      _id: { toString(): string };
+      userId: string;
+      packageId?: string;
+      packageName?: string;
+      limits?: {
+        maxCompetitionsPerDay?: number;
+        maxUsersPerCompetition?: number;
+        referralFeePercentage?: number;
+        canCreateCompetitions?: boolean;
+        canEarnFromChallenges?: boolean;
+        challengeReferralFeePercentage?: number;
+      };
+      [key: string]: unknown;
+    } | null;
+
     if (!subscription) {
       return NextResponse.json({
         success: true,
@@ -38,22 +54,24 @@ export async function GET() {
         },
       });
     }
-    
+
     // Get referred users from UserReferral collection
     const referredUsers = await UserReferral.find({
       gameMasterId: userId,
     })
-      .select('userName userEmail referredAt userId')
+      .select("userName userEmail referredAt userId")
       .sort({ referredAt: -1 })
       .limit(50)
       .lean()
-      .then(users => users.map(u => ({
-        _id: u.userId,
-        name: u.userName || 'Unknown',
-        email: u.userEmail,
-        createdAt: u.referredAt,
-      })));
-    
+      .then((users) =>
+        users.map((u) => ({
+          _id: u.userId,
+          name: u.userName || "Unknown",
+          email: u.userEmail,
+          createdAt: u.referredAt,
+        })),
+      );
+
     // Get recent earnings
     const recentEarnings = await GameMasterEarning.find({
       gameMasterId: userId,
@@ -61,30 +79,59 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
-    
+
     // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
     // This ensures if admin changes package, all GMs with that package see the update
-    let currentPackageLimits = subscription.limits || {};
-    
+    let currentPackageLimits: {
+      maxCompetitionsPerDay?: number;
+      maxUsersPerCompetition?: number;
+      referralFeePercentage?: number;
+      canCreateCompetitions?: boolean;
+      canEarnFromChallenges?: boolean;
+      challengeReferralFeePercentage?: number;
+    } = subscription.limits || {};
+
     if (subscription.packageId) {
-      const currentPackage = await MarketplaceItem.findById(subscription.packageId).lean();
+      const currentPackage = (await MarketplaceItem.findById(
+        subscription.packageId,
+      ).lean()) as {
+        gameMasterConfig?: {
+          maxCompetitionsPerDay?: number;
+          maxUsersPerCompetition?: number;
+          referralFeePercentage?: number;
+          canCreateCompetitions?: boolean;
+          canEarnFromChallenges?: boolean;
+          challengeReferralFeePercentage?: number;
+        };
+      } | null;
       if (currentPackage?.gameMasterConfig) {
         // Use current package settings
         currentPackageLimits = {
-          maxCompetitionsPerDay: currentPackage.gameMasterConfig.maxCompetitionsPerDay,
-          maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition,
-          referralFeePercentage: currentPackage.gameMasterConfig.referralFeePercentage,
-          canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
-          canEarnFromChallenges: currentPackage.gameMasterConfig.canEarnFromChallenges === true,
-          challengeReferralFeePercentage: currentPackage.gameMasterConfig.challengeReferralFeePercentage,
+          maxCompetitionsPerDay:
+            currentPackage.gameMasterConfig.maxCompetitionsPerDay,
+          maxUsersPerCompetition:
+            currentPackage.gameMasterConfig.maxUsersPerCompetition,
+          referralFeePercentage:
+            currentPackage.gameMasterConfig.referralFeePercentage,
+          canCreateCompetitions:
+            currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+          canEarnFromChallenges:
+            currentPackage.gameMasterConfig.canEarnFromChallenges === true,
+          challengeReferralFeePercentage:
+            currentPackage.gameMasterConfig.challengeReferralFeePercentage,
         };
-        console.log(`[GM Dashboard] Using current package settings for ${subscription.packageName}:`, currentPackageLimits);
+        console.log(
+          `[GM Dashboard] Using current package settings for ${subscription.packageName}:`,
+          currentPackageLimits,
+        );
       }
     }
-    
-    const canCreateCompetitions = currentPackageLimits.canCreateCompetitions !== false;
-    const canEarnFromChallenges = currentPackageLimits.canEarnFromChallenges === true;
-    
+
+    const canCreateCompetitions =
+      currentPackageLimits.canCreateCompetitions !== false;
+    const canEarnFromChallenges =
+      currentPackageLimits.canEarnFromChallenges === true;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -99,10 +146,13 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching GM dashboard:', error);
+    console.error("Error fetching GM dashboard:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }

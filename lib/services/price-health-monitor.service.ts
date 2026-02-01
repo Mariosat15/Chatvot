@@ -1,19 +1,19 @@
 /**
  * Price Health Monitor Service
- * 
+ *
  * Monitors the health of price feeds in real-time and triggers alerts
  * when issues are detected (staleness, anomalies, disconnections).
- * 
+ *
  * Used for competition risk mitigation - ensures fair pricing during competitions.
- * 
+ *
  * IMPORTANT: Only monitors symbols that are ENABLED in the admin TradingSymbol settings.
  * Disabled symbols are not monitored to avoid false alerts.
  */
 
-import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
-import { notificationService } from './notification.service';
-import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
+import { ForexSymbol, FOREX_PAIRS } from "./pnl-calculator.service";
+import { notificationService } from "./notification.service";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
 
 // Get array of forex symbols from the FOREX_PAIRS object (used as fallback)
 const FOREX_SYMBOLS_FALLBACK = Object.keys(FOREX_PAIRS) as ForexSymbol[];
@@ -22,7 +22,7 @@ const FOREX_SYMBOLS_FALLBACK = Object.keys(FOREX_PAIRS) as ForexSymbol[];
 // Types & Interfaces
 // ============================================
 
-export type PriceHealthStatus = 'healthy' | 'degraded' | 'critical';
+export type PriceHealthStatus = "healthy" | "degraded" | "critical";
 
 export interface SymbolHealthInfo {
   symbol: ForexSymbol;
@@ -34,13 +34,13 @@ export interface SymbolHealthInfo {
   isStale: boolean;
   isAnomaly: boolean;
   status: PriceHealthStatus;
-  source: 'websocket' | 'rest' | 'cache' | 'fallback';
+  source: "websocket" | "rest" | "cache" | "fallback";
 }
 
 export interface PriceHealthSnapshot {
   timestamp: Date;
   overallStatus: PriceHealthStatus;
-  connectionStatus: 'connected' | 'reconnecting' | 'disconnected';
+  connectionStatus: "connected" | "reconnecting" | "disconnected";
   reconnectAttempts: number;
   symbols: SymbolHealthInfo[];
   healthyCount: number;
@@ -52,8 +52,14 @@ export interface PriceHealthSnapshot {
 export interface PriceAlert {
   id: string;
   timestamp: Date;
-  type: 'connection_lost' | 'connection_restored' | 'price_stale' | 'price_anomaly' | 'max_reconnect_reached' | 'critical_health';
-  severity: 'warning' | 'error' | 'critical';
+  type:
+    | "connection_lost"
+    | "connection_restored"
+    | "price_stale"
+    | "price_anomaly"
+    | "max_reconnect_reached"
+    | "critical_health";
+  severity: "warning" | "error" | "critical";
   symbol?: ForexSymbol;
   message: string;
   metadata?: Record<string, unknown>;
@@ -63,11 +69,11 @@ export interface PriceAlert {
 }
 
 export interface PriceHealthConfig {
-  staleThresholdMs: number;           // How long without update = stale (default: 30s)
-  criticalStaleThresholdMs: number;   // How long without update = critical (default: 60s)
-  anomalyThresholdPercent: number;    // Price change % that triggers anomaly (default: 1%)
-  alertCooldownMs: number;            // Minimum time between same type alerts (default: 60s)
-  checkIntervalMs: number;            // How often to check health (default: 5s)
+  staleThresholdMs: number; // How long without update = stale (default: 30s)
+  criticalStaleThresholdMs: number; // How long without update = critical (default: 60s)
+  anomalyThresholdPercent: number; // Price change % that triggers anomaly (default: 1%)
+  alertCooldownMs: number; // Minimum time between same type alerts (default: 60s)
+  checkIntervalMs: number; // How often to check health (default: 5s)
 }
 
 // ============================================
@@ -75,18 +81,18 @@ export interface PriceHealthConfig {
 // ============================================
 
 const DEFAULT_CONFIG: PriceHealthConfig = {
-  staleThresholdMs: 30000,           // 30 seconds
-  criticalStaleThresholdMs: 60000,   // 60 seconds  
-  anomalyThresholdPercent: 1.0,      // 1% sudden change
-  alertCooldownMs: 60000,            // 60 seconds between same alerts
-  checkIntervalMs: 5000,             // Check every 5 seconds
+  staleThresholdMs: 30000, // 30 seconds
+  criticalStaleThresholdMs: 60000, // 60 seconds
+  anomalyThresholdPercent: 1.0, // 1% sudden change
+  alertCooldownMs: 60000, // 60 seconds between same alerts
+  checkIntervalMs: 5000, // Check every 5 seconds
 };
 
 // ============================================
 // Global State (survives HMR)
 // ============================================
 
-const GLOBAL_KEY = '__PRICE_HEALTH_MONITOR__';
+const GLOBAL_KEY = "__PRICE_HEALTH_MONITOR__";
 
 interface PriceHealthGlobalState {
   config: PriceHealthConfig;
@@ -96,7 +102,7 @@ interface PriceHealthGlobalState {
   lastAlertTimes: Map<string, number>; // Alert type -> last alert timestamp
   checkInterval: NodeJS.Timeout | null;
   initialized: boolean;
-  connectionStatus: 'connected' | 'reconnecting' | 'disconnected';
+  connectionStatus: "connected" | "reconnecting" | "disconnected";
   reconnectAttempts: number;
   lastConnectionChange: number;
   adminNotifiedOfDisconnect: boolean;
@@ -105,7 +111,7 @@ interface PriceHealthGlobalState {
 
 function getGlobalState(): PriceHealthGlobalState {
   if (!(globalThis as Record<string, unknown>)[GLOBAL_KEY]) {
-    console.log('🏥 [PriceHealthMonitor] Initializing health monitor state');
+    console.log("🏥 [PriceHealthMonitor] Initializing health monitor state");
     (globalThis as Record<string, unknown>)[GLOBAL_KEY] = {
       config: { ...DEFAULT_CONFIG },
       symbolHealth: new Map<ForexSymbol, SymbolHealthInfo>(),
@@ -114,14 +120,16 @@ function getGlobalState(): PriceHealthGlobalState {
       lastAlertTimes: new Map<string, number>(),
       checkInterval: null,
       initialized: false,
-      connectionStatus: 'disconnected',
+      connectionStatus: "disconnected",
       reconnectAttempts: 0,
       lastConnectionChange: Date.now(),
       adminNotifiedOfDisconnect: false,
       subscribers: new Set(),
     };
   }
-  return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as PriceHealthGlobalState;
+  return (globalThis as Record<string, unknown>)[
+    GLOBAL_KEY
+  ] as PriceHealthGlobalState;
 }
 
 // ============================================
@@ -129,7 +137,9 @@ function getGlobalState(): PriceHealthGlobalState {
 // ============================================
 
 class PriceHealthMonitorService {
-  private get state() { return getGlobalState(); }
+  private get state() {
+    return getGlobalState();
+  }
 
   /**
    * Initialize the health monitor
@@ -148,8 +158,13 @@ class PriceHealthMonitorService {
     // Start periodic health checks
     this.startHealthChecks();
     this.state.initialized = true;
-    console.log('🏥 [PriceHealthMonitor] Initialized with config:', this.state.config);
-    console.log(`🏥 [PriceHealthMonitor] Monitoring ${this.state.enabledSymbols.length} enabled symbols`);
+    console.log(
+      "🏥 [PriceHealthMonitor] Initialized with config:",
+      this.state.config,
+    );
+    console.log(
+      `🏥 [PriceHealthMonitor] Monitoring ${this.state.enabledSymbols.length} enabled symbols`,
+    );
   }
 
   /**
@@ -159,26 +174,39 @@ class PriceHealthMonitorService {
   private async loadEnabledSymbols(): Promise<void> {
     try {
       await connectToDatabase();
-      
+
       // Fetch enabled symbols from TradingSymbol collection
-      const TradingSymbol = (await import('@/database/models/trading/symbol-settings.model')).default;
-      const enabledDocs = await TradingSymbol.find({ enabled: true }).select('symbol').lean();
-      
+      const TradingSymbol = (
+        await import("@/database/models/trading/symbol-settings.model")
+      ).default;
+      const enabledDocs = await TradingSymbol.find({ enabled: true })
+        .select("symbol")
+        .lean();
+
       if (enabledDocs && enabledDocs.length > 0) {
         // Map database symbols to ForexSymbol format (they might be stored as EUR/USD or EURUSD)
-        this.state.enabledSymbols = enabledDocs
-          .map((doc: { symbol: string }) => doc.symbol as ForexSymbol)
-          .filter((symbol: ForexSymbol) => symbol in FOREX_PAIRS); // Only track symbols we know how to handle
-        
-        console.log(`🏥 [PriceHealthMonitor] Loaded ${this.state.enabledSymbols.length} enabled symbols from database`);
+        this.state.enabledSymbols = (
+          enabledDocs as unknown as Array<{ symbol: string }>
+        )
+          .map((doc) => doc.symbol as ForexSymbol)
+          .filter((symbol) => symbol in FOREX_PAIRS); // Only track symbols we know how to handle
+
+        console.log(
+          `🏥 [PriceHealthMonitor] Loaded ${this.state.enabledSymbols.length} enabled symbols from database`,
+        );
       } else {
         // Fallback to all symbols if database is empty or not seeded
-        console.log('🏥 [PriceHealthMonitor] No enabled symbols in database, using fallback (all symbols)');
+        console.log(
+          "🏥 [PriceHealthMonitor] No enabled symbols in database, using fallback (all symbols)",
+        );
         this.state.enabledSymbols = [...FOREX_SYMBOLS_FALLBACK];
       }
     } catch (error) {
       // Fallback to all symbols on error
-      console.warn('🏥 [PriceHealthMonitor] Failed to load symbols from database, using fallback:', error);
+      console.warn(
+        "🏥 [PriceHealthMonitor] Failed to load symbols from database, using fallback:",
+        error,
+      );
       this.state.enabledSymbols = [...FOREX_SYMBOLS_FALLBACK];
     }
 
@@ -194,8 +222,8 @@ class PriceHealthMonitorService {
         staleDuration: Infinity,
         isStale: true,
         isAnomaly: false,
-        status: 'critical',
-        source: 'fallback',
+        status: "critical",
+        source: "fallback",
       });
     }
   }
@@ -206,20 +234,28 @@ class PriceHealthMonitorService {
    */
   async refreshEnabledSymbols(): Promise<void> {
     const previousSymbols = new Set(this.state.enabledSymbols);
-    
+
     await this.loadEnabledSymbols();
-    
+
     // Log changes
-    const newSymbols = this.state.enabledSymbols.filter(s => !previousSymbols.has(s));
-    const removedSymbols = Array.from(previousSymbols).filter(s => !this.state.enabledSymbols.includes(s));
-    
+    const newSymbols = this.state.enabledSymbols.filter(
+      (s) => !previousSymbols.has(s),
+    );
+    const removedSymbols = Array.from(previousSymbols).filter(
+      (s) => !this.state.enabledSymbols.includes(s),
+    );
+
     if (newSymbols.length > 0) {
-      console.log(`🏥 [PriceHealthMonitor] Added symbols to monitoring: ${newSymbols.join(', ')}`);
+      console.log(
+        `🏥 [PriceHealthMonitor] Added symbols to monitoring: ${newSymbols.join(", ")}`,
+      );
     }
     if (removedSymbols.length > 0) {
-      console.log(`🏥 [PriceHealthMonitor] Removed symbols from monitoring: ${removedSymbols.join(', ')}`);
+      console.log(
+        `🏥 [PriceHealthMonitor] Removed symbols from monitoring: ${removedSymbols.join(", ")}`,
+      );
     }
-    
+
     // Notify subscribers of the change
     this.notifySubscribers();
   }
@@ -245,7 +281,7 @@ class PriceHealthMonitorService {
   updatePrice(
     symbol: ForexSymbol,
     price: number,
-    source: 'websocket' | 'rest' | 'cache' | 'fallback'
+    source: "websocket" | "rest" | "cache" | "fallback",
   ): void {
     // Skip if symbol is not being monitored (disabled in admin)
     if (!this.state.enabledSymbols.includes(symbol)) {
@@ -254,7 +290,7 @@ class PriceHealthMonitorService {
 
     const now = Date.now();
     const health = this.state.symbolHealth.get(symbol);
-    
+
     if (!health) return;
 
     const previousPrice = health.lastPrice;
@@ -263,12 +299,14 @@ class PriceHealthMonitorService {
     // Calculate price change percentage
     let priceChangePercent = 0;
     if (previousPrice > 0 && previousUpdate > 0) {
-      priceChangePercent = Math.abs((price - previousPrice) / previousPrice) * 100;
+      priceChangePercent =
+        Math.abs((price - previousPrice) / previousPrice) * 100;
     }
 
     // Check for anomaly (sudden large price movement)
-    const isAnomaly = priceChangePercent > this.state.config.anomalyThresholdPercent &&
-                      (now - previousUpdate) < 1000; // Within 1 second
+    const isAnomaly =
+      priceChangePercent > this.state.config.anomalyThresholdPercent &&
+      now - previousUpdate < 1000; // Within 1 second
 
     // Update health info
     health.previousPrice = previousPrice;
@@ -279,13 +317,13 @@ class PriceHealthMonitorService {
     health.isStale = false;
     health.isAnomaly = isAnomaly;
     health.source = source;
-    health.status = isAnomaly ? 'degraded' : 'healthy';
+    health.status = isAnomaly ? "degraded" : "healthy";
 
     // Trigger anomaly alert if needed
     if (isAnomaly) {
       this.triggerAlert({
-        type: 'price_anomaly',
-        severity: 'warning',
+        type: "price_anomaly",
+        severity: "warning",
         symbol,
         message: `Price anomaly detected for ${symbol}: ${priceChangePercent.toFixed(2)}% change in < 1 second`,
         metadata: {
@@ -301,8 +339,8 @@ class PriceHealthMonitorService {
    * Update connection status (called from websocket-price-streamer)
    */
   updateConnectionStatus(
-    status: 'connected' | 'reconnecting' | 'disconnected',
-    reconnectAttempts: number = 0
+    status: "connected" | "reconnecting" | "disconnected",
+    reconnectAttempts: number = 0,
   ): void {
     const previousStatus = this.state.connectionStatus;
     this.state.connectionStatus = status;
@@ -310,10 +348,10 @@ class PriceHealthMonitorService {
     this.state.lastConnectionChange = Date.now();
 
     // Connection lost
-    if (previousStatus === 'connected' && status !== 'connected') {
+    if (previousStatus === "connected" && status !== "connected") {
       this.triggerAlert({
-        type: 'connection_lost',
-        severity: 'error',
+        type: "connection_lost",
+        severity: "error",
         message: `WebSocket connection lost. Attempting to reconnect...`,
         metadata: { previousStatus, newStatus: status },
       });
@@ -321,10 +359,10 @@ class PriceHealthMonitorService {
     }
 
     // Connection restored
-    if (previousStatus !== 'connected' && status === 'connected') {
+    if (previousStatus !== "connected" && status === "connected") {
       this.triggerAlert({
-        type: 'connection_restored',
-        severity: 'warning',
+        type: "connection_restored",
+        severity: "warning",
         message: `WebSocket connection restored after ${reconnectAttempts} attempts`,
         metadata: { reconnectAttempts },
       });
@@ -334,14 +372,16 @@ class PriceHealthMonitorService {
     // Max reconnect attempts reached
     if (reconnectAttempts >= 10 && !this.state.adminNotifiedOfDisconnect) {
       this.triggerAlert({
-        type: 'max_reconnect_reached',
-        severity: 'critical',
+        type: "max_reconnect_reached",
+        severity: "critical",
         message: `Max reconnect attempts (10) reached! Price feed is DOWN. Manual intervention required.`,
         metadata: { reconnectAttempts },
       });
       this.state.adminNotifiedOfDisconnect = true;
       // Notify admin via system
-      this.notifyAdminOfCriticalIssue('Price feed connection failed after maximum retry attempts');
+      this.notifyAdminOfCriticalIssue(
+        "Price feed connection failed after maximum retry attempts",
+      );
     }
   }
 
@@ -374,41 +414,45 @@ class PriceHealthMonitorService {
       }
 
       // Check staleness
-      health.isStale = health.staleDuration > this.state.config.staleThresholdMs;
+      health.isStale =
+        health.staleDuration > this.state.config.staleThresholdMs;
 
       // Determine status
       if (health.staleDuration > this.state.config.criticalStaleThresholdMs) {
-        health.status = 'critical';
+        health.status = "critical";
         criticalCount++;
-        
+
         // Trigger stale alert
         this.triggerAlert({
-          type: 'price_stale',
-          severity: 'error',
+          type: "price_stale",
+          severity: "error",
           symbol,
           message: `Price for ${symbol} is critically stale (${Math.round(health.staleDuration / 1000)}s without update)`,
           metadata: { staleDuration: health.staleDuration },
         });
       } else if (health.isStale || health.isAnomaly) {
-        health.status = 'degraded';
+        health.status = "degraded";
         degradedCount++;
       } else {
-        health.status = 'healthy';
+        health.status = "healthy";
         healthyCount++;
       }
     }
 
     // Check overall health (based on enabled symbols count)
     const enabledCount = this.state.enabledSymbols.length;
-    const overallStatus: PriceHealthStatus = 
-      criticalCount > 0 ? 'critical' :
-      degradedCount > enabledCount / 4 ? 'degraded' : 'healthy';
+    const overallStatus: PriceHealthStatus =
+      criticalCount > 0
+        ? "critical"
+        : degradedCount > enabledCount / 4
+          ? "degraded"
+          : "healthy";
 
     // Trigger critical health alert if too many symbols are unhealthy
-    if (overallStatus === 'critical') {
+    if (overallStatus === "critical") {
       this.triggerAlert({
-        type: 'critical_health',
-        severity: 'critical',
+        type: "critical_health",
+        severity: "critical",
         message: `Price feed health is CRITICAL: ${criticalCount} symbols critically stale`,
         metadata: { healthyCount, degradedCount, criticalCount },
       });
@@ -421,9 +465,14 @@ class PriceHealthMonitorService {
   /**
    * Trigger an alert (with cooldown to prevent spam)
    */
-  private triggerAlert(alertData: Omit<PriceAlert, 'id' | 'timestamp' | 'acknowledged' | 'acknowledgedAt' | 'acknowledgedBy'>): void {
-    const alertKey = alertData.symbol 
-      ? `${alertData.type}_${alertData.symbol}` 
+  private triggerAlert(
+    alertData: Omit<
+      PriceAlert,
+      "id" | "timestamp" | "acknowledged" | "acknowledgedAt" | "acknowledgedBy"
+    >,
+  ): void {
+    const alertKey = alertData.symbol
+      ? `${alertData.type}_${alertData.symbol}`
       : alertData.type;
 
     const lastAlert = this.state.lastAlertTimes.get(alertKey) || 0;
@@ -449,7 +498,9 @@ class PriceHealthMonitorService {
       this.state.alerts = this.state.alerts.slice(-100);
     }
 
-    console.log(`🚨 [PriceHealthMonitor] Alert: ${alert.severity.toUpperCase()} - ${alert.message}`);
+    console.log(
+      `🚨 [PriceHealthMonitor] Alert: ${alert.severity.toUpperCase()} - ${alert.message}`,
+    );
 
     // Log to database for audit trail
     this.logAlertToDatabase(alert).catch(console.error);
@@ -461,10 +512,12 @@ class PriceHealthMonitorService {
   private async logAlertToDatabase(alert: PriceAlert): Promise<void> {
     try {
       await connectToDatabase();
-      
+
       // Dynamic import to avoid circular dependencies
-      const PriceHealthAlert = (await import('@/database/models/price-health-alert.model')).default;
-      
+      const PriceHealthAlert = (
+        await import("@/database/models/price-health-alert.model")
+      ).default;
+
       await PriceHealthAlert.create({
         alertId: alert.id,
         type: alert.type,
@@ -477,7 +530,7 @@ class PriceHealthMonitorService {
       });
     } catch (error) {
       // Don't crash if logging fails
-      console.error('Failed to log alert to database:', error);
+      console.error("Failed to log alert to database:", error);
     }
   }
 
@@ -487,29 +540,32 @@ class PriceHealthMonitorService {
   private async notifyAdminOfCriticalIssue(message: string): Promise<void> {
     try {
       await connectToDatabase();
-      
+
       // Get admin users from collection (no User model exists)
-      const usersCollection = mongoose.connection.collection('user');
-      const admins = await usersCollection.find({ role: 'admin' }).project({ _id: 1 }).toArray();
+      const usersCollection = mongoose.connection.collection("user");
+      const admins = await usersCollection
+        .find({ role: "admin" })
+        .project({ _id: 1 })
+        .toArray();
 
       for (const admin of admins) {
         try {
           await notificationService.createCustom({
             userId: admin._id.toString(),
-            type: 'price_feed_critical',
-            title: '🚨 Critical: Price Feed Issue',
+            type: "price_feed_critical",
+            title: "🚨 Critical: Price Feed Issue",
             message,
-            icon: 'alert-triangle',
-            category: 'system',
-            priority: 'urgent',
-            color: 'red',
+            icon: "alert-triangle",
+            category: "system",
+            priority: "urgent",
+            color: "red",
           });
         } catch {
           // Notification method may not exist, continue
         }
       }
     } catch (error) {
-      console.error('Failed to notify admin:', error);
+      console.error("Failed to notify admin:", error);
     }
   }
 
@@ -530,7 +586,7 @@ class PriceHealthMonitorService {
       try {
         callback(snapshot);
       } catch (error) {
-        console.error('Error in health subscriber:', error);
+        console.error("Error in health subscriber:", error);
       }
     }
   }
@@ -541,17 +597,21 @@ class PriceHealthMonitorService {
    */
   getHealthSnapshot(): PriceHealthSnapshot {
     // Only return health info for enabled symbols
-    const symbols = Array.from(this.state.symbolHealth.values())
-      .filter(s => this.state.enabledSymbols.includes(s.symbol));
-    
-    const healthyCount = symbols.filter(s => s.status === 'healthy').length;
-    const degradedCount = symbols.filter(s => s.status === 'degraded').length;
-    const criticalCount = symbols.filter(s => s.status === 'critical').length;
+    const symbols = Array.from(this.state.symbolHealth.values()).filter((s) =>
+      this.state.enabledSymbols.includes(s.symbol),
+    );
+
+    const healthyCount = symbols.filter((s) => s.status === "healthy").length;
+    const degradedCount = symbols.filter((s) => s.status === "degraded").length;
+    const criticalCount = symbols.filter((s) => s.status === "critical").length;
 
     const enabledCount = this.state.enabledSymbols.length;
-    const overallStatus: PriceHealthStatus = 
-      criticalCount > 0 ? 'critical' :
-      degradedCount > enabledCount / 4 ? 'degraded' : 'healthy';
+    const overallStatus: PriceHealthStatus =
+      criticalCount > 0
+        ? "critical"
+        : degradedCount > enabledCount / 4
+          ? "degraded"
+          : "healthy";
 
     return {
       timestamp: new Date(),
@@ -585,26 +645,26 @@ class PriceHealthMonitorService {
 
     for (const symbol of symbols) {
       const health = this.state.symbolHealth.get(symbol);
-      
+
       if (!health) {
-        issues.push({ symbol, issue: 'No health data available' });
+        issues.push({ symbol, issue: "No health data available" });
         continue;
       }
 
-      if (health.status === 'critical') {
-        issues.push({ 
-          symbol, 
-          issue: `Critically stale (${Math.round(health.staleDuration / 1000)}s without update)` 
+      if (health.status === "critical") {
+        issues.push({
+          symbol,
+          issue: `Critically stale (${Math.round(health.staleDuration / 1000)}s without update)`,
         });
       } else if (health.isAnomaly) {
-        issues.push({ 
-          symbol, 
-          issue: `Price anomaly detected (${health.priceChangePercent.toFixed(2)}% sudden change)` 
+        issues.push({
+          symbol,
+          issue: `Price anomaly detected (${health.priceChangePercent.toFixed(2)}% sudden change)`,
         });
-      } else if (health.source === 'fallback') {
-        issues.push({ 
-          symbol, 
-          issue: 'Using fallback prices (no live data)' 
+      } else if (health.source === "fallback") {
+        issues.push({
+          symbol,
+          issue: "Using fallback prices (no live data)",
         });
       }
     }
@@ -619,7 +679,7 @@ class PriceHealthMonitorService {
    * Acknowledge an alert
    */
   acknowledgeAlert(alertId: string, acknowledgedBy: string): boolean {
-    const alert = this.state.alerts.find(a => a.id === alertId);
+    const alert = this.state.alerts.find((a) => a.id === alertId);
     if (!alert) return false;
 
     alert.acknowledged = true;
@@ -627,8 +687,8 @@ class PriceHealthMonitorService {
     alert.acknowledgedBy = acknowledgedBy;
 
     // Update in database
-    this.updateAlertInDatabase(alertId, { 
-      acknowledged: true, 
+    this.updateAlertInDatabase(alertId, {
+      acknowledged: true,
       acknowledgedAt: alert.acknowledgedAt,
       acknowledgedBy,
     }).catch(console.error);
@@ -639,13 +699,18 @@ class PriceHealthMonitorService {
   /**
    * Update alert in database
    */
-  private async updateAlertInDatabase(alertId: string, update: Partial<PriceAlert>): Promise<void> {
+  private async updateAlertInDatabase(
+    alertId: string,
+    update: Partial<PriceAlert>,
+  ): Promise<void> {
     try {
       await connectToDatabase();
-      const PriceHealthAlert = (await import('@/database/models/price-health-alert.model')).default;
+      const PriceHealthAlert = (
+        await import("@/database/models/price-health-alert.model")
+      ).default;
       await PriceHealthAlert.updateOne({ alertId }, { $set: update });
     } catch (error) {
-      console.error('Failed to update alert in database:', error);
+      console.error("Failed to update alert in database:", error);
     }
   }
 
@@ -660,7 +725,7 @@ class PriceHealthMonitorService {
    * Get unacknowledged alerts
    */
   getUnacknowledgedAlerts(): PriceAlert[] {
-    return this.state.alerts.filter(a => !a.acknowledged);
+    return this.state.alerts.filter((a) => !a.acknowledged);
   }
 
   /**
@@ -668,7 +733,7 @@ class PriceHealthMonitorService {
    */
   updateConfig(config: Partial<PriceHealthConfig>): void {
     this.state.config = { ...this.state.config, ...config };
-    console.log('🏥 [PriceHealthMonitor] Config updated:', this.state.config);
+    console.log("🏥 [PriceHealthMonitor] Config updated:", this.state.config);
   }
 
   /**
@@ -687,7 +752,7 @@ class PriceHealthMonitorService {
       this.state.checkInterval = null;
     }
     this.state.initialized = false;
-    console.log('🏥 [PriceHealthMonitor] Stopped');
+    console.log("🏥 [PriceHealthMonitor] Stopped");
   }
 }
 

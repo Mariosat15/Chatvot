@@ -1,17 +1,17 @@
 /**
  * Worker Thread Pool
- * 
+ *
  * Manages a pool of worker threads for CPU-intensive tasks.
  * Automatically scales based on CPU cores and queues tasks when all workers are busy.
- * 
+ *
  * Usage:
  *   const hash = await workerPool.hashPassword('mypassword');
  *   const isValid = await workerPool.comparePassword('mypassword', hash);
  */
 
-import { Worker } from 'worker_threads';
-import path from 'path';
-import os from 'os';
+import { Worker } from "worker_threads";
+import path from "path";
+import os from "os";
 
 interface PendingTask {
   id: string;
@@ -46,8 +46,10 @@ class BcryptWorkerPool {
   public initialize(): void {
     // Don't initialize if already initialized or if shutting down
     if (this.initialized || this.isShuttingDown) return;
-    
-    console.log(`🔧 Initializing bcrypt worker pool with ${this.poolSize} workers...`);
+
+    console.log(
+      `🔧 Initializing bcrypt worker pool with ${this.poolSize} workers...`,
+    );
 
     let successCount = 0;
     for (let i = 0; i < this.poolSize; i++) {
@@ -55,16 +57,20 @@ class BcryptWorkerPool {
         successCount++;
       }
     }
-    
+
     if (successCount === 0) {
       // CRITICAL: Don't set initialized=true if no workers were created
       // This allows retry on next operation, or failing fast if workers can't be created
-      console.error(`❌ Bcrypt worker pool failed to create any workers! Password operations will fail.`);
+      console.error(
+        `❌ Bcrypt worker pool failed to create any workers! Password operations will fail.`,
+      );
       // Set initialized to true to prevent infinite retry loops, but we'll check workers.length in executeTask
       this.initialized = true;
     } else if (successCount < this.poolSize) {
       this.initialized = true;
-      console.warn(`⚠️ Bcrypt worker pool partially initialized (${successCount}/${this.poolSize} workers)`);
+      console.warn(
+        `⚠️ Bcrypt worker pool partially initialized (${successCount}/${this.poolSize} workers)`,
+      );
     } else {
       this.initialized = true;
       console.log(`✅ Bcrypt worker pool ready (${this.poolSize} workers)`);
@@ -78,116 +84,133 @@ class BcryptWorkerPool {
   private createWorker(): boolean {
     // Don't create workers during shutdown
     if (this.isShuttingDown) return false;
-    
+
     try {
       // Detect if running from compiled dist/ folder (same method as index.ts)
       // Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
-      const isCompiledBuild = __dirname.split(path.sep).includes('dist');
-      
+      const isCompiledBuild = __dirname.split(path.sep).includes("dist");
+
       // Use compiled JS in dist/, TS in source
       const workerPath = isCompiledBuild
-        ? path.join(__dirname, 'bcrypt.worker.js')
-        : path.join(__dirname, 'bcrypt.worker.ts');
+        ? path.join(__dirname, "bcrypt.worker.js")
+        : path.join(__dirname, "bcrypt.worker.ts");
 
       const worker = new Worker(workerPath, {
         // Use tsx for TypeScript in development (non-compiled)
-        execArgv: isCompiledBuild 
-          ? undefined
-          : ['--require', 'tsx/cjs'],
+        execArgv: isCompiledBuild ? undefined : ["--require", "tsx/cjs"],
       });
 
-      const workerInfo: WorkerInfo = { worker, busy: false, currentTaskId: null };
+      const workerInfo: WorkerInfo = {
+        worker,
+        busy: false,
+        currentTaskId: null,
+      };
 
-    worker.on('message', (result: { id: string; success: boolean; result?: any; error?: string }) => {
-      const task = this.pendingTasks.get(result.id);
-      
-      if (task) {
-        this.pendingTasks.delete(result.id);
-        
-        if (result.success) {
-          task.resolve(result.result);
+      worker.on(
+        "message",
+        (result: {
+          id: string;
+          success: boolean;
+          result?: any;
+          error?: string;
+        }) => {
+          const task = this.pendingTasks.get(result.id);
+
+          if (task) {
+            this.pendingTasks.delete(result.id);
+
+            if (result.success) {
+              task.resolve(result.result);
+            } else {
+              task.reject(new Error(result.error || "Worker task failed"));
+            }
+          }
+
+          workerInfo.busy = false;
+          workerInfo.currentTaskId = null;
+          this.processQueue();
+        },
+      );
+
+      worker.on("error", (error) => {
+        console.error("❌ Worker error:", error);
+
+        // Reject the orphaned task if there was one
+        if (workerInfo.currentTaskId) {
+          const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
+          if (orphanedTask) {
+            this.pendingTasks.delete(workerInfo.currentTaskId);
+            orphanedTask.reject(new Error(`Worker crashed: ${error.message}`));
+          }
+        }
+
+        workerInfo.busy = false;
+        workerInfo.currentTaskId = null;
+
+        // Remove and recreate worker
+        const index = this.workers.indexOf(workerInfo);
+        if (index !== -1) {
+          this.workers.splice(index, 1);
+          if (!this.isShuttingDown) {
+            try {
+              this.createWorker();
+              // Process any queued tasks with the new worker
+              this.processQueue();
+            } catch (recreateError) {
+              console.error(
+                "❌ Failed to recreate worker after error:",
+                recreateError,
+              );
+              // Don't crash the server - gracefully degrade with fewer workers
+            }
+          }
+        }
+      });
+
+      worker.on("exit", (code) => {
+        // Skip cleanup only during intentional shutdown
+        if (this.isShuttingDown) return;
+
+        // Handle any exit (code 0 or non-zero) during normal operation
+        if (code !== 0) {
+          console.warn(`⚠️ Worker exited with code ${code}, recreating...`);
         } else {
-          task.reject(new Error(result.error || 'Worker task failed'));
+          console.info(`ℹ️ Worker exited normally (code 0), recreating...`);
         }
-      }
 
-      workerInfo.busy = false;
-      workerInfo.currentTaskId = null;
-      this.processQueue();
-    });
-
-    worker.on('error', (error) => {
-      console.error('❌ Worker error:', error);
-      
-      // Reject the orphaned task if there was one
-      if (workerInfo.currentTaskId) {
-        const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
-        if (orphanedTask) {
-          this.pendingTasks.delete(workerInfo.currentTaskId);
-          orphanedTask.reject(new Error(`Worker crashed: ${error.message}`));
+        // Reject the orphaned task if there was one
+        if (workerInfo.currentTaskId) {
+          const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
+          if (orphanedTask) {
+            this.pendingTasks.delete(workerInfo.currentTaskId);
+            orphanedTask.reject(
+              new Error(`Worker exited unexpectedly with code ${code}`),
+            );
+          }
         }
-      }
-      
-      workerInfo.busy = false;
-      workerInfo.currentTaskId = null;
-      
-      // Remove and recreate worker
-      const index = this.workers.indexOf(workerInfo);
-      if (index !== -1) {
-        this.workers.splice(index, 1);
-        if (!this.isShuttingDown) {
+
+        // Remove zombie workerInfo and recreate
+        const index = this.workers.indexOf(workerInfo);
+        if (index !== -1) {
+          this.workers.splice(index, 1);
           try {
             this.createWorker();
             // Process any queued tasks with the new worker
             this.processQueue();
           } catch (recreateError) {
-            console.error('❌ Failed to recreate worker after error:', recreateError);
+            console.error(
+              "❌ Failed to recreate worker after exit:",
+              recreateError,
+            );
             // Don't crash the server - gracefully degrade with fewer workers
           }
         }
-      }
-    });
+      });
 
-    worker.on('exit', (code) => {
-      // Skip cleanup only during intentional shutdown
-      if (this.isShuttingDown) return;
-      
-      // Handle any exit (code 0 or non-zero) during normal operation
-      if (code !== 0) {
-        console.warn(`⚠️ Worker exited with code ${code}, recreating...`);
-      } else {
-        console.info(`ℹ️ Worker exited normally (code 0), recreating...`);
-      }
-      
-      // Reject the orphaned task if there was one
-      if (workerInfo.currentTaskId) {
-        const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
-        if (orphanedTask) {
-          this.pendingTasks.delete(workerInfo.currentTaskId);
-          orphanedTask.reject(new Error(`Worker exited unexpectedly with code ${code}`));
-        }
-      }
-      
-      // Remove zombie workerInfo and recreate
-      const index = this.workers.indexOf(workerInfo);
-      if (index !== -1) {
-        this.workers.splice(index, 1);
-        try {
-          this.createWorker();
-          // Process any queued tasks with the new worker
-          this.processQueue();
-        } catch (recreateError) {
-          console.error('❌ Failed to recreate worker after exit:', recreateError);
-          // Don't crash the server - gracefully degrade with fewer workers
-        }
-      }
-    });
-
-    this.workers.push(workerInfo);
-    return true;
-    
+      this.workers.push(workerInfo);
+      return true;
     } catch (error) {
-      console.error('❌ Failed to create worker:', error);
+      console.error("❌ Failed to create worker:", error);
       // Don't crash the server - gracefully degrade
       return false;
     }
@@ -201,7 +224,7 @@ class BcryptWorkerPool {
     if (this.isShuttingDown) return;
     if (this.taskQueue.length === 0) return;
 
-    const availableWorker = this.workers.find(w => !w.busy);
+    const availableWorker = this.workers.find((w) => !w.busy);
     if (!availableWorker) return;
 
     const { message, task } = this.taskQueue.shift()!;
@@ -218,60 +241,72 @@ class BcryptWorkerPool {
   private async executeTask<T>(type: string, data: any): Promise<T> {
     // Reject immediately if shutting down
     if (this.isShuttingDown) {
-      return Promise.reject(new Error('Worker pool is shutting down'));
+      return Promise.reject(new Error("Worker pool is shutting down"));
     }
-    
+
     // Lazy initialization
     if (!this.initialized) {
       this.initialize();
     }
-    
+
     // CRITICAL: Reject immediately if no workers are available (pool failed to initialize)
     if (this.workers.length === 0) {
-      return Promise.reject(new Error('Worker pool has no available workers. Password operations cannot be performed.'));
+      return Promise.reject(
+        new Error(
+          "Worker pool has no available workers. Password operations cannot be performed.",
+        ),
+      );
     }
 
     return new Promise<T>((resolve, reject) => {
       // Double-check shutdown state inside promise (race condition guard)
       if (this.isShuttingDown) {
-        reject(new Error('Worker pool is shutting down'));
+        reject(new Error("Worker pool is shutting down"));
         return;
       }
-      
+
       const id = `${Date.now()}-${++this.taskIdCounter}`;
-      
+
       // Set up timeout to prevent indefinite hanging
       const TASK_TIMEOUT_MS = 30000; // 30 seconds
       const timeoutId = setTimeout(() => {
         // Clean up the task if it's still pending
         if (this.pendingTasks.has(id)) {
           this.pendingTasks.delete(id);
-          reject(new Error(`Worker task timed out after ${TASK_TIMEOUT_MS / 1000} seconds`));
+          reject(
+            new Error(
+              `Worker task timed out after ${TASK_TIMEOUT_MS / 1000} seconds`,
+            ),
+          );
         }
         // Also remove from queue if it's still there
-        const queueIndex = this.taskQueue.findIndex(t => t.task.id === id);
+        const queueIndex = this.taskQueue.findIndex((t) => t.task.id === id);
         if (queueIndex !== -1) {
           this.taskQueue.splice(queueIndex, 1);
-          reject(new Error(`Worker task timed out in queue after ${TASK_TIMEOUT_MS / 1000} seconds`));
+          reject(
+            new Error(
+              `Worker task timed out in queue after ${TASK_TIMEOUT_MS / 1000} seconds`,
+            ),
+          );
         }
       }, TASK_TIMEOUT_MS);
-      
-      const task: PendingTask = { 
-        id, 
+
+      const task: PendingTask = {
+        id,
         resolve: (result: T) => {
           clearTimeout(timeoutId);
           resolve(result);
-        }, 
+        },
         reject: (error: Error) => {
           clearTimeout(timeoutId);
           reject(error);
-        }
+        },
       };
 
       const message = { type, id, ...data };
 
-      const availableWorker = this.workers.find(w => !w.busy);
-      
+      const availableWorker = this.workers.find((w) => !w.busy);
+
       if (availableWorker) {
         availableWorker.busy = true;
         availableWorker.currentTaskId = id;
@@ -287,15 +322,21 @@ class BcryptWorkerPool {
   /**
    * Hash a password using bcrypt (non-blocking)
    */
-  public async hashPassword(password: string, rounds: number = 12): Promise<string> {
-    return this.executeTask<string>('hash', { password, rounds });
+  public async hashPassword(
+    password: string,
+    rounds: number = 12,
+  ): Promise<string> {
+    return this.executeTask<string>("hash", { password, rounds });
   }
 
   /**
    * Compare a password with a hash (non-blocking)
    */
-  public async comparePassword(password: string, hash: string): Promise<boolean> {
-    return this.executeTask<boolean>('compare', { password, hash });
+  public async comparePassword(
+    password: string,
+    hash: string,
+  ): Promise<boolean> {
+    return this.executeTask<boolean>("compare", { password, hash });
   }
 
   /**
@@ -306,14 +347,14 @@ class BcryptWorkerPool {
       poolSize: this.poolSize,
       initialized: this.initialized,
       totalWorkers: this.workers.length,
-      activeWorkers: this.workers.filter(w => w.busy).length,
-      idleWorkers: this.workers.filter(w => !w.busy).length,
+      activeWorkers: this.workers.filter((w) => w.busy).length,
+      idleWorkers: this.workers.filter((w) => !w.busy).length,
       queuedTasks: this.taskQueue.length,
       pendingTasks: this.pendingTasks.size,
       isReady: this.isReady(),
     };
   }
-  
+
   /**
    * Check if the worker pool is ready to accept tasks
    * Returns true only if initialized AND has at least one worker
@@ -327,35 +368,33 @@ class BcryptWorkerPool {
    */
   public async shutdown(): Promise<void> {
     this.isShuttingDown = true;
-    
-    console.log('🛑 Shutting down worker pool...');
-    
-    const shutdownError = new Error('Worker pool is shutting down');
-    
+
+    console.log("🛑 Shutting down worker pool...");
+
+    const shutdownError = new Error("Worker pool is shutting down");
+
     // Reject all pending tasks (in-flight operations)
     for (const [taskId, task] of this.pendingTasks) {
       console.log(`   Rejecting pending task: ${taskId}`);
       task.reject(shutdownError);
     }
-    
+
     // Reject all queued tasks (waiting operations)
     for (const { task } of this.taskQueue) {
       console.log(`   Rejecting queued task: ${task.id}`);
       task.reject(shutdownError);
     }
-    
+
     // Terminate all workers
-    await Promise.all(
-      this.workers.map(({ worker }) => worker.terminate())
-    );
+    await Promise.all(this.workers.map(({ worker }) => worker.terminate()));
 
     // Clear all collections
     this.workers = [];
     this.taskQueue = [];
     this.pendingTasks.clear();
     this.initialized = false;
-    
-    console.log('✅ Worker pool shut down');
+
+    console.log("✅ Worker pool shut down");
   }
 }
 
@@ -363,9 +402,8 @@ class BcryptWorkerPool {
 export const bcryptPool = new BcryptWorkerPool();
 
 // Convenience functions
-export const hashPassword = (password: string, rounds?: number) => 
+export const hashPassword = (password: string, rounds?: number) =>
   bcryptPool.hashPassword(password, rounds);
 
-export const comparePassword = (password: string, hash: string) => 
+export const comparePassword = (password: string, hash: string) =>
   bcryptPool.comparePassword(password, hash);
-

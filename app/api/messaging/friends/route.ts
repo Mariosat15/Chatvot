@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import MessagingService from '@/lib/services/messaging/messaging.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import MessagingService from "@/lib/services/messaging/messaging.service";
 
 /**
  * GET /api/messaging/friends
@@ -11,13 +11,13 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const friendships = await MessagingService.getFriends(session.user.id);
 
-    const friends = friendships.map(f => {
-      const friend = f.userDetails.find(u => u.userId !== session.user.id);
+    const friends = friendships.map((f) => {
+      const friend = f.userDetails.find((u) => u.userId !== session.user.id);
       return {
         id: f._id.toString(),
         friendId: friend?.userId,
@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
       total: friends.length,
     });
   } catch (error) {
-    console.error('Error fetching friends:', error);
+    console.error("Error fetching friends:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch friends' },
-      { status: 500 }
+      { error: "Failed to fetch friends" },
+      { status: 500 },
     );
   }
 }
@@ -49,7 +49,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -57,8 +57,8 @@ export async function DELETE(request: NextRequest) {
 
     if (!friendId) {
       return NextResponse.json(
-        { error: 'Friend ID is required' },
-        { status: 400 }
+        { error: "Friend ID is required" },
+        { status: 400 },
       );
     }
 
@@ -66,11 +66,10 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error removing friend:', error);
+    console.error("Error removing friend:", error);
     return NextResponse.json(
-      { error: 'Failed to remove friend' },
-      { status: 500 }
+      { error: "Failed to remove friend" },
+      { status: 500 },
     );
   }
 }
-

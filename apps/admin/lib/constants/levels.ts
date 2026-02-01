@@ -20,93 +20,93 @@ export const BADGE_XP_VALUES = {
 export const TITLE_LEVELS: TitleLevel[] = [
   {
     level: 1,
-    title: 'Novice Trader',
+    title: "Novice Trader",
     minXP: 0,
     maxXP: 99,
-    color: 'text-gray-400',
-    icon: '🌱',
-    description: 'Just starting the trading journey',
+    color: "text-gray-400",
+    icon: "🌱",
+    description: "Just starting the trading journey",
   },
   {
     level: 2,
-    title: 'Apprentice Trader',
+    title: "Apprentice Trader",
     minXP: 100,
     maxXP: 299,
-    color: 'text-green-400',
-    icon: '📚',
-    description: 'Learning the basics of trading',
+    color: "text-green-400",
+    icon: "📚",
+    description: "Learning the basics of trading",
   },
   {
     level: 3,
-    title: 'Skilled Trader',
+    title: "Skilled Trader",
     minXP: 300,
     maxXP: 599,
-    color: 'text-blue-400',
-    icon: '⚔️',
-    description: 'Developing trading skills',
+    color: "text-blue-400",
+    icon: "⚔️",
+    description: "Developing trading skills",
   },
   {
     level: 4,
-    title: 'Expert Trader',
+    title: "Expert Trader",
     minXP: 600,
     maxXP: 999,
-    color: 'text-cyan-400',
-    icon: '🎯',
-    description: 'Mastering trading strategies',
+    color: "text-cyan-400",
+    icon: "🎯",
+    description: "Mastering trading strategies",
   },
   {
     level: 5,
-    title: 'Elite Trader',
+    title: "Elite Trader",
     minXP: 1000,
     maxXP: 1599,
-    color: 'text-purple-400',
-    icon: '💎',
-    description: 'Among the trading elite',
+    color: "text-purple-400",
+    icon: "💎",
+    description: "Among the trading elite",
   },
   {
     level: 6,
-    title: 'Master Trader',
+    title: "Master Trader",
     minXP: 1600,
     maxXP: 2399,
-    color: 'text-pink-400',
-    icon: '👑',
-    description: 'A master of the markets',
+    color: "text-pink-400",
+    icon: "👑",
+    description: "A master of the markets",
   },
   {
     level: 7,
-    title: 'Grand Master',
+    title: "Grand Master",
     minXP: 2400,
     maxXP: 3399,
-    color: 'text-orange-400',
-    icon: '🔥',
-    description: 'Legendary trading prowess',
+    color: "text-orange-400",
+    icon: "🔥",
+    description: "Legendary trading prowess",
   },
   {
     level: 8,
-    title: 'Trading Champion',
+    title: "Trading Champion",
     minXP: 3400,
     maxXP: 4599,
-    color: 'text-red-400',
-    icon: '⚡',
-    description: 'Champion of competitions',
+    color: "text-red-400",
+    icon: "⚡",
+    description: "Champion of competitions",
   },
   {
     level: 9,
-    title: 'Market Legend',
+    title: "Market Legend",
     minXP: 4600,
     maxXP: 5999,
-    color: 'text-yellow-400',
-    icon: '🌟',
-    description: 'A living legend in trading',
+    color: "text-yellow-400",
+    icon: "🌟",
+    description: "A living legend in trading",
   },
   {
     level: 10,
-    title: 'Trading God',
+    title: "Trading God",
     minXP: 6000,
     maxXP: Infinity,
-    color: 'text-yellow-300',
-    icon: '👑',
-    description: 'The ultimate trading master',
+    color: "text-yellow-300",
+    icon: "👑",
+    description: "The ultimate trading master",
   },
 ];
 
@@ -153,7 +153,10 @@ export function calculateXPProgress(currentXP: number): {
 
   const xpInCurrentLevel = currentXP - currentLevel.minXP;
   const xpNeededForNextLevel = nextLevel.minXP - currentLevel.minXP;
-  const progressPercent = Math.min(100, (xpInCurrentLevel / xpNeededForNextLevel) * 100);
+  const progressPercent = Math.min(
+    100,
+    (xpInCurrentLevel / xpNeededForNextLevel) * 100,
+  );
   const xpToNext = nextLevel.minXP - currentXP;
 
   return {
@@ -167,7 +170,8 @@ export function calculateXPProgress(currentXP: number): {
 /**
  * Get XP value for a badge rarity
  */
-export function getXPForBadge(rarity: 'common' | 'rare' | 'epic' | 'legendary'): number {
+export function getXPForBadge(
+  rarity: "common" | "rare" | "epic" | "legendary",
+): number {
   return BADGE_XP_VALUES[rarity];
 }
-

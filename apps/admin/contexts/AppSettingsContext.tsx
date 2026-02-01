@@ -1,6 +1,12 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 export interface AppSettings {
   currency: {
@@ -35,22 +41,22 @@ interface AppSettingsContextType {
 
 const defaultSettings: AppSettings = {
   currency: {
-    code: 'EUR',
-    symbol: '€',
-    name: 'Euro',
+    code: "EUR",
+    symbol: "€",
+    name: "Euro",
     exchangeRateToEUR: 1.0,
   },
   credits: {
-    name: 'Volt Credits',
-    symbol: '⚡',
-    icon: 'zap',
+    name: "Volt Credits",
+    symbol: "⚡",
+    icon: "zap",
     valueInEUR: 1.0,
     showEUREquivalent: true,
     decimals: 2,
   },
   branding: {
-    primaryColor: '#EAB308',
-    accentColor: '#F59E0B',
+    primaryColor: "#EAB308",
+    accentColor: "#F59E0B",
   },
 };
 
@@ -70,7 +76,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/settings', { cache: 'no-store' });
+      const response = await fetch("/api/settings", { cache: "no-store" });
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
@@ -78,7 +84,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         setSettings(defaultSettings);
       }
     } catch (error) {
-      console.error('Error fetching app settings:', error);
+      console.error("Error fetching app settings:", error);
       setSettings(defaultSettings);
     } finally {
       setLoading(false);
@@ -103,24 +109,27 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     return eur / settings.credits.valueInEUR;
   };
 
-  const formatCredits = (amount: number, showEquivalent: boolean = true): string => {
+  const formatCredits = (
+    amount: number,
+    showEquivalent: boolean = true,
+  ): string => {
     if (!settings) return `${amount.toFixed(2)}`;
-    
+
     const { name, symbol, showEUREquivalent, decimals } = settings.credits;
     const formattedAmount = amount.toFixed(decimals);
     const creditText = `${symbol} ${formattedAmount} ${name}`;
-    
+
     if (showEquivalent && showEUREquivalent) {
       const eurValue = creditsToEUR(amount);
       return `${creditText} (${settings.currency.symbol}${eurValue.toFixed(2)})`;
     }
-    
+
     return creditText;
   };
 
   const formatCurrency = (amount: number): string => {
     if (!settings) return `€${amount.toFixed(2)}`;
-    
+
     const { symbol } = settings.currency;
     return `${symbol}${amount.toFixed(2)}`;
   };
@@ -145,8 +154,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 export function useAppSettings() {
   const context = useContext(AppSettingsContext);
   if (!context) {
-    throw new Error('useAppSettings must be used within AppSettingsProvider');
+    throw new Error("useAppSettings must be used within AppSettingsProvider");
   }
   return context;
 }
-

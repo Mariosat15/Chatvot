@@ -1,15 +1,22 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useRef, useCallback, useState } from 'react';
-import { toast } from 'sonner';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+} from "react";
+import { toast } from "sonner";
 
 /**
  * Position Events Provider
- * 
+ *
  * Manages SSE connection for real-time position updates.
  * When TP/SL triggers on the server, this receives the event instantly
  * and dispatches it to all listening components.
- * 
+ *
  * Benefits over polling:
  * - < 100ms latency (vs 3+ seconds with polling)
  * - No wasted API calls
@@ -21,17 +28,23 @@ export interface PositionEvent {
   id: string;
   positionId: string;
   symbol: string;
-  side: 'long' | 'short';
-  eventType: 'closed' | 'opened' | 'modified';
-  closeReason?: 'user' | 'stop_loss' | 'take_profit' | 'margin_call' | 'competition_end' | 'challenge_end';
+  side: "long" | "short";
+  eventType: "closed" | "opened" | "modified";
+  closeReason?:
+    | "user"
+    | "stop_loss"
+    | "take_profit"
+    | "margin_call"
+    | "competition_end"
+    | "challenge_end";
   realizedPnl?: number;
   exitPrice?: number;
-  contestType: 'competition' | 'challenge';
+  contestType: "competition" | "challenge";
   timestamp: string;
 }
 
 // Custom event name for position updates
-export const POSITION_SSE_EVENT = 'positionSSEEvent';
+export const POSITION_SSE_EVENT = "positionSSEEvent";
 
 interface PositionEventsContextType {
   isConnected: boolean;
@@ -50,18 +63,18 @@ export const usePositionEvents = () => useContext(PositionEventsContext);
 interface PositionEventsProviderProps {
   children: React.ReactNode;
   competitionId: string;
-  contestType?: 'competition' | 'challenge';
+  contestType?: "competition" | "challenge";
 }
 
-export function PositionEventsProvider({ 
-  children, 
+export function PositionEventsProvider({
+  children,
   competitionId,
-  contestType = 'competition'
+  contestType: _contestType = "competition",
 }: PositionEventsProviderProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<PositionEvent | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  
+
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -71,24 +84,32 @@ export function PositionEventsProvider({
   // Handle incoming position event
   const handlePositionEvent = useCallback((event: PositionEvent) => {
     setLastEvent(event);
-    
+
     // Dispatch custom DOM event for components to listen
-    window.dispatchEvent(new CustomEvent(POSITION_SSE_EVENT, {
-      detail: event
-    }));
+    window.dispatchEvent(
+      new CustomEvent(POSITION_SSE_EVENT, {
+        detail: event,
+      }),
+    );
 
     // Show toast notification for closed positions
-    if (event.eventType === 'closed') {
-      const reasonText = event.closeReason === 'take_profit' ? 'Take Profit' 
-        : event.closeReason === 'stop_loss' ? 'Stop Loss'
-        : event.closeReason === 'margin_call' ? 'Margin Call'
-        : event.closeReason === 'user' ? 'Manual Close'
-        : 'Auto Close';
-      
-      const pnlText = event.realizedPnl !== undefined 
-        ? ` • P&L: ${event.realizedPnl >= 0 ? '+' : ''}$${event.realizedPnl.toFixed(2)}`
-        : '';
-      
+    if (event.eventType === "closed") {
+      const reasonText =
+        event.closeReason === "take_profit"
+          ? "Take Profit"
+          : event.closeReason === "stop_loss"
+            ? "Stop Loss"
+            : event.closeReason === "margin_call"
+              ? "Margin Call"
+              : event.closeReason === "user"
+                ? "Manual Close"
+                : "Auto Close";
+
+      const pnlText =
+        event.realizedPnl !== undefined
+          ? ` • P&L: ${event.realizedPnl >= 0 ? "+" : ""}$${event.realizedPnl.toFixed(2)}`
+          : "";
+
       if (event.realizedPnl !== undefined && event.realizedPnl >= 0) {
         toast.success(`${event.symbol} closed by ${reasonText}`, {
           description: `${event.side.toUpperCase()} position${pnlText}`,
@@ -120,8 +141,8 @@ export function PositionEventsProvider({
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
-        if (data.type === 'position_event') {
+
+        if (data.type === "position_event") {
           handlePositionEvent(data.event);
         }
       } catch {
@@ -132,17 +153,18 @@ export function PositionEventsProvider({
     eventSource.onerror = () => {
       setIsConnected(false);
       eventSource.close();
-      
+
       // Attempt reconnection with exponential backoff
       if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-        
+        const delay =
+          reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttemptsRef.current++;
           connect();
         }, delay);
       } else {
-        setConnectionError('Connection lost. Please refresh the page.');
+        setConnectionError("Connection lost. Please refresh the page.");
       }
     };
   }, [competitionId, handlePositionEvent]);
@@ -172,7 +194,9 @@ export function PositionEventsProvider({
   }, [competitionId, connect]);
 
   return (
-    <PositionEventsContext.Provider value={{ isConnected, lastEvent, connectionError }}>
+    <PositionEventsContext.Provider
+      value={{ isConnected, lastEvent, connectionError }}
+    >
       {children}
     </PositionEventsContext.Provider>
   );
@@ -184,7 +208,7 @@ export function PositionEventsProvider({
  */
 export function usePositionEventListener(
   callback: (event: PositionEvent) => void,
-  deps: React.DependencyList = []
+  deps: React.DependencyList = [],
 ) {
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
@@ -195,10 +219,10 @@ export function usePositionEventListener(
     };
 
     window.addEventListener(POSITION_SSE_EVENT, handler as EventListener);
-    
+
     return () => {
       window.removeEventListener(POSITION_SSE_EVENT, handler as EventListener);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

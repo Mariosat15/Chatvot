@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ChevronRight, Swords, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { LandingTheme } from '@/lib/themes/landing-themes';
-import SectionWrapper from './SectionWrapper';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ChevronRight, Swords, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LandingTheme } from "@/lib/themes/landing-themes";
+import SectionWrapper from "./SectionWrapper";
 
 interface ActiveChallenge {
   id: string;
@@ -55,28 +55,32 @@ export default function LiveChallenges({
   theme,
   effectiveColors: propColors,
   effectiveHeadingFont: propFont,
-  title = '1v1 Challenges',
-  subtitle = 'Prove Your Skills',
-  description = 'Challenge any trader to a head-to-head battle.',
-  ctaText = 'Start a Challenge',
-  ctaLink = '/challenges',
+  title = "1v1 Challenges",
+  subtitle = "Prove Your Skills",
+  description = "Challenge any trader to a head-to-head battle.",
+  ctaText = "Start a Challenge",
+  ctaLink = "/challenges",
 }: LiveChallengesProps) {
   const effectiveColors = {
-    primary: propColors?.primary || '#00f0ff',
-    secondary: propColors?.secondary || '#ff00ff',
-    accent: propColors?.accent || '#ffd700',
-    text: propColors?.text || '#ffffff',
+    primary: propColors?.primary || "#00f0ff",
+    secondary: propColors?.secondary || "#ff00ff",
+    accent: propColors?.accent || "#ffd700",
+    text: propColors?.text || "#ffffff",
   };
-  const effectiveHeadingFont = propFont || 'inherit';
-  const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
-  const [completedChallenges, setCompletedChallenges] = useState<CompletedChallenge[]>([]);
+  const effectiveHeadingFont = propFont || "inherit";
+  const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>(
+    [],
+  );
+  const [completedChallenges, setCompletedChallenges] = useState<
+    CompletedChallenge[]
+  >([]);
   const [stats, setStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchChallenges = async () => {
       try {
-        const response = await fetch('/api/landing/challenges');
+        const response = await fetch("/api/landing/challenges");
         if (response.ok) {
           const data = await response.json();
           setActiveChallenges(data.active || []);
@@ -84,7 +88,7 @@ export default function LiveChallenges({
           setStats(data.stats);
         }
       } catch (error) {
-        console.error('Failed to fetch challenges:', error);
+        console.error("Failed to fetch challenges:", error);
       } finally {
         setLoading(false);
       }
@@ -98,26 +102,29 @@ export default function LiveChallenges({
   return (
     <SectionWrapper id="challenges">
       <div className="text-center max-w-3xl mx-auto mb-12">
-        <div 
+        <div
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-          style={{ 
+          style={{
             backgroundColor: `${effectiveColors.secondary}15`,
             border: `1px solid ${effectiveColors.secondary}30`,
             color: effectiveColors.secondary,
           }}
         >
-          <span>{theme?.themeIcons?.challenge || '⚔️'}</span>
+          <span>{theme?.themeIcons?.battle || "⚔️"}</span>
           {subtitle}
         </div>
-        
-        <h2 
+
+        <h2
           className="text-4xl md:text-5xl font-black mb-6"
-          style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+          style={{
+            color: effectiveColors.text,
+            fontFamily: effectiveHeadingFont,
+          }}
         >
           {title}
         </h2>
-        
-        <p 
+
+        <p
           className="text-lg leading-relaxed"
           style={{ color: theme?.colors?.textMuted }}
         >
@@ -127,7 +134,10 @@ export default function LiveChallenges({
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: effectiveColors.secondary }} />
+          <Loader2
+            className="h-8 w-8 animate-spin"
+            style={{ color: effectiveColors.secondary }}
+          />
         </div>
       ) : (
         <>
@@ -143,16 +153,16 @@ export default function LiveChallenges({
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ scale: 1.03 }}
                   className="relative overflow-hidden rounded-2xl p-6"
-                  style={{ 
+                  style={{
                     backgroundColor: theme?.colors?.backgroundCard,
                     border: `1px solid ${theme?.colors?.border}`,
                   }}
                 >
                   {/* Status badge */}
                   <div className="absolute top-4 right-4">
-                    <span 
+                    <span
                       className="px-2 py-1 rounded-full text-xs font-bold"
-                      style={{ 
+                      style={{
                         backgroundColor: `${effectiveColors.secondary}20`,
                         color: effectiveColors.secondary,
                       }}
@@ -164,57 +174,72 @@ export default function LiveChallenges({
                   {/* VS Display */}
                   <div className="flex items-center justify-center gap-4 mb-6">
                     <div className="text-center flex-1">
-                      <div 
+                      <div
                         className="w-16 h-16 rounded-xl mx-auto mb-2 flex items-center justify-center text-2xl"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.primary}10)` 
+                        style={{
+                          background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.primary}10)`,
                         }}
                       >
-                        {theme?.themeIcons?.player || '🎮'}
+                        {theme?.themeIcons?.users || "🎮"}
                       </div>
-                      <span className="font-bold text-sm" style={{ color: effectiveColors.text }}>
+                      <span
+                        className="font-bold text-sm"
+                        style={{ color: effectiveColors.text }}
+                      >
                         {challenge.challenger}
                       </span>
                     </div>
-                    
-                    <div 
+
+                    <div
                       className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black"
-                      style={{ 
+                      style={{
                         background: theme?.effects?.gradientStyle,
                         color: theme?.colors?.background,
                       }}
                     >
                       VS
                     </div>
-                    
+
                     <div className="text-center flex-1">
-                      <div 
+                      <div
                         className="w-16 h-16 rounded-xl mx-auto mb-2 flex items-center justify-center text-2xl"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${effectiveColors.secondary}30, ${effectiveColors.secondary}10)` 
+                        style={{
+                          background: `linear-gradient(135deg, ${effectiveColors.secondary}30, ${effectiveColors.secondary}10)`,
                         }}
                       >
-                        {theme?.themeIcons?.player || '🎮'}
+                        {theme?.themeIcons?.users || "🎮"}
                       </div>
-                      <span className="font-bold text-sm" style={{ color: effectiveColors.text }}>
+                      <span
+                        className="font-bold text-sm"
+                        style={{ color: effectiveColors.text }}
+                      >
                         {challenge.challenged}
                       </span>
                     </div>
                   </div>
 
                   {/* Stake */}
-                  <div 
+                  <div
                     className="text-center p-3 rounded-xl"
                     style={{ backgroundColor: `${effectiveColors.accent}15` }}
                   >
-                    <span className="text-xs uppercase tracking-wider" style={{ color: theme?.colors?.textMuted }}>
+                    <span
+                      className="text-xs uppercase tracking-wider"
+                      style={{ color: theme?.colors?.textMuted }}
+                    >
                       Prize Pool
                     </span>
-                    <div className="text-2xl font-black" style={{ color: effectiveColors.accent }}>
+                    <div
+                      className="text-2xl font-black"
+                      style={{ color: effectiveColors.accent }}
+                    >
                       {challenge.stakeFormatted}
                     </div>
                     {challenge.timeRemaining && (
-                      <span className="text-xs" style={{ color: theme?.colors?.textMuted }}>
+                      <span
+                        className="text-xs"
+                        style={{ color: theme?.colors?.textMuted }}
+                      >
                         {challenge.timeRemaining} remaining
                       </span>
                     )}
@@ -223,15 +248,21 @@ export default function LiveChallenges({
               ))
             ) : (
               // Fallback when no active challenges
-              <div 
+              <div
                 className="col-span-full p-8 rounded-2xl text-center"
-                style={{ 
+                style={{
                   backgroundColor: theme?.colors?.backgroundCard,
                   border: `1px solid ${theme?.colors?.border}`,
                 }}
               >
-                <Swords className="h-12 w-12 mx-auto mb-4" style={{ color: effectiveColors.secondary }} />
-                <h4 className="font-bold text-lg mb-2" style={{ color: effectiveColors.text }}>
+                <Swords
+                  className="h-12 w-12 mx-auto mb-4"
+                  style={{ color: effectiveColors.secondary }}
+                />
+                <h4
+                  className="font-bold text-lg mb-2"
+                  style={{ color: effectiveColors.text }}
+                >
                   Challenge Your Friends!
                 </h4>
                 <p style={{ color: theme?.colors?.textMuted }}>
@@ -248,25 +279,38 @@ export default function LiveChallenges({
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               className="p-4 rounded-xl mb-8 overflow-hidden"
-              style={{ 
+              style={{
                 backgroundColor: `${effectiveColors.secondary}10`,
                 border: `1px solid ${effectiveColors.secondary}20`,
               }}
             >
               <div className="flex items-center gap-3 animate-marquee">
-                <span className="text-sm font-bold whitespace-nowrap" style={{ color: effectiveColors.secondary }}>
+                <span
+                  className="text-sm font-bold whitespace-nowrap"
+                  style={{ color: effectiveColors.secondary }}
+                >
                   🏆 Recent Winners:
                 </span>
                 {completedChallenges.map((result, i) => (
-                  <span 
-                    key={i} 
+                  <span
+                    key={i}
                     className="flex items-center gap-2 text-sm whitespace-nowrap"
                     style={{ color: theme?.colors?.textMuted }}
                   >
-                    <span className="font-bold" style={{ color: effectiveColors.text }}>{result.winner}</span>
+                    <span
+                      className="font-bold"
+                      style={{ color: effectiveColors.text }}
+                    >
+                      {result.winner}
+                    </span>
                     defeated {result.loser} ({result.winnerPrizeFormatted})
                     {i < completedChallenges.length - 1 && (
-                      <span className="mx-2" style={{ color: theme?.colors?.border }}>•</span>
+                      <span
+                        className="mx-2"
+                        style={{ color: theme?.colors?.border }}
+                      >
+                        •
+                      </span>
                     )}
                   </span>
                 ))}
@@ -276,30 +320,54 @@ export default function LiveChallenges({
 
           {/* Stats Bar */}
           {stats && (
-            <div 
+            <div
               className="grid grid-cols-3 gap-4 p-4 rounded-xl mb-8"
-              style={{ 
+              style={{
                 backgroundColor: theme?.colors?.backgroundCard,
                 border: `1px solid ${theme?.colors?.border}`,
               }}
             >
               <div className="text-center">
-                <div className="text-2xl font-black" style={{ color: effectiveColors.secondary }}>
+                <div
+                  className="text-2xl font-black"
+                  style={{ color: effectiveColors.secondary }}
+                >
                   {stats.totalActive}
                 </div>
-                <div className="text-xs" style={{ color: theme?.colors?.textMuted }}>Active Battles</div>
+                <div
+                  className="text-xs"
+                  style={{ color: theme?.colors?.textMuted }}
+                >
+                  Active Battles
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-black" style={{ color: effectiveColors.primary }}>
+                <div
+                  className="text-2xl font-black"
+                  style={{ color: effectiveColors.primary }}
+                >
                   {stats.totalCompleted.toLocaleString()}
                 </div>
-                <div className="text-xs" style={{ color: theme?.colors?.textMuted }}>Total Completed</div>
+                <div
+                  className="text-xs"
+                  style={{ color: theme?.colors?.textMuted }}
+                >
+                  Total Completed
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-black" style={{ color: effectiveColors.accent }}>
+                <div
+                  className="text-2xl font-black"
+                  style={{ color: effectiveColors.accent }}
+                >
                   {stats.activePrizePoolFormatted}
                 </div>
-                <div className="text-xs" style={{ color: theme?.colors?.textMuted }}>At Stake Now</div>
+                <div
+                  className="text-xs"
+                  style={{ color: theme?.colors?.textMuted }}
+                >
+                  At Stake Now
+                </div>
               </div>
             </div>
           )}
@@ -309,10 +377,10 @@ export default function LiveChallenges({
       {/* CTA */}
       <div className="text-center">
         <Link href={ctaLink}>
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             className="font-bold hover:scale-105 transition-all"
-            style={{ 
+            style={{
               background: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
               color: theme?.colors?.background,
               boxShadow: `0 10px 30px ${effectiveColors.secondary}40`,

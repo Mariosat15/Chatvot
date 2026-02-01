@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
 /**
  * Admin Events Client - Using Polling instead of SSE
- * 
+ *
  * SSE has issues with Next.js App Router + Turbopack causing connection loops.
  * This uses simple polling every 30 seconds to check for changes.
  */
@@ -10,7 +10,7 @@
 export interface AdminEvent {
   type: string;
   section: string;
-  action: 'create' | 'update' | 'delete' | 'refresh';
+  action: "create" | "update" | "delete" | "refresh";
   data?: any;
   adminId?: string;
   adminEmail?: string;
@@ -38,16 +38,16 @@ class AdminEventsClient {
    */
   addListener(listener: EventListener): () => void {
     this.listeners.add(listener);
-    
+
     // Start polling if this is the first listener
     if (this.listeners.size === 1) {
       this.startPolling();
     }
-    
+
     // Return unsubscribe function
     return () => {
       this.listeners.delete(listener);
-      
+
       // Stop polling if no more listeners
       if (this.listeners.size === 0) {
         this.stopPolling();
@@ -57,10 +57,10 @@ class AdminEventsClient {
 
   private startPolling() {
     if (this.pollInterval) return;
-    
+
     this._isConnected = true;
-    console.log('📡 [Polling] Started admin events polling (every 30s)');
-    
+    console.log("📡 [Polling] Started admin events polling (every 30s)");
+
     // Poll every 30 seconds
     this.pollInterval = setInterval(() => this.poll(), 30000);
   }
@@ -71,36 +71,36 @@ class AdminEventsClient {
       this.pollInterval = null;
     }
     this._isConnected = false;
-    console.log('📡 [Polling] Stopped admin events polling');
+    console.log("📡 [Polling] Stopped admin events polling");
   }
 
   private async poll() {
     try {
-      const url = `/api/admin/events/poll${this.lastEventTime ? `?since=${this.lastEventTime}` : ''}`;
+      const url = `/api/admin/events/poll${this.lastEventTime ? `?since=${this.lastEventTime}` : ""}`;
       const response = await fetch(url);
-      
+
       if (!response.ok) return;
-      
+
       const data = await response.json();
-      
+
       if (data.events && data.events.length > 0) {
         data.events.forEach((event: AdminEvent) => {
           if (event.timestamp) {
             this.lastEventTime = Math.max(this.lastEventTime, event.timestamp);
           }
-          
+
           // Notify all listeners
-          this.listeners.forEach(listener => {
+          this.listeners.forEach((listener) => {
             try {
               listener(event);
             } catch (err) {
-              console.error('Error in event listener:', err);
+              console.error("Error in event listener:", err);
             }
           });
         });
       }
     } catch (err) {
-      console.error('Poll error:', err);
+      console.error("Poll error:", err);
     }
   }
 
@@ -116,7 +116,7 @@ class AdminEventsClient {
 let adminEventsClient: AdminEventsClient | null = null;
 
 export function getAdminEventsClient(): AdminEventsClient {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return {
       isConnected: false,
       subscriberCount: 0,
@@ -124,10 +124,10 @@ export function getAdminEventsClient(): AdminEventsClient {
       reconnect: () => {},
     } as AdminEventsClient;
   }
-  
+
   if (!adminEventsClient) {
     adminEventsClient = new AdminEventsClient();
   }
-  
+
   return adminEventsClient;
 }

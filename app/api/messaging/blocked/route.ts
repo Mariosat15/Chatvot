@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import { Friendship } from '@/database/models/messaging/friend.model';
-import { BlockedUser } from '@/database/models/messaging/blocked-user.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import { Friendship } from "@/database/models/messaging/friend.model";
+import { BlockedUser } from "@/database/models/messaging/blocked-user.model";
 
 /**
  * GET /api/messaging/blocked
@@ -13,40 +13,66 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const currentUserId = session.user.id;
     await connectToDatabase();
 
     // Get blocked non-friends
-    const blockedUsers = await BlockedUser.getBlockedByUser(session.user.id);
+    const blockedUsers = await (
+      BlockedUser as unknown as {
+        getBlockedByUser: (u: string) => Promise<
+          Array<{
+            blockedUserId: string;
+            blockedUserName: string;
+            createdAt: Date;
+          }>
+        >;
+      }
+    ).getBlockedByUser(currentUserId);
 
     // Get blocked friends (friendships where blockedBy is current user)
-    const blockedFriendships = await Friendship.getBlockedUsers(session.user.id);
+    const blockedFriendships = await (
+      Friendship as unknown as {
+        getBlockedUsers: (u: string) => Promise<
+          Array<{
+            userDetails: Array<{
+              userId: string;
+              userName: string;
+              userAvatar?: string;
+            }>;
+            blockedAt?: Date;
+          }>
+        >;
+      }
+    ).getBlockedUsers(currentUserId);
 
     // Combine both lists
     const allBlocked = [
-      ...blockedUsers.map(b => ({
+      ...blockedUsers.map((b) => ({
         id: b.blockedUserId,
         name: b.blockedUserName,
         blockedAt: b.createdAt,
-        type: 'user' as const,
+        type: "user" as const,
       })),
-      ...blockedFriendships.map(f => {
-        const otherUser = f.userDetails.find(u => u.userId !== session.user.id);
+      ...blockedFriendships.map((f) => {
+        const otherUser = f.userDetails.find((u) => u.userId !== currentUserId);
         return {
-          id: otherUser?.userId || '',
-          name: otherUser?.userName || 'Unknown',
+          id: otherUser?.userId || "",
+          name: otherUser?.userName || "Unknown",
           avatar: otherUser?.userAvatar,
           blockedAt: f.blockedAt,
-          type: 'friend' as const,
+          type: "friend" as const,
         };
       }),
     ];
 
     // Sort by blocked date
-    allBlocked.sort((a, b) => 
-      new Date(b.blockedAt || 0).getTime() - new Date(a.blockedAt || 0).getTime()
+    allBlocked.sort(
+      (a, b) =>
+        new Date(b.blockedAt || 0).getTime() -
+        new Date(a.blockedAt || 0).getTime(),
     );
 
     return NextResponse.json({
@@ -54,10 +80,10 @@ export async function GET(request: NextRequest) {
       total: allBlocked.length,
     });
   } catch (error) {
-    console.error('Error getting blocked users:', error);
+    console.error("Error getting blocked users:", error);
     return NextResponse.json(
-      { error: 'Failed to get blocked users' },
-      { status: 500 }
+      { error: "Failed to get blocked users" },
+      { status: 500 },
     );
   }
 }

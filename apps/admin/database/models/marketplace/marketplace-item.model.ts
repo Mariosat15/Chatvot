@@ -1,43 +1,48 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+import mongoose, { Document, Schema, Model } from "mongoose";
 
 // Item Categories - Indicators, Strategies, Cosmetics, and Game Master
-export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic' | 'gamemaster';
+export type ItemCategory = "indicator" | "strategy" | "cosmetic" | "gamemaster";
 
 // Cosmetic Types
-export type CosmeticType = 'avatar' | 'profile_frame' | 'badge' | 'title';
+export type CosmeticType = "avatar" | "profile_frame" | "badge" | "title";
 
 // Item Status
-export type ItemStatus = 'active' | 'inactive' | 'coming_soon' | 'deprecated';
+export type ItemStatus = "active" | "inactive" | "coming_soon" | "deprecated";
 
 // Indicator Types (chart implementations)
-export type IndicatorType = 
-  | 'sma' 
-  | 'ema' 
-  | 'bb'
-  | 'rsi'
-  | 'macd'
-  | 'support_resistance';
+export type IndicatorType =
+  | "sma"
+  | "ema"
+  | "bb"
+  | "rsi"
+  | "macd"
+  | "support_resistance";
 
 // Strategy Condition Operators
-export type ConditionOperator = 
-  | 'above'       // value > threshold
-  | 'below'       // value < threshold
-  | 'crosses_above' // value crosses above threshold
-  | 'crosses_below' // value crosses below threshold
-  | 'between'     // min < value < max
-  | 'equals';     // value == threshold
+export type ConditionOperator =
+  | "above" // value > threshold
+  | "below" // value < threshold
+  | "crosses_above" // value crosses above threshold
+  | "crosses_below" // value crosses below threshold
+  | "between" // min < value < max
+  | "equals"; // value == threshold
 
 // Strategy Signal Types
-export type SignalType = 'buy' | 'sell' | 'strong_buy' | 'strong_sell' | 'neutral';
+export type SignalType =
+  | "buy"
+  | "sell"
+  | "strong_buy"
+  | "strong_sell"
+  | "neutral";
 
 // Strategy Condition - a single rule
 export interface IStrategyCondition {
   id: string;
-  indicator: string;        // e.g., 'price', 'sma', 'ema', 'rsi', 'macd', 'bb_upper', 'bb_lower', 'bb_middle'
+  indicator: string; // e.g., 'price', 'sma', 'ema', 'rsi', 'macd', 'bb_upper', 'bb_lower', 'bb_middle'
   indicatorParams?: Record<string, number>; // e.g., { period: 20 }
   operator: ConditionOperator;
-  compareWith: 'value' | 'indicator'; // Compare with fixed value or another indicator
-  compareValue?: number;    // Fixed value to compare with
+  compareWith: "value" | "indicator"; // Compare with fixed value or another indicator
+  compareValue?: number; // Fixed value to compare with
   compareIndicator?: string; // Another indicator to compare with
   compareIndicatorParams?: Record<string, number>;
 }
@@ -47,7 +52,7 @@ export interface IStrategyRule {
   id: string;
   name: string;
   conditions: IStrategyCondition[];
-  logic: 'AND' | 'OR'; // How to combine conditions
+  logic: "AND" | "OR"; // How to combine conditions
   signal: SignalType;
   signalStrength: number; // 1-5, used for arrow size
 }
@@ -60,46 +65,46 @@ export interface IStrategyConfig {
     showOnChart: boolean;
     showArrows: boolean;
     showLabels: boolean;
-    arrowSize: 'small' | 'medium' | 'large';
+    arrowSize: "small" | "medium" | "large";
   };
 }
 
 // Game Master Package Configuration
 export interface IGameMasterConfig {
   subscriptionDurationDays: number; // How long the subscription lasts (e.g., 30 days)
-  referralFeePercentage: number;    // % of entry fees earned from referrals in competitions (e.g., 5, 7.5, 10)
-  maxCompetitionsPerDay: number;    // How many competitions can be created per day
-  maxUsersPerCompetition: number;   // Max participants in GM-created competitions
-  canCreateCompetitions: boolean;   // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
-  canEarnFromChallenges: boolean;   // Whether GM earns referral fees from 1v1 challenges
+  referralFeePercentage: number; // % of entry fees earned from referrals in competitions (e.g., 5, 7.5, 10)
+  maxCompetitionsPerDay: number; // How many competitions can be created per day
+  maxUsersPerCompetition: number; // Max participants in GM-created competitions
+  canCreateCompetitions: boolean; // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
+  canEarnFromChallenges: boolean; // Whether GM earns referral fees from 1v1 challenges
   challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
 }
 
 export interface IMarketplaceItem extends Document {
   _id: mongoose.Types.ObjectId;
-  
+
   // Basic Info
   name: string;
   slug: string;
   shortDescription: string;
   fullDescription: string;
   category: ItemCategory;
-  
+
   // Pricing
   price: number; // In credits
   originalPrice?: number; // For showing discounts
   isFree: boolean;
-  
+
   // Status & Visibility
   status: ItemStatus;
   isPublished: boolean;
   isFeatured: boolean;
-  
+
   // Media
   iconUrl?: string;
   thumbnailUrl?: string;
   screenshots?: string[];
-  
+
   // Technical Details
   version: string;
   indicatorType?: IndicatorType; // For indicator items
@@ -108,71 +113,95 @@ export interface IMarketplaceItem extends Document {
   cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
   imageUrl?: string; // Image URL for any item type
   iconName?: string; // Lucide icon name for non-cosmetic items
-  
+
   // The actual code/configuration (JSON string)
   codeTemplate: string;
   defaultSettings: Record<string, any>;
-  
+
   // Supported assets (empty = all)
   supportedAssets: string[];
-  
+
   // Stats
   totalPurchases: number;
   totalActiveUsers: number;
   averageRating: number;
   totalRatings: number;
-  
+
   // Tags for search/filter
   tags: string[];
-  
+
   // Risk info
-  riskLevel: 'low' | 'medium' | 'high' | 'very_high';
+  riskLevel: "low" | "medium" | "high" | "very_high";
   riskWarning?: string;
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
 }
 
-const StrategyConditionSchema = new Schema({
-  id: { type: String, required: true },
-  indicator: { type: String, required: true },
-  indicatorParams: { type: Schema.Types.Mixed },
-  operator: { 
-    type: String, 
-    required: true,
-    enum: ['above', 'below', 'crosses_above', 'crosses_below', 'between', 'equals']
+const StrategyConditionSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    indicator: { type: String, required: true },
+    indicatorParams: { type: Schema.Types.Mixed },
+    operator: {
+      type: String,
+      required: true,
+      enum: [
+        "above",
+        "below",
+        "crosses_above",
+        "crosses_below",
+        "between",
+        "equals",
+      ],
+    },
+    compareWith: {
+      type: String,
+      enum: ["value", "indicator"],
+      default: "value",
+    },
+    compareValue: { type: Number },
+    compareIndicator: { type: String },
+    compareIndicatorParams: { type: Schema.Types.Mixed },
   },
-  compareWith: { type: String, enum: ['value', 'indicator'], default: 'value' },
-  compareValue: { type: Number },
-  compareIndicator: { type: String },
-  compareIndicatorParams: { type: Schema.Types.Mixed },
-}, { _id: false });
+  { _id: false },
+);
 
-const StrategyRuleSchema = new Schema({
-  id: { type: String, required: true },
-  name: { type: String, required: true },
-  conditions: [StrategyConditionSchema],
-  logic: { type: String, enum: ['AND', 'OR'], default: 'AND' },
-  signal: { 
-    type: String, 
-    required: true,
-    enum: ['buy', 'sell', 'strong_buy', 'strong_sell', 'neutral']
+const StrategyRuleSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    conditions: [StrategyConditionSchema],
+    logic: { type: String, enum: ["AND", "OR"], default: "AND" },
+    signal: {
+      type: String,
+      required: true,
+      enum: ["buy", "sell", "strong_buy", "strong_sell", "neutral"],
+    },
+    signalStrength: { type: Number, min: 1, max: 5, default: 3 },
   },
-  signalStrength: { type: Number, min: 1, max: 5, default: 3 },
-}, { _id: false });
+  { _id: false },
+);
 
-const StrategyConfigSchema = new Schema({
-  rules: [StrategyRuleSchema],
-  defaultIndicators: [String],
-  signalDisplay: {
-    showOnChart: { type: Boolean, default: true },
-    showArrows: { type: Boolean, default: true },
-    showLabels: { type: Boolean, default: true },
-    arrowSize: { type: String, enum: ['small', 'medium', 'large'], default: 'medium' },
+const StrategyConfigSchema = new Schema(
+  {
+    rules: [StrategyRuleSchema],
+    defaultIndicators: [String],
+    signalDisplay: {
+      showOnChart: { type: Boolean, default: true },
+      showArrows: { type: Boolean, default: true },
+      showLabels: { type: Boolean, default: true },
+      arrowSize: {
+        type: String,
+        enum: ["small", "medium", "large"],
+        default: "medium",
+      },
+    },
   },
-}, { _id: false });
+  { _id: false },
+);
 
 const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
   {
@@ -202,8 +231,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     category: {
       type: String,
       required: true,
-      enum: ['indicator', 'strategy', 'cosmetic', 'gamemaster'],
-      default: 'indicator',
+      enum: ["indicator", "strategy", "cosmetic", "gamemaster"],
+      default: "indicator",
     },
     price: {
       type: Number,
@@ -222,8 +251,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     status: {
       type: String,
       required: true,
-      enum: ['active', 'inactive', 'coming_soon', 'deprecated'],
-      default: 'active',
+      enum: ["active", "inactive", "coming_soon", "deprecated"],
+      default: "active",
     },
     isPublished: {
       type: Boolean,
@@ -238,11 +267,11 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     screenshots: [String],
     version: {
       type: String,
-      default: '1.0.0',
+      default: "1.0.0",
     },
     indicatorType: {
       type: String,
-      enum: ['sma', 'ema', 'bb', 'rsi', 'macd', 'support_resistance'],
+      enum: ["sma", "ema", "bb", "rsi", "macd", "support_resistance"],
     },
     strategyConfig: StrategyConfigSchema,
     gameMasterConfig: {
@@ -256,14 +285,14 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     },
     cosmeticType: {
       type: String,
-      enum: ['avatar', 'profile_frame', 'badge', 'title'],
+      enum: ["avatar", "profile_frame", "badge", "title"],
     },
     imageUrl: String, // Image URL for any item type
     iconName: String, // Lucide icon name for non-cosmetic items
     codeTemplate: {
       type: String,
       required: true,
-      default: '{}',
+      default: "{}",
     },
     defaultSettings: {
       type: Schema.Types.Mixed,
@@ -297,8 +326,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     },
     riskLevel: {
       type: String,
-      enum: ['low', 'medium', 'high', 'very_high'],
-      default: 'medium',
+      enum: ["low", "medium", "high", "very_high"],
+      default: "medium",
     },
     riskWarning: String,
     createdBy: {
@@ -308,7 +337,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -318,4 +347,5 @@ MarketplaceItemSchema.index({ tags: 1 });
 MarketplaceItemSchema.index({ isFeatured: 1 });
 
 export const MarketplaceItem: Model<IMarketplaceItem> =
-  mongoose.models.MarketplaceItem || mongoose.model<IMarketplaceItem>('MarketplaceItem', MarketplaceItemSchema);
+  mongoose.models.MarketplaceItem ||
+  mongoose.model<IMarketplaceItem>("MarketplaceItem", MarketplaceItemSchema);

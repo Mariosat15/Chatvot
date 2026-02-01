@@ -1,11 +1,14 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import XPConfig from '@/database/models/xp-config.model';
-import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
-import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
-import AppSettings from '@/database/models/app-settings.model';
-import { getBadgeXPValues, getTitleLevels } from '@/lib/services/xp-config.service';
-import { BADGE_XP_VALUES, TITLE_LEVELS } from '@/lib/constants/levels';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import XPConfig from "@/database/models/xp-config.model";
+import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import AppSettings from "@/database/models/app-settings.model";
+import {
+  getBadgeXPValues,
+  getTitleLevels,
+} from "@/lib/services/xp-config.service";
+import { BADGE_XP_VALUES, TITLE_LEVELS } from "@/lib/constants/levels";
 
 /**
  * GET /api/help-settings
@@ -19,7 +22,7 @@ export async function GET() {
     // Fetch XP configuration (badge XP values and level progression)
     let badgeXP;
     let levels;
-    
+
     try {
       badgeXP = await getBadgeXPValues();
       levels = await getTitleLevels();
@@ -36,10 +39,10 @@ export async function GET() {
     const creditSettings = await CreditConversionSettings.getSingleton();
 
     // Fetch app settings
-    const appSettingsDoc = await AppSettings.findById('app-settings').lean();
+    const appSettingsDoc = await AppSettings.findById("app-settings").lean();
     const appSettings = appSettingsDoc || {
-      currency: { code: 'EUR', symbol: '€', name: 'Euro' },
-      credits: { name: 'Credits', symbol: '⚡', valueInEUR: 1, decimals: 2 },
+      currency: { code: "EUR", symbol: "€", name: "Euro" },
+      credits: { name: "Credits", symbol: "⚡", valueInEUR: 1, decimals: 2 },
     };
 
     // Format the response
@@ -86,20 +89,23 @@ export async function GET() {
       // Use nullish coalescing (??) for numeric values that can legitimately be 0
       // (e.g., 0% withdrawal fee for free withdrawals, 0 minimum deposit, etc.)
       credits: {
-        name: (appSettings as any)?.credits?.name || 'Credits',
-        symbol: (appSettings as any)?.credits?.symbol || '⚡',
+        name: (appSettings as any)?.credits?.name || "Credits",
+        symbol: (appSettings as any)?.credits?.symbol || "⚡",
         valueInEUR: (appSettings as any)?.credits?.valueInEUR ?? 1,
         eurToCreditsRate: creditSettings.eurToCreditsRate ?? 100,
         minimumDeposit: creditSettings.minimumDeposit ?? 10,
         minimumWithdrawal: creditSettings.minimumWithdrawal ?? 20,
-        withdrawalFee: creditSettings.platformWithdrawalFeePercentage ?? creditSettings.withdrawalFeePercentage ?? 2,
+        withdrawalFee:
+          creditSettings.platformWithdrawalFeePercentage ??
+          creditSettings.withdrawalFeePercentage ??
+          2,
       },
 
       // Currency
       currency: {
-        code: (appSettings as any)?.currency?.code || 'EUR',
-        symbol: (appSettings as any)?.currency?.symbol || '€',
-        name: (appSettings as any)?.currency?.name || 'Euro',
+        code: (appSettings as any)?.currency?.code || "EUR",
+        symbol: (appSettings as any)?.currency?.symbol || "€",
+        name: (appSettings as any)?.currency?.name || "Euro",
       },
     };
 
@@ -108,10 +114,10 @@ export async function GET() {
       settings: helpSettings,
     });
   } catch (error) {
-    console.error('Error fetching help settings:', error);
+    console.error("Error fetching help settings:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch help settings' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch help settings" },
+      { status: 500 },
     );
   }
 }

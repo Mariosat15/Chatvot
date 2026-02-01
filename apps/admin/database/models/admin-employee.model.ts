@@ -1,82 +1,88 @@
-import { Schema, model, models, type Document, type Model } from 'mongoose';
-import bcrypt from 'bcryptjs';
+import { Schema, model, models, type Document, type Model } from "mongoose";
+import bcrypt from "bcryptjs";
 
 // All available admin sections that can be controlled
 export const ADMIN_SECTIONS = [
   // Dashboard
-  'overview',
+  "overview",
   // Content
-  'hero-page',
-  'marketplace',
+  "hero-page",
+  "marketplace",
   // Trading
-  'competitions',
-  'challenges',
-  'trading-history',
-  'analytics',
-  'market',
-  'symbols',
-  'market-data',
+  "competitions",
+  "challenges",
+  "trading-history",
+  "analytics",
+  "market",
+  "symbols",
+  "market-data",
   // User Management
-  'users',
-  'badges',
-  'customer-assignment',
+  "users",
+  "badges",
+  "customer-assignment",
   // Finance
-  'financial',
-  'payments',
-  'failed-deposits',
-  'withdrawals',
-  'pending-withdrawals',
+  "financial",
+  "payments",
+  "failed-deposits",
+  "withdrawals",
+  "pending-withdrawals",
   // Security
-  'kyc-settings',
-  'kyc-history',
-  'fraud',
+  "kyc-settings",
+  "kyc-history",
+  "fraud",
   // Operations
-  'price-health',
-  'incidents',
+  "price-health",
+  "incidents",
   // Messaging
-  'messaging',
-  'messaging-settings',
+  "messaging",
+  "messaging-settings",
   // Help
-  'wiki',
+  "wiki",
   // Game Master
-  'gamemaster-dashboard',    // For game masters - their referrals, earnings, competitions
-  'gamemaster-management',   // For super admin - manage all game masters
+  "gamemaster-dashboard", // For game masters - their referrals, earnings, competitions
+  "gamemaster-management", // For super admin - manage all game masters
   // AI & Automation
-  'ai-agent',
-  'ai-knowledge',
+  "ai-agent",
+  "ai-knowledge",
   // Settings (main + subsections)
-  'settings',
-  'credentials',
-  'environment',
-  'branding',
-  'company',
-  'invoices',
-  'email-templates',
-  'notifications',
-  'trading-risk',
-  'currency',
-  'fees',
-  'payment-providers',
-  'database',
-  'audit-logs',
+  "settings",
+  "credentials",
+  "environment",
+  "branding",
+  "company",
+  "invoices",
+  "email-templates",
+  "notifications",
+  "trading-risk",
+  "currency",
+  "fees",
+  "payment-providers",
+  "database",
+  "audit-logs",
   // Dev Zone (main + subsections)
-  'dev-zone-menu',
-  'server-monitor',
-  'redis',
-  'dev-settings',
-  'performance-simulator',
-  'image-optimizer',
-  'dependency-updates',
+  "dev-zone-menu",
+  "server-monitor",
+  "redis",
+  "dev-settings",
+  "performance-simulator",
+  "image-optimizer",
+  "dependency-updates",
   // Admin (Super Admin only)
-  'employees',
+  "employees",
   // My Account
-  'profile',
+  "profile",
 ] as const;
 
-export type AdminSection = typeof ADMIN_SECTIONS[number];
+export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
-export type EmployeeRole = 'admin' | 'backoffice' | 'payments' | 'support' | 'compliance' | 'custom';
-export type EmployeeStatus = 'active' | 'disabled' | 'pending';
+export type EmployeeRole =
+  | "admin"
+  | "backoffice"
+  | "payments"
+  | "support"
+  | "compliance"
+  | "custom";
+export type EmployeeStatus = "active" | "disabled" | "pending";
 
 export interface IAdminEmployee extends Document {
   email: string;
@@ -119,24 +125,35 @@ const AdminEmployeeSchema = new Schema<IAdminEmployee>(
     },
     role: {
       type: String,
-      enum: ['admin', 'backoffice', 'payments', 'support', 'compliance', 'custom'],
-      default: 'custom',
+      enum: [
+        "admin",
+        "backoffice",
+        "payments",
+        "support",
+        "compliance",
+        "custom",
+      ],
+      default: "custom",
     },
     roleTemplateId: {
       type: String,
     },
-    customPermissions: [{
-      type: String,
-      enum: ADMIN_SECTIONS,
-    }],
-    allowedSections: [{
-      type: String,
-      enum: ADMIN_SECTIONS,
-    }],
+    customPermissions: [
+      {
+        type: String,
+        enum: ADMIN_SECTIONS,
+      },
+    ],
+    allowedSections: [
+      {
+        type: String,
+        enum: ADMIN_SECTIONS,
+      },
+    ],
     status: {
       type: String,
-      enum: ['active', 'disabled', 'pending'],
-      default: 'pending',
+      enum: ["active", "disabled", "pending"],
+      default: "pending",
     },
     isSuperAdmin: {
       type: Boolean,
@@ -166,13 +183,13 @@ const AdminEmployeeSchema = new Schema<IAdminEmployee>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Hash password before saving
-AdminEmployeeSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  
+AdminEmployeeSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
   this.passwordChangedAt = new Date();
@@ -181,7 +198,7 @@ AdminEmployeeSchema.pre('save', async function (next) {
 
 // Method to compare password
 AdminEmployeeSchema.methods.comparePassword = async function (
-  candidatePassword: string
+  candidatePassword: string,
 ): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
 };
@@ -193,6 +210,5 @@ AdminEmployeeSchema.index({ role: 1 });
 AdminEmployeeSchema.index({ isOnline: 1 });
 
 export const AdminEmployee: Model<IAdminEmployee> =
-  (models?.AdminEmployee as Model<IAdminEmployee>) || 
-  model<IAdminEmployee>('AdminEmployee', AdminEmployeeSchema);
-
+  (models?.AdminEmployee as Model<IAdminEmployee>) ||
+  model<IAdminEmployee>("AdminEmployee", AdminEmployeeSchema);

@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
-import { Users, Trophy, DollarSign, TrendingUp, Zap, Target } from 'lucide-react';
-import { LandingTheme } from '@/lib/themes/landing-themes';
+import { useState, useEffect, useRef } from "react";
+import { motion, useInView } from "framer-motion";
+import {
+  Users,
+  Trophy,
+  DollarSign,
+  TrendingUp,
+  Zap,
+  Target,
+} from "lucide-react";
+import { LandingTheme } from "@/lib/themes/landing-themes";
 
 interface StatsData {
   totalUsers: number;
@@ -42,12 +49,12 @@ interface LiveStatsBarProps {
 }
 
 // Animated counter component
-function AnimatedCounter({ 
-  value, 
-  suffix = '',
+function AnimatedCounter({
+  value,
+  suffix = "",
   color,
-}: { 
-  value: number; 
+}: {
+  value: number;
   suffix?: string;
   color: string;
 }) {
@@ -61,7 +68,7 @@ function AnimatedCounter({
       const steps = 60;
       const increment = value / steps;
       let current = 0;
-      
+
       const timer = setInterval(() => {
         current += increment;
         if (current >= value) {
@@ -71,20 +78,26 @@ function AnimatedCounter({
           setCount(Math.floor(current));
         }
       }, duration / steps);
-      
+
       return () => clearInterval(timer);
     }
   }, [isInView, value]);
 
   return (
     <span ref={ref} style={{ color }} className="font-black">
-      {count.toLocaleString()}{suffix}
+      {count.toLocaleString()}
+      {suffix}
     </span>
   );
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  Users, Trophy, DollarSign, TrendingUp, Zap, Target,
+  Users,
+  Trophy,
+  DollarSign,
+  TrendingUp,
+  Zap,
+  Target,
 };
 
 export default function LiveStatsBar({
@@ -95,10 +108,10 @@ export default function LiveStatsBar({
 }: LiveStatsBarProps) {
   // Ensure effectiveColors has defaults
   const effectiveColors = {
-    primary: propColors.primary || '#00f0ff',
-    secondary: propColors.secondary || '#ff00ff',
-    accent: propColors.accent || '#ffd700',
-    text: propColors.text || '#ffffff',
+    primary: propColors.primary || "#00f0ff",
+    secondary: propColors.secondary || "#ff00ff",
+    accent: propColors.accent || "#ffd700",
+    text: propColors.text || "#ffffff",
   };
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,13 +119,13 @@ export default function LiveStatsBar({
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/landing/stats');
+        const response = await fetch("/api/landing/stats");
         if (response.ok) {
           const data = await response.json();
           setStats(data);
         }
       } catch (error) {
-        console.error('Failed to fetch stats:', error);
+        console.error("Failed to fetch stats:", error);
       } finally {
         setLoading(false);
       }
@@ -126,65 +139,76 @@ export default function LiveStatsBar({
 
   // Default stats to show
   const defaultStats = [
-    { 
-      icon: 'Users', 
-      label: 'Active Traders', 
+    {
+      icon: "Users",
+      label: "Active Traders",
       value: stats?.activeTraders || 0,
-      formatted: stats?.formatted?.activeTraders || '0',
-      suffix: '+',
-      themeIcon: theme?.themeIcons?.users || '👥',
+      formatted: stats?.formatted?.activeTraders || "0",
+      suffix: "+",
+      themeIcon: theme?.themeIcons?.users || "👥",
     },
-    { 
-      icon: 'Trophy', 
-      label: 'Competitions', 
+    {
+      icon: "Trophy",
+      label: "Competitions",
       value: stats?.activeCompetitions || 0,
-      formatted: stats?.formatted?.activeCompetitions || '0',
-      suffix: ' Live',
-      themeIcon: theme?.themeIcons?.trophy || '🏆',
+      formatted: stats?.formatted?.activeCompetitions || "0",
+      suffix: " Live",
+      themeIcon: theme?.themeIcons?.trophy || "🏆",
     },
-    { 
-      icon: 'DollarSign', 
-      label: 'Prizes Paid', 
+    {
+      icon: "DollarSign",
+      label: "Prizes Paid",
       value: stats?.totalPrizesPaid || 0,
-      formatted: stats?.formatted?.totalPrizesPaid || '$0',
-      suffix: '',
-      themeIcon: theme?.themeIcons?.currency || '💰',
+      formatted: stats?.formatted?.totalPrizesPaid || "$0",
+      suffix: "",
+      themeIcon: theme?.themeIcons?.currency || "💰",
     },
-    { 
-      icon: 'TrendingUp', 
-      label: 'Trades Today', 
+    {
+      icon: "TrendingUp",
+      label: "Trades Today",
       value: stats?.tradesToday || 0,
-      formatted: stats?.formatted?.tradesToday || '0',
-      suffix: '',
-      themeIcon: theme?.themeIcons?.stats || '📈',
+      formatted: stats?.formatted?.tradesToday || "0",
+      suffix: "",
+      themeIcon: theme?.themeIcons?.stats || "📈",
     },
   ];
 
   // Use custom stats if provided, otherwise use defaults
-  const displayStats = customStats && customStats.length > 0 
-    ? customStats.filter(s => s.enabled).map(s => ({
-        icon: s.icon,
-        label: s.label,
-        value: parseInt(s.value.replace(/\D/g, '')) || 0,
-        formatted: s.value,
-        suffix: s.suffix,
-        themeIcon: theme?.themeIcons?.[s.icon.toLowerCase()] || '📊',
-      }))
-    : defaultStats;
+  const displayStats =
+    customStats && customStats.length > 0
+      ? customStats
+          .filter((s) => s.enabled)
+          .map((s) => ({
+            icon: s.icon,
+            label: s.label,
+            value: parseInt(s.value.replace(/\D/g, "")) || 0,
+            formatted: s.value,
+            suffix: s.suffix,
+            themeIcon:
+              (theme?.themeIcons as Record<string, string> | undefined)?.[
+                s.icon.toLowerCase()
+              ] || "📊",
+          }))
+      : defaultStats;
 
   if (loading) {
     return (
-      <div 
+      <div
         className="py-6 border-y"
-        style={{ 
+        style={{
           backgroundColor: `${effectiveColors.primary}05`,
           borderColor: `${effectiveColors.primary}20`,
         }}
       >
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-center items-center gap-2">
-            <div className="w-4 h-4 rounded-full animate-pulse" style={{ backgroundColor: effectiveColors.primary }} />
-            <span style={{ color: theme?.colors?.textMuted }}>Loading live stats...</span>
+            <div
+              className="w-4 h-4 rounded-full animate-pulse"
+              style={{ backgroundColor: effectiveColors.primary }}
+            />
+            <span style={{ color: theme?.colors?.textMuted }}>
+              Loading live stats...
+            </span>
           </div>
         </div>
       </div>
@@ -197,7 +221,7 @@ export default function LiveStatsBar({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5 }}
       className="py-6 border-y"
-      style={{ 
+      style={{
         backgroundColor: `${effectiveColors.primary}08`,
         borderColor: `${effectiveColors.primary}20`,
       }}
@@ -217,23 +241,24 @@ export default function LiveStatsBar({
                   {stat.themeIcon}
                 </span>
               </div>
-              <div 
+              <div
                 className="text-2xl md:text-3xl font-black mb-1"
                 style={{ fontFamily: theme?.fonts?.heading }}
               >
                 {animated ? (
-                  <AnimatedCounter 
-                    value={stat.value} 
+                  <AnimatedCounter
+                    value={stat.value}
                     suffix={stat.suffix}
                     color={effectiveColors.primary}
                   />
                 ) : (
                   <span style={{ color: effectiveColors.primary }}>
-                    {stat.formatted}{stat.suffix}
+                    {stat.formatted}
+                    {stat.suffix}
                   </span>
                 )}
               </div>
-              <div 
+              <div
                 className="text-xs md:text-sm uppercase tracking-wider font-medium"
                 style={{ color: theme?.colors?.textMuted }}
               >
@@ -245,14 +270,17 @@ export default function LiveStatsBar({
 
         {/* Live indicator */}
         <div className="flex justify-center mt-4">
-          <div 
+          <div
             className="flex items-center gap-2 px-3 py-1 rounded-full text-xs"
-            style={{ 
-              backgroundColor: `${theme?.colors?.success || '#22c55e'}20`,
-              color: theme?.colors?.success || '#22c55e',
+            style={{
+              backgroundColor: `${theme?.colors?.success || "#22c55e"}20`,
+              color: theme?.colors?.success || "#22c55e",
             }}
           >
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme?.colors?.success || '#22c55e' }} />
+            <span
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ backgroundColor: theme?.colors?.success || "#22c55e" }}
+            />
             Live Data
           </div>
         </div>

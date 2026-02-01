@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { 
-  ArrowLeft, 
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
   Users,
   Search,
   Calendar,
@@ -16,9 +16,9 @@ import {
   UserCheck,
   UserX,
   Clock,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ReferredUser {
   _id: string;
@@ -55,8 +55,8 @@ export default function GMReferralsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReferralsData | null>(null);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
 
   useEffect(() => {
     fetchReferrals();
@@ -67,26 +67,26 @@ export default function GMReferralsPage() {
       setLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: "20",
       });
-      if (filter !== 'all') {
-        params.set('status', filter);
+      if (filter !== "all") {
+        params.set("status", filter);
       }
       if (search) {
-        params.set('search', search);
+        params.set("search", search);
       }
-      
+
       const response = await fetch(`/api/gamemaster/referrals?${params}`);
       const result = await response.json();
-      
+
       if (result.success) {
         setData(result.data);
       } else {
-        toast.error(result.error || 'Failed to load referrals');
+        toast.error(result.error || "Failed to load referrals");
       }
     } catch (error) {
-      console.error('Error fetching referrals:', error);
-      toast.error('Failed to load referrals');
+      console.error("Error fetching referrals:", error);
+      toast.error("Failed to load referrals");
     } finally {
       setLoading(false);
     }
@@ -103,21 +103,23 @@ export default function GMReferralsPage() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
         <div className="max-w-6xl mx-auto px-4 py-6">
-          <Link 
+          <Link
             href="/gamemaster"
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
               <Users className="h-7 w-7 text-blue-400" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Your Referrals</h1>
-              <p className="text-gray-400">Track users who signed up with your referral link</p>
+              <p className="text-gray-400">
+                Track users who signed up with your referral link
+              </p>
             </div>
           </div>
         </div>
@@ -129,26 +131,36 @@ export default function GMReferralsPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Total Referred</div>
-              <div className="text-2xl font-bold text-white">{data.stats.totalReferred}</div>
+              <div className="text-2xl font-bold text-white">
+                {data.stats.totalReferred}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <UserCheck className="h-3 w-3 text-emerald-400" />
                 Active Users
               </div>
-              <div className="text-2xl font-bold text-emerald-400">{data.stats.activeUsers}</div>
+              <div className="text-2xl font-bold text-emerald-400">
+                {data.stats.activeUsers}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Total Entry Fees</div>
-              <div className="text-2xl font-bold text-white">⚡ {data.stats.totalEntryFees.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">
+                ⚡ {data.stats.totalEntryFees.toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Your Earnings</div>
-              <div className="text-2xl font-bold text-emerald-400">⚡ {data.stats.totalEarningsGenerated.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-400">
+                ⚡ {data.stats.totalEarningsGenerated.toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Avg/User</div>
-              <div className="text-2xl font-bold text-yellow-400">⚡ {data.stats.avgEarningsPerUser.toFixed(0)}</div>
+              <div className="text-2xl font-bold text-yellow-400">
+                ⚡ {data.stats.avgEarningsPerUser.toFixed(0)}
+              </div>
             </div>
           </div>
         )}
@@ -173,23 +185,26 @@ export default function GMReferralsPage() {
               Search
             </button>
           </form>
-          
+
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">Status:</span>
             <div className="flex gap-1">
               {[
-                { value: 'all', label: 'All' },
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' },
+                { value: "all", label: "All" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
               ].map((f) => (
                 <button
                   key={f.value}
-                  onClick={() => { setFilter(f.value as typeof filter); setPage(1); }}
+                  onClick={() => {
+                    setFilter(f.value as typeof filter);
+                    setPage(1);
+                  }}
                   className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                     filter === f.value
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800",
                   )}
                 >
                   {f.label}
@@ -235,11 +250,18 @@ export default function GMReferralsPage() {
                   </thead>
                   <tbody>
                     {data.referrals.map((user) => (
-                      <tr key={user._id} className="border-t border-gray-700/50 hover:bg-gray-800/30">
+                      <tr
+                        key={user._id}
+                        className="border-t border-gray-700/50 hover:bg-gray-800/30"
+                      >
                         <td className="px-6 py-4">
                           <div>
-                            <p className="text-white font-medium">{user.userName || 'Unknown'}</p>
-                            <p className="text-gray-500 text-sm">{user.userEmail}</p>
+                            <p className="text-white font-medium">
+                              {user.userName || "Unknown"}
+                            </p>
+                            <p className="text-gray-500 text-sm">
+                              {user.userEmail}
+                            </p>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-300 text-sm">
@@ -249,16 +271,22 @@ export default function GMReferralsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
-                            user.isActive
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-gray-700 text-gray-400'
-                          )}>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+                              user.isActive
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "bg-gray-700 text-gray-400",
+                            )}
+                          >
                             {user.isActive ? (
-                              <><UserCheck className="h-3 w-3" /> Active</>
+                              <>
+                                <UserCheck className="h-3 w-3" /> Active
+                              </>
                             ) : (
-                              <><UserX className="h-3 w-3" /> Inactive</>
+                              <>
+                                <UserX className="h-3 w-3" /> Inactive
+                              </>
                             )}
                           </span>
                         </td>
@@ -276,7 +304,10 @@ export default function GMReferralsPage() {
                           {user.lastActivityAt && (
                             <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              Last: {new Date(user.lastActivityAt).toLocaleDateString()}
+                              Last:{" "}
+                              {new Date(
+                                user.lastActivityAt,
+                              ).toLocaleDateString()}
                             </p>
                           )}
                         </td>
@@ -296,21 +327,32 @@ export default function GMReferralsPage() {
               {data.pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
                   <p className="text-sm text-gray-400">
-                    Showing {((data.pagination.page - 1) * data.pagination.limit) + 1} - {Math.min(data.pagination.page * data.pagination.limit, data.pagination.total)} of {data.pagination.total}
+                    Showing{" "}
+                    {(data.pagination.page - 1) * data.pagination.limit + 1} -{" "}
+                    {Math.min(
+                      data.pagination.page * data.pagination.limit,
+                      data.pagination.total,
+                    )}{" "}
+                    of {data.pagination.total}
                   </p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
                       className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-sm text-gray-400">
-                      Page {data.pagination.page} of {data.pagination.totalPages}
+                      Page {data.pagination.page} of{" "}
+                      {data.pagination.totalPages}
                     </span>
                     <button
-                      onClick={() => setPage(p => Math.min(data.pagination.totalPages, p + 1))}
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(data.pagination.totalPages, p + 1),
+                        )
+                      }
                       disabled={page === data.pagination.totalPages}
                       className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >

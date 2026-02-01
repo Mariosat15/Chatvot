@@ -1,21 +1,21 @@
-'use server';
+"use server";
 
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { auth } from '@/lib/better-auth/auth';
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import Challenge from '@/database/models/trading/challenge.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/better-auth/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
 
 export interface UserCompetitionStats {
   // Overall Stats
   totalCompetitionsEntered: number;
   totalCompetitionsCompleted: number;
   totalCompetitionsActive: number;
-  
+
   // Performance Metrics
   totalCapitalTraded: number;
   totalPnl: number;
@@ -26,20 +26,20 @@ export interface UserCompetitionStats {
   overallWinRate: number;
   averageRoi: number;
   profitFactor: number;
-  
+
   // Best Performances
   bestRank: number;
   bestPnl: number;
   bestRoi: number;
   bestWinRate: number;
   mostTrades: number;
-  
+
   // Prizes
   totalPrizesWon: number;
   totalCreditsWon: number;
   competitionsWon: number; // Rank 1 finishes
   podiumFinishes: number; // Top 3 finishes
-  
+
   // Recent Competitions
   recentCompetitions: {
     competitionId: string;
@@ -59,17 +59,21 @@ export interface UserCompetitionStats {
 /**
  * Get comprehensive competition stats for a user
  */
-export async function getUserCompetitionStats(userId?: string): Promise<UserCompetitionStats> {
+export async function getUserCompetitionStats(
+  userId?: string,
+): Promise<UserCompetitionStats> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     const targetUserId = userId || session.user.id;
 
     await connectToDatabase();
 
     // Get all participations
-    const participations = await CompetitionParticipant.find({ userId: targetUserId })
+    const participations = await CompetitionParticipant.find({
+      userId: targetUserId,
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -77,8 +81,12 @@ export async function getUserCompetitionStats(userId?: string): Promise<UserComp
     const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
 
     // Calculate overall stats
-    const completedParticipations = participations.filter((p) => p.status === 'completed');
-    const activeParticipations = participations.filter((p) => p.status === 'active');
+    const completedParticipations = participations.filter(
+      (p) => p.status === "completed",
+    );
+    const activeParticipations = participations.filter(
+      (p) => p.status === "active",
+    );
 
     // Aggregate performance metrics
     let totalCapitalTraded = 0;
@@ -110,17 +118,20 @@ export async function getUserCompetitionStats(userId?: string): Promise<UserComp
       totalRoi += p.pnlPercentage || 0;
 
       // For profit factor
-      if (p.averageWin && p.winningTrades) totalGross += p.averageWin * p.winningTrades;
-      if (p.averageLoss && p.losingTrades) totalLoss += Math.abs(p.averageLoss) * p.losingTrades;
+      if (p.averageWin && p.winningTrades)
+        totalGross += p.averageWin * p.winningTrades;
+      if (p.averageLoss && p.losingTrades)
+        totalLoss += Math.abs(p.averageLoss) * p.losingTrades;
 
       // Best performances (include active competitions)
       if (p.currentRank && p.currentRank < bestRank) bestRank = p.currentRank;
       if ((p.pnl || 0) > bestPnl) bestPnl = p.pnl || 0;
       if ((p.pnlPercentage || 0) > bestRoi) bestRoi = p.pnlPercentage || 0;
-      
-      const winRate = p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
+
+      const winRate =
+        p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
       if (winRate > bestWinRate) bestWinRate = winRate;
-      
+
       if (p.totalTrades > mostTrades) mostTrades = p.totalTrades;
 
       // Count wins and podiums
@@ -128,34 +139,49 @@ export async function getUserCompetitionStats(userId?: string): Promise<UserComp
       if (p.currentRank && p.currentRank <= 3) podiumFinishes++;
     });
 
-    const overallWinRate = totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
-    const averageRoi = participations.length > 0 ? totalRoi / participations.length : 0;
-    const profitFactor = totalLoss > 0 ? totalGross / totalLoss : totalWinningTrades > 0 ? 9999 : 0;
-    const totalPnlPercentage = totalCapitalTraded > 0 ? (totalPnl / totalCapitalTraded) * 100 : 0;
+    const overallWinRate =
+      totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+    const averageRoi =
+      participations.length > 0 ? totalRoi / participations.length : 0;
+    const profitFactor =
+      totalLoss > 0
+        ? totalGross / totalLoss
+        : totalWinningTrades > 0
+          ? 9999
+          : 0;
+    const totalPnlPercentage =
+      totalCapitalTraded > 0 ? (totalPnl / totalCapitalTraded) * 100 : 0;
 
     // Get recent competitions with details (show both active and completed)
     const recentParticipations = participations.slice(0, 10);
-    const recentCompetitionIds = recentParticipations.map((p) => p.competitionId);
-    const competitions = await Competition.find({ _id: { $in: recentCompetitionIds } }).lean();
+    const recentCompetitionIds = recentParticipations.map(
+      (p) => p.competitionId,
+    );
+    const competitions = await Competition.find({
+      _id: { $in: recentCompetitionIds },
+    }).lean();
 
-    const competitionMap = new Map(competitions.map((c: any) => [c._id.toString(), c]));
+    const competitionMap = new Map(
+      competitions.map((c: any) => [c._id.toString(), c]),
+    );
 
     const recentCompetitions = recentParticipations.map((p: any) => {
       const competition = competitionMap.get(p.competitionId.toString());
-      const winRate = p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
-      
+      const winRate =
+        p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0;
+
       // Find prize amount from leaderboard (only for completed)
       let prizeAmount = 0;
-      if (competition?.status === 'completed' && competition.finalLeaderboard) {
+      if (competition?.status === "completed" && competition.finalLeaderboard) {
         const leaderboardEntry = competition.finalLeaderboard.find(
-          (entry: any) => entry.userId === targetUserId
+          (entry: any) => entry.userId === targetUserId,
         );
         if (leaderboardEntry) prizeAmount = leaderboardEntry.prizeAmount || 0;
       }
 
       return {
         competitionId: p.competitionId,
-        competitionName: competition?.name || 'Unknown Competition',
+        competitionName: competition?.name || "Unknown Competition",
         rank: p.currentRank || 0,
         pnl: p.pnl || 0,
         pnlPercentage: p.pnlPercentage || 0,
@@ -186,15 +212,19 @@ export async function getUserCompetitionStats(userId?: string): Promise<UserComp
       bestRoi,
       bestWinRate,
       mostTrades,
-      totalPrizesWon: (wallet as Record<string, number> | null)?.totalWonFromCompetitions || 0,
-      totalCreditsWon: (wallet as Record<string, number> | null)?.totalWonFromCompetitions || 0,
+      totalPrizesWon:
+        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
+        0,
+      totalCreditsWon:
+        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
+        0,
       competitionsWon,
       podiumFinishes,
       recentCompetitions,
     };
   } catch (error) {
-    console.error('Error getting user competition stats:', error);
-    throw new Error('Failed to get competition stats');
+    console.error("Error getting user competition stats:", error);
+    throw new Error("Failed to get competition stats");
   }
 }
 
@@ -206,21 +236,21 @@ export interface UserChallengeStats {
   totalChallengesWon: number;
   totalChallengesLost: number;
   totalChallengesTied: number;
-  
+
   // Performance Metrics
   totalPnl: number;
   totalTrades: number;
   overallWinRate: number;
-  
+
   // Best Performances
   bestPnl: number;
   bestRoi: number;
   mostTrades: number;
-  
+
   // Prizes
   totalCreditsWon: number;
   totalCreditsSpent: number;
-  
+
   // Recent Challenges
   recentChallenges: {
     challengeId: string;
@@ -242,10 +272,12 @@ export interface UserChallengeStats {
 /**
  * Get comprehensive challenge stats for a user
  */
-export async function getUserChallengeStats(userId?: string): Promise<UserChallengeStats> {
+export async function getUserChallengeStats(
+  userId?: string,
+): Promise<UserChallengeStats> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     const targetUserId = userId || session.user.id;
 
@@ -253,16 +285,15 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
 
     // Get all challenges where user is a participant
     const challenges = await Challenge.find({
-      $or: [
-        { challengerId: targetUserId },
-        { challengedId: targetUserId },
-      ],
+      $or: [{ challengerId: targetUserId }, { challengedId: targetUserId }],
     })
       .sort({ createdAt: -1 })
       .lean();
 
     // Get all participations
-    const participations = await ChallengeParticipant.find({ userId: targetUserId })
+    const participations = await ChallengeParticipant.find({
+      userId: targetUserId,
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -270,9 +301,13 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
     const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
 
     // Calculate stats
-    const completedChallenges = challenges.filter((c: any) => c.status === 'completed');
-    const activeChallenges = challenges.filter((c: any) => c.status === 'active');
-    
+    const completedChallenges = challenges.filter(
+      (c: any) => c.status === "completed",
+    );
+    const activeChallenges = challenges.filter(
+      (c: any) => c.status === "active",
+    );
+
     let totalChallengesWon = 0;
     let totalChallengesLost = 0;
     let totalChallengesTied = 0;
@@ -289,11 +324,11 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
       totalPnl += p.pnl || 0;
       totalTrades += p.totalTrades || 0;
       totalWinningTrades += p.winningTrades || 0;
-      
+
       if ((p.pnl || 0) > bestPnl) bestPnl = p.pnl || 0;
       if ((p.pnlPercentage || 0) > bestRoi) bestRoi = p.pnlPercentage || 0;
       if ((p.totalTrades || 0) > mostTrades) mostTrades = p.totalTrades || 0;
-      
+
       if (p.prizeReceived) totalPrizeAmount += p.prizeReceived;
       if (p.isWinner) totalChallengesWon++;
     });
@@ -311,18 +346,22 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
 
     // If we didn't get wins from participations, use wallet data
     if (totalPrizeAmount === 0) {
-      totalPrizeAmount = (wallet as Record<string, number> | null)?.totalWonFromChallenges || 0;
+      totalPrizeAmount =
+        (wallet as Record<string, number> | null)?.totalWonFromChallenges || 0;
     }
 
-    const overallWinRate = totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+    const overallWinRate =
+      totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
 
     // Build recent challenges
     const recentChallenges = challenges.slice(0, 10).map((c: any) => {
       const isChallenger = c.challengerId === targetUserId;
       const opponentName = isChallenger ? c.challengedName : c.challengerName;
-      const myStats = isChallenger ? c.challengerFinalStats : c.challengedFinalStats;
+      const myStats = isChallenger
+        ? c.challengerFinalStats
+        : c.challengedFinalStats;
       const isWinner = c.winnerId === targetUserId;
-      
+
       return {
         challengeId: c._id.toString(),
         opponentName,
@@ -353,13 +392,15 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
       bestPnl,
       bestRoi,
       mostTrades,
-      totalCreditsWon: (wallet as Record<string, number> | null)?.totalWonFromChallenges || totalPrizeAmount,
-      totalCreditsSpent: (wallet as Record<string, number> | null)?.totalSpentOnChallenges || 0,
+      totalCreditsWon:
+        (wallet as Record<string, number> | null)?.totalWonFromChallenges ||
+        totalPrizeAmount,
+      totalCreditsSpent:
+        (wallet as Record<string, number> | null)?.totalSpentOnChallenges || 0,
       recentChallenges,
     };
   } catch (error) {
-    console.error('Error getting user challenge stats:', error);
-    throw new Error('Failed to get challenge stats');
+    console.error("Error getting user challenge stats:", error);
+    throw new Error("Failed to get challenge stats");
   }
 }
-

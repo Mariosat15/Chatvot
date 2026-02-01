@@ -1,16 +1,19 @@
 /**
  * Price Cache Update Job
- * 
+ *
  * Updates the price cache for all forex pairs.
  * Runs every minute (same as Inngest: update-price-cache)
- * 
+ *
  * Note: This is a backup to real-time price updates.
  * The main app fetches prices on-demand, this ensures cache stays fresh.
  */
 
-import { connectToDatabase } from '../config/database';
-import { fetchRealForexPrices } from '../../lib/services/real-forex-prices.service';
-import { FOREX_PAIRS, type ForexSymbol } from '../../lib/services/pnl-calculator.service';
+import { connectToDatabase } from "../config/database";
+import { fetchRealForexPrices } from "../../lib/services/real-forex-prices.service";
+import {
+  FOREX_PAIRS,
+  type ForexSymbol,
+} from "../../lib/services/pnl-calculator.service";
 
 export interface PriceCacheResult {
   pairsUpdated: number;
@@ -41,4 +44,3 @@ export async function runPriceCacheUpdate(): Promise<PriceCacheResult> {
 }
 
 export default runPriceCacheUpdate;
-

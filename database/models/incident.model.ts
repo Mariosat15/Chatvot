@@ -1,8 +1,8 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 /**
  * Incident Model
- * 
+ *
  * Tracks incidents related to competitions, challenges, and system issues.
  * Used for dispute resolution, audit trail, and post-mortem analysis.
  */
@@ -12,7 +12,7 @@ export interface ICompensation {
   username?: string;
   amount: number;
   reason: string;
-  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  status: "pending" | "approved" | "paid" | "rejected";
   paidAt?: Date;
   transactionId?: string;
 }
@@ -41,17 +41,23 @@ export interface IIncident extends Document {
   // Reference
   competitionId?: string;
   challengeId?: string;
-  
+
   // Classification
-  type: 'price_feed_failure' | 'unfair_result' | 'technical_error' | 'user_complaint' | 'system_error' | 'other';
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  status: 'open' | 'investigating' | 'resolved' | 'rejected' | 'escalated';
-  
+  type:
+    | "price_feed_failure"
+    | "unfair_result"
+    | "technical_error"
+    | "user_complaint"
+    | "system_error"
+    | "other";
+  severity: "low" | "medium" | "high" | "critical";
+  status: "open" | "investigating" | "resolved" | "rejected" | "escalated";
+
   // Details
   title: string;
   description: string;
   affectedUsers: string[];
-  
+
   // Evidence
   evidence: {
     priceSnapshots?: string[]; // Snapshot IDs
@@ -62,7 +68,7 @@ export interface IIncident extends Document {
     logs?: string[];
     healthAlertIds?: string[];
   };
-  
+
   // Resolution
   resolution?: {
     summary: string;
@@ -71,7 +77,7 @@ export interface IIncident extends Document {
     resultAdjustments: IResultAdjustment[];
     resolvedAt: Date;
   };
-  
+
   // Tracking
   createdBy: string; // Admin ID or 'system'
   createdByEmail?: string;
@@ -80,51 +86,60 @@ export interface IIncident extends Document {
   resolvedBy?: string;
   resolvedByEmail?: string;
   resolvedAt?: Date;
-  
+
   // Audit trail
   auditLog: IAuditLogEntry[];
-  
+
   // Metadata
   tags?: string[];
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  
+  priority: "low" | "medium" | "high" | "urgent";
+
   createdAt: Date;
   updatedAt: Date;
 }
 
-const CompensationSchema = new Schema({
-  userId: { type: String, required: true },
-  username: { type: String },
-  amount: { type: Number, required: true },
-  reason: { type: String, required: true },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'paid', 'rejected'],
-    default: 'pending'
+const CompensationSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    username: { type: String },
+    amount: { type: Number, required: true },
+    reason: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "paid", "rejected"],
+      default: "pending",
+    },
+    paidAt: { type: Date },
+    transactionId: { type: String },
   },
-  paidAt: { type: Date },
-  transactionId: { type: String },
-}, { _id: false });
+  { _id: false },
+);
 
-const ResultAdjustmentSchema = new Schema({
-  participantId: { type: String, required: true },
-  userId: { type: String, required: true },
-  username: { type: String },
-  previousRank: { type: Number },
-  newRank: { type: Number },
-  previousPrize: { type: Number },
-  newPrize: { type: Number },
-  adjustmentReason: { type: String, required: true },
-}, { _id: false });
+const ResultAdjustmentSchema = new Schema(
+  {
+    participantId: { type: String, required: true },
+    userId: { type: String, required: true },
+    username: { type: String },
+    previousRank: { type: Number },
+    newRank: { type: Number },
+    previousPrize: { type: Number },
+    newPrize: { type: Number },
+    adjustmentReason: { type: String, required: true },
+  },
+  { _id: false },
+);
 
-const AuditLogEntrySchema = new Schema({
-  timestamp: { type: Date, required: true, default: Date.now },
-  action: { type: String, required: true },
-  by: { type: String, required: true },
-  byEmail: { type: String },
-  details: { type: String, required: true },
-  metadata: { type: Schema.Types.Mixed },
-}, { _id: false });
+const AuditLogEntrySchema = new Schema(
+  {
+    timestamp: { type: Date, required: true, default: Date.now },
+    action: { type: String, required: true },
+    by: { type: String, required: true },
+    byEmail: { type: String },
+    details: { type: String, required: true },
+    metadata: { type: Schema.Types.Mixed },
+  },
+  { _id: false },
+);
 
 const IncidentSchema: Schema = new Schema(
   {
@@ -138,21 +153,28 @@ const IncidentSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ['price_feed_failure', 'unfair_result', 'technical_error', 'user_complaint', 'system_error', 'other'],
+      enum: [
+        "price_feed_failure",
+        "unfair_result",
+        "technical_error",
+        "user_complaint",
+        "system_error",
+        "other",
+      ],
       required: true,
       index: true,
     },
     severity: {
       type: String,
-      enum: ['low', 'medium', 'high', 'critical'],
+      enum: ["low", "medium", "high", "critical"],
       required: true,
       index: true,
     },
     status: {
       type: String,
-      enum: ['open', 'investigating', 'resolved', 'rejected', 'escalated'],
+      enum: ["open", "investigating", "resolved", "rejected", "escalated"],
       required: true,
-      default: 'open',
+      default: "open",
       index: true,
     },
     title: {
@@ -163,9 +185,11 @@ const IncidentSchema: Schema = new Schema(
       type: String,
       required: true,
     },
-    affectedUsers: [{
-      type: String,
-    }],
+    affectedUsers: [
+      {
+        type: String,
+      },
+    ],
     evidence: {
       priceSnapshots: [{ type: String }],
       tradeIds: [{ type: String }],
@@ -205,19 +229,21 @@ const IncidentSchema: Schema = new Schema(
       type: Date,
     },
     auditLog: [AuditLogEntrySchema],
-    tags: [{
-      type: String,
-    }],
+    tags: [
+      {
+        type: String,
+      },
+    ],
     priority: {
       type: String,
-      enum: ['low', 'medium', 'high', 'urgent'],
-      default: 'medium',
+      enum: ["low", "medium", "high", "urgent"],
+      default: "medium",
     },
   },
   {
     timestamps: true,
-    collection: 'incidents',
-  }
+    collection: "incidents",
+  },
 );
 
 // Compound indexes
@@ -227,12 +253,12 @@ IncidentSchema.index({ createdBy: 1, createdAt: -1 });
 IncidentSchema.index({ assignedTo: 1, status: 1 });
 
 // Methods
-IncidentSchema.methods.addAuditEntry = function(
+IncidentSchema.methods.addAuditEntry = function (
   action: string,
   by: string,
   details: string,
   byEmail?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ) {
   this.auditLog.push({
     timestamp: new Date(),
@@ -245,7 +271,8 @@ IncidentSchema.methods.addAuditEntry = function(
   return this;
 };
 
-const Incident = mongoose.models.Incident || 
-  mongoose.model<IIncident>('Incident', IncidentSchema);
+const Incident =
+  mongoose.models.Incident ||
+  mongoose.model<IIncident>("Incident", IncidentSchema);
 
 export default Incident;

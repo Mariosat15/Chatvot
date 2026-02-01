@@ -1,21 +1,21 @@
 /**
  * Nuvei Payment Status API
  * Verify payment status after createPayment() completes
- * 
+ *
  * POST /api/nuvei/payment-status
  * Body: { sessionToken: string }
- * 
- * Uses completeDeposit from wallet.actions to handle wallet crediting, 
+ *
+ * Uses completeDeposit from wallet.actions to handle wallet crediting,
  * fee recording, and invoice generation - same as Stripe.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { nuveiService } from '@/lib/services/nuvei.service';
-import { connectToDatabase } from '@/database/mongoose';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { nuveiService } from "@/lib/services/nuvei.service";
+import { connectToDatabase } from "@/database/mongoose";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,10 +25,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const userId = session.user.id;
@@ -37,42 +34,48 @@ export async function POST(req: NextRequest) {
 
     if (!sessionToken) {
       return NextResponse.json(
-        { error: 'Session token required' },
-        { status: 400 }
+        { error: "Session token required" },
+        { status: 400 },
       );
     }
 
     await connectToDatabase();
 
     // Get payment status from Nuvei
-    const result = await nuveiService.getPaymentStatus({ sessionToken });
+    const result = (await nuveiService.getPaymentStatus({ sessionToken })) as {
+      error?: string;
+      transactionStatus?: string;
+      transactionId?: string;
+      errCode?: number;
+      authCode?: string;
+      amount?: number;
+      currency?: string;
+      reason?: string;
+    };
 
-    if ('error' in result) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 500 }
-      );
+    if ("error" in result && result.error) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
     // Find the transaction
     // New format: clientUniqueId = "txn_[transactionId]" - extract and find directly
     let transaction = null;
-    
-    if (clientUniqueId?.startsWith('txn_')) {
+
+    if (clientUniqueId?.startsWith("txn_")) {
       // NEW FORMAT: Extract transaction ID directly
-      const ourTransactionId = clientUniqueId.replace('txn_', '');
+      const ourTransactionId = clientUniqueId.replace("txn_", "");
       transaction = await WalletTransaction.findOne({
         _id: ourTransactionId,
         userId, // Ensure it belongs to this user
       });
     }
-    
+
     if (!transaction) {
       // FALLBACK: Search by sessionToken
       transaction = await WalletTransaction.findOne({
         userId,
-        'metadata.sessionToken': sessionToken,
-        provider: 'nuvei',
+        "metadata.sessionToken": sessionToken,
+        provider: "nuvei",
       });
     }
 
@@ -80,17 +83,17 @@ export async function POST(req: NextRequest) {
       // FALLBACK: Old format - search by metadata
       transaction = await WalletTransaction.findOne({
         userId,
-        'metadata.clientUniqueId': clientUniqueId,
-        provider: 'nuvei',
+        "metadata.clientUniqueId": clientUniqueId,
+        provider: "nuvei",
       });
     }
 
     // Process based on transaction status
-    if (result.transactionStatus === 'APPROVED' && result.errCode === 0) {
+    if (result.transactionStatus === "APPROVED" && result.errCode === 0) {
       // Payment approved
       let invoiceGenerated = false;
-      
-      if (transaction && transaction.status === 'pending') {
+
+      if (transaction && transaction.status === "pending") {
         // Update transaction with Nuvei details before completing
         transaction.paymentId = result.transactionId;
         transaction.providerTransactionId = result.transactionId;
@@ -104,39 +107,48 @@ export async function POST(req: NextRequest) {
         // Use completeDeposit to handle wallet crediting, fee recording, and invoice
         // This ensures Nuvei deposits are tracked the same way as Stripe
         try {
-          const { completeDeposit } = await import('@/lib/actions/trading/wallet.actions');
-          
+          const { completeDeposit } =
+            await import("@/lib/actions/trading/wallet.actions");
+
           await completeDeposit(
             transaction._id.toString(),
-            result.transactionId,
-            'card',
-            undefined // Card details will be fetched from webhook DMN
+            result.transactionId || "",
+            "card",
+            undefined, // Card details will be fetched from webhook DMN
           );
-          
-          console.log(`✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`);
+
+          console.log(
+            `✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`,
+          );
           invoiceGenerated = true; // completeDeposit handles invoice
         } catch (completeError) {
           // CRITICAL: Do NOT credit wallet if completeDeposit fails
-          console.error('❌ CRITICAL: completeDeposit failed:', completeError);
-          
+          console.error("❌ CRITICAL: completeDeposit failed:", completeError);
+
           // Mark transaction as failed - requires manual intervention
-          transaction.status = 'failed';
-          transaction.failureReason = `completeDeposit error: ${completeError instanceof Error ? completeError.message : 'Unknown error'}`;
+          transaction.status = "failed";
+          transaction.failureReason = `completeDeposit error: ${completeError instanceof Error ? completeError.message : "Unknown error"}`;
           transaction.metadata = {
             ...transaction.metadata,
-            processingError: completeError instanceof Error ? completeError.message : 'Unknown error',
+            processingError:
+              completeError instanceof Error
+                ? completeError.message
+                : "Unknown error",
             requiresManualReview: true,
             nuveiPaymentApproved: true,
           };
           await transaction.save();
-          
-          console.error(`🚨 ALERT: Deposit ${transaction._id} needs manual review!`);
-          
+
+          console.error(
+            `🚨 ALERT: Deposit ${transaction._id} needs manual review!`,
+          );
+
           // Return error to client so they know something went wrong
           return NextResponse.json({
             success: false,
-            status: 'PROCESSING_ERROR',
-            error: 'Payment was received but there was an error processing your deposit. Please contact support.',
+            status: "PROCESSING_ERROR",
+            error:
+              "Payment was received but there was an error processing your deposit. Please contact support.",
             transactionId: result.transactionId,
           });
         }
@@ -144,16 +156,16 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        status: 'APPROVED',
+        status: "APPROVED",
         transactionId: result.transactionId,
         amount: result.amount,
         currency: result.currency,
         invoiceGenerated,
       });
-    } else if (result.transactionStatus === 'DECLINED') {
+    } else if (result.transactionStatus === "DECLINED") {
       // Payment declined
-      if (transaction && transaction.status === 'pending') {
-        transaction.status = 'failed';
+      if (transaction && transaction.status === "pending") {
+        transaction.status = "failed";
         transaction.metadata = {
           ...transaction.metadata,
           paymentStatus: result.transactionStatus,
@@ -165,21 +177,24 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: false,
-        status: 'DECLINED',
-        reason: result.reason || 'Payment declined',
+        status: "DECLINED",
+        reason: result.reason || "Payment declined",
         errorCode: result.errCode,
       });
-    } else if (result.transactionStatus === 'PENDING') {
+    } else if (result.transactionStatus === "PENDING") {
       // Payment still pending
       return NextResponse.json({
         success: false,
-        status: 'PENDING',
-        message: 'Payment is still processing',
+        status: "PENDING",
+        message: "Payment is still processing",
       });
-    } else if (result.transactionStatus === 'ERROR' || result.status === 'ERROR') {
+    } else if (
+      result.transactionStatus === "ERROR" ||
+      (result as { status?: string }).status === "ERROR"
+    ) {
       // Error
-      if (transaction && transaction.status === 'pending') {
-        transaction.status = 'failed';
+      if (transaction && transaction.status === "pending") {
+        transaction.status = "failed";
         transaction.metadata = {
           ...transaction.metadata,
           paymentStatus: result.transactionStatus,
@@ -191,8 +206,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: false,
-        status: 'ERROR',
-        reason: result.reason || 'Payment error',
+        status: "ERROR",
+        reason: result.reason || "Payment error",
         errorCode: result.errCode,
       });
     }
@@ -200,15 +215,14 @@ export async function POST(req: NextRequest) {
     // Unknown status
     return NextResponse.json({
       success: false,
-      status: result.transactionStatus || 'UNKNOWN',
+      status: result.transactionStatus || "UNKNOWN",
       raw: result,
     });
   } catch (error) {
-    console.error('Nuvei payment status error:', error);
+    console.error("Nuvei payment status error:", error);
     return NextResponse.json(
-      { error: 'Failed to verify payment status' },
-      { status: 500 }
+      { error: "Failed to verify payment status" },
+      { status: 500 },
     );
   }
 }
-

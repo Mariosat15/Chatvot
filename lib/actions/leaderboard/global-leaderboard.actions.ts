@@ -1,15 +1,15 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import UserBadge from '@/database/models/user-badge.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { getAllUsers } from '@/lib/utils/user-lookup';
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import UserBadge from "@/database/models/user-badge.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { getAllUsers } from "@/lib/utils/user-lookup";
 // Static imports for better performance (no dynamic import overhead)
-import { getUsersWithTitles } from '@/lib/services/xp-level.service';
-import { getTitleByXP } from '@/lib/constants/levels';
+import { getUsersWithTitles } from "@/lib/services/xp-level.service";
+import { getTitleByXP } from "@/lib/constants/levels";
 
 export interface GlobalLeaderboardEntry {
   userId: string;
@@ -19,32 +19,32 @@ export interface GlobalLeaderboardEntry {
   rank: number;
   isTied?: boolean;
   tiedWith?: string[];
-  
+
   // Title
   userTitle?: string;
   userTitleIcon?: string;
   userTitleColor?: string;
-  
+
   // Overall stats
   totalPnl: number;
   totalPnlPercentage: number;
   totalTrades: number;
   winRate: number;
   profitFactor: number;
-  
+
   // Competition stats
   competitionsEntered: number;
   competitionsWon: number;
   podiumFinishes: number;
-  
+
   // Challenge stats
   challengesEntered?: number;
   challengesWon?: number;
-  
+
   // Badges
   totalBadges: number;
   legendaryBadges: number;
-  
+
   // Score (for ranking)
   overallScore: number;
 }
@@ -60,20 +60,24 @@ let leaderboardCache: CachedLeaderboard | null = null;
 const CACHE_TTL = 30000; // 30 seconds
 
 function isCacheValid(): boolean {
-  return leaderboardCache !== null && 
-         (Date.now() - leaderboardCache.timestamp) < CACHE_TTL;
+  return (
+    leaderboardCache !== null &&
+    Date.now() - leaderboardCache.timestamp < CACHE_TTL
+  );
 }
 
 /**
  * Get global leaderboard - ranks ALL users (including those without competition/challenge history)
- * 
+ *
  * OPTIMIZED VERSION:
  * - 30-second in-memory cache
  * - Parallel database queries
  * - O(n) lookups with Maps instead of O(n²)
  * - Static imports (no dynamic import overhead)
  */
-export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLeaderboardEntry[]> {
+export async function getGlobalLeaderboard(
+  limit: number = 0,
+): Promise<GlobalLeaderboardEntry[]> {
   // Check cache first
   if (isCacheValid()) {
     const cached = leaderboardCache!.data;
@@ -84,19 +88,26 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
 
   try {
     // OPTIMIZATION: Run all queries in parallel
-    const [allUsers, allCompetitionParticipants, allChallengeParticipants, allUserBadges] = await Promise.all([
+    const [
+      allUsers,
+      allCompetitionParticipants,
+      allChallengeParticipants,
+      allUserBadges,
+    ] = await Promise.all([
       getAllUsers(),
       CompetitionParticipant.find({})
-        .select('userId pnl startingCapital totalTrades winningTrades losingTrades currentRank')
+        .select(
+          "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
+        )
         .lean(),
       ChallengeParticipant.find({})
-        .select('userId pnl startingCapital totalTrades winningTrades losingTrades isWinner')
+        .select(
+          "userId pnl startingCapital totalTrades winningTrades losingTrades isWinner",
+        )
         .lean(),
-      UserBadge.find({})
-        .select('userId badgeId')
-        .lean(),
+      UserBadge.find({}).select("userId badgeId").lean(),
     ]);
-    
+
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)
     const badgeCounts = new Map<string, { total: number; legendary: number }>();
     for (const userBadge of allUserBadges) {
@@ -105,39 +116,42 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       }
       const counts = badgeCounts.get(userBadge.userId)!;
       counts.total += 1;
-      if (userBadge.badgeId.startsWith('legend_')) {
+      if (userBadge.badgeId.startsWith("legend_")) {
         counts.legendary += 1;
       }
     }
-    
+
     // Group by userId - start with all users (even those with no history)
-    const userStatsMap = new Map<string, {
-      userId: string;
-      email: string;
-      username: string;
-      profileImage?: string;
-      totalPnl: number;
-      totalCapital: number;
-      totalTrades: number;
-      winningTrades: number;
-      losingTrades: number;
-      competitionsEntered: number;
-      competitionsWon: number;
-      podiumFinishes: number;
-      challengesEntered: number;
-      challengesWon: number;
-      grossProfit: number;
-      grossLoss: number;
-    }>();
+    const userStatsMap = new Map<
+      string,
+      {
+        userId: string;
+        email: string;
+        username: string;
+        profileImage?: string;
+        totalPnl: number;
+        totalCapital: number;
+        totalTrades: number;
+        winningTrades: number;
+        losingTrades: number;
+        competitionsEntered: number;
+        competitionsWon: number;
+        podiumFinishes: number;
+        challengesEntered: number;
+        challengesWon: number;
+        grossProfit: number;
+        grossLoss: number;
+      }
+    >();
 
     // Initialize all users with zero stats
     for (const user of allUsers) {
       if (!user.id || !user.email) continue;
-      
+
       userStatsMap.set(user.id, {
         userId: user.id,
         email: user.email,
-        username: user.name || user.email.split('@')[0] || 'Unknown',
+        username: user.name || user.email.split("@")[0] || "Unknown",
         profileImage: user.profileImage,
         totalPnl: 0,
         totalCapital: 0,
@@ -166,7 +180,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       userStats.winningTrades += participant.winningTrades || 0;
       userStats.losingTrades += participant.losingTrades || 0;
       userStats.competitionsEntered += 1;
-      
+
       if (participant.currentRank === 1) {
         userStats.competitionsWon += 1;
       }
@@ -194,7 +208,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       userStats.winningTrades += participant.winningTrades || 0;
       userStats.losingTrades += participant.losingTrades || 0;
       userStats.challengesEntered += 1;
-      
+
       if (participant.isWinner) {
         userStats.challengesWon += 1;
       }
@@ -211,9 +225,16 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     const leaderboardEntries: GlobalLeaderboardEntry[] = [];
 
     for (const [userId, stats] of userStatsMap.entries()) {
-      const winRate = stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
-      const profitFactor = stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
-      const totalPnlPercentage = stats.totalCapital > 0 ? (stats.totalPnl / stats.totalCapital) * 100 : 0;
+      const winRate =
+        stats.totalTrades > 0
+          ? (stats.winningTrades / stats.totalTrades) * 100
+          : 0;
+      const profitFactor =
+        stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
+      const totalPnlPercentage =
+        stats.totalCapital > 0
+          ? (stats.totalPnl / stats.totalCapital) * 100
+          : 0;
 
       const badges = badgeCounts.get(userId) || { total: 0, legendary: 0 };
 
@@ -260,27 +281,31 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     const epsilon = 0.0001;
     for (let i = 0; i < leaderboardEntries.length; i++) {
       const current = leaderboardEntries[i];
-      
+
       if (i === 0) {
         current.rank = 1;
         current.isTied = false;
       } else {
         const previous = leaderboardEntries[i - 1];
-        const isTied = Math.abs(current.overallScore - previous.overallScore) < epsilon;
-        
+        const isTied =
+          Math.abs(current.overallScore - previous.overallScore) < epsilon;
+
         if (isTied) {
           current.rank = previous.rank;
           current.isTied = true;
           previous.isTied = true;
-          
+
           if (!current.tiedWith) current.tiedWith = [];
           if (!previous.tiedWith) previous.tiedWith = [];
-          
+
           current.tiedWith.push(previous.userId);
           previous.tiedWith.push(current.userId);
-          
+
           for (let j = i - 2; j >= 0; j--) {
-            if (leaderboardEntries[j].rank === current.rank && leaderboardEntries[j].isTied) {
+            if (
+              leaderboardEntries[j].rank === current.rank &&
+              leaderboardEntries[j].isTied
+            ) {
               if (!current.tiedWith!.includes(leaderboardEntries[j].userId)) {
                 current.tiedWith!.push(leaderboardEntries[j].userId);
               }
@@ -299,13 +324,15 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
     }
 
     // Get user titles in batch
-    const userIds = leaderboardEntries.map(entry => entry.userId);
+    const userIds = leaderboardEntries.map((entry) => entry.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
     // Add title information to each entry
-    const entriesWithTitles = leaderboardEntries.map(entry => {
+    const entriesWithTitles = leaderboardEntries.map((entry) => {
       const userLevel = userLevels.get(entry.userId);
-      const titleLevel = userLevel ? getTitleByXP(userLevel.currentXP) : getTitleByXP(0);
+      const titleLevel = userLevel
+        ? getTitleByXP(userLevel.currentXP)
+        : getTitleByXP(0);
 
       return {
         ...entry,
@@ -323,7 +350,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
 
     return limit > 0 ? entriesWithTitles.slice(0, limit) : entriesWithTitles;
   } catch (error) {
-    console.error('Error getting global leaderboard:', error);
+    console.error("Error getting global leaderboard:", error);
     return [];
   }
 }
@@ -379,12 +406,14 @@ export async function getUserGlobalRank(userId: string): Promise<{
   percentile: number;
 }> {
   const leaderboard = await getGlobalLeaderboard(999999); // Get all
-  const userEntry = leaderboard.find(entry => entry.userId === userId);
+  const userEntry = leaderboard.find((entry) => entry.userId === userId);
 
   return {
     rank: userEntry?.rank || 0,
     totalUsers: leaderboard.length,
-    percentile: userEntry ? ((leaderboard.length - userEntry.rank + 1) / leaderboard.length) * 100 : 0,
+    percentile: userEntry
+      ? ((leaderboard.length - userEntry.rank + 1) / leaderboard.length) * 100
+      : 0,
   };
 }
 
@@ -400,4 +429,3 @@ export async function getMyLeaderboardPosition() {
   const userId = session.user.id;
   return getUserGlobalRank(userId);
 }
-

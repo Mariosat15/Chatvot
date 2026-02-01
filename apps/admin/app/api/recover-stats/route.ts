@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 
 /**
  * Admin API: Recover participant stats from trade history
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     if (participants.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'No participants need fixing',
+        message: "No participants need fixing",
         fixed: 0,
         skipped: 0,
       });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     for (const participant of participants) {
       const participantId = participant._id.toString();
-      
+
       console.log(`\n👤 Processing: ${participant.username}`);
       console.log(`   Competition: ${participant.competitionId}`);
       console.log(`   Participant ID: ${participantId}`);
@@ -44,52 +44,66 @@ export async function POST(request: Request) {
 
       // Try to find trade history by participantId OR by userId+competitionId
       let trades = await TradeHistory.find({ participantId }).lean();
-      
+
       if (trades.length > 0) {
         console.log(`   ✅ Found ${trades.length} trades by participantId`);
       }
-      
+
       // Fallback: If no trades found by participantId, try by userId + competitionId
       if (trades.length === 0) {
         trades = await TradeHistory.find({
           userId: participant.userId,
           competitionId: participant.competitionId,
         }).lean();
-        
+
         if (trades.length > 0) {
-          console.log(`  ℹ️  ${participant.username}: Found ${trades.length} trades by userId+competitionId (participantId mismatch)`);
+          console.log(
+            `  ℹ️  ${participant.username}: Found ${trades.length} trades by userId+competitionId (participantId mismatch)`,
+          );
         }
       }
 
       if (trades.length === 0) {
         // Last resort: Check if there are ANY positions (open or closed)
-        const TradingPosition = (await import('@/database/models/trading/trading-position.model')).default;
-        
+        const TradingPosition = (
+          await import("@/database/models/trading/trading-position.model")
+        ).default;
+
         // First, check ALL positions for this user in this competition
         const allPositions = await TradingPosition.find({
           userId: participant.userId,
           competitionId: participant.competitionId,
         }).lean();
 
-        console.log(`  🔍 ${participant.username}: Found ${allPositions.length} total positions (statuses: ${allPositions.map((p: any) => p.status).join(', ')})`);
+        console.log(
+          `  🔍 ${participant.username}: Found ${allPositions.length} total positions (statuses: ${allPositions.map((p: any) => p.status).join(", ")})`,
+        );
 
         if (allPositions.length > 0) {
           // Check if any have profitLoss data
-          const positionsWithPnL = allPositions.filter((p: any) => p.profitLoss !== undefined && p.profitLoss !== null);
-          
+          const positionsWithPnL = allPositions.filter(
+            (p: any) => p.profitLoss !== undefined && p.profitLoss !== null,
+          );
+
           if (positionsWithPnL.length > 0) {
-            console.log(`  ℹ️  ${participant.username}: Found ${positionsWithPnL.length} positions with P&L data (reconstructing from positions)`);
+            console.log(
+              `  ℹ️  ${participant.username}: Found ${positionsWithPnL.length} positions with P&L data (reconstructing from positions)`,
+            );
             // Convert positions to trade-like objects
             trades = positionsWithPnL.map((pos: any) => ({
               realizedPnl: pos.profitLoss || 0,
             })) as unknown as typeof trades;
           } else {
-            console.log(`  ⚠️  ${participant.username}: ${allPositions.length} positions found but NONE have profitLoss data (likely never closed)`);
+            console.log(
+              `  ⚠️  ${participant.username}: ${allPositions.length} positions found but NONE have profitLoss data (likely never closed)`,
+            );
             skipped++;
             continue;
           }
         } else {
-          console.log(`  ⚠️  ${participant.username}: No positions found at all (never traded)`);
+          console.log(
+            `  ⚠️  ${participant.username}: No positions found at all (never traded)`,
+          );
           skipped++;
           continue;
         }
@@ -155,7 +169,9 @@ export async function POST(request: Request) {
         winRate,
       };
 
-      console.log(`  ✅ ${participant.username}: ${totalTrades} trades, P&L: $${totalPnL.toFixed(2)}`);
+      console.log(
+        `  ✅ ${participant.username}: ${totalTrades} trades, P&L: $${totalPnL.toFixed(2)}`,
+      );
       results.push(result);
       fixed++;
     }
@@ -168,15 +184,14 @@ export async function POST(request: Request) {
       results,
     });
   } catch (error) {
-    console.error('Error recovering stats:', error);
+    console.error("Error recovering stats:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to recover stats',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Failed to recover stats",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

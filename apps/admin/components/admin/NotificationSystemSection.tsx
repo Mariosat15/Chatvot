@@ -1,26 +1,36 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  Bell, Send, Settings, Trash2, Edit, Save, 
-  RefreshCw, CheckCircle, Users, User,
-  Search, ToggleLeft, ToggleRight
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from "react";
+import {
+  Bell,
+  Send,
+  Settings,
+  Trash2,
+  Edit,
+  Save,
+  RefreshCw,
+  CheckCircle,
+  Users,
+  User,
+  Search,
+  ToggleLeft,
+  ToggleRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -29,14 +39,14 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { toast } from 'sonner';
+} from "@/components/ui/accordion";
+import { toast } from "sonner";
 
 interface NotificationTemplate {
   _id: string;
@@ -66,58 +76,68 @@ interface NotificationStats {
   byCategory: Record<string, number>;
 }
 
-const CATEGORY_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  purchase: { label: 'Purchases & Wallet', icon: '💳', color: 'text-blue-400' },
-  competition: { label: 'Competitions', icon: '🏆', color: 'text-yellow-400' },
-  challenge: { label: 'Challenges', icon: '⚔️', color: 'text-orange-400' },
-  trading: { label: 'Trading', icon: '📈', color: 'text-green-400' },
-  achievement: { label: 'Achievements', icon: '🏅', color: 'text-purple-400' },
-  system: { label: 'System', icon: '⚙️', color: 'text-gray-400' },
-  admin: { label: 'Admin Messages', icon: '📢', color: 'text-amber-400' },
-  security: { label: 'Security', icon: '🔐', color: 'text-red-400' },
-  social: { label: 'Social & Friends', icon: '👥', color: 'text-cyan-400' },
-  messaging: { label: 'Messaging & Support', icon: '💬', color: 'text-indigo-400' },
+const CATEGORY_LABELS: Record<
+  string,
+  { label: string; icon: string; color: string }
+> = {
+  purchase: { label: "Purchases & Wallet", icon: "💳", color: "text-blue-400" },
+  competition: { label: "Competitions", icon: "🏆", color: "text-yellow-400" },
+  challenge: { label: "Challenges", icon: "⚔️", color: "text-orange-400" },
+  trading: { label: "Trading", icon: "📈", color: "text-green-400" },
+  achievement: { label: "Achievements", icon: "🏅", color: "text-purple-400" },
+  system: { label: "System", icon: "⚙️", color: "text-gray-400" },
+  admin: { label: "Admin Messages", icon: "📢", color: "text-amber-400" },
+  security: { label: "Security", icon: "🔐", color: "text-red-400" },
+  social: { label: "Social & Friends", icon: "👥", color: "text-cyan-400" },
+  messaging: {
+    label: "Messaging & Support",
+    icon: "💬",
+    color: "text-indigo-400",
+  },
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-gray-500/20 text-gray-400',
-  normal: 'bg-blue-500/20 text-blue-400',
-  high: 'bg-orange-500/20 text-orange-400',
-  urgent: 'bg-red-500/20 text-red-400',
+  low: "bg-gray-500/20 text-gray-400",
+  normal: "bg-blue-500/20 text-blue-400",
+  high: "bg-orange-500/20 text-orange-400",
+  urgent: "bg-red-500/20 text-red-400",
 };
 
 export default function NotificationSystemSection() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
-  const [_groupedTemplates, setGroupedTemplates] = useState<Record<string, NotificationTemplate[]>>({});
+  const [_groupedTemplates, setGroupedTemplates] = useState<
+    Record<string, NotificationTemplate[]>
+  >({});
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('templates');
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const [activeTab, setActiveTab] = useState("templates");
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Send notification state
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
-  const [sendType, setSendType] = useState<'instant' | 'template'>('instant');
-  const [sendTarget, setSendTarget] = useState<'all' | 'specific'>('all');
-  const [targetUserIds, setTargetUserIds] = useState('');
-  const [instantTitle, setInstantTitle] = useState('');
-  const [instantMessage, setInstantMessage] = useState('');
-  const [instantCategory, setInstantCategory] = useState('admin');
-  const [instantPriority, setInstantPriority] = useState('normal');
-  const [instantIcon, setInstantIcon] = useState('📢');
+  const [sendType, setSendType] = useState<"instant" | "template">("instant");
+  const [sendTarget, setSendTarget] = useState<"all" | "specific">("all");
+  const [targetUserIds, setTargetUserIds] = useState("");
+  const [instantTitle, setInstantTitle] = useState("");
+  const [instantMessage, setInstantMessage] = useState("");
+  const [instantCategory, setInstantCategory] = useState("admin");
+  const [instantPriority, setInstantPriority] = useState("normal");
+  const [instantIcon, setInstantIcon] = useState("📢");
   const [sending, setSending] = useState(false);
 
   // Edit template state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] =
+    useState<NotificationTemplate | null>(null);
   const [editForm, setEditForm] = useState({
-    name: '',
-    title: '',
-    message: '',
-    icon: '',
-    priority: 'normal',
-    color: '#FDD458',
-    actionUrl: '',
-    actionText: '',
+    name: "",
+    title: "",
+    message: "",
+    icon: "",
+    priority: "normal",
+    color: "#FDD458",
+    actionUrl: "",
+    actionText: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -129,8 +149,8 @@ export default function NotificationSystemSection() {
     setLoading(true);
     try {
       const [templatesRes, statsRes] = await Promise.all([
-        fetch('/api/notifications'),
-        fetch('/api/notifications?action=stats'),
+        fetch("/api/notifications"),
+        fetch("/api/notifications?action=stats"),
       ]);
 
       if (templatesRes.ok) {
@@ -144,8 +164,8 @@ export default function NotificationSystemSection() {
         setStats(data);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load notification data');
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load notification data");
     } finally {
       setLoading(false);
     }
@@ -153,62 +173,71 @@ export default function NotificationSystemSection() {
 
   const handleSeedDefaults = async () => {
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'seed_defaults' }),
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "seed_defaults" }),
       });
 
       if (response.ok) {
-        toast.success('Default templates seeded successfully');
+        toast.success("Default templates seeded successfully");
         fetchData();
       } else {
-        toast.error('Failed to seed templates');
+        toast.error("Failed to seed templates");
       }
     } catch (_error) {
-      toast.error('Failed to seed templates');
+      toast.error("Failed to seed templates");
     }
   };
 
-  const handleToggleTemplate = async (templateId: string, isEnabled: boolean) => {
+  const handleToggleTemplate = async (
+    templateId: string,
+    isEnabled: boolean,
+  ) => {
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId, action: 'toggle', isEnabled }),
+      const response = await fetch("/api/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId, action: "toggle", isEnabled }),
       });
 
       if (response.ok) {
-        setTemplates(prev => prev.map(t => 
-          t.templateId === templateId ? { ...t, isEnabled } : t
-        ));
-        toast.success(`Template ${isEnabled ? 'enabled' : 'disabled'}`);
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.templateId === templateId ? { ...t, isEnabled } : t,
+          ),
+        );
+        toast.success(`Template ${isEnabled ? "enabled" : "disabled"}`);
       }
     } catch (_error) {
-      toast.error('Failed to toggle template');
+      toast.error("Failed to toggle template");
     }
   };
 
   const handleToggleAll = async (isEnabled: boolean) => {
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: 'all', action: 'toggle_all', isEnabled }),
+      const response = await fetch("/api/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: "all",
+          action: "toggle_all",
+          isEnabled,
+        }),
       });
 
       if (response.ok) {
-        setTemplates(prev => prev.map(t => ({ ...t, isEnabled })));
-        toast.success(`All templates ${isEnabled ? 'enabled' : 'disabled'}`);
+        setTemplates((prev) => prev.map((t) => ({ ...t, isEnabled })));
+        toast.success(`All templates ${isEnabled ? "enabled" : "disabled"}`);
       }
     } catch (_error) {
-      toast.error('Failed to toggle templates');
+      toast.error("Failed to toggle templates");
     }
   };
 
   const handleSendNotification = async () => {
-    if (sendType === 'instant' && (!instantTitle || !instantMessage)) {
-      toast.error('Title and message are required');
+    if (sendType === "instant" && (!instantTitle || !instantMessage)) {
+      toast.error("Title and message are required");
       return;
     }
 
@@ -216,7 +245,7 @@ export default function NotificationSystemSection() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: any = {
-        action: 'send_instant',
+        action: "send_instant",
         title: instantTitle,
         message: instantMessage,
         category: instantCategory,
@@ -224,22 +253,25 @@ export default function NotificationSystemSection() {
         icon: instantIcon,
       };
 
-      if (sendTarget === 'all') {
-        body.userId = 'all';
+      if (sendTarget === "all") {
+        body.userId = "all";
       } else {
         // Parse comma-separated user IDs
-        const userIds = targetUserIds.split(',').map(id => id.trim()).filter(Boolean);
+        const userIds = targetUserIds
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
         if (userIds.length === 0) {
-          toast.error('Please enter at least one user ID');
+          toast.error("Please enter at least one user ID");
           setSending(false);
           return;
         }
         body.userId = userIds[0]; // For now, single user
       }
 
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
@@ -247,15 +279,15 @@ export default function NotificationSystemSection() {
         const data = await response.json();
         toast.success(data.message);
         setSendDialogOpen(false);
-        setInstantTitle('');
-        setInstantMessage('');
+        setInstantTitle("");
+        setInstantMessage("");
         fetchData();
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to send notification');
+        toast.error(data.error || "Failed to send notification");
       }
     } catch (_error) {
-      toast.error('Failed to send notification');
+      toast.error("Failed to send notification");
     } finally {
       setSending(false);
     }
@@ -270,8 +302,8 @@ export default function NotificationSystemSection() {
       icon: template.icon,
       priority: template.priority,
       color: template.color,
-      actionUrl: template.actionUrl || '',
-      actionText: template.actionText || '',
+      actionUrl: template.actionUrl || "",
+      actionText: template.actionText || "",
     });
     setEditDialogOpen(true);
   };
@@ -281,9 +313,9 @@ export default function NotificationSystemSection() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           templateId: editingTemplate.templateId,
           ...editForm,
@@ -291,43 +323,47 @@ export default function NotificationSystemSection() {
       });
 
       if (response.ok) {
-        toast.success('Template updated');
+        toast.success("Template updated");
         setEditDialogOpen(false);
         fetchData();
       } else {
-        toast.error('Failed to update template');
+        toast.error("Failed to update template");
       }
     } catch (_error) {
-      toast.error('Failed to update template');
+      toast.error("Failed to update template");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+    if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(`/api/notifications?templateId=${templateId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/notifications?templateId=${templateId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (response.ok) {
-        toast.success('Template deleted');
+        toast.success("Template deleted");
         fetchData();
       } else {
         const data = await response.json();
-        toast.error(data.error || 'Failed to delete template');
+        toast.error(data.error || "Failed to delete template");
       }
     } catch (_error) {
-      toast.error('Failed to delete template');
+      toast.error("Failed to delete template");
     }
   };
 
-  const filteredTemplates = templates.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.templateId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTemplates = templates.filter(
+    (t) =>
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.templateId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (loading) {
@@ -369,7 +405,9 @@ export default function NotificationSystemSection() {
             </DialogTrigger>
             <DialogContent className="bg-gray-900 border-gray-800 max-w-lg">
               <DialogHeader>
-                <DialogTitle className="text-white">Send Notification</DialogTitle>
+                <DialogTitle className="text-white">
+                  Send Notification
+                </DialogTitle>
                 <DialogDescription className="text-gray-400">
                   Send an instant notification to users
                 </DialogDescription>
@@ -377,29 +415,37 @@ export default function NotificationSystemSection() {
               <div className="space-y-4 py-4">
                 <div className="flex gap-2">
                   <Button
-                    variant={sendTarget === 'all' ? 'default' : 'outline'}
-                    onClick={() => setSendTarget('all')}
-                    className={sendTarget === 'all' ? 'bg-yellow-500 text-black' : 'border-gray-700'}
+                    variant={sendTarget === "all" ? "default" : "outline"}
+                    onClick={() => setSendTarget("all")}
+                    className={
+                      sendTarget === "all"
+                        ? "bg-yellow-500 text-black"
+                        : "border-gray-700"
+                    }
                   >
                     <Users className="h-4 w-4 mr-2" />
                     All Users
                   </Button>
                   <Button
-                    variant={sendTarget === 'specific' ? 'default' : 'outline'}
-                    onClick={() => setSendTarget('specific')}
-                    className={sendTarget === 'specific' ? 'bg-yellow-500 text-black' : 'border-gray-700'}
+                    variant={sendTarget === "specific" ? "default" : "outline"}
+                    onClick={() => setSendTarget("specific")}
+                    className={
+                      sendTarget === "specific"
+                        ? "bg-yellow-500 text-black"
+                        : "border-gray-700"
+                    }
                   >
                     <User className="h-4 w-4 mr-2" />
                     Specific User
                   </Button>
                 </div>
 
-                {sendTarget === 'specific' && (
+                {sendTarget === "specific" && (
                   <div>
                     <Label className="text-gray-300">User ID</Label>
                     <Input
                       value={targetUserIds}
-                      onChange={e => setTargetUserIds(e.target.value)}
+                      onChange={(e) => setTargetUserIds(e.target.value)}
                       placeholder="Enter user ID"
                       className="mt-1 bg-gray-800 border-gray-700 text-white"
                     />
@@ -409,30 +455,50 @@ export default function NotificationSystemSection() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-300">Category</Label>
-                    <Select value={instantCategory} onValueChange={setInstantCategory}>
+                    <Select
+                      value={instantCategory}
+                      onValueChange={setInstantCategory}
+                    >
                       <SelectTrigger className="mt-1 bg-gray-800 border-gray-700 text-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {Object.entries(CATEGORY_LABELS).map(([key, { label, icon }]) => (
-                          <SelectItem key={key} value={key} className="text-white">
-                            {icon} {label}
-                          </SelectItem>
-                        ))}
+                        {Object.entries(CATEGORY_LABELS).map(
+                          ([key, { label, icon }]) => (
+                            <SelectItem
+                              key={key}
+                              value={key}
+                              className="text-white"
+                            >
+                              {icon} {label}
+                            </SelectItem>
+                          ),
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label className="text-gray-300">Priority</Label>
-                    <Select value={instantPriority} onValueChange={setInstantPriority}>
+                    <Select
+                      value={instantPriority}
+                      onValueChange={setInstantPriority}
+                    >
                       <SelectTrigger className="mt-1 bg-gray-800 border-gray-700 text-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        <SelectItem value="low" className="text-white">Low</SelectItem>
-                        <SelectItem value="normal" className="text-white">Normal</SelectItem>
-                        <SelectItem value="high" className="text-white">High</SelectItem>
-                        <SelectItem value="urgent" className="text-white">Urgent</SelectItem>
+                        <SelectItem value="low" className="text-white">
+                          Low
+                        </SelectItem>
+                        <SelectItem value="normal" className="text-white">
+                          Normal
+                        </SelectItem>
+                        <SelectItem value="high" className="text-white">
+                          High
+                        </SelectItem>
+                        <SelectItem value="urgent" className="text-white">
+                          Urgent
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -443,7 +509,7 @@ export default function NotificationSystemSection() {
                     <Label className="text-gray-300">Icon</Label>
                     <Input
                       value={instantIcon}
-                      onChange={e => setInstantIcon(e.target.value)}
+                      onChange={(e) => setInstantIcon(e.target.value)}
                       className="mt-1 bg-gray-800 border-gray-700 text-white text-center text-xl"
                       maxLength={2}
                     />
@@ -452,7 +518,7 @@ export default function NotificationSystemSection() {
                     <Label className="text-gray-300">Title</Label>
                     <Input
                       value={instantTitle}
-                      onChange={e => setInstantTitle(e.target.value)}
+                      onChange={(e) => setInstantTitle(e.target.value)}
                       placeholder="Notification title"
                       className="mt-1 bg-gray-800 border-gray-700 text-white"
                     />
@@ -463,7 +529,7 @@ export default function NotificationSystemSection() {
                   <Label className="text-gray-300">Message</Label>
                   <Textarea
                     value={instantMessage}
-                    onChange={e => setInstantMessage(e.target.value)}
+                    onChange={(e) => setInstantMessage(e.target.value)}
                     placeholder="Write your notification message..."
                     className="mt-1 bg-gray-800 border-gray-700 text-white min-h-[100px]"
                   />
@@ -503,7 +569,9 @@ export default function NotificationSystemSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">Total Sent</p>
-                  <p className="text-2xl font-bold text-white">{stats.totalSent}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {stats.totalSent}
+                  </p>
                 </div>
                 <Send className="h-8 w-8 text-blue-400 opacity-50" />
               </div>
@@ -514,7 +582,9 @@ export default function NotificationSystemSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">Unread</p>
-                  <p className="text-2xl font-bold text-yellow-400">{stats.unreadCount}</p>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {stats.unreadCount}
+                  </p>
                 </div>
                 <Bell className="h-8 w-8 text-yellow-400 opacity-50" />
               </div>
@@ -525,7 +595,9 @@ export default function NotificationSystemSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">Templates</p>
-                  <p className="text-2xl font-bold text-white">{stats.templateCount}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {stats.templateCount}
+                  </p>
                 </div>
                 <Settings className="h-8 w-8 text-gray-400 opacity-50" />
               </div>
@@ -536,7 +608,9 @@ export default function NotificationSystemSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">Enabled</p>
-                  <p className="text-2xl font-bold text-green-400">{stats.enabledCount}</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {stats.enabledCount}
+                  </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-400 opacity-50" />
               </div>
@@ -548,7 +622,10 @@ export default function NotificationSystemSection() {
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-gray-800 border-gray-700">
-          <TabsTrigger value="templates" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black">
+          <TabsTrigger
+            value="templates"
+            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+          >
             <Settings className="h-4 w-4 mr-2" />
             Templates
           </TabsTrigger>
@@ -563,7 +640,7 @@ export default function NotificationSystemSection() {
               <Input
                 placeholder="Search templates..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-gray-800 border-gray-700 text-white"
               />
             </div>
@@ -588,86 +665,110 @@ export default function NotificationSystemSection() {
           </div>
 
           {/* Templates by Category */}
-          <Accordion type="multiple" defaultValue={Object.keys(CATEGORY_LABELS)} className="space-y-2">
-            {Object.entries(CATEGORY_LABELS).map(([category, { label, icon, color }]) => {
-              const categoryTemplates = filteredTemplates.filter(t => t.category === category);
-              if (categoryTemplates.length === 0) return null;
+          <Accordion
+            type="multiple"
+            defaultValue={Object.keys(CATEGORY_LABELS)}
+            className="space-y-2"
+          >
+            {Object.entries(CATEGORY_LABELS).map(
+              ([category, { label, icon, color }]) => {
+                const categoryTemplates = filteredTemplates.filter(
+                  (t) => t.category === category,
+                );
+                if (categoryTemplates.length === 0) return null;
 
-              return (
-                <AccordionItem
-                  key={category}
-                  value={category}
-                  className="border border-gray-800 rounded-lg bg-gray-900/50 overflow-hidden"
-                >
-                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-800/50">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{icon}</span>
-                      <span className={`font-medium ${color}`}>{label}</span>
-                      <Badge variant="secondary" className="bg-gray-800">
-                        {categoryTemplates.length}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-4">
-                    <div className="space-y-2">
-                      {categoryTemplates.map(template => (
-                        <div
-                          key={template.templateId}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${
-                            template.isEnabled
-                              ? 'bg-gray-800/50 border-gray-700'
-                              : 'bg-gray-900/50 border-gray-800 opacity-60'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            <span className="text-xl">{template.icon}</span>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-white">{template.name}</p>
-                                <Badge className={PRIORITY_COLORS[template.priority]}>
-                                  {template.priority}
-                                </Badge>
-                                {template.isCustom && (
-                                  <Badge className="bg-purple-500/20 text-purple-400">Custom</Badge>
-                                )}
+                return (
+                  <AccordionItem
+                    key={category}
+                    value={category}
+                    className="border border-gray-800 rounded-lg bg-gray-900/50 overflow-hidden"
+                  >
+                    <AccordionTrigger className="px-4 py-3 hover:bg-gray-800/50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{icon}</span>
+                        <span className={`font-medium ${color}`}>{label}</span>
+                        <Badge variant="secondary" className="bg-gray-800">
+                          {categoryTemplates.length}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="space-y-2">
+                        {categoryTemplates.map((template) => (
+                          <div
+                            key={template.templateId}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              template.isEnabled
+                                ? "bg-gray-800/50 border-gray-700"
+                                : "bg-gray-900/50 border-gray-800 opacity-60"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <span className="text-xl">{template.icon}</span>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-white">
+                                    {template.name}
+                                  </p>
+                                  <Badge
+                                    className={
+                                      PRIORITY_COLORS[template.priority]
+                                    }
+                                  >
+                                    {template.priority}
+                                  </Badge>
+                                  {template.isCustom && (
+                                    <Badge className="bg-purple-500/20 text-purple-400">
+                                      Custom
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 font-mono">
+                                  {template.templateId}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-500 font-mono">{template.templateId}</p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditTemplate(template)}
-                              className="text-gray-400 hover:text-white"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {template.isCustom && (
+                            <div className="flex items-center gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteTemplate(template.templateId)}
-                                className="text-red-400 hover:text-red-300"
+                                onClick={() => handleEditTemplate(template)}
+                                className="text-gray-400 hover:text-white"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Edit className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Switch
-                              checked={template.isEnabled}
-                              onCheckedChange={checked => handleToggleTemplate(template.templateId, checked)}
-                            />
+                              {template.isCustom && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteTemplate(template.templateId)
+                                  }
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Switch
+                                checked={template.isEnabled}
+                                onCheckedChange={(checked) =>
+                                  handleToggleTemplate(
+                                    template.templateId,
+                                    checked,
+                                  )
+                                }
+                              />
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              },
+            )}
           </Accordion>
         </TabsContent>
-
       </Tabs>
 
       {/* Edit Template Dialog */}
@@ -684,7 +785,9 @@ export default function NotificationSystemSection() {
               <Label className="text-gray-300">Name</Label>
               <Input
                 value={editForm.name}
-                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
                 className="mt-1 bg-gray-800 border-gray-700 text-white"
               />
             </div>
@@ -693,7 +796,9 @@ export default function NotificationSystemSection() {
                 <Label className="text-gray-300">Icon</Label>
                 <Input
                   value={editForm.icon}
-                  onChange={e => setEditForm({ ...editForm, icon: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, icon: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white text-center text-xl"
                   maxLength={2}
                 />
@@ -702,7 +807,9 @@ export default function NotificationSystemSection() {
                 <Label className="text-gray-300">Title</Label>
                 <Input
                   value={editForm.title}
-                  onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, title: e.target.value })
+                  }
                   className="mt-1 bg-gray-800 border-gray-700 text-white"
                 />
               </div>
@@ -711,7 +818,9 @@ export default function NotificationSystemSection() {
               <Label className="text-gray-300">Message</Label>
               <Textarea
                 value={editForm.message}
-                onChange={e => setEditForm({ ...editForm, message: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, message: e.target.value })
+                }
                 className="mt-1 bg-gray-800 border-gray-700 text-white min-h-[80px]"
               />
             </div>
@@ -720,16 +829,26 @@ export default function NotificationSystemSection() {
                 <Label className="text-gray-300">Priority</Label>
                 <Select
                   value={editForm.priority}
-                  onValueChange={v => setEditForm({ ...editForm, priority: v })}
+                  onValueChange={(v) =>
+                    setEditForm({ ...editForm, priority: v })
+                  }
                 >
                   <SelectTrigger className="mt-1 bg-gray-800 border-gray-700 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="low" className="text-white">Low</SelectItem>
-                    <SelectItem value="normal" className="text-white">Normal</SelectItem>
-                    <SelectItem value="high" className="text-white">High</SelectItem>
-                    <SelectItem value="urgent" className="text-white">Urgent</SelectItem>
+                    <SelectItem value="low" className="text-white">
+                      Low
+                    </SelectItem>
+                    <SelectItem value="normal" className="text-white">
+                      Normal
+                    </SelectItem>
+                    <SelectItem value="high" className="text-white">
+                      High
+                    </SelectItem>
+                    <SelectItem value="urgent" className="text-white">
+                      Urgent
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -738,7 +857,9 @@ export default function NotificationSystemSection() {
                 <Input
                   type="color"
                   value={editForm.color}
-                  onChange={e => setEditForm({ ...editForm, color: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, color: e.target.value })
+                  }
                   className="mt-1 h-10 bg-gray-800 border-gray-700"
                 />
               </div>
@@ -757,7 +878,11 @@ export default function NotificationSystemSection() {
               disabled={saving}
               className="bg-yellow-500 hover:bg-yellow-600 text-black"
             >
-              {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              {saving ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
               Save Changes
             </Button>
           </DialogFooter>
@@ -766,4 +891,3 @@ export default function NotificationSystemSection() {
     </div>
   );
 }
-

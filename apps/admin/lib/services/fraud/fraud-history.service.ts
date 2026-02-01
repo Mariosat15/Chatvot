@@ -1,5 +1,10 @@
-import { FraudHistory, FraudActionType, ActionSeverity, LogActionParams } from '@/database/models/fraud/fraud-history.model';
-import { connectToDatabase } from '@/database/mongoose';
+import {
+  FraudHistory,
+  FraudActionType,
+  ActionSeverity,
+  LogActionParams,
+} from "@/database/models/fraud/fraud-history.model";
+import { connectToDatabase } from "@/database/mongoose";
 
 interface UserInfo {
   userId: string;
@@ -35,12 +40,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    relatedAlertId?: string
+    relatedAlertId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'warning_issued',
-      actionSeverity: 'medium',
+      actionType: "warning_issued",
+      actionSeverity: "medium",
       reason,
       details,
       admin,
@@ -57,12 +62,12 @@ export class FraudHistoryService {
     details: string,
     admin?: AdminInfo,
     relatedAlertId?: string,
-    previousState?: StateInfo
+    previousState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'investigation_started',
-      actionSeverity: 'high',
+      actionType: "investigation_started",
+      actionSeverity: "high",
       reason,
       details,
       admin,
@@ -80,12 +85,12 @@ export class FraudHistoryService {
     details: string,
     admin?: AdminInfo,
     relatedAlertId?: string,
-    newState?: StateInfo
+    newState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'investigation_resolved',
-      actionSeverity: 'medium',
+      actionType: "investigation_resolved",
+      actionSeverity: "medium",
       reason,
       details,
       admin,
@@ -104,19 +109,19 @@ export class FraudHistoryService {
     duration?: DurationInfo,
     admin?: AdminInfo,
     relatedAlertId?: string,
-    previousState?: StateInfo
+    previousState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'suspended',
-      actionSeverity: 'high',
+      actionType: "suspended",
+      actionSeverity: "high",
       reason,
       details,
       duration,
       admin,
       relatedAlertId,
       previousState,
-      newState: { accountStatus: 'suspended' },
+      newState: { accountStatus: "suspended" },
     });
   }
 
@@ -128,17 +133,17 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    previousState?: StateInfo
+    previousState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'suspension_lifted',
-      actionSeverity: 'low',
+      actionType: "suspension_lifted",
+      actionSeverity: "low",
       reason,
       details,
       admin,
       previousState,
-      newState: { accountStatus: 'active' },
+      newState: { accountStatus: "active" },
     });
   }
 
@@ -152,19 +157,19 @@ export class FraudHistoryService {
     isPermanent: boolean,
     admin?: AdminInfo,
     relatedAlertId?: string,
-    previousState?: StateInfo
+    previousState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'banned',
-      actionSeverity: 'critical',
+      actionType: "banned",
+      actionSeverity: "critical",
       reason,
       details,
       duration: { isPermanent },
       admin,
       relatedAlertId,
       previousState,
-      newState: { accountStatus: 'banned' },
+      newState: { accountStatus: "banned" },
     });
   }
 
@@ -176,17 +181,17 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    previousState?: StateInfo
+    previousState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'ban_lifted',
-      actionSeverity: 'medium',
+      actionType: "ban_lifted",
+      actionSeverity: "medium",
       reason,
       details,
       admin,
       previousState,
-      newState: { accountStatus: 'active' },
+      newState: { accountStatus: "active" },
     });
   }
 
@@ -200,12 +205,12 @@ export class FraudHistoryService {
     details: string,
     admin?: AdminInfo,
     relatedRestrictionId?: string,
-    relatedAlertId?: string
+    relatedAlertId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'restriction_added',
-      actionSeverity: 'high',
+      actionType: "restriction_added",
+      actionSeverity: "high",
       reason: `${restrictionType}: ${reason}`,
       details,
       admin,
@@ -223,12 +228,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    relatedRestrictionId?: string
+    relatedRestrictionId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'restriction_removed',
-      actionSeverity: 'low',
+      actionType: "restriction_removed",
+      actionSeverity: "low",
       reason: `${restrictionType}: ${reason}`,
       details,
       admin,
@@ -245,12 +250,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     relatedAlertId?: string,
-    evidence?: LogActionParams['evidence']
+    evidence?: LogActionParams["evidence"],
   ) {
     return this.logAction({
       ...user,
-      actionType: 'alert_created',
-      actionSeverity: 'medium',
+      actionType: "alert_created",
+      actionSeverity: "medium",
       reason: `${alertType}: ${reason}`,
       details,
       relatedAlertId,
@@ -267,12 +272,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    relatedAlertId?: string
+    relatedAlertId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'alert_dismissed',
-      actionSeverity: 'low',
+      actionType: "alert_dismissed",
+      actionSeverity: "low",
       reason,
       details,
       admin,
@@ -288,12 +293,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     admin?: AdminInfo,
-    relatedAlertId?: string
+    relatedAlertId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'alert_resolved',
-      actionSeverity: 'low',
+      actionType: "alert_resolved",
+      actionSeverity: "low",
       reason,
       details,
       admin,
@@ -310,12 +315,12 @@ export class FraudHistoryService {
     reason: string,
     details: string,
     relatedAlertId?: string,
-    evidence?: LogActionParams['evidence']
+    evidence?: LogActionParams["evidence"],
   ) {
     return this.logAction({
       ...user,
-      actionType: 'evidence_added',
-      actionSeverity: 'medium',
+      actionType: "evidence_added",
+      actionSeverity: "medium",
       reason: `${evidenceType}: ${reason}`,
       details,
       relatedAlertId,
@@ -331,13 +336,13 @@ export class FraudHistoryService {
     user: UserInfo,
     reason: string,
     details: string,
-    severity: ActionSeverity = 'high',
+    severity: ActionSeverity = "high",
     previousState?: StateInfo,
-    newState?: StateInfo
+    newState?: StateInfo,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'auto_action',
+      actionType: "auto_action",
       actionSeverity: severity,
       reason,
       details,
@@ -356,12 +361,12 @@ export class FraudHistoryService {
     details: string,
     admin: AdminInfo,
     adminNotes?: string,
-    relatedAlertId?: string
+    relatedAlertId?: string,
   ) {
     return this.logAction({
       ...user,
-      actionType: 'manual_review',
-      actionSeverity: 'low',
+      actionType: "manual_review",
+      actionSeverity: "low",
       reason,
       details,
       admin,
@@ -385,7 +390,7 @@ export class FraudHistoryService {
     relatedAlertId?: string;
     relatedRestrictionId?: string;
     relatedCompetitionId?: string;
-    evidence?: LogActionParams['evidence'];
+    evidence?: LogActionParams["evidence"];
     previousState?: StateInfo;
     newState?: StateInfo;
     duration?: DurationInfo;
@@ -396,15 +401,17 @@ export class FraudHistoryService {
       await connectToDatabase();
 
       const performedBy = params.isAutomated
-        ? { type: 'automated' as const }
+        ? { type: "automated" as const }
         : params.admin?.adminId
-        ? {
-            type: 'admin' as const,
-            adminId: params.admin.adminId,
-            adminEmail: params.admin.adminEmail,
-            adminName: params.admin.adminName || params.admin.adminEmail?.split('@')[0],
-          }
-        : { type: 'system' as const };
+          ? {
+              type: "admin" as const,
+              adminId: params.admin.adminId,
+              adminEmail: params.admin.adminEmail,
+              adminName:
+                params.admin.adminName ||
+                params.admin.adminEmail?.split("@")[0],
+            }
+          : { type: "system" as const };
 
       const entry = await FraudHistory.logAction({
         userId: params.userId,
@@ -425,10 +432,12 @@ export class FraudHistoryService {
         adminNotes: params.adminNotes,
       });
 
-      console.log(`[FraudHistory] Logged ${params.actionType} for user ${params.email}`);
+      console.log(
+        `[FraudHistory] Logged ${params.actionType} for user ${params.email}`,
+      );
       return entry;
     } catch (error) {
-      console.error('[FraudHistory] Error logging action:', error);
+      console.error("[FraudHistory] Error logging action:", error);
       // Don't throw - history logging should not break main flows
       return null;
     }
@@ -439,7 +448,7 @@ export class FraudHistoryService {
    */
   static async getUserSummary(userId: string) {
     await connectToDatabase();
-    
+
     const [history, actionCounts] = await Promise.all([
       FraudHistory.getUserHistory(userId),
       FraudHistory.getActionCounts(userId),
@@ -448,7 +457,8 @@ export class FraudHistoryService {
     const suspensionCount = actionCounts.suspended || 0;
     const banCount = actionCounts.banned || 0;
     const warningCount = actionCounts.warning_issued || 0;
-    const liftCount = (actionCounts.suspension_lifted || 0) + (actionCounts.ban_lifted || 0);
+    const liftCount =
+      (actionCounts.suspension_lifted || 0) + (actionCounts.ban_lifted || 0);
 
     return {
       history,
@@ -465,4 +475,3 @@ export class FraudHistoryService {
     };
   }
 }
-

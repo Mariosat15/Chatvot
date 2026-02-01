@@ -1,8 +1,8 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 /**
  * Historical Fetch Status
- * 
+ *
  * Tracks which symbols/timeframes have had historical data downloaded.
  * Prevents re-downloading the same data multiple times.
  */
@@ -10,26 +10,27 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IHistoricalFetchStatus {
   symbol: string;
   timeframe: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  oldestCandleDate?: Date;    // Oldest candle we have
-  newestCandleDate?: Date;    // Newest candle we have
-  totalCandles?: number;      // Total candles downloaded
-  lastFetchedAt?: Date;       // When we last ran a fetch
-  lastError?: string;         // Error message if failed
+  status: "pending" | "in_progress" | "completed" | "failed";
+  oldestCandleDate?: Date; // Oldest candle we have
+  newestCandleDate?: Date; // Newest candle we have
+  totalCandles?: number; // Total candles downloaded
+  lastFetchedAt?: Date; // When we last ran a fetch
+  lastError?: string; // Error message if failed
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface IHistoricalFetchStatusDocument extends IHistoricalFetchStatus, Document {}
+export interface IHistoricalFetchStatusDocument
+  extends IHistoricalFetchStatus, Document {}
 
 const HistoricalFetchStatusSchema = new Schema<IHistoricalFetchStatusDocument>(
   {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    status: { 
-      type: String, 
-      enum: ['pending', 'in_progress', 'completed', 'failed'],
-      default: 'pending'
+    status: {
+      type: String,
+      enum: ["pending", "in_progress", "completed", "failed"],
+      default: "pending",
     },
     oldestCandleDate: { type: Date },
     newestCandleDate: { type: Date },
@@ -39,21 +40,29 @@ const HistoricalFetchStatusSchema = new Schema<IHistoricalFetchStatusDocument>(
   },
   {
     timestamps: true,
-    collection: 'historical_fetch_status',
-  }
+    collection: "historical_fetch_status",
+  },
 );
 
 // Compound unique index: one record per symbol per timeframe
-HistoricalFetchStatusSchema.index({ symbol: 1, timeframe: 1 }, { unique: true });
+HistoricalFetchStatusSchema.index(
+  { symbol: 1, timeframe: 1 },
+  { unique: true },
+);
 
-export const HistoricalFetchStatus = mongoose.models.historical_fetch_status as mongoose.Model<IHistoricalFetchStatusDocument> || 
-  mongoose.model<IHistoricalFetchStatusDocument>('historical_fetch_status', HistoricalFetchStatusSchema);
+export const HistoricalFetchStatus =
+  (mongoose.models
+    .historical_fetch_status as mongoose.Model<IHistoricalFetchStatusDocument>) ||
+  mongoose.model<IHistoricalFetchStatusDocument>(
+    "historical_fetch_status",
+    HistoricalFetchStatusSchema,
+  );
 
 // Helper functions
 
 export async function getFetchStatus(
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): Promise<IHistoricalFetchStatus | null> {
   return HistoricalFetchStatus.findOne({ symbol, timeframe }).lean();
 }
@@ -61,28 +70,28 @@ export async function getFetchStatus(
 export async function setFetchStatus(
   symbol: string,
   timeframe: string,
-  data: Partial<IHistoricalFetchStatus>
+  data: Partial<IHistoricalFetchStatus>,
 ): Promise<IHistoricalFetchStatus> {
   return HistoricalFetchStatus.findOneAndUpdate(
     { symbol, timeframe },
     { $set: data },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   ).lean() as Promise<IHistoricalFetchStatus>;
 }
 
 export async function markFetchInProgress(
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): Promise<void> {
   await HistoricalFetchStatus.updateOne(
     { symbol, timeframe },
-    { 
-      $set: { 
-        status: 'in_progress',
+    {
+      $set: {
+        status: "in_progress",
         lastFetchedAt: new Date(),
-      }
+      },
     },
-    { upsert: true }
+    { upsert: true },
   );
 }
 
@@ -93,47 +102,49 @@ export async function markFetchCompleted(
     oldestCandleDate?: Date;
     newestCandleDate?: Date;
     totalCandles: number;
-  }
+  },
 ): Promise<void> {
   await HistoricalFetchStatus.updateOne(
     { symbol, timeframe },
-    { 
-      $set: { 
-        status: 'completed',
+    {
+      $set: {
+        status: "completed",
         ...stats,
         lastFetchedAt: new Date(),
         lastError: null,
-      }
+      },
     },
-    { upsert: true }
+    { upsert: true },
   );
 }
 
 export async function markFetchFailed(
   symbol: string,
   timeframe: string,
-  error: string
+  error: string,
 ): Promise<void> {
   await HistoricalFetchStatus.updateOne(
     { symbol, timeframe },
-    { 
-      $set: { 
-        status: 'failed',
+    {
+      $set: {
+        status: "failed",
         lastError: error,
         lastFetchedAt: new Date(),
-      }
+      },
     },
-    { upsert: true }
+    { upsert: true },
   );
 }
 
 export async function isFetchCompleted(
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): Promise<boolean> {
-  const status = await HistoricalFetchStatus.findOne(
-    { symbol, timeframe, status: 'completed' }
-  ).lean();
+  const status = await HistoricalFetchStatus.findOne({
+    symbol,
+    timeframe,
+    status: "completed",
+  }).lean();
   return !!status;
 }
 
@@ -143,7 +154,7 @@ export async function getAllFetchStatuses(): Promise<IHistoricalFetchStatus[]> {
 
 export async function resetFetchStatus(
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): Promise<void> {
   await HistoricalFetchStatus.deleteOne({ symbol, timeframe });
 }

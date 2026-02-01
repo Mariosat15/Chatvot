@@ -1,12 +1,15 @@
 /**
  * Fraud Settings Service
- * 
+ *
  * Centralized service to get fraud detection settings
  * with caching for performance
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import FraudSettings, { DEFAULT_FRAUD_SETTINGS, IFraudSettings } from '@/database/models/fraud/fraud-settings.model';
+import { connectToDatabase } from "@/database/mongoose";
+import FraudSettings, {
+  DEFAULT_FRAUD_SETTINGS,
+  IFraudSettings,
+} from "@/database/models/fraud/fraud-settings.model";
 
 // Cache settings for 5 minutes
 let cachedSettings: IFraudSettings | null = null;
@@ -18,17 +21,18 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
  */
 export async function getFraudSettings(): Promise<IFraudSettings> {
   const now = Date.now();
-  
+
   // Return cached settings if still valid
-  if (cachedSettings && (now - cacheTime) < CACHE_DURATION) {
+  if (cachedSettings && now - cacheTime < CACHE_DURATION) {
     return cachedSettings;
   }
 
   try {
     await connectToDatabase();
-    
-    let settings = await FraudSettings.findOne().lean() as IFraudSettings | null;
-    
+
+    let settings =
+      (await FraudSettings.findOne().lean()) as IFraudSettings | null;
+
     // Create default settings if none exist
     if (!settings) {
       const created = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
@@ -41,7 +45,7 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
 
     return cachedSettings;
   } catch (error) {
-    console.error('Error fetching fraud settings, using defaults:', error);
+    console.error("Error fetching fraud settings, using defaults:", error);
     return DEFAULT_FRAUD_SETTINGS as IFraudSettings;
   }
 }
@@ -93,4 +97,3 @@ export async function shouldCreateAlert(riskScore: number): Promise<boolean> {
   const settings = await getFraudSettings();
   return riskScore > settings.alertThreshold;
 }
-

@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
-import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
-import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
-import { auditLogService } from '@/lib/services/audit-log.service';
-import { seedMarketplaceItems, getMarketplaceStats } from '@/lib/services/marketplace-seed.service';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
+import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { auditLogService } from "@/lib/services/audit-log.service";
+import {
+  seedMarketplaceItems,
+  getMarketplaceStats,
+} from "@/lib/services/marketplace-seed.service";
 
 /**
  * GET /api/admin/marketplace
@@ -14,56 +17,62 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
-    
+
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    
+    const action = searchParams.get("action");
+
     // Seed default items
-    if (action === 'seed') {
+    if (action === "seed") {
       const admin = await getAdminSession();
-      const result = await seedMarketplaceItems(admin?.email || 'admin');
+      const result = await seedMarketplaceItems(admin?.email || "admin");
       return NextResponse.json({ success: true, ...result });
     }
-    
+
     // Get stats
-    if (action === 'stats') {
+    if (action === "stats") {
       const stats = await getMarketplaceStats();
       return NextResponse.json({ success: true, ...stats });
     }
-    
+
     // Get all items
-    const items = await MarketplaceItem.find()
-      .sort({ createdAt: -1 })
-      .lean();
-    
+    const items = await MarketplaceItem.find().sort({ createdAt: -1 }).lean();
+
     // Get purchase counts per item
     const purchaseCounts = await UserPurchase.aggregate([
-      { $group: { _id: '$itemId', count: { $sum: 1 } } },
+      { $group: { _id: "$itemId", count: { $sum: 1 } } },
     ]);
-    
-    const purchaseMap = new Map(purchaseCounts.map(p => [p._id.toString(), p.count]));
-    
+
+    const purchaseMap = new Map(
+      purchaseCounts.map((p) => [p._id.toString(), p.count]),
+    );
+
     // Add real purchase counts
-    const itemsWithStats = items.map(item => ({
+    const itemsWithStats = items.map((item) => ({
       ...item,
       actualPurchases: purchaseMap.get(item._id.toString()) || 0,
     }));
-    
+
     const stats = await getMarketplaceStats();
-    
+
     return NextResponse.json({
       success: true,
       items: itemsWithStats,
       stats,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
-    console.error('Error fetching marketplace items:', error);
+    console.error("Error fetching marketplace items:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
@@ -76,18 +85,18 @@ export async function POST(request: NextRequest) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
-    
+
     const admin = await getAdminSession();
     const data = await request.json();
-    
+
     // Generate slug from name if not provided
     if (!data.slug && data.name) {
       data.slug = data.name
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
     }
-    
+
     // Check for duplicate slug
     const existing = await MarketplaceItem.findOne({ slug: data.slug });
     if (existing) {
@@ -100,41 +109,56 @@ export async function POST(request: NextRequest) {
       }
       data.slug = newSlug;
     }
-    
+
     // Set defaults
-    data.createdBy = admin?.email || 'admin';
+    data.createdBy = admin?.email || "admin";
     data.isFree = data.price === 0;
-    
+
     // Parse code template if it's a string
-    if (typeof data.codeTemplate === 'object') {
+    if (typeof data.codeTemplate === "object") {
       data.codeTemplate = JSON.stringify(data.codeTemplate);
     }
-    
+
     const item = await MarketplaceItem.create(data);
-    
+
     // Log audit
     const adminSession = await getAdminSession();
     if (adminSession) {
       await auditLogService.logSettingsUpdated(
-        { id: adminSession.id, email: adminSession.email, name: adminSession.name },
-        'marketplace_item_created',
+        {
+          id: adminSession.id,
+          email: adminSession.email,
+          name: adminSession.name,
+        },
+        "marketplace_item_created",
         null,
-        { itemId: (item._id as any).toString(), name: item.name, category: item.category, price: item.price }
+        {
+          itemId: (item._id as any).toString(),
+          name: item.name,
+          category: item.category,
+          price: item.price,
+        },
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       item,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
-    console.error('Error creating marketplace item:', error);
+    console.error("Error creating marketplace item:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
@@ -148,123 +172,150 @@ export async function PUT(request: NextRequest) {
     await requireAdminAuth();
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     const { itemId, ...updates } = await request.json();
-    
+
     if (!itemId) {
       return NextResponse.json(
-        { success: false, error: 'Item ID is required' },
-        { status: 400 }
+        { success: false, error: "Item ID is required" },
+        { status: 400 },
       );
     }
-    
+
     // Update isFree based on price
-    if (typeof updates.price === 'number') {
+    if (typeof updates.price === "number") {
       updates.isFree = updates.price === 0;
     }
-    
+
     // Parse code template if needed
-    if (typeof updates.codeTemplate === 'object') {
+    if (typeof updates.codeTemplate === "object") {
       updates.codeTemplate = JSON.stringify(updates.codeTemplate);
     }
-    
+
     // Get the item before update to compare gameMasterConfig changes
     const oldItem = await MarketplaceItem.findById(itemId).lean();
-    
+
     const item = await MarketplaceItem.findByIdAndUpdate(
       itemId,
       { $set: updates },
-      { new: true }
+      { new: true },
     );
-    
+
     if (!item) {
       return NextResponse.json(
-        { success: false, error: 'Item not found' },
-        { status: 404 }
+        { success: false, error: "Item not found" },
+        { status: 404 },
       );
     }
-    
+
     // SYNC GAME MASTER SUBSCRIPTIONS: When a Game Master package's settings change,
     // update all active subscriptions that use this package
     let subscriptionsUpdated = 0;
-    if (item.category === 'gamemaster' && updates.gameMasterConfig && db) {
+    if (item.category === "gamemaster" && updates.gameMasterConfig && db) {
       const gmConfig = updates.gameMasterConfig;
-      
+
       console.log(`🔄 Syncing Game Master package changes to subscriptions...`);
       console.log(`   Package: ${item.name} (${itemId})`);
-      
+
       // Build the subscription limits update
       const limitsUpdate: Record<string, unknown> = {};
-      
+
       if (gmConfig.referralFeePercentage !== undefined) {
-        limitsUpdate['limits.referralFeePercentage'] = gmConfig.referralFeePercentage;
-        console.log(`   → referralFeePercentage: ${oldItem?.gameMasterConfig?.referralFeePercentage} → ${gmConfig.referralFeePercentage}`);
+        limitsUpdate["limits.referralFeePercentage"] =
+          gmConfig.referralFeePercentage;
+        console.log(
+          `   → referralFeePercentage: ${oldItem?.gameMasterConfig?.referralFeePercentage} → ${gmConfig.referralFeePercentage}`,
+        );
       }
       if (gmConfig.maxCompetitionsPerDay !== undefined) {
-        limitsUpdate['limits.maxCompetitionsPerDay'] = gmConfig.maxCompetitionsPerDay;
-        console.log(`   → maxCompetitionsPerDay: ${oldItem?.gameMasterConfig?.maxCompetitionsPerDay} → ${gmConfig.maxCompetitionsPerDay}`);
+        limitsUpdate["limits.maxCompetitionsPerDay"] =
+          gmConfig.maxCompetitionsPerDay;
+        console.log(
+          `   → maxCompetitionsPerDay: ${oldItem?.gameMasterConfig?.maxCompetitionsPerDay} → ${gmConfig.maxCompetitionsPerDay}`,
+        );
       }
       if (gmConfig.maxUsersPerCompetition !== undefined) {
-        limitsUpdate['limits.maxUsersPerCompetition'] = gmConfig.maxUsersPerCompetition;
-        console.log(`   → maxUsersPerCompetition: ${oldItem?.gameMasterConfig?.maxUsersPerCompetition} → ${gmConfig.maxUsersPerCompetition}`);
+        limitsUpdate["limits.maxUsersPerCompetition"] =
+          gmConfig.maxUsersPerCompetition;
+        console.log(
+          `   → maxUsersPerCompetition: ${oldItem?.gameMasterConfig?.maxUsersPerCompetition} → ${gmConfig.maxUsersPerCompetition}`,
+        );
       }
       if (gmConfig.canCreateCompetitions !== undefined) {
-        limitsUpdate['limits.canCreateCompetitions'] = gmConfig.canCreateCompetitions;
-        console.log(`   → canCreateCompetitions: ${oldItem?.gameMasterConfig?.canCreateCompetitions} → ${gmConfig.canCreateCompetitions}`);
+        limitsUpdate["limits.canCreateCompetitions"] =
+          gmConfig.canCreateCompetitions;
+        console.log(
+          `   → canCreateCompetitions: ${oldItem?.gameMasterConfig?.canCreateCompetitions} → ${gmConfig.canCreateCompetitions}`,
+        );
       }
       if (gmConfig.canEarnFromChallenges !== undefined) {
-        limitsUpdate['limits.canEarnFromChallenges'] = gmConfig.canEarnFromChallenges;
-        console.log(`   → canEarnFromChallenges: ${oldItem?.gameMasterConfig?.canEarnFromChallenges} → ${gmConfig.canEarnFromChallenges}`);
+        limitsUpdate["limits.canEarnFromChallenges"] =
+          gmConfig.canEarnFromChallenges;
+        console.log(
+          `   → canEarnFromChallenges: ${oldItem?.gameMasterConfig?.canEarnFromChallenges} → ${gmConfig.canEarnFromChallenges}`,
+        );
       }
       if (gmConfig.challengeReferralFeePercentage !== undefined) {
-        limitsUpdate['limits.challengeReferralFeePercentage'] = gmConfig.challengeReferralFeePercentage;
-        console.log(`   → challengeReferralFeePercentage: ${oldItem?.gameMasterConfig?.challengeReferralFeePercentage} → ${gmConfig.challengeReferralFeePercentage}`);
+        limitsUpdate["limits.challengeReferralFeePercentage"] =
+          gmConfig.challengeReferralFeePercentage;
+        console.log(
+          `   → challengeReferralFeePercentage: ${oldItem?.gameMasterConfig?.challengeReferralFeePercentage} → ${gmConfig.challengeReferralFeePercentage}`,
+        );
       }
-      
+
       // Only update if there are changes
       if (Object.keys(limitsUpdate).length > 0) {
         limitsUpdate.updatedAt = new Date();
-        
+
         // Update all subscriptions using this package
-        const updateResult = await db.collection('gamemastersubscriptions').updateMany(
-          { packageId: itemId },
-          { $set: limitsUpdate }
-        );
-        
+        const updateResult = await db
+          .collection("gamemastersubscriptions")
+          .updateMany({ packageId: itemId }, { $set: limitsUpdate });
+
         subscriptionsUpdated = updateResult.modifiedCount;
         console.log(`   ✅ Updated ${subscriptionsUpdated} subscription(s)`);
       }
     }
-    
+
     // Log audit
     const adminSession2 = await getAdminSession();
     if (adminSession2) {
       await auditLogService.logSettingsUpdated(
-        { id: adminSession2.id, email: adminSession2.email, name: adminSession2.name },
-        'marketplace_item_updated',
+        {
+          id: adminSession2.id,
+          email: adminSession2.email,
+          name: adminSession2.name,
+        },
+        "marketplace_item_updated",
         null,
-        { 
-          itemId: (item._id as any).toString(), 
-          name: item.name, 
+        {
+          itemId: (item._id as any).toString(),
+          name: item.name,
           updates: Object.keys(updates),
           subscriptionsUpdated,
-        }
+        },
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       item,
       subscriptionsUpdated,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
-    console.error('Error updating marketplace item:', error);
+    console.error("Error updating marketplace item:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
@@ -277,59 +328,71 @@ export async function DELETE(request: NextRequest) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
-    
+
     const { searchParams } = new URL(request.url);
-    const itemId = searchParams.get('itemId');
-    
+    const itemId = searchParams.get("itemId");
+
     if (!itemId) {
       return NextResponse.json(
-        { success: false, error: 'Item ID is required' },
-        { status: 400 }
+        { success: false, error: "Item ID is required" },
+        { status: 400 },
       );
     }
-    
+
     // Check if item has purchases
     const purchaseCount = await UserPurchase.countDocuments({ itemId });
     if (purchaseCount > 0) {
       return NextResponse.json(
-        { success: false, error: `Cannot delete item with ${purchaseCount} purchases. Set it to inactive instead.` },
-        { status: 400 }
+        {
+          success: false,
+          error: `Cannot delete item with ${purchaseCount} purchases. Set it to inactive instead.`,
+        },
+        { status: 400 },
       );
     }
-    
+
     const item = await MarketplaceItem.findByIdAndDelete(itemId);
-    
+
     if (!item) {
       return NextResponse.json(
-        { success: false, error: 'Item not found' },
-        { status: 404 }
+        { success: false, error: "Item not found" },
+        { status: 404 },
       );
     }
-    
+
     // Log audit
     const adminSession3 = await getAdminSession();
     if (adminSession3) {
       await auditLogService.logSettingsUpdated(
-        { id: adminSession3.id, email: adminSession3.email, name: adminSession3.name },
-        'marketplace_item_deleted',
+        {
+          id: adminSession3.id,
+          email: adminSession3.email,
+          name: adminSession3.name,
+        },
+        "marketplace_item_deleted",
         null,
-        { itemId: (item._id as any).toString(), name: item.name }
+        { itemId: (item._id as any).toString(), name: item.name },
       );
     }
-    
+
     return NextResponse.json({
       success: true,
-      message: 'Item deleted',
+      message: "Item deleted",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
-    console.error('Error deleting marketplace item:', error);
+    console.error("Error deleting marketplace item:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
-

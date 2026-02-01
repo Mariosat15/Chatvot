@@ -1,15 +1,15 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 /**
  * BlockedUser model - for blocking users who are not friends
  * Friendships have their own block functionality in the Friendship model
  */
 export interface IBlockedUser extends Document {
-  blockerUserId: string;  // The user who blocked
+  blockerUserId: string; // The user who blocked
   blockerUserName: string;
-  blockedUserId: string;  // The user who is blocked
+  blockedUserId: string; // The user who is blocked
   blockedUserName: string;
-  reason?: string;        // Optional reason for blocking
+  reason?: string; // Optional reason for blocking
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,25 +24,28 @@ const BlockedUserSchema = new Schema<IBlockedUser>(
   },
   {
     timestamps: true,
-    collection: 'blocked_users',
-  }
+    collection: "blocked_users",
+  },
 );
 
 // Compound index for efficient lookups
-BlockedUserSchema.index({ blockerUserId: 1, blockedUserId: 1 }, { unique: true });
+BlockedUserSchema.index(
+  { blockerUserId: 1, blockedUserId: 1 },
+  { unique: true },
+);
 
 // Static methods
-BlockedUserSchema.statics.isBlocked = async function(
+BlockedUserSchema.statics.isBlocked = async function (
   blockerUserId: string,
-  blockedUserId: string
+  blockedUserId: string,
 ): Promise<boolean> {
   const block = await this.findOne({ blockerUserId, blockedUserId });
   return !!block;
 };
 
-BlockedUserSchema.statics.isBlockedByEither = async function(
+BlockedUserSchema.statics.isBlockedByEither = async function (
   userId1: string,
-  userId2: string
+  userId2: string,
 ): Promise<boolean> {
   const block = await this.findOne({
     $or: [
@@ -53,11 +56,11 @@ BlockedUserSchema.statics.isBlockedByEither = async function(
   return !!block;
 };
 
-BlockedUserSchema.statics.getBlockedByUser = function(userId: string) {
+BlockedUserSchema.statics.getBlockedByUser = function (userId: string) {
   return this.find({ blockerUserId: userId }).sort({ createdAt: -1 });
 };
 
-BlockedUserSchema.statics.getBlockersOfUser = function(userId: string) {
+BlockedUserSchema.statics.getBlockersOfUser = function (userId: string) {
   return this.find({ blockedUserId: userId }).sort({ createdAt: -1 });
 };
 
@@ -68,7 +71,11 @@ interface BlockedUserModel extends Model<IBlockedUser> {
   getBlockersOfUser(userId: string): Promise<IBlockedUser[]>;
 }
 
-export const BlockedUser = mongoose.models.BlockedUser ||
-  mongoose.model<IBlockedUser, BlockedUserModel>('BlockedUser', BlockedUserSchema);
+export const BlockedUser =
+  mongoose.models.BlockedUser ||
+  mongoose.model<IBlockedUser, BlockedUserModel>(
+    "BlockedUser",
+    BlockedUserSchema,
+  );
 
 export default BlockedUser;

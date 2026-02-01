@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { UserPlus, Check, Clock, Users } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from "react";
+import { UserPlus, Check, Clock, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface LeaderboardFriendButtonProps {
   userId: string;
@@ -17,7 +17,9 @@ export default function LeaderboardFriendButton({
   isCurrentUser,
   compact = false,
 }: LeaderboardFriendButtonProps) {
-  const [status, setStatus] = useState<'none' | 'pending' | 'friends' | 'loading' | 'disabled'>('loading');
+  const [status, setStatus] = useState<
+    "none" | "pending" | "friends" | "loading" | "disabled"
+  >("loading");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -30,40 +32,40 @@ export default function LeaderboardFriendButton({
       if (response.ok) {
         const data = await response.json();
         if (data.disabled) {
-          setStatus('disabled');
+          setStatus("disabled");
         } else if (data.isFriend) {
-          setStatus('friends');
+          setStatus("friends");
         } else if (data.hasPendingRequest) {
-          setStatus('pending');
+          setStatus("pending");
         } else {
-          setStatus('none');
+          setStatus("none");
         }
       } else {
-        setStatus('none');
+        setStatus("none");
       }
     } catch {
-      setStatus('none');
+      setStatus("none");
     }
   };
 
   const sendFriendRequest = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (sending || status !== 'none') return;
+    if (sending || status !== "none") return;
     setSending(true);
-    
+
     try {
-      const response = await fetch('/api/messaging/friends/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/messaging/friends/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ toUserId: userId }),
       });
-      
+
       if (response.ok) {
-        setStatus('pending');
+        setStatus("pending");
       } else {
         const data = await response.json();
-        if (data.error?.includes('disabled')) {
-          setStatus('disabled');
+        if (data.error?.includes("disabled")) {
+          setStatus("disabled");
         }
       }
     } catch {
@@ -78,25 +80,27 @@ export default function LeaderboardFriendButton({
 
   const baseClasses = cn(
     "flex items-center justify-center rounded-xl transition-all duration-200 font-medium",
-    compact ? "w-9 h-9" : "w-10 h-10"
+    compact ? "w-9 h-9" : "w-10 h-10",
   );
 
   // Loading state
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
-      <div className={cn(baseClasses, "bg-gray-800/50 border border-gray-700/50")}>
+      <div
+        className={cn(baseClasses, "bg-gray-800/50 border border-gray-700/50")}
+      >
         <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-400 rounded-full animate-spin" />
       </div>
     );
   }
 
   // Already friends
-  if (status === 'friends') {
+  if (status === "friends") {
     return (
-      <div 
+      <div
         className={cn(
           baseClasses,
-          "bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-emerald-400 border border-emerald-500/30"
+          "bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-emerald-400 border border-emerald-500/30",
         )}
         title="Already friends"
       >
@@ -106,12 +110,12 @@ export default function LeaderboardFriendButton({
   }
 
   // Request pending
-  if (status === 'pending') {
+  if (status === "pending") {
     return (
-      <div 
+      <div
         className={cn(
           baseClasses,
-          "bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30"
+          "bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30",
         )}
         title="Request pending"
       >
@@ -121,12 +125,12 @@ export default function LeaderboardFriendButton({
   }
 
   // Friend requests disabled
-  if (status === 'disabled') {
+  if (status === "disabled") {
     return (
-      <div 
+      <div
         className={cn(
           baseClasses,
-          "bg-gray-800/50 text-gray-600 border border-gray-700/50 cursor-not-allowed"
+          "bg-gray-800/50 text-gray-600 border border-gray-700/50 cursor-not-allowed",
         )}
         title="Friend requests disabled by user"
       >
@@ -144,7 +148,7 @@ export default function LeaderboardFriendButton({
         baseClasses,
         "bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30",
         "hover:from-cyan-500/30 hover:to-blue-500/30 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10",
-        sending && "opacity-50 cursor-not-allowed"
+        sending && "opacity-50 cursor-not-allowed",
       )}
       title={`Add ${username} as friend`}
     >

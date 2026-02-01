@@ -1,24 +1,24 @@
-'use client';
+"use client";
 
-import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { usePrices } from '@/contexts/PriceProvider';
-import { useTradingMode } from './TradingInterface';
-import Image from 'next/image';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import GameChart from './GameChart';
-import GameModeOrderForm from './GameModeOrderForm';
-import GameModePositions from './GameModePositions';
-import GameMarketWatchSidebar from './GameMarketWatchSidebar';
-import GameLiveRankingPanel from './GameLiveRankingPanel';
-import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from 'lucide-react';
-import { MarginStatusIndicator } from './MarginStatusIndicator';
-import { getMarginStatus } from '@/lib/services/risk-manager.service';
+import { useChartSymbol } from "@/contexts/ChartSymbolContext";
+import { usePrices } from "@/contexts/PriceProvider";
+import { useTradingMode } from "./TradingInterface";
+import Image from "next/image";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import GameChart from "./GameChart";
+import GameModeOrderForm from "./GameModeOrderForm";
+import GameModePositions from "./GameModePositions";
+import GameMarketWatchSidebar from "./GameMarketWatchSidebar";
+import GameLiveRankingPanel from "./GameLiveRankingPanel";
+import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from "lucide-react";
+import { MarginStatusIndicator } from "./MarginStatusIndicator";
+import { getMarginStatus } from "@/lib/services/risk-manager.service";
 
 interface Position {
   _id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   quantity: number;
   unrealizedPnl: number;
@@ -75,93 +75,128 @@ export default function GameModeTradingPage({
 }: GameModeTradingPageProps) {
   const { symbol } = useChartSymbol();
   const { marketOpen } = usePrices();
-  
+
   const equity = participant.currentCapital + participant.unrealizedPnl;
-  
+
   // Calculate margin level
-  const marginLevel = participant.usedMargin > 0 
-    ? (equity / participant.usedMargin) * 100 
-    : Infinity;
-  
+  const marginLevel =
+    participant.usedMargin > 0
+      ? (equity / participant.usedMargin) * 100
+      : Infinity;
+
   // Get margin status for warning banner
   const marginStatus = getMarginStatus(
     participant.currentCapital,
     participant.unrealizedPnl,
     participant.usedMargin,
-    marginThresholds ? {
-      liquidation: marginThresholds.LIQUIDATION,
-      marginCall: marginThresholds.MARGIN_CALL,
-      warning: marginThresholds.WARNING,
-    } : undefined
+    marginThresholds
+      ? {
+          liquidation: marginThresholds.LIQUIDATION,
+          marginCall: marginThresholds.MARGIN_CALL,
+          warning: marginThresholds.WARNING,
+        }
+      : undefined,
   );
-  
+
   // Calculate time remaining
   const endTime = new Date(competition.endTime);
   const now = new Date();
   const timeRemaining = endTime.getTime() - now.getTime();
-  const daysRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60 * 24)));
-  const hoursRemaining = Math.max(0, Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
-  
+  const daysRemaining = Math.max(
+    0,
+    Math.floor(timeRemaining / (1000 * 60 * 60 * 24)),
+  );
+  const hoursRemaining = Math.max(
+    0,
+    Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e]">
       {/* Gaming Header */}
       <div className="relative bg-gradient-to-r from-[#1a1a2e] to-[#16213e] border-b-2 border-purple-500/50">
         <div className="absolute inset-0 bg-[url('/images/noise.png')] opacity-5" />
-        
+
         <div className="container mx-auto px-4 py-3 relative">
           <div className="flex items-center justify-between">
             {/* Back Button & Title */}
             <div className="flex items-center gap-4">
-              <Link 
+              <Link
                 href={`/competitions/${competitionId}`}
                 className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-purple-400 group-hover:-translate-x-1 transition-transform" />
-                <span className="text-purple-300 text-sm font-medium">Exit</span>
+                <span className="text-purple-300 text-sm font-medium">
+                  Exit
+                </span>
               </Link>
-              
+
               <div className="flex items-center gap-3">
                 <div className="text-2xl">⚔️</div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">{competition.name}</h1>
+                  <h1 className="text-xl font-bold text-white">
+                    {competition.name}
+                  </h1>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className={cn(
-                      "flex items-center gap-1",
-                      marketOpen ? "text-green-400" : "text-red-400"
-                    )}>
-                      <span className={cn(
-                        "w-2 h-2 rounded-full",
-                        marketOpen ? "bg-green-400 animate-pulse" : "bg-red-400"
-                      )} />
-                      {marketOpen ? 'MARKET OPEN' : 'MARKET CLOSED'}
+                    <span
+                      className={cn(
+                        "flex items-center gap-1",
+                        marketOpen ? "text-green-400" : "text-red-400",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "w-2 h-2 rounded-full",
+                          marketOpen
+                            ? "bg-green-400 animate-pulse"
+                            : "bg-red-400",
+                        )}
+                      />
+                      {marketOpen ? "MARKET OPEN" : "MARKET CLOSED"}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             {/* Quick Stats Bar */}
             <div className="hidden md:flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 rounded-lg border border-purple-500/30">
-                <Image src="/game-icons/timer.png" alt="Time" width={20} height={20} />
-                <span className="text-purple-300 text-sm">{daysRemaining}d {hoursRemaining}h left</span>
+                <Image
+                  src="/game-icons/timer.png"
+                  alt="Time"
+                  width={20}
+                  height={20}
+                />
+                <span className="text-purple-300 text-sm">
+                  {daysRemaining}d {hoursRemaining}h left
+                </span>
               </div>
               <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
-                <Image src="/game-icons/treasure.png" alt="Prize" width={20} height={20} />
-                <span className="text-yellow-300 text-sm">${competition.prizePool.toLocaleString()}</span>
+                <Image
+                  src="/game-icons/treasure.png"
+                  alt="Prize"
+                  width={20}
+                  height={20}
+                />
+                <span className="text-yellow-300 text-sm">
+                  ${competition.prizePool.toLocaleString()}
+                </span>
               </div>
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
                 <Users className="w-4 h-4 text-blue-400" />
-                <span className="text-blue-300 text-sm">{competition.currentParticipants} players</span>
+                <span className="text-blue-300 text-sm">
+                  {competition.currentParticipants} players
+                </span>
               </div>
-              
+
               {/* Mode Toggle */}
               <ModeToggle />
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4">
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
@@ -175,120 +210,179 @@ export default function GameModeTradingPage({
               mode="game"
               openPositionsCount={positions.length}
             />
-            
+
             {/* Chart */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 overflow-hidden shadow-2xl shadow-purple-500/10">
-              <GameChart 
-                competitionId={competitionId} 
-                positions={positions.filter(p => p.symbol === symbol)} 
+              <GameChart
+                competitionId={competitionId}
+                positions={positions.filter((p) => p.symbol === symbol)}
               />
             </div>
-            
+
             {/* Positions */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Swords className="w-5 h-5 text-purple-400" />
-                <h2 className="text-white font-bold">Open Positions ({positions.length})</h2>
+                <h2 className="text-white font-bold">
+                  Open Positions ({positions.length})
+                </h2>
               </div>
-              <GameModePositions positions={positions} competitionId={competitionId} />
+              <GameModePositions
+                positions={positions}
+                competitionId={competitionId}
+              />
             </div>
-            
+
             {/* Account Stats - Horizontal Layout */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
-                <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
+                <Image
+                  src="/game-icons/chest.png"
+                  alt="Stats"
+                  width={20}
+                  height={20}
+                />
                 <h2 className="text-white font-bold">Account Stats</h2>
               </div>
-              
+
               {/* Horizontal Stats Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                 {/* Balance */}
                 <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-xl p-3 border border-purple-500/30">
-                  <div className="text-[10px] text-purple-300 uppercase tracking-wider mb-1">💰 Balance</div>
-                  <div className="text-white font-bold text-lg">${participant.currentCapital.toFixed(2)}</div>
+                  <div className="text-[10px] text-purple-300 uppercase tracking-wider mb-1">
+                    💰 Balance
+                  </div>
+                  <div className="text-white font-bold text-lg">
+                    ${participant.currentCapital.toFixed(2)}
+                  </div>
                 </div>
-                
+
                 {/* Equity */}
                 <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl p-3 border border-blue-500/30">
-                  <div className="text-[10px] text-blue-300 uppercase tracking-wider mb-1">💎 Equity</div>
-                  <div className="text-white font-bold text-lg">${equity.toFixed(2)}</div>
+                  <div className="text-[10px] text-blue-300 uppercase tracking-wider mb-1">
+                    💎 Equity
+                  </div>
+                  <div className="text-white font-bold text-lg">
+                    ${equity.toFixed(2)}
+                  </div>
                 </div>
-                
+
                 {/* Unrealized P&L */}
-                <div className={cn(
-                  "rounded-xl p-3 border",
-                  participant.unrealizedPnl >= 0 
-                    ? "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
-                    : "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30"
-                )}>
-                  <div className={cn(
-                    "text-[10px] uppercase tracking-wider mb-1",
-                    participant.unrealizedPnl >= 0 ? "text-green-300" : "text-red-300"
-                  )}>
-                    {participant.unrealizedPnl >= 0 ? '📈' : '📉'} P&L
+                <div
+                  className={cn(
+                    "rounded-xl p-3 border",
+                    participant.unrealizedPnl >= 0
+                      ? "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
+                      : "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "text-[10px] uppercase tracking-wider mb-1",
+                      participant.unrealizedPnl >= 0
+                        ? "text-green-300"
+                        : "text-red-300",
+                    )}
+                  >
+                    {participant.unrealizedPnl >= 0 ? "📈" : "📉"} P&L
                   </div>
-                  <div className={cn(
-                    "font-bold text-lg",
-                    participant.unrealizedPnl >= 0 ? "text-green-400" : "text-red-400"
-                  )}>
-                    {participant.unrealizedPnl >= 0 ? '+' : ''}${participant.unrealizedPnl.toFixed(2)}
+                  <div
+                    className={cn(
+                      "font-bold text-lg",
+                      participant.unrealizedPnl >= 0
+                        ? "text-green-400"
+                        : "text-red-400",
+                    )}
+                  >
+                    {participant.unrealizedPnl >= 0 ? "+" : ""}$
+                    {participant.unrealizedPnl.toFixed(2)}
                   </div>
                 </div>
-                
+
                 {/* Margin Level */}
-                <div className={cn(
-                  "rounded-xl p-3 border",
-                  marginLevel < 100 ? "bg-gradient-to-br from-red-500/30 to-red-600/20 border-red-500/50 animate-pulse" :
-                  marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30" :
-                  marginLevel < (marginThresholds?.WARNING || 300) ? "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/30" :
-                  "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
-                )}>
-                  <div className={cn(
-                    "text-[10px] uppercase tracking-wider mb-1",
-                    marginLevel < 100 ? "text-red-300" :
-                    marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "text-red-300" :
-                    marginLevel < (marginThresholds?.WARNING || 300) ? "text-yellow-300" :
-                    "text-green-300"
-                  )}>
-                    {marginLevel < 100 ? '💀' : marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? '🚨' : '🛡️'} Margin Level
+                <div
+                  className={cn(
+                    "rounded-xl p-3 border",
+                    marginLevel < 100
+                      ? "bg-gradient-to-br from-red-500/30 to-red-600/20 border-red-500/50 animate-pulse"
+                      : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
+                        ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30"
+                        : marginLevel < (marginThresholds?.WARNING || 300)
+                          ? "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/30"
+                          : "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "text-[10px] uppercase tracking-wider mb-1",
+                      marginLevel < 100
+                        ? "text-red-300"
+                        : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
+                          ? "text-red-300"
+                          : marginLevel < (marginThresholds?.WARNING || 300)
+                            ? "text-yellow-300"
+                            : "text-green-300",
+                    )}
+                  >
+                    {marginLevel < 100
+                      ? "💀"
+                      : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
+                        ? "🚨"
+                        : "🛡️"}{" "}
+                    Margin Level
                   </div>
-                  <div className={cn(
-                    "font-bold text-lg font-mono",
-                    marginLevel < 100 ? "text-red-400" :
-                    marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "text-red-400" :
-                    marginLevel < (marginThresholds?.WARNING || 300) ? "text-yellow-400" :
-                    "text-green-400"
-                  )}>
-                    {Number.isFinite(marginLevel) ? `${marginLevel.toFixed(1)}%` : '∞'}
+                  <div
+                    className={cn(
+                      "font-bold text-lg font-mono",
+                      marginLevel < 100
+                        ? "text-red-400"
+                        : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
+                          ? "text-red-400"
+                          : marginLevel < (marginThresholds?.WARNING || 300)
+                            ? "text-yellow-400"
+                            : "text-green-400",
+                    )}
+                  >
+                    {Number.isFinite(marginLevel)
+                      ? `${marginLevel.toFixed(1)}%`
+                      : "∞"}
                   </div>
                 </div>
-                
+
                 {/* Available */}
                 <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-xl p-3 border border-cyan-500/30">
-                  <div className="text-[10px] text-cyan-300 uppercase tracking-wider mb-1">💵 Available</div>
-                  <div className="text-white font-bold text-lg">${participant.availableCapital.toFixed(2)}</div>
+                  <div className="text-[10px] text-cyan-300 uppercase tracking-wider mb-1">
+                    💵 Available
+                  </div>
+                  <div className="text-white font-bold text-lg">
+                    ${participant.availableCapital.toFixed(2)}
+                  </div>
                 </div>
-                
+
                 {/* Positions Count */}
                 <div className="bg-gradient-to-br from-pink-500/20 to-pink-600/10 rounded-xl p-3 border border-pink-500/30">
-                  <div className="text-[10px] text-pink-300 uppercase tracking-wider mb-1">⚔️ Positions</div>
-                  <div className="text-white font-bold text-lg">{positions.length}</div>
+                  <div className="text-[10px] text-pink-300 uppercase tracking-wider mb-1">
+                    ⚔️ Positions
+                  </div>
+                  <div className="text-white font-bold text-lg">
+                    {positions.length}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* Right Column - Market Watch, Leaderboard & Trade Station */}
           <div className="xl:col-span-4 space-y-4">
             {/* Market Watch Sidebar */}
             <GameMarketWatchSidebar />
-            
+
             {/* Live Ranking Leaderboard */}
             <GameLiveRankingPanel
               competitionId={competitionId}
               userId={userId}
             />
-            
+
             {/* Order Form (Trade Station) */}
             <GameModeOrderForm
               competitionId={competitionId}
@@ -305,7 +399,6 @@ export default function GameModeTradingPage({
           </div>
         </div>
       </div>
-      
     </div>
   );
 }
@@ -313,16 +406,16 @@ export default function GameModeTradingPage({
 // Mode Toggle Component
 function ModeToggle() {
   const { mode, setMode } = useTradingMode();
-  
+
   return (
     <div className="flex items-center gap-1 bg-dark-400/50 p-1 rounded-lg border border-purple-500/30">
       <button
-        onClick={() => setMode('professional')}
+        onClick={() => setMode("professional")}
         className={cn(
           "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all",
-          mode === 'professional' 
-            ? "bg-blue-500 text-white" 
-            : "text-gray-400 hover:text-white"
+          mode === "professional"
+            ? "bg-blue-500 text-white"
+            : "text-gray-400 hover:text-white",
         )}
         title="Professional Mode"
       >
@@ -330,12 +423,12 @@ function ModeToggle() {
         <span className="hidden lg:inline">Pro</span>
       </button>
       <button
-        onClick={() => setMode('game')}
+        onClick={() => setMode("game")}
         className={cn(
           "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all",
-          mode === 'game' 
-            ? "bg-purple-500 text-white" 
-            : "text-gray-400 hover:text-white"
+          mode === "game"
+            ? "bg-purple-500 text-white"
+            : "text-gray-400 hover:text-white",
         )}
         title="Game Mode"
       >

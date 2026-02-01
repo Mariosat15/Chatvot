@@ -1,22 +1,38 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { updatePositionTPSL } from '@/lib/actions/trading/position.actions';
-import { toast } from 'sonner';
-import { Loader2, TrendingUp, TrendingDown, DollarSign, Target, Shield } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { calculateUnrealizedPnL, FOREX_PAIRS, ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { updatePositionTPSL } from "@/lib/actions/trading/position.actions";
+import { toast } from "sonner";
+import {
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Target,
+  Shield,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  calculateUnrealizedPnL,
+  FOREX_PAIRS,
+  ForexSymbol,
+} from "@/lib/services/pnl-calculator.service";
 
 interface Position {
   _id: string;
   symbol: ForexSymbol;
-  side: 'long' | 'short';
+  side: "long" | "short";
   quantity: number;
   entryPrice: number;
   currentPrice: number;
@@ -32,19 +48,24 @@ interface EditPositionModalProps {
   onSuccess: (updatedData: { takeProfit?: number; stopLoss?: number }) => void;
 }
 
-const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositionModalProps) => {
+const EditPositionModal = ({
+  position,
+  isOpen,
+  onClose,
+  onSuccess,
+}: EditPositionModalProps) => {
   const [loading, setLoading] = useState(false);
-  
+
   // TP/SL Input Modes
-  const [tpMode, setTpMode] = useState<'price' | 'pips'>('pips');
-  const [slMode, setSlMode] = useState<'price' | 'pips'>('pips');
-  
+  const [tpMode, setTpMode] = useState<"price" | "pips">("pips");
+  const [slMode, setSlMode] = useState<"price" | "pips">("pips");
+
   // TP/SL Values
-  const [takeProfitPrice, setTakeProfitPrice] = useState<string>('');
-  const [takeProfitPips, setTakeProfitPips] = useState<string>('');
-  const [stopLossPrice, setStopLossPrice] = useState<string>('');
-  const [stopLossPips, setStopLossPips] = useState<string>('');
-  
+  const [takeProfitPrice, setTakeProfitPrice] = useState<string>("");
+  const [takeProfitPips, setTakeProfitPips] = useState<string>("");
+  const [stopLossPrice, setStopLossPrice] = useState<string>("");
+  const [stopLossPips, setStopLossPips] = useState<string>("");
+
   // Enable/Disable TP/SL
   const [enableTP, setEnableTP] = useState(false);
   const [enableSL, setEnableSL] = useState(false);
@@ -56,25 +77,29 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
         setEnableTP(true);
         setTakeProfitPrice(position.takeProfit.toFixed(5));
         const pipValue = FOREX_PAIRS[position.symbol].pip;
-        const pips = Math.abs((position.takeProfit - position.entryPrice) / pipValue);
+        const pips = Math.abs(
+          (position.takeProfit - position.entryPrice) / pipValue,
+        );
         setTakeProfitPips(pips.toFixed(1));
       } else {
         setEnableTP(false);
-        setTakeProfitPrice('');
-        setTakeProfitPips('50'); // Default 50 pips
+        setTakeProfitPrice("");
+        setTakeProfitPips("50"); // Default 50 pips
       }
-      
+
       // Initialize SL
       if (position.stopLoss) {
         setEnableSL(true);
         setStopLossPrice(position.stopLoss.toFixed(5));
         const pipValue = FOREX_PAIRS[position.symbol].pip;
-        const pips = Math.abs((position.stopLoss - position.entryPrice) / pipValue);
+        const pips = Math.abs(
+          (position.stopLoss - position.entryPrice) / pipValue,
+        );
         setStopLossPips(pips.toFixed(1));
       } else {
         setEnableSL(false);
-        setStopLossPrice('');
-        setStopLossPips('30'); // Default 30 pips
+        setStopLossPrice("");
+        setStopLossPips("30"); // Default 30 pips
       }
     }
   }, [position]);
@@ -85,39 +110,51 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 
   // Calculate TP price from pips (rounded to avoid floating point issues)
   const calculateTPFromPips = (pips: number): number => {
-    if (position.side === 'long') {
-      return Math.round((position.entryPrice + (pips * pipValue)) * 100000) / 100000;
+    if (position.side === "long") {
+      return (
+        Math.round((position.entryPrice + pips * pipValue) * 100000) / 100000
+      );
     } else {
-      return Math.round((position.entryPrice - (pips * pipValue)) * 100000) / 100000;
+      return (
+        Math.round((position.entryPrice - pips * pipValue) * 100000) / 100000
+      );
     }
   };
 
   // Calculate SL price from pips (rounded to avoid floating point issues)
   const calculateSLFromPips = (pips: number): number => {
-    if (position.side === 'long') {
-      return Math.round((position.entryPrice - (pips * pipValue)) * 100000) / 100000;
+    if (position.side === "long") {
+      return (
+        Math.round((position.entryPrice - pips * pipValue) * 100000) / 100000
+      );
     } else {
-      return Math.round((position.entryPrice + (pips * pipValue)) * 100000) / 100000;
+      return (
+        Math.round((position.entryPrice + pips * pipValue) * 100000) / 100000
+      );
     }
   };
 
   // Get effective TP price
   const getEffectiveTPPrice = (): number | null => {
     if (!enableTP) return null;
-    if (tpMode === 'price') {
+    if (tpMode === "price") {
       return takeProfitPrice ? parseFloat(takeProfitPrice) : null;
     } else {
-      return takeProfitPips ? calculateTPFromPips(parseFloat(takeProfitPips)) : null;
+      return takeProfitPips
+        ? calculateTPFromPips(parseFloat(takeProfitPips))
+        : null;
     }
   };
 
   // Get effective SL price
   const getEffectiveSLPrice = (): number | null => {
     if (!enableSL) return null;
-    if (slMode === 'price') {
+    if (slMode === "price") {
       return stopLossPrice ? parseFloat(stopLossPrice) : null;
     } else {
-      return stopLossPips ? calculateSLFromPips(parseFloat(stopLossPips)) : null;
+      return stopLossPips
+        ? calculateSLFromPips(parseFloat(stopLossPips))
+        : null;
     }
   };
 
@@ -125,13 +162,13 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
   const calculateTPPnL = (): number | null => {
     const tpPrice = getEffectiveTPPrice();
     if (!tpPrice) return null;
-    
+
     return calculateUnrealizedPnL(
       position.side,
       position.entryPrice,
       tpPrice,
       position.quantity,
-      position.symbol
+      position.symbol,
     );
   };
 
@@ -139,13 +176,13 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
   const calculateSLPnL = (): number | null => {
     const slPrice = getEffectiveSLPrice();
     if (!slPrice) return null;
-    
+
     return calculateUnrealizedPnL(
       position.side,
       position.entryPrice,
       slPrice,
       position.quantity,
-      position.symbol
+      position.symbol,
     );
   };
 
@@ -157,12 +194,16 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 
       // Validation
       if (enableTP && tpPrice) {
-        const isValid = position.side === 'long' ? tpPrice > position.currentPrice : tpPrice < position.currentPrice;
+        const isValid =
+          position.side === "long"
+            ? tpPrice > position.currentPrice
+            : tpPrice < position.currentPrice;
         if (!isValid) {
-          toast.error('Invalid Take Profit', {
-            description: position.side === 'long' 
-              ? 'Take Profit must be above current price for long positions'
-              : 'Take Profit must be below current price for short positions'
+          toast.error("Invalid Take Profit", {
+            description:
+              position.side === "long"
+                ? "Take Profit must be above current price for long positions"
+                : "Take Profit must be below current price for short positions",
           });
           setLoading(false);
           return;
@@ -170,12 +211,16 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
       }
 
       if (enableSL && slPrice) {
-        const isValid = position.side === 'long' ? slPrice < position.currentPrice : slPrice > position.currentPrice;
+        const isValid =
+          position.side === "long"
+            ? slPrice < position.currentPrice
+            : slPrice > position.currentPrice;
         if (!isValid) {
-          toast.error('Invalid Stop Loss', {
-            description: position.side === 'long' 
-              ? 'Stop Loss must be below current price for long positions'
-              : 'Stop Loss must be above current price for short positions'
+          toast.error("Invalid Stop Loss", {
+            description:
+              position.side === "long"
+                ? "Stop Loss must be below current price for long positions"
+                : "Stop Loss must be above current price for short positions",
           });
           setLoading(false);
           return;
@@ -185,34 +230,37 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
       const result = await updatePositionTPSL(position._id, tpPrice, slPrice);
 
       if (result.success) {
-        toast.success('Position updated successfully!', {
-          description: 'Your TP/SL levels have been set'
+        toast.success("Position updated successfully!", {
+          description: "Your TP/SL levels have been set",
         });
-        
+
         // ⚡ Dispatch event for immediate chart update
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('tpslUpdated', {
-            detail: {
-              positionId: position._id,
-              symbol: position.symbol,
-              takeProfit: result.position?.takeProfit,
-              stopLoss: result.position?.stopLoss,
-            }
-          }));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("tpslUpdated", {
+              detail: {
+                positionId: position._id,
+                symbol: position.symbol,
+                takeProfit: result.position?.takeProfit,
+                stopLoss: result.position?.stopLoss,
+              },
+            }),
+          );
         }
-        
+
         // Pass updated TP/SL values back to parent for immediate UI update
         onSuccess({
           takeProfit: result.position?.takeProfit,
-          stopLoss: result.position?.stopLoss
+          stopLoss: result.position?.stopLoss,
         });
         onClose();
       } else {
-        throw new Error(result.error || 'Failed to update position');
+        throw new Error(result.error || "Failed to update position");
       }
     } catch (error) {
-      toast.error('Failed to update position', {
-        description: error instanceof Error ? error.message : 'Please try again'
+      toast.error("Failed to update position", {
+        description:
+          error instanceof Error ? error.message : "Please try again",
       });
     } finally {
       setLoading(false);
@@ -226,7 +274,11 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-[#1e222d] border-[#2b2b43] max-sm:border-0" fullScreenMobile size="lg">
+      <DialogContent
+        className="bg-[#1e222d] border-[#2b2b43] max-sm:border-0"
+        fullScreenMobile
+        size="lg"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
             <Target className="h-5 w-5 text-blue-500" />
@@ -239,28 +291,44 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
           <div className="bg-[#131722] rounded-lg p-4 space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-dark-600">Side</span>
-              <span className={cn(
-                'px-2 py-1 rounded text-xs font-semibold',
-                position.side === 'long' ? 'bg-green-500/30 text-green-400' : 'bg-red-500/30 text-red-400'
-              )}>
-                {position.side === 'long' ? (
-                  <><TrendingUp className="inline size-3 mr-1" />LONG</>
+              <span
+                className={cn(
+                  "px-2 py-1 rounded text-xs font-semibold",
+                  position.side === "long"
+                    ? "bg-green-500/30 text-green-400"
+                    : "bg-red-500/30 text-red-400",
+                )}
+              >
+                {position.side === "long" ? (
+                  <>
+                    <TrendingUp className="inline size-3 mr-1" />
+                    LONG
+                  </>
                 ) : (
-                  <><TrendingDown className="inline size-3 mr-1" />SHORT</>
+                  <>
+                    <TrendingDown className="inline size-3 mr-1" />
+                    SHORT
+                  </>
                 )}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-dark-600">Entry Price</span>
-              <span className="text-white font-mono">{position.entryPrice.toFixed(5)}</span>
+              <span className="text-white font-mono">
+                {position.entryPrice.toFixed(5)}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-dark-600">Current Price</span>
-              <span className="text-white font-mono">{position.currentPrice.toFixed(5)}</span>
+              <span className="text-white font-mono">
+                {position.currentPrice.toFixed(5)}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-dark-600">Quantity</span>
-              <span className="text-white font-mono">{position.quantity} lots</span>
+              <span className="text-white font-mono">
+                {position.quantity} lots
+              </span>
             </div>
           </div>
 
@@ -269,21 +337,28 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-green-500" />
-                <Label className="text-base font-semibold text-white">Take Profit</Label>
+                <Label className="text-base font-semibold text-white">
+                  Take Profit
+                </Label>
               </div>
               <Switch checked={enableTP} onCheckedChange={setEnableTP} />
             </div>
 
             {enableTP && (
               <div className="space-y-4 pl-7">
-                <Tabs value={tpMode} onValueChange={(v) => setTpMode(v as 'price' | 'pips')}>
+                <Tabs
+                  value={tpMode}
+                  onValueChange={(v) => setTpMode(v as "price" | "pips")}
+                >
                   <TabsList className="grid w-full grid-cols-2 bg-[#131722]">
                     <TabsTrigger value="pips">Pips</TabsTrigger>
                     <TabsTrigger value="price">Price</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="pips" className="mt-4">
-                    <Label className="text-sm text-dark-600">Pips from Entry</Label>
+                    <Label className="text-sm text-dark-600">
+                      Pips from Entry
+                    </Label>
                     <Input
                       type="number"
                       value={takeProfitPips}
@@ -293,16 +368,21 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                     />
                     {takeProfitPips && (
                       <p className="text-xs text-dark-600 mt-1">
-                        Triggers at: {calculateTPFromPips(parseFloat(takeProfitPips)).toFixed(5)}
+                        Triggers at:{" "}
+                        {calculateTPFromPips(
+                          parseFloat(takeProfitPips),
+                        ).toFixed(5)}
                         <span className="text-emerald-400 ml-1">
-                          ({position.side === 'long' ? 'BID' : 'ASK'} price)
+                          ({position.side === "long" ? "BID" : "ASK"} price)
                         </span>
                       </p>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="price" className="mt-4">
-                    <Label className="text-sm text-dark-600">Target Price</Label>
+                    <Label className="text-sm text-dark-600">
+                      Target Price
+                    </Label>
                     <Input
                       type="number"
                       step="0.00001"
@@ -312,7 +392,11 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                       className="bg-[#131722] border-[#2b2b43] text-white mt-2"
                     />
                     <p className="text-xs text-dark-600 mt-1">
-                      Triggers when <span className="text-emerald-400">{position.side === 'long' ? 'BID' : 'ASK'}</span> reaches this price
+                      Triggers when{" "}
+                      <span className="text-emerald-400">
+                        {position.side === "long" ? "BID" : "ASK"}
+                      </span>{" "}
+                      reaches this price
                     </p>
                   </TabsContent>
                 </Tabs>
@@ -342,21 +426,28 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-red-500" />
-                <Label className="text-base font-semibold text-white">Stop Loss</Label>
+                <Label className="text-base font-semibold text-white">
+                  Stop Loss
+                </Label>
               </div>
               <Switch checked={enableSL} onCheckedChange={setEnableSL} />
             </div>
 
             {enableSL && (
               <div className="space-y-4 pl-7">
-                <Tabs value={slMode} onValueChange={(v) => setSlMode(v as 'price' | 'pips')}>
+                <Tabs
+                  value={slMode}
+                  onValueChange={(v) => setSlMode(v as "price" | "pips")}
+                >
                   <TabsList className="grid w-full grid-cols-2 bg-[#131722]">
                     <TabsTrigger value="pips">Pips</TabsTrigger>
                     <TabsTrigger value="price">Price</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="pips" className="mt-4">
-                    <Label className="text-sm text-dark-600">Pips from Entry</Label>
+                    <Label className="text-sm text-dark-600">
+                      Pips from Entry
+                    </Label>
                     <Input
                       type="number"
                       value={stopLossPips}
@@ -366,14 +457,17 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                     />
                     {stopLossPips && (
                       <p className="text-xs text-dark-600 mt-1">
-                        Triggers at: {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(5)}
+                        Triggers at:{" "}
+                        {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(
+                          5,
+                        )}
                         <span className="text-red-400 ml-1">
-                          ({position.side === 'long' ? 'BID' : 'ASK'} price)
+                          ({position.side === "long" ? "BID" : "ASK"} price)
                         </span>
                       </p>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="price" className="mt-4">
                     <Label className="text-sm text-dark-600">Stop Price</Label>
                     <Input
@@ -385,7 +479,11 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                       className="bg-[#131722] border-[#2b2b43] text-white mt-2"
                     />
                     <p className="text-xs text-dark-600 mt-1">
-                      Triggers when <span className="text-red-400">{position.side === 'long' ? 'BID' : 'ASK'}</span> reaches this price
+                      Triggers when{" "}
+                      <span className="text-red-400">
+                        {position.side === "long" ? "BID" : "ASK"}
+                      </span>{" "}
+                      reaches this price
                     </p>
                   </TabsContent>
                 </Tabs>
@@ -398,7 +496,7 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                         Potential Loss
                       </span>
                       <span className="text-lg font-bold text-red-400">
-                        {slPnL.toFixed(2) > '0' ? '+' : ''}${slPnL.toFixed(2)}
+                        {slPnL.toFixed(2) > "0" ? "+" : ""}${slPnL.toFixed(2)}
                       </span>
                     </div>
                     <p className="text-xs text-dark-600 mt-1">
@@ -431,7 +529,7 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                   Saving...
                 </>
               ) : (
-                'Save Changes'
+                "Save Changes"
               )}
             </Button>
           </div>
@@ -442,4 +540,3 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 };
 
 export default EditPositionModal;
-

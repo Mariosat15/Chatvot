@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import { ObjectId } from 'mongodb';
-import { syncUserProfile } from '@/lib/services/profile-sync.service';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import { ObjectId } from "mongodb";
+import { syncUserProfile } from "@/lib/services/profile-sync.service";
 
 export interface UserProfile {
   id: string;
@@ -28,22 +28,22 @@ export interface UserProfile {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findUserById(db: any, userId: string) {
   // Try by 'id' field first (better-auth uses this)
-  let user = await db.collection('user').findOne({ id: userId });
-  
+  let user = await db.collection("user").findOne({ id: userId });
+
   // If not found, try by '_id' as ObjectId
   if (!user && ObjectId.isValid(userId)) {
     try {
-      user = await db.collection('user').findOne({ _id: new ObjectId(userId) });
+      user = await db.collection("user").findOne({ _id: new ObjectId(userId) });
     } catch {
       // Not a valid ObjectId
     }
   }
-  
+
   // If still not found, try by '_id' as string
   if (!user) {
-    user = await db.collection('user').findOne({ _id: userId });
+    user = await db.collection("user").findOne({ _id: userId });
   }
-  
+
   return user;
 }
 
@@ -53,12 +53,12 @@ async function findUserById(db: any, userId: string) {
 function buildUserQuery(userId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queries: any[] = [{ id: userId }];
-  
+
   if (ObjectId.isValid(userId)) {
     queries.push({ _id: new ObjectId(userId) });
   }
   queries.push({ _id: userId });
-  
+
   return { $or: queries };
 }
 
@@ -69,24 +69,27 @@ function buildUserQuery(userId: string) {
 export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
     }
 
     // Get user from database (try multiple ID formats)
     const user = await findUserById(db, session.user.id);
-    
+
     if (!user) {
       console.error(`User not found for ID: ${session.user.id}`);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Log all user fields to debug missing data
@@ -103,34 +106,40 @@ export async function GET() {
     });
 
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
-    const userImage = user.profileImage || user.image || '';
-    
-    const profile: UserProfile & { settings?: { privacy?: { allowFriendRequests?: boolean } } } = {
+    const userImage = user.profileImage || user.image || "";
+
+    const profile: UserProfile & {
+      settings?: { privacy?: { allowFriendRequests?: boolean } };
+    } = {
       id: user.id || user._id?.toString(),
-      name: user.name || '',
-      email: user.email || '',
+      name: user.name || "",
+      email: user.email || "",
       profileImage: userImage,
-      activeFrameId: user.activeFrameId || '',
-      activeFrameUrl: user.activeFrameUrl || '',
-      bio: user.bio || '',
-      country: user.country || '',
-      address: user.address || '',
-      city: user.city || '',
-      postalCode: user.postalCode || '',
-      phone: user.phone || '',
+      activeFrameId: user.activeFrameId || "",
+      activeFrameUrl: user.activeFrameUrl || "",
+      bio: user.bio || "",
+      country: user.country || "",
+      address: user.address || "",
+      city: user.city || "",
+      postalCode: user.postalCode || "",
+      phone: user.phone || "",
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       settings: {
         privacy: {
-          allowFriendRequests: user.settings?.privacy?.allowFriendRequests ?? true,
+          allowFriendRequests:
+            user.settings?.privacy?.allowFriendRequests ?? true,
         },
       },
     };
 
     return NextResponse.json({ user: profile });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
-    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
+    console.error("Error fetching user profile:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch profile" },
+      { status: 500 },
+    );
   }
 }
 
@@ -141,19 +150,33 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
-    const { name, profileImage, activeFrameId, activeFrameUrl, bio, country, address, city, postalCode, phone } = body;
+    const {
+      name,
+      profileImage,
+      activeFrameId,
+      activeFrameUrl,
+      bio,
+      country,
+      address,
+      city,
+      postalCode,
+      phone,
+    } = body;
 
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
-    
+
     if (!db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
     }
 
     // Build update object (only update provided fields)
@@ -165,7 +188,8 @@ export async function PUT(req: NextRequest) {
     if (name !== undefined) updateFields.name = name.trim();
     if (profileImage !== undefined) updateFields.profileImage = profileImage;
     if (activeFrameId !== undefined) updateFields.activeFrameId = activeFrameId;
-    if (activeFrameUrl !== undefined) updateFields.activeFrameUrl = activeFrameUrl;
+    if (activeFrameUrl !== undefined)
+      updateFields.activeFrameUrl = activeFrameUrl;
     if (bio !== undefined) updateFields.bio = bio.trim();
     if (country !== undefined) updateFields.country = country;
     if (address !== undefined) updateFields.address = address.trim();
@@ -176,15 +200,17 @@ export async function PUT(req: NextRequest) {
     console.log(`📝 Profile Update - Fields to update:`, updateFields);
 
     // Update user in database (try multiple ID formats)
-    const result = await db.collection('user').findOneAndUpdate(
-      buildUserQuery(session.user.id),
-      { $set: updateFields },
-      { returnDocument: 'after' }
-    );
+    const result = await db
+      .collection("user")
+      .findOneAndUpdate(
+        buildUserQuery(session.user.id),
+        { $set: updateFields },
+        { returnDocument: "after" },
+      );
 
     if (!result) {
       console.error(`User not found for update, ID: ${session.user.id}`);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     console.log(`✅ User profile updated: ${session.user.email}`, {
@@ -205,35 +231,37 @@ export async function PUT(req: NextRequest) {
           avatar: profileImage !== undefined ? profileImage : undefined,
         });
       } catch (syncError) {
-        console.error('Error syncing profile to messaging:', syncError);
+        console.error("Error syncing profile to messaging:", syncError);
         // Don't fail the request if sync fails
       }
     }
 
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
-    const updatedUserImage = result.profileImage || result.image || '';
-    
+    const updatedUserImage = result.profileImage || result.image || "";
+
     const updatedProfile: UserProfile = {
       id: result.id || result._id?.toString(),
-      name: result.name || '',
-      email: result.email || '',
+      name: result.name || "",
+      email: result.email || "",
       profileImage: updatedUserImage,
-      activeFrameId: result.activeFrameId || '',
-      activeFrameUrl: result.activeFrameUrl || '',
-      bio: result.bio || '',
-      country: result.country || '',
-      address: result.address || '',
-      city: result.city || '',
-      postalCode: result.postalCode || '',
-      phone: result.phone || '',
+      activeFrameId: result.activeFrameId || "",
+      activeFrameUrl: result.activeFrameUrl || "",
+      bio: result.bio || "",
+      country: result.country || "",
+      address: result.address || "",
+      city: result.city || "",
+      postalCode: result.postalCode || "",
+      phone: result.phone || "",
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
     };
 
     return NextResponse.json({ user: updatedProfile });
   } catch (error) {
-    console.error('Error updating user profile:', error);
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    console.error("Error updating user profile:", error);
+    return NextResponse.json(
+      { error: "Failed to update profile" },
+      { status: 500 },
+    );
   }
 }
-

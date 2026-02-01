@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 
 /**
  * Admin API: Check database for recent data
@@ -19,21 +19,25 @@ export async function POST(request: Request) {
     const competitions = await Competition.find()
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('name status startTime endTime currentParticipants')
+      .select("name status startTime endTime currentParticipants")
       .lean();
 
     // Get total counts
     const totalParticipants = await CompetitionParticipant.countDocuments();
     const totalPositions = await TradingPosition.countDocuments();
     const totalTradeHistory = await TradeHistory.countDocuments();
-    const openPositions = await TradingPosition.countDocuments({ status: 'open' });
-    const closedPositions = await TradingPosition.countDocuments({ status: 'closed' });
+    const openPositions = await TradingPosition.countDocuments({
+      status: "open",
+    });
+    const closedPositions = await TradingPosition.countDocuments({
+      status: "closed",
+    });
 
     // Get recent trades
     const recentTrades = await TradeHistory.find()
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('competitionId userId symbol realizedPnl closedAt')
+      .select("competitionId userId symbol realizedPnl closedAt")
       .lean();
 
     // Get participants with stats
@@ -42,22 +46,22 @@ export async function POST(request: Request) {
     })
       .sort({ updatedAt: -1 })
       .limit(10)
-      .select('username competitionId totalTrades pnl currentCapital updatedAt')
+      .select("username competitionId totalTrades pnl currentCapital updatedAt")
       .lean();
 
     // If specific competition requested, get details
     let competitionDetails = null;
     if (competitionId) {
       const participants = await CompetitionParticipant.find({ competitionId })
-        .select('username totalTrades pnl winRate currentCapital')
+        .select("username totalTrades pnl winRate currentCapital")
         .lean();
 
       const positions = await TradingPosition.find({ competitionId })
-        .select('userId symbol status profitLoss closedAt')
+        .select("userId symbol status profitLoss closedAt")
         .lean();
 
       const trades = await TradeHistory.find({ competitionId })
-        .select('userId symbol realizedPnl closedAt')
+        .select("userId symbol realizedPnl closedAt")
         .lean();
 
       competitionDetails = {
@@ -99,15 +103,14 @@ export async function POST(request: Request) {
       competitionDetails,
     });
   } catch (error) {
-    console.error('Error checking database:', error);
+    console.error("Error checking database:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to check database',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Failed to check database",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

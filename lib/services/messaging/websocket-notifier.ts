@@ -1,10 +1,10 @@
 /**
  * WebSocket Notifier Service
- * 
+ *
  * This service notifies the WebSocket server of events that need to be
  * broadcast to connected clients. In production, this communicates with
  * the standalone WebSocket server.
- * 
+ *
  * Architecture:
  * - API Route receives request
  * - Processes business logic
@@ -13,11 +13,12 @@
  */
 
 // For server-to-server communication, use internal HTTP URL (not public wss://)
-const WEBSOCKET_SERVER_URL = process.env.WS_INTERNAL_URL || 
-                             process.env.WEBSOCKET_INTERNAL_URL || 
-                             'http://localhost:3003';
+const WEBSOCKET_SERVER_URL =
+  process.env.WS_INTERNAL_URL ||
+  process.env.WEBSOCKET_INTERNAL_URL ||
+  "http://localhost:3003";
 
-interface WebSocketEvent {
+interface _WebSocketEvent {
   type: string;
   conversationId?: string;
   participantId?: string;
@@ -46,8 +47,8 @@ class WebSocketNotifier {
   private async notify(endpoint: string, data: any): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
         // Short timeout - don't block API responses waiting for WS
         signal: AbortSignal.timeout(2000),
@@ -65,7 +66,7 @@ class WebSocketNotifier {
    * Notify of a new message in a conversation
    */
   async notifyNewMessage(conversationId: string, message: any): Promise<void> {
-    await this.notify('/internal/message', {
+    await this.notify("/internal/message", {
       conversationId,
       message: {
         id: message._id?.toString() || message.id,
@@ -84,8 +85,12 @@ class WebSocketNotifier {
   /**
    * Notify of messages being read
    */
-  async notifyRead(conversationId: string, participantId: string, participantName: string): Promise<void> {
-    await this.notify('/internal/read', {
+  async notifyRead(
+    conversationId: string,
+    participantId: string,
+    participantName: string,
+  ): Promise<void> {
+    await this.notify("/internal/read", {
       conversationId,
       participantId,
       participantName,
@@ -99,9 +104,9 @@ class WebSocketNotifier {
   async notifyTransfer(
     conversationId: string,
     toEmployeeId: string,
-    toEmployeeName: string
+    toEmployeeName: string,
   ): Promise<void> {
-    await this.notify('/internal/transfer', {
+    await this.notify("/internal/transfer", {
       conversationId,
       toEmployeeId,
       toEmployeeName,
@@ -115,9 +120,9 @@ class WebSocketNotifier {
     conversationId: string,
     participantId: string,
     participantName: string,
-    isTyping: boolean
+    isTyping: boolean,
   ): Promise<void> {
-    await this.notify('/internal/typing', {
+    await this.notify("/internal/typing", {
       conversationId,
       participantId,
       participantName,
@@ -130,10 +135,10 @@ class WebSocketNotifier {
    */
   async notifyFriendRequest(
     toUserId: string,
-    eventType: 'received' | 'accepted' | 'declined' | 'cancelled',
-    request: any
+    eventType: "received" | "accepted" | "declined" | "cancelled",
+    request: any,
   ): Promise<void> {
-    await this.notify('/internal/friend-request', {
+    await this.notify("/internal/friend-request", {
       toUserId,
       eventType,
       request: {
@@ -150,8 +155,11 @@ class WebSocketNotifier {
   /**
    * Notify of presence change
    */
-  async notifyPresence(participantId: string, status: 'online' | 'away' | 'busy' | 'offline'): Promise<void> {
-    await this.notify('/internal/presence', {
+  async notifyPresence(
+    participantId: string,
+    status: "online" | "away" | "busy" | "offline",
+  ): Promise<void> {
+    await this.notify("/internal/presence", {
       participantId,
       status,
     });
@@ -167,11 +175,11 @@ class WebSocketNotifier {
       customerName: string;
       customerId: string;
       reason: string;
-    }
+    },
   ): Promise<void> {
-    await this.notify('/internal/employee-notification', {
+    await this.notify("/internal/employee-notification", {
       employeeId,
-      type: 'new_chat',
+      type: "new_chat",
       data: {
         conversationId: chatInfo.conversationId,
         customerName: chatInfo.customerName,
@@ -189,11 +197,11 @@ class WebSocketNotifier {
     employeeId: string,
     customerId: string,
     customerName: string,
-    assignmentType: 'assigned' | 'transferred' | 'unassigned'
+    assignmentType: "assigned" | "transferred" | "unassigned",
   ): Promise<void> {
-    await this.notify('/internal/employee-notification', {
+    await this.notify("/internal/employee-notification", {
       employeeId,
-      type: 'customer_assignment',
+      type: "customer_assignment",
       data: {
         customerId,
         customerName,
@@ -241,4 +249,3 @@ class WebSocketNotifier {
 // Export singleton instance
 export const wsNotifier = WebSocketNotifier.getInstance();
 export default wsNotifier;
-

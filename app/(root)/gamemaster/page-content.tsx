@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Crown, 
-  Copy, 
-  Check, 
-  Users, 
-  TrendingUp, 
-  Calendar, 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  Crown,
+  Copy,
+  Check,
+  Users,
+  TrendingUp,
+  Calendar,
   Percent,
   Trophy,
   Link2,
@@ -28,9 +28,9 @@ import {
   Trash2,
   AlertTriangle,
   XCircle,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface GameMasterData {
   subscription: {
@@ -96,9 +96,9 @@ export default function GameMasterDashboardContent() {
   const fetchGameMasterData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/gamemaster/dashboard');
+      const response = await fetch("/api/gamemaster/dashboard");
       const result = await response.json();
-      
+
       if (result.success) {
         setData(result.data);
       } else {
@@ -106,56 +106,64 @@ export default function GameMasterDashboardContent() {
         setData({ subscription: null, referredUsers: [], recentEarnings: [] });
       }
     } catch (error) {
-      console.error('Error fetching GM data:', error);
-      toast.error('Failed to load Game Master data');
+      console.error("Error fetching GM data:", error);
+      toast.error("Failed to load Game Master data");
     } finally {
       setLoading(false);
     }
   };
 
-  const copyToClipboard = async (text: string, type: 'code' | 'link') => {
+  const copyToClipboard = async (text: string, type: "code" | "link") => {
     try {
       await navigator.clipboard.writeText(text);
-      if (type === 'code') {
+      if (type === "code") {
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2000);
       } else {
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2000);
       }
-      toast.success('Copied to clipboard!');
+      toast.success("Copied to clipboard!");
     } catch {
-      toast.error('Failed to copy');
+      toast.error("Failed to copy");
     }
   };
 
   const toggleAutoRenew = async () => {
     if (!data?.subscription) return;
-    
+
     try {
       setTogglingRenewal(true);
-      const response = await fetch('/api/gamemaster/toggle-renewal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/gamemaster/toggle-renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ autoRenew: !data.subscription.autoRenew }),
       });
-      
+
       const result = await response.json();
       if (result.success) {
-        setData(prev => prev ? {
-          ...prev,
-          subscription: prev.subscription ? {
-            ...prev.subscription,
-            autoRenew: !prev.subscription.autoRenew,
-          } : null,
-        } : null);
-        toast.success(`Auto-renewal ${!data.subscription.autoRenew ? 'enabled' : 'disabled'}`);
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                subscription: prev.subscription
+                  ? {
+                      ...prev.subscription,
+                      autoRenew: !prev.subscription.autoRenew,
+                    }
+                  : null,
+              }
+            : null,
+        );
+        toast.success(
+          `Auto-renewal ${!data.subscription.autoRenew ? "enabled" : "disabled"}`,
+        );
       } else {
-        toast.error(result.error || 'Failed to update auto-renewal');
+        toast.error(result.error || "Failed to update auto-renewal");
       }
     } catch (error) {
-      console.error('Error toggling auto-renewal:', error);
-      toast.error('Failed to update auto-renewal');
+      console.error("Error toggling auto-renewal:", error);
+      toast.error("Failed to update auto-renewal");
     } finally {
       setTogglingRenewal(false);
     }
@@ -163,35 +171,46 @@ export default function GameMasterDashboardContent() {
 
   const togglePause = async () => {
     if (!data?.subscription) return;
-    
+
     const isPaused = data.subscription.isPaused;
-    const action = isPaused ? 'resume' : 'pause';
-    
+    const action = isPaused ? "resume" : "pause";
+
     try {
       setTogglingPause(true);
-      const response = await fetch('/api/gamemaster/pause', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/gamemaster/pause", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      
+
       const result = await response.json();
       if (result.success) {
-        setData(prev => prev ? {
-          ...prev,
-          subscription: prev.subscription ? {
-            ...prev.subscription,
-            isPaused: !isPaused,
-            pausedAt: isPaused ? undefined : new Date().toISOString(),
-          } : null,
-        } : null);
-        
-        if (action === 'pause') {
-          toast.warning('Subscription paused. You will NOT receive referral fees while paused.', {
-            duration: 5000,
-          });
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                subscription: prev.subscription
+                  ? {
+                      ...prev.subscription,
+                      isPaused: !isPaused,
+                      pausedAt: isPaused ? undefined : new Date().toISOString(),
+                    }
+                  : null,
+              }
+            : null,
+        );
+
+        if (action === "pause") {
+          toast.warning(
+            "Subscription paused. You will NOT receive referral fees while paused.",
+            {
+              duration: 5000,
+            },
+          );
         } else {
-          toast.success('Subscription resumed! You will now receive referral fees again.');
+          toast.success(
+            "Subscription resumed! You will now receive referral fees again.",
+          );
         }
       } else {
         toast.error(result.error || `Failed to ${action} subscription`);
@@ -206,37 +225,58 @@ export default function GameMasterDashboardContent() {
 
   const toggleScheduledCancellation = async () => {
     if (!data?.subscription) return;
-    
+
     const isScheduled = data.subscription.scheduledForDeletion;
-    const action = isScheduled ? 'unschedule' : 'schedule';
-    
+    const action = isScheduled ? "unschedule" : "schedule";
+
     try {
       setSchedulingCancel(true);
-      const response = await fetch('/api/gamemaster/schedule-cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/gamemaster/schedule-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      
+
       const result = await response.json();
       if (result.success) {
-        setData(prev => prev ? {
-          ...prev,
-          subscription: prev.subscription ? {
-            ...prev.subscription,
-            scheduledForDeletion: !isScheduled,
-            scheduledDeletionAt: isScheduled ? undefined : new Date().toISOString(),
-            autoRenew: isScheduled ? prev.subscription.autoRenew : false, // Disable autoRenew on schedule
-          } : null,
-        } : null);
-        
-        if (action === 'schedule') {
-          const daysRemaining = Math.max(0, Math.ceil((new Date(data.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-          toast.info(`Subscription scheduled for deletion after ${daysRemaining} days. You will continue earning until then.`, {
-            duration: 6000,
-          });
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                subscription: prev.subscription
+                  ? {
+                      ...prev.subscription,
+                      scheduledForDeletion: !isScheduled,
+                      scheduledDeletionAt: isScheduled
+                        ? undefined
+                        : new Date().toISOString(),
+                      autoRenew: isScheduled
+                        ? prev.subscription.autoRenew
+                        : false, // Disable autoRenew on schedule
+                    }
+                  : null,
+              }
+            : null,
+        );
+
+        if (action === "schedule") {
+          const daysRemaining = Math.max(
+            0,
+            Math.ceil(
+              (new Date(data.subscription.endDate).getTime() - Date.now()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          );
+          toast.info(
+            `Subscription scheduled for deletion after ${daysRemaining} days. You will continue earning until then.`,
+            {
+              duration: 6000,
+            },
+          );
         } else {
-          toast.success('Cancellation cancelled. Your subscription will not be deleted.');
+          toast.success(
+            "Cancellation cancelled. Your subscription will not be deleted.",
+          );
         }
         setShowCancelConfirm(false);
       } else {
@@ -270,33 +310,45 @@ export default function GameMasterDashboardContent() {
             <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 mb-8">
               <Crown className="h-12 w-12 text-yellow-400" />
             </div>
-            
+
             <h1 className="text-4xl font-bold text-white mb-4">
               Become a Game Master
             </h1>
             <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Create competitions, build your trading community, and earn from referrals. 
-              Unlock the power of Game Master status today!
+              Create competitions, build your trading community, and earn from
+              referrals. Unlock the power of Game Master status today!
             </p>
-            
+
             <div className="grid md:grid-cols-3 gap-6 mb-12">
               <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                 <Trophy className="h-10 w-10 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Create Competitions</h3>
-                <p className="text-gray-400 text-sm">Host your own trading competitions for your community</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Create Competitions
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Host your own trading competitions for your community
+                </p>
               </div>
               <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                 <Users className="h-10 w-10 text-emerald-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Grow Your Community</h3>
-                <p className="text-gray-400 text-sm">Refer traders and build your trading network</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Grow Your Community
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Refer traders and build your trading network
+                </p>
               </div>
               <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                 <TrendingUp className="h-10 w-10 text-blue-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Earn Rewards</h3>
-                <p className="text-gray-400 text-sm">Get a percentage of entry fees from your referrals</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Earn Rewards
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Get a percentage of entry fees from your referrals
+                </p>
               </div>
             </div>
-            
+
             <Link
               href="/marketplace?category=gamemaster"
               className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold text-lg rounded-2xl transition-all shadow-lg shadow-yellow-500/20"
@@ -312,9 +364,14 @@ export default function GameMasterDashboardContent() {
   }
 
   const sub = data.subscription;
-  const daysRemaining = Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-  const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/sign-up?ref=${sub.referralCode}`;
-  const isExpired = sub.status !== 'active' || daysRemaining === 0;
+  const daysRemaining = Math.max(
+    0,
+    Math.ceil(
+      (new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    ),
+  );
+  const referralLink = `${typeof window !== "undefined" ? window.location.origin : ""}/sign-up?ref=${sub.referralCode}`;
+  const isExpired = sub.status !== "active" || daysRemaining === 0;
   const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7; // Warning when 7 days or less
   const isExpiringCritical = daysRemaining > 0 && daysRemaining <= 3; // Critical when 3 days or less
   const isPaused = sub.isPaused === true;
@@ -335,19 +392,21 @@ export default function GameMasterDashboardContent() {
               <div>
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                   Game Master Dashboard
-                  <span className={cn(
-                    'px-3 py-1 rounded-full text-sm font-semibold',
-                    isExpired 
-                      ? 'bg-red-500/20 text-red-400' 
-                      : 'bg-emerald-500/20 text-emerald-400'
-                  )}>
-                    {isExpired ? 'Expired' : 'Active'}
+                  <span
+                    className={cn(
+                      "px-3 py-1 rounded-full text-sm font-semibold",
+                      isExpired
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-emerald-500/20 text-emerald-400",
+                    )}
+                  >
+                    {isExpired ? "Expired" : "Active"}
                   </span>
                 </h1>
                 <p className="text-gray-400 mt-1">{sub.packageName}</p>
               </div>
             </div>
-            
+
             <button
               onClick={fetchGameMasterData}
               className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors"
@@ -365,9 +424,12 @@ export default function GameMasterDashboardContent() {
           <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-4">
             <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-red-400">Your Game Master subscription has expired</h3>
+              <h3 className="font-semibold text-red-400">
+                Your Game Master subscription has expired
+              </h3>
               <p className="text-gray-400 text-sm mt-1">
-                Renew your subscription to continue creating competitions and earning from referrals.
+                Renew your subscription to continue creating competitions and
+                earning from referrals.
               </p>
               <Link
                 href="/marketplace?category=gamemaster"
@@ -384,16 +446,26 @@ export default function GameMasterDashboardContent() {
           <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl flex items-start gap-4">
             <Pause className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-yellow-400">Subscription Paused</h3>
+              <h3 className="font-semibold text-yellow-400">
+                Subscription Paused
+              </h3>
               <p className="text-gray-400 text-sm mt-1">
-                Your Game Master subscription is paused. You will <span className="text-yellow-400 font-semibold">NOT receive referral fees</span> from your referrals until you resume.
+                Your Game Master subscription is paused. You will{" "}
+                <span className="text-yellow-400 font-semibold">
+                  NOT receive referral fees
+                </span>{" "}
+                from your referrals until you resume.
               </p>
               <button
                 onClick={togglePause}
                 disabled={togglingPause}
                 className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {togglingPause ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {togglingPause ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
                 Resume Subscription
               </button>
             </div>
@@ -405,17 +477,26 @@ export default function GameMasterDashboardContent() {
           <div className="mb-8 p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-start gap-4">
             <AlertTriangle className="h-6 w-6 text-orange-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-orange-400">Scheduled for Cancellation</h3>
+              <h3 className="font-semibold text-orange-400">
+                Scheduled for Cancellation
+              </h3>
               <p className="text-gray-400 text-sm mt-1">
-                Your subscription is scheduled to be deleted on <span className="text-orange-400 font-semibold">{new Date(sub.endDate).toLocaleDateString()}</span>. 
-                You will continue receiving referral fees until then.
+                Your subscription is scheduled to be deleted on{" "}
+                <span className="text-orange-400 font-semibold">
+                  {new Date(sub.endDate).toLocaleDateString()}
+                </span>
+                . You will continue receiving referral fees until then.
               </p>
               <button
                 onClick={toggleScheduledCancellation}
                 disabled={schedulingCancel}
                 className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                {schedulingCancel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
                 Cancel Deletion
               </button>
             </div>
@@ -424,54 +505,85 @@ export default function GameMasterDashboardContent() {
 
         {/* Referral Section */}
         <div className="mb-8">
-          <div className={cn(
-            "rounded-2xl p-6 border",
-            isPaused 
-              ? "bg-gray-800/50 border-gray-700/50 opacity-75"
-              : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20"
-          )}>
+          <div
+            className={cn(
+              "rounded-2xl p-6 border",
+              isPaused
+                ? "bg-gray-800/50 border-gray-700/50 opacity-75"
+                : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20",
+            )}
+          >
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Link2 className={isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"} />
+              <Link2
+                className={
+                  isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"
+                }
+              />
               Your Referral Link
-              {isPaused && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">PAUSED</span>}
+              {isPaused && (
+                <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                  PAUSED
+                </span>
+              )}
             </h2>
             <p className="text-gray-400 text-sm mb-4">
               {isPaused ? (
-                <span className="text-yellow-400">⚠️ Your subscription is paused. Referral fees are not being collected.</span>
+                <span className="text-yellow-400">
+                  ⚠️ Your subscription is paused. Referral fees are not being
+                  collected.
+                </span>
               ) : (
-                <>Share this link to invite new traders. You'll earn <span className="text-emerald-400 font-semibold">{sub.limits.referralFeePercentage}%</span> of their competition entry fees!</>
+                <>
+                  Share this link to invite new traders. You'll earn{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {sub.limits.referralFeePercentage}%
+                  </span>{" "}
+                  of their competition entry fees!
+                </>
               )}
             </p>
-            
+
             <div className="grid md:grid-cols-2 gap-4">
               {/* Referral Code */}
               <div>
-                <label className="text-sm text-gray-500 mb-2 block">Referral Code</label>
+                <label className="text-sm text-gray-500 mb-2 block">
+                  Referral Code
+                </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-gray-900 rounded-xl px-4 py-3 font-mono text-xl text-yellow-400 border border-gray-700">
                     {sub.referralCode}
                   </div>
                   <button
-                    onClick={() => copyToClipboard(sub.referralCode, 'code')}
+                    onClick={() => copyToClipboard(sub.referralCode, "code")}
                     className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
                   >
-                    {copiedCode ? <Check className="h-5 w-5 text-emerald-400" /> : <Copy className="h-5 w-5 text-gray-400" />}
+                    {copiedCode ? (
+                      <Check className="h-5 w-5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-gray-400" />
+                    )}
                   </button>
                 </div>
               </div>
-              
+
               {/* Full Referral Link */}
               <div>
-                <label className="text-sm text-gray-500 mb-2 block">Full Referral Link</label>
+                <label className="text-sm text-gray-500 mb-2 block">
+                  Full Referral Link
+                </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-gray-900 rounded-xl px-4 py-3 text-sm text-gray-300 border border-gray-700 truncate">
                     {referralLink}
                   </div>
                   <button
-                    onClick={() => copyToClipboard(referralLink, 'link')}
+                    onClick={() => copyToClipboard(referralLink, "link")}
                     className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
                   >
-                    {copiedLink ? <Check className="h-5 w-5 text-emerald-400" /> : <Copy className="h-5 w-5 text-gray-400" />}
+                    {copiedLink ? (
+                      <Check className="h-5 w-5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-gray-400" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -488,9 +600,11 @@ export default function GameMasterDashboardContent() {
               </div>
               <span className="text-sm text-gray-400">Total Earnings</span>
             </div>
-            <p className="text-2xl font-bold text-white">⚡ {sub.totalEarnings.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-white">
+              ⚡ {sub.totalEarnings.toLocaleString()}
+            </p>
           </div>
-          
+
           <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-blue-500/10">
@@ -498,43 +612,67 @@ export default function GameMasterDashboardContent() {
               </div>
               <span className="text-sm text-gray-400">Referred Users</span>
             </div>
-            <p className="text-2xl font-bold text-white">{sub.totalReferredUsers}</p>
+            <p className="text-2xl font-bold text-white">
+              {sub.totalReferredUsers}
+            </p>
           </div>
-          
+
           <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-purple-500/10">
                 <Trophy className="h-5 w-5 text-purple-400" />
               </div>
-              <span className="text-sm text-gray-400">Competitions Created</span>
+              <span className="text-sm text-gray-400">
+                Competitions Created
+              </span>
             </div>
-            <p className="text-2xl font-bold text-white">{sub.totalCompetitionsCreated}</p>
+            <p className="text-2xl font-bold text-white">
+              {sub.totalCompetitionsCreated}
+            </p>
           </div>
-          
-          <div className={`rounded-2xl p-5 border ${
-            isExpiringCritical ? 'bg-red-900/30 border-red-500/50' :
-            isExpiringSoon ? 'bg-yellow-900/20 border-yellow-500/50' :
-            'bg-gray-800/50 border-gray-700/50'
-          }`}>
+
+          <div
+            className={`rounded-2xl p-5 border ${
+              isExpiringCritical
+                ? "bg-red-900/30 border-red-500/50"
+                : isExpiringSoon
+                  ? "bg-yellow-900/20 border-yellow-500/50"
+                  : "bg-gray-800/50 border-gray-700/50"
+            }`}
+          >
             <div className="flex items-center gap-3 mb-3">
-              <div className={`p-2 rounded-lg ${
-                isExpiringCritical ? 'bg-red-500/20' :
-                isExpiringSoon ? 'bg-yellow-500/20' :
-                'bg-yellow-500/10'
-              }`}>
-                <Calendar className={`h-5 w-5 ${
-                  isExpiringCritical ? 'text-red-400' :
-                  isExpiringSoon ? 'text-yellow-400' :
-                  'text-yellow-400'
-                }`} />
+              <div
+                className={`p-2 rounded-lg ${
+                  isExpiringCritical
+                    ? "bg-red-500/20"
+                    : isExpiringSoon
+                      ? "bg-yellow-500/20"
+                      : "bg-yellow-500/10"
+                }`}
+              >
+                <Calendar
+                  className={`h-5 w-5 ${
+                    isExpiringCritical
+                      ? "text-red-400"
+                      : isExpiringSoon
+                        ? "text-yellow-400"
+                        : "text-yellow-400"
+                  }`}
+                />
               </div>
               <span className="text-sm text-gray-400">Days Remaining</span>
             </div>
-            <p className={`text-2xl font-bold ${
-              isExpiringCritical ? 'text-red-400 animate-pulse' :
-              isExpiringSoon ? 'text-yellow-400' :
-              'text-white'
-            }`}>{daysRemaining}</p>
+            <p
+              className={`text-2xl font-bold ${
+                isExpiringCritical
+                  ? "text-red-400 animate-pulse"
+                  : isExpiringSoon
+                    ? "text-yellow-400"
+                    : "text-white"
+              }`}
+            >
+              {daysRemaining}
+            </p>
             {isExpiringCritical && (
               <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
                 ⚠️ Expires soon! Renew now
@@ -556,19 +694,25 @@ export default function GameMasterDashboardContent() {
               <Shield className="h-5 w-5 text-yellow-400" />
               Subscription Details
             </h2>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Package</span>
-                <span className="text-white font-medium">{sub.packageName}</span>
+                <span className="text-white font-medium">
+                  {sub.packageName}
+                </span>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Create Competitions</span>
-                <span className={cn(
-                  'font-medium',
-                  sub.canCreateCompetitions ? 'text-emerald-400' : 'text-purple-400'
-                )}>
-                  {sub.canCreateCompetitions ? 'Enabled' : 'Referral-Only'}
+                <span
+                  className={cn(
+                    "font-medium",
+                    sub.canCreateCompetitions
+                      ? "text-emerald-400"
+                      : "text-purple-400",
+                  )}
+                >
+                  {sub.canCreateCompetitions ? "Enabled" : "Referral-Only"}
                 </span>
               </div>
               {sub.canCreateCompetitions && (
@@ -576,28 +720,37 @@ export default function GameMasterDashboardContent() {
                   <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                     <span className="text-gray-400">Competitions/Day</span>
                     <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                      {sub.currentPeriodCompetitionsCreated} /{" "}
+                      {sub.limits.maxCompetitionsPerDay}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                     <span className="text-gray-400">Max Users/Competition</span>
-                    <span className="text-white font-medium">{sub.limits.maxUsersPerCompetition}</span>
+                    <span className="text-white font-medium">
+                      {sub.limits.maxUsersPerCompetition}
+                    </span>
                   </div>
                 </>
               )}
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Competition Referral Fee</span>
-                <span className="text-emerald-400 font-medium">{sub.limits.referralFeePercentage}%</span>
+                <span className="text-emerald-400 font-medium">
+                  {sub.limits.referralFeePercentage}%
+                </span>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Challenge Earnings</span>
-                <span className={cn(
-                  'font-medium',
-                  sub.canEarnFromChallenges ? 'text-orange-400' : 'text-gray-500'
-                )}>
-                  {sub.canEarnFromChallenges 
+                <span
+                  className={cn(
+                    "font-medium",
+                    sub.canEarnFromChallenges
+                      ? "text-orange-400"
+                      : "text-gray-500",
+                  )}
+                >
+                  {sub.canEarnFromChallenges
                     ? `${sub.limits.challengeReferralFeePercentage ?? sub.limits.referralFeePercentage}% ⚔️`
-                    : 'Not Included'}
+                    : "Not Included"}
                 </span>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
@@ -612,22 +765,25 @@ export default function GameMasterDashboardContent() {
                   onClick={toggleAutoRenew}
                   disabled={togglingRenewal}
                   className={cn(
-                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                    sub.autoRenew ? 'bg-emerald-500' : 'bg-gray-600'
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    sub.autoRenew ? "bg-emerald-500" : "bg-gray-600",
                   )}
                 >
-                  <span className={cn(
-                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                    sub.autoRenew ? 'translate-x-6' : 'translate-x-1'
-                  )} />
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      sub.autoRenew ? "translate-x-6" : "translate-x-1",
+                    )}
+                  />
                 </button>
               </div>
             </div>
-            
+
             {sub.autoRenew && (
               <p className="text-sm text-gray-500 mt-4">
                 <Clock className="h-4 w-4 inline mr-1" />
-                Auto-renews for ⚡ {sub.renewalPrice.toLocaleString()} credits on {new Date(sub.endDate).toLocaleDateString()}
+                Auto-renews for ⚡ {sub.renewalPrice.toLocaleString()} credits
+                on {new Date(sub.endDate).toLocaleDateString()}
               </p>
             )}
 
@@ -637,34 +793,44 @@ export default function GameMasterDashboardContent() {
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
                   Subscription Controls
                 </h3>
-                
+
                 {/* Pause/Resume Toggle */}
                 <div className="flex items-center justify-between py-3 mb-3 bg-gray-900/50 rounded-lg px-4">
                   <div>
                     <span className="text-white font-medium flex items-center gap-2">
-                      {isPaused ? <Pause className="h-4 w-4 text-yellow-400" /> : <Play className="h-4 w-4 text-emerald-400" />}
-                      {isPaused ? 'Paused' : 'Active'}
+                      {isPaused ? (
+                        <Pause className="h-4 w-4 text-yellow-400" />
+                      ) : (
+                        <Play className="h-4 w-4 text-emerald-400" />
+                      )}
+                      {isPaused ? "Paused" : "Active"}
                     </span>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {isPaused ? 'Not receiving referral fees' : 'Receiving referral fees'}
+                      {isPaused
+                        ? "Not receiving referral fees"
+                        : "Receiving referral fees"}
                     </p>
                   </div>
                   <button
                     onClick={togglePause}
                     disabled={togglingPause}
                     className={cn(
-                      'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50',
-                      isPaused 
-                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
-                        : 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30'
+                      "px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50",
+                      isPaused
+                        ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                        : "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30",
                     )}
                   >
                     {togglingPause ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isPaused ? (
-                      <><Play className="h-4 w-4" /> Resume</>
+                      <>
+                        <Play className="h-4 w-4" /> Resume
+                      </>
                     ) : (
-                      <><Pause className="h-4 w-4" /> Pause</>
+                      <>
+                        <Pause className="h-4 w-4" /> Pause
+                      </>
                     )}
                   </button>
                 </div>
@@ -694,7 +860,11 @@ export default function GameMasterDashboardContent() {
                       disabled={schedulingCancel}
                       className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
-                      {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                      {schedulingCancel ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4" />
+                      )}
                       Keep
                     </button>
                   </div>
@@ -709,7 +879,7 @@ export default function GameMasterDashboardContent() {
               <Zap className="h-5 w-5 text-yellow-400" />
               Quick Actions
             </h2>
-            
+
             <div className="space-y-4">
               {/* Today's Usage - Only show if can create competitions */}
               {sub.canCreateCompetitions && (
@@ -717,14 +887,15 @@ export default function GameMasterDashboardContent() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-400">Today's Competitions</span>
                     <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                      {sub.currentPeriodCompetitionsCreated} /{" "}
+                      {sub.limits.maxCompetitionsPerDay}
                     </span>
                   </div>
                   <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-gradient-to-r from-yellow-500 to-amber-500 transition-all"
-                      style={{ 
-                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%` 
+                      style={{
+                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%`,
                       }}
                     />
                   </div>
@@ -736,10 +907,10 @@ export default function GameMasterDashboardContent() {
                 <Link
                   href="/gamemaster/create-competition"
                   className={cn(
-                    'flex items-center justify-between p-4 rounded-xl transition-all',
-                    isExpired 
-                      ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20 text-white border border-yellow-500/20'
+                    "flex items-center justify-between p-4 rounded-xl transition-all",
+                    isExpired
+                      ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
+                      : "bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20 text-white border border-yellow-500/20",
                   )}
                   onClick={(e) => isExpired && e.preventDefault()}
                 >
@@ -747,7 +918,9 @@ export default function GameMasterDashboardContent() {
                     <Trophy className="h-5 w-5 text-yellow-400" />
                     <div>
                       <p className="font-medium">Create Competition</p>
-                      <p className="text-sm text-gray-400">Host a new trading competition</p>
+                      <p className="text-sm text-gray-400">
+                        Host a new trading competition
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5" />
@@ -759,9 +932,12 @@ export default function GameMasterDashboardContent() {
                       <TrendingUp className="h-5 w-5 text-purple-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-purple-400">Referral-Only Package</p>
+                      <p className="font-medium text-purple-400">
+                        Referral-Only Package
+                      </p>
                       <p className="text-sm text-gray-400">
-                        Earn {sub.limits.referralFeePercentage}% from your referrals in all competitions
+                        Earn {sub.limits.referralFeePercentage}% from your
+                        referrals in all competitions
                       </p>
                     </div>
                   </div>
@@ -776,7 +952,9 @@ export default function GameMasterDashboardContent() {
                   <Users className="h-5 w-5 text-blue-400" />
                   <div>
                     <p className="font-medium">View Referrals</p>
-                    <p className="text-sm text-gray-400">See all your referred users</p>
+                    <p className="text-sm text-gray-400">
+                      See all your referred users
+                    </p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5" />
@@ -790,7 +968,9 @@ export default function GameMasterDashboardContent() {
                   <Gift className="h-5 w-5 text-emerald-400" />
                   <div>
                     <p className="font-medium">View Earnings</p>
-                    <p className="text-sm text-gray-400">Detailed earnings history</p>
+                    <p className="text-sm text-gray-400">
+                      Detailed earnings history
+                    </p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5" />
@@ -809,7 +989,7 @@ export default function GameMasterDashboardContent() {
                 ({data.referredUsers.length} total)
               </span>
             </h2>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -848,33 +1028,39 @@ export default function GameMasterDashboardContent() {
                 <AlertTriangle className="h-6 w-6 text-orange-400" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">Cancel Subscription?</h3>
-                <p className="text-sm text-gray-400">This action schedules your subscription for deletion</p>
+                <h3 className="text-xl font-bold text-white">
+                  Cancel Subscription?
+                </h3>
+                <p className="text-sm text-gray-400">
+                  This action schedules your subscription for deletion
+                </p>
               </div>
             </div>
-            
+
             <div className="space-y-4 mb-6">
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
                 <p className="text-sm text-emerald-400 flex items-center gap-2">
                   <Check className="h-4 w-4" />
-                  You'll continue earning referral fees until {new Date(sub.endDate).toLocaleDateString()}
+                  You'll continue earning referral fees until{" "}
+                  {new Date(sub.endDate).toLocaleDateString()}
                 </p>
               </div>
-              
+
               <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
                 <p className="text-sm text-orange-400 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
                   After that, your subscription will be permanently deleted
                 </p>
               </div>
-              
+
               <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                 <p className="text-sm text-gray-400">
-                  <strong className="text-white">Note:</strong> Auto-renewal will be disabled. You can undo this anytime before expiry.
+                  <strong className="text-white">Note:</strong> Auto-renewal
+                  will be disabled. You can undo this anytime before expiry.
                 </p>
               </div>
             </div>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelConfirm(false)}

@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import Invoice from '@/database/models/invoice.model';
-import { InvoiceService } from '@/lib/services/invoice.service';
-import { requireAdminAuth } from '@/lib/admin/auth';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import Invoice from "@/database/models/invoice.model";
+import { InvoiceService } from "@/lib/services/invoice.service";
+import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/invoices/[id]/view
@@ -10,18 +10,19 @@ import { requireAdminAuth } from '@/lib/admin/auth';
  */
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
 
     const { id } = await params;
-    
+
     const invoice = await Invoice.findById(id);
-    
+
     if (!invoice) {
-      return new NextResponse(`
+      return new NextResponse(
+        `
 <!DOCTYPE html>
 <html>
 <head>
@@ -57,15 +58,17 @@ export async function GET(
   </div>
 </body>
 </html>
-      `, { 
-        status: 404,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' }
-      });
+      `,
+        {
+          status: 404,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        },
+      );
     }
-    
+
     // Generate HTML for viewing
     const invoiceHtml = await InvoiceService.generateInvoiceHTML(invoice);
-    
+
     // Wrap in a nice viewing page
     const viewableHtml = `
 <!DOCTYPE html>
@@ -186,17 +189,18 @@ export async function GET(
 </body>
 </html>
     `;
-    
+
     return new NextResponse(viewableHtml, {
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
+        "Content-Type": "text/html; charset=utf-8",
       },
     });
   } catch (error) {
-    console.error('Error viewing invoice:', error);
-    
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return new NextResponse(`
+    console.error("Error viewing invoice:", error);
+
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return new NextResponse(
+        `
 <!DOCTYPE html>
 <html>
 <head>
@@ -223,13 +227,14 @@ export async function GET(
   </div>
 </body>
 </html>
-      `, { 
-        status: 401,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' }
-      });
+      `,
+        {
+          status: 401,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        },
+      );
     }
-    
-    return new NextResponse('Failed to load invoice', { status: 500 });
+
+    return new NextResponse("Failed to load invoice", { status: 500 });
   }
 }
-

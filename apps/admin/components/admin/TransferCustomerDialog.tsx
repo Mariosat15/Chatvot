@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,20 +8,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { ArrowRight, User, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, User, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Employee {
   _id: string;
@@ -58,8 +58,8 @@ export function TransferCustomerDialog({
   onTransferComplete,
 }: TransferCustomerDialogProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-  const [reason, setReason] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
@@ -72,19 +72,19 @@ export function TransferCustomerDialog({
   const fetchEmployees = async () => {
     try {
       setLoadingEmployees(true);
-      const response = await fetch('/api/employees');
+      const response = await fetch("/api/employees");
       const data = await response.json();
 
       if (data.success) {
         // Filter out current assignee
         const filtered = (data.employees || []).filter(
-          (emp: Employee) => emp._id !== currentAssignment?.employeeId
+          (emp: Employee) => emp._id !== currentAssignment?.employeeId,
         );
         setEmployees(filtered);
       }
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Failed to load employees');
+      console.error("Error fetching employees:", error);
+      toast.error("Failed to load employees");
     } finally {
       setLoadingEmployees(false);
     }
@@ -92,16 +92,16 @@ export function TransferCustomerDialog({
 
   const handleTransfer = async () => {
     if (!selectedEmployeeId) {
-      toast.error('Please select an employee');
+      toast.error("Please select an employee");
       return;
     }
 
     try {
       setLoading(true);
-      
-      const response = await fetch('/api/customer-assignments/transfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+
+      const response = await fetch("/api/customer-assignments/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId,
           toEmployeeId: selectedEmployeeId,
@@ -112,21 +112,21 @@ export function TransferCustomerDialog({
       const data = await response.json();
 
       if (data.success) {
-        toast.success(data.message || 'Customer transferred successfully');
+        toast.success(data.message || "Customer transferred successfully");
         onOpenChange(false);
         onTransferComplete?.();
       } else {
-        toast.error(data.error || 'Failed to transfer customer');
+        toast.error(data.error || "Failed to transfer customer");
       }
     } catch (error) {
-      console.error('Error transferring customer:', error);
-      toast.error('Failed to transfer customer');
+      console.error("Error transferring customer:", error);
+      toast.error("Failed to transfer customer");
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedEmployee = employees.find(e => e._id === selectedEmployeeId);
+  const selectedEmployee = employees.find((e) => e._id === selectedEmployeeId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,12 +142,18 @@ export function TransferCustomerDialog({
           {/* Current Assignment */}
           {currentAssignment && (
             <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Current Assignment</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                Current Assignment
+              </p>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-400" />
                 <div>
-                  <p className="text-sm font-medium text-white">{currentAssignment.employeeName}</p>
-                  <p className="text-xs text-gray-400">{currentAssignment.employeeEmail}</p>
+                  <p className="text-sm font-medium text-white">
+                    {currentAssignment.employeeName}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {currentAssignment.employeeEmail}
+                  </p>
                 </div>
                 <Badge variant="outline" className="ml-auto text-xs">
                   {currentAssignment.employeeRole}
@@ -169,7 +175,10 @@ export function TransferCustomerDialog({
                 <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
               </div>
             ) : (
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={setSelectedEmployeeId}
+              >
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
@@ -180,15 +189,17 @@ export function TransferCustomerDialog({
                     </div>
                   ) : (
                     employees.map((emp) => (
-                      <SelectItem 
-                        key={emp._id} 
+                      <SelectItem
+                        key={emp._id}
                         value={emp._id}
                         className="text-white"
                       >
                         <div className="flex items-center justify-between w-full gap-4">
                           <div>
                             <span className="font-medium">{emp.name}</span>
-                            <span className="text-gray-400 text-xs ml-2">({emp.email})</span>
+                            <span className="text-gray-400 text-xs ml-2">
+                              ({emp.email})
+                            </span>
                           </div>
                           <Badge variant="outline" className="text-xs">
                             {emp.role}
@@ -205,14 +216,23 @@ export function TransferCustomerDialog({
           {/* Selected Employee Preview */}
           {selectedEmployee && (
             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
-              <p className="text-xs text-emerald-400 uppercase tracking-wider mb-2">New Assignment</p>
+              <p className="text-xs text-emerald-400 uppercase tracking-wider mb-2">
+                New Assignment
+              </p>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-emerald-400" />
                 <div>
-                  <p className="text-sm font-medium text-white">{selectedEmployee.name}</p>
-                  <p className="text-xs text-gray-400">{selectedEmployee.email}</p>
+                  <p className="text-sm font-medium text-white">
+                    {selectedEmployee.name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {selectedEmployee.email}
+                  </p>
                 </div>
-                <Badge variant="outline" className="ml-auto text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                <Badge
+                  variant="outline"
+                  className="ml-auto text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                >
                   {selectedEmployee.role}
                 </Badge>
               </div>
@@ -251,7 +271,7 @@ export function TransferCustomerDialog({
                 Transferring...
               </>
             ) : (
-              'Transfer Customer'
+              "Transfer Customer"
             )}
           </Button>
         </DialogFooter>
@@ -261,4 +281,3 @@ export function TransferCustomerDialog({
 }
 
 export default TransferCustomerDialog;
-

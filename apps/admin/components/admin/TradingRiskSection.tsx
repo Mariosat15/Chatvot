@@ -1,12 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, Shield, TrendingDown, Layers, Save, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  AlertTriangle,
+  Shield,
+  TrendingDown,
+  Layers,
+  Save,
+  RefreshCw,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface RiskSettings {
   // Margin Levels (%)
@@ -14,20 +27,20 @@ interface RiskSettings {
   marginCall: number; // Margin call warning
   marginWarning: number; // Low margin warning
   marginSafe: number; // Recommended minimum
-  
+
   // Position Limits
   maxOpenPositions: number; // Max trades per user
   maxPositionSize: number; // Max lot size per trade
-  
+
   // Leverage Limits
   minLeverage: number; // Minimum leverage allowed
   maxLeverage: number; // Maximum leverage allowed
   defaultLeverage: number; // Default leverage in forms
-  
+
   // Risk Limits
   maxDrawdownPercent: number; // Max drawdown before restrictions
   dailyLossLimit: number; // Max daily loss percentage
-  
+
   // Monitoring Settings
   marginCheckIntervalSeconds: number; // How often to check margin levels (in seconds)
 }
@@ -38,20 +51,20 @@ const DEFAULT_SETTINGS: RiskSettings = {
   marginCall: 100,
   marginWarning: 150,
   marginSafe: 200,
-  
+
   // Position Limits
   maxOpenPositions: 10,
   maxPositionSize: 100,
-  
+
   // Leverage Limits
   minLeverage: 1,
   maxLeverage: 500,
   defaultLeverage: 10,
-  
+
   // Risk Limits
   maxDrawdownPercent: 50,
   dailyLossLimit: 20,
-  
+
   // Monitoring Settings
   marginCheckIntervalSeconds: 60,
 };
@@ -65,7 +78,7 @@ export default function TradingRiskSection() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch('/api/trading-risk-settings');
+        const response = await fetch("/api/trading-risk-settings");
         if (response.ok) {
           const data = await response.json();
           if (data.settings) {
@@ -73,7 +86,7 @@ export default function TradingRiskSection() {
           }
         }
       } catch (error) {
-        console.error('Failed to load risk settings:', error);
+        console.error("Failed to load risk settings:", error);
       } finally {
         setIsLoading(false);
       }
@@ -84,54 +97,58 @@ export default function TradingRiskSection() {
   const handleSave = async () => {
     // Validation
     if (settings.marginLiquidation >= settings.marginCall) {
-      toast.error('Stopout level must be less than Margin Call level');
+      toast.error("Stopout level must be less than Margin Call level");
       return;
     }
     if (settings.marginCall >= settings.marginWarning) {
-      toast.error('Margin Call level must be less than Warning level');
+      toast.error("Margin Call level must be less than Warning level");
       return;
     }
     if (settings.marginWarning >= settings.marginSafe) {
-      toast.error('Warning level must be less than Safe level');
+      toast.error("Warning level must be less than Safe level");
       return;
     }
     if (settings.minLeverage >= settings.maxLeverage) {
-      toast.error('Min leverage must be less than Max leverage');
+      toast.error("Min leverage must be less than Max leverage");
       return;
     }
-    if (settings.defaultLeverage < settings.minLeverage || settings.defaultLeverage > settings.maxLeverage) {
-      toast.error('Default leverage must be between Min and Max');
+    if (
+      settings.defaultLeverage < settings.minLeverage ||
+      settings.defaultLeverage > settings.maxLeverage
+    ) {
+      toast.error("Default leverage must be between Min and Max");
       return;
     }
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/trading-risk-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/trading-risk-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
       if (response.ok) {
-        toast.success('Trading risk settings saved successfully!', {
-          description: '✅ Changes are now live and will apply to all users immediately (within 10 seconds)',
+        toast.success("Trading risk settings saved successfully!", {
+          description:
+            "✅ Changes are now live and will apply to all users immediately (within 10 seconds)",
           duration: 5000,
         });
       } else {
         const data = await response.json();
-        toast.error(data.message || 'Failed to save settings');
+        toast.error(data.message || "Failed to save settings");
       }
     } catch (error) {
-      toast.error('Network error. Please try again.');
+      toast.error("Network error. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleReset = () => {
-    if (confirm('Reset all settings to default values?')) {
+    if (confirm("Reset all settings to default values?")) {
       setSettings(DEFAULT_SETTINGS);
-      toast.info('Settings reset to defaults. Click Save to apply.');
+      toast.info("Settings reset to defaults. Click Save to apply.");
     }
   };
 
@@ -163,7 +180,8 @@ export default function TradingRiskSection() {
                   Trading Risk Settings
                 </h2>
                 <p className="text-red-100 mt-1">
-                  Configure global risk management parameters for all competitions
+                  Configure global risk management parameters for all
+                  competitions
                 </p>
               </div>
             </div>
@@ -182,7 +200,7 @@ export default function TradingRiskSection() {
                 className="bg-white hover:bg-gray-100 text-red-600 font-bold shadow-xl"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSaving ? 'Saving...' : 'Save Settings'}
+                {isSaving ? "Saving..." : "Save Settings"}
               </Button>
             </div>
           </div>
@@ -199,17 +217,25 @@ export default function TradingRiskSection() {
             Margin & Stopout Levels
           </CardTitle>
           <CardDescription className="text-gray-400 text-sm">
-            Define margin thresholds that trigger warnings and automatic position closures
+            Define margin thresholds that trigger warnings and automatic
+            position closures
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-gray-300">Stopout Level (Liquidation) %</Label>
+              <Label className="text-gray-300">
+                Stopout Level (Liquidation) %
+              </Label>
               <Input
                 type="number"
                 value={settings.marginLiquidation}
-                onChange={(e) => setSettings({ ...settings, marginLiquidation: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    marginLiquidation: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={1}
                 max={100}
@@ -224,7 +250,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.marginCall}
-                onChange={(e) => setSettings({ ...settings, marginCall: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    marginCall: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={settings.marginLiquidation + 1}
                 max={200}
@@ -239,7 +270,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.marginWarning}
-                onChange={(e) => setSettings({ ...settings, marginWarning: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    marginWarning: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={settings.marginCall + 1}
                 max={300}
@@ -254,7 +290,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.marginSafe}
-                onChange={(e) => setSettings({ ...settings, marginSafe: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    marginSafe: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={settings.marginWarning + 1}
                 max={500}
@@ -283,11 +324,18 @@ export default function TradingRiskSection() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-gray-300">Max Open Positions (Trades)</Label>
+              <Label className="text-gray-300">
+                Max Open Positions (Trades)
+              </Label>
               <Input
                 type="number"
                 value={settings.maxOpenPositions}
-                onChange={(e) => setSettings({ ...settings, maxOpenPositions: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    maxOpenPositions: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={1}
                 max={100}
@@ -302,7 +350,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.maxPositionSize}
-                onChange={(e) => setSettings({ ...settings, maxPositionSize: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    maxPositionSize: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={0.01}
                 max={1000}
@@ -336,7 +389,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.minLeverage}
-                onChange={(e) => setSettings({ ...settings, minLeverage: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    minLeverage: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={1}
                 max={settings.maxLeverage - 1}
@@ -349,7 +407,12 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.maxLeverage}
-                onChange={(e) => setSettings({ ...settings, maxLeverage: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    maxLeverage: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={settings.minLeverage + 1}
                 max={500}
@@ -362,12 +425,19 @@ export default function TradingRiskSection() {
               <Input
                 type="number"
                 value={settings.defaultLeverage}
-                onChange={(e) => setSettings({ ...settings, defaultLeverage: Number(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    defaultLeverage: Number(e.target.value),
+                  })
+                }
                 className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
                 min={settings.minLeverage}
                 max={settings.maxLeverage}
               />
-              <p className="text-xs text-gray-400 mt-1">Pre-selected value in forms</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Pre-selected value in forms
+              </p>
             </div>
           </div>
         </CardContent>
@@ -391,13 +461,17 @@ export default function TradingRiskSection() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-blue-400 mt-0.5" />
               <div>
-                <h4 className="text-sm font-semibold text-blue-300 mb-1">Risk Limits Moved to Competitions</h4>
+                <h4 className="text-sm font-semibold text-blue-300 mb-1">
+                  Risk Limits Moved to Competitions
+                </h4>
                 <p className="text-xs text-gray-400">
-                  Max Drawdown and Daily Loss Limit settings are now configured per-competition when creating or editing a competition. 
-                  This allows different competitions to have different risk profiles.
+                  Max Drawdown and Daily Loss Limit settings are now configured
+                  per-competition when creating or editing a competition. This
+                  allows different competitions to have different risk profiles.
                 </p>
                 <p className="text-xs text-blue-400 mt-2">
-                  📍 Go to Create Competition → Step 4 (Trading Settings) → Risk Limits section
+                  📍 Go to Create Competition → Step 4 (Trading Settings) → Risk
+                  Limits section
                 </p>
               </div>
             </div>
@@ -420,27 +494,42 @@ export default function TradingRiskSection() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <Label htmlFor="marginCheckInterval" className="text-gray-300 text-sm font-medium">
+            <Label
+              htmlFor="marginCheckInterval"
+              className="text-gray-300 text-sm font-medium"
+            >
               Margin Check Interval (seconds)
             </Label>
             <Input
               id="marginCheckInterval"
               type="number"
               value={settings.marginCheckIntervalSeconds}
-              onChange={(e) => setSettings({ ...settings, marginCheckIntervalSeconds: Number(e.target.value) })}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  marginCheckIntervalSeconds: Number(e.target.value),
+                })
+              }
               className="bg-gray-700 border-gray-600 text-gray-100 mt-2"
               min={1}
               max={3600}
             />
             <p className="text-xs text-gray-400 mt-1">
-              How often the system checks for margin calls (1-3600 seconds). Lower = more responsive, higher = less server load.
+              How often the system checks for margin calls (1-3600 seconds).
+              Lower = more responsive, higher = less server load.
             </p>
             <div className="mt-2 text-xs text-gray-500">
               <strong>Recommended:</strong>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
-                <li><strong>1 second:</strong> Real-time monitoring (high load)</li>
-                <li><strong>5 seconds:</strong> Very responsive (moderate load)</li>
-                <li><strong>60 seconds:</strong> Balanced (low load)</li>
+                <li>
+                  <strong>1 second:</strong> Real-time monitoring (high load)
+                </li>
+                <li>
+                  <strong>5 seconds:</strong> Very responsive (moderate load)
+                </li>
+                <li>
+                  <strong>60 seconds:</strong> Balanced (low load)
+                </li>
               </ul>
             </div>
           </div>
@@ -454,7 +543,9 @@ export default function TradingRiskSection() {
             <Shield className="h-6 w-6 text-blue-400" />
           </div>
           <div>
-            <h4 className="text-lg font-semibold text-blue-300 mb-3">Important Information</h4>
+            <h4 className="text-lg font-semibold text-blue-300 mb-3">
+              Important Information
+            </h4>
             <ul className="text-sm text-gray-400 space-y-2 list-disc list-inside">
               <li>Changes apply to all new trades immediately</li>
               <li>Existing open positions are not affected</li>
@@ -468,4 +559,3 @@ export default function TradingRiskSection() {
     </div>
   );
 }
-

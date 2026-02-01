@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 /**
  * Game Master Earning Model
@@ -6,44 +6,44 @@ import { Schema, model, models, Document } from 'mongoose';
  * where referred users participated
  */
 
-export type EarningSource = 'competition' | 'challenge';
-export type EarningStatus = 'pending' | 'paid' | 'cancelled';
+export type EarningSource = "competition" | "challenge";
+export type EarningStatus = "pending" | "paid" | "cancelled";
 
 export interface IGameMasterEarning extends Document {
-  gameMasterId: string;           // Reference to userId (game master)
-  gameMasterEmail: string;        // Cached for quick lookups
-  
+  gameMasterId: string; // Reference to userId (game master)
+  gameMasterEmail: string; // Cached for quick lookups
+
   // Source of earning
   sourceType: EarningSource;
-  sourceId: string;               // Competition or Challenge ID
-  sourceName: string;             // Cached name for display
-  
+  sourceId: string; // Competition or Challenge ID
+  sourceName: string; // Cached name for display
+
   // Referred user who generated this earning
   referredUserId: string;
   referredUserEmail: string;
   referredUserName: string;
-  
+
   // Earning calculation
-  entryFeeAmount: number;         // What the referred user paid as entry fee
-  earningPercentage: number;      // The % at time of calculation
-  grossEarning: number;           // Raw earning (entryFee * percentage)
-  platformFee: number;            // Platform cut (if any)
-  netEarning: number;             // Final amount credited to game master
-  
+  entryFeeAmount: number; // What the referred user paid as entry fee
+  earningPercentage: number; // The % at time of calculation
+  grossEarning: number; // Raw earning (entryFee * percentage)
+  platformFee: number; // Platform cut (if any)
+  netEarning: number; // Final amount credited to game master
+
   // Status & Payment
   status: EarningStatus;
   paidAt?: Date;
-  transactionId?: string;         // Reference to WalletTransaction
-  
+  transactionId?: string; // Reference to WalletTransaction
+
   // Event details
-  eventStartTime: Date;           // When competition/challenge started
-  eventEndTime: Date;             // When it ended
-  participantCount: number;       // Total participants in the event
-  referredUserRank?: number;      // Final rank of referred user (if applicable)
-  
+  eventStartTime: Date; // When competition/challenge started
+  eventEndTime: Date; // When it ended
+  participantCount: number; // Total participants in the event
+  referredUserRank?: number; // Final rank of referred user (if applicable)
+
   // Notes
   notes?: string;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,7 +62,7 @@ const GameMasterEarningSchema = new Schema<IGameMasterEarning>(
     sourceType: {
       type: String,
       required: true,
-      enum: ['competition', 'challenge'],
+      enum: ["competition", "challenge"],
       index: true,
     },
     sourceId: {
@@ -117,8 +117,8 @@ const GameMasterEarningSchema = new Schema<IGameMasterEarning>(
     status: {
       type: String,
       required: true,
-      enum: ['pending', 'paid', 'cancelled'],
-      default: 'pending',
+      enum: ["pending", "paid", "cancelled"],
+      default: "pending",
       index: true,
     },
     paidAt: Date,
@@ -141,17 +141,17 @@ const GameMasterEarningSchema = new Schema<IGameMasterEarning>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound indexes for common queries
-GameMasterEarningSchema.index({ gameMasterId: 1, createdAt: -1 });  // GM's earnings history
-GameMasterEarningSchema.index({ gameMasterId: 1, status: 1 });  // GM's pending earnings
-GameMasterEarningSchema.index({ sourceType: 1, sourceId: 1 });  // Find earnings by event
-GameMasterEarningSchema.index({ referredUserId: 1, gameMasterId: 1 });  // Find GM for user
+GameMasterEarningSchema.index({ gameMasterId: 1, createdAt: -1 }); // GM's earnings history
+GameMasterEarningSchema.index({ gameMasterId: 1, status: 1 }); // GM's pending earnings
+GameMasterEarningSchema.index({ sourceType: 1, sourceId: 1 }); // Find earnings by event
+GameMasterEarningSchema.index({ referredUserId: 1, gameMasterId: 1 }); // Find GM for user
 
 const GameMasterEarning =
-  models?.GameMasterEarning || 
-  model<IGameMasterEarning>('GameMasterEarning', GameMasterEarningSchema);
+  models?.GameMasterEarning ||
+  model<IGameMasterEarning>("GameMasterEarning", GameMasterEarningSchema);
 
 export default GameMasterEarning;

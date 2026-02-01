@@ -1,15 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface InlineCountdownProps {
   targetDate: string;
-  type: 'start' | 'end';
+  type: "start" | "end";
   className?: string;
 }
 
-export default function InlineCountdown({ targetDate, type, className = '' }: InlineCountdownProps) {
-  const [countdown, setCountdown] = useState<string>('');
+export default function InlineCountdown({
+  targetDate,
+  type,
+  className = "",
+}: InlineCountdownProps) {
+  const [countdown, setCountdown] = useState<string>("");
 
   useEffect(() => {
     const calculateTime = () => {
@@ -18,12 +22,14 @@ export default function InlineCountdown({ targetDate, type, className = '' }: In
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setCountdown(type === 'start' ? 'Started' : 'Ended');
+        setCountdown(type === "start" ? "Started" : "Ended");
         return;
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -45,9 +51,6 @@ export default function InlineCountdown({ targetDate, type, className = '' }: In
   }, [targetDate, type]);
 
   return (
-    <span className={`tabular-nums ${className}`}>
-      {countdown || '...'}
-    </span>
+    <span className={`tabular-nums ${className}`}>{countdown || "..."}</span>
   );
 }
-

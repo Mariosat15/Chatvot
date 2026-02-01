@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/admin/auth';
-import { finalizeEndedChallenges, expirePendingChallenges } from '@/lib/actions/trading/challenge-finalize.actions';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import {
+  finalizeEndedChallenges,
+  expirePendingChallenges,
+} from "@/lib/actions/trading/challenge-finalize.actions";
 
 // POST - Manually trigger challenge finalization (for testing/debugging)
 export async function POST(_request: NextRequest) {
   try {
     await requireAdminAuth();
 
-    console.log('🔧 Manually triggering challenge finalization...');
+    console.log("🔧 Manually triggering challenge finalization...");
 
     // First expire pending challenges
     const expireResult = await expirePendingChallenges();
@@ -24,11 +27,13 @@ export async function POST(_request: NextRequest) {
       results: finalizeResult.results,
     });
   } catch (error) {
-    console.error('Error manually finalizing challenges:', error);
+    console.error("Error manually finalizing challenges:", error);
     return NextResponse.json(
-      { error: 'Failed to finalize challenges', details: (error as Error).message },
-      { status: 500 }
+      {
+        error: "Failed to finalize challenges",
+        details: (error as Error).message,
+      },
+      { status: 500 },
     );
   }
 }
-

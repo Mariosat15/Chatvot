@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import ChallengeSettings from '@/database/models/trading/challenge-settings.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import ChallengeSettings from "@/database/models/trading/challenge-settings.model";
 
 // GET - Get challenge settings for users
 export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -34,11 +34,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching challenge settings:', error);
+    console.error("Error fetching challenge settings:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
+      { error: "Failed to fetch settings" },
+      { status: 500 },
     );
   }
 }
-

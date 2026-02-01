@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Track participants in each competition
 export interface ICompetitionParticipant extends Document {
@@ -6,19 +6,19 @@ export interface ICompetitionParticipant extends Document {
   userId: string; // Reference to Better Auth user
   username: string; // For leaderboard display
   email: string; // For notifications
-  
+
   // Capital & Performance
   startingCapital: number; // Initial trading points
   currentCapital: number; // Updated real-time
   availableCapital: number; // Not tied up in positions
   usedMargin: number; // Capital tied in open positions
-  
+
   // P&L Metrics
   pnl: number; // Total profit/loss
   pnlPercentage: number; // ROI percentage
   realizedPnl: number; // From closed positions
   unrealizedPnl: number; // From open positions
-  
+
   // Trading Statistics
   totalTrades: number;
   winningTrades: number;
@@ -28,29 +28,29 @@ export interface ICompetitionParticipant extends Document {
   averageLoss: number;
   largestWin: number;
   largestLoss: number;
-  
+
   // Position Stats
   currentOpenPositions: number;
   maxDrawdown: number; // Worst decline from peak
   maxDrawdownPercentage: number;
-  
+
   // Ranking
   currentRank: number;
   highestRank: number; // Best rank achieved
-  
+
   // Status
-  status: 'active' | 'liquidated' | 'completed' | 'disqualified' | 'refunded';
+  status: "active" | "liquidated" | "completed" | "disqualified" | "refunded";
   liquidationReason?: string;
   disqualificationReason?: string;
-  
+
   // Risk Management
   marginCallWarnings: number; // How many times warned
   lastMarginCallAt?: Date;
-  
+
   // Timing
   enteredAt: Date;
   lastTradeAt?: Date;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -190,8 +190,8 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
     status: {
       type: String,
       required: true,
-      enum: ['active', 'liquidated', 'completed', 'disqualified', 'refunded'],
-      default: 'active',
+      enum: ["active", "liquidated", "completed", "disqualified", "refunded"],
+      default: "active",
     },
     liquidationReason: {
       type: String,
@@ -219,11 +219,14 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
-CompetitionParticipantSchema.index({ competitionId: 1, userId: 1 }, { unique: true });
+CompetitionParticipantSchema.index(
+  { competitionId: 1, userId: 1 },
+  { unique: true },
+);
 CompetitionParticipantSchema.index({ competitionId: 1, currentRank: 1 });
 CompetitionParticipantSchema.index({ competitionId: 1, pnl: -1 }); // For leaderboard
 CompetitionParticipantSchema.index({ userId: 1, status: 1 });
@@ -233,20 +236,22 @@ CompetitionParticipantSchema.index({ userId: 1, enteredAt: -1 }); // User's comp
 CompetitionParticipantSchema.index({ competitionId: 1, currentCapital: -1 }); // Capital-based ranking
 
 // Virtual for profit factor (average win / average loss)
-CompetitionParticipantSchema.virtual('profitFactor').get(function () {
+CompetitionParticipantSchema.virtual("profitFactor").get(function () {
   if (this.averageLoss === 0) return 0;
   return Math.abs(this.averageWin / this.averageLoss);
 });
 
 // Virtual for is at risk (close to margin call)
-CompetitionParticipantSchema.virtual('isAtRisk').get(function () {
+CompetitionParticipantSchema.virtual("isAtRisk").get(function () {
   const capitalPercentage = (this.currentCapital / this.startingCapital) * 100;
   return capitalPercentage < 60; // Below 60% of starting capital
 });
 
 const CompetitionParticipant =
   models?.CompetitionParticipant ||
-  model<ICompetitionParticipant>('CompetitionParticipant', CompetitionParticipantSchema);
+  model<ICompetitionParticipant>(
+    "CompetitionParticipant",
+    CompetitionParticipantSchema,
+  );
 
 export default CompetitionParticipant;
-

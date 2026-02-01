@@ -1,14 +1,28 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap, CheckCircle2, XCircle, Crown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import DepositModal from '@/components/trading/DepositModal';
-import WithdrawalModal from '@/components/trading/WithdrawalModal';
-import TransactionHistory, { FilteredStats } from '@/components/trading/TransactionHistory';
-import BankAccountsSection from '@/components/wallet/BankAccountsSection';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  History,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  Crown,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import DepositModal from "@/components/trading/DepositModal";
+import WithdrawalModal from "@/components/trading/WithdrawalModal";
+import TransactionHistory, {
+  FilteredStats,
+} from "@/components/trading/TransactionHistory";
+import BankAccountsSection from "@/components/wallet/BankAccountsSection";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface WithdrawalSettings {
   bankWithdrawalsEnabled?: boolean;
@@ -31,53 +45,79 @@ interface WalletContentProps {
   transactions: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-export default function WalletContent({ stats, transactions }: WalletContentProps) {
+export default function WalletContent({
+  stats,
+  transactions,
+}: WalletContentProps) {
   const { settings, creditsToEUR } = useAppSettings();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [paymentStatus, setPaymentStatus] = useState<'success' | 'error' | null>(null);
-  const [withdrawalSettings, setWithdrawalSettings] = useState<WithdrawalSettings>({
-    bankWithdrawalsEnabled: true,
-    cardWithdrawalsEnabled: true,
-  });
-  const [filteredStats, setFilteredStats] = useState<FilteredStats | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    "success" | "error" | null
+  >(null);
+  const [withdrawalSettings, setWithdrawalSettings] =
+    useState<WithdrawalSettings>({
+      bankWithdrawalsEnabled: true,
+      cardWithdrawalsEnabled: true,
+    });
+  const [filteredStats, setFilteredStats] = useState<FilteredStats | null>(
+    null,
+  );
   const [isDateFiltered, setIsDateFiltered] = useState(false);
 
   // Callback for when transaction history filters change
-  const handleFilteredStatsChange = useCallback((newStats: FilteredStats) => {
-    setFilteredStats(newStats);
-    // Check if any filtering is happening (compare with original stats)
-    const isFiltered = 
-      newStats.totalDeposited !== stats.totalDeposited ||
-      newStats.totalWithdrawn !== stats.totalWithdrawn;
-    setIsDateFiltered(isFiltered);
-  }, [stats.totalDeposited, stats.totalWithdrawn]);
+  const handleFilteredStatsChange = useCallback(
+    (newStats: FilteredStats) => {
+      setFilteredStats(newStats);
+      // Check if any filtering is happening (compare with original stats)
+      const isFiltered =
+        newStats.totalDeposited !== stats.totalDeposited ||
+        newStats.totalWithdrawn !== stats.totalWithdrawn;
+      setIsDateFiltered(isFiltered);
+    },
+    [stats.totalDeposited, stats.totalWithdrawn],
+  );
 
   // Get display stats (filtered or original)
   const displayStats = {
-    totalDeposited: isDateFiltered && filteredStats ? filteredStats.totalDeposited : stats.totalDeposited,
-    totalWithdrawn: isDateFiltered && filteredStats ? filteredStats.totalWithdrawn : stats.totalWithdrawn,
-    totalSpentOnCompetitions: isDateFiltered && filteredStats ? filteredStats.totalSpent : stats.totalSpentOnCompetitions,
-    totalWonFromCompetitions: isDateFiltered && filteredStats ? filteredStats.totalWinnings : stats.totalWonFromCompetitions,
-    totalGMEarnings: isDateFiltered && filteredStats ? filteredStats.totalGMEarnings : (stats.totalGMEarnings ?? 0),
+    totalDeposited:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalDeposited
+        : stats.totalDeposited,
+    totalWithdrawn:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalWithdrawn
+        : stats.totalWithdrawn,
+    totalSpentOnCompetitions:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalSpent
+        : stats.totalSpentOnCompetitions,
+    totalWonFromCompetitions:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalWinnings
+        : stats.totalWonFromCompetitions,
+    totalGMEarnings:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalGMEarnings
+        : (stats.totalGMEarnings ?? 0),
   };
 
   // Handle payment return from Stripe/Paddle
   useEffect(() => {
-    const payment = searchParams.get('payment');
-    const paddleSuccess = searchParams.get('paddle_status');
-    const error = searchParams.get('error');
+    const payment = searchParams.get("payment");
+    const paddleSuccess = searchParams.get("paddle_status");
+    const error = searchParams.get("error");
 
-    if (payment === 'success' || paddleSuccess === 'completed') {
-      setPaymentStatus('success');
+    if (payment === "success" || paddleSuccess === "completed") {
+      setPaymentStatus("success");
       // Clear URL params after showing message
       setTimeout(() => {
-        router.replace('/wallet', { scroll: false });
+        router.replace("/wallet", { scroll: false });
       }, 5000);
-    } else if (error || payment === 'failed' || paddleSuccess === 'failed') {
-      setPaymentStatus('error');
+    } else if (error || payment === "failed" || paddleSuccess === "failed") {
+      setPaymentStatus("error");
       setTimeout(() => {
-        router.replace('/wallet', { scroll: false });
+        router.replace("/wallet", { scroll: false });
       }, 5000);
     }
   }, [searchParams, router]);
@@ -86,7 +126,7 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
   useEffect(() => {
     const fetchWithdrawalSettings = async () => {
       try {
-        const response = await fetch('/api/wallet/withdrawal-settings');
+        const response = await fetch("/api/wallet/withdrawal-settings");
         if (response.ok) {
           const data = await response.json();
           setWithdrawalSettings({
@@ -95,7 +135,7 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
           });
         }
       } catch (error) {
-        console.error('Failed to fetch withdrawal settings:', error);
+        console.error("Failed to fetch withdrawal settings:", error);
       }
     };
     fetchWithdrawalSettings();
@@ -106,13 +146,15 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
   return (
     <div className="flex min-h-screen flex-col gap-4 sm:gap-6 md:gap-8">
       {/* Payment Status Banner */}
-      {paymentStatus === 'success' && (
+      {paymentStatus === "success" && (
         <div className="animate-in fade-in slide-in-from-top-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4 sm:p-6 flex items-center gap-3 sm:gap-4">
           <div className="rounded-full bg-green-500/20 p-2 sm:p-3 flex-shrink-0">
             <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg sm:text-xl font-bold text-green-400">Payment Successful!</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-green-400">
+              Payment Successful!
+            </h3>
             <p className="text-xs sm:text-sm text-gray-300 mt-0.5 sm:mt-1 truncate sm:whitespace-normal">
               Your {settings.credits.name} have been added to your wallet.
             </p>
@@ -120,13 +162,15 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         </div>
       )}
 
-      {paymentStatus === 'error' && (
+      {paymentStatus === "error" && (
         <div className="animate-in fade-in slide-in-from-top-4 rounded-xl bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-500/30 p-4 sm:p-6 flex items-center gap-3 sm:gap-4">
           <div className="rounded-full bg-red-500/20 p-2 sm:p-3 flex-shrink-0">
             <XCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg sm:text-xl font-bold text-red-400">Payment Failed</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-red-400">
+              Payment Failed
+            </h3>
             <p className="text-xs sm:text-sm text-gray-300 mt-0.5 sm:mt-1">
               There was an issue. Please try again.
             </p>
@@ -144,7 +188,9 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
             <Zap className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-500 flex-shrink-0" />
             <span className="truncate">{settings.credits.name} Wallet</span>
           </h1>
-          <p className="text-xs sm:text-sm text-gray-400 truncate">Manage your {settings.credits.name.toLowerCase()}</p>
+          <p className="text-xs sm:text-sm text-gray-400 truncate">
+            Manage your {settings.credits.name.toLowerCase()}
+          </p>
         </div>
       </div>
 
@@ -164,7 +210,9 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
             <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-yellow-400 tabular-nums">
               {stats.currentBalance.toFixed(settings.credits.decimals)}
             </span>
-            <span className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">{settings.credits.symbol}</span>
+            <span className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
+              {settings.credits.symbol}
+            </span>
           </div>
           <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2">
             <p className="text-sm sm:text-lg font-semibold text-yellow-500/80">
@@ -172,7 +220,9 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
             </p>
             {settings.credits.showEUREquivalent && (
               <p className="text-xs sm:text-sm text-gray-400">
-                ≈ {settings.currency.symbol}{creditsToEUR(stats.currentBalance).toFixed(2)} {settings.currency.code}
+                ≈ {settings.currency.symbol}
+                {creditsToEUR(stats.currentBalance).toFixed(2)}{" "}
+                {settings.currency.code}
               </p>
             )}
           </div>
@@ -211,16 +261,23 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Total Bought</p>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+                Total Bought
+              </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalDeposited.toFixed(settings.credits.decimals)}
+                  {displayStats.totalDeposited.toFixed(
+                    settings.credits.decimals,
+                  )}
                 </p>
-                <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
+                <span className="text-sm sm:text-lg text-yellow-500">
+                  {settings.credits.symbol}
+                </span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalDeposited).toFixed(2)}
+                  ≈ {settings.currency.symbol}
+                  {creditsToEUR(displayStats.totalDeposited).toFixed(2)}
                 </p>
               )}
             </div>
@@ -234,16 +291,23 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Withdrawn</p>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+                Withdrawn
+              </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalWithdrawn.toFixed(settings.credits.decimals)}
+                  {displayStats.totalWithdrawn.toFixed(
+                    settings.credits.decimals,
+                  )}
                 </p>
-                <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
+                <span className="text-sm sm:text-lg text-yellow-500">
+                  {settings.credits.symbol}
+                </span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalWithdrawn).toFixed(2)}
+                  ≈ {settings.currency.symbol}
+                  {creditsToEUR(displayStats.totalWithdrawn).toFixed(2)}
                 </p>
               )}
             </div>
@@ -257,16 +321,25 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Spent</p>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+                Spent
+              </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalSpentOnCompetitions.toFixed(settings.credits.decimals)}
+                  {displayStats.totalSpentOnCompetitions.toFixed(
+                    settings.credits.decimals,
+                  )}
                 </p>
-                <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
+                <span className="text-sm sm:text-lg text-yellow-500">
+                  {settings.credits.symbol}
+                </span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalSpentOnCompetitions).toFixed(2)}
+                  ≈ {settings.currency.symbol}
+                  {creditsToEUR(displayStats.totalSpentOnCompetitions).toFixed(
+                    2,
+                  )}
                 </p>
               )}
             </div>
@@ -280,21 +353,34 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Winnings</p>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+                Winnings
+              </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalWonFromCompetitions.toFixed(settings.credits.decimals)}
+                  {displayStats.totalWonFromCompetitions.toFixed(
+                    settings.credits.decimals,
+                  )}
                 </p>
-                <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
+                <span className="text-sm sm:text-lg text-yellow-500">
+                  {settings.credits.symbol}
+                </span>
               </div>
               {!isDateFiltered && stats.roi !== 0 && (
-                <p className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${stats.roi > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  ROI: {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                <p
+                  className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${stats.roi > 0 ? "text-green-500" : "text-red-500"}`}
+                >
+                  ROI: {stats.roi > 0 ? "+" : ""}
+                  {stats.roi.toFixed(1)}%
                 </p>
               )}
             </div>
-            <div className={`rounded-full ${displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} p-2 sm:p-3 flex-shrink-0`}>
-              {displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? (
+            <div
+              className={`rounded-full ${displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? "bg-green-500/10" : "bg-red-500/10"} p-2 sm:p-3 flex-shrink-0`}
+            >
+              {displayStats.totalWonFromCompetitions -
+                displayStats.totalSpentOnCompetitions >=
+              0 ? (
                 <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
@@ -308,12 +394,18 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
           <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 p-3 sm:p-4 md:p-6 hover:bg-amber-500/15 transition-all">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">Referral Earnings</p>
+                <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">
+                  Referral Earnings
+                </p>
                 <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-400 tabular-nums">
-                    {displayStats.totalGMEarnings.toFixed(settings.credits.decimals)}
+                    {displayStats.totalGMEarnings.toFixed(
+                      settings.credits.decimals,
+                    )}
                   </p>
-                  <span className="text-sm sm:text-lg text-amber-500">{settings.credits.symbol}</span>
+                  <span className="text-sm sm:text-lg text-amber-500">
+                    {settings.credits.symbol}
+                  </span>
                 </div>
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-amber-500/60 truncate">
                   From Game Master
@@ -334,10 +426,15 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
       <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6">
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <History className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-100">Transaction History</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-100">
+            Transaction History
+          </h2>
         </div>
 
-        <TransactionHistory transactions={transactions} onFilteredStatsChange={handleFilteredStatsChange} />
+        <TransactionHistory
+          transactions={transactions}
+          onFilteredStatsChange={handleFilteredStatsChange}
+        />
       </div>
     </div>
   );

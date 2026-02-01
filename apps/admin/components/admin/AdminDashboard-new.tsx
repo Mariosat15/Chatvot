@@ -1,21 +1,30 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, LogOut, Trophy, Plus, DollarSign, BarChart3, Settings as SettingsIcon, Database } from 'lucide-react';
-import { toast } from 'sonner';
-import CredentialsSection from '@/components/admin/CredentialsSection';
-import EnvironmentSection from '@/components/admin/EnvironmentSection';
-import ImagesSection from '@/components/admin/ImagesSection';
-import TradingRiskSection from '@/components/admin/TradingRiskSection';
-import CurrencySettingsSection from '@/components/admin/CurrencySettingsSection';
-import FinancialDashboard from '@/components/admin/FinancialDashboard';
-import CompetitionAnalytics from '@/components/admin/CompetitionAnalytics';
-import CompetitionsListSection from '@/components/admin/CompetitionsListSection';
-import DatabaseSection from '@/components/admin/DatabaseSection';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Shield,
+  LogOut,
+  Trophy,
+  Plus,
+  DollarSign,
+  BarChart3,
+  Settings as SettingsIcon,
+  Database,
+} from "lucide-react";
+import { toast } from "sonner";
+import CredentialsSection from "@/components/admin/CredentialsSection";
+import EnvironmentSection from "@/components/admin/EnvironmentSection";
+import ImagesSection from "@/components/admin/ImagesSection";
+import TradingRiskSection from "@/components/admin/TradingRiskSection";
+import CurrencySettingsSection from "@/components/admin/CurrencySettingsSection";
+import FinancialDashboard from "@/components/admin/FinancialDashboard";
+import CompetitionAnalytics from "@/components/admin/CompetitionAnalytics";
+import CompetitionsListSection from "@/components/admin/CompetitionsListSection";
+import DatabaseSection from "@/components/admin/DatabaseSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -27,16 +36,18 @@ export default function AdminDashboard({
   adminEmail,
 }: AdminDashboardProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(isFirstLogin ? 'credentials' : 'competitions');
-  const [settingsTab, setSettingsTab] = useState('general');
+  const [activeTab, setActiveTab] = useState(
+    isFirstLogin ? "credentials" : "competitions",
+  );
+  const [settingsTab, setSettingsTab] = useState("general");
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      toast.success('Logged out successfully');
-      router.push('/login');
+      await fetch("/api/auth/logout", { method: "POST" });
+      toast.success("Logged out successfully");
+      router.push("/login");
     } catch (error) {
-      toast.error('Logout failed');
+      toast.error("Logout failed");
     }
   };
 
@@ -87,7 +98,11 @@ export default function AdminDashboard({
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           {/* Main Navigation */}
           <div className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-2xl p-2 shadow-xl border border-gray-600">
             <TabsList className="w-full bg-transparent gap-2 h-auto p-0">
@@ -171,7 +186,11 @@ export default function AdminDashboard({
 
             {/* Settings Tab */}
             <TabsContent value="settings">
-              <Tabs value={settingsTab} onValueChange={setSettingsTab} className="space-y-6">
+              <Tabs
+                value={settingsTab}
+                onValueChange={setSettingsTab}
+                className="space-y-6"
+              >
                 {/* Settings Sub-Navigation */}
                 <div className="bg-gradient-to-r from-purple-800/50 to-purple-700/50 rounded-xl p-2 border border-purple-500/30">
                   <TabsList className="w-full bg-transparent gap-2 h-auto p-0 flex-wrap">
@@ -247,4 +266,3 @@ export default function AdminDashboard({
     </div>
   );
 }
-
