@@ -137,7 +137,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    console.log(`💰 Fee settings updated by ${admin.email}:`, {
+    // Sanitize email for logging to prevent format string injection
+    const safeEmail = String(admin.email || "unknown").replace(/[%\n\r]/g, "");
+    console.log(`💰 Fee settings updated by ${safeEmail}:`, {
       platformDepositFeePercentage: settings.platformDepositFeePercentage,
       platformWithdrawalFeePercentage: settings.platformWithdrawalFeePercentage,
       bankDepositFeePercentage: settings.bankDepositFeePercentage,

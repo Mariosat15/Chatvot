@@ -222,9 +222,9 @@ export async function POST(request: NextRequest) {
         description: `Full employee data reset - deleted ${totalDeleted} items, protected ${superAdminIds.length} super admin(s)`,
         metadata: results,
         status: "success",
-        userId: auth.adminId || "admin",
-        userName: auth.name || "Admin",
-        userEmail: auth.email || "admin@system",
+        userId: auth.adminId || "system-action",
+        userName: auth.name || "System",
+        userEmail: auth.email || "system@internal",
         userRole: "superadmin",
         timestamp: new Date(),
       });

@@ -130,10 +130,10 @@ export async function POST(request: NextRequest) {
         description: `Full user data reset - deleted ${totalDeleted} documents across ${Object.keys(results).filter((k) => results[k] > 0).length} collections`,
         metadata: results,
         status: "success",
-        userId: "admin",
-        userName: "Admin",
-        userEmail: "admin@system",
-        userRole: "admin",
+        userId: "system-action",
+        userName: "System",
+        userEmail: "system@internal",
+        userRole: "superadmin",
         timestamp: new Date(),
       });
     } catch (auditError) {

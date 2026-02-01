@@ -138,7 +138,7 @@ const TEST_CASES: TestCase[] = [
           ) {
             batch.push({
               email: `simuser_${Date.now()}_${j}@test.simulator`,
-              password: "SimTest123!",
+              password: process.env.SIMULATOR_TEST_PASSWORD || "SimTest123!",
               name: `Sim User ${j}`,
             });
           }
@@ -181,7 +181,7 @@ const TEST_CASES: TestCase[] = [
                       ctx.testUsers.push({
                         id: userResult.userId,
                         email: userResult.email,
-                        password: "SimTest123!",
+                        password: process.env.SIMULATOR_TEST_PASSWORD || "SimTest123!",
                       });
                       results.createdIds!.users!.push(userResult.userId);
                       results.successCount++;
@@ -229,7 +229,7 @@ const TEST_CASES: TestCase[] = [
           for (let i = startIdx; i < endIdx; i++) {
             batchUsers.push({
               email: `simuser_${Date.now()}_${i}@test.simulator`,
-              password: "SimTest123!",
+              password: process.env.SIMULATOR_TEST_PASSWORD || "SimTest123!",
               name: `Sim User ${i}`,
             });
           }
@@ -265,7 +265,7 @@ const TEST_CASES: TestCase[] = [
                     ctx.testUsers.push({
                       id: userResult.userId,
                       email: userResult.email,
-                      password: "SimTest123!",
+                      password: process.env.SIMULATOR_TEST_PASSWORD || "SimTest123!",
                     });
                     results.createdIds!.users!.push(userResult.userId);
                     results.successCount++;

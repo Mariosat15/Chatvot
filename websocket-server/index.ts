@@ -90,6 +90,9 @@ async function connectToMongoDB() {
 // ==========================================
 // HTTP Server with Internal API
 // ==========================================
+// NOTE: Using HTTP is intentional - this server runs internally behind nginx
+// which handles SSL/TLS termination. Direct HTTPS here would add unnecessary
+// overhead and complexity for internal service-to-service communication.
 
 const server = createServer(async (req, res) => {
   // Set CORS headers
@@ -640,7 +643,9 @@ function handleConnection(ws: WebSocket, req: any) {
 
   // Handle error
   ws.on("error", (error) => {
-    console.error(`WebSocket error for ${participantId}:`, error.message);
+    // Sanitize error message to prevent format string injection
+    const safeMessage = String(error.message || "unknown error").slice(0, 200);
+    console.error(`WebSocket error for ${participantId}:`, safeMessage);
     handleDisconnect(connectionId);
   });
 
