@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
             `   ✅ Cleared ${collectionName}: ${result.deletedCount} documents`,
           );
         }
-      } catch (_collError) {
+      } catch (collError) {
+        console.warn(`Could not clear ${collectionName}:`, collError instanceof Error ? collError.message : "Unknown error");
         results[collectionName] = 0;
       }
     }

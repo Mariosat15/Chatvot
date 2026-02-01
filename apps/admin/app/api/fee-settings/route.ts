@@ -3,10 +3,9 @@ import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
+import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
-);
+const JWT_SECRET = new TextEncoder().encode(getAdminJwtSecret());
 
 async function verifyAdminToken(request: NextRequest) {
   const token = request.cookies.get("admin_token")?.value;
@@ -79,15 +78,15 @@ export async function PUT(request: NextRequest) {
 
     // Parse and validate inputs with defaults
     const platformDepositFeePercentage =
-      parseFloat(body.platformDepositFeePercentage) || 0;
+      Number.parseFloat(body.platformDepositFeePercentage) || 0;
     const platformWithdrawalFeePercentage =
-      parseFloat(body.platformWithdrawalFeePercentage) || 0;
+      Number.parseFloat(body.platformWithdrawalFeePercentage) || 0;
     const bankDepositFeePercentage =
-      parseFloat(body.bankDepositFeePercentage) || 0;
-    const bankDepositFeeFixed = parseFloat(body.bankDepositFeeFixed) || 0;
+      Number.parseFloat(body.bankDepositFeePercentage) || 0;
+    const bankDepositFeeFixed = Number.parseFloat(body.bankDepositFeeFixed) || 0;
     const bankWithdrawalFeePercentage =
-      parseFloat(body.bankWithdrawalFeePercentage) || 0;
-    const bankWithdrawalFeeFixed = parseFloat(body.bankWithdrawalFeeFixed) || 0;
+      Number.parseFloat(body.bankWithdrawalFeePercentage) || 0;
+    const bankWithdrawalFeeFixed = Number.parseFloat(body.bankWithdrawalFeeFixed) || 0;
 
     // Validate percentages are within bounds
     if (platformDepositFeePercentage < 0 || platformDepositFeePercentage > 50) {
@@ -138,7 +137,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Sanitize email for logging to prevent format string injection
-    const safeEmail = String(admin.email || "unknown").replace(/[%\n\r]/g, "");
+    const safeEmail = String(admin.email || "unknown").replaceAll(/[%\n\r]/g, "");
     console.log(`💰 Fee settings updated by ${safeEmail}:`, {
       platformDepositFeePercentage: settings.platformDepositFeePercentage,
       platformWithdrawalFeePercentage: settings.platformWithdrawalFeePercentage,

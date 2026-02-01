@@ -133,7 +133,8 @@ export async function POST(request: NextRequest) {
           `   ✅ Deleted ${assignmentsResult.deletedCount} customer assignments`,
         );
       }
-    } catch (e) {
+    } catch (error) {
+      console.warn("Could not clear customer_assignments:", error instanceof Error ? error.message : "Unknown error");
       results["customerAssignments"] = 0;
     }
 
@@ -151,7 +152,8 @@ export async function POST(request: NextRequest) {
           `   ✅ Deleted ${auditTrailResult.deletedCount} customer audit trail entries`,
         );
       }
-    } catch (e) {
+    } catch (error) {
+      console.warn("Could not clear customer_audit_trail:", error instanceof Error ? error.message : "Unknown error");
       results["customerAuditTrails"] = 0;
     }
 
@@ -168,7 +170,8 @@ export async function POST(request: NextRequest) {
           `   ✅ Deleted ${notificationsResult.deletedCount} employee notifications`,
         );
       }
-    } catch (e) {
+    } catch (error) {
+      console.warn("Could not clear employee_notifications:", error instanceof Error ? error.message : "Unknown error");
       results["employeeNotifications"] = 0;
     }
 
@@ -178,16 +181,26 @@ export async function POST(request: NextRequest) {
       await assignmentSettingsCollection.deleteMany({});
       results["assignmentSettings"] = 1;
       console.log(`   ✅ Reset assignment settings`);
-    } catch (e) {
+    } catch (error) {
+      console.warn("Could not reset assignment_settings:", error instanceof Error ? error.message : "Unknown error");
       results["assignmentSettings"] = 0;
     }
 
-    // 8. Delete audit logs related to employees (but keep general audit logs)
+    // 9. Delete audit logs related to employees (but keep general audit logs)
+    // Using explicit string matching patterns instead of regex for safety
     try {
       const auditLogCollection = db.collection("auditlogs");
+      const employeeActionPrefixes = [
+        "employee_create",
+        "employee_update",
+        "employee_delete",
+        "employee_login",
+        "employee_logout",
+        "employee_permission",
+      ];
       const employeeAuditResult = await auditLogCollection.deleteMany({
         $or: [
-          { action: { $regex: /^employee_/ } },
+          { action: { $in: employeeActionPrefixes } },
           { actionCategory: "employee" },
           { targetType: "employee" },
         ],
@@ -198,7 +211,8 @@ export async function POST(request: NextRequest) {
           `   ✅ Deleted ${employeeAuditResult.deletedCount} employee audit log entries`,
         );
       }
-    } catch (e) {
+    } catch (error) {
+      console.warn("Could not clear employee audit logs:", error instanceof Error ? error.message : "Unknown error");
       results["employeeAuditLogs"] = 0;
     }
 
