@@ -109,6 +109,27 @@ interface NotificationEvent {
 export class WebSocketService {
   private static wss: WebSocketServer | null = null;
   private static heartbeatInterval: NodeJS.Timeout | null = null;
+  private static devFallbackWarned = false;
+
+  /**
+   * Get JWT secret with production safety check
+   */
+  private static getJwtSecret(): string | null {
+    const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
+    if (secret) return secret;
+    
+    if (process.env.NODE_ENV === "production") {
+      console.error("CRITICAL: AUTH_SECRET or JWT_SECRET required in production");
+      return null;
+    }
+    
+    // Development only fallback
+    if (!this.devFallbackWarned) {
+      console.warn("⚠️  JWT secret not set - using dev fallback (OK for development only)");
+      this.devFallbackWarned = true;
+    }
+    return "dev-fallback-secret-not-for-production-use-32ch";
+  }
 
   /**
    * Initialize WebSocket server (call this once on server startup)
@@ -147,12 +168,12 @@ export class WebSocketService {
 
     // Verify JWT token
     try {
-      const jwtSecret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-      if (!jwtSecret && process.env.NODE_ENV === "production") {
+      const jwtSecret = this.getJwtSecret();
+      if (!jwtSecret) {
         ws.close(4001, "Server configuration error");
         return;
       }
-      const decoded = verify(token, jwtSecret || "dev-only-insecure-secret") as {
+      const decoded = verify(token, jwtSecret) as {
         id?: string;
         sub?: string;
         userId?: string;
