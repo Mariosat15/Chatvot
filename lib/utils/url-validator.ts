@@ -49,10 +49,14 @@ const ALLOWED_KYC_BASE_URLS: Record<string, string> = {
 
 // Valid forex symbols (whitelist)
 const VALID_FOREX_SYMBOLS = [
+  // Major pairs
   "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD", "USD/CAD", "NZD/USD",
+  // Cross pairs
   "EUR/GBP", "EUR/JPY", "GBP/JPY", "EUR/CHF", "EUR/AUD", "EUR/CAD", "EUR/NZD",
   "GBP/CHF", "GBP/AUD", "GBP/CAD", "GBP/NZD", "AUD/JPY", "AUD/NZD", "AUD/CAD",
   "AUD/CHF", "CAD/JPY", "CAD/CHF", "CHF/JPY", "NZD/JPY", "NZD/CAD", "NZD/CHF",
+  // Exotic pairs
+  "USD/MXN", "USD/ZAR", "USD/TRY", "USD/SEK", "USD/NOK",
   // Crypto pairs
   "BTC/USD", "ETH/USD", "XRP/USD", "LTC/USD", "BCH/USD", "ADA/USD", "DOT/USD",
   "SOL/USD", "DOGE/USD", "MATIC/USD", "LINK/USD", "UNI/USD", "AVAX/USD",
