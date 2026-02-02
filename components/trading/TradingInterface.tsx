@@ -2,7 +2,7 @@
 
 import { useState, createContext, useContext } from "react";
 import OrderForm from "@/components/trading/OrderForm";
-import GameModeOrderForm from "@/components/trading/GameModeOrderForm";
+import GameModeSimpleOrderForm from "@/components/trading/GameModeSimpleOrderForm";
 import TradingModeSelector, {
   TradingMode,
 } from "@/components/trading/TradingModeSelector";
@@ -18,6 +18,7 @@ interface TradingInterfaceProps {
   currentEquity: number;
   existingUsedMargin: number;
   currentBalance: number;
+  startingCapital?: number; // For Game Mode P&L display
   marginThresholds?: MarginThresholds;
   disabled?: boolean; // Disable trading (e.g., when disqualified)
   disabledReason?: string; // Reason for disabling (e.g., "You are disqualified")
@@ -76,6 +77,7 @@ export default function TradingInterface({
   currentEquity,
   existingUsedMargin,
   currentBalance,
+  startingCapital = 10000,
   marginThresholds,
   disabled = false,
   disabledReason,
@@ -86,40 +88,43 @@ export default function TradingInterface({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Watchlist - Compact */}
-      <div className="flex-shrink-0">
-        <Watchlist className="h-[180px]" />
-      </div>
-
-      {/* Mode Selector - Compact */}
-      <div className="flex justify-center py-2 flex-shrink-0">
+      {/* Mode Selector - Top with clear labels */}
+      <div className="flex justify-center py-3 flex-shrink-0 border-b border-dark-400/30">
         <TradingModeSelector mode={mode} onModeChange={setMode} />
       </div>
 
       {/* Conditional Order Form - Fills remaining space */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
         {mode === "professional" ? (
-          <OrderForm
-            competitionId={competitionId}
-            availableCapital={availableCapital}
-            defaultLeverage={defaultLeverage}
-            openPositionsCount={openPositionsCount}
-            maxPositions={maxPositions}
-            currentEquity={currentEquity}
-            existingUsedMargin={existingUsedMargin}
-            currentBalance={currentBalance}
-            marginThresholds={marginThresholds}
-            disabled={disabled}
-            disabledReason={disabledReason}
-            userId={userId}
-            contestType={contestType}
-          />
+          <>
+            {/* Watchlist only for Professional mode */}
+            <div className="flex-shrink-0 border-b border-dark-400/30">
+              <Watchlist className="h-[140px]" />
+            </div>
+            <OrderForm
+              competitionId={competitionId}
+              availableCapital={availableCapital}
+              defaultLeverage={defaultLeverage}
+              openPositionsCount={openPositionsCount}
+              maxPositions={maxPositions}
+              currentEquity={currentEquity}
+              existingUsedMargin={existingUsedMargin}
+              currentBalance={currentBalance}
+              marginThresholds={marginThresholds}
+              disabled={disabled}
+              disabledReason={disabledReason}
+              userId={userId}
+              contestType={contestType}
+            />
+          </>
         ) : (
-          <GameModeOrderForm
+          /* Game Mode - Simplified interface for beginners */
+          <GameModeSimpleOrderForm
             competitionId={competitionId}
             availableCapital={availableCapital}
             defaultLeverage={defaultLeverage}
             currentBalance={currentBalance}
+            startingCapital={startingCapital}
             openPositionsCount={openPositionsCount}
             maxPositions={maxPositions}
             currentEquity={currentEquity}

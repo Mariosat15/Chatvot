@@ -539,6 +539,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                 currentEquity={equity}
                                 existingUsedMargin={participant.usedMargin}
                                 currentBalance={participant.currentCapital}
+                                startingCapital={competition.startingCapital}
                                 marginThresholds={marginThresholds}
                                 disabled={isDisqualified || isPaused}
                                 disabledReason={
