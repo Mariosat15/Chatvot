@@ -14,7 +14,7 @@ export interface IPriceSnapshotEntry {
   ask: number;
   mid: number;
   spread: number;
-  source: "websocket" | "api" | "cache" | "fallback";
+  source: "websocket" | "api" | "cache" | "fallback" | "rest";
   isValid: boolean;
   staleDuration?: number; // How old the price was when snapshot taken (ms)
 }
@@ -56,7 +56,7 @@ const PriceSnapshotEntrySchema = new Schema(
     spread: { type: Number, required: true },
     source: {
       type: String,
-      enum: ["websocket", "api", "cache", "fallback"],
+      enum: ["websocket", "api", "cache", "fallback", "rest"],
       required: true,
     },
     isValid: { type: Boolean, required: true },
