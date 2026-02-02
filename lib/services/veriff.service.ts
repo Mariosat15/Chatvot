@@ -167,9 +167,11 @@ class VeriffService {
       );
     }
 
-    // Veriff requires HTTPS callback URLs - ensure we use HTTPS
-    // Check multiple env var names for compatibility
+    // Get the production URL for Veriff callback
+    // VERIFF_CALLBACK_URL takes priority, then NEXT_PUBLIC_APP_URL, then fallback
+    // This is where users are REDIRECTED after verification (not webhooks)
     let baseUrl =
+      process.env.VERIFF_CALLBACK_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_BASE_URL ||
       "https://chartvolt.com";
@@ -184,9 +186,16 @@ class VeriffService {
     }
     // Ensure URL doesn't have trailing slash
     baseUrl = baseUrl.replace(/\/$/, "");
+    
+    // Remove localhost URLs in production - use chartvolt.com instead
+    if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("192.168.")) {
+      console.log("⚠️ [KYC] Localhost URL detected, using production URL instead");
+      baseUrl = "https://chartvolt.com";
+    }
 
-    const callbackUrl = `${baseUrl}/api/kyc/webhook`;
-    console.log("🔐 Veriff callback URL:", callbackUrl);
+    // User redirect URL (where browser goes after verification)
+    const callbackUrl = `${baseUrl}/profile?tab=verification&checkStatus=true`;
+    console.log("🔐 Veriff callback URL (user redirect):", callbackUrl);
 
     const payload = {
       verification: {
