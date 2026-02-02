@@ -2,25 +2,17 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  Trophy,
-  Clock,
-  TrendingUp,
-  Zap,
   LayoutGrid,
   List,
   Filter,
   Search,
   X,
   ChevronDown,
-  Target,
-  Flame,
-  Crown,
-  Sparkles,
   SlidersHorizontal,
   RefreshCw,
-  Skull,
-  Star,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import CompetitionCard from "@/components/trading/CompetitionCard";
 import WalletBalanceDisplay from "@/components/trading/WalletBalanceDisplay";
 import UTCClock from "@/components/trading/UTCClock";
@@ -140,6 +132,9 @@ export default function CompetitionsPageContent({
   initialBalance,
   userInCompetitionIds,
 }: CompetitionsPageContentProps) {
+  // App settings for credits symbol
+  const { settings } = useAppSettings();
+  
   // Use server-fetched data as initial state - make mutable for auto-refresh
   const [competitions, setCompetitions] =
     useState<Competition[]>(initialCompetitions);
@@ -560,13 +555,13 @@ export default function CompetitionsPageContent({
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
               <div className="relative rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 p-2.5 sm:p-4 shadow-xl shadow-yellow-500/30">
-                <Trophy className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-900" />
+                <GameIcon name="trophy" size={32} className="drop-shadow-lg" />
               </div>
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-100 flex items-center gap-2 truncate">
                 <span className="truncate">Trading Arena</span>
-                <Sparkles className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-500 flex-shrink-0" />
+                <GameIcon name="star1" size={24} className="flex-shrink-0" />
               </h1>
               <p className="text-xs sm:text-sm text-gray-400 hidden sm:block">
                 Compete with traders worldwide • Win massive prizes
@@ -606,7 +601,7 @@ export default function CompetitionsPageContent({
           <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
           <Link href="/wallet">
             <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-auto py-2 px-4 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
-              <Zap className="mr-2 h-4 w-4" />
+              <GameIcon name="coin" size={16} className="mr-2" />
               Add Credits
             </Button>
           </Link>
@@ -622,7 +617,7 @@ export default function CompetitionsPageContent({
               size="sm"
               className="bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 font-bold rounded-lg shadow-lg"
             >
-              <Zap className="h-4 w-4" />
+              <GameIcon name="coin" size={16} />
             </Button>
           </Link>
         </div>
@@ -634,7 +629,7 @@ export default function CompetitionsPageContent({
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-blue-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
             <p className="text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-              <Flame className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <GameIcon name="fireSpell" size={12} />
               <span className="hidden sm:inline">Live Now</span>
               <span className="sm:hidden">Live</span>
             </p>
@@ -651,7 +646,7 @@ export default function CompetitionsPageContent({
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-yellow-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
             <p className="text-[10px] sm:text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
-              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <GameIcon name="timer" size={12} />
               <span className="hidden sm:inline">Starting Soon</span>
               <span className="sm:hidden">Soon</span>
             </p>
@@ -668,7 +663,7 @@ export default function CompetitionsPageContent({
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-green-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
             <p className="text-[10px] sm:text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
-              <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <GameIcon name="crown" size={12} />
               <span className="hidden sm:inline">Prize Pool</span>
               <span className="sm:hidden">Prize</span>
             </p>
@@ -676,7 +671,7 @@ export default function CompetitionsPageContent({
               <span className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 tabular-nums">
                 {totalPrizePool.toFixed(0)}
               </span>
-              <Zap className="h-3 w-3 sm:h-5 sm:w-5 text-green-400" />
+              <span className="text-green-400 text-lg sm:text-2xl">{settings?.credits.symbol || "⚡"}</span>
             </div>
             <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">
               Available to win
@@ -922,7 +917,7 @@ export default function CompetitionsPageContent({
                   variant="outline"
                   className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl"
                 >
-                  <Target className="h-4 w-4 mr-2" />
+                  <GameIcon name="target" size={16} className="mr-2" />
                   Type
                   {rankingFilter.length > 0 && (
                     <Badge className="ml-2 bg-blue-500/20 text-blue-400 text-[10px]">
@@ -1013,7 +1008,7 @@ export default function CompetitionsPageContent({
                 variant="outline"
                 className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl"
               >
-                <Skull className="h-4 w-4 mr-2" />
+                <GameIcon name="skull" size={16} className="mr-2" />
                 Difficulty
                 {difficultyFilter.length > 0 && (
                   <Badge className="ml-2 bg-red-500/20 text-red-400 text-[10px]">
@@ -1061,7 +1056,7 @@ export default function CompetitionsPageContent({
                   variant="outline"
                   className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl"
                 >
-                  <Star className="h-4 w-4 mr-2" />
+                  <GameIcon name="star1" size={16} className="mr-2" />
                   Level
                   {levelFilter.length > 0 && (
                     <Badge className="ml-2 bg-amber-500/20 text-amber-400 text-[10px]">
@@ -1193,7 +1188,7 @@ export default function CompetitionsPageContent({
         <section>
           <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
             <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/30">
-              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+              <GameIcon name="timer" size={20} />
               <h2 className="text-base sm:text-xl font-bold text-gray-100">
                 Starting Soon
               </h2>
@@ -1230,7 +1225,7 @@ export default function CompetitionsPageContent({
           {upcomingCompetitions.length > 0 && (
             <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 mt-4 sm:mt-8">
               <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                <GameIcon name="profit" size={20} />
                 <h2 className="text-base sm:text-xl font-bold text-gray-100">
                   {statusFilter.includes("active") &&
                   statusFilter.includes("completed")
@@ -1273,7 +1268,7 @@ export default function CompetitionsPageContent({
       {totalFilteredCount === 0 && (
         <div className="py-12 sm:py-20 text-center">
           <div className="mx-auto w-16 h-16 sm:w-24 sm:h-24 bg-gray-800/50 rounded-full flex items-center justify-center mb-4 sm:mb-6 border border-gray-700">
-            <Trophy className="h-8 w-8 sm:h-12 sm:w-12 text-gray-600" />
+            <GameIcon name="trophy" size={48} className="opacity-50" />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-gray-300 mb-2">
             No Competitions Found

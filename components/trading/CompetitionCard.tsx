@@ -1,16 +1,7 @@
 "use client";
 
 import {
-  Users,
-  Clock,
-  Calendar,
-  CheckCircle,
-  Zap,
-  Flame,
-  Sparkles,
   ChevronRight,
-  Gauge,
-  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -364,12 +355,12 @@ export default function CompetitionCard({
                     showTooltip={true}
                   />
                   <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
+                    <GameIcon name="war" size={12} />
                     {competition.currentParticipants}/
                     {competition.maxParticipants}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <GameIcon name="timer" size={12} />
                     {getDuration()}
                   </span>
                 </div>
@@ -442,7 +433,7 @@ export default function CompetitionCard({
             <div className="flex items-center gap-3 px-4 pb-3 pt-0 -mt-1">
               {/* Starting Capital */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                <Target className="h-3 w-3 text-purple-400" />
+                <GameIcon name="target" size={12} />
                 <span className="text-[10px] text-purple-300 font-medium">
                   $
                   {(
@@ -455,7 +446,7 @@ export default function CompetitionCard({
 
               {/* Leverage */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                <Zap className="h-3 w-3 text-orange-400" />
+                <GameIcon name="fireSpell" size={12} />
                 <span className="text-[10px] text-orange-300 font-medium">
                   1:{maxLeverage}
                 </span>
@@ -475,7 +466,7 @@ export default function CompetitionCard({
               {/* Liquidation Risk */}
               {competition.rules?.disqualifyOnLiquidation && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <Flame className="h-3 w-3 text-red-400" />
+                  <GameIcon name="skull" size={12} />
                   <span className="text-[10px] text-red-300 font-medium">
                     Liquidation = DQ
                   </span>
@@ -495,7 +486,7 @@ export default function CompetitionCard({
               {/* Risk Limits */}
               {competition.riskLimits?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Target className="h-3 w-3 text-blue-400" />
+                  <GameIcon name="shield1" size={12} />
                   <span className="text-[10px] text-blue-300 font-medium">
                     Max DD: {competition.riskLimits.maxDrawdownPercent}%
                   </span>
@@ -566,7 +557,7 @@ export default function CompetitionCard({
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         {isUserIn && !isCompleted && !isCancelled && (
           <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/40">
-            <CheckCircle className="h-3 w-3" />
+            <GameIcon name="starBadge" size={12} />
             ENTERED
           </span>
         )}
@@ -687,9 +678,7 @@ export default function CompetitionCard({
               <div
                 className={`w-8 h-8 rounded-lg ${isCancelled ? "bg-red-500/20" : "bg-green-500/20"} flex items-center justify-center`}
               >
-                <Zap
-                  className={`h-4 w-4 ${isCancelled ? "text-red-400" : "text-green-400"}`}
-                />
+                <GameIcon name="coin" size={16} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Entry Fee</p>
@@ -706,7 +695,7 @@ export default function CompetitionCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-400" />
+                <GameIcon name="war" size={16} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Players</p>
@@ -757,7 +746,7 @@ export default function CompetitionCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-yellow-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-yellow-400" />
+                <GameIcon name="fireSpell" size={16} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
@@ -791,7 +780,7 @@ export default function CompetitionCard({
               <div className="absolute top-0 right-0 w-8 h-8 bg-red-500/10 rounded-full blur-lg"></div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                  <Flame className="h-4 w-4 text-red-400" />
+                  <GameIcon name="skull" size={16} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase">
@@ -806,7 +795,7 @@ export default function CompetitionCard({
               <div className="absolute top-0 right-0 w-8 h-8 bg-green-500/10 rounded-full blur-lg"></div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <GameIcon name="starBadge" size={16} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase">Status</p>
@@ -822,7 +811,7 @@ export default function CompetitionCard({
           <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                <Calendar className="h-4 w-4 text-cyan-400" />
+                <GameIcon name="timer" size={16} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Starts</p>
@@ -836,7 +825,7 @@ export default function CompetitionCard({
           <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                <Clock className="h-4 w-4 text-red-400" />
+                <GameIcon name="timer" size={16} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Ends</p>
@@ -852,14 +841,14 @@ export default function CompetitionCard({
         {isUpcoming && (
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-yellow-500/10 border border-yellow-500/30">
             <div className="flex items-center justify-center gap-3">
-              <Flame className="h-4 w-4 text-yellow-500 animate-pulse" />
+              <GameIcon name="fireSpell" size={16} className="animate-pulse" />
               <div className="flex items-center gap-1">
                 <span className="text-xs text-gray-400">Starts in</span>
                 <span className="px-2 py-1 rounded bg-gray-900/80 font-mono text-yellow-400 font-bold text-sm">
                   {liveCountdown || getTimeUntilStart()}
                 </span>
               </div>
-              <Flame className="h-4 w-4 text-yellow-500 animate-pulse" />
+              <GameIcon name="fireSpell" size={16} className="animate-pulse" />
             </div>
           </div>
         )}
@@ -880,19 +869,7 @@ export default function CompetitionCard({
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Gauge
-                className={`h-4 w-4 ${
-                  difficulty.score <= 20
-                    ? "text-green-400"
-                    : difficulty.score <= 40
-                      ? "text-blue-400"
-                      : difficulty.score <= 60
-                        ? "text-yellow-400"
-                        : difficulty.score <= 80
-                          ? "text-orange-400"
-                          : "text-red-400"
-                }`}
-              />
+              <GameIcon name="target" size={16} />
               <span
                 className={`text-xs font-bold ${
                   difficulty.score <= 20
@@ -1001,7 +978,7 @@ export default function CompetitionCard({
             >
               {entering ? (
                 <span className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 animate-spin" />
+                  <GameIcon name="star1" size={20} className="animate-spin" />
                   Entering Arena...
                 </span>
               ) : isUserIn ? (
@@ -1011,12 +988,12 @@ export default function CompetitionCard({
                 </span>
               ) : isFull ? (
                 <span className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <GameIcon name="war" size={20} />
                   Arena Full
                 </span>
               ) : !canAfford ? (
                 <span className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
+                  <GameIcon name="coin" size={20} />
                   Need {Math.abs(getEntryFee() - userBalance).toFixed(0)} More
                 </span>
               ) : isUpcoming ? (

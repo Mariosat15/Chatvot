@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 export default function UTCClock() {
   const [time, setTime] = useState(new Date());
@@ -30,7 +30,7 @@ export default function UTCClock() {
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/30 shadow-lg h-[72px]">
-      <Clock className="h-6 w-6 text-blue-400 animate-pulse" />
+      <GameIcon name="timer" size={24} className="animate-pulse" />
       <div className="flex flex-col">
         <span className="text-[10px] text-blue-400/80 font-semibold uppercase tracking-wider">
           Server Time (UTC)

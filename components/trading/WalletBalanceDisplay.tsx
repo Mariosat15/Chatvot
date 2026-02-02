@@ -1,7 +1,6 @@
 "use client";
 
 import { useAppSettings } from "@/contexts/AppSettingsContext";
-import { Zap } from "lucide-react";
 
 interface WalletBalanceDisplayProps {
   balance: number;
@@ -14,7 +13,7 @@ export default function WalletBalanceDisplay({
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-yellow-500/10 to-amber-600/5 border border-yellow-500/30 shadow-lg h-[72px]">
-      <Zap className="h-6 w-6 text-yellow-500" />
+      <span className="text-2xl text-yellow-500">{settings?.credits.symbol || "⚡"}</span>
       <div className="flex flex-col">
         <span className="text-[10px] text-yellow-400/80 font-semibold uppercase tracking-wider">
           Your Balance
