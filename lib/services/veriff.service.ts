@@ -598,43 +598,91 @@ class VeriffService {
     
     const settings = await this.getSettings();
     
-    if (!settings.veriffApiKey) {
+    if (!settings.veriffApiKey || !settings.veriffApiSecret) {
       throw new Error("Veriff API not configured");
     }
 
     try {
-      // Fetch decision from Veriff API
-      const response = await fetch(
+      // Try the session attempts endpoint first (more reliable)
+      console.log("🔐 [KYC] Trying Veriff attempts endpoint...");
+      const attemptsResponse = await fetch(
+        `${settings.veriffBaseUrl}/v1/sessions/${veriffSessionId}/attempts`,
+        {
+          method: "GET",
+          headers: {
+            "X-AUTH-CLIENT": settings.veriffApiKey,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (attemptsResponse.ok) {
+        const attemptsData = await attemptsResponse.json();
+        console.log("📋 [KYC] Veriff attempts data:", JSON.stringify(attemptsData).substring(0, 500));
+        
+        // Check if there's a completed verification in the attempts
+        const verifications = attemptsData.verifications || [];
+        for (const verification of verifications) {
+          if (verification.status === "approved" || verification.status === "declined" || 
+              verification.status === "resubmission_requested" || verification.status === "expired") {
+            console.log("✅ [KYC] Found decision in attempts:", verification.status);
+            
+            // Create a payload that matches what handleDecision expects
+            const decisionPayload = {
+              status: "success",
+              verification: {
+                id: veriffSessionId,
+                status: verification.status,
+                code: verification.code,
+                reason: verification.reason,
+                reasonCode: verification.reasonCode,
+                decisionTime: verification.decisionTime || new Date().toISOString(),
+                acceptanceTime: verification.acceptanceTime,
+                vendorData: verification.vendorData,
+                person: verification.person,
+                document: verification.document,
+              },
+            };
+            
+            await this.handleDecision(decisionPayload, "");
+            return { status: verification.status, processed: true };
+          }
+        }
+      } else {
+        console.log("⚠️ [KYC] Attempts endpoint response:", attemptsResponse.status);
+      }
+
+      // Fallback: Try the decision endpoint with proper authentication
+      console.log("🔐 [KYC] Trying Veriff decision endpoint with HMAC...");
+      const signature = this.generateHmacSignature(veriffSessionId, settings.veriffApiSecret);
+      
+      const decisionResponse = await fetch(
         `${settings.veriffBaseUrl}/v1/sessions/${veriffSessionId}/decision`,
         {
           method: "GET",
           headers: {
             "X-AUTH-CLIENT": settings.veriffApiKey,
+            "X-HMAC-SIGNATURE": signature,
+            "Content-Type": "application/json",
           },
         }
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log("⚠️ [KYC] Veriff API response:", response.status, errorText);
-        
-        if (response.status === 404) {
-          return { status: "pending", processed: false };
+      if (decisionResponse.ok) {
+        const data = await decisionResponse.json();
+        console.log("📋 [KYC] Veriff decision data:", {
+          status: data.verification?.status,
+          code: data.verification?.code,
+          hasVerification: !!data.verification,
+        });
+
+        if (data.verification && data.verification.status) {
+          await this.handleDecision(data, "");
+          return { status: data.verification.status, processed: true };
         }
-        throw new Error(`Veriff API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("📋 [KYC] Veriff decision data:", {
-        status: data.verification?.status,
-        code: data.verification?.code,
-        hasVerification: !!data.verification,
-      });
-
-      if (data.verification && data.verification.status) {
-        // Process the decision as if it came from webhook
-        await this.handleDecision(data, "");
-        return { status: data.verification.status, processed: true };
+      } else {
+        const errorText = await decisionResponse.text();
+        console.log("⚠️ [KYC] Decision endpoint response:", decisionResponse.status, errorText);
       }
 
       return { status: "pending", processed: false };

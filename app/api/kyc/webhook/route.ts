@@ -29,22 +29,54 @@ export async function POST(req: NextRequest) {
       action: payload.action,
       hasVerification: !!payload.verification,
       payloadKeys: Object.keys(payload),
+      fullPayload: JSON.stringify(payload).substring(0, 1000),
     });
 
     // Handle different webhook types
     if (payload.verification && payload.verification.status) {
-      // This is a decision webhook
+      // This is a decision webhook (traditional format)
       console.log("🔐 [KYC Webhook] Processing decision webhook...");
       await veriffService.handleDecision(payload, signature);
       console.log("✅ [KYC Webhook] Decision processed successfully");
+    } else if (payload.status === "success" && payload.data?.verification?.status) {
+      // Alternative decision format (nested in data)
+      console.log("🔐 [KYC Webhook] Processing decision webhook (data format)...");
+      const decisionPayload = {
+        status: payload.status,
+        verification: payload.data.verification,
+      };
+      await veriffService.handleDecision(decisionPayload, signature);
+      console.log("✅ [KYC Webhook] Decision processed successfully");
+    } else if (payload.action === "finished" && payload.data?.status) {
+      // Event-based decision format
+      console.log("🔐 [KYC Webhook] Processing finished event with decision...");
+      const sessionId = payload.id || payload.sessionId;
+      const status = payload.data.status;
+      
+      // Map Veriff event status to our expected format
+      if (["approved", "declined", "resubmission_requested", "expired"].includes(status)) {
+        const decisionPayload = {
+          status: "success",
+          verification: {
+            id: sessionId,
+            status: status,
+            code: payload.data.code,
+            reason: payload.data.reason,
+            vendorData: payload.vendorData,
+            decisionTime: new Date().toISOString(),
+          },
+        };
+        await veriffService.handleDecision(decisionPayload, signature);
+        console.log("✅ [KYC Webhook] Finished event processed successfully");
+      }
     } else if (payload.action) {
       // Handle session events (started, submitted, etc.)
       console.log("📋 [KYC Webhook] Processing session event:", payload.action);
       await handleSessionEvent(payload);
     } else {
       console.log(
-        "⚠️ [KYC Webhook] Unknown webhook type, payload:",
-        JSON.stringify(payload).substring(0, 500),
+        "⚠️ [KYC Webhook] Unknown webhook type, full payload:",
+        JSON.stringify(payload).substring(0, 1500),
       );
     }
 
