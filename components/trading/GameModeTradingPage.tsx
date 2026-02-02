@@ -7,11 +7,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import GameChart from "./GameChart";
-import GameModeOrderForm from "./GameModeOrderForm";
+import GameModeSimpleOrderForm from "./GameModeSimpleOrderForm";
 import GameModePositions from "./GameModePositions";
 import GameMarketWatchSidebar from "./GameMarketWatchSidebar";
 import GameLiveRankingPanel from "./GameLiveRankingPanel";
-import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from "lucide-react";
+import { ArrowLeft, Users, Monitor, Gamepad2, Trophy, Clock, Coins, TrendingUp, TrendingDown } from "lucide-react";
 import { MarginStatusIndicator } from "./MarginStatusIndicator";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 
@@ -219,13 +219,25 @@ export default function GameModeTradingPage({
               />
             </div>
 
-            {/* Positions */}
+            {/* Positions - Simplified */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Swords className="w-5 h-5 text-purple-400" />
-                <h2 className="text-white font-bold">
-                  Open Positions ({positions.length})
-                </h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚔️</span>
+                  <h2 className="text-white font-bold">
+                    Your Trades ({positions.length})
+                  </h2>
+                </div>
+                {positions.length > 0 && (
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-sm font-bold",
+                    participant.unrealizedPnl >= 0 
+                      ? "bg-green-500/20 text-green-400" 
+                      : "bg-red-500/20 text-red-400"
+                  )}>
+                    {participant.unrealizedPnl >= 0 ? "+" : ""}{participant.unrealizedPnl.toFixed(2)}
+                  </div>
+                )}
               </div>
               <GameModePositions
                 positions={positions}
@@ -233,139 +245,80 @@ export default function GameModeTradingPage({
               />
             </div>
 
-            {/* Account Stats - Horizontal Layout */}
+            {/* Simplified Stats - Beginner Friendly */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
-                <Image
-                  src="/game-icons/chest.png"
-                  alt="Stats"
-                  width={20}
-                  height={20}
-                />
-                <h2 className="text-white font-bold">Account Stats</h2>
+                <span className="text-xl">📊</span>
+                <h2 className="text-white font-bold">Your Progress</h2>
               </div>
 
-              {/* Horizontal Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                {/* Balance */}
-                <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-xl p-3 border border-purple-500/30">
-                  <div className="text-[10px] text-purple-300 uppercase tracking-wider mb-1">
-                    💰 Balance
-                  </div>
-                  <div className="text-white font-bold text-lg">
-                    ${participant.currentCapital.toFixed(2)}
-                  </div>
-                </div>
-
-                {/* Equity */}
-                <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl p-3 border border-blue-500/30">
-                  <div className="text-[10px] text-blue-300 uppercase tracking-wider mb-1">
-                    💎 Equity
-                  </div>
-                  <div className="text-white font-bold text-lg">
-                    ${equity.toFixed(2)}
-                  </div>
-                </div>
-
-                {/* Unrealized P&L */}
-                <div
-                  className={cn(
-                    "rounded-xl p-3 border",
-                    participant.unrealizedPnl >= 0
-                      ? "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
-                      : "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "text-[10px] uppercase tracking-wider mb-1",
-                      participant.unrealizedPnl >= 0
-                        ? "text-green-300"
-                        : "text-red-300",
+              {/* Simple Progress Display */}
+              <div className="space-y-4">
+                {/* Main P&L Display - Big & Clear */}
+                <div className={cn(
+                  "rounded-xl p-4 text-center border-2",
+                  participant.currentCapital >= startingCapital
+                    ? "bg-gradient-to-br from-green-500/20 to-emerald-600/10 border-green-500/50"
+                    : "bg-gradient-to-br from-red-500/20 to-rose-600/10 border-red-500/50"
+                )}>
+                  <div className="text-gray-300 text-sm mb-2">Total Profit/Loss</div>
+                  <div className={cn(
+                    "text-3xl font-black flex items-center justify-center gap-2",
+                    participant.currentCapital >= startingCapital ? "text-green-400" : "text-red-400"
+                  )}>
+                    {participant.currentCapital >= startingCapital ? (
+                      <TrendingUp className="w-8 h-8" />
+                    ) : (
+                      <TrendingDown className="w-8 h-8" />
                     )}
-                  >
-                    {participant.unrealizedPnl >= 0 ? "📈" : "📉"} P&L
+                    {participant.currentCapital >= startingCapital ? "+" : ""}
+                    ${(participant.currentCapital - startingCapital).toFixed(2)}
                   </div>
-                  <div
-                    className={cn(
-                      "font-bold text-lg",
-                      participant.unrealizedPnl >= 0
-                        ? "text-green-400"
-                        : "text-red-400",
-                    )}
-                  >
-                    {participant.unrealizedPnl >= 0 ? "+" : ""}$
-                    {participant.unrealizedPnl.toFixed(2)}
+                  <div className={cn(
+                    "text-sm mt-1",
+                    participant.currentCapital >= startingCapital ? "text-green-300" : "text-red-300"
+                  )}>
+                    {((participant.currentCapital - startingCapital) / startingCapital * 100).toFixed(2)}% from start
                   </div>
                 </div>
 
-                {/* Margin Level */}
-                <div
-                  className={cn(
-                    "rounded-xl p-3 border",
-                    marginLevel < 100
-                      ? "bg-gradient-to-br from-red-500/30 to-red-600/20 border-red-500/50 animate-pulse"
-                      : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
-                        ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30"
-                        : marginLevel < (marginThresholds?.WARNING || 300)
-                          ? "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/30"
-                          : "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "text-[10px] uppercase tracking-wider mb-1",
-                      marginLevel < 100
-                        ? "text-red-300"
-                        : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
-                          ? "text-red-300"
-                          : marginLevel < (marginThresholds?.WARNING || 300)
-                            ? "text-yellow-300"
-                            : "text-green-300",
-                    )}
-                  >
-                    {marginLevel < 100
-                      ? "💀"
-                      : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
-                        ? "🚨"
-                        : "🛡️"}{" "}
-                    Margin Level
+                {/* Simple Stats Grid */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-purple-500/10 rounded-xl p-3 text-center border border-purple-500/20">
+                    <div className="text-purple-300 text-xs mb-1">💰 Started</div>
+                    <div className="text-white font-bold">${startingCapital.toLocaleString()}</div>
                   </div>
-                  <div
-                    className={cn(
-                      "font-bold text-lg font-mono",
-                      marginLevel < 100
-                        ? "text-red-400"
-                        : marginLevel < (marginThresholds?.MARGIN_CALL || 260)
-                          ? "text-red-400"
-                          : marginLevel < (marginThresholds?.WARNING || 300)
-                            ? "text-yellow-400"
-                            : "text-green-400",
-                    )}
-                  >
-                    {Number.isFinite(marginLevel)
-                      ? `${marginLevel.toFixed(1)}%`
-                      : "∞"}
+                  <div className="bg-blue-500/10 rounded-xl p-3 text-center border border-blue-500/20">
+                    <div className="text-blue-300 text-xs mb-1">💎 Now</div>
+                    <div className="text-white font-bold">${participant.currentCapital.toFixed(2)}</div>
+                  </div>
+                  <div className="bg-cyan-500/10 rounded-xl p-3 text-center border border-cyan-500/20">
+                    <div className="text-cyan-300 text-xs mb-1">💵 Free</div>
+                    <div className="text-white font-bold">${participant.availableCapital.toFixed(2)}</div>
                   </div>
                 </div>
 
-                {/* Available */}
-                <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-xl p-3 border border-cyan-500/30">
-                  <div className="text-[10px] text-cyan-300 uppercase tracking-wider mb-1">
-                    💵 Available
+                {/* Account Health Bar */}
+                <div className="bg-dark-400/30 rounded-xl p-3 border border-purple-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-400 text-sm">Account Health</span>
+                    <span className={cn(
+                      "text-sm font-bold",
+                      marginLevel > 300 ? "text-green-400" : marginLevel > 150 ? "text-yellow-400" : "text-red-400"
+                    )}>
+                      {marginLevel > 300 ? "😊 Great!" : marginLevel > 150 ? "😐 OK" : "😰 Low"}
+                    </span>
                   </div>
-                  <div className="text-white font-bold text-lg">
-                    ${participant.availableCapital.toFixed(2)}
-                  </div>
-                </div>
-
-                {/* Positions Count */}
-                <div className="bg-gradient-to-br from-pink-500/20 to-pink-600/10 rounded-xl p-3 border border-pink-500/30">
-                  <div className="text-[10px] text-pink-300 uppercase tracking-wider mb-1">
-                    ⚔️ Positions
-                  </div>
-                  <div className="text-white font-bold text-lg">
-                    {positions.length}
+                  <div className="h-3 bg-dark-500 rounded-full overflow-hidden">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        marginLevel > 300 ? "bg-gradient-to-r from-green-500 to-emerald-400" 
+                          : marginLevel > 150 ? "bg-gradient-to-r from-yellow-500 to-orange-400" 
+                          : "bg-gradient-to-r from-red-500 to-rose-400"
+                      )}
+                      style={{ width: `${Math.min(100, marginLevel / 5)}%` }}
+                    />
                   </div>
                 </div>
               </div>
@@ -383,12 +336,13 @@ export default function GameModeTradingPage({
               userId={userId}
             />
 
-            {/* Order Form (Trade Station) */}
-            <GameModeOrderForm
+            {/* Simplified Order Form for Beginners */}
+            <GameModeSimpleOrderForm
               competitionId={competitionId}
               availableCapital={participant.availableCapital}
               defaultLeverage={defaultLeverage}
               currentBalance={participant.currentCapital}
+              startingCapital={startingCapital}
               currentEquity={equity}
               usedMargin={participant.usedMargin}
               openPositionsCount={positions.length}
