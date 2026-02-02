@@ -35,11 +35,52 @@ export async function POST(req: NextRequest) {
     // Handle different webhook types
     if (payload.verification && payload.verification.status) {
       // This is a decision webhook (traditional format)
-      console.log("🔐 [KYC Webhook] Processing decision webhook...");
+      console.log("🔐 [KYC Webhook] Processing decision webhook (traditional format)...");
       await veriffService.handleDecision(payload, signature);
       console.log("✅ [KYC Webhook] Decision processed successfully");
+    } else if (payload.eventType === "fullauto" && payload.data?.verification?.decision) {
+      // Fullauto webhook format - the decision is in data.verification.decision (not .status)
+      console.log("🔐 [KYC Webhook] Processing fullauto decision webhook...");
+      console.log("   Decision:", payload.data.verification.decision);
+      console.log("   Session ID:", payload.sessionId);
+      console.log("   Vendor Data (userId):", payload.vendorData);
+      
+      const decision = payload.data.verification.decision; // "approved", "declined", etc.
+      const person = payload.data.verification.person || {};
+      const document = payload.data.verification.document || {};
+      
+      // Convert fullauto format to our standard format
+      const decisionPayload = {
+        status: payload.status,
+        verification: {
+          id: payload.sessionId,
+          status: decision, // Map decision to status
+          code: decision === "approved" ? 9001 : decision === "declined" ? 9102 : 9104,
+          person: {
+            firstName: person.firstName?.value,
+            lastName: person.lastName?.value,
+            dateOfBirth: person.dateOfBirth?.value,
+            gender: person.gender?.value,
+            nationality: person.nationality?.value,
+            idNumber: person.idNumber?.value,
+          },
+          document: {
+            type: document.type?.value,
+            number: document.number?.value,
+            country: document.country?.value,
+            validFrom: document.validFrom?.value,
+            validUntil: document.validUntil?.value,
+          },
+          vendorData: payload.vendorData,
+          decisionTime: payload.time || new Date().toISOString(),
+          acceptanceTime: payload.acceptanceTime,
+        },
+      };
+      
+      await veriffService.handleDecision(decisionPayload, signature);
+      console.log("✅ [KYC Webhook] Fullauto decision processed successfully");
     } else if (payload.status === "success" && payload.data?.verification?.status) {
-      // Alternative decision format (nested in data)
+      // Alternative decision format (nested in data with status field)
       console.log("🔐 [KYC Webhook] Processing decision webhook (data format)...");
       const decisionPayload = {
         status: payload.status,
