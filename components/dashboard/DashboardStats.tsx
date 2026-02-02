@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  TrendingUp,
-  TrendingDown,
-  Trophy,
-  Target,
-  Activity,
-  DollarSign,
-} from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
 import { formatCurrency } from "@/lib/utils";
 
 interface DashboardStatsProps {
@@ -31,11 +25,18 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
       ? (overallStats.totalPnL / overallStats.totalCapital) * 100
       : 0;
 
-  const stats = [
+  const stats: {
+    label: string;
+    value: string | number;
+    iconName: GameIconName;
+    color: string;
+    bgColor: string;
+    trend: string | null;
+  }[] = [
     {
       label: "Active Competitions",
       value: overallStats.activeCompetitionsCount,
-      icon: Trophy,
+      iconName: "trophy",
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/10",
       trend: null,
@@ -43,7 +44,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     {
       label: "Total Capital",
       value: formatCurrency(overallStats.totalCapital),
-      icon: DollarSign,
+      iconName: "coin",
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
       trend: null,
@@ -51,7 +52,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     {
       label: "Total P&L",
       value: formatCurrency(overallStats.totalPnL),
-      icon: isProfitable ? TrendingUp : TrendingDown,
+      iconName: isProfitable ? "profit" : "loss",
       color: isProfitable ? "text-green-500" : "text-red-500",
       bgColor: isProfitable ? "bg-green-500/10" : "bg-red-500/10",
       trend: `${pnlPercentage >= 0 ? "+" : ""}${pnlPercentage.toFixed(2)}%`,
@@ -59,7 +60,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     {
       label: "Open Positions",
       value: overallStats.totalPositions,
-      icon: Activity,
+      iconName: "portfolio",
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
       trend: null,
@@ -67,7 +68,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     {
       label: "Total Trades",
       value: overallStats.totalTrades,
-      icon: Target,
+      iconName: "target",
       color: "text-indigo-500",
       bgColor: "bg-indigo-500/10",
       trend: `${overallStats.totalWinningTrades}W / ${overallStats.totalLosingTrades}L`,
@@ -75,7 +76,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
     {
       label: "Overall Win Rate",
       value: `${overallStats.overallWinRate.toFixed(1)}%`,
-      icon: Trophy,
+      iconName: "goldMedal",
       color:
         overallStats.overallWinRate >= 50
           ? "text-green-500"
@@ -100,7 +101,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
         >
           <div className="flex items-start justify-between mb-4">
             <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-              <stat.icon className={`h-6 w-6 ${stat.color}`} />
+              <GameIcon name={stat.iconName} size={24} />
             </div>
             {stat.trend && (
               <span className={`text-sm font-medium ${stat.color}`}>

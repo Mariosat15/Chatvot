@@ -4,34 +4,10 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  Target,
-  Zap,
-  Users,
-  DollarSign,
-  BarChart3,
-  Activity,
-  Clock,
-  Calendar,
-  Award,
-  Crown,
-  Medal,
-  ArrowUpRight,
-  ArrowDownRight,
   RefreshCw,
   ChevronRight,
-  Flame,
-  Swords,
-  LineChart,
-  PieChart,
-  Timer,
-  Sparkles,
-  Shield,
-  Eye,
-  Percent,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import WinPotentialCard from "./WinPotentialCard";
 import MarketHolidaysCard from "./MarketHolidaysCard";
@@ -147,8 +123,8 @@ function GlowStatCard({
             <div
               className={`flex items-center gap-1 text-xs ${trend === "up" ? "text-green-400" : trend === "down" ? "text-red-400" : "text-gray-400"}`}
             >
-              {trend === "up" && <TrendingUp className="w-3 h-3" />}
-              {trend === "down" && <TrendingDown className="w-3 h-3" />}
+              {trend === "up" && <GameIcon name="profit" size={12} />}
+              {trend === "down" && <GameIcon name="loss" size={12} />}
             </div>
           )}
         </div>
@@ -754,7 +730,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl">
-              <Activity className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+              <GameIcon name="headset" size={28} className="drop-shadow-lg" />
             </div>
             Trading Dashboard
           </h1>
@@ -780,7 +756,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
       {/* Hero Stats Grid with Glow Cards - All same size */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <GlowStatCard
-          icon={<DollarSign className="w-5 h-5 text-white" />}
+          icon={<GameIcon name="coin" size={20} />}
           label="Total Capital"
           value={formatCurrency(data.overview.totalCapital)}
           subvalue={`${data.overview.activeContests} active contest${data.overview.activeContests !== 1 ? "s" : ""}`}
@@ -791,9 +767,9 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
         <GlowStatCard
           icon={
             data.overview.totalPnL >= 0 ? (
-              <TrendingUp className="w-5 h-5 text-white" />
+              <GameIcon name="profit" size={20} />
             ) : (
-              <TrendingDown className="w-5 h-5 text-white" />
+              <GameIcon name="loss" size={20} />
             )
           }
           label="Total P&L"
@@ -805,7 +781,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           delay={0.1}
         />
         <GlowStatCard
-          icon={<Target className="w-5 h-5 text-white" />}
+          icon={<GameIcon name="target" size={20} />}
           label="Win Rate"
           value={`${data.overview.winRate.toFixed(1)}%`}
           subvalue={`${data.overview.winningTrades}W / ${data.overview.losingTrades}L`}
@@ -815,7 +791,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           delay={0.2}
         />
         <GlowStatCard
-          icon={<Trophy className="w-5 h-5 text-white" />}
+          icon={<GameIcon name="trophy" size={20} />}
           label="Prizes Won"
           value={
             <span
@@ -825,10 +801,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
                 gap: "4px",
               }}
             >
-              <Zap
-                className="w-5 h-5 text-yellow-400 flex-shrink-0"
-                style={{ display: "inline-block" }}
-              />
+              <GameIcon name="gems" size={20} />
               <span>{data.overview.totalPrizesWon.toLocaleString()}</span>
             </span>
           }
@@ -848,7 +821,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-purple-500/20 rounded-lg">
-            <PieChart className="h-5 w-5 text-purple-400" />
+            <GameIcon name="target" size={20} />
           </div>
           <h3 className="text-lg font-bold text-white">Performance Metrics</h3>
         </div>
@@ -929,7 +902,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           >
             <div className="p-4 sm:p-5 border-b border-gray-700/50 flex items-center gap-3">
               <div className="p-2 bg-cyan-500/20 rounded-lg">
-                <DollarSign className="h-5 w-5 text-cyan-400" />
+                <GameIcon name="chest1" size={20} />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white">
@@ -957,7 +930,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           >
             <div className="p-4 sm:p-5 border-b border-gray-700/50 flex items-center gap-3">
               <div className="p-2 bg-green-500/20 rounded-lg">
-                <BarChart3 className="h-5 w-5 text-green-400" />
+                <GameIcon name="gain" size={20} />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white">
@@ -982,7 +955,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             >
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <PieChart className="h-4 w-4 text-purple-400" />
+                  <GameIcon name="target" size={16} />
                 </div>
                 <h3 className="text-sm font-bold text-white">
                   Win/Loss Distribution
@@ -1000,7 +973,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             >
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <BarChart3 className="h-4 w-4 text-orange-400" />
+                  <GameIcon name="fireSpell" size={16} />
                 </div>
                 <h3 className="text-sm font-bold text-white">Trading Stats</h3>
               </div>
@@ -1021,7 +994,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           >
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 bg-cyan-500/20 rounded-lg">
-                <Activity className="h-4 w-4 text-cyan-400" />
+                <GameIcon name="trade" size={16} />
               </div>
               <h3 className="text-sm font-bold text-white">
                 Top Traded Symbols
@@ -1080,7 +1053,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             <div className="p-4 border-b border-yellow-500/20 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <Trophy className="h-5 w-5 text-yellow-400" />
+                  <GameIcon name="trophy" size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">Competitions</h3>
@@ -1134,7 +1107,9 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
                 ))
               ) : (
                 <div className="text-center py-6">
-                  <Trophy className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                  <div className="flex justify-center mb-2 opacity-50">
+                    <GameIcon name="trophy" size={32} />
+                  </div>
                   <p className="text-sm text-gray-500">
                     No active competitions
                   </p>
@@ -1179,7 +1154,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             <div className="p-4 border-b border-purple-500/20 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <Swords className="h-5 w-5 text-purple-400" />
+                  <GameIcon name="sword" size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">
@@ -1234,7 +1209,9 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
                 ))
               ) : (
                 <div className="text-center py-6">
-                  <Swords className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                  <div className="flex justify-center mb-2 opacity-50">
+                    <GameIcon name="sword" size={32} />
+                  </div>
                   <p className="text-sm text-gray-500">No active challenges</p>
                   <Link
                     href="/challenges"
@@ -1276,7 +1253,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           >
             <div className="p-4 border-b border-gray-700/50 flex items-center gap-3">
               <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Clock className="h-5 w-5 text-blue-400" />
+                <GameIcon name="timer" size={20} />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">Recent Trades</h3>
@@ -1301,9 +1278,9 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
                       }`}
                     >
                       {trade.side === "long" ? (
-                        <ArrowUpRight className="h-4 w-4 text-green-400" />
+                        <GameIcon name="profit" size={16} />
                       ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-400" />
+                        <GameIcon name="loss" size={16} />
                       )}
                     </div>
                     <div>
@@ -1332,7 +1309,9 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
               ))}
               {data.recentActivity.trades.length === 0 && (
                 <div className="text-center py-6">
-                  <Activity className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                  <div className="flex justify-center mb-2 opacity-50">
+                    <GameIcon name="trade" size={32} />
+                  </div>
                   <p className="text-sm text-gray-500">No trades yet</p>
                 </div>
               )}
@@ -1352,7 +1331,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           <div className="p-4 sm:p-5 border-b border-gray-700/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg">
-                <Trophy className="h-5 w-5 text-yellow-400" />
+                <GameIcon name="trophy" size={20} />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Win Potential</h3>
@@ -1398,7 +1377,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-orange-500/20 rounded-lg">
-            <Sparkles className="h-5 w-5 text-orange-400" />
+            <GameIcon name="star1" size={20} />
           </div>
           <div>
             <h3 className="text-lg font-bold text-white">Trading Streaks</h3>
@@ -1409,7 +1388,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <StreakCard
-            icon={<Flame className="w-5 h-5" />}
+            icon={<GameIcon name="fireSpell" size={20} />}
             label="Win Streak"
             value={data.streaks.currentWinStreak}
             subtitle={`Best: ${data.streaks.longestWinStreak}`}
@@ -1417,7 +1396,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             delay={1.2}
           />
           <StreakCard
-            icon={<TrendingDown className="w-5 h-5" />}
+            icon={<GameIcon name="loss" size={20} />}
             label="Loss Streak"
             value={data.streaks.currentLossStreak}
             subtitle={`Worst: ${data.streaks.longestLossStreak}`}
@@ -1425,7 +1404,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             delay={1.3}
           />
           <StreakCard
-            icon={<Calendar className="w-5 h-5" />}
+            icon={<GameIcon name="timer" size={20} />}
             label="Trading Days"
             value={data.streaks.tradingDaysThisMonth}
             subtitle="This month"
@@ -1433,7 +1412,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             delay={1.4}
           />
           <StreakCard
-            icon={<TrendingUp className="w-5 h-5" />}
+            icon={<GameIcon name="profit" size={20} />}
             label="Profit Days"
             value={data.streaks.consecutiveProfitableDays}
             subtitle="In a row"
@@ -1441,7 +1420,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             delay={1.5}
           />
           <StreakCard
-            icon={<Trophy className="w-5 h-5" />}
+            icon={<GameIcon name="trophy" size={20} />}
             label="Best Rank"
             value={
               data.competitions.stats.bestRank > 0
@@ -1453,7 +1432,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             delay={1.6}
           />
           <StreakCard
-            icon={<Award className="w-5 h-5" />}
+            icon={<GameIcon name="sword" size={20} />}
             label="Challenge W/L"
             value={`${data.challenges.stats.wins}/${data.challenges.stats.losses}`}
             subtitle={`${data.challenges.stats.winRate.toFixed(0)}% rate`}

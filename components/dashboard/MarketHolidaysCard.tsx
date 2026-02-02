@@ -2,16 +2,12 @@
 
 import { useState, useEffect } from "react";
 import {
-  Calendar,
-  Clock,
-  AlertTriangle,
   ChevronRight,
-  Zap,
-  Globe,
   Loader2,
   RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 interface Holiday {
   id: string;
@@ -95,14 +91,14 @@ export default function MarketHolidaysCard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg shadow-red-500/20">
-              <Calendar className="h-5 w-5 text-white" />
+              <GameIcon name="timer" size={20} />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 Market Holidays
                 {data?.mode === "automatic" && (
                   <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] font-medium ml-1">
-                    <Zap className="h-3 w-3 mr-1" />
+                    <GameIcon name="gems" size={12} className="mr-1" />
                     Live
                   </Badge>
                 )}
@@ -132,7 +128,9 @@ export default function MarketHolidaysCard() {
           </div>
         ) : error ? (
           <div className="text-center py-6 text-gray-500">
-            <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+            <div className="flex justify-center mb-2">
+              <GameIcon name="warning" size={32} />
+            </div>
             <p className="text-sm">{error}</p>
           </div>
         ) : (
@@ -203,7 +201,7 @@ export default function MarketHolidaysCard() {
                             variant="outline"
                             className="text-[10px] border-emerald-500/30 text-emerald-400 px-1.5"
                           >
-                            <Globe className="h-2.5 w-2.5 mr-1" />
+                            <GameIcon name="star1" size={10} className="mr-1" />
                             {nextHoliday.exchange || "API"}
                           </Badge>
                         ) : (
@@ -279,7 +277,7 @@ export default function MarketHolidaysCard() {
                             {holiday.name}
                           </h4>
                           {holiday.type === "automatic" && (
-                            <Zap className="h-3 w-3 text-emerald-400 flex-shrink-0" />
+                            <GameIcon name="gems" size={12} className="flex-shrink-0" />
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -324,7 +322,7 @@ export default function MarketHolidaysCard() {
       {data?.mode === "automatic" && (
         <div className="relative px-5 pb-4">
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Zap className="h-3 w-3 text-emerald-500" />
+            <GameIcon name="gems" size={12} />
             <span>Holiday data from live market API</span>
           </div>
         </div>
