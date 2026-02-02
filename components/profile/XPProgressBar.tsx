@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 import { TitleLevel } from "@/lib/constants/levels";
-import {
-  Trophy,
-  Zap,
-  Target,
-  TrendingUp,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Zap, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 interface XPProgressBarProps {
   currentXP: number;
@@ -82,7 +76,7 @@ export default function XPProgressBar({
       >
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-full bg-purple-500/20 border border-purple-500/30">
-            <Trophy className="h-6 w-6 text-purple-400" />
+            <GameIcon name="trophy" size={26} />
           </div>
           <div className="text-left">
             <h2 className="text-xl font-bold text-white">
@@ -174,7 +168,7 @@ export default function XPProgressBar({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-purple-400" />
+                      <GameIcon name="target" size={22} />
                       <p className="text-sm font-semibold text-white">
                         Next Title:
                       </p>

@@ -4,29 +4,19 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Trophy,
-  Medal,
-  Star,
-  Crown,
   Zap,
-  Swords,
   LayoutList,
   Sparkles,
   TrendingUp,
-  Target,
-  Award,
   Search,
   X,
   ChevronDown,
-  ChevronUp,
   Users,
   Filter,
   ArrowUpDown,
-  Flame,
-  Shield,
-  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
+import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
 import LeaderboardChallengeButton from "@/components/leaderboard/LeaderboardChallengeButton";
 import LeaderboardFriendButton from "@/components/leaderboard/LeaderboardFriendButton";
 import MatchmakingCards from "@/components/leaderboard/MatchmakingCards";
@@ -224,9 +214,9 @@ export default function LeaderboardContent({
 
   // Rank visuals
   const getRankIcon = (rank: number, isTied?: boolean) => {
-    if (rank === 1) return <Crown className="h-4 w-4 text-yellow-400" />;
-    if (rank === 2) return <Medal className="h-4 w-4 text-gray-300" />;
-    if (rank === 3) return <Medal className="h-4 w-4 text-amber-600" />;
+    if (rank === 1) return <RankIcon rank={1} size={18} />;
+    if (rank === 2) return <RankIcon rank={2} size={18} />;
+    if (rank === 3) return <RankIcon rank={3} size={18} />;
     return <span className="text-sm font-bold text-gray-400">#{rank}</span>;
   };
 
@@ -317,7 +307,7 @@ export default function LeaderboardContent({
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-lg opacity-60 animate-pulse" />
               <div className="relative bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 p-3 rounded-2xl shadow-2xl">
-                <Trophy className="h-8 w-8 text-white drop-shadow-lg" />
+                <GameIcon name="trophy" size={32} className="drop-shadow-lg" />
               </div>
             </div>
             <div>
@@ -391,14 +381,7 @@ export default function LeaderboardContent({
                 )}
               >
                 {myPosition.rank <= 3 ? (
-                  <Crown
-                    className={cn(
-                      "h-10 w-10",
-                      myPosition.rank === 1 && "text-yellow-400",
-                      myPosition.rank === 2 && "text-gray-300",
-                      myPosition.rank === 3 && "text-amber-500",
-                    )}
-                  />
+                  <RankIcon rank={myPosition.rank} size={40} />
                 ) : (
                   <span className="text-3xl font-black text-primary-400">
                     #{myPosition.rank}
@@ -506,7 +489,7 @@ export default function LeaderboardContent({
                   {/* Rank Filter */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Trophy className="h-3 w-3" /> Rank
+                      <GameIcon name="trophy" size={14} /> Rank
                     </label>
                     <select
                       value={filters.rankRange}
@@ -529,7 +512,7 @@ export default function LeaderboardContent({
                   {/* Win Rate Filter */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Target className="h-3 w-3" /> Win Rate
+                      <GameIcon name="target" size={14} /> Win Rate
                     </label>
                     <select
                       value={filters.winRateRange}
@@ -795,7 +778,7 @@ export default function LeaderboardContent({
                       {/* Badges */}
                       <div className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Award className="h-3.5 w-3.5 text-purple-400" />
+                          <GameIcon name="starAward" size={16} />
                           <span className="font-semibold text-sm text-gray-300">
                             {entry.totalBadges}
                           </span>

@@ -3,41 +3,50 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Trophy, Swords, Wallet, User } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  iconName: GameIconName;
+  color: string;
+  activeColor: string;
+}
+
+const navItems: NavItem[] = [
   {
     href: "/",
     label: "Home",
-    icon: LayoutDashboard,
+    iconName: "headset",
     color: "text-blue-400",
     activeColor: "bg-blue-500/20",
   },
   {
     href: "/competitions",
     label: "Compete",
-    icon: Trophy,
+    iconName: "trophy",
     color: "text-yellow-400",
     activeColor: "bg-yellow-500/20",
   },
   {
     href: "/challenges",
     label: "Battle",
-    icon: Swords,
+    iconName: "sword",
     color: "text-red-400",
     activeColor: "bg-red-500/20",
   },
   {
     href: "/wallet",
     label: "Wallet",
-    icon: Wallet,
+    iconName: "chest1",
     color: "text-green-400",
     activeColor: "bg-green-500/20",
   },
   {
     href: "/profile",
     label: "Profile",
-    icon: User,
+    iconName: "helmet1",
     color: "text-cyan-400",
     activeColor: "bg-cyan-500/20",
   },
@@ -56,7 +65,6 @@ export default function MobileBottomNav() {
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const active = isActive(item.href);
-          const Icon = item.icon;
 
           return (
             <Link
@@ -70,10 +78,17 @@ export default function MobileBottomNav() {
               <div
                 className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
-                  active ? item.color : "text-gray-500",
+                  active && "scale-110",
                 )}
               >
-                <Icon className={cn("h-5 w-5", active && "scale-110")} />
+                <GameIcon 
+                  name={item.iconName} 
+                  size={24} 
+                  className={cn(
+                    "transition-all duration-200",
+                    active ? "drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" : "opacity-60 grayscale"
+                  )}
+                />
               </div>
               <span
                 className={cn(

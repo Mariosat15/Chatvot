@@ -26,7 +26,10 @@
     "worker": "npx cross-env IS_WORKER=true tsx worker/index.ts",
     "worker:build": "node worker/build.mjs",
     "worker:start": "npx cross-env IS_WORKER=true NODE_ENV=production node dist/worker/index.js",
-    "fix:gm-purchases": "tsx scripts/fix-existing-gm-purchases.ts"
+    "fix:gm-purchases": "tsx scripts/fix-existing-gm-purchases.ts",
+    "optimize-images": "node scripts/optimize-images.js",
+    "optimize-images:all": "node scripts/optimize-images.js --all",
+    "optimize-images:preview": "node scripts/optimize-images.js --dry-run"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^5.0.1",

@@ -4,33 +4,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Trophy,
   TrendingUp,
   TrendingDown,
-  Target,
   Zap,
-  Users,
   DollarSign,
   BarChart3,
   Activity,
   Clock,
   Calendar,
-  Award,
-  Crown,
-  Medal,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
   ChevronRight,
   Flame,
-  Swords,
   LineChart,
   PieChart,
-  Timer,
   Sparkles,
-  Shield,
   Eye,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import WinPotentialCard from "./WinPotentialCard";
 import MarketHolidaysCard from "./MarketHolidaysCard";
@@ -155,7 +147,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         {/* Win Rate */}
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5">
           <div className="flex items-center gap-2 mb-2 sm:mb-3">
-            <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+            <GameIcon name="target" size={22} />
           </div>
           <p className="text-lg sm:text-xl md:text-2xl font-black text-white mb-0.5 sm:mb-1 tabular-nums">
             {data.overview.winRate.toFixed(1)}%
@@ -239,7 +231,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg flex-shrink-0">
-                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+                  <GameIcon name="trophy" size={22} />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white truncate">
@@ -392,7 +384,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="p-3 sm:p-4 border-b border-yellow-500/20 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-yellow-500/20 rounded-lg">
-                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+                  <GameIcon name="trophy" size={22} />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-bold text-white">
@@ -445,7 +437,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="p-3 sm:p-4 border-b border-purple-500/20 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg">
-                  <Swords className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                  <GameIcon name="sword" size={22} />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-bold text-white">

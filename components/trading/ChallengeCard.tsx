@@ -1,20 +1,16 @@
 "use client";
 
 import {
-  Trophy,
   Users,
   Clock,
   Zap,
-  Target,
-  Timer,
   ChevronRight,
-  Swords,
-  Crown,
   CheckCircle,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 
@@ -228,7 +224,7 @@ export default function ChallengeCard({
             <div
               className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}
             >
-              <Swords className="h-7 w-7 text-white" />
+              <GameIcon name="sword" size={30} />
             </div>
 
             {/* Main Info */}
@@ -275,7 +271,7 @@ export default function ChallengeCard({
             {/* Prize */}
             <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
               <div className="flex items-center gap-1 text-yellow-500">
-                <Trophy className="h-4 w-4" />
+                <GameIcon name="trophy" size={18} />
                 <span className="text-xl font-black">
                   {challenge.winnerPrize?.toFixed(0) || 0}
                 </span>
@@ -375,7 +371,7 @@ export default function ChallengeCard({
         )}
         {isChallenger && isPending && (
           <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold border border-blue-500/40">
-            <Swords className="h-3 w-3" />
+            <GameIcon name="sword" size={14} />
             SENT
           </span>
         )}
@@ -390,7 +386,7 @@ export default function ChallengeCard({
               className={`absolute inset-0 bg-gradient-to-r ${theme.gradient} rounded-xl blur opacity-50 group-hover/type:opacity-80 transition-opacity`}
             ></div>
             <div className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900/80 border border-gray-700 backdrop-blur">
-              <Swords className="h-5 w-5 text-orange-400" />
+              <GameIcon name="sword" size={22} />
               <div>
                 <p
                   className={`text-sm font-black bg-gradient-to-r ${theme.gradient} bg-clip-text text-transparent`}
@@ -423,7 +419,7 @@ export default function ChallengeCard({
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-1 mb-1">
-                  <Crown className="h-4 w-4 text-yellow-500" />
+                  <GameIcon name="crown" size={18} />
                   <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider">
                     Winner Takes
                   </p>
@@ -449,7 +445,7 @@ export default function ChallengeCard({
               <div className="relative">
                 <div className="absolute inset-0 bg-yellow-500 rounded-xl blur-lg opacity-30 animate-pulse"></div>
                 <div className="relative w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-xl flex items-center justify-center shadow-xl transform group-hover:rotate-12 transition-transform">
-                  <Trophy className="h-9 w-9 text-yellow-900" />
+                  <GameIcon name="trophy" size={36} />
                 </div>
               </div>
             </div>
@@ -490,7 +486,7 @@ export default function ChallengeCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-purple-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                <Target className="h-4 w-4 text-purple-400" />
+                <GameIcon name="target" size={18} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Capital</p>
@@ -505,7 +501,7 @@ export default function ChallengeCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-orange-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                <Timer className="h-4 w-4 text-orange-400" />
+                <GameIcon name="timer" size={18} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Duration</p>
@@ -576,12 +572,12 @@ export default function ChallengeCard({
             >
               {isActive ? (
                 <span className="flex items-center gap-2">
-                  <Swords className="h-5 w-5" />
+                  <GameIcon name="sword" size={22} />
                   Trade Now
                 </span>
               ) : isCompleted ? (
                 <span className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5" />
+                  <GameIcon name="trophy" size={22} />
                   View Results
                 </span>
               ) : isPending && isChallenger ? (
@@ -591,7 +587,7 @@ export default function ChallengeCard({
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Swords className="h-5 w-5" />
+                  <GameIcon name="sword" size={22} />
                   View Challenge
                 </span>
               )}

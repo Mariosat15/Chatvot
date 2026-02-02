@@ -7,7 +7,8 @@ import {
   calculateUnrealizedPnL,
   type ForexSymbol,
 } from "@/lib/services/pnl-calculator.service";
-import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 interface Position {
   _id: string;
@@ -197,10 +198,10 @@ export function AccountStrip({
           </span>
           <div className="flex items-center gap-1">
             {marginStatus === "danger" && (
-              <AlertTriangle className="size-3 text-red-400 animate-pulse" />
+              <GameIcon name="warning" size={14} className="animate-pulse" />
             )}
             {marginStatus === "warning" && (
-              <AlertTriangle className="size-3 text-orange-400" />
+              <GameIcon name="warning2" size={14} />
             )}
             <span
               className={cn(

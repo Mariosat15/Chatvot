@@ -1,24 +1,19 @@
 "use client";
 
 import {
-  Trophy,
   Users,
   Clock,
   Calendar,
   CheckCircle,
   Zap,
-  Target,
   Flame,
-  Crown,
   Sparkles,
-  Timer,
   ChevronRight,
-  Swords,
-  Gamepad2,
   Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect, useMemo } from "react";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
@@ -396,7 +391,7 @@ export default function CompetitionCard({
               {/* Prize */}
               <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
                 <div className="flex items-center gap-1 text-yellow-500">
-                  <Trophy className="h-4 w-4" />
+                  <GameIcon name="trophy" size={18} />
                   <span className="text-xl font-black">
                     {getPrizePool().toFixed(0)}
                   </span>
@@ -469,7 +464,7 @@ export default function CompetitionCard({
               {competition.rules?.minimumTrades &&
                 competition.rules.minimumTrades > 1 && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                    <Swords className="h-3 w-3 text-cyan-400" />
+                    <GameIcon name="sword" size={14} />
                     <span className="text-[10px] text-cyan-300 font-medium">
                       Min {competition.rules.minimumTrades} trades
                     </span>
@@ -489,7 +484,7 @@ export default function CompetitionCard({
               {/* Level Requirement */}
               {competition.levelRequirement?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <Crown className="h-3 w-3 text-amber-400" />
+                  <GameIcon name="crown" size={14} />
                   <span className="text-[10px] text-amber-300 font-medium">
                     Level {competition.levelRequirement.minLevel}+
                   </span>
@@ -639,9 +634,7 @@ export default function CompetitionCard({
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-1 mb-1">
-                  <Crown
-                    className={`h-4 w-4 ${isCancelled ? "text-red-500" : "text-yellow-500"}`}
-                  />
+                  <GameIcon name="crown" size={18} />
                   <p
                     className={`text-xs font-bold ${isCancelled ? "text-red-400" : "text-yellow-400"} uppercase tracking-wider`}
                   >
@@ -676,9 +669,7 @@ export default function CompetitionCard({
                 <div
                   className={`relative w-16 h-16 bg-gradient-to-br ${isCancelled ? "from-red-400 to-red-600" : "from-yellow-400 to-amber-600"} rounded-xl flex items-center justify-center shadow-xl transform group-hover:rotate-12 transition-transform`}
                 >
-                  <Trophy
-                    className={`h-9 w-9 ${isCancelled ? "text-red-900" : "text-yellow-900"}`}
-                  />
+                  <GameIcon name="trophy" size={36} />
                 </div>
               </div>
             </div>
@@ -732,7 +723,7 @@ export default function CompetitionCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-purple-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                <Target className="h-4 w-4 text-purple-400" />
+                <GameIcon name="target" size={18} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Capital</p>
@@ -747,7 +738,7 @@ export default function CompetitionCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-orange-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                <Timer className="h-4 w-4 text-orange-400" />
+                <GameIcon name="timer" size={18} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Duration</p>
@@ -782,7 +773,7 @@ export default function CompetitionCard({
               <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full blur-lg"></div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                  <Swords className="h-4 w-4 text-cyan-400" />
+                  <GameIcon name="sword" size={18} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase">
@@ -955,7 +946,7 @@ export default function CompetitionCard({
         {competition.levelRequirement?.enabled && (
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-violet-500/10 to-purple-500/10 border border-purple-500/30">
             <div className="flex items-center gap-2">
-              <Crown className="h-4 w-4 text-purple-400" />
+              <GameIcon name="crown" size={18} />
               <span className="text-xs text-purple-300">
                 {(() => {
                   const minLevel = competition.levelRequirement.minLevel || 1;
@@ -1014,7 +1005,7 @@ export default function CompetitionCard({
                 </span>
               ) : isUserIn ? (
                 <span className="flex items-center gap-2">
-                  <Gamepad2 className="h-5 w-5" />
+                  <GameIcon name="joystick1" size={22} />
                   Enter Arena
                 </span>
               ) : isFull ? (
@@ -1029,12 +1020,12 @@ export default function CompetitionCard({
                 </span>
               ) : isUpcoming ? (
                 <span className="flex items-center gap-2">
-                  <Swords className="h-5 w-5" />
+                  <GameIcon name="sword" size={22} />
                   Join Now
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Swords className="h-5 w-5" />
+                  <GameIcon name="sword" size={22} />
                   View Competition
                 </span>
               )}
@@ -1050,9 +1041,7 @@ export default function CompetitionCard({
                   : "border-gray-600 text-gray-100 hover:bg-gradient-to-r hover:from-yellow-500 hover:to-amber-500 hover:text-gray-900 hover:border-transparent"
               }`}
             >
-              <Trophy
-                className={`h-5 w-5 mr-2 ${isCancelled ? "text-red-400" : ""}`}
-              />
+              <GameIcon name="trophy" size={22} className="mr-2" />
               {isCancelled ? "View Details" : "View Results"}
             </Button>
           </Link>

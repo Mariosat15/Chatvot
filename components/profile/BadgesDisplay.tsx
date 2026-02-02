@@ -2,22 +2,8 @@
 
 import { useState } from "react";
 import { Badge, BadgeCategory } from "@/lib/constants/badges";
-import {
-  Lock,
-  Crown,
-  Star,
-  Sparkles,
-  Shield,
-  TrendingUp,
-  DollarSign,
-  Zap,
-  Target,
-  BarChart3,
-  Globe,
-  Users,
-  Award,
-  Trophy,
-} from "lucide-react";
+import { Lock, Sparkles } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import {
   Select,
   SelectContent,
@@ -88,43 +74,43 @@ export default function BadgesDisplay({ badges, stats }: BadgesDisplayProps) {
   const getRarityIcon = (rarity: Badge["rarity"]) => {
     switch (rarity) {
       case "common":
-        return <Star className="h-3 w-3" />;
+        return <GameIcon name="star1" size={14} />;
       case "rare":
-        return <Star className="h-3 w-3 fill-current" />;
+        return <GameIcon name="star2" size={14} />;
       case "epic":
         return <Sparkles className="h-3 w-3" />;
       case "legendary":
-        return <Crown className="h-3 w-3 fill-current" />;
+        return <GameIcon name="crown" size={14} />;
     }
   };
 
   const getCategoryIcon = (
     category: BadgeCategory,
-    size: string = "h-8 w-8",
+    iconSize: number = 32,
   ) => {
     switch (category) {
       case "Competition":
-        return <Trophy className={size} />;
+        return <GameIcon name="trophy" size={iconSize} />;
       case "Trading":
-        return <TrendingUp className={size} />;
+        return <GameIcon name="profit" size={iconSize} />;
       case "Profit":
-        return <DollarSign className={size} />;
+        return <GameIcon name="coin" size={iconSize} />;
       case "Risk":
-        return <Shield className={size} />;
+        return <GameIcon name="shield1" size={iconSize} />;
       case "Speed":
-        return <Zap className={size} />;
+        return <GameIcon name="blueFireSpell" size={iconSize} />;
       case "Consistency":
-        return <Target className={size} />;
+        return <GameIcon name="target" size={iconSize} />;
       case "Volume":
-        return <BarChart3 className={size} />;
+        return <GameIcon name="capital" size={iconSize} />;
       case "Strategy":
-        return <Globe className={size} />;
+        return <GameIcon name="guideBook" size={iconSize} />;
       case "Social":
-        return <Users className={size} />;
+        return <GameIcon name="animal1" size={iconSize} />;
       case "Legendary":
-        return <Crown className={size} />;
+        return <GameIcon name="crown" size={iconSize} />;
       default:
-        return <Award className={size} />;
+        return <GameIcon name="starAward" size={iconSize} />;
     }
   };
 
@@ -168,7 +154,7 @@ export default function BadgesDisplay({ badges, stats }: BadgesDisplayProps) {
         <div className="col-span-2 md:col-span-4 bg-gradient-to-r from-yellow-500/30 to-amber-500/30 rounded-xl p-4 border-2 border-yellow-400 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Crown className="h-8 w-8 text-yellow-300" />
+              <GameIcon name="crown" size={32} />
               <div>
                 <p className="text-sm text-yellow-100 mb-1 font-semibold">
                   Legendary

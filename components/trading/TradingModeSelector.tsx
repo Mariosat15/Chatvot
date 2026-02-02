@@ -1,7 +1,8 @@
 "use client";
 
-import { Gamepad2, TrendingUp, Zap, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 export type TradingMode = "professional" | "game";
 
@@ -28,7 +29,7 @@ export default function TradingModeSelector({
               : "text-gray-400 hover:text-white hover:bg-dark-400/50",
           )}
         >
-          <TrendingUp className="size-4" />
+          <GameIcon name="helmet1" size={18} />
           <span>Pro</span>
         </button>
 
@@ -45,7 +46,7 @@ export default function TradingModeSelector({
           {mode === "game" && (
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/30 to-pink-600/30 animate-pulse" />
           )}
-          <Gamepad2 className="size-4 relative z-10" />
+          <GameIcon name="joystick1" size={18} className="relative z-10" />
           <span className="relative z-10">Easy</span>
           {mode === "game" && (
             <Sparkles className="size-3 relative z-10 text-yellow-300" />

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Wallet,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -13,8 +12,8 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
-  Crown,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { Button } from "@/components/ui/button";
 import DepositModal from "@/components/trading/DepositModal";
 import WithdrawalModal from "@/components/trading/WithdrawalModal";
@@ -181,11 +180,11 @@ export default function WalletContent({
       {/* Header - Mobile Optimized */}
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="rounded-full bg-yellow-500/10 p-2 sm:p-3 flex-shrink-0">
-          <Wallet className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
+          <GameIcon name="chest1" size={26} />
         </div>
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-100 flex items-center gap-2 truncate">
-            <Zap className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-500 flex-shrink-0" />
+            <GameIcon name="coin" size={32} className="flex-shrink-0" />
             <span className="truncate">{settings.credits.name} Wallet</span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 truncate">
@@ -412,7 +411,7 @@ export default function WalletContent({
                 </p>
               </div>
               <div className="rounded-full bg-amber-500/10 p-2 sm:p-3 flex-shrink-0">
-                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+                <GameIcon name="crown" size={22} />
               </div>
             </div>
           </div>

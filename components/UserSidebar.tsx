@@ -11,25 +11,14 @@ import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import { signOut } from "@/lib/actions/auth.actions";
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
+import { GameIcon } from "@/components/ui/GameIcon";
 import {
-  LayoutDashboard,
-  Trophy,
-  Swords,
-  ShoppingBag,
-  Medal,
-  User,
-  Wallet,
-  HelpCircle,
   LogOut,
   Menu,
   X,
   ChevronRight,
   TrendingUp,
-  Settings,
-  Bell,
   Sparkles,
-  MessageCircle,
-  Crown,
 } from "lucide-react";
 
 interface SidebarUser {
@@ -55,14 +44,14 @@ const mainNavItems: NavItem[] = [
   {
     href: "/",
     label: "Dashboard",
-    icon: <LayoutDashboard className="h-5 w-5" />,
+    icon: <GameIcon name="headset" size={22} />,
     color: "text-blue-400",
     gradient: "from-blue-500/20 to-blue-600/5",
   },
   {
     href: "/competitions",
     label: "Competitions",
-    icon: <Trophy className="h-5 w-5" />,
+    icon: <GameIcon name="trophy" size={22} />,
     color: "text-yellow-400",
     gradient: "from-yellow-500/20 to-yellow-600/5",
     badge: "HOT",
@@ -70,28 +59,28 @@ const mainNavItems: NavItem[] = [
   {
     href: "/challenges",
     label: "1v1 Challenges",
-    icon: <Swords className="h-5 w-5" />,
+    icon: <GameIcon name="sword" size={22} />,
     color: "text-red-400",
     gradient: "from-red-500/20 to-red-600/5",
   },
   {
     href: "/marketplace",
     label: "Marketplace",
-    icon: <ShoppingBag className="h-5 w-5" />,
+    icon: <GameIcon name="pouch1" size={22} />,
     color: "text-purple-400",
     gradient: "from-purple-500/20 to-purple-600/5",
   },
   {
     href: "/leaderboard",
     label: "Leaderboard",
-    icon: <Medal className="h-5 w-5" />,
+    icon: <GameIcon name="goldMedal" size={22} />,
     color: "text-emerald-400",
     gradient: "from-emerald-500/20 to-emerald-600/5",
   },
   {
     href: "/messaging",
     label: "Messages",
-    icon: <MessageCircle className="h-5 w-5" />,
+    icon: <GameIcon name="flag" size={22} />,
     color: "text-pink-400",
     gradient: "from-pink-500/20 to-pink-600/5",
   },
@@ -101,21 +90,21 @@ const accountNavItems: NavItem[] = [
   {
     href: "/profile",
     label: "Profile",
-    icon: <User className="h-5 w-5" />,
+    icon: <GameIcon name="helmet1" size={22} />,
     color: "text-cyan-400",
     gradient: "from-cyan-500/20 to-cyan-600/5",
   },
   {
     href: "/wallet",
     label: "Wallet",
-    icon: <Wallet className="h-5 w-5" />,
+    icon: <GameIcon name="chest1" size={22} />,
     color: "text-green-400",
     gradient: "from-green-500/20 to-green-600/5",
   },
   {
     href: "/help",
     label: "Help Center",
-    icon: <HelpCircle className="h-5 w-5" />,
+    icon: <GameIcon name="guideBook" size={22} />,
     color: "text-orange-400",
     gradient: "from-orange-500/20 to-orange-600/5",
   },
@@ -337,7 +326,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <div className="mt-6 space-y-1">
             {!isCollapsed && (
               <h4 className="px-3 mb-2 text-xs font-semibold text-yellow-500/80 uppercase tracking-wider flex items-center gap-1">
-                <Crown className="h-3 w-3" />
+                <GameIcon name="crown" size={14} />
                 Game Master
               </h4>
             )}
@@ -345,7 +334,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               item={{
                 href: "/gamemaster",
                 label: "GM Dashboard",
-                icon: <Crown className="h-5 w-5" />,
+                icon: <GameIcon name="crown" size={22} />,
                 color: "text-yellow-400",
                 gradient: "from-yellow-500/20 to-amber-600/5",
                 badge: "GM",
