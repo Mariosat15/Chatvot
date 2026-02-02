@@ -194,7 +194,8 @@ class VeriffService {
     }
 
     // User redirect URL (where browser goes after verification)
-    const callbackUrl = `${baseUrl}/profile?tab=verification&checkStatus=true`;
+    // This goes to a dedicated callback page that shows confirmation
+    const callbackUrl = `${baseUrl}/kyc/callback`;
     console.log("🔐 Veriff callback URL (user redirect):", callbackUrl);
 
     const payload = {
