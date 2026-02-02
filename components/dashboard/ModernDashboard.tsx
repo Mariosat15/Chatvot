@@ -726,6 +726,13 @@ function GameStreakCard({
 }
 
 function CompetitionCard({ competition }: { competition: any }) {
+  const getRankIcon = (rank: number): GameIconName => {
+    if (rank === 1) return "crown";
+    if (rank === 2) return "rank2";
+    if (rank === 3) return "rank3";
+    return "starBadge";
+  };
+
   return (
     <Link
       href={`/competitions/${competition.id}`}
@@ -736,7 +743,7 @@ function CompetitionCard({ competition }: { competition: any }) {
           {competition.name}
         </span>
         <span
-          className={`text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${
+          className={`flex items-center gap-1 text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${
             competition.currentRank === 1
               ? "bg-yellow-500/20 text-yellow-400"
               : competition.currentRank <= 3
@@ -744,11 +751,15 @@ function CompetitionCard({ competition }: { competition: any }) {
                 : "bg-gray-700 text-gray-300"
           }`}
         >
+          {competition.currentRank && competition.currentRank <= 3 && (
+            <GameIcon name={getRankIcon(competition.currentRank)} size={12} />
+          )}
           #{competition.currentRank || "-"}
         </span>
       </div>
       <div className="flex items-center justify-between text-[10px] sm:text-xs">
-        <span className="text-gray-400">
+        <span className="text-gray-400 flex items-center gap-1">
+          <GameIcon name="war" size={12} />
           {competition.totalParticipants} traders
         </span>
         <span
@@ -772,17 +783,21 @@ function ChallengeCard({ challenge }: { challenge: any }) {
           vs {challenge.opponent?.name || "Opponent"}
         </span>
         <span
-          className={`text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${
+          className={`flex items-center gap-1 text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${
             challenge.isLeading
               ? "bg-green-500/20 text-green-400"
               : "bg-red-500/20 text-red-400"
           }`}
         >
-          {challenge.isLeading ? "🏆" : "📉"}
+          <GameIcon name={challenge.isLeading ? "crown" : "loss"} size={12} />
+          {challenge.isLeading ? "Leading" : "Behind"}
         </span>
       </div>
       <div className="flex items-center justify-between text-[10px] sm:text-xs">
-        <span className="text-gray-400">${challenge.stakeAmount}</span>
+        <span className="text-gray-400 flex items-center gap-1">
+          <GameIcon name="coin" size={12} />
+          ${challenge.stakeAmount}
+        </span>
         <span
           className={`font-bold tabular-nums ${challenge.userPnL >= 0 ? "text-green-400" : "text-red-400"}`}
         >
