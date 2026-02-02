@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Zap,
-  Target,
-} from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import { MarginStatusIndicator } from "./MarginStatusIndicator";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 interface AccountInfoPanelProps {
   balance: number;
@@ -97,7 +92,7 @@ export function AccountInfoPanel({
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-sm font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="size-4 text-primary" />
+              <GameIcon name="coin" size={16} />
               Account Overview
             </h3>
             <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
@@ -111,7 +106,7 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-primary/20 rounded-lg">
-                    <DollarSign className="size-3.5 text-primary" />
+                    <GameIcon name="coin" size={14} />
                   </div>
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Balance
@@ -129,7 +124,7 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                    <Target className="size-3.5 text-blue-400" />
+                    <GameIcon name="target" size={14} />
                   </div>
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Equity
@@ -147,7 +142,7 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-emerald-500/20 rounded-lg">
-                    <Zap className="size-3.5 text-emerald-400" />
+                    <GameIcon name="profit" size={14} />
                   </div>
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Available
@@ -177,9 +172,9 @@ export function AccountInfoPanel({
                     )}
                   >
                     {isProfit ? (
-                      <TrendingUp className="size-3.5 text-green-400" />
+                      <GameIcon name="profit" size={14} />
                     ) : (
-                      <TrendingDown className="size-3.5 text-red-400" />
+                      <GameIcon name="loss" size={14} />
                     )}
                   </div>
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
@@ -223,9 +218,9 @@ export function AccountInfoPanel({
               >
                 <div className="flex items-center gap-2 mb-1">
                   {isDailyProfit ? (
-                    <TrendingUp className="size-3.5 text-green-400" />
+                    <GameIcon name="profit" size={14} />
                   ) : (
-                    <TrendingDown className="size-3.5 text-red-400" />
+                    <GameIcon name="loss" size={14} />
                   )}
                   <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">
                     Daily P&L
@@ -263,9 +258,9 @@ export function AccountInfoPanel({
               >
                 <div className="flex items-center gap-2 mb-1">
                   {isTotalProfit ? (
-                    <TrendingUp className="size-3.5 text-emerald-400" />
+                    <GameIcon name="profit" size={14} />
                   ) : (
-                    <TrendingDown className="size-3.5 text-rose-400" />
+                    <GameIcon name="loss" size={14} />
                   )}
                   <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">
                     Total P&L

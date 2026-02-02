@@ -33,6 +33,7 @@ import {
   getPipValue,
 } from "@/lib/utils/limit-order-validation";
 import LiveRankingPanel from "./LiveRankingPanel";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 // Collapsible Section Component
 const CollapsibleSection = ({
@@ -43,7 +44,7 @@ const CollapsibleSection = ({
   className = "",
 }: {
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
@@ -557,7 +558,7 @@ const OrderForm = ({
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Section 1: Live Ranking - Only show for competitions, not challenges */}
       {contestType === "competition" && (
-        <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={true}>
+        <CollapsibleSection title="Live Ranking" icon={<GameIcon name="trophy" size={16} />} defaultOpen={true}>
           {userId ? (
             <LiveRankingPanel competitionId={competitionId} userId={userId} />
           ) : (
@@ -569,7 +570,7 @@ const OrderForm = ({
       )}
 
       {/* Section 3: Order Configuration */}
-      <CollapsibleSection title="Order Setup" icon="⚙️" defaultOpen={true}>
+      <CollapsibleSection title="Order Setup" icon={<GameIcon name="guideBook" size={16} />} defaultOpen={true}>
         {/* Order Type Tabs */}
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">
@@ -590,7 +591,7 @@ const OrderForm = ({
                 value="limit"
                 className="data-[state=active]:bg-blue-500 data-[state=active]:text-white font-semibold"
               >
-                📊 Limit
+                <GameIcon name="target" size={14} className="inline mr-1" /> Limit
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -613,13 +614,13 @@ const OrderForm = ({
                   value="pips"
                   className="data-[state=active]:bg-primary"
                 >
-                  📏 Pips
+                  <GameIcon name="sword" size={12} className="inline" /> Pips
                 </TabsTrigger>
                 <TabsTrigger
                   value="price"
                   className="data-[state=active]:bg-primary"
                 >
-                  💰 Price
+                  <GameIcon name="coin" size={12} className="inline" /> Price
                 </TabsTrigger>
               </TabsList>
 
@@ -664,13 +665,13 @@ const OrderForm = ({
       {/* Section 4: Trading Size */}
       <CollapsibleSection
         title="Trade Size & Risk"
-        icon="📐"
+        icon={<GameIcon name="sword" size={16} />}
         defaultOpen={true}
       >
         {/* Quantity */}
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide flex items-center gap-2">
-            📊 Quantity (Lots)
+            <GameIcon name="chest" size={14} className="inline" /> Quantity (Lots)
           </Label>
           <Input
             type="number"
@@ -713,14 +714,14 @@ const OrderForm = ({
       {/* Section 5: Take Profit & Stop Loss */}
       <CollapsibleSection
         title="Take Profit / Stop Loss"
-        icon="🎯"
+        icon={<GameIcon name="target" size={16} />}
         defaultOpen={false}
       >
         {/* Take Profit Toggle & Input */}
         <div className="bg-dark-400/30 rounded-lg p-3 border border-dark-500/30 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-semibold text-dark-600 uppercase tracking-wide flex items-center gap-2">
-              🎯 Take Profit
+              <GameIcon name="profit" size={14} className="inline" /> Take Profit
             </Label>
             <div className="flex items-center gap-2">
               <span
@@ -746,13 +747,13 @@ const OrderForm = ({
                     value="pips"
                     className="text-xs data-[state=active]:bg-green-500"
                   >
-                    📏 Pips
+                    <GameIcon name="sword" size={12} className="inline" /> Pips
                   </TabsTrigger>
                   <TabsTrigger
                     value="price"
                     className="text-xs data-[state=active]:bg-green-500"
                   >
-                    💰 Price
+                    <GameIcon name="coin" size={12} className="inline" /> Price
                   </TabsTrigger>
                 </TabsList>
 
@@ -793,7 +794,7 @@ const OrderForm = ({
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 mt-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-green-400">
-                      💰 Potential Profit:
+                      <GameIcon name="profit" size={12} className="inline mr-1" /> Potential Profit:
                     </span>
                     <div className="text-right">
                       <div className="text-sm font-bold text-green-400">
@@ -840,13 +841,13 @@ const OrderForm = ({
                     value="pips"
                     className="text-xs data-[state=active]:bg-red-500"
                   >
-                    📏 Pips
+                    <GameIcon name="sword" size={12} className="inline" /> Pips
                   </TabsTrigger>
                   <TabsTrigger
                     value="price"
                     className="text-xs data-[state=active]:bg-red-500"
                   >
-                    💰 Price
+                    <GameIcon name="coin" size={12} className="inline" /> Price
                   </TabsTrigger>
                 </TabsList>
 
@@ -906,7 +907,7 @@ const OrderForm = ({
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 mt-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-blue-400">
-                      📊 Risk:Reward:
+                      <GameIcon name="target" size={12} className="inline mr-1" /> Risk:Reward:
                     </span>
                     <span className="text-sm font-bold text-blue-400">
                       1:
@@ -1022,7 +1023,7 @@ const OrderForm = ({
       )}
 
       {/* Margin Required */}
-      <CollapsibleSection title="Margin Required" icon="💳" defaultOpen={true}>
+      <CollapsibleSection title="Margin Required" icon={<GameIcon name="coin" size={16} />} defaultOpen={true}>
         <div className="flex items-center justify-between">
           <span className="text-sm text-dark-600 flex items-center gap-1">
             Margin Required:
