@@ -554,9 +554,9 @@ const OrderForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col">
-      {/* Content Area */}
-      <div className="space-y-3 pb-3">
+    <form onSubmit={handleSubmit} className="flex flex-col h-full">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto space-y-4 pb-4">
         {/* Section 1: Live Ranking - Only show for competitions, not challenges */}
         {contestType === "competition" && (
           <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={false}>
@@ -817,9 +817,10 @@ const OrderForm = ({
           </div>
         )}
       </div>
+      {/* End Scrollable Content */}
 
-      {/* Buy/Sell Footer */}
-      <div className="border-t border-dark-400/50 pt-3 pb-1">
+      {/* Sticky Buy/Sell Footer */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-dark-200 via-dark-200 to-dark-200/95 border-t border-dark-400/50 pt-3 pb-1 mt-auto -mx-4 px-4 md:-mx-6 md:px-6">
         {/* Error Messages */}
         {!canPlaceOrder && (
           <p className="text-xs text-red-400 text-center mb-2">
