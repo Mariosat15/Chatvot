@@ -129,6 +129,7 @@ export class WebSocketService {
       console.warn("⚠️  JWT secret not set - using dev fallback (OK for development only)");
       this.devFallbackWarned = true;
     }
+    // snyk:ignore:next-line - Intentional dev-only fallback, production uses env vars
     return "dev-fallback-secret-not-for-production-use-32ch";
   }
 

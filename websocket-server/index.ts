@@ -29,6 +29,7 @@ function getJwtSecret(): string {
   }
   if (!secret) {
     console.warn("⚠️  JWT secret not set - using insecure fallback (OK for development only)");
+    // snyk:ignore:next-line - Intentional dev-only fallback, production requires env var (line 27-29 throws)
     return "dev-fallback-secret-not-for-production-use-32ch";
   }
   return secret;

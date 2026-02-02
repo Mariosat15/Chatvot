@@ -26,6 +26,15 @@ ignore:
     - "lib/services/settings.service.ts":
         reason: "False positive - these are field NAME mappings like 'nodemailerPassword', not actual secrets"
         expires: "2027-01-01T00:00:00.000Z"
+  
+  # LOW - False positives: Audit log placeholders, NOT credentials
+  SNYK-CODE-HARDCODEDCREDENTIALS:
+    - "apps/admin/app/api/admin/reset-all-users/route.ts":
+        reason: "False positive - 'system@internal' is audit log placeholder for system actions, not a credential"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/app/api/admin/reset-all-employees/route.ts":
+        reason: "False positive - 'system@internal' is audit log placeholder for system actions, not a credential"
+        expires: "2027-01-01T00:00:00.000Z"
 
   # MEDIUM - HTTP intentional for internal service
   SNYK-CODE-CLEARTEXT:

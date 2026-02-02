@@ -30,6 +30,7 @@ export function getAdminJwtSecret(): string {
         "⚠️  ADMIN_JWT_SECRET not set - using insecure fallback (OK for development only)"
       );
     }
+    // snyk:ignore:next-line - Intentional dev-only fallback with warning
     cachedSecret = "dev-only-insecure-secret-do-not-use-in-production-32chars";
     return cachedSecret;
   }

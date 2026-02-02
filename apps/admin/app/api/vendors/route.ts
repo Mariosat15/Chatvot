@@ -88,20 +88,26 @@ export async function GET(request: NextRequest) {
       // Protect against prototype pollution
       if (!isSafeKey(vendor.serviceType)) continue;
 
-      if (!byServiceType[vendor.serviceType]) {
-        byServiceType[vendor.serviceType] = { count: 0, monthlyTotal: 0 };
+      // Guard against prototype pollution
+      const serviceType = vendor.serviceType;
+      if (serviceType === "__proto__" || serviceType === "constructor" || serviceType === "prototype") {
+        continue;
       }
-      byServiceType[vendor.serviceType].count++;
+      
+      if (!Object.prototype.hasOwnProperty.call(byServiceType, serviceType)) {
+        byServiceType[serviceType] = { count: 0, monthlyTotal: 0 };
+      }
+      byServiceType[serviceType].count++;
 
       switch (vendor.billingCycle) {
         case "monthly":
-          byServiceType[vendor.serviceType].monthlyTotal += vendor.amount;
+          byServiceType[serviceType].monthlyTotal += vendor.amount;
           break;
         case "quarterly":
-          byServiceType[vendor.serviceType].monthlyTotal += vendor.amount / 3;
+          byServiceType[serviceType].monthlyTotal += vendor.amount / 3;
           break;
         case "yearly":
-          byServiceType[vendor.serviceType].monthlyTotal += vendor.amount / 12;
+          byServiceType[serviceType].monthlyTotal += vendor.amount / 12;
           break;
       }
     }
