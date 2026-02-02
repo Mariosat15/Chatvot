@@ -61,13 +61,20 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleSessionEvent(payload: any) {
-  const { action, verification } = payload;
+  const { action } = payload;
+  
+  // Veriff sends the session ID either as payload.id or payload.verification.id
+  const sessionId = payload.id || payload.verification?.id;
+  const vendorData = payload.vendorData || payload.verification?.vendorData;
 
-  if (!verification?.id) return;
+  if (!sessionId) {
+    console.log("⚠️ [KYC Webhook] Session event missing session ID");
+    return;
+  }
 
-  // Validate verification.id to prevent NoSQL injection
-  if (!isSafeMongoString(verification.id)) {
-    console.error("❌ [KYC Webhook] Invalid verification.id format");
+  // Validate sessionId to prevent NoSQL injection
+  if (!isSafeMongoString(sessionId)) {
+    console.error("❌ [KYC Webhook] Invalid session ID format");
     return;
   }
 
@@ -80,17 +87,37 @@ async function handleSessionEvent(payload: any) {
   const newStatus = statusMap[action];
   if (!newStatus) return;
 
-  await KYCSession.findOneAndUpdate(
-    { veriffSessionId: verification.id },
-    {
+  // Try to find session by veriffSessionId first, then by vendorData (userId)
+  let session = await KYCSession.findOne({ veriffSessionId: sessionId });
+  
+  if (!session && vendorData) {
+    // If session not found by veriffSessionId, try to find by userId and update it
+    session = await KYCSession.findOne({ 
+      userId: vendorData, 
+      status: { $in: ["created", "started"] } 
+    }).sort({ createdAt: -1 });
+    
+    if (session) {
+      // Update the session with the Veriff session ID
+      await KYCSession.findByIdAndUpdate(session._id, {
+        veriffSessionId: sessionId,
+        status: newStatus,
+        ...(action === "submitted" ? { submittedAt: new Date() } : {}),
+      });
+      console.log(`📝 [KYC Webhook] Updated session ${session._id} (linked to Veriff ${sessionId}) status to: ${newStatus}`);
+      return;
+    }
+  }
+
+  if (session) {
+    await KYCSession.findByIdAndUpdate(session._id, {
       status: newStatus,
       ...(action === "submitted" ? { submittedAt: new Date() } : {}),
-    },
-  );
-
-  console.log(
-    `📝 [KYC Webhook] Updated session ${verification.id} status to: ${newStatus}`,
-  );
+    });
+    console.log(`📝 [KYC Webhook] Updated session ${sessionId} status to: ${newStatus}`);
+  } else {
+    console.log(`⚠️ [KYC Webhook] No session found for ID: ${sessionId}`);
+  }
 }
 
 // Handle GET requests - either Veriff testing webhook or user redirect after verification

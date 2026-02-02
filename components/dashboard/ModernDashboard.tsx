@@ -4,25 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  TrendingUp,
-  TrendingDown,
-  Zap,
-  DollarSign,
-  BarChart3,
-  Activity,
-  Clock,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
   RefreshCw,
   ChevronRight,
-  Flame,
-  LineChart,
-  PieChart,
-  Sparkles,
-  Eye,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import WinPotentialCard from "./WinPotentialCard";
 import MarketHolidaysCard from "./MarketHolidaysCard";
@@ -61,7 +47,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white flex items-center gap-2 sm:gap-3">
             <div className="p-1.5 sm:p-2 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg sm:rounded-xl flex-shrink-0">
-              <Activity className="h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 text-white" />
+              <GameIcon name="headset" size={28} className="drop-shadow-lg" />
             </div>
             <span className="truncate">Trading Dashboard</span>
           </h1>
@@ -90,7 +76,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         <div className="col-span-2 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5">
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg">
-              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+              <GameIcon name="coin" size={20} />
             </div>
             <span className="text-[10px] sm:text-xs text-emerald-400 font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 bg-emerald-500/20 rounded-full">
               Live Balance
@@ -118,9 +104,9 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
               className={`p-1.5 sm:p-2 rounded-lg ${data.overview.totalPnL >= 0 ? "bg-green-500/20" : "bg-red-500/20"}`}
             >
               {data.overview.totalPnL >= 0 ? (
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+                <GameIcon name="profit" size={20} />
               ) : (
-                <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />
+                <GameIcon name="loss" size={20} />
               )}
             </div>
             <span
@@ -158,7 +144,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         {/* Profit Factor */}
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5">
           <div className="flex items-center gap-2 mb-2 sm:mb-3">
-            <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+            <GameIcon name="equity" size={22} />
           </div>
           <p className="text-lg sm:text-xl md:text-2xl font-black text-white mb-0.5 sm:mb-1 tabular-nums">
             {data.overview.profitFactor > 99
@@ -171,53 +157,53 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
 
       {/* Secondary Stats - Mobile: 4 cols, scrollable on very small screens */}
       <section className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-1.5 sm:gap-2 md:gap-3">
-        <StatCard
-          icon={Activity}
+        <GameStatCard
+          iconName="trade"
           label="Trades"
           value={data.overview.totalTrades}
           color="gray"
         />
-        <StatCard
-          icon={TrendingUp}
+        <GameStatCard
+          iconName="profit"
           label="Wins"
           value={data.overview.winningTrades}
           color="green"
         />
-        <StatCard
-          icon={TrendingDown}
+        <GameStatCard
+          iconName="loss"
           label="Losses"
           value={data.overview.losingTrades}
           color="red"
         />
-        <StatCard
-          icon={Flame}
+        <GameStatCard
+          iconName="fireSpell"
           label="Streak"
           value={data.streaks.currentWinStreak}
           color="orange"
         />
-        <StatCard
-          icon={ArrowUpRight}
+        <GameStatCard
+          iconName="profit"
           label="Avg Win"
           value={formatCurrency(data.overview.averageWin)}
           color="green"
           small
         />
-        <StatCard
-          icon={ArrowDownRight}
+        <GameStatCard
+          iconName="loss"
           label="Avg Loss"
           value={formatCurrency(data.overview.averageLoss)}
           color="red"
           small
         />
-        <StatCard
-          icon={Award}
+        <GameStatCard
+          iconName="reward1"
           label="Prizes"
           value={`${settings?.credits.symbol || "⚡"}${data.overview.totalPrizesWon.toLocaleString()}`}
           color="yellow"
           small
         />
-        <StatCard
-          icon={Calendar}
+        <GameStatCard
+          iconName="timer"
           label="Days"
           value={data.streaks.tradingDaysThisMonth}
           color="blue"
@@ -281,11 +267,11 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="p-3 sm:p-4 md:p-5 border-b border-gray-700/50 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg">
-                  <LineChart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+                  <GameIcon name="financialCalculation" size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white">
-                    Equity Curve
+                    Wallet Balance
                   </h3>
                   <p className="text-[10px] sm:text-xs text-gray-400">
                     Last 30 days performance
@@ -303,7 +289,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="p-3 sm:p-4 md:p-5 border-b border-gray-700/50 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-green-500/20 rounded-lg">
-                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+                  <GameIcon name="gain" size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white">
@@ -326,7 +312,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <section className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg">
-                  <PieChart className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                  <GameIcon name="target" size={20} />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-white">
                   Win/Loss Distribution
@@ -339,10 +325,10 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <section className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="p-1.5 sm:p-2 bg-cyan-500/20 rounded-lg">
-                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
+                  <GameIcon name="trade" size={20} />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-white">
-                  Top Symbols
+                  Top Traded Symbols
                 </h3>
               </div>
               <div className="space-y-1.5 sm:space-y-2">
@@ -408,8 +394,8 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
                   <CompetitionCard key={comp.id} competition={comp} />
                 ))
               ) : (
-                <EmptyState
-                  icon={Trophy}
+                <GameEmptyState
+                  iconName="trophy"
                   message="No active competitions"
                   action="Browse Competitions"
                   href="/competitions"
@@ -461,8 +447,8 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
                   <ChallengeCard key={challenge.id} challenge={challenge} />
                 ))
               ) : (
-                <EmptyState
-                  icon={Swords}
+                <GameEmptyState
+                  iconName="sword"
                   message="No active challenges"
                   action="Create Challenge"
                   href="/challenges"
@@ -490,7 +476,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             <div className="p-3 sm:p-4 border-b border-gray-700/50 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg">
-                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+                  <GameIcon name="timer" size={20} />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-bold text-white">
@@ -507,7 +493,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
                 <TradeCard key={trade.id} trade={trade} />
               ))}
               {data.recentActivity.trades.length === 0 && (
-                <EmptyState icon={Activity} message="No trades yet" />
+                <GameEmptyState iconName="trade" message="No trades yet" />
               )}
             </div>
           </section>
@@ -518,7 +504,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
               <div className="p-3 sm:p-4 border-b border-gray-700/50 flex items-center justify-between">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-green-500/20 rounded-lg">
-                    <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+                    <GameIcon name="portfolio" size={20} />
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-white">
@@ -544,7 +530,7 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
       <section className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6">
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <div className="p-1.5 sm:p-2 bg-orange-500/20 rounded-lg">
-            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
+            <GameIcon name="star1" size={20} />
           </div>
           <div>
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white">
@@ -556,36 +542,36 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4">
-          <StreakCard
-            icon={Flame}
+          <GameStreakCard
+            iconName="fireSpell"
             label="Win Streak"
             value={data.streaks.currentWinStreak}
             subtitle={`Best: ${data.streaks.longestWinStreak}`}
             color="green"
           />
-          <StreakCard
-            icon={TrendingDown}
+          <GameStreakCard
+            iconName="loss"
             label="Loss Streak"
             value={data.streaks.currentLossStreak}
             subtitle={`Worst: ${data.streaks.longestLossStreak}`}
             color="red"
           />
-          <StreakCard
-            icon={Calendar}
+          <GameStreakCard
+            iconName="timer"
             label="Trading Days"
             value={data.streaks.tradingDaysThisMonth}
             subtitle="This month"
             color="blue"
           />
-          <StreakCard
-            icon={TrendingUp}
+          <GameStreakCard
+            iconName="profit"
             label="Profit Days"
             value={data.streaks.consecutiveProfitableDays}
             subtitle="In a row"
             color="emerald"
           />
-          <StreakCard
-            icon={Trophy}
+          <GameStreakCard
+            iconName="trophy"
             label="Best Rank"
             value={
               data.competitions.stats.bestRank > 0
@@ -595,8 +581,8 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
             subtitle="All time"
             color="yellow"
           />
-          <StreakCard
-            icon={Award}
+          <GameStreakCard
+            iconName="sword"
             label="Challenge W/L"
             value={`${data.challenges.stats.wins}/${data.challenges.stats.losses}`}
             subtitle={`${data.challenges.stats.winRate.toFixed(0)}% rate`}
@@ -611,15 +597,15 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
   );
 }
 
-// Helper Components - Mobile Optimized
-function StatCard({
-  icon: Icon,
+// Helper Components - Mobile Optimized with Game Icons
+function GameStatCard({
+  iconName,
   label,
   value,
   color,
   small,
 }: {
-  icon: any;
+  iconName: GameIconName;
   label: string;
   value: string | number;
   color: string;
@@ -633,21 +619,11 @@ function StatCard({
     yellow: "from-yellow-500/10 to-yellow-600/10 border-yellow-500/30",
     blue: "from-blue-500/10 to-blue-600/10 border-blue-500/30",
   };
-  const iconColors: Record<string, string> = {
-    gray: "text-gray-400",
-    green: "text-green-400",
-    red: "text-red-400",
-    orange: "text-orange-400",
-    yellow: "text-yellow-400",
-    blue: "text-blue-400",
-  };
   return (
     <div
       className={`bg-gradient-to-br ${colorClasses[color]} border rounded-lg sm:rounded-xl p-2 sm:p-3`}
     >
-      <Icon
-        className={`h-3 w-3 sm:h-4 sm:w-4 ${iconColors[color]} mb-1 sm:mb-2`}
-      />
+      <GameIcon name={iconName} size={16} className="mb-1 sm:mb-2" />
       <p
         className={`${small ? "text-sm sm:text-base md:text-lg" : "text-base sm:text-lg md:text-xl"} font-bold text-white tabular-nums truncate`}
       >
@@ -684,14 +660,14 @@ function MiniStat({
   );
 }
 
-function StreakCard({
-  icon: Icon,
+function GameStreakCard({
+  iconName,
   label,
   value,
   subtitle,
   color,
 }: {
-  icon: any;
+  iconName: GameIconName;
   label: string;
   value: string | number;
   subtitle: string;
@@ -699,36 +675,30 @@ function StreakCard({
 }) {
   const colorClasses: Record<
     string,
-    { bg: string; icon: string; text: string }
+    { bg: string; text: string }
   > = {
     green: {
       bg: "bg-green-500/10 border-green-500/30",
-      icon: "text-green-400",
       text: "text-green-400",
     },
     red: {
       bg: "bg-red-500/10 border-red-500/30",
-      icon: "text-red-400",
       text: "text-red-400",
     },
     blue: {
       bg: "bg-blue-500/10 border-blue-500/30",
-      icon: "text-blue-400",
       text: "text-blue-400",
     },
     emerald: {
       bg: "bg-emerald-500/10 border-emerald-500/30",
-      icon: "text-emerald-400",
       text: "text-emerald-400",
     },
     yellow: {
       bg: "bg-yellow-500/10 border-yellow-500/30",
-      icon: "text-yellow-400",
       text: "text-yellow-400",
     },
     purple: {
       bg: "bg-purple-500/10 border-purple-500/30",
-      icon: "text-purple-400",
       text: "text-purple-400",
     },
   };
@@ -737,9 +707,9 @@ function StreakCard({
     <div
       className={`${c.bg} border rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 text-center`}
     >
-      <Icon
-        className={`h-4 w-4 sm:h-5 sm:w-5 ${c.icon} mx-auto mb-1 sm:mb-2`}
-      />
+      <div className="flex justify-center mb-1 sm:mb-2">
+        <GameIcon name={iconName} size={20} />
+      </div>
       <p
         className={`text-lg sm:text-xl md:text-2xl font-black ${c.text} tabular-nums`}
       >
@@ -833,9 +803,9 @@ function TradeCard({ trade }: { trade: any }) {
           }`}
         >
           {trade.side === "long" ? (
-            <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+            <GameIcon name="profit" size={16} />
           ) : (
-            <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
+            <GameIcon name="loss" size={16} />
           )}
         </div>
         <div className="min-w-0">
@@ -874,9 +844,9 @@ function PositionCard({ position }: { position: any }) {
           }`}
         >
           {position.side === "long" ? (
-            <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+            <GameIcon name="profit" size={16} />
           ) : (
-            <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
+            <GameIcon name="loss" size={16} />
           )}
         </div>
         <div className="min-w-0">
@@ -904,20 +874,22 @@ function PositionCard({ position }: { position: any }) {
   );
 }
 
-function EmptyState({
-  icon: Icon,
+function GameEmptyState({
+  iconName,
   message,
   action,
   href,
 }: {
-  icon: any;
+  iconName: GameIconName;
   message: string;
   action?: string;
   href?: string;
 }) {
   return (
     <div className="text-center py-4 sm:py-6">
-      <Icon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-600 mx-auto mb-1.5 sm:mb-2" />
+      <div className="flex justify-center mb-1.5 sm:mb-2 opacity-50">
+        <GameIcon name={iconName} size={32} />
+      </div>
       <p className="text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">
         {message}
       </p>

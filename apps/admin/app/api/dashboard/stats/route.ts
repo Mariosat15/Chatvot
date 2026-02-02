@@ -14,10 +14,12 @@ import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 
-// Get User and KYCVerification collections directly (models not available in admin app)
+// Get User, KYCVerification, and KYCSettings collections directly (models not available in admin app)
 const getUserCollection = () => mongoose.connection.collection("users");
 const getKYCCollection = () =>
   mongoose.connection.collection("kycverifications");
+const getKYCSettingsCollection = () =>
+  mongoose.connection.collection("kycsettings");
 
 interface DashboardStats {
   // User Stats
@@ -183,9 +185,22 @@ async function checkServiceStatus(): Promise<DashboardStats["services"]> {
         }
       }
 
-      // KYC (Veriff)
+      // KYC (Veriff) - check WhiteLabel settings
       if (settings.veriffApiKey || process.env.VERIFF_API_KEY) {
         services.kyc = "operational";
+      }
+    }
+    
+    // Also check KYCSettings collection for Veriff configuration
+    if (services.kyc === "not_configured") {
+      try {
+        const kycSettingsCollection = getKYCSettingsCollection();
+        const kycSettings = await kycSettingsCollection.findOne({});
+        if (kycSettings && (kycSettings.veriffApiKey || kycSettings.enabled)) {
+          services.kyc = "operational";
+        }
+      } catch (e) {
+        // KYCSettings collection might not exist, continue
       }
     }
   } catch (error) {

@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import KYCSession from "@/database/models/kyc-session.model";
+import veriffService from "@/lib/services/veriff.service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,10 @@ export async function GET() {
     }
 
     // Get user wallet with KYC status
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
+    let wallet = await CreditWallet.findOne({ userId: session.user.id });
 
     // Get latest KYC session
-    const latestSession = (await KYCSession.findOne({ userId: session.user.id })
+    let latestSession = (await KYCSession.findOne({ userId: session.user.id })
       .sort({ createdAt: -1 })
       .lean()) as {
       _id: { toString(): string };
@@ -39,6 +40,7 @@ export async function GET() {
       completedAt?: Date;
       kycProvider?: string;
       externalSessionId?: string;
+      veriffSessionId?: string;
       documentInfo?: {
         firstName?: string;
         lastName?: string;
@@ -49,6 +51,29 @@ export async function GET() {
         expiryDate?: string;
       };
     } | null;
+    
+    // If session is submitted but not yet decided, try to fetch decision from Veriff
+    if (latestSession && 
+        latestSession.status === "submitted" && 
+        latestSession.veriffSessionId &&
+        settings.enabled) {
+      try {
+        console.log("🔍 [KYC Status] Session is submitted, checking Veriff for decision...");
+        const result = await veriffService.fetchAndProcessDecision(latestSession.veriffSessionId);
+        
+        if (result.processed) {
+          console.log("✅ [KYC Status] Decision fetched and processed:", result.status);
+          // Refresh the data after processing
+          wallet = await CreditWallet.findOne({ userId: session.user.id });
+          latestSession = await KYCSession.findOne({ userId: session.user.id })
+            .sort({ createdAt: -1 })
+            .lean() as typeof latestSession;
+        }
+      } catch (error: any) {
+        console.log("⚠️ [KYC Status] Could not fetch decision from Veriff:", error.message);
+        // Continue with existing data
+      }
+    }
 
     // Determine the actual KYC status - wallet status is the source of truth
     let kycStatus = wallet?.kycStatus || "none";

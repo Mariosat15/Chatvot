@@ -588,6 +588,100 @@ class VeriffService {
     await connectToDatabase();
     return KYCSession.findById(sessionId).lean();
   }
+
+  /**
+   * Fetch decision from Veriff API and process it
+   * This is useful when webhooks fail to arrive
+   */
+  async fetchAndProcessDecision(veriffSessionId: string): Promise<{ status: string; processed: boolean }> {
+    console.log("🔍 [KYC] Fetching decision from Veriff API for session:", veriffSessionId);
+    
+    const settings = await this.getSettings();
+    
+    if (!settings.veriffApiKey) {
+      throw new Error("Veriff API not configured");
+    }
+
+    try {
+      // Fetch decision from Veriff API
+      const response = await fetch(
+        `${settings.veriffBaseUrl}/v1/sessions/${veriffSessionId}/decision`,
+        {
+          method: "GET",
+          headers: {
+            "X-AUTH-CLIENT": settings.veriffApiKey,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("⚠️ [KYC] Veriff API response:", response.status, errorText);
+        
+        if (response.status === 404) {
+          return { status: "pending", processed: false };
+        }
+        throw new Error(`Veriff API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("📋 [KYC] Veriff decision data:", {
+        status: data.verification?.status,
+        code: data.verification?.code,
+        hasVerification: !!data.verification,
+      });
+
+      if (data.verification && data.verification.status) {
+        // Process the decision as if it came from webhook
+        await this.handleDecision(data, "");
+        return { status: data.verification.status, processed: true };
+      }
+
+      return { status: "pending", processed: false };
+    } catch (error: any) {
+      console.error("❌ [KYC] Error fetching decision:", error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Check and update verification status for a user
+   */
+  async checkAndUpdateStatus(userId: string): Promise<{ status: string; updated: boolean }> {
+    await connectToDatabase();
+    
+    // Validate userId
+    if (!isValidObjectId(userId)) {
+      throw new Error("Invalid user ID");
+    }
+
+    // Find the most recent pending session for this user
+    const session = await KYCSession.findOne({
+      userId,
+      status: { $in: ["created", "started", "submitted"] },
+    }).sort({ createdAt: -1 });
+
+    if (!session) {
+      // Check if user is already verified
+      const wallet = await CreditWallet.findOne({ userId });
+      if (wallet?.kycVerified) {
+        return { status: "approved", updated: false };
+      }
+      return { status: "none", updated: false };
+    }
+
+    console.log("🔍 [KYC] Checking status for session:", session.veriffSessionId);
+
+    // Try to fetch and process the decision from Veriff
+    try {
+      const result = await this.fetchAndProcessDecision(session.veriffSessionId);
+      return { status: result.status, updated: result.processed };
+    } catch (error: any) {
+      console.error("❌ [KYC] Error checking status:", error.message);
+      // Return current session status
+      return { status: session.status, updated: false };
+    }
+  }
 }
 
 export const veriffService = new VeriffService();
