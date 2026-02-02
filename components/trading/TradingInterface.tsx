@@ -85,61 +85,51 @@ export default function TradingInterface({
   const { mode, setMode } = useTradingMode();
 
   return (
-    <div className="space-y-4">
-      {/* Watchlist - Above Order Form */}
-      <Watchlist className="h-[260px]" />
+    <div className="flex flex-col h-full">
+      {/* Watchlist - Compact */}
+      <div className="flex-shrink-0">
+        <Watchlist className="h-[180px]" />
+      </div>
 
-      {/* Mode Selector */}
-      <div className="flex justify-center">
+      {/* Mode Selector - Compact */}
+      <div className="flex justify-center py-2 flex-shrink-0">
         <TradingModeSelector mode={mode} onModeChange={setMode} />
       </div>
 
-      {/* Mode Description */}
-      <div className="text-center">
+      {/* Conditional Order Form - Fills remaining space */}
+      <div className="flex-1 overflow-hidden">
         {mode === "professional" ? (
-          <p className="text-xs text-dark-600">
-            Advanced trading interface with full control
-          </p>
+          <OrderForm
+            competitionId={competitionId}
+            availableCapital={availableCapital}
+            defaultLeverage={defaultLeverage}
+            openPositionsCount={openPositionsCount}
+            maxPositions={maxPositions}
+            currentEquity={currentEquity}
+            existingUsedMargin={existingUsedMargin}
+            currentBalance={currentBalance}
+            marginThresholds={marginThresholds}
+            disabled={disabled}
+            disabledReason={disabledReason}
+            userId={userId}
+            contestType={contestType}
+          />
         ) : (
-          <p className="text-xs text-purple-400 font-medium">
-            ✨ Simplified trading with gaming elements - Perfect for beginners!
-            🎮
-          </p>
+          <GameModeOrderForm
+            competitionId={competitionId}
+            availableCapital={availableCapital}
+            defaultLeverage={defaultLeverage}
+            currentBalance={currentBalance}
+            openPositionsCount={openPositionsCount}
+            maxPositions={maxPositions}
+            currentEquity={currentEquity}
+            usedMargin={existingUsedMargin}
+            marginThresholds={marginThresholds}
+            disabled={disabled}
+            disabledReason={disabledReason}
+          />
         )}
       </div>
-
-      {/* Conditional Order Form */}
-      {mode === "professional" ? (
-        <OrderForm
-          competitionId={competitionId}
-          availableCapital={availableCapital}
-          defaultLeverage={defaultLeverage}
-          openPositionsCount={openPositionsCount}
-          maxPositions={maxPositions}
-          currentEquity={currentEquity}
-          existingUsedMargin={existingUsedMargin}
-          currentBalance={currentBalance}
-          marginThresholds={marginThresholds}
-          disabled={disabled}
-          disabledReason={disabledReason}
-          userId={userId}
-          contestType={contestType}
-        />
-      ) : (
-        <GameModeOrderForm
-          competitionId={competitionId}
-          availableCapital={availableCapital}
-          defaultLeverage={defaultLeverage}
-          currentBalance={currentBalance}
-          openPositionsCount={openPositionsCount}
-          maxPositions={maxPositions}
-          currentEquity={currentEquity}
-          usedMargin={existingUsedMargin}
-          marginThresholds={marginThresholds}
-          disabled={disabled}
-          disabledReason={disabledReason}
-        />
-      )}
     </div>
   );
 }
