@@ -565,6 +565,7 @@ const ChallengeTradingPage = async ({
                               existingUsedMargin={participant.usedMargin}
                               currentBalance={participant.currentCapital}
                               marginThresholds={marginThresholds}
+                              contestType="challenge"
                             />
                           </div>
                         </div>

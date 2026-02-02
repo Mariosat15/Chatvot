@@ -22,6 +22,7 @@ interface TradingInterfaceProps {
   disabled?: boolean; // Disable trading (e.g., when disqualified)
   disabledReason?: string; // Reason for disabling (e.g., "You are disqualified")
   userId?: string; // Current user ID for live ranking highlight
+  contestType?: "competition" | "challenge"; // Challenges don't show live ranking panel
 }
 
 // Create context for trading mode
@@ -79,6 +80,7 @@ export default function TradingInterface({
   disabled = false,
   disabledReason,
   userId,
+  contestType = "competition",
 }: TradingInterfaceProps) {
   const { mode, setMode } = useTradingMode();
 
@@ -121,6 +123,7 @@ export default function TradingInterface({
           disabled={disabled}
           disabledReason={disabledReason}
           userId={userId}
+          contestType={contestType}
         />
       ) : (
         <GameModeOrderForm

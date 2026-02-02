@@ -103,6 +103,7 @@ interface OrderFormProps {
   disabled?: boolean; // Disable trading (e.g., when disqualified)
   disabledReason?: string; // Reason for disabling
   userId?: string; // Current user ID for live ranking highlight
+  contestType?: "competition" | "challenge"; // Type of contest - challenges don't show ranking panel
 }
 
 const OrderForm = ({
@@ -118,6 +119,7 @@ const OrderForm = ({
   disabled = false,
   disabledReason,
   userId,
+  contestType = "competition",
 }: OrderFormProps) => {
   const { prices, subscribe, unsubscribe, marketOpen, marketStatus } =
     usePrices();
@@ -553,16 +555,18 @@ const OrderForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Section 1: Live Ranking */}
-      <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={true}>
-        {userId ? (
-          <LiveRankingPanel competitionId={competitionId} userId={userId} />
-        ) : (
-          <div className="text-center py-4 text-gray-500 text-xs">
-            Loading ranking...
-          </div>
-        )}
-      </CollapsibleSection>
+      {/* Section 1: Live Ranking - Only show for competitions, not challenges */}
+      {contestType === "competition" && (
+        <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={true}>
+          {userId ? (
+            <LiveRankingPanel competitionId={competitionId} userId={userId} />
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-xs">
+              Loading ranking...
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
 
       {/* Section 3: Order Configuration */}
       <CollapsibleSection title="Order Setup" icon="⚙️" defaultOpen={true}>
