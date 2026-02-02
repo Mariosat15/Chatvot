@@ -679,30 +679,6 @@ const OrderForm = ({
             </div>
           </div>
 
-          {/* Margin Required - Compact */}
-          <div className="flex items-center justify-between py-2 px-3 bg-dark-400/30 rounded-lg border border-dark-500/30">
-            <span className="text-xs text-dark-600">Margin:</span>
-            <span className="text-sm font-bold text-light-900">${marginRequired.toFixed(2)}</span>
-            <span className="text-xs text-dark-600">Avail:</span>
-            <span className={cn("text-sm font-semibold", canPlaceOrder ? "text-green-400" : "text-red-400")}>
-              ${availableCapital.toFixed(2)}
-            </span>
-          </div>
-
-          {/* Margin Warning - Only show if relevant */}
-          {marginRequired > 0 && (wouldCauseMarginCall || currentlyBelowMarginCall) && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2">
-              {currentlyBelowMarginCall ? (
-                <p className="text-xs text-red-400 font-semibold text-center">
-                  🚨 Margin at {currentMarginLevel.toFixed(0)}% - Close positions first
-                </p>
-              ) : (
-                <p className="text-xs text-red-400 text-center">
-                  ⚠️ Would drop to {marginLevelAfterTrade.toFixed(0)}% margin
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* TP/SL Section - Collapsed by default */}
