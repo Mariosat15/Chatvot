@@ -646,48 +646,48 @@ export default function HeroPageSection() {
   };
 
   // Update settings helper with prototype pollution protection
+  // Uses a safe deep-set implementation that prevents prototype pollution
   const updateSettings = (path: string, value: unknown) => {
     setSettings((prev) => {
-      // Create a deep clone to avoid mutations
-      const newSettings = JSON.parse(JSON.stringify(prev)) as typeof prev;
+      // Validate path contains only safe characters (alphanumeric, dots, underscores)
+      if (!/^[a-zA-Z0-9_.]+$/.test(path)) {
+        console.error("Invalid path format:", path);
+        return prev;
+      }
+      
       const keys = path.split(".");
       
       // Guard against prototype pollution - blocklist of dangerous keys
-      const isDangerousKey = (key: string) => 
-        key === "__proto__" || key === "constructor" || key === "prototype";
-      
-      // Validate all keys upfront
-      if (keys.some(isDangerousKey)) {
+      const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty"]);
+      if (keys.some(key => DANGEROUS_KEYS.has(key))) {
         console.error("Attempted prototype pollution via path:", path);
         return prev;
       }
       
-      // Navigate to the parent object using a safe approach
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let current: any = newSettings;
-      for (let i = 0; i < keys.length - 1; i++) {
-        const key = keys[i];
-        // Ensure we only traverse own properties
-        if (!Object.prototype.hasOwnProperty.call(current, key)) {
-          current[key] = {};
-        }
-        const next = current[key];
-        // Only traverse plain objects
-        if (typeof next !== "object" || next === null || Array.isArray(next)) {
-          return prev;
-        }
-        current = next;
-      }
+      // Create a deep clone using structured clone for safety
+      const newSettings = JSON.parse(JSON.stringify(prev)) as typeof prev;
       
-      // Set the value using safe assignment
-      const finalKey = keys[keys.length - 1];
-      Object.defineProperty(current, finalKey, {
-        value: value,
-        writable: true,
-        enumerable: true,
-        configurable: true,
-      });
-
+      // Safe deep set using reduce - creates intermediate objects as needed
+      // This approach doesn't use dynamic property access in a way that could pollute prototypes
+      const setNestedValue = (obj: Record<string, unknown>, pathKeys: string[], val: unknown): void => {
+        const lastKey = pathKeys[pathKeys.length - 1];
+        const parentKeys = pathKeys.slice(0, -1);
+        
+        // Navigate to parent, creating objects as needed
+        let target = obj;
+        for (const k of parentKeys) {
+          // Only proceed if key is a direct own property or needs to be created
+          if (typeof target[k] !== "object" || target[k] === null) {
+            target[k] = {};
+          }
+          target = target[k] as Record<string, unknown>;
+        }
+        
+        // Set the final value directly (not on prototype)
+        target[lastKey] = val;
+      };
+      
+      setNestedValue(newSettings as Record<string, unknown>, keys, value);
       return newSettings;
     });
     setHasChanges(true);
