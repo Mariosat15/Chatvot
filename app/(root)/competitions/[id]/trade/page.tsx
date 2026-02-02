@@ -407,17 +407,6 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                     </div>
                   </div>
 
-                  {/* Account Strip - Always Visible */}
-                  <AccountStrip
-                    balance={participant.currentCapital}
-                    initialEquity={equity}
-                    initialUnrealizedPnl={participant.unrealizedPnl}
-                    usedMargin={participant.usedMargin}
-                    availableCapital={participant.availableCapital}
-                    positions={positions}
-                    startingCapital={competition.startingCapital}
-                  />
-
                   {/* Professional Main Content - Redesigned Layout */}
                   <div className="container-custom py-4 md:py-6">
                     {/* Market Status Banner */}
@@ -449,6 +438,18 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                             />
                           </div>
                         </div>
+                        
+                        {/* Account Strip - Below Chart (Live Stats) */}
+                        <AccountStrip
+                          balance={participant.currentCapital}
+                          initialEquity={equity}
+                          initialUnrealizedPnl={participant.unrealizedPnl}
+                          usedMargin={participant.usedMargin}
+                          availableCapital={participant.availableCapital}
+                          positions={positions}
+                          startingCapital={competition.startingCapital}
+                          className="mt-4"
+                        />
                       </div>
 
                       {/* Right Column: Trading Interface - Compact */}

@@ -111,7 +111,7 @@ export default function TradingInterface({
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-500">
-                    {watchlistOpen ? "Click to collapse" : "Click to expand"}
+                    {watchlistOpen ? "Collapse" : "Expand"}
                   </span>
                   {watchlistOpen ? (
                     <ChevronUp className="size-4 text-dark-600" />
@@ -123,10 +123,10 @@ export default function TradingInterface({
               <div
                 className={cn(
                   "transition-all duration-300 ease-in-out overflow-hidden",
-                  watchlistOpen ? "max-h-[140px] opacity-100" : "max-h-0 opacity-0"
+                  watchlistOpen ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
                 )}
               >
-                <Watchlist className="h-[140px]" />
+                <Watchlist className="h-[200px]" />
               </div>
             </div>
             <div className="flex-1">
