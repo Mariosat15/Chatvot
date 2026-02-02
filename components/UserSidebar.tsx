@@ -17,8 +17,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  TrendingUp,
-  Sparkles,
 } from "lucide-react";
 
 interface SidebarUser {
@@ -292,11 +290,11 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-white truncate flex items-center gap-1">
                   {user?.name || "Trader"}
-                  <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
+                  <GameIcon name="star1" size={14} />
                 </h3>
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-400" />
+                  <GameIcon name="profit" size={12} />
                   <span className="text-[10px] font-medium text-green-400">
                     Active Trader
                   </span>

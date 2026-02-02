@@ -27,7 +27,8 @@ import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
 import TradingPageContent from "@/components/trading/TradingPageContent";
 import { AccountStrip } from "@/components/trading/AccountStrip";
 import { BottomPositionsPanel } from "@/components/trading/BottomPositionsPanel";
-import { ArrowLeft, Skull, Ban, History } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -300,12 +301,12 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                   >
                                     {participantStatus === "liquidated" ? (
                                       <>
-                                        <Skull className="size-3.5" />
+                                        <GameIcon name="skull" size={14} />
                                         Liquidated - Trading Disabled
                                       </>
                                     ) : (
                                       <>
-                                        <Ban className="size-3.5" />
+                                        <GameIcon name="warning" size={14} />
                                         Disqualified - Trading Disabled
                                       </>
                                     )}
@@ -487,9 +488,9 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                             <div className="flex items-center justify-between mb-4">
                               <h2 className="text-lg font-bold text-light-900 flex items-center gap-2">
                                 {participantStatus === "liquidated" ? (
-                                  <><Skull className="h-5 w-5 text-red-400" /> Liquidated</>
+                                  <><GameIcon name="skull" size={20} /> Liquidated</>
                                 ) : (
-                                  <><Ban className="h-5 w-5 text-orange-400" /> Disqualified</>
+                                  <><GameIcon name="warning" size={20} /> Disqualified</>
                                 )}
                               </h2>
                             </div>
@@ -505,7 +506,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                               </div>
                               <Link href={`/competitions/${competitionId}`} className="block">
                                 <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold gap-2">
-                                  <History className="h-4 w-4" /> Back to Competition
+                                  <GameIcon name="trophy" size={16} /> Back to Competition
                                 </Button>
                               </Link>
                             </div>

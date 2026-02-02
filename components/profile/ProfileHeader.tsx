@@ -4,15 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Camera,
-  Calendar,
   ChevronDown,
-  Sparkles,
-  Trophy,
-  Swords,
-  TrendingUp,
   Verified,
-  Crown,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import AvatarWithFrame from "@/components/ui/AvatarWithFrame";
@@ -195,7 +190,7 @@ export default function ProfileHeader({
                 {isGameMaster && (
                   <Link href="/gamemaster">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30 hover:border-yellow-400/50 transition-colors cursor-pointer">
-                      <Crown className="w-4 h-4" />
+                      <GameIcon name="crown" size={16} />
                       <span>{gmPackageName}</span>
                     </div>
                   </Link>
@@ -209,15 +204,15 @@ export default function ProfileHeader({
               {/* Meta Info */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
                 <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4" />
+                  <GameIcon name="timer" size={16} />
                   <span>Member since {memberSince}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-yellow-500" />
+                  <GameIcon name="star1" size={16} />
                   <span>{levelData.currentXP.toLocaleString()} XP</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-amber-500" />
+                  <GameIcon name="trophy" size={16} />
                   <span>{totalWins} Wins</span>
                 </div>
                 {isGameMaster && (
@@ -225,7 +220,7 @@ export default function ProfileHeader({
                     href="/gamemaster"
                     className="flex items-center gap-1.5 text-yellow-400 hover:text-yellow-300 transition-colors"
                   >
-                    <Crown className="w-4 h-4" />
+                    <GameIcon name="crown" size={16} />
                     <span>Game Master Dashboard</span>
                   </Link>
                 )}
@@ -276,25 +271,25 @@ export default function ProfileHeader({
             }`}
           >
             <QuickStatCard
-              icon={<TrendingUp className="w-4 h-4" />}
+              icon={<GameIcon name="profit" size={16} />}
               label="Total Trades"
               value={combinedStats.totalTrades.toString()}
               color="text-blue-400"
             />
             <QuickStatCard
-              icon={<Trophy className="w-4 h-4" />}
+              icon={<GameIcon name="trophy" size={16} />}
               label="Win Rate"
               value={`${combinedStats.winRate.toFixed(1)}%`}
               color="text-green-400"
             />
             <QuickStatCard
-              icon={<Trophy className="w-4 h-4" />}
+              icon={<GameIcon name="trophy" size={16} />}
               label="Competitions"
               value={competitionStats.totalCompetitionsEntered.toString()}
               color="text-yellow-400"
             />
             <QuickStatCard
-              icon={<Swords className="w-4 h-4" />}
+              icon={<GameIcon name="sword" size={16} />}
               label="Challenges"
               value={challengeStats?.totalChallengesEntered?.toString() || "0"}
               color="text-orange-400"

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { TitleLevel } from "@/lib/constants/levels";
-import { Zap, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface XPProgressBarProps {
   currentXP: number;
@@ -35,6 +36,7 @@ export default function XPProgressBar({
   titleLevels,
 }: XPProgressBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { settings } = useAppSettings();
 
   // Use the title, icon, description from database (passed as props)
   const levelData = {
@@ -223,7 +225,7 @@ export default function XPProgressBar({
               {/* All Levels Preview */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="h-5 w-5 text-purple-400" />
+                  <GameIcon name="profit" size={20} />
                   <h3 className="text-lg font-bold text-white">
                     All Title Levels
                   </h3>
@@ -285,7 +287,7 @@ export default function XPProgressBar({
               {/* XP Earning Guide */}
               <div className="p-4 rounded-lg bg-dark-800/50 border border-dark-600">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className="h-5 w-5 text-yellow-400" />
+                  <span className="text-xl text-yellow-400">{settings?.credits.symbol || "⚡"}</span>
                   <h4 className="text-sm font-bold text-white">
                     How to Earn XP
                   </h4>

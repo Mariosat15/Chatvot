@@ -10,19 +10,10 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Target,
-  Clock,
-  DollarSign,
-  Activity,
-  Award,
-  Calendar,
   ChevronRight,
   Eye,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 const CompetitionResultsPage = async ({
   params,
@@ -147,7 +138,7 @@ const CompetitionResultsPage = async ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Trophy className="h-6 w-6 text-purple-400" />
+              <GameIcon name="trophy" size={24} />
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-medium">
                 COMPLETED
               </span>
@@ -160,7 +151,7 @@ const CompetitionResultsPage = async ({
 
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
+              <GameIcon name="timer" size={16} />
               <span className="text-sm text-gray-400">
                 {formatDate(competition.startTime)} -{" "}
                 {formatDate(competition.endTime)}
@@ -169,7 +160,7 @@ const CompetitionResultsPage = async ({
             {prizeWon > 0 && (
               <div className="px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
                 <p className="text-yellow-400 font-bold flex items-center gap-2">
-                  <Award className="h-5 w-5" />
+                  <GameIcon name="trophy" size={20} />
                   You won {prizeWon.toFixed(2)} credits!
                 </p>
               </div>
@@ -183,7 +174,7 @@ const CompetitionResultsPage = async ({
         {/* Final Rank */}
         <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
+            <GameIcon name="crown" size={20} />
             <span className="text-sm font-medium text-gray-400">
               Final Rank
             </span>
@@ -203,11 +194,7 @@ const CompetitionResultsPage = async ({
           } to-gray-800/50 border p-5`}
         >
           <div className="flex items-center gap-2 mb-2">
-            {totalPnl >= 0 ? (
-              <TrendingUp className="h-5 w-5 text-green-500" />
-            ) : (
-              <TrendingDown className="h-5 w-5 text-red-500" />
-            )}
+            <GameIcon name={totalPnl >= 0 ? "profit" : "loss"} size={20} />
             <span className="text-sm font-medium text-gray-400">Total P&L</span>
           </div>
           <p
@@ -228,7 +215,7 @@ const CompetitionResultsPage = async ({
         {/* Win Rate */}
         <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-gray-800/50 border border-blue-500/30 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Target className="h-5 w-5 text-blue-500" />
+            <GameIcon name="target" size={20} />
             <span className="text-sm font-medium text-gray-400">Win Rate</span>
           </div>
           <p className="text-4xl font-black text-blue-500">
@@ -242,7 +229,7 @@ const CompetitionResultsPage = async ({
         {/* Total Trades */}
         <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-gray-800/50 border border-purple-500/30 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Activity className="h-5 w-5 text-purple-500" />
+            <GameIcon name="sword" size={20} />
             <span className="text-sm font-medium text-gray-400">
               Total Trades
             </span>
@@ -262,7 +249,7 @@ const CompetitionResultsPage = async ({
         {/* Account Summary */}
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
+            <GameIcon name="coin" size={20} />
             Account Summary
           </h3>
           <div className="space-y-3">
@@ -305,7 +292,7 @@ const CompetitionResultsPage = async ({
         {/* Trading Stats */}
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-500" />
+            <GameIcon name="target" size={20} />
             Trading Statistics
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -353,7 +340,7 @@ const CompetitionResultsPage = async ({
       <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-purple-500" />
+            <GameIcon name="timer" size={20} />
             Trade History
           </h3>
           <Link href={`/competitions/${competitionId}/trade?viewOnly=true`}>
@@ -370,7 +357,9 @@ const CompetitionResultsPage = async ({
 
         {tradeHistory.length === 0 ? (
           <div className="py-12 text-center">
-            <Activity className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+            <div className="flex justify-center mb-3">
+              <GameIcon name="sword" size={48} className="opacity-50" />
+            </div>
             <p className="text-gray-400">
               No trades were made in this competition
             </p>
@@ -481,7 +470,7 @@ const CompetitionResultsPage = async ({
         </Link>
         <Link href="/competitions">
           <Button variant="outline" className="gap-2">
-            <Trophy className="h-4 w-4" />
+            <GameIcon name="trophy" size={16} />
             Browse More Competitions
           </Button>
         </Link>

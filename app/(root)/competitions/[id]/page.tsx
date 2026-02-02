@@ -1,23 +1,7 @@
 import {
-  Trophy,
-  Users,
-  DollarSign,
-  Clock,
-  Calendar,
-  TrendingUp,
   ArrowLeft,
-  Target,
-  Shield,
-  AlertTriangle,
-  Zap,
-  Info,
-  Percent,
-  BarChart3,
-  Skull,
-  Bell,
-  Ban,
-  Gauge,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
@@ -289,7 +273,7 @@ const CompetitionDetailsPage = async ({
         {/* Competition Header */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-6 md:p-8 shadow-xl border border-yellow-500/20">
           <div className="absolute top-0 right-0 opacity-10">
-            <Trophy className="h-48 w-48 text-yellow-500" />
+            <GameIcon name="trophy" size={192} />
           </div>
 
           <div className="relative z-10">
@@ -446,7 +430,7 @@ const CompetitionDetailsPage = async ({
             {/* Leaderboard */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
               <div className="flex items-center gap-2 mb-6">
-                <Trophy className="h-5 w-5 text-yellow-500" />
+                <GameIcon name="trophy" size={20} />
                 <h2 className="text-xl font-bold text-gray-100">Leaderboard</h2>
                 <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 text-xs font-medium">
                   {leaderboard.length} traders
@@ -503,7 +487,7 @@ const CompetitionDetailsPage = async ({
             {/* Schedule */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Calendar className="h-4 w-4 text-orange-400" />
+                <GameIcon name="timer" size={16} />
                 <h3 className="text-sm font-semibold text-gray-100">
                   Schedule (UTC)
                 </h3>
@@ -533,7 +517,7 @@ const CompetitionDetailsPage = async ({
             {/* ===== SECTION 2: COMPETITION DETAILS ===== */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Info className="h-4 w-4 text-blue-400" />
+                <GameIcon name="guideBook" size={16} />
                 <h3 className="text-sm font-semibold text-gray-100">
                   Competition Details
                 </h3>
@@ -543,7 +527,7 @@ const CompetitionDetailsPage = async ({
                 {/* Competition Type */}
                 <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-3.5 w-3.5 text-blue-400" />
+                    <GameIcon name="fireSpell" size={14} />
                     <span className="text-xs font-medium text-blue-400">
                       Type
                     </span>
@@ -621,7 +605,7 @@ const CompetitionDetailsPage = async ({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Gauge className={`h-4 w-4 ${diffColors.text}`} />
+                  <GameIcon name="target" size={16} />
                   <span className="text-sm font-semibold text-white">
                     Difficulty
                   </span>
@@ -664,7 +648,7 @@ const CompetitionDetailsPage = async ({
               <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-yellow-500" />
+                    <GameIcon name="trophy" size={16} />
                     <h3 className="text-sm font-semibold text-gray-100">
                       Competition Rules
                     </h3>
@@ -755,7 +739,7 @@ const CompetitionDetailsPage = async ({
                 competition.rules.minimumWinRate) && (
                 <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Skull className="h-4 w-4 text-red-400" />
+                    <GameIcon name="skull" size={16} />
                     <h3 className="text-sm font-semibold text-red-400">
                       ⚠️ Disqualification Rules
                     </h3>
@@ -821,9 +805,7 @@ const CompetitionDetailsPage = async ({
               className={`rounded-xl p-4 ${competition.riskLimits?.enabled ? "bg-red-500/10 border border-red-500/20" : "bg-gray-800/50 border border-gray-700"}`}
             >
               <div className="flex items-center gap-2 mb-3">
-                <Shield
-                  className={`h-4 w-4 ${competition.riskLimits?.enabled ? "text-red-400" : "text-gray-400"}`}
-                />
+                <GameIcon name="shield1" size={16} />
                 <h3 className="text-sm font-semibold text-gray-100">
                   Risk Limits
                 </h3>
@@ -869,7 +851,7 @@ const CompetitionDetailsPage = async ({
             {/* Margin Levels */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Skull className="h-4 w-4 text-red-400" />
+                <GameIcon name="skull" size={16} />
                 <h3 className="text-sm font-semibold text-gray-100">
                   Margin Levels
                 </h3>
@@ -878,7 +860,7 @@ const CompetitionDetailsPage = async ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20">
                   <div className="flex items-center gap-1.5">
-                    <Skull className="h-3 w-3 text-red-500" />
+                    <GameIcon name="skull" size={12} />
                     <span className="text-xs text-red-400">Liquidation</span>
                   </div>
                   <span className="text-sm font-black text-red-500">
@@ -887,7 +869,7 @@ const CompetitionDetailsPage = async ({
                 </div>
                 <div className="flex items-center justify-between p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
                   <div className="flex items-center gap-1.5">
-                    <Bell className="h-3 w-3 text-orange-400" />
+                    <GameIcon name="warning" size={12} />
                     <span className="text-xs text-orange-400">Margin Call</span>
                   </div>
                   <span className="text-sm font-black text-orange-400">
@@ -896,7 +878,7 @@ const CompetitionDetailsPage = async ({
                 </div>
                 <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                   <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="h-3 w-3 text-yellow-400" />
+                    <GameIcon name="warning" size={12} />
                     <span className="text-xs text-yellow-400">Warning</span>
                   </div>
                   <span className="text-sm font-black text-yellow-400">
@@ -905,7 +887,7 @@ const CompetitionDetailsPage = async ({
                 </div>
                 <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
                   <div className="flex items-center gap-1.5">
-                    <Shield className="h-3 w-3 text-green-400" />
+                    <GameIcon name="shield1" size={12} />
                     <span className="text-xs text-green-400">Safe</span>
                   </div>
                   <span className="text-sm font-black text-green-400">
@@ -935,7 +917,7 @@ const CompetitionDetailsPage = async ({
             <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-yellow-500" />
+                  <GameIcon name="trophy" size={16} />
                   <h3 className="text-sm font-semibold text-gray-100">
                     Prize Distribution
                   </h3>
@@ -1007,8 +989,9 @@ const CompetitionDetailsPage = async ({
                               className={`p-2.5 rounded-lg flex items-center justify-between ${isFilled ? "bg-gray-800/50 border border-gray-700" : "bg-gray-900/30 opacity-50"}`}
                             >
                               <div className="flex items-center gap-2">
-                                <Trophy
-                                  className={`h-4 w-4 ${index === 0 ? "text-yellow-500" : index === 1 ? "text-gray-400" : index === 2 ? "text-orange-600" : "text-gray-600"}`}
+                                <GameIcon
+                                  name={index === 0 ? "crown" : index === 1 ? "rank2" : index === 2 ? "rank3" : "trophy"}
+                                  size={16}
                                 />
                                 <span className="text-sm font-medium text-gray-300">
                                   #{prize.rank ?? index + 1}
