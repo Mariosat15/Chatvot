@@ -87,14 +87,14 @@ export default function TradingInterface({
   const { mode, setMode } = useTradingMode();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Mode Selector - Top with clear labels */}
       <div className="flex justify-center py-3 flex-shrink-0 border-b border-dark-400/30">
         <TradingModeSelector mode={mode} onModeChange={setMode} />
       </div>
 
-      {/* Conditional Order Form - Fills remaining space */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Conditional Order Form - Fills remaining space with scroll */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         {mode === "professional" ? (
           <>
             {/* Watchlist only for Professional mode */}

@@ -515,13 +515,13 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                           /* Active Trading Interface */
                           <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl border border-dark-400/30 shadow-2xl backdrop-blur-sm flex flex-col h-[500px] xl:h-[600px]">
                             {/* Header */}
-                            <div className="flex items-center justify-between p-4 border-b border-dark-400/30">
+                            <div className="flex items-center justify-between p-4 border-b border-dark-400/30 flex-shrink-0">
                               <h2 className="text-lg font-bold text-light-900">Place Order</h2>
                               <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
                             </div>
 
                             {/* Trading Arsenal (collapsed style) */}
-                            <div className="px-4 pt-3">
+                            <div className="px-4 pt-3 flex-shrink-0">
                               <TradingArsenalPanel
                                 contestType="competition"
                                 contestId={competitionId}
@@ -529,8 +529,8 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                               />
                             </div>
 
-                            {/* Trading Interface - Takes remaining space */}
-                            <div className="flex-1 overflow-hidden px-4 pb-4">
+                            {/* Trading Interface - Takes remaining space with scroll */}
+                            <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 custom-scrollbar">
                               <TradingInterface
                                 competitionId={competitionId}
                                 availableCapital={participant.availableCapital}
