@@ -310,12 +310,11 @@ async function seedHistoricalCandles(
     await Candle1m.bulkUpsertCandles(candlesToSave);
 
     console.log(
-      `✅ [Candles API] Seeded ${limitedCandles.length} candles (${formatTime(seedingMinutes)}) for ${symbol} to MongoDB`,
+      "✅ [Candles API] Seeded", limitedCandles.length, "candles", "(", formatTime(seedingMinutes), ") for", symbol, "to MongoDB"
     );
   } catch (error) {
     console.error(
-      `❌ [Candles API] Failed to seed candles for ${symbol}:`,
-      error,
+      "❌ [Candles API] Failed to seed candles for", symbol, ":", error
     );
   } finally {
     seedingInProgress.delete(symbol);
@@ -832,8 +831,7 @@ async function handleCandleRequest(
           })
           .catch((err) => {
             console.error(
-              `❌ [Candles API] Background seeding failed for ${symbol}:`,
-              err,
+              "❌ [Candles API] Background seeding failed for", symbol, ":", err
             );
           });
       }
@@ -1345,8 +1343,7 @@ async function handleCandleRequest(
                   }
                 } catch (apiError) {
                   console.error(
-                    `❌ [${normalizedTf}] ${symbol}: API fetch failed:`,
-                    apiError,
+                    "❌ [", normalizedTf, "]", symbol, ": API fetch failed:", apiError
                   );
                 }
               }
@@ -1505,8 +1502,7 @@ async function handleCandleRequest(
       });
     } catch (error) {
       console.error(
-        `❌ [Candles API] Hybrid approach failed for ${symbol} ${timeframe}:`,
-        error,
+        "❌ [Candles API] Hybrid approach failed for", symbol, timeframe, ":", error
       );
       // Fall through to Massive.com API as fallback
     }

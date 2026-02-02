@@ -4,6 +4,8 @@
  * SECURITY: Prevents XSS, SQL injection, and other injection attacks
  */
 
+import DOMPurify from "isomorphic-dompurify";
+
 /**
  * Sanitize a string to prevent XSS attacks
  * Removes or escapes potentially dangerous characters
@@ -42,7 +44,7 @@ export function sanitizeString(
 
 /**
  * Sanitize a string but preserve some formatting (for notes/descriptions)
- * Less aggressive than full sanitization
+ * Uses DOMPurify for robust HTML sanitization
  */
 export function sanitizeText(
   input: string | null | undefined,
@@ -59,23 +61,9 @@ export function sanitizeText(
   // Remove null bytes
   str = str.replace(/\0/g, "");
 
-  // Remove script/style tags using iterative approach to handle nested/malformed tags
-  // Use loop to ensure complete removal even with whitespace variations
-  let prevLength;
-  do {
-    prevLength = str.length;
-    str = str.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
-    str = str.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
-  } while (str.length < prevLength);
-
-  // Remove event handlers (on* attributes) - match various patterns
-  str = str.replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "");
-
-  // Remove dangerous URL schemes (javascript, vbscript, data with scripts)
-  str = str.replace(/\b(javascript|vbscript|data)\s*:/gi, "blocked:");
-
-  // Basic HTML entity escaping for dangerous characters
-  str = str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Use DOMPurify for robust HTML sanitization - strips all dangerous content
+  // ALLOWED_TAGS: [] means strip ALL HTML, just keep text
+  str = DOMPurify.sanitize(str, { ALLOWED_TAGS: [] });
 
   return str;
 }

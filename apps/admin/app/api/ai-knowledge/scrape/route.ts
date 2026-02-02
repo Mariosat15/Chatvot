@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { isValidSsrfUrl } from "@/lib/utils/url-validator";
+import DOMPurify from "isomorphic-dompurify";
 
 // POST - Scrape a URL and add to knowledge base
 export async function POST(request: NextRequest) {
@@ -29,12 +30,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // Validate URL format
+    // Validate URL format and parse it
+    let parsedUrl: URL;
     try {
-      new URL(url);
+      parsedUrl = new URL(url);
     } catch {
       return NextResponse.json(
         { error: "Invalid URL format" },
+        { status: 400 },
+      );
+    }
+
+    // Only allow http and https protocols
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return NextResponse.json(
+        { error: "Only HTTP and HTTPS URLs are allowed" },
         { status: 400 },
       );
     }
@@ -48,8 +58,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the webpage
-    const response = await fetch(url, {
+    // Reconstruct URL from validated components to prevent SSRF bypass
+    // This ensures the URL we fetch is exactly what we validated
+    const safeUrl = new URL(parsedUrl.pathname + parsedUrl.search, `${parsedUrl.protocol}//${parsedUrl.host}`);
+
+    // Fetch the webpage using the reconstructed safe URL
+    const response = await fetch(safeUrl.toString(), {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; ChartVolt-Bot/1.0; Knowledge Indexer)",
@@ -112,28 +126,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * Extract text content from HTML, preserving structure
+ * Uses DOMPurify for safe HTML sanitization
  */
 function extractTextFromHtml(html: string, url: string): string {
-  // Remove script and style tags using iterative approach for complete removal
-  let text = html;
-  let prevLength;
-  
-  // Remove script blocks iteratively (handles whitespace in closing tags)
-  do {
-    prevLength = text.length;
-    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
-  } while (text.length < prevLength);
-  
-  // Remove style blocks iteratively
-  do {
-    prevLength = text.length;
-    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
-  } while (text.length < prevLength);
-  
-  // Remove noscript and comments
-  text = text
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
+  // Use DOMPurify to strip all dangerous content while preserving safe structural tags
+  // This handles script, style, event handlers, and dangerous URLs safely
+  let text = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr", "ul", "ol", "li", "a", "strong", "b", "em", "i", "pre", "code"],
+    ALLOWED_ATTR: ["href"],
+  });
 
   // Convert headings to markdown
   text = text
@@ -174,17 +175,11 @@ function extractTextFromHtml(html: string, url: string): string {
     )
     .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`");
 
-  // Remove remaining HTML tags
-  text = text.replace(/<[^>]+>/g, " ");
+  // Strip any remaining HTML tags (shouldn't be many after DOMPurify)
+  text = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
 
   // Clean up whitespace
   text = text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
     .replace(/\n\s*\n\s*\n/g, "\n\n")
     .replace(/[ \t]+/g, " ")
     .trim();

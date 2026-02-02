@@ -620,10 +620,10 @@ export class SuspicionScoringService {
       }
 
       console.log(
-        `🚨 AUTO-SUSPENDED user ${userId} - Score: ${score.totalScore}%/${settings.autoSuspendThreshold}% threshold`,
+        "🚨 AUTO-SUSPENDED user", userId, "- Score:", score.totalScore, "%/", settings.autoSuspendThreshold, "% threshold"
       );
     } catch (error) {
-      console.error(`❌ Failed to check/auto-restrict user ${userId}:`, error);
+      console.error("❌ Failed to check/auto-restrict user", userId, ":", error);
     }
   }
 

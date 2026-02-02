@@ -260,8 +260,7 @@ export async function POST(request: NextRequest) {
               }
             } catch (chunkError) {
               console.error(
-                `❌ [Seed History] Chunk error for ${symbol}:`,
-                chunkError,
+                "❌ [Seed History] Chunk error for", symbol, ":", chunkError
               );
             }
 
@@ -272,10 +271,10 @@ export async function POST(request: NextRequest) {
           totalFetched += symbolFetched;
           totalInserted += symbolInserted;
           console.log(
-            `✅ [Seed History] ${symbol}: fetched ${symbolFetched}, inserted ${symbolInserted}`,
+            "✅ [Seed History]", symbol, ": fetched", symbolFetched, ", inserted", symbolInserted
           );
         } catch (symbolError) {
-          console.error(`❌ [Seed History] Error for ${symbol}:`, symbolError);
+          console.error("❌ [Seed History] Error for", symbol, ":", symbolError);
         }
       }
 

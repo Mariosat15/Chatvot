@@ -558,8 +558,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (error) {
             console.error(
-              `❌ [Download History] Error ${symbol} ${timeframe}:`,
-              error,
+              "❌ [Download History] Error", symbol, timeframe, ":", error
             );
             await FetchStatus.updateOne(
               { symbol, timeframe },

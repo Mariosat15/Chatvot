@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/admin/auth";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import DOMPurify from "isomorphic-dompurify";
 
 // Supported file types
 const SUPPORTED_TYPES = {
@@ -66,29 +67,12 @@ export async function POST(request: NextRequest) {
     if (extension === "txt" || extension === "md" || extension === "html") {
       content = buffer.toString("utf-8");
 
-      // Safe HTML stripping for HTML files using iterative approach
+      // Safe HTML stripping for HTML files using DOMPurify
       if (extension === "html") {
-        // Remove script blocks iteratively to handle edge cases
-        let prevLength;
-        do {
-          prevLength = content.length;
-          content = content.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
-        } while (content.length < prevLength);
-        
-        // Remove style blocks iteratively
-        do {
-          prevLength = content.length;
-          content = content.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
-        } while (content.length < prevLength);
-        
-        // Remove comments
-        content = content.replace(/<!--[\s\S]*?-->/g, "");
-        
-        // Remove remaining HTML tags and clean up
-        content = content
-          .replace(/<[^>]+>/g, "\n")
-          .replace(/\n\s*\n/g, "\n\n")
-          .trim();
+        // Use DOMPurify to strip all HTML tags safely
+        content = DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
+        // Clean up whitespace
+        content = content.replace(/\s+/g, " ").trim();
       }
     } else if (extension === "pdf") {
       // For PDF, we'll create the source and process later with a PDF library

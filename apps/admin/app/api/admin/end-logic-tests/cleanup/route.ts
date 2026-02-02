@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
             });
             deletedCount += result.deletedCount;
           } catch (e) {
-            console.warn(`Failed to delete ${idString}:`, e);
+            console.warn("Failed to delete", idString, ":", e);
           }
         }
       }

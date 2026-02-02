@@ -645,39 +645,48 @@ export default function HeroPageSection() {
     }
   };
 
-  // Update settings helper
+  // Update settings helper with prototype pollution protection
   const updateSettings = (path: string, value: unknown) => {
     setSettings((prev) => {
-      const newSettings = { ...prev };
+      // Create a deep clone to avoid mutations
+      const newSettings = JSON.parse(JSON.stringify(prev)) as typeof prev;
       const keys = path.split(".");
       
-      // Guard against prototype pollution - check all keys
-      const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
+      // Guard against prototype pollution - blocklist of dangerous keys
+      const isDangerousKey = (key: string) => 
+        key === "__proto__" || key === "constructor" || key === "prototype";
       
       // Validate all keys upfront
-      for (const key of keys) {
-        if (dangerousKeys.has(key)) {
-          console.error("Attempted prototype pollution via path:", path);
-          return prev;
-        }
+      if (keys.some(isDangerousKey)) {
+        console.error("Attempted prototype pollution via path:", path);
+        return prev;
       }
       
-      // Navigate to the parent object, checking each key as we go
-      let current: Record<string, unknown> = newSettings;
+      // Navigate to the parent object using a safe approach
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let current: any = newSettings;
       for (let i = 0; i < keys.length - 1; i++) {
         const key = keys[i];
-        // Double-check each key for safety
-        if (dangerousKeys.has(key)) {
+        // Ensure we only traverse own properties
+        if (!Object.prototype.hasOwnProperty.call(current, key)) {
+          current[key] = {};
+        }
+        const next = current[key];
+        // Only traverse plain objects
+        if (typeof next !== "object" || next === null || Array.isArray(next)) {
           return prev;
         }
-        current = current[key] as Record<string, unknown>;
+        current = next;
       }
       
-      // Set the value on the final key (also validated above)
+      // Set the value using safe assignment
       const finalKey = keys[keys.length - 1];
-      if (!dangerousKeys.has(finalKey)) {
-        current[finalKey] = value;
-      }
+      Object.defineProperty(current, finalKey, {
+        value: value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
 
       return newSettings;
     });

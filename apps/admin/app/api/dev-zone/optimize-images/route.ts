@@ -476,7 +476,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error",
         });
-        console.error(`❌ Failed to optimize ${img.filename}:`, error);
+        console.error("❌ Failed to optimize", img.filename, ":", error);
       }
     }
 

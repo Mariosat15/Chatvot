@@ -853,7 +853,7 @@ export async function finalizeChallenge(challengeId: string) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
-    console.error(`Error finalizing challenge ${challengeId}:`, error);
+    console.error("Error finalizing challenge", challengeId, ":", error);
     throw error;
   } finally {
     // End session if it hasn't been ended yet (for error cases)

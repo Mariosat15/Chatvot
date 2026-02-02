@@ -320,8 +320,7 @@ export async function POST(req: NextRequest) {
       const ourTransactionId = clientUniqueId.replace("txn_", "");
       transaction = await WalletTransaction.findById(ourTransactionId);
       console.log(
-        `Found transaction by ID: ${ourTransactionId}`,
-        !!transaction,
+        "Found transaction by ID:", ourTransactionId, !!transaction
       );
     }
 

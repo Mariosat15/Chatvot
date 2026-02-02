@@ -531,18 +531,17 @@ export async function POST(request: Request) {
 
             if (isConflict) {
               console.log(
-                `⏭️ ${indexName} on ${collectionName}: equivalent index already exists`,
+                "⏭️", indexName, "on", collectionName, ": equivalent index already exists"
               );
             } else {
               console.error(
-                `❌ Failed to create index ${indexName} on ${collectionName}:`,
-                indexError,
+                "❌ Failed to create index", indexName, "on", collectionName, ":", indexError
               );
             }
           }
         }
       } catch (collError) {
-        console.error(`Error processing ${collectionName}:`, collError);
+        console.error("Error processing", collectionName, ":", collError);
       }
     }
 

@@ -130,7 +130,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    console.log(`✅ Updated user ${userId}:`, updateData);
+    console.log("✅ Updated user", userId, ":", updateData);
 
     // Log audit action
     try {

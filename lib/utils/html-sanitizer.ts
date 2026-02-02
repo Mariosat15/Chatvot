@@ -189,20 +189,10 @@ export function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
   
   // Use DOMPurify to safely strip all HTML tags
-  let text = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  const text = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
   
-  // Decode common HTML entities that remain after stripping
-  text = text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/")
-    .replace(/\s+/g, " ")
-    .trim();
-  
-  return text;
+  // DOMPurify already handles entity decoding properly when stripping tags
+  // Just normalize whitespace - don't do additional entity replacement to avoid
+  // double-decoding issues (e.g., &amp;amp; becoming & then being re-interpreted)
+  return text.replace(/\s+/g, " ").trim();
 }

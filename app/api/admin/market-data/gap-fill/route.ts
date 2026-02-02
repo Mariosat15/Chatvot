@@ -396,8 +396,7 @@ export async function POST(request: NextRequest) {
               }
             } catch (err) {
               console.error(
-                `❌ [Gap Fill] ${sym} ${tf} trailing gap error:`,
-                err,
+                "❌ [Gap Fill]", sym, tf, "trailing gap error:", err
               );
             }
           }
