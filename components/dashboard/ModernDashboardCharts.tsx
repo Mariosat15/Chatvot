@@ -801,7 +801,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
                 gap: "4px",
               }}
             >
-              <GameIcon name="gems" size={20} />
+              <span className="text-yellow-400">{settings?.credits.symbol || "⚡"}</span>
               <span>{data.overview.totalPrizesWon.toLocaleString()}</span>
             </span>
           }
