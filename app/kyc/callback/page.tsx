@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { CheckCircle, XCircle, Clock, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type VerificationStatus = "loading" | "approved" | "pending" | "declined" | "error";
 
-export default function KYCCallbackPage() {
-  const searchParams = useSearchParams();
+function KYCCallbackContent() {
   const [status, setStatus] = useState<VerificationStatus>("loading");
   const [countdown, setCountdown] = useState(5);
 
@@ -191,5 +189,35 @@ export default function KYCCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-2xl p-8 text-center shadow-2xl">
+          <div className="w-20 h-20 mx-auto mb-6 bg-blue-500/20 rounded-full flex items-center justify-center">
+            <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            Loading...
+          </h1>
+          <p className="text-gray-400">
+            Please wait...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main page component wrapped in Suspense
+export default function KYCCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <KYCCallbackContent />
+    </Suspense>
   );
 }
