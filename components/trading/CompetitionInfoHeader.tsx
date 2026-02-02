@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { GameIcon } from "@/components/ui/GameIcon";
 
 interface CompetitionInfoHeaderProps {
   endTime: Date;
@@ -15,6 +17,7 @@ export function CompetitionInfoHeader({
   prizePool,
 }: CompetitionInfoHeaderProps) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const { settings } = useAppSettings();
 
   useEffect(() => {
     const calculateTimeRemaining = () => {
@@ -59,7 +62,7 @@ export function CompetitionInfoHeader({
       <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-primary/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-primary/20 min-w-[180px]">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
         <div className="relative flex items-center gap-3">
-          <div className="text-3xl">⏱️</div>
+          <GameIcon name="timer" size={32} />
           <div>
             <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Time Remaining
@@ -82,7 +85,7 @@ export function CompetitionInfoHeader({
       <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-blue-500/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-blue-500/20 min-w-[180px]">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
         <div className="relative flex items-center gap-3">
-          <div className="text-3xl">👥</div>
+          <GameIcon name="war" size={32} />
           <div>
             <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Participants
@@ -98,13 +101,14 @@ export function CompetitionInfoHeader({
       <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-500/5 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-amber-500/30 hover:border-amber-500/50 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-amber-500/20 min-w-[200px]">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
         <div className="relative flex items-center gap-3">
-          <div className="text-3xl">🏆</div>
+          <GameIcon name="trophy" size={32} />
           <div>
             <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Prize Pool
             </p>
             <p className="text-lg md:text-xl font-bold text-amber-400 tabular-nums">
-              {prizePool.toLocaleString()} Credits
+              <span className="mr-1">{settings?.credits?.symbol || "⚡"}</span>
+              {prizePool.toLocaleString()} {settings?.credits?.name || "Credits"}
             </p>
           </div>
         </div>

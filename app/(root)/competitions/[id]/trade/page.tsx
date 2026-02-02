@@ -30,7 +30,8 @@ import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMoni
 import ParticipantStatusMonitor from "@/components/trading/ParticipantStatusMonitor";
 import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
 import TradingPageContent from "@/components/trading/TradingPageContent";
-import { ArrowLeft, Skull, Ban, History } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -238,7 +239,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                     <div className="bg-gradient-to-r from-purple-500/20 via-purple-500/10 to-purple-500/20 border-b border-purple-500/30">
                       <div className="container-custom py-3">
                         <div className="flex items-center justify-center gap-3 text-purple-300">
-                          <span className="text-xl">📊</span>
+                          <GameIcon name="trophy" size={24} />
                           <span className="font-medium">
                             Viewing completed competition results — Trading is
                             disabled
@@ -302,12 +303,12 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                   >
                                     {participantStatus === "liquidated" ? (
                                       <>
-                                        <Skull className="size-3.5" />
+                                        <GameIcon name="skull" size={14} />
                                         Liquidated - Trading Disabled
                                       </>
                                     ) : (
                                       <>
-                                        <Ban className="size-3.5" />
+                                        <GameIcon name="warning" size={14} />
                                         Disqualified - Trading Disabled
                                       </>
                                     )}
@@ -528,8 +529,8 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                           /* View-Only Mode - Show Summary Instead of Trading Interface */
                           <div className="bg-gradient-to-br from-purple-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-purple-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
                             <div className="flex items-center justify-between mb-5">
-                              <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight">
-                                📊 Competition Ended
+                              <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
+                                <GameIcon name="trophy" size={24} /> Competition Ended
                               </h2>
                               <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-bold rounded">
                                 COMPLETED
@@ -589,12 +590,12 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                               <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
                                 {participantStatus === "liquidated" ? (
                                   <>
-                                    <Skull className="h-6 w-6 text-red-400" />
+                                    <GameIcon name="skull" size={24} />
                                     Account Liquidated
                                   </>
                                 ) : (
                                   <>
-                                    <Ban className="h-6 w-6 text-orange-400" />
+                                    <GameIcon name="warning" size={24} />
                                     Disqualified
                                   </>
                                 )}
@@ -681,7 +682,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                   className="block"
                                 >
                                   <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold gap-2">
-                                    <History className="h-4 w-4" />
+                                    <GameIcon name="trophy" size={16} />
                                     Back to Competition
                                   </Button>
                                 </Link>
