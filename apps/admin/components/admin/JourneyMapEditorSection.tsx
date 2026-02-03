@@ -1082,342 +1082,26 @@ export default function JourneyMapEditorSection() {
     </div>
   );
 
-  // Render milestone editor dialog
+  // Render milestone editor - fullscreen overlay
   const renderMilestoneEditor = () => {
-    if (!selectedMilestone) return null;
+    if (!selectedMilestone || !editMilestoneOpen) return null;
 
     return (
-      <Dialog open={editMilestoneOpen} onOpenChange={setEditMilestoneOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {milestones.find(m => m.id === selectedMilestone.id) ? "Edit" : "Create"} Milestone
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>ID (unique)</Label>
-                <Input
-                  value={selectedMilestone.id}
-                  onChange={e => setSelectedMilestone({ ...selectedMilestone, id: e.target.value })}
-                  placeholder="e.g., first_trade"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={selectedMilestone.name}
-                  onChange={e => setSelectedMilestone({ ...selectedMilestone, name: e.target.value })}
-                  placeholder="First Trade"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={selectedMilestone.description}
-                onChange={e => setSelectedMilestone({ ...selectedMilestone, description: e.target.value })}
-                placeholder="Execute your first trade..."
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Zone</Label>
-                <Select
-                  value={selectedMilestone.zoneId}
-                  onValueChange={value => setSelectedMilestone({ ...selectedMilestone, zoneId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mapConfig?.zones.map(zone => (
-                      <SelectItem key={zone.id} value={zone.id}>
-                        {zone.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Node Type</Label>
-                <Select
-                  value={selectedMilestone.nodeType}
-                  onValueChange={value => setSelectedMilestone({ ...selectedMilestone, nodeType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(NODE_TYPE_CONFIG).map(([key, config]) => (
-                      <SelectItem key={key} value={key}>
-                        {config.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Size</Label>
-                <Select
-                  value={selectedMilestone.size}
-                  onValueChange={value => setSelectedMilestone({ ...selectedMilestone, size: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="small">Small</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="large">Large</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Position */}
-            <div className="grid grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label>Position X</Label>
-                <Input
-                  type="number"
-                  value={selectedMilestone.position.x}
-                  onChange={e => setSelectedMilestone({
-                    ...selectedMilestone,
-                    position: { ...selectedMilestone.position, x: parseInt(e.target.value) || 0 }
-                  })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Position Y</Label>
-                <Input
-                  type="number"
-                  value={selectedMilestone.position.y}
-                  onChange={e => setSelectedMilestone({
-                    ...selectedMilestone,
-                    position: { ...selectedMilestone.position, y: parseInt(e.target.value) || 0 }
-                  })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input
-                  type="color"
-                  value={selectedMilestone.color}
-                  onChange={e => setSelectedMilestone({ ...selectedMilestone, color: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Order</Label>
-                <Input
-                  type="number"
-                  value={selectedMilestone.order}
-                  onChange={e => setSelectedMilestone({
-                    ...selectedMilestone,
-                    order: parseInt(e.target.value) || 0
-                  })}
-                />
-              </div>
-            </div>
-
-            {/* Icon */}
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <div className="flex items-center gap-4">
-                <GameIcon name={selectedMilestone.icon as GameIconName} size={40} />
-                <GameIconPicker
-                  value={selectedMilestone.icon as GameIconName}
-                  onChange={(icon) => setSelectedMilestone({ ...selectedMilestone, icon })}
-                />
-              </div>
-            </div>
-
-            {/* Completion Condition */}
-            <div className="space-y-2 p-4 border rounded-lg">
-              <Label className="text-base font-semibold">Completion Condition</Label>
-              <div className="grid grid-cols-3 gap-4 mt-2">
-                <div className="space-y-2">
-                  <Label className="text-sm">Type</Label>
-                  <Select
-                    value={selectedMilestone.completeCondition.type}
-                    onValueChange={value => setSelectedMilestone({
-                      ...selectedMilestone,
-                      completeCondition: { ...selectedMilestone.completeCondition, type: value }
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONDITION_TYPES.map(ct => (
-                        <SelectItem key={ct.value} value={ct.value}>
-                          {ct.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Value</Label>
-                  <Input
-                    type="number"
-                    value={selectedMilestone.completeCondition.value || ""}
-                    onChange={e => setSelectedMilestone({
-                      ...selectedMilestone,
-                      completeCondition: {
-                        ...selectedMilestone.completeCondition,
-                        value: e.target.value ? parseInt(e.target.value) : undefined
-                      }
-                    })}
-                    placeholder="e.g., 10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Comparison</Label>
-                  <Select
-                    value={selectedMilestone.completeCondition.comparison || "gte"}
-                    onValueChange={value => setSelectedMilestone({
-                      ...selectedMilestone,
-                      completeCondition: { ...selectedMilestone.completeCondition, comparison: value }
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gte">≥ Greater or Equal</SelectItem>
-                      <SelectItem value="gt">&gt; Greater</SelectItem>
-                      <SelectItem value="eq">= Equal</SelectItem>
-                      <SelectItem value="lte">≤ Less or Equal</SelectItem>
-                      <SelectItem value="lt">&lt; Less</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Rewards */}
-            <div className="space-y-2 p-4 border rounded-lg">
-              <Label className="text-base font-semibold">Rewards</Label>
-              <div className="grid grid-cols-3 gap-4 mt-2">
-                <div className="space-y-2">
-                  <Label className="text-sm">XP</Label>
-                  <Input
-                    type="number"
-                    value={selectedMilestone.rewards.xp}
-                    onChange={e => setSelectedMilestone({
-                      ...selectedMilestone,
-                      rewards: { ...selectedMilestone.rewards, xp: parseInt(e.target.value) || 0 }
-                    })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Badge ID (optional)</Label>
-                  <Input
-                    value={selectedMilestone.rewards.badgeId || ""}
-                    onChange={e => setSelectedMilestone({
-                      ...selectedMilestone,
-                      rewards: { ...selectedMilestone.rewards, badgeId: e.target.value || undefined }
-                    })}
-                    placeholder="e.g., trade_first"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Title (optional)</Label>
-                  <Input
-                    value={selectedMilestone.rewards.title || ""}
-                    onChange={e => setSelectedMilestone({
-                      ...selectedMilestone,
-                      rewards: { ...selectedMilestone.rewards, title: e.target.value || undefined }
-                    })}
-                    placeholder="e.g., First Trader"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Connections */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Connected To (comma-separated IDs)</Label>
-                <Input
-                  value={selectedMilestone.connectedTo.join(", ")}
-                  onChange={e => setSelectedMilestone({
-                    ...selectedMilestone,
-                    connectedTo: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
-                  })}
-                  placeholder="first_trade, first_deposit"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Connected From (comma-separated IDs)</Label>
-                <Input
-                  value={selectedMilestone.connectedFrom.join(", ")}
-                  onChange={e => setSelectedMilestone({
-                    ...selectedMilestone,
-                    connectedFrom: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
-                  })}
-                  placeholder="account_created"
-                />
-              </div>
-            </div>
-
-            {/* Options */}
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={selectedMilestone.isRequired}
-                  onCheckedChange={checked => setSelectedMilestone({
-                    ...selectedMilestone,
-                    isRequired: checked
-                  })}
-                />
-                <Label>Required for progression</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={selectedMilestone.isAutoComplete}
-                  onCheckedChange={checked => setSelectedMilestone({
-                    ...selectedMilestone,
-                    isAutoComplete: checked
-                  })}
-                />
-                <Label>Auto-complete on unlock</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={selectedMilestone.isActive}
-                  onCheckedChange={checked => setSelectedMilestone({
-                    ...selectedMilestone,
-                    isActive: checked
-                  })}
-                />
-                <Label>Active</Label>
-              </div>
-            </div>
-
-            {/* Texts */}
-            <div className="space-y-2">
-              <Label>Celebration Text (shown on complete)</Label>
-              <Textarea
-                value={selectedMilestone.celebrationText || ""}
-                onChange={e => setSelectedMilestone({
-                  ...selectedMilestone,
-                  celebrationText: e.target.value
-                })}
-                placeholder="Congratulations! You've completed this milestone!"
-              />
+      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-700">
+          <div className="flex items-center gap-4">
+            <GameIcon name={selectedMilestone.icon as GameIconName} size={40} />
+            <div>
+              <h2 className="text-xl font-bold">
+                {milestones.find(m => m.id === selectedMilestone.id) ? "Edit" : "Create"} Milestone
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {selectedMilestone.name || "New Milestone"}
+              </p>
             </div>
           </div>
-
-          <DialogFooter>
+          <div className="flex items-center gap-3">
             <Button variant="outline" onClick={() => setEditMilestoneOpen(false)}>
               Cancel
             </Button>
@@ -1425,9 +1109,450 @@ export default function JourneyMapEditorSection() {
               <Save className="h-4 w-4 mr-2" />
               Save Milestone
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+
+        {/* Main Content - Two Columns */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Column - Form Fields */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Basic Info */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-500" />
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>ID (unique)</Label>
+                    <Input
+                      value={selectedMilestone.id}
+                      onChange={e => setSelectedMilestone({ ...selectedMilestone, id: e.target.value })}
+                      placeholder="e.g., first_trade"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input
+                      value={selectedMilestone.name}
+                      onChange={e => setSelectedMilestone({ ...selectedMilestone, name: e.target.value })}
+                      placeholder="First Trade"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={selectedMilestone.description}
+                    onChange={e => setSelectedMilestone({ ...selectedMilestone, description: e.target.value })}
+                    placeholder="Execute your first trade..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Appearance */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Palette className="h-5 w-5 text-purple-500" />
+                  Appearance
+                </h3>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Zone</Label>
+                    <Select
+                      value={selectedMilestone.zoneId}
+                      onValueChange={value => setSelectedMilestone({ ...selectedMilestone, zoneId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mapConfig?.zones.map(zone => (
+                          <SelectItem key={zone.id} value={zone.id}>
+                            <span className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: zone.color }} />
+                              {zone.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Node Type</Label>
+                    <Select
+                      value={selectedMilestone.nodeType}
+                      onValueChange={value => setSelectedMilestone({ ...selectedMilestone, nodeType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(NODE_TYPE_CONFIG).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            {config.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Size</Label>
+                    <Select
+                      value={selectedMilestone.size}
+                      onValueChange={value => setSelectedMilestone({ ...selectedMilestone, size: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">Small</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="large">Large</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Color</Label>
+                    <Input
+                      type="color"
+                      value={selectedMilestone.color}
+                      onChange={e => setSelectedMilestone({ ...selectedMilestone, color: e.target.value })}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Position */}
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div className="space-y-2">
+                    <Label>Position X</Label>
+                    <Input
+                      type="number"
+                      value={selectedMilestone.position.x}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        position: { ...selectedMilestone.position, x: parseInt(e.target.value) || 0 }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Position Y</Label>
+                    <Input
+                      type="number"
+                      value={selectedMilestone.position.y}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        position: { ...selectedMilestone.position, y: parseInt(e.target.value) || 0 }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Order</Label>
+                    <Input
+                      type="number"
+                      value={selectedMilestone.order}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        order: parseInt(e.target.value) || 0
+                      })}
+                    />
+                  </div>
+                </div>
+
+                {/* Icon */}
+                <div className="space-y-2 mt-4">
+                  <Label>Icon</Label>
+                  <GameIconPicker
+                    value={selectedMilestone.icon as GameIconName}
+                    onChange={(icon) => setSelectedMilestone({ ...selectedMilestone, icon })}
+                  />
+                </div>
+              </div>
+
+              {/* Completion Condition */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-green-500" />
+                  Completion Condition
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select
+                      value={selectedMilestone.completeCondition.type}
+                      onValueChange={value => setSelectedMilestone({
+                        ...selectedMilestone,
+                        completeCondition: { ...selectedMilestone.completeCondition, type: value }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONDITION_TYPES.map(ct => (
+                          <SelectItem key={ct.value} value={ct.value}>
+                            {ct.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Value</Label>
+                    <Input
+                      type="number"
+                      value={selectedMilestone.completeCondition.value || ""}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        completeCondition: {
+                          ...selectedMilestone.completeCondition,
+                          value: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      placeholder="e.g., 10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Comparison</Label>
+                    <Select
+                      value={selectedMilestone.completeCondition.comparison || "gte"}
+                      onValueChange={value => setSelectedMilestone({
+                        ...selectedMilestone,
+                        completeCondition: { ...selectedMilestone.completeCondition, comparison: value }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gte">≥ Greater or Equal</SelectItem>
+                        <SelectItem value="gt">&gt; Greater</SelectItem>
+                        <SelectItem value="eq">= Equal</SelectItem>
+                        <SelectItem value="lte">≤ Less or Equal</SelectItem>
+                        <SelectItem value="lt">&lt; Less</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rewards */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-500" />
+                  Rewards
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>XP</Label>
+                    <Input
+                      type="number"
+                      value={selectedMilestone.rewards.xp}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        rewards: { ...selectedMilestone.rewards, xp: parseInt(e.target.value) || 0 }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Badge ID (optional)</Label>
+                    <Input
+                      value={selectedMilestone.rewards.badgeId || ""}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        rewards: { ...selectedMilestone.rewards, badgeId: e.target.value || undefined }
+                      })}
+                      placeholder="e.g., trade_first"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Title (optional)</Label>
+                    <Input
+                      value={selectedMilestone.rewards.title || ""}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        rewards: { ...selectedMilestone.rewards, title: e.target.value || undefined }
+                      })}
+                      placeholder="e.g., First Trader"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Connections */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Link className="h-5 w-5 text-cyan-500" />
+                  Connections
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Connected To (comma-separated IDs)</Label>
+                    <Input
+                      value={selectedMilestone.connectedTo.join(", ")}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        connectedTo: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      })}
+                      placeholder="first_trade, first_deposit"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Connected From (comma-separated IDs)</Label>
+                    <Input
+                      value={selectedMilestone.connectedFrom.join(", ")}
+                      onChange={e => setSelectedMilestone({
+                        ...selectedMilestone,
+                        connectedFrom: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      })}
+                      placeholder="account_created"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Options */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-slate-400" />
+                  Options
+                </h3>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={selectedMilestone.isRequired}
+                      onCheckedChange={checked => setSelectedMilestone({
+                        ...selectedMilestone,
+                        isRequired: checked
+                      })}
+                    />
+                    <Label>Required for progression</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={selectedMilestone.isAutoComplete}
+                      onCheckedChange={checked => setSelectedMilestone({
+                        ...selectedMilestone,
+                        isAutoComplete: checked
+                      })}
+                    />
+                    <Label>Auto-complete on unlock</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={selectedMilestone.isActive}
+                      onCheckedChange={checked => setSelectedMilestone({
+                        ...selectedMilestone,
+                        isActive: checked
+                      })}
+                    />
+                    <Label>Active</Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Celebration Text */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-amber-500" />
+                  Celebration
+                </h3>
+                <div className="space-y-2">
+                  <Label>Celebration Text (shown on complete)</Label>
+                  <Textarea
+                    value={selectedMilestone.celebrationText || ""}
+                    onChange={e => setSelectedMilestone({
+                      ...selectedMilestone,
+                      celebrationText: e.target.value
+                    })}
+                    placeholder="Congratulations! You've completed this milestone!"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Preview */}
+          <div className="w-80 bg-slate-900 border-l border-slate-700 p-4 overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Preview</h3>
+            
+            {/* Milestone Preview Card */}
+            <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: selectedMilestone.color }}
+                >
+                  <GameIcon name={selectedMilestone.icon as GameIconName} size={28} />
+                </div>
+                <div>
+                  <div className="font-semibold">{selectedMilestone.name || "Unnamed"}</div>
+                  <div className="text-sm text-muted-foreground">{selectedMilestone.nodeType}</div>
+                </div>
+              </div>
+              
+              <p className="text-sm text-muted-foreground mb-3">
+                {selectedMilestone.description || "No description"}
+              </p>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Zone:</span>
+                  <span>{mapConfig?.zones.find(z => z.id === selectedMilestone.zoneId)?.name || selectedMilestone.zoneId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Position:</span>
+                  <span>({selectedMilestone.position.x}, {selectedMilestone.position.y})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Order:</span>
+                  <span>#{selectedMilestone.order}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">XP Reward:</span>
+                  <span className="text-yellow-500 font-semibold">+{selectedMilestone.rewards.xp} XP</span>
+                </div>
+                {selectedMilestone.rewards.badgeId && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Badge:</span>
+                    <span className="text-purple-400">{selectedMilestone.rewards.badgeId}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-3 pt-3 border-t border-slate-600">
+                <div className="text-sm text-muted-foreground mb-1">Condition:</div>
+                <div className="text-sm">
+                  {selectedMilestone.completeCondition.type} {selectedMilestone.completeCondition.comparison || "≥"} {selectedMilestone.completeCondition.value || 0}
+                </div>
+              </div>
+            </div>
+            
+            {/* Quick Stats */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant={selectedMilestone.isActive ? "default" : "secondary"}>
+                  {selectedMilestone.isActive ? "Active" : "Inactive"}
+                </Badge>
+                {selectedMilestone.isRequired && (
+                  <Badge variant="outline">Required</Badge>
+                )}
+                {selectedMilestone.isAutoComplete && (
+                  <Badge variant="outline">Auto</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
