@@ -179,8 +179,9 @@ export default function XPProgressBar({
                       <p className="text-sm font-semibold text-white">
                         Next Title:
                       </p>
-                      <span className={`text-sm font-bold ${nextLevel.color}`}>
-                        {nextLevel.icon} {nextLevel.title}
+                      <span className={`text-sm font-bold ${nextLevel.color} flex items-center gap-1`}>
+                        <GameIcon name={nextLevel.icon as GameIconName} size={18} />
+                        {nextLevel.title}
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">

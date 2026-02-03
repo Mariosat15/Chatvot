@@ -150,7 +150,7 @@ export default function ProfileHeader({
                   style={{ backgroundColor: levelData.currentColor }}
                 >
                   <span className="text-white drop-shadow">
-                    {levelData.currentIcon}
+                    {levelData.currentLevel}
                   </span>
                 </div>
 
@@ -179,7 +179,7 @@ export default function ProfileHeader({
                     border: `1px solid ${levelData.currentColor}40`,
                   }}
                 >
-                  <span>{levelData.currentIcon}</span>
+                  <GameIcon name={levelData.currentIcon as import("@/lib/constants/game-icons").GameIconName} size={16} />
                   <span>{levelData.currentTitle}</span>
                   <span className="text-xs opacity-70">
                     Lv.{levelData.currentLevel}
