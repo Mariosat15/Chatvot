@@ -506,14 +506,20 @@ export default function JourneyMapRenderer({
             draggable={false}
           />
 
-          {/* Path Connections */}
-          {milestones.map(milestone =>
-            milestone.connectedTo.map(targetId => {
-              const target = milestones.find(m => m.id === targetId);
-              if (!target) return null;
-              return renderPath(milestone, target);
-            })
-          )}
+          {/* Path Connections - SEQUENTIAL by order */}
+          {(() => {
+            // Sort milestones by order to draw sequential paths
+            const sortedMilestones = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
+            const paths: React.ReactNode[] = [];
+            
+            for (let i = 0; i < sortedMilestones.length - 1; i++) {
+              const from = sortedMilestones[i];
+              const to = sortedMilestones[i + 1];
+              paths.push(renderPath(from, to));
+            }
+            
+            return paths;
+          })()}
 
           {/* Milestone Nodes */}
           {milestones.map(milestone => {
