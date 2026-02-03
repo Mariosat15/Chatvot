@@ -21,7 +21,7 @@ export const DEFAULT_ZONES: IJourneyZone[] = [
     order: 1,
     position: { x: 120, y: 600 },
     color: "#22C55E",
-    icon: "ship",
+    icon: "anchor",
     isUnlockable: false,
   },
   {
@@ -31,7 +31,7 @@ export const DEFAULT_ZONES: IJourneyZone[] = [
     order: 2,
     position: { x: 350, y: 450 },
     color: "#3B82F6",
-    icon: "guideBook",
+    icon: "compass",
     isUnlockable: true,
     unlockCondition: {
       type: "milestone_complete",
@@ -45,7 +45,7 @@ export const DEFAULT_ZONES: IJourneyZone[] = [
     order: 3,
     position: { x: 580, y: 350 },
     color: "#8B5CF6",
-    icon: "maps",
+    icon: "pirateMap",
     isUnlockable: true,
     unlockCondition: {
       type: "milestone_complete",
@@ -59,7 +59,7 @@ export const DEFAULT_ZONES: IJourneyZone[] = [
     order: 4,
     position: { x: 820, y: 320 },
     color: "#F59E0B",
-    icon: "trophy",
+    icon: "pirateSword",
     isUnlockable: true,
     unlockCondition: {
       type: "milestone_complete",
@@ -73,7 +73,7 @@ export const DEFAULT_ZONES: IJourneyZone[] = [
     order: 5,
     position: { x: 1050, y: 180 },
     color: "#EF4444",
-    icon: "crown",
+    icon: "skull",
     isUnlockable: true,
     unlockCondition: {
       type: "milestone_complete",
@@ -125,7 +125,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "starting_dock",
     position: { x: 85, y: 680 }, // Near the ship
     nodeType: "start",
-    icon: "ship",
+    icon: "pirateShip",
     color: "#22C55E",
     size: "large",
     completeCondition: { type: "account_created" },
@@ -145,7 +145,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "starting_dock",
     position: { x: 165, y: 590 }, // Dock island
     nodeType: "milestone",
-    icon: "moneyDeposit",
+    icon: "pirateCoins",
     color: "#22C55E",
     size: "medium",
     unlockCondition: { type: "account_created" },
@@ -167,7 +167,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "starting_dock",
     position: { x: 260, y: 510 }, // Island with trees
     nodeType: "milestone",
-    icon: "trade",
+    icon: "compass",
     color: "#22C55E",
     size: "medium",
     unlockCondition: { type: "first_deposit" },
@@ -235,7 +235,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "calm_waters",
     position: { x: 430, y: 490 }, // Island with waterfall
     nodeType: "milestone",
-    icon: "target",
+    icon: "anchor",
     color: "#3B82F6",
     size: "medium",
     unlockCondition: { type: "total_trades", value: 2, comparison: "gte" },
@@ -257,7 +257,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "calm_waters",
     position: { x: 520, y: 410 }, // Island with cave
     nodeType: "milestone",
-    icon: "profit",
+    icon: "treasure",
     color: "#22C55E",
     size: "medium",
     unlockCondition: { type: "total_trades", value: 5, comparison: "gte" },
@@ -279,7 +279,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "calm_waters",
     position: { x: 520, y: 570 }, // Rocky island
     nodeType: "lesson",
-    icon: "guideBook",
+    icon: "barrel",
     color: "#F59E0B",
     size: "small",
     unlockCondition: { type: "total_trades", value: 5, comparison: "gte" },
@@ -301,7 +301,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "calm_waters",
     position: { x: 610, y: 490 }, // Larger middle island
     nodeType: "checkpoint",
-    icon: "starBadge",
+    icon: "pirateHat",
     color: "#3B82F6",
     size: "medium",
     unlockCondition: { type: "winning_trades", value: 1, comparison: "gte" },
@@ -327,7 +327,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "trading_paths",
     position: { x: 560, y: 270 }, // Island with red gate
     nodeType: "branch",
-    icon: "maps",
+    icon: "pirateMap",
     color: "#8B5CF6",
     size: "large",
     unlockCondition: { type: "total_trades", value: 10, comparison: "gte" },
@@ -349,7 +349,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "trading_paths",
     position: { x: 650, y: 200 }, // Upper island
     nodeType: "milestone",
-    icon: "lightningSpell",
+    icon: "pirateCannon",
     color: "#F59E0B",
     size: "medium",
     unlockCondition: { type: "total_trades", value: 15, comparison: "gte" },
@@ -415,7 +415,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "trading_paths",
     position: { x: 740, y: 200 }, // Upper right island
     nodeType: "checkpoint",
-    icon: "archer",
+    icon: "piratePistol",
     color: "#F59E0B",
     size: "small",
     unlockCondition: { type: "total_trades", value: 25, comparison: "gte" },
@@ -481,7 +481,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "competition_arena",
     position: { x: 830, y: 290 }, // Arena island
     nodeType: "milestone",
-    icon: "trophy",
+    icon: "pirateSword",
     color: "#F59E0B",
     size: "large",
     unlockCondition: { type: "total_trades", value: 30, comparison: "gte" },
@@ -503,7 +503,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "competition_arena",
     position: { x: 900, y: 210 }, // Upper arena island
     nodeType: "milestone",
-    icon: "trophyStar",
+    icon: "pirateFlag",
     color: "#F59E0B",
     size: "medium",
     unlockCondition: { type: "competitions_entered", value: 1, comparison: "gte" },
@@ -525,7 +525,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "competition_arena",
     position: { x: 900, y: 360 }, // Lower arena island
     nodeType: "checkpoint",
-    icon: "goldMedal",
+    icon: "pirateHook",
     color: "#F59E0B",
     size: "large",
     unlockCondition: { type: "competitions_entered", value: 1, comparison: "gte" },
@@ -551,7 +551,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "mastery_islands",
     position: { x: 1000, y: 200 }, // Near skull volcano
     nodeType: "legendary",
-    icon: "champion",
+    icon: "parrot",
     color: "#EF4444",
     size: "large",
     unlockCondition: { type: "podium_finishes", value: 1, comparison: "gte" },
@@ -595,7 +595,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "mastery_islands",
     position: { x: 1100, y: 150 }, // Skull volcano peak
     nodeType: "legendary",
-    icon: "crown",
+    icon: "skull",
     color: "#EF4444",
     size: "large",
     unlockCondition: { type: "first_place_finishes", value: 1, comparison: "gte" },
@@ -621,7 +621,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     zoneId: "competition_arena",
     position: { x: 1050, y: 580 }, // Treasure chest location
     nodeType: "legendary",
-    icon: "treasureChest",
+    icon: "chest",
     color: "#F59E0B",
     size: "large",
     unlockCondition: { type: "total_trades", value: 50, comparison: "gte" },

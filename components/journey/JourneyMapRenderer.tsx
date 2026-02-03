@@ -527,40 +527,98 @@ export default function JourneyMapRenderer({
             const style = getNodeStyle(status, milestone.size);
             const nodeSize = style.width as number;
             
-            // Map icon names to emojis for reliable display
-            const getIconEmoji = (): string => {
+            // Map icon names to actual game-icons image files (pirate/adventure themed)
+            const getIconImage = (): string => {
               const iconMap: Record<string, string> = {
-                ship: "⛵",
-                moneyDeposit: "💰",
-                trade: "📈",
-                buy: "📈",
-                sell: "📉",
-                target: "🎯",
-                profit: "💎",
-                guideBook: "📖",
-                starBadge: "⭐",
-                maps: "🗺️",
-                lightningSpell: "⚡",
-                longTermInvestment: "💹",
-                shield1: "🛡️",
-                archer: "🏹",
-                star1: "⭐",
-                magicShield3D: "🛡️",
-                trophy: "🏆",
-                trophyStar: "🏆",
-                goldMedal: "🥇",
-                champion: "👑",
-                fireSpell: "🔥",
-                crown: "👑",
-                treasureChest: "📦",
-                // Additional common icons
-                flag: "🚩",
-                sword: "⚔️",
-                gems: "💎",
-                victory: "🏆",
-                lord: "👑",
+                // Pirate themed icons
+                ship: "Pirate Ship.png",
+                pirateShip: "Pirate Ship.png",
+                anchor: "Anchor.png",
+                compass: "Compass.png",
+                map: "Pirate Map.png",
+                pirateMap: "Pirate Map.png",
+                maps: "Pirate Map.png",
+                treasure: "treasure.png",
+                treasureChest: "chest 1.png",
+                chest: "chest 1.png",
+                pirateCoins: "Pirate Coins.png",
+                pirateFlag: "Pirate Flag.png",
+                flag: "Pirate Flag.png",
+                pirateSword: "Pirate Sword.png",
+                pirateHat: "Pirate Hat.png",
+                pirateHook: "Pirate Hook.png",
+                pirateCannon: "Pirate Cannon.png",
+                cannon: "Pirate Cannon.png",
+                piratePistol: "Pirate Pistol.png",
+                parrot: "Parrot.png",
+                skull: "skull.png",
+                barrel: "Barrel.png",
+                island: "Island Rock.png",
+                eyePatch: "Eye Patch.png",
+                
+                // Finance/Trading icons
+                moneyDeposit: "money deposite.png",
+                deposit: "money deposite.png",
+                trade: "2. trade.png",
+                buy: "2. trade.png",
+                sell: "stock down.png",
+                profit: "3. profit.png",
+                coin: "3. Coin.png",
+                coins: "Pirate Coins.png",
+                gems: "4. Gems.png",
+                target: "target.png",
+                portfolio: "1. invest portfolio.png",
+                invest: "Long Term Investment.png",
+                longTermInvestment: "Long Term Investment.png",
+                balance: "money balance.png",
+                
+                // Achievement/Trophy icons
+                trophy: "1. TROPHY.png",
+                trophyStar: "2. STAR TROPHY.png",
+                goldMedal: "3. GOLD MEDAL.png",
+                starBadge: "14. STAR BADGE.png",
+                shield: "5. SHIELD AWARD.png",
+                shield1: "shield 1.png",
+                champion: "11. CHAMPION AWARD.png",
+                victory: "20. VICTORY AWARD.png",
+                crown: "16. Crown.png",
+                star1: "star 1.png",
+                star: "star 1.png",
+                medal: "medal 1.png",
+                reward: "reward 1.png",
+                
+                // Game/RPG icons
+                guideBook: "20. GuideBook.png",
+                sword: "sword.png",
+                archer: "11. Archer.png",
+                axe: "10. Axe.png",
+                bomb: "12. Bomb.png",
+                timer: "13. Timer.png",
+                key: "15. Key.png",
+                banner: "18. Banner.png",
+                helmet: "helmet 1.png",
+                armor: "armor 1.png",
+                hammer: "hammer 1.png",
+                
+                // Spell/Magic icons
+                lightningSpell: "lightning speel.png",
+                fireSpell: "fire spell.png",
+                spell: "1. Spell Brown.png",
+                magicShield3D: "Magic Shiled 3D.png",
+                healthPotion: "healt potion.png",
+                energyPotion: "energi potion.png",
+                
+                // Risk/Finance themed
+                riskWarning: "1. Risk Warning.png",
+                riskManagement: "2. Risk Management.png",
+                riskControl: "7. Risk Control.png",
+                
+                // Default fallback
+                lord: "8. Lord.png",
+                rookie: "7. Rookie.png",
+                war: "6. War.png",
               };
-              return iconMap[milestone.icon] || "🏝️";
+              return `/game-icons/${iconMap[milestone.icon] || "Pirate Ship.png"}`;
             };
             
             return (
@@ -585,25 +643,43 @@ export default function JourneyMapRenderer({
                 >
                   {/* Content based on status */}
                   {status === "completed" ? (
-                    // Completed: Show the actual icon (not checkmark)
-                    <span className="text-xl drop-shadow-lg">
-                      {getIconEmoji()}
-                    </span>
+                    // Completed: Show the actual icon image
+                    <div className="relative w-8 h-8 drop-shadow-lg">
+                      <Image
+                        src={getIconImage()}
+                        alt={milestone.name}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    </div>
                   ) : status === "locked" || status === "level_locked" ? (
                     // Locked: Show order number in gray
                     <span className="text-slate-400 text-lg font-bold drop-shadow-md">
                       {milestone.order || "?"}
                     </span>
                   ) : status === "current" ? (
-                    // Current: Show emoji icon with animation
-                    <span className="text-2xl drop-shadow-lg animate-bounce">
-                      {getIconEmoji()}
-                    </span>
+                    // Current: Show icon image with animation
+                    <div className="relative w-10 h-10 drop-shadow-lg animate-bounce">
+                      <Image
+                        src={getIconImage()}
+                        alt={milestone.name}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
-                    // Unlocked/Available: Show emoji icon
-                    <span className="text-xl drop-shadow-md">
-                      {getIconEmoji()}
-                    </span>
+                    // Unlocked/Available: Show icon image
+                    <div className="relative w-8 h-8 drop-shadow-md">
+                      <Image
+                        src={getIconImage()}
+                        alt={milestone.name}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    </div>
                   )}
 
                   {/* Level requirement badge for level_locked */}

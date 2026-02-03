@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import type { Milestone } from "./JourneyMapRenderer";
 
 interface MilestoneDetailModalProps {
@@ -110,39 +111,98 @@ export default function MilestoneDetailModal({
     return formatter ? formatter(condition.value) : condition.type.replace(/_/g, " ");
   };
 
-  // Get emoji icon for the milestone
-  const getIconEmoji = (): string => {
+  // Map icon names to actual game-icons image files (pirate/adventure themed)
+  const getIconImage = (): string => {
     const iconMap: Record<string, string> = {
-      ship: "⛵",
-      moneyDeposit: "💰",
-      trade: "📈",
-      buy: "📈",
-      sell: "📉",
-      target: "🎯",
-      profit: "💎",
-      guideBook: "📖",
-      starBadge: "⭐",
-      maps: "🗺️",
-      lightningSpell: "⚡",
-      longTermInvestment: "💹",
-      shield1: "🛡️",
-      archer: "🏹",
-      star1: "⭐",
-      magicShield3D: "🛡️",
-      trophy: "🏆",
-      trophyStar: "🏆",
-      goldMedal: "🥇",
-      champion: "👑",
-      fireSpell: "🔥",
-      crown: "👑",
-      treasureChest: "📦",
-      flag: "🚩",
-      sword: "⚔️",
-      gems: "💎",
-      victory: "🏆",
-      lord: "👑",
+      // Pirate themed icons
+      ship: "Pirate Ship.png",
+      pirateShip: "Pirate Ship.png",
+      anchor: "Anchor.png",
+      compass: "Compass.png",
+      map: "Pirate Map.png",
+      pirateMap: "Pirate Map.png",
+      maps: "Pirate Map.png",
+      treasure: "treasure.png",
+      treasureChest: "chest 1.png",
+      chest: "chest 1.png",
+      pirateCoins: "Pirate Coins.png",
+      pirateFlag: "Pirate Flag.png",
+      flag: "Pirate Flag.png",
+      pirateSword: "Pirate Sword.png",
+      pirateHat: "Pirate Hat.png",
+      pirateHook: "Pirate Hook.png",
+      pirateCannon: "Pirate Cannon.png",
+      cannon: "Pirate Cannon.png",
+      piratePistol: "Pirate Pistol.png",
+      parrot: "Parrot.png",
+      skull: "skull.png",
+      barrel: "Barrel.png",
+      island: "Island Rock.png",
+      eyePatch: "Eye Patch.png",
+      
+      // Finance/Trading icons
+      moneyDeposit: "money deposite.png",
+      deposit: "money deposite.png",
+      trade: "2. trade.png",
+      buy: "2. trade.png",
+      sell: "stock down.png",
+      profit: "3. profit.png",
+      coin: "3. Coin.png",
+      coins: "Pirate Coins.png",
+      gems: "4. Gems.png",
+      target: "target.png",
+      portfolio: "1. invest portfolio.png",
+      invest: "Long Term Investment.png",
+      longTermInvestment: "Long Term Investment.png",
+      balance: "money balance.png",
+      
+      // Achievement/Trophy icons
+      trophy: "1. TROPHY.png",
+      trophyStar: "2. STAR TROPHY.png",
+      goldMedal: "3. GOLD MEDAL.png",
+      starBadge: "14. STAR BADGE.png",
+      shield: "5. SHIELD AWARD.png",
+      shield1: "shield 1.png",
+      champion: "11. CHAMPION AWARD.png",
+      victory: "20. VICTORY AWARD.png",
+      crown: "16. Crown.png",
+      star1: "star 1.png",
+      star: "star 1.png",
+      medal: "medal 1.png",
+      reward: "reward 1.png",
+      
+      // Game/RPG icons
+      guideBook: "20. GuideBook.png",
+      sword: "sword.png",
+      archer: "11. Archer.png",
+      axe: "10. Axe.png",
+      bomb: "12. Bomb.png",
+      timer: "13. Timer.png",
+      key: "15. Key.png",
+      banner: "18. Banner.png",
+      helmet: "helmet 1.png",
+      armor: "armor 1.png",
+      hammer: "hammer 1.png",
+      
+      // Spell/Magic icons
+      lightningSpell: "lightning speel.png",
+      fireSpell: "fire spell.png",
+      spell: "1. Spell Brown.png",
+      magicShield3D: "Magic Shiled 3D.png",
+      healthPotion: "healt potion.png",
+      energyPotion: "energi potion.png",
+      
+      // Risk/Finance themed
+      riskWarning: "1. Risk Warning.png",
+      riskManagement: "2. Risk Management.png",
+      riskControl: "7. Risk Control.png",
+      
+      // Default fallback
+      lord: "8. Lord.png",
+      rookie: "7. Rookie.png",
+      war: "6. War.png",
     };
-    return iconMap[milestone.icon] || "🏝️";
+    return `/game-icons/${iconMap[milestone.icon] || "Pirate Ship.png"}`;
   };
 
   return (
@@ -174,19 +234,25 @@ export default function MilestoneDetailModal({
             >
               {/* Header with color accent and icon */}
               <div
-                className="h-20 relative flex items-center justify-center"
+                className="h-24 relative flex items-center justify-center"
                 style={{ background: `linear-gradient(135deg, ${milestone.color}40, ${milestone.color}20)` }}
               >
                 <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center border-4 shadow-lg"
+                  className="w-18 h-18 rounded-full flex items-center justify-center border-4 shadow-lg p-2"
                   style={{ 
                     backgroundColor: milestone.color,
                     borderColor: `${milestone.color}80`
                   }}
                 >
-                  <span className="text-3xl drop-shadow-lg">
-                    {getIconEmoji()}
-                  </span>
+                  <div className="relative w-12 h-12 drop-shadow-lg">
+                    <Image
+                      src={getIconImage()}
+                      alt={milestone.name}
+                      fill
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
                 </div>
                 {/* Order number badge */}
                 <div className="absolute top-2 left-2 bg-slate-800/80 text-slate-300 text-xs px-2 py-1 rounded-full">
