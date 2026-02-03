@@ -402,6 +402,15 @@ export default function UserFullDetailPanel({
     search: string;
   }>({
     type: "all",
+
+  // Gamification Sync State
+  const [syncingGamification, setSyncingGamification] = useState(false);
+  const [gamificationStatus, setGamificationStatus] = useState<{
+    level?: number;
+    xp?: number;
+    badges?: number;
+    milestones?: number;
+  } | null>(null);
     status: "all",
     dateFrom: "",
     dateTo: "",
@@ -597,6 +606,7 @@ export default function UserFullDetailPanel({
     if (open && user.id) {
       fetchUserData();
       fetchAssignment();
+      fetchGamificationStatus();
       // Reset edit form
       setEditName(user.name);
       setEditEmail(user.email);
@@ -885,6 +895,64 @@ export default function UserFullDetailPanel({
       console.error("Error resetting KYC:", error);
     } finally {
       setUpdatingKYC(false);
+    }
+  };
+
+  // Gamification Sync - Retroactively award badges/milestones
+  const handleSyncGamification = async () => {
+    setSyncingGamification(true);
+    try {
+      const response = await fetch(`/api/gamification/sync-user`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGamificationStatus({
+          level: data.newLevel,
+          badges: data.badgesAwarded?.length || 0,
+          milestones: data.milestonesCompleted?.length || 0,
+        });
+        
+        const badgeCount = data.badgesAwarded?.length || 0;
+        const milestoneCount = data.milestonesCompleted?.length || 0;
+        
+        if (badgeCount > 0 || milestoneCount > 0) {
+          toast.success(
+            `Synced! ${badgeCount} badges, ${milestoneCount} milestones awarded`
+          );
+        } else {
+          toast.info("User already up to date - no new rewards");
+        }
+        onRefresh?.();
+      } else {
+        toast.error("Failed to sync gamification");
+      }
+    } catch (error) {
+      console.error("Error syncing gamification:", error);
+      toast.error("Error syncing gamification");
+    } finally {
+      setSyncingGamification(false);
+    }
+  };
+
+  // Fetch gamification status
+  const fetchGamificationStatus = async () => {
+    try {
+      const response = await fetch(`/api/gamification/sync-user?userId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGamificationStatus({
+          level: data.level?.currentLevel,
+          xp: data.level?.currentXP,
+          badges: data.badges?.total,
+          milestones: data.journey?.completedMilestones,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching gamification status:", error);
     }
   };
 
@@ -1676,6 +1744,73 @@ export default function UserFullDetailPanel({
                             </p>
                           </div>
                         </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Gamification Card */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader>
+                        <CardTitle className="text-white text-lg flex items-center gap-2">
+                          <Trophy className="h-5 w-5 text-amber-400" />
+                          Gamification
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="grid grid-cols-4 gap-4 flex-1">
+                            <div className="text-center p-3 bg-gray-900/50 rounded-lg">
+                              <p className="text-xs text-gray-400 mb-1">Level</p>
+                              <p className="text-lg font-bold text-amber-400">
+                                {gamificationStatus?.level || "—"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gray-900/50 rounded-lg">
+                              <p className="text-xs text-gray-400 mb-1">XP</p>
+                              <p className="text-lg font-bold text-purple-400">
+                                {gamificationStatus?.xp?.toLocaleString() || "—"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gray-900/50 rounded-lg">
+                              <p className="text-xs text-gray-400 mb-1">Badges</p>
+                              <p className="text-lg font-bold text-blue-400">
+                                {gamificationStatus?.badges || "—"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gray-900/50 rounded-lg">
+                              <p className="text-xs text-gray-400 mb-1">Milestones</p>
+                              <p className="text-lg font-bold text-green-400">
+                                {gamificationStatus?.milestones || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="ml-4 flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={fetchGamificationStatus}
+                              className="text-cyan-400 border-cyan-500/30"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Refresh
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleSyncGamification}
+                              disabled={syncingGamification}
+                              className="bg-amber-600 hover:bg-amber-700 text-white"
+                            >
+                              {syncingGamification ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Trophy className="h-4 w-4 mr-2" />
+                              )}
+                              Sync Rewards
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-3">
+                          Sync awards any missing badges and milestones based on user&apos;s activity (deposits, KYC, trades, etc.)
+                        </p>
                       </CardContent>
                     </Card>
                   </div>
