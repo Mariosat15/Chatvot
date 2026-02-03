@@ -241,11 +241,28 @@ export async function checkConditionMet(
       break;
 
     case "kyc_verified":
-      currentValue = stats.kycVerified ? 1 : 0;
+      // Check actual KYC status from database
+      if (stats.kycVerified !== undefined) {
+        currentValue = stats.kycVerified ? 1 : 0;
+      } else {
+        const User = (await import("@/database/models/user.model")).default;
+        const user = await User.findById(userId).lean();
+        currentValue = (user as any)?.kycVerified || (user as any)?.kycStatus === "verified" ? 1 : 0;
+      }
       break;
 
     case "profile_complete":
-      currentValue = stats.profileComplete ? 1 : 0;
+      // Check if user has filled required profile fields
+      if (stats.profileComplete !== undefined) {
+        currentValue = stats.profileComplete ? 1 : 0;
+      } else {
+        const UserModel = (await import("@/database/models/user.model")).default;
+        const userProfile = await UserModel.findById(userId).lean();
+        const profile = userProfile as any;
+        // Profile is complete if they have name, email, and avatar
+        const isComplete = !!(profile?.name && profile?.email && profile?.image);
+        currentValue = isComplete ? 1 : 0;
+      }
       break;
 
     // ============================================
@@ -271,15 +288,15 @@ export async function checkConditionMet(
       break;
 
     case "trades_today":
-      currentValue = stats.tradesToday || 0;
+      currentValue = stats.tradesToday || stats.maxTradesInOneDay || 0;
       break;
 
     case "trades_this_week":
-      currentValue = stats.tradesThisWeek || 0;
+      currentValue = stats.tradesThisWeek || stats.maxTradesInOneWeek || 0;
       break;
 
     case "trades_this_month":
-      currentValue = stats.tradesThisMonth || 0;
+      currentValue = stats.tradesThisMonth || stats.maxTradesInOneMonth || 0;
       break;
 
     case "consecutive_trading_days":
@@ -287,7 +304,8 @@ export async function checkConditionMet(
       break;
 
     case "different_assets_traded":
-      currentValue = stats.differentAssetsTraded || 0;
+    case "unique_pairs_traded":
+      currentValue = stats.uniquePairsTraded || stats.differentAssetsTraded || 0;
       break;
 
     // ============================================
@@ -317,15 +335,20 @@ export async function checkConditionMet(
       break;
 
     case "best_trade_pnl":
-      currentValue = stats.bestTradePnl || 0;
+    case "best_single_trade":
+      currentValue = stats.bestSingleTrade || stats.bestTradePnl || 0;
       break;
 
     case "average_trade_pnl":
-      currentValue = stats.averageTradePnl || 0;
+    case "average_win":
+      currentValue = stats.averageWin || stats.averageTradePnl || 0;
       break;
 
     case "risk_reward_ratio":
-      currentValue = stats.riskRewardRatio || 0;
+      // Average win / Average loss
+      const avgWin = stats.averageWin || 0;
+      const avgLoss = stats.averageLoss || 1;
+      currentValue = avgLoss > 0 ? avgWin / avgLoss : 0;
       break;
 
     // ============================================
@@ -336,7 +359,7 @@ export async function checkConditionMet(
       break;
 
     case "competitions_completed":
-      currentValue = stats.competitionsCompleted || 0;
+      currentValue = stats.completedCompetitions || stats.competitionsCompleted || 0;
       break;
 
     case "first_place_finishes":
@@ -420,11 +443,30 @@ export async function checkConditionMet(
     // Social & Community
     // ============================================
     case "referrals_made":
-      currentValue = stats.referralsMade || 0;
+      if (stats.referralsMade !== undefined) {
+        currentValue = stats.referralsMade;
+      } else {
+        // Count actual referrals from database
+        const Referral = (await import("@/database/models/referral.model")).default;
+        currentValue = await Referral.countDocuments({ referrerId: userId });
+      }
       break;
 
     case "referrals_active":
-      currentValue = stats.referralsActive || 0;
+      if (stats.referralsActive !== undefined) {
+        currentValue = stats.referralsActive;
+      } else {
+        // Count referrals who have made at least one trade
+        const ReferralActive = (await import("@/database/models/referral.model")).default;
+        const referrals = await ReferralActive.find({ referrerId: userId }).lean();
+        const TradeHistory = (await import("@/database/models/trading/trade-history.model")).default;
+        let activeCount = 0;
+        for (const ref of referrals) {
+          const hasTrades = await TradeHistory.exists({ userId: (ref as any).referredId });
+          if (hasTrades) activeCount++;
+        }
+        currentValue = activeCount;
+      }
       break;
 
     case "friends_added":
@@ -439,11 +481,15 @@ export async function checkConditionMet(
     // Risk Management
     // ============================================
     case "stop_loss_used":
-      currentValue = stats.stopLossUsed || 0;
+    case "always_uses_sl":
+      // alwaysUsesSL is boolean - convert to 1/0
+      currentValue = stats.alwaysUsesSL ? 1 : (stats.stopLossUsed || 0);
       break;
 
     case "take_profit_used":
-      currentValue = stats.takeProfitUsed || 0;
+    case "always_uses_tp":
+      // alwaysUsesTP is boolean - convert to 1/0
+      currentValue = stats.alwaysUsesTP ? 1 : (stats.takeProfitUsed || 0);
       break;
 
     case "max_drawdown_under":
@@ -465,15 +511,21 @@ export async function checkConditionMet(
     // Time-based
     // ============================================
     case "account_age_days":
-      currentValue = stats.accountAgeDays || 0;
+    case "account_age":
+      currentValue = stats.accountAge || stats.accountAgeDays || 0;
       break;
 
     case "active_days":
-      currentValue = stats.activeTradingDays || 0;
+    case "active_trading_days":
+      currentValue = stats.consecutiveTradingDays || stats.activeTradingDays || 0;
       break;
 
     case "login_streak":
-      currentValue = stats.loginStreak || 0;
+      currentValue = stats.loginStreak || stats.consecutiveTradingDays || 0;
+      break;
+
+    case "consecutive_profitable_days":
+      currentValue = stats.consecutiveProfitableDays || 0;
       break;
 
     default:
