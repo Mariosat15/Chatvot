@@ -57,9 +57,9 @@ export async function initializeUserJourney(
 }
 
 /**
- * Quick sync to unlock milestones based on connectedFrom and start nodes ONLY
- * Also auto-completes milestones with always-true conditions (account_created)
- * Does NOT check expensive unlockConditions - only structural unlocks
+ * Quick sync to unlock milestones - SEQUENTIAL PROGRESSION
+ * Only ONE milestone is unlocked at a time (the current one to work on)
+ * Auto-completes milestones with always-true conditions (account_created)
  * This is FAST and safe to run on every page load
  */
 export async function quickSyncUnlocks(
@@ -71,27 +71,50 @@ export async function quickSyncUnlocks(
   const progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) return;
 
-  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true }).lean();
+  // Get all milestones sorted by order for sequential progression
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true })
+    .sort({ order: 1 })
+    .lean();
+  
   const unlockedIds = new Set(progress.unlockedMilestones);
   const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
 
   let hasChanges = false;
 
-  // PHASE 1: Unlock milestones
+  // PHASE 1: Determine what should be unlocked
+  // For sequential progression, only the NEXT milestone after the last completed one should be unlocked
+  
+  // Find the highest order completed milestone
+  let highestCompletedOrder = 0;
   for (const milestone of allMilestones) {
-    if (unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
+    if (completedIds.has(milestone.id)) {
+      highestCompletedOrder = Math.max(highestCompletedOrder, milestone.order || 0);
+    }
+  }
+
+  // The "current" milestone is the first one that:
+  // 1. Is NOT completed
+  // 2. Has order > highestCompletedOrder OR is a start node (if nothing completed yet)
+  // 3. Has a completed prerequisite (connectedFrom)
+  
+  // Clear unlocked list and rebuild with only what should be unlocked
+  const newUnlockedIds = new Set<string>();
+  
+  for (const milestone of allMilestones) {
+    // Skip completed milestones
+    if (completedIds.has(milestone.id)) {
       continue;
     }
 
     let shouldUnlock = false;
 
-    // Method 1: Start nodes with no prerequisites should be unlocked
+    // Start nodes are always unlocked if nothing is completed yet
     if (milestone.nodeType === "start" && 
         (!milestone.connectedFrom || milestone.connectedFrom.length === 0)) {
       shouldUnlock = true;
     }
 
-    // Method 2: Check if any prerequisite (connectedFrom) is completed
+    // Check if any prerequisite (connectedFrom) is completed
     if (!shouldUnlock && milestone.connectedFrom && milestone.connectedFrom.length > 0) {
       const hasCompletedPrereq = milestone.connectedFrom.some(prereqId => 
         completedIds.has(prereqId)
@@ -102,19 +125,26 @@ export async function quickSyncUnlocks(
     }
 
     if (shouldUnlock) {
-      progress.unlockedMilestones.push(milestone.id);
-      unlockedIds.add(milestone.id);
-      hasChanges = true;
+      newUnlockedIds.add(milestone.id);
     }
   }
 
+  // Update unlocked list if changed
+  const currentUnlocked = new Set(progress.unlockedMilestones);
+  const needsUpdate = newUnlockedIds.size !== currentUnlocked.size || 
+    ![...newUnlockedIds].every(id => currentUnlocked.has(id));
+  
+  if (needsUpdate) {
+    progress.unlockedMilestones = [...newUnlockedIds];
+    hasChanges = true;
+  }
+
   // PHASE 2: Auto-complete unlocked milestones with always-true conditions
-  // These conditions don't require stats gathering
   const alwaysTrueConditions = ["account_created"];
   
   for (const milestone of allMilestones) {
     // Skip if not unlocked or already completed
-    if (!unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
+    if (!newUnlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
       continue;
     }
 
@@ -132,6 +162,7 @@ export async function quickSyncUnlocks(
         },
       });
       completedIds.add(milestone.id);
+      newUnlockedIds.delete(milestone.id);
       progress.totalXPFromJourney = (progress.totalXPFromJourney || 0) + (milestone.rewards?.xp || 0);
       progress.totalMilestonesCompleted = (progress.totalMilestonesCompleted || 0) + 1;
       progress.currentMilestone = milestone.id;
@@ -139,14 +170,26 @@ export async function quickSyncUnlocks(
       progress.lastProgressAt = new Date();
       hasChanges = true;
 
-      // Unlock connected milestones
+      // Unlock ONLY the directly connected milestones (next in sequence)
       for (const nextId of (milestone.connectedTo || [])) {
-        if (!unlockedIds.has(nextId)) {
-          progress.unlockedMilestones.push(nextId);
-          unlockedIds.add(nextId);
+        if (!completedIds.has(nextId)) {
+          newUnlockedIds.add(nextId);
         }
       }
     }
+  }
+
+  // Update the unlocked milestones list
+  progress.unlockedMilestones = [...newUnlockedIds];
+
+  // PHASE 3: Determine current milestone (first unlocked by order)
+  const sortedUnlocked = allMilestones
+    .filter(m => newUnlockedIds.has(m.id))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  
+  if (sortedUnlocked.length > 0 && !completedIds.has(sortedUnlocked[0].id)) {
+    progress.currentMilestone = sortedUnlocked[0].id;
+    progress.currentZone = sortedUnlocked[0].zoneId;
   }
 
   if (hasChanges) {

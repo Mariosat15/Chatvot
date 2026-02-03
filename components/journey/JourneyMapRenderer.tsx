@@ -20,6 +20,7 @@ export interface Milestone {
   icon: string;
   color: string;
   size: string;
+  order: number; // Sequential order number
   unlockCondition?: {
     type: string;
     value?: number;
@@ -60,6 +61,13 @@ export interface MapConfig {
   backgroundImage?: string;
 }
 
+// Progress data for each milestone
+export interface MilestoneProgress {
+  milestoneId: string;
+  currentValue: number;
+  targetValue: number;
+}
+
 export interface JourneyMapRendererProps {
   mapConfig: MapConfig | null;
   milestones: Milestone[];
@@ -67,6 +75,7 @@ export interface JourneyMapRendererProps {
   unlockedIds: string[];
   currentMilestone?: string;
   userLevel?: number; // User's current level for unlock condition checking
+  milestoneProgress?: MilestoneProgress[]; // Progress data for milestones
   onMilestoneClick?: (milestone: Milestone) => void;
   className?: string;
 }
@@ -82,6 +91,7 @@ export default function JourneyMapRenderer({
   unlockedIds,
   currentMilestone,
   userLevel = 1,
+  milestoneProgress = [],
   onMilestoneClick,
   className,
 }: JourneyMapRendererProps) {
@@ -135,10 +145,8 @@ export default function JourneyMapRenderer({
     return null;
   };
 
-  // Handle milestone click
+  // Handle milestone click - allow clicking ALL milestones to see details
   const handleMilestoneClick = (milestone: Milestone) => {
-    const status = getMilestoneStatus(milestone.id);
-    if (status === "locked" || status === "level_locked") return;
     setSelectedMilestone(milestone);
     setModalOpen(true);
     onMilestoneClick?.(milestone);
@@ -259,8 +267,8 @@ export default function JourneyMapRenderer({
   // Get node style based on status
   const getNodeStyle = (status: "completed" | "current" | "unlocked" | "locked" | "level_locked", size: string) => {
     // Bigger sizes for better visibility
-    const sizeMap = { small: 40, medium: 50, large: 60 };
-    const nodeSize = sizeMap[size as keyof typeof sizeMap] || 50;
+    const sizeMap = { small: 44, medium: 52, large: 60 };
+    const nodeSize = sizeMap[size as keyof typeof sizeMap] || 52;
     
     const baseStyle = {
       width: nodeSize,
@@ -269,7 +277,7 @@ export default function JourneyMapRenderer({
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      cursor: status === "locked" || status === "level_locked" ? "not-allowed" : "pointer",
+      cursor: "pointer", // All milestones are clickable now
       transition: "all 0.3s ease",
       fontSize: nodeSize * 0.45,
     };
@@ -301,18 +309,18 @@ export default function JourneyMapRenderer({
         // Shows as locked but with purple tint to indicate level requirement
         return {
           ...baseStyle,
-          background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
-          boxShadow: "0 4px 12px rgba(124, 58, 237, 0.4), inset 0 2px 4px rgba(0,0,0,0.3)",
-          border: "4px solid #A78BFA",
-          opacity: 0.7,
+          background: "linear-gradient(135deg, #4C1D95, #3B0764)",
+          boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3), inset 0 2px 4px rgba(0,0,0,0.4)",
+          border: "3px solid #6D28D9",
+          opacity: 0.9,
         };
       case "locked":
         return {
           ...baseStyle,
-          background: "linear-gradient(135deg, #6B7280, #4B5563)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.3)",
-          border: "4px solid #9CA3AF",
-          opacity: 0.85,
+          background: "linear-gradient(135deg, #374151, #1F2937)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.4)",
+          border: "3px solid #4B5563",
+          opacity: 0.95,
         };
     }
   };
@@ -490,14 +498,47 @@ export default function JourneyMapRenderer({
           {milestones.map(milestone => {
             const status = getMilestoneStatus(milestone.id);
             const style = getNodeStyle(status, milestone.size);
+            const nodeSize = style.width as number;
+            
+            // Get the icon image path based on milestone icon
+            const getIconPath = () => {
+              // Map icon names to actual game-icons files
+              const iconMap: Record<string, string> = {
+                ship: "pirate-ship",
+                moneyDeposit: "money-bag",
+                trade: "trade",
+                buy: "arrow-up",
+                sell: "arrow-down",
+                target: "target",
+                profit: "gold-coins",
+                guideBook: "guide-book",
+                starBadge: "star-badge",
+                maps: "maps",
+                lightningSpell: "lightning-spell",
+                longTermInvestment: "long-term-investment",
+                shield1: "shield-1",
+                archer: "archer",
+                star1: "star-1",
+                magicShield3D: "magic-shield-3d",
+                trophy: "trophy",
+                trophyStar: "trophy-star",
+                goldMedal: "gold-medal",
+                champion: "champion",
+                fireSpell: "fire-spell",
+                crown: "crown",
+                treasureChest: "treasure-chest",
+              };
+              const iconName = iconMap[milestone.icon] || milestone.icon;
+              return `/game-icons/${iconName}.png`;
+            };
             
             return (
               <motion.div
                 key={milestone.id}
                 className="absolute"
                 style={{
-                  left: milestone.position.x - (style.width as number) / 2,
-                  top: milestone.position.y - (style.height as number) / 2,
+                  left: milestone.position.x - nodeSize / 2,
+                  top: milestone.position.y - nodeSize / 2,
                 }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -507,68 +548,76 @@ export default function JourneyMapRenderer({
                 <motion.div
                   style={style as any}
                   onClick={() => handleMilestoneClick(milestone)}
-                  whileHover={status !== "locked" && status !== "level_locked" ? { scale: 1.12 } : {}}
-                  whileTap={status !== "locked" && status !== "level_locked" ? { scale: 0.95 } : {}}
+                  whileHover={{ scale: 1.15, zIndex: 10 }}
+                  whileTap={{ scale: 0.95 }}
                   className="relative"
                 >
-                  {/* Icon/Status indicator - bigger and clearer */}
+                  {/* Content based on status */}
                   {status === "completed" ? (
-                    <span className="text-white text-2xl font-bold drop-shadow-lg">✓</span>
-                  ) : status === "locked" ? (
-                    <span className="text-xl drop-shadow-md">🔒</span>
-                  ) : status === "level_locked" ? (
-                    <span className="text-xl drop-shadow-md">⭐</span>
+                    // Completed: Show checkmark with icon behind
+                    <div className="relative flex items-center justify-center">
+                      <Image
+                        src={getIconPath()}
+                        alt={milestone.name}
+                        width={nodeSize * 0.55}
+                        height={nodeSize * 0.55}
+                        className="opacity-60"
+                        draggable={false}
+                      />
+                      <span className="absolute text-white text-xl font-bold drop-shadow-lg">✓</span>
+                    </div>
+                  ) : status === "locked" || status === "level_locked" ? (
+                    // Locked: Show order number in gray
+                    <span className="text-slate-400 text-lg font-bold drop-shadow-md">
+                      {milestone.order || "?"}
+                    </span>
                   ) : status === "current" ? (
-                    <span className="text-2xl drop-shadow-lg">⭐</span>
+                    // Current: Show icon with glow effect
+                    <div className="relative">
+                      <Image
+                        src={getIconPath()}
+                        alt={milestone.name}
+                        width={nodeSize * 0.6}
+                        height={nodeSize * 0.6}
+                        className="drop-shadow-lg"
+                        draggable={false}
+                      />
+                    </div>
                   ) : (
-                    <span className="text-xl drop-shadow-lg">🏝️</span>
+                    // Unlocked/Available: Show icon
+                    <Image
+                      src={getIconPath()}
+                      alt={milestone.name}
+                      width={nodeSize * 0.55}
+                      height={nodeSize * 0.55}
+                      className="drop-shadow-md"
+                      draggable={false}
+                    />
                   )}
 
                   {/* Level requirement badge for level_locked */}
                   {status === "level_locked" && (
-                    <div className="absolute -top-2 -right-2 bg-purple-600 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border border-purple-400">
+                    <div className="absolute -top-1 -right-1 bg-purple-600 text-[9px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border border-purple-400">
                       Lv.{getRequiredLevel(milestone)}
                     </div>
                   )}
 
-                  {/* XP Badge */}
-                  {status !== "locked" && status !== "level_locked" && milestone.rewards.xp > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-amber-500 text-[11px] font-bold text-white px-2 py-0.5 rounded-full shadow-lg border-2 border-amber-300">
+                  {/* XP Badge - only for current/unlocked */}
+                  {(status === "current" || status === "unlocked") && milestone.rewards.xp > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-amber-500 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border-2 border-amber-300">
                       +{milestone.rewards.xp}
                     </div>
                   )}
 
-                  {/* Badge indicator */}
-                  {milestone.rewards.badgeId && status !== "locked" && status !== "level_locked" && (
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border-2 border-purple-300">
-                      <span className="text-[10px]">🏆</span>
+                  {/* Badge indicator - only for current/unlocked */}
+                  {milestone.rewards.badgeId && (status === "current" || status === "unlocked") && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border border-purple-300">
+                      <span className="text-[8px]">🏆</span>
                     </div>
                   )}
                 </motion.div>
 
-                {/* Label */}
-                <div 
-                  className="absolute left-1/2 -translate-x-1/2 mt-2 text-center whitespace-nowrap"
-                  style={{ top: (style.height as number) }}
-                >
-                  <span 
-                    className={cn(
-                      "text-xs font-semibold px-2 py-1 rounded shadow-md",
-                      status === "completed" && "bg-green-900/90 text-green-100 border border-green-700",
-                      status === "current" && "bg-blue-900/90 text-blue-100 border border-blue-700",
-                      status === "unlocked" && "bg-amber-900/90 text-amber-100 border border-amber-700",
-                      status === "level_locked" && "bg-purple-900/90 text-purple-200 border border-purple-600",
-                      status === "locked" && "bg-slate-800/90 text-slate-300 border border-slate-600"
-                    )}
-                  >
-                    {status === "level_locked" 
-                      ? `🔒 Lv.${getRequiredLevel(milestone)} Required`
-                      : milestone.name.length > 14 
-                        ? milestone.name.slice(0, 12) + "..." 
-                        : milestone.name
-                    }
-                  </span>
-                </div>
+                {/* NO labels on map - clean look */}
               </motion.div>
             );
           })}
@@ -607,17 +656,22 @@ export default function JourneyMapRenderer({
 
       {/* Milestone Detail Modal */}
       <AnimatePresence>
-        {modalOpen && selectedMilestone && (
-          <MilestoneDetailModal
-            milestone={selectedMilestone}
-            status={getMilestoneStatus(selectedMilestone.id)}
-            open={modalOpen}
-            onClose={() => {
-              setModalOpen(false);
-              setSelectedMilestone(null);
-            }}
-          />
-        )}
+        {modalOpen && selectedMilestone && (() => {
+          const progress = milestoneProgress.find(p => p.milestoneId === selectedMilestone.id);
+          return (
+            <MilestoneDetailModal
+              milestone={selectedMilestone}
+              status={getMilestoneStatus(selectedMilestone.id)}
+              open={modalOpen}
+              currentValue={progress?.currentValue || 0}
+              targetValue={progress?.targetValue || selectedMilestone.completeCondition?.value || 1}
+              onClose={() => {
+                setModalOpen(false);
+                setSelectedMilestone(null);
+              }}
+            />
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

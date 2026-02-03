@@ -1,19 +1,21 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Star, Trophy, CheckCircle, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { X, Star, Trophy, CheckCircle, Lock, ArrowRight, Sparkles, Target, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import type { Milestone } from "./JourneyMapRenderer";
 
 interface MilestoneDetailModalProps {
   milestone: Milestone;
-  status: "completed" | "current" | "unlocked" | "locked";
+  status: "completed" | "current" | "unlocked" | "locked" | "level_locked";
   open: boolean;
   onClose: () => void;
-  currentProgress?: number; // 0-100 for progress towards completion
+  currentValue?: number; // Current progress value (e.g., 3 trades)
+  targetValue?: number; // Target value (e.g., 10 trades)
   onContinue?: () => void;
 }
 
@@ -35,16 +37,23 @@ const STATUS_CONFIG = {
   unlocked: {
     icon: ArrowRight,
     label: "Available",
-    color: "text-slate-400",
-    bgColor: "bg-slate-500/10",
-    borderColor: "border-slate-500/30",
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+    borderColor: "border-amber-500/30",
   },
   locked: {
     icon: Lock,
     label: "Locked",
-    color: "text-slate-600",
-    bgColor: "bg-slate-700/10",
-    borderColor: "border-slate-700/30",
+    color: "text-slate-500",
+    bgColor: "bg-slate-700/20",
+    borderColor: "border-slate-600/30",
+  },
+  level_locked: {
+    icon: Shield,
+    label: "Level Required",
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10",
+    borderColor: "border-purple-500/30",
   },
 };
 
@@ -63,11 +72,16 @@ export default function MilestoneDetailModal({
   status,
   open,
   onClose,
-  currentProgress = 0,
+  currentValue = 0,
+  targetValue,
   onContinue,
 }: MilestoneDetailModalProps) {
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.locked;
   const StatusIcon = config.icon;
+
+  // Calculate progress percentage
+  const target = targetValue || milestone.completeCondition?.value || 1;
+  const progressPercent = Math.min(100, Math.round((currentValue / target) * 100));
 
   const formatCondition = (condition: { type: string; value?: number }) => {
     const conditionLabels: Record<string, (value?: number) => string> = {
@@ -76,18 +90,56 @@ export default function MilestoneDetailModal({
       total_deposits: (v) => `Make ${v || 1} deposit${(v || 1) > 1 ? "s" : ""}`,
       total_trades: (v) => `Complete ${v || 1} trade${(v || 1) > 1 ? "s" : ""}`,
       winning_trades: (v) => `Win ${v || 1} trade${(v || 1) > 1 ? "s" : ""}`,
+      losing_trades: (v) => `Experience ${v || 1} loss${(v || 1) > 1 ? "es" : ""}`,
       competitions_entered: (v) => `Join ${v || 1} competition${(v || 1) > 1 ? "s" : ""}`,
       competitions_completed: (v) => `Complete ${v || 1} competition${(v || 1) > 1 ? "s" : ""}`,
       first_place_finishes: (v) => `Win ${v || 1} competition${(v || 1) > 1 ? "s" : ""}`,
       podium_finishes: (v) => `Finish top 3 in ${v || 1} competition${(v || 1) > 1 ? "s" : ""}`,
+      top_10_finishes: (v) => `Finish top 10 in ${v || 1} competition${(v || 1) > 1 ? "s" : ""}`,
       win_rate: (v) => `Achieve ${v || 50}% win rate`,
       win_streak: (v) => `Get ${v || 3} wins in a row`,
+      max_win_streak: (v) => `Achieve ${v || 5} consecutive wins`,
       xp_threshold: (v) => `Earn ${v || 100} XP`,
       level_reached: (v) => `Reach level ${v || 5}`,
+      total_pnl_positive: () => "Make a profit",
+      profit_factor: (v) => `Achieve profit factor of ${v || 1.5}`,
+      consecutive_trading_days: (v) => `Trade for ${v || 5} consecutive days`,
+      different_assets_traded: (v) => `Trade ${v || 3} different assets`,
     };
 
     const formatter = conditionLabels[condition.type];
-    return formatter ? formatter(condition.value) : condition.type;
+    return formatter ? formatter(condition.value) : condition.type.replace(/_/g, " ");
+  };
+
+  // Get icon path for the milestone
+  const getIconPath = () => {
+    const iconMap: Record<string, string> = {
+      ship: "pirate-ship",
+      moneyDeposit: "money-bag",
+      trade: "trade",
+      buy: "arrow-up",
+      sell: "arrow-down",
+      target: "target",
+      profit: "gold-coins",
+      guideBook: "guide-book",
+      starBadge: "star-badge",
+      maps: "maps",
+      lightningSpell: "lightning-spell",
+      longTermInvestment: "long-term-investment",
+      shield1: "shield-1",
+      archer: "archer",
+      star1: "star-1",
+      magicShield3D: "magic-shield-3d",
+      trophy: "trophy",
+      trophyStar: "trophy-star",
+      goldMedal: "gold-medal",
+      champion: "champion",
+      fireSpell: "fire-spell",
+      crown: "crown",
+      treasureChest: "treasure-chest",
+    };
+    const iconName = iconMap[milestone.icon] || milestone.icon;
+    return `/game-icons/${iconName}.png`;
   };
 
   return (
@@ -96,7 +148,7 @@ export default function MilestoneDetailModal({
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -105,7 +157,7 @@ export default function MilestoneDetailModal({
 
           {/* Modal */}
           <motion.div
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md mx-4"
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -113,28 +165,48 @@ export default function MilestoneDetailModal({
           >
             <div
               className={cn(
-                "bg-slate-900 border rounded-2xl overflow-hidden shadow-2xl",
+                "bg-slate-900 border-2 rounded-2xl overflow-hidden shadow-2xl",
                 config.borderColor
               )}
             >
-              {/* Header with color accent */}
+              {/* Header with color accent and icon */}
               <div
-                className="h-2"
-                style={{ backgroundColor: milestone.color }}
-              />
-
-              {/* Content */}
-              <div className="p-6">
+                className="h-20 relative flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${milestone.color}40, ${milestone.color}20)` }}
+              >
+                <div 
+                  className="w-16 h-16 rounded-full flex items-center justify-center border-4 shadow-lg"
+                  style={{ 
+                    backgroundColor: milestone.color,
+                    borderColor: `${milestone.color}80`
+                  }}
+                >
+                  <Image
+                    src={getIconPath()}
+                    alt={milestone.name}
+                    width={36}
+                    height={36}
+                    className="drop-shadow-lg"
+                    draggable={false}
+                  />
+                </div>
+                {/* Order number badge */}
+                <div className="absolute top-2 left-2 bg-slate-800/80 text-slate-300 text-xs px-2 py-1 rounded-full">
+                  #{milestone.order || "?"}
+                </div>
                 {/* Close button */}
                 <button
                   onClick={onClose}
-                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-slate-800 transition-colors"
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-800/60 hover:bg-slate-700 transition-colors"
                 >
-                  <X className="h-5 w-5 text-slate-400" />
+                  <X className="h-4 w-4 text-slate-300" />
                 </button>
+              </div>
 
+              {/* Content */}
+              <div className="p-5">
                 {/* Status badge */}
-                <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4", config.bgColor)}>
+                <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3", config.bgColor)}>
                   <StatusIcon className={cn("h-4 w-4", config.color)} />
                   <span className={cn("text-sm font-medium", config.color)}>
                     {config.label}
@@ -142,92 +214,136 @@ export default function MilestoneDetailModal({
                 </div>
 
                 {/* Milestone name */}
-                <h2 className="text-2xl font-bold text-white mb-2">
+                <h2 className="text-xl font-bold text-white mb-1">
                   {milestone.name}
                 </h2>
 
                 {/* Type badge */}
-                <Badge variant="outline" className="mb-4">
+                <Badge variant="outline" className="mb-3 text-xs">
                   {NODE_TYPE_LABELS[milestone.nodeType] || milestone.nodeType}
                 </Badge>
 
                 {/* Description */}
-                <p className="text-slate-300 mb-6">
+                <p className="text-slate-300 text-sm mb-4">
                   {milestone.description}
                 </p>
 
-                {/* Requirement */}
-                <div className="bg-slate-800/50 rounded-lg p-4 mb-4">
-                  <div className="text-sm text-slate-400 mb-2">Requirement</div>
-                  <div className="text-white font-medium">
+                {/* Requirement Card */}
+                <div className="bg-slate-800/50 rounded-xl p-4 mb-4 border border-slate-700/50">
+                  <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                    <Target className="h-4 w-4" />
+                    <span>Requirement</span>
+                  </div>
+                  <div className="text-white font-medium mb-2">
                     {formatCondition(milestone.completeCondition)}
                   </div>
 
-                  {/* Progress bar for in-progress milestones */}
-                  {(status === "current" || status === "unlocked") && milestone.completeCondition.value && (
+                  {/* Progress bar - show for all statuses except completed */}
+                  {status !== "completed" && milestone.completeCondition.value && (
                     <div className="mt-3">
-                      <div className="flex justify-between text-xs text-slate-400 mb-1">
-                        <span>Progress</span>
-                        <span>{Math.round(currentProgress)}%</span>
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="text-slate-400">Progress</span>
+                        <span className={cn(
+                          "font-medium",
+                          status === "locked" || status === "level_locked" ? "text-slate-500" : "text-blue-400"
+                        )}>
+                          {currentValue} / {target}
+                        </span>
                       </div>
-                      <Progress value={currentProgress} className="h-2" />
+                      <div className="h-2.5 bg-slate-700 rounded-full overflow-hidden">
+                        <motion.div
+                          className={cn(
+                            "h-full rounded-full",
+                            status === "locked" || status === "level_locked" 
+                              ? "bg-slate-600" 
+                              : "bg-gradient-to-r from-blue-500 to-blue-400"
+                          )}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progressPercent}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
+                      <div className="text-right text-xs text-slate-500 mt-1">
+                        {progressPercent}%
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Rewards */}
-                <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-lg p-4 mb-6">
+                <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
                   <div className="flex items-center gap-2 text-amber-400 mb-3">
                     <Sparkles className="h-4 w-4" />
                     <span className="text-sm font-medium">Rewards</span>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2 bg-amber-500/20 px-3 py-1.5 rounded-full">
-                      <Star className="h-4 w-4 text-amber-400" />
-                      <span className="text-amber-100 font-medium">
-                        +{milestone.rewards.xp} XP
-                      </span>
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    {milestone.rewards.xp > 0 && (
+                      <div className="flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-full">
+                        <Star className="h-4 w-4 text-amber-400" />
+                        <span className="text-amber-100 font-medium text-sm">
+                          +{milestone.rewards.xp} XP
+                        </span>
+                      </div>
+                    )}
                     {milestone.rewards.badgeId && (
-                      <div className="flex items-center gap-2 bg-purple-500/20 px-3 py-1.5 rounded-full">
+                      <div className="flex items-center gap-1.5 bg-purple-500/20 px-3 py-1.5 rounded-full">
                         <Trophy className="h-4 w-4 text-purple-400" />
-                        <span className="text-purple-100 font-medium">
-                          Badge
+                        <span className="text-purple-100 font-medium text-sm">
+                          Badge Unlock
                         </span>
                       </div>
                     )}
                     {milestone.rewards.title && (
-                      <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-full">
+                      <div className="flex items-center gap-1.5 bg-blue-500/20 px-3 py-1.5 rounded-full">
                         <CheckCircle className="h-4 w-4 text-blue-400" />
-                        <span className="text-blue-100 font-medium">
+                        <span className="text-blue-100 font-medium text-sm">
                           "{milestone.rewards.title}"
                         </span>
                       </div>
                     )}
+                    {!milestone.rewards.xp && !milestone.rewards.badgeId && !milestone.rewards.title && (
+                      <span className="text-slate-400 text-sm">Complete to progress</span>
+                    )}
                   </div>
                 </div>
+
+                {/* Locked info - show what's needed to unlock */}
+                {(status === "locked" || status === "level_locked") && (
+                  <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 text-slate-400 mb-2">
+                      <Lock className="h-4 w-4" />
+                      <span className="text-sm font-medium">How to Unlock</span>
+                    </div>
+                    <p className="text-sm text-slate-300">
+                      {status === "level_locked" && milestone.unlockCondition?.value
+                        ? `Reach Level ${milestone.unlockCondition.value} to unlock this milestone.`
+                        : "Complete the previous milestones in your journey to unlock this one."
+                      }
+                    </p>
+                  </div>
+                )}
 
                 {/* Celebration text for completed */}
                 {status === "completed" && milestone.celebrationText && (
                   <motion.div
-                    className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4"
+                    className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-4"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
-                    <p className="text-green-300 text-center italic">
+                    <p className="text-green-300 text-center italic text-sm">
                       "{milestone.celebrationText}"
                     </p>
                   </motion.div>
                 )}
 
                 {/* Action button */}
-                {status === "locked" ? (
-                  <Button disabled className="w-full" variant="secondary">
+                {status === "locked" || status === "level_locked" ? (
+                  <Button onClick={onClose} className="w-full" variant="secondary">
                     <Lock className="h-4 w-4 mr-2" />
-                    Complete previous milestones to unlock
+                    {status === "level_locked" ? "Level Up to Unlock" : "Complete Previous Steps"}
                   </Button>
                 ) : status === "completed" ? (
-                  <Button onClick={onClose} className="w-full" variant="outline">
+                  <Button onClick={onClose} className="w-full bg-green-600 hover:bg-green-700">
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Completed!
                   </Button>
