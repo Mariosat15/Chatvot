@@ -213,6 +213,28 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     await session.commitTransaction();
 
+    // Trigger milestone and badge check after manual deposit credit
+    try {
+      const { checkAndCompleteMilestones } = await import(
+        "@/lib/services/journey-progress.service"
+      );
+      const journeyResult = await checkAndCompleteMilestones(failedDeposit.userId);
+      if (journeyResult.completed.length > 0) {
+        console.log(
+          `🗺️ [Manual Deposit] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+        );
+      }
+
+      const { evaluateUserBadges } = await import(
+        "@/lib/services/badge-evaluation.service"
+      );
+      await evaluateUserBadges(failedDeposit.userId);
+      console.log(`🏅 [Manual Deposit] Badge evaluation completed for user ${failedDeposit.userId}`);
+    } catch (gamificationError) {
+      console.error("🗺️ [Manual Deposit] Error checking milestones:", gamificationError);
+      // Don't fail the deposit if gamification check fails
+    }
+
     return NextResponse.json({
       success: true,
       message: `Successfully credited ${creditsToAdd} credits to user`,

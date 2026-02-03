@@ -450,6 +450,28 @@ class VeriffService {
         await sendKYCApprovedNotification(userId);
         console.log("📧 [KYC] Approval notification sent");
 
+        // Trigger milestone and badge check after KYC approval
+        try {
+          const { checkAndCompleteMilestones } = await import(
+            "@/lib/services/journey-progress.service"
+          );
+          const journeyResult = await checkAndCompleteMilestones(userId);
+          if (journeyResult.completed.length > 0) {
+            console.log(
+              `🗺️ [KYC] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+            );
+          }
+
+          const { evaluateUserBadges } = await import(
+            "@/lib/services/badge-evaluation.service"
+          );
+          await evaluateUserBadges(userId);
+          console.log(`🏅 [KYC] Badge evaluation completed for user ${userId}`);
+        } catch (gamificationError) {
+          console.error("🗺️ [KYC] Error checking milestones:", gamificationError);
+          // Don't fail the KYC if gamification check fails
+        }
+
         // Check for duplicate KYC (fraud detection)
         try {
           const duplicateResult = await checkForDuplicateKYC(

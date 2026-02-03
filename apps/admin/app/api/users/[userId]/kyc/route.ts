@@ -112,6 +112,31 @@ export async function PUT(
       kycStatus: wallet?.kycStatus,
     });
 
+    // Trigger milestone check if KYC was verified
+    if (body.kycVerified === true) {
+      try {
+        const { checkAndCompleteMilestones } = await import(
+          "@/lib/services/journey-progress.service"
+        );
+        const journeyResult = await checkAndCompleteMilestones(userId);
+        if (journeyResult.completed.length > 0) {
+          console.log(
+            `🗺️ [Admin KYC] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+          );
+        }
+
+        // Also evaluate badges
+        const { evaluateUserBadges } = await import(
+          "@/lib/services/badge-evaluation.service"
+        );
+        await evaluateUserBadges(userId);
+        console.log(`🏅 [Admin KYC] Badge evaluation completed for user ${userId}`);
+      } catch (journeyError) {
+        console.error("🗺️ [Admin KYC] Error checking milestones:", journeyError);
+        // Don't fail the KYC update if milestone check fails
+      }
+    }
+
     // Create audit log
     const AuditLog = (await import("@/database/models/audit-log.model"))
       .default;
