@@ -529,16 +529,83 @@ export default function JourneyMapEditorSection() {
   // GENERATOR FUNCTIONS
   // ============================================
 
-  // Initialize generator with island count
-  const initializeGenerator = () => {
-    const islands = Array.from({ length: generatorIslandCount }, (_, i) => ({
-      id: i + 1,
-      name: `Island ${i + 1}`,
-      position: { x: 0, y: 0 },
-      milestonesCount: 1,
-      zoneId: generatorZones[Math.floor(i / Math.ceil(generatorIslandCount / generatorZones.length))]?.id || "zone_1",
-      isPlaced: false,
+  // Predefined zone templates for automatic generation
+  const ZONE_TEMPLATES = [
+    { name: "Beginner's Cove", color: "#22C55E", icon: "flag", description: "Your journey begins here" },
+    { name: "Training Grounds", color: "#3B82F6", icon: "sword", description: "Learn the basics of trading" },
+    { name: "Proving Grounds", color: "#8B5CF6", icon: "target", description: "Test your skills" },
+    { name: "Expert Territory", color: "#F59E0B", icon: "shield1", description: "Challenges for experienced traders" },
+    { name: "Champion's Domain", color: "#EF4444", icon: "trophy", description: "Only the best reach here" },
+    { name: "Legend's Realm", color: "#EC4899", icon: "crown", description: "The path to mastery" },
+    { name: "God's Peak", color: "#FFD700", icon: "victory", description: "The ultimate destination" },
+  ];
+
+  // Calculate optimal number of zones based on islands
+  const calculateOptimalZones = (islandCount: number): number => {
+    if (islandCount <= 3) return 2;
+    if (islandCount <= 6) return 3;
+    if (islandCount <= 10) return 4;
+    if (islandCount <= 15) return 5;
+    if (islandCount <= 22) return 6;
+    return 7;
+  };
+
+  // Auto-generate zones based on island count
+  const autoGenerateZones = (islandCount: number) => {
+    const zoneCount = calculateOptimalZones(islandCount);
+    const zones = ZONE_TEMPLATES.slice(0, zoneCount).map((template, idx) => ({
+      id: `zone_${idx + 1}`,
+      name: template.name,
+      color: template.color,
+      order: idx + 1,
     }));
+    return zones;
+  };
+
+  // Initialize generator with island count and auto-generated zones
+  const initializeGenerator = () => {
+    // Auto-generate zones based on island count
+    const autoZones = autoGenerateZones(generatorIslandCount);
+    setGeneratorZones(autoZones);
+    
+    // Calculate how many islands per zone
+    const islandsPerZone = Math.ceil(generatorIslandCount / autoZones.length);
+    
+    // Create islands with automatic zone assignment
+    const islands = Array.from({ length: generatorIslandCount }, (_, i) => {
+      const zoneIndex = Math.min(Math.floor(i / islandsPerZone), autoZones.length - 1);
+      const zone = autoZones[zoneIndex];
+      
+      // Generate thematic island names based on zone
+      const islandNamesPerZone: Record<string, string[]> = {
+        "Beginner's Cove": ["Welcome Isle", "First Steps", "Dawn Harbor", "Novice Bay", "Starter Shore"],
+        "Training Grounds": ["Practice Point", "Drill Island", "Learning Lagoon", "Study Shores", "Tutorial Atoll"],
+        "Proving Grounds": ["Challenge Cay", "Trial Isle", "Test Reef", "Skill Shoals", "Exam Island"],
+        "Expert Territory": ["Veteran Valley", "Pro Point", "Master's Marina", "Elite Edge", "Advanced Atoll"],
+        "Champion's Domain": ["Victory Cove", "Winner's Wharf", "Champion's Channel", "Glory Gulf", "Trophy Trench"],
+        "Legend's Realm": ["Mythic Mesa", "Hero's Harbor", "Legend's Landing", "Fame Fjord", "Honor Haven"],
+        "God's Peak": ["Divine Dock", "Immortal Isle", "God's Gateway", "Eternal End", "Final Frontier"],
+      };
+      
+      const zoneNames = islandNamesPerZone[zone.name] || ["Island"];
+      const posInZone = i - (zoneIndex * islandsPerZone);
+      const islandName = zoneNames[posInZone % zoneNames.length] || `Island ${i + 1}`;
+      
+      // Auto-calculate milestones: more milestones for later islands (harder zones)
+      // Early: 1-2 milestones, Mid: 2-3, Late: 3-5
+      const progress = i / generatorIslandCount;
+      const baseMilestones = progress < 0.3 ? 1 : progress < 0.6 ? 2 : progress < 0.85 ? 3 : 4;
+      
+      return {
+        id: i + 1,
+        name: islandName,
+        position: { x: 0, y: 0 },
+        milestonesCount: baseMilestones,
+        zoneId: zone.id,
+        isPlaced: false,
+      };
+    });
+    
     setGeneratorIslands(islands);
     setGeneratorCurrentIsland(0);
     setGeneratorStep(2);
@@ -2163,56 +2230,77 @@ export default function JourneyMapEditorSection() {
                     className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">
-                    Each island can have 1 or more milestones
+                    Islands, zones & milestones will be auto-generated
                   </span>
                 </div>
               </div>
 
-              {/* Zones */}
-              <div className="space-y-2">
+              {/* Auto-generation Preview */}
+              <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                 <Label className="text-lg font-semibold flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Zones ({generatorZones.length})
+                  <Wand2 className="h-4 w-4 text-purple-400" />
+                  Auto-Generation Preview
                 </Label>
-                <div className="space-y-2">
-                  {generatorZones.map((zone, idx) => (
-                    <div key={zone.id} className="flex items-center gap-2 p-2 border rounded-lg">
-                      <span className="w-8 text-center text-sm text-muted-foreground">{idx + 1}</span>
-                      <Input
-                        value={zone.name}
-                        onChange={e => setGeneratorZones(prev => prev.map(z => 
-                          z.id === zone.id ? { ...z, name: e.target.value } : z
-                        ))}
-                        className="flex-1"
-                        placeholder="Zone name"
-                      />
-                      <Input
-                        type="color"
-                        value={zone.color}
-                        onChange={e => setGeneratorZones(prev => prev.map(z => 
-                          z.id === zone.id ? { ...z, color: e.target.value } : z
-                        ))}
-                        className="w-16"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeGeneratorZone(zone.id)}
-                        disabled={generatorZones.length <= 1}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                
+                {/* Stats Preview */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-400">{generatorIslandCount}</div>
+                    <div className="text-xs text-muted-foreground">Islands</div>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-purple-400">{calculateOptimalZones(generatorIslandCount)}</div>
+                    <div className="text-xs text-muted-foreground">Zones</div>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-amber-400">
+                      {/* Estimate milestones: avg 2 per island */}
+                      ~{Math.round(generatorIslandCount * 2.5)}
                     </div>
-                  ))}
-                  <Button variant="outline" onClick={addGeneratorZone} className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Zone
-                  </Button>
+                    <div className="text-xs text-muted-foreground">Milestones</div>
+                  </div>
+                </div>
+
+                {/* Zone Preview */}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Zones that will be created:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {ZONE_TEMPLATES.slice(0, calculateOptimalZones(generatorIslandCount)).map((zone, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm text-white"
+                        style={{ backgroundColor: zone.color }}
+                      >
+                        <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">
+                          {idx + 1}
+                        </span>
+                        {zone.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Progression Info */}
+                <div className="text-sm text-muted-foreground mt-2 p-3 bg-slate-900/30 rounded-lg">
+                  <div className="font-medium text-slate-300 mb-1">Game-like progression:</div>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>Early islands: 1-2 milestones (easy challenges)</li>
+                    <li>Mid islands: 2-3 milestones (moderate challenges)</li>
+                    <li>Late islands: 3-4 milestones (hard challenges)</li>
+                    <li>Each zone requires higher player level to unlock</li>
+                    <li>Milestones use varied conditions (trades, wins, competitions...)</li>
+                  </ul>
                 </div>
               </div>
 
-              <Button onClick={initializeGenerator} className="w-full">
-                Next: Place Islands
+              {/* Customize hint */}
+              <div className="text-xs text-muted-foreground text-center">
+                You can customize island names, zones, and milestones after placement
+              </div>
+
+              <Button onClick={initializeGenerator} className="w-full" size="lg">
+                <Wand2 className="h-4 w-4 mr-2" />
+                Generate & Place Islands
                 <MapPin className="h-4 w-4 ml-2" />
               </Button>
             </div>
