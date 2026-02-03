@@ -11,6 +11,8 @@ async function seedJourneyMap() {
   await connectToDatabase();
 
   console.log("🗺️ [SEED] Starting journey map seed...");
+  console.log("📦 [SEED] Map config:", DEFAULT_MAP_CONFIG.mapId);
+  console.log("📦 [SEED] Milestones count:", DEFAULT_MILESTONES.length);
 
   // Check if map already exists
   const existingMap = await JourneyMapConfig.findOne({ mapId: DEFAULT_MAP_CONFIG.mapId });
@@ -20,14 +22,30 @@ async function seedJourneyMap() {
     await JourneyMapConfig.findOneAndUpdate(
       { mapId: DEFAULT_MAP_CONFIG.mapId },
       {
-        ...DEFAULT_MAP_CONFIG,
+        name: DEFAULT_MAP_CONFIG.name,
+        description: DEFAULT_MAP_CONFIG.description,
+        zones: DEFAULT_MAP_CONFIG.zones,
+        defaultStartNode: DEFAULT_MAP_CONFIG.defaultStartNode,
+        backgroundColor: DEFAULT_MAP_CONFIG.backgroundColor,
+        backgroundImage: DEFAULT_MAP_CONFIG.backgroundImage,
+        isActive: DEFAULT_MAP_CONFIG.isActive,
         $inc: { version: 1 },
       }
     );
     console.log("📝 [SEED] Updated existing map configuration");
   } else {
     // Create new map
-    await JourneyMapConfig.create(DEFAULT_MAP_CONFIG);
+    await JourneyMapConfig.create({
+      mapId: DEFAULT_MAP_CONFIG.mapId,
+      name: DEFAULT_MAP_CONFIG.name,
+      description: DEFAULT_MAP_CONFIG.description,
+      zones: DEFAULT_MAP_CONFIG.zones,
+      defaultStartNode: DEFAULT_MAP_CONFIG.defaultStartNode,
+      backgroundColor: DEFAULT_MAP_CONFIG.backgroundColor,
+      backgroundImage: DEFAULT_MAP_CONFIG.backgroundImage,
+      isActive: DEFAULT_MAP_CONFIG.isActive,
+      version: 1,
+    });
     console.log("✨ [SEED] Created new map configuration");
   }
 
@@ -36,21 +54,46 @@ async function seedJourneyMap() {
   let updated = 0;
 
   for (const milestone of DEFAULT_MILESTONES) {
-    const existing = await JourneyMilestone.findOne({ id: milestone.id });
-    
-    if (existing) {
-      await JourneyMilestone.findOneAndUpdate(
-        { id: milestone.id },
-        { ...milestone, isActive: true }
-      );
-      updated++;
-    } else {
-      await JourneyMilestone.create({
-        ...milestone,
+    try {
+      const existing = await JourneyMilestone.findOne({ id: milestone.id });
+      
+      const milestoneData = {
+        id: milestone.id,
         mapId: DEFAULT_MAP_CONFIG.mapId,
+        name: milestone.name,
+        description: milestone.description,
+        shortDescription: milestone.shortDescription,
+        zoneId: milestone.zoneId,
+        position: milestone.position,
+        nodeType: milestone.nodeType,
+        icon: milestone.icon,
+        color: milestone.color,
+        size: milestone.size,
+        unlockCondition: milestone.unlockCondition,
+        completeCondition: milestone.completeCondition,
+        rewards: milestone.rewards,
+        connectedTo: milestone.connectedTo,
+        connectedFrom: milestone.connectedFrom,
+        isRequired: milestone.isRequired,
+        isAutoComplete: milestone.isAutoComplete,
+        order: milestone.order,
+        tooltipText: milestone.tooltipText,
+        celebrationText: milestone.celebrationText,
         isActive: true,
-      });
-      created++;
+      };
+      
+      if (existing) {
+        await JourneyMilestone.findOneAndUpdate(
+          { id: milestone.id },
+          milestoneData
+        );
+        updated++;
+      } else {
+        await JourneyMilestone.create(milestoneData);
+        created++;
+      }
+    } catch (err) {
+      console.error(`Error seeding milestone ${milestone.id}:`, err);
     }
   }
 
@@ -85,7 +128,8 @@ export async function GET(request: NextRequest) {
       { 
         success: false, 
         error: "Failed to seed journey map",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
@@ -111,7 +155,8 @@ export async function POST(request: NextRequest) {
       { 
         success: false, 
         error: "Failed to seed journey map",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
@@ -145,7 +190,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(
       { 
         success: false, 
-        error: "Failed to reset journey map"
+        error: "Failed to reset journey map",
+        details: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
     );

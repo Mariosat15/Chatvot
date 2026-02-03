@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,10 +54,14 @@ import {
   Trophy,
   Crown,
   BookOpen,
+  MousePointer,
+  Hand,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from "next/image";
 
 // Types
 interface Zone {
@@ -121,9 +125,14 @@ interface MapConfig {
   zones: Zone[];
   defaultStartNode: string;
   backgroundColor: string;
+  backgroundImage?: string;
   isActive: boolean;
   version: number;
 }
+
+// Map dimensions (matching treasure map)
+const MAP_WIDTH = 1200;
+const MAP_HEIGHT = 800;
 
 // Node type icons and colors
 const NODE_TYPE_CONFIG: Record<string, { icon: typeof Flag; color: string; label: string }> = {
@@ -165,14 +174,17 @@ export default function JourneyMapEditorSection() {
   
   // Edit dialogs
   const [editMilestoneOpen, setEditMilestoneOpen] = useState(false);
-  const [editZoneOpen, setEditZoneOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
-  const [selectedEditZone, setSelectedEditZone] = useState<Zone | null>(null);
   
   // Visual map state
-  const [mapScale, setMapScale] = useState(1);
+  const [mapScale, setMapScale] = useState(0.7);
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
-  const [previewMode, setPreviewMode] = useState(false);
+  const [editMode, setEditMode] = useState<"select" | "drag">("select");
+  const [draggedMilestone, setDraggedMilestone] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -205,7 +217,15 @@ export default function JourneyMapEditorSection() {
     fetchData();
   }, [fetchData]);
 
-  // Save milestone
+  // Update milestone position (local state)
+  const updateMilestonePosition = (id: string, x: number, y: number) => {
+    setMilestones(prev => prev.map(m => 
+      m.id === id ? { ...m, position: { x: Math.round(x), y: Math.round(y) } } : m
+    ));
+    setHasUnsavedChanges(true);
+  };
+
+  // Save single milestone
   const saveMilestone = async (milestone: Partial<Milestone>) => {
     try {
       const isNew = !milestones.find(m => m.id === milestone.id);
@@ -229,6 +249,29 @@ export default function JourneyMapEditorSection() {
       }
     } catch (error) {
       toast.error("Failed to save milestone");
+    }
+  };
+
+  // Save all milestone positions
+  const saveAllPositions = async () => {
+    try {
+      let savedCount = 0;
+      for (const milestone of milestones) {
+        const res = await fetch("/api/journey-milestones", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: milestone.id,
+            position: milestone.position,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) savedCount++;
+      }
+      toast.success(`Saved ${savedCount} milestone positions`);
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      toast.error("Failed to save positions");
     }
   };
 
@@ -279,7 +322,7 @@ export default function JourneyMapEditorSection() {
 
   // Seed default map template
   const seedDefaultMap = async () => {
-    if (!confirm("This will seed/update the default journey map template. Continue?")) return;
+    if (!confirm("This will reset all milestone positions to default. Continue?")) return;
     
     setLoading(true);
     try {
@@ -288,11 +331,14 @@ export default function JourneyMapEditorSection() {
 
       if (data.success) {
         toast.success(`Map seeded: ${data.milestonesCreated} created, ${data.milestonesUpdated} updated`);
+        setHasUnsavedChanges(false);
         fetchData();
       } else {
+        console.error("Seed error:", data);
         toast.error(data.error || "Failed to seed map");
       }
     } catch (error) {
+      console.error("Seed fetch error:", error);
       toast.error("Failed to seed map");
     } finally {
       setLoading(false);
@@ -308,146 +354,262 @@ export default function JourneyMapEditorSection() {
     return matchesSearch && matchesZone;
   });
 
-  // Render visual map
+  // Handle mouse down on milestone
+  const handleMilestoneMouseDown = (e: React.MouseEvent, milestone: Milestone) => {
+    if (editMode === "drag") {
+      e.preventDefault();
+      e.stopPropagation();
+      setDraggedMilestone(milestone.id);
+    } else if (editMode === "select") {
+      setSelectedMilestone(milestone);
+      setEditMilestoneOpen(true);
+    }
+  };
+
+  // Handle mouse move for dragging
+  const handleMapMouseMove = (e: React.MouseEvent) => {
+    if (draggedMilestone && mapContainerRef.current) {
+      const rect = mapContainerRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left - mapOffset.x) / mapScale;
+      const y = (e.clientY - rect.top - mapOffset.y) / mapScale;
+      
+      // Clamp to map bounds
+      const clampedX = Math.max(20, Math.min(MAP_WIDTH - 20, x));
+      const clampedY = Math.max(20, Math.min(MAP_HEIGHT - 20, y));
+      
+      updateMilestonePosition(draggedMilestone, clampedX, clampedY);
+    } else if (isPanning) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      setMapOffset(prev => ({
+        x: prev.x + dx,
+        y: prev.y + dy,
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  // Handle mouse up
+  const handleMapMouseUp = () => {
+    setDraggedMilestone(null);
+    setIsPanning(false);
+  };
+
+  // Handle pan start
+  const handlePanStart = (e: React.MouseEvent) => {
+    if (editMode === "drag" && !draggedMilestone) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  // Get node size
+  const getNodeSize = (size: string) => {
+    switch (size) {
+      case "small": return 20;
+      case "large": return 36;
+      default: return 28;
+    }
+  };
+
+  // Render visual map with treasure map background
   const renderVisualMap = () => (
-    <div className="relative w-full h-[600px] bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
-      {/* Map Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setMapScale(s => Math.min(s + 0.2, 2))}
-        >
-          <ZoomIn className="h-4 w-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setMapScale(s => Math.max(s - 0.2, 0.5))}
-        >
-          <ZoomOut className="h-4 w-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => { setMapScale(1); setMapOffset({ x: 0, y: 0 }); }}
-        >
-          <Move className="h-4 w-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant={previewMode ? "default" : "outline"}
-          onClick={() => setPreviewMode(!previewMode)}
-        >
-          <Eye className="h-4 w-4 mr-1" />
-          {previewMode ? "Edit" : "Preview"}
-        </Button>
+    <div className="space-y-4">
+      {/* Map Toolbar */}
+      <div className="flex items-center justify-between bg-slate-800 p-3 rounded-lg">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={editMode === "select" ? "default" : "outline"}
+            onClick={() => setEditMode("select")}
+          >
+            <MousePointer className="h-4 w-4 mr-1" />
+            Select
+          </Button>
+          <Button
+            size="sm"
+            variant={editMode === "drag" ? "default" : "outline"}
+            onClick={() => setEditMode("drag")}
+          >
+            <Hand className="h-4 w-4 mr-1" />
+            Drag
+          </Button>
+          <div className="w-px h-6 bg-slate-600 mx-2" />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setMapScale(s => Math.min(s + 0.1, 1.5))}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-slate-400 w-16 text-center">
+            {Math.round(mapScale * 100)}%
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setMapScale(s => Math.max(s - 0.1, 0.3))}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setMapScale(0.7); setMapOffset({ x: 0, y: 0 }); }}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <Badge variant="destructive">Unsaved changes</Badge>
+          )}
+          <Button
+            size="sm"
+            onClick={saveAllPositions}
+            disabled={!hasUnsavedChanges}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Save className="h-4 w-4 mr-1" />
+            Save Positions
+          </Button>
+        </div>
       </div>
 
-      {/* SVG Map */}
-      <svg
-        className="w-full h-full"
-        viewBox="0 0 1200 600"
-        style={{
-          transform: `scale(${mapScale}) translate(${mapOffset.x}px, ${mapOffset.y}px)`,
-        }}
-      >
-        {/* Background gradient */}
-        <defs>
-          <linearGradient id="mapGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0F172A" />
-            <stop offset="100%" stopColor="#1E293B" />
-          </linearGradient>
-        </defs>
-        <rect width="1200" height="600" fill="url(#mapGradient)" />
-
-        {/* Zone backgrounds */}
-        {mapConfig?.zones.map((zone, index) => (
-          <g key={zone.id}>
-            <rect
-              x={100 + index * 200}
-              y={50}
-              width={180}
-              height={500}
-              rx={10}
-              fill={zone.color}
-              fillOpacity={0.1}
-              stroke={zone.color}
-              strokeOpacity={0.3}
-              strokeWidth={2}
-            />
-            <text
-              x={190 + index * 200}
-              y={80}
-              fill={zone.color}
-              fontSize="14"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {zone.name}
-            </text>
-          </g>
-        ))}
-
-        {/* Connections */}
-        {milestones.map(milestone =>
-          milestone.connectedTo.map(targetId => {
-            const target = milestones.find(m => m.id === targetId);
-            if (!target) return null;
-            return (
-              <line
-                key={`${milestone.id}-${targetId}`}
-                x1={milestone.position.x}
-                y1={milestone.position.y}
-                x2={target.position.x}
-                y2={target.position.y}
-                stroke={milestone.color}
-                strokeWidth={2}
-                strokeOpacity={0.5}
-                strokeDasharray={milestone.nodeType === "branch" ? "5,5" : "none"}
-              />
-            );
-          })
+      {/* Instructions */}
+      <div className="text-sm text-slate-400">
+        {editMode === "select" ? (
+          <span>Click on a milestone to edit its details</span>
+        ) : (
+          <span>Drag milestones to reposition them on the map. Drag empty space to pan.</span>
         )}
+      </div>
 
-        {/* Nodes */}
-        {milestones.map(milestone => {
-          const config = NODE_TYPE_CONFIG[milestone.nodeType] || NODE_TYPE_CONFIG.milestone;
-          const size = milestone.size === "large" ? 30 : milestone.size === "small" ? 18 : 24;
-          
-          return (
-            <g
-              key={milestone.id}
-              className="cursor-pointer"
-              onClick={() => {
-                if (!previewMode) {
-                  setSelectedMilestone(milestone);
-                  setEditMilestoneOpen(true);
-                }
-              }}
-            >
-              <circle
-                cx={milestone.position.x}
-                cy={milestone.position.y}
-                r={size}
-                fill={milestone.isActive ? milestone.color : "#4B5563"}
-                stroke={previewMode ? "#fff" : "#94A3B8"}
-                strokeWidth={2}
-                className="transition-all hover:stroke-white hover:stroke-[3]"
-              />
-              <text
-                x={milestone.position.x}
-                y={milestone.position.y + size + 15}
-                fill="#E2E8F0"
-                fontSize="10"
-                textAnchor="middle"
+      {/* Map Container */}
+      <div
+        ref={mapContainerRef}
+        className="relative w-full h-[650px] bg-slate-900 rounded-lg overflow-hidden border-4 border-amber-900/50 cursor-move"
+        onMouseMove={handleMapMouseMove}
+        onMouseUp={handleMapMouseUp}
+        onMouseLeave={handleMapMouseUp}
+        onMouseDown={handlePanStart}
+      >
+        {/* Map wrapper with transform */}
+        <div
+          className="absolute"
+          style={{
+            width: MAP_WIDTH,
+            height: MAP_HEIGHT,
+            transform: `translate(${mapOffset.x}px, ${mapOffset.y}px) scale(${mapScale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          {/* Treasure Map Background */}
+          <Image
+            src="/assets/treasure-map.png"
+            alt="Treasure Map"
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            className="absolute top-0 left-0"
+            style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+            priority
+            draggable={false}
+          />
+
+          {/* Path Connections */}
+          <svg
+            className="absolute top-0 left-0 pointer-events-none"
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+          >
+            <defs>
+              <filter id="pathGlow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            {milestones.map(milestone =>
+              milestone.connectedTo.map(targetId => {
+                const target = milestones.find(m => m.id === targetId);
+                if (!target) return null;
+                return (
+                  <path
+                    key={`${milestone.id}-${targetId}`}
+                    d={`M ${milestone.position.x} ${milestone.position.y} Q ${(milestone.position.x + target.position.x) / 2} ${Math.min(milestone.position.y, target.position.y) - 30} ${target.position.x} ${target.position.y}`}
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth={3}
+                    strokeDasharray="8,8"
+                    strokeLinecap="round"
+                    opacity={0.5}
+                  />
+                );
+              })
+            )}
+          </svg>
+
+          {/* Milestone Nodes */}
+          {milestones.map(milestone => {
+            const size = getNodeSize(milestone.size);
+            const isDragging = draggedMilestone === milestone.id;
+            
+            return (
+              <div
+                key={milestone.id}
+                className={`absolute cursor-pointer transition-transform ${isDragging ? "scale-125 z-50" : "hover:scale-110"}`}
+                style={{
+                  left: milestone.position.x - size / 2,
+                  top: milestone.position.y - size / 2,
+                  width: size,
+                  height: size,
+                }}
+                onMouseDown={(e) => handleMilestoneMouseDown(e, milestone)}
               >
-                {milestone.name.length > 15 ? milestone.name.slice(0, 12) + "..." : milestone.name}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+                {/* Node circle */}
+                <div
+                  className="w-full h-full rounded-full flex items-center justify-center text-white font-bold shadow-lg border-2"
+                  style={{
+                    background: `linear-gradient(135deg, ${milestone.color}, ${milestone.color}88)`,
+                    borderColor: isDragging ? "#FFFFFF" : `${milestone.color}`,
+                    boxShadow: isDragging 
+                      ? `0 0 20px ${milestone.color}, 0 0 40px ${milestone.color}80`
+                      : `0 4px 12px rgba(0,0,0,0.4)`,
+                  }}
+                >
+                  <span style={{ fontSize: size * 0.4 }}>
+                    {milestone.order}
+                  </span>
+                </div>
+
+                {/* Label */}
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 mt-1 text-center whitespace-nowrap pointer-events-none"
+                  style={{ top: size }}
+                >
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-900/80 text-white">
+                    {milestone.name.length > 12 ? milestone.name.slice(0, 10) + "..." : milestone.name}
+                  </span>
+                </div>
+
+                {/* Position indicator when dragging */}
+                {isDragging && (
+                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] bg-black/80 text-white px-2 py-0.5 rounded whitespace-nowrap">
+                    x: {Math.round(milestone.position.x)}, y: {Math.round(milestone.position.y)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Scale indicator */}
+        <div className="absolute bottom-4 right-4 bg-slate-900/80 text-white px-3 py-1 rounded text-sm">
+          {Math.round(mapScale * 100)}%
+        </div>
+      </div>
     </div>
   );
 
@@ -818,29 +980,21 @@ export default function JourneyMapEditorSection() {
             Journey Map Editor
           </h2>
           <p className="text-muted-foreground">
-            Configure the trader's journey progression map
+            Configure the trader's journey progression map - drag milestones to position them
           </p>
         </div>
         <div className="flex gap-2">
-          {(!mapConfig || milestones.length === 0) && (
-            <Button variant="default" onClick={seedDefaultMap} className="bg-amber-600 hover:bg-amber-700">
-              <Download className="h-4 w-4 mr-2" />
-              Seed Default Map
-            </Button>
-          )}
-          {mapConfig && milestones.length > 0 && (
-            <Button variant="outline" onClick={seedDefaultMap}>
-              <Download className="h-4 w-4 mr-2" />
-              Reset to Default
-            </Button>
-          )}
+          <Button variant="outline" onClick={seedDefaultMap} className="border-amber-600 text-amber-600 hover:bg-amber-600/10">
+            <Download className="h-4 w-4 mr-2" />
+            Reset to Default
+          </Button>
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           <Button onClick={saveMapConfig} disabled={!mapConfig}>
             <Save className="h-4 w-4 mr-2" />
-            Save Map
+            Save Config
           </Button>
         </div>
       </div>
@@ -915,9 +1069,6 @@ export default function JourneyMapEditorSection() {
         {/* Visual Map Tab */}
         <TabsContent value="map" className="mt-4">
           {renderVisualMap()}
-          <p className="text-sm text-muted-foreground mt-2">
-            Click on any node to edit. Toggle Preview mode to see player view.
-          </p>
         </TabsContent>
 
         {/* Milestones Tab */}
@@ -982,6 +1133,7 @@ export default function JourneyMapEditorSection() {
                 <TableHead>Order</TableHead>
                 <TableHead>Icon</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Position</TableHead>
                 <TableHead>Zone</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Condition</TableHead>
@@ -1002,6 +1154,11 @@ export default function JourneyMapEditorSection() {
                       <div className="font-medium">{milestone.name}</div>
                       <div className="text-xs text-muted-foreground">{milestone.id}</div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs font-mono">
+                      ({milestone.position.x}, {milestone.position.y})
+                    </span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" style={{ borderColor: milestone.color }}>
