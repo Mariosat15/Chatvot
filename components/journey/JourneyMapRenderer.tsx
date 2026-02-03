@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import MilestoneNode from "./MilestoneNode";
-import PathConnection from "./PathConnection";
 import MilestoneDetailModal from "./MilestoneDetailModal";
-import { ZoomIn, ZoomOut, RotateCcw, Compass } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw, Compass, Ship } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 // Types
 export interface Milestone {
@@ -53,6 +52,7 @@ export interface MapConfig {
   description: string;
   zones: Zone[];
   backgroundColor: string;
+  backgroundImage?: string;
 }
 
 export interface JourneyMapRendererProps {
@@ -65,6 +65,10 @@ export interface JourneyMapRendererProps {
   className?: string;
 }
 
+// Treasure map dimensions (based on the image aspect ratio ~1.5:1)
+const MAP_WIDTH = 1200;
+const MAP_HEIGHT = 800;
+
 export default function JourneyMapRenderer({
   mapConfig,
   milestones,
@@ -75,32 +79,12 @@ export default function JourneyMapRenderer({
   className,
 }: JourneyMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-
-  // Calculate viewbox dimensions based on milestones
-  const viewBox = useMemo(() => {
-    if (milestones.length === 0) return { minX: 0, minY: 0, width: 1200, height: 600 };
-    
-    const padding = 100;
-    const xs = milestones.map(m => m.position.x);
-    const ys = milestones.map(m => m.position.y);
-    const minX = Math.min(...xs) - padding;
-    const minY = Math.min(...ys) - padding;
-    const maxX = Math.max(...xs) + padding;
-    const maxY = Math.max(...ys) + padding;
-    
-    return {
-      minX,
-      minY,
-      width: Math.max(maxX - minX, 800),
-      height: Math.max(maxY - minY, 400),
-    };
-  }, [milestones]);
 
   // Get milestone status
   const getMilestoneStatus = (id: string): "completed" | "current" | "unlocked" | "locked" => {
@@ -112,16 +96,18 @@ export default function JourneyMapRenderer({
 
   // Handle milestone click
   const handleMilestoneClick = (milestone: Milestone) => {
+    const status = getMilestoneStatus(milestone.id);
+    if (status === "locked") return;
     setSelectedMilestone(milestone);
     setModalOpen(true);
     onMilestoneClick?.(milestone);
   };
 
   // Zoom controls
-  const handleZoomIn = () => setScale(s => Math.min(s + 0.2, 2));
-  const handleZoomOut = () => setScale(s => Math.max(s - 0.2, 0.5));
+  const handleZoomIn = () => setScale(s => Math.min(s + 0.15, 2));
+  const handleZoomOut = () => setScale(s => Math.max(s - 0.15, 0.4));
   const handleReset = () => {
-    setScale(1);
+    setScale(0.8);
     setPosition({ x: 0, y: 0 });
   };
 
@@ -135,7 +121,6 @@ export default function JourneyMapRenderer({
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    // Calculate position to center milestone
     const newX = containerWidth / 2 - milestone.position.x * scale;
     const newY = containerHeight / 2 - milestone.position.y * scale;
 
@@ -144,7 +129,7 @@ export default function JourneyMapRenderer({
 
   // Drag handling
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
@@ -157,11 +142,9 @@ export default function JourneyMapRenderer({
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
-  // Touch handling for mobile
+  // Touch handling
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     setIsDragging(true);
@@ -180,11 +163,10 @@ export default function JourneyMapRenderer({
   // Wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale(s => Math.min(Math.max(s + delta, 0.5), 2));
+    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    setScale(s => Math.min(Math.max(s + delta, 0.4), 2));
   };
 
-  // Center on current on mount
   useEffect(() => {
     if (currentMilestone) {
       setTimeout(centerOnCurrent, 100);
@@ -199,15 +181,106 @@ export default function JourneyMapRenderer({
     );
   }
 
+  // Get node style based on status
+  const getNodeStyle = (status: "completed" | "current" | "unlocked" | "locked", size: string) => {
+    const sizeMap = { small: 28, medium: 36, large: 48 };
+    const nodeSize = sizeMap[size as keyof typeof sizeMap] || 36;
+    
+    const baseStyle = {
+      width: nodeSize,
+      height: nodeSize,
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: status === "locked" ? "not-allowed" : "pointer",
+      transition: "all 0.3s ease",
+      fontSize: nodeSize * 0.5,
+    };
+
+    switch (status) {
+      case "completed":
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, #22C55E, #16A34A)",
+          boxShadow: "0 0 20px rgba(34, 197, 94, 0.6), inset 0 2px 4px rgba(255,255,255,0.3)",
+          border: "3px solid #86EFAC",
+        };
+      case "current":
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+          boxShadow: "0 0 25px rgba(59, 130, 246, 0.8), inset 0 2px 4px rgba(255,255,255,0.3)",
+          border: "3px solid #93C5FD",
+          animation: "pulse 2s infinite",
+        };
+      case "unlocked":
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, #F59E0B, #D97706)",
+          boxShadow: "0 4px 12px rgba(245, 158, 11, 0.4), inset 0 2px 4px rgba(255,255,255,0.2)",
+          border: "3px solid #FCD34D",
+        };
+      case "locked":
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, #374151, #1F2937)",
+          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.4)",
+          border: "3px solid #4B5563",
+          opacity: 0.6,
+        };
+    }
+  };
+
+  // Draw path between nodes
+  const renderPath = (from: Milestone, to: Milestone) => {
+    const fromStatus = getMilestoneStatus(from.id);
+    const isCompleted = fromStatus === "completed";
+    
+    return (
+      <svg
+        key={`path-${from.id}-${to.id}`}
+        className="absolute top-0 left-0 pointer-events-none"
+        style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+      >
+        <defs>
+          <filter id="pathGlow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <path
+          d={`M ${from.position.x} ${from.position.y} Q ${(from.position.x + to.position.x) / 2} ${Math.min(from.position.y, to.position.y) - 30} ${to.position.x} ${to.position.y}`}
+          fill="none"
+          stroke={isCompleted ? "#22C55E" : "#FFFFFF"}
+          strokeWidth={isCompleted ? 4 : 3}
+          strokeDasharray={isCompleted ? "none" : "8,8"}
+          strokeLinecap="round"
+          opacity={isCompleted ? 0.9 : 0.4}
+          filter={isCompleted ? "url(#pathGlow)" : "none"}
+        />
+      </svg>
+    );
+  };
+
   return (
-    <div className={cn("relative overflow-hidden rounded-xl", className)}>
+    <div className={cn("relative overflow-hidden rounded-xl border-4 border-amber-900/50", className)}>
+      {/* Decorative frame corners */}
+      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-amber-700 rounded-tl-lg z-30" />
+      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-amber-700 rounded-tr-lg z-30" />
+      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-amber-700 rounded-bl-lg z-30" />
+      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-amber-700 rounded-br-lg z-30" />
+
       {/* Map Controls */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         <Button
           size="icon"
           variant="secondary"
           onClick={handleZoomIn}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-amber-100"
         >
           <ZoomIn className="h-4 w-4" />
         </Button>
@@ -215,7 +288,7 @@ export default function JourneyMapRenderer({
           size="icon"
           variant="secondary"
           onClick={handleZoomOut}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-amber-100"
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
@@ -223,7 +296,7 @@ export default function JourneyMapRenderer({
           size="icon"
           variant="secondary"
           onClick={handleReset}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-amber-100"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
@@ -231,44 +304,47 @@ export default function JourneyMapRenderer({
           size="icon"
           variant="secondary"
           onClick={centerOnCurrent}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-amber-100"
         >
           <Compass className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-20 bg-background/80 backdrop-blur-sm rounded-lg p-3">
-        <div className="text-xs font-medium mb-2">Legend</div>
-        <div className="flex flex-wrap gap-3 text-xs">
+      <div className="absolute bottom-4 left-4 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg p-3 border border-amber-800">
+        <div className="text-xs font-medium mb-2 text-amber-200 flex items-center gap-2">
+          <Ship className="h-4 w-4" />
+          Legend
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs text-amber-100">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span>Completed</span>
+            <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+            <span>Conquered</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+            <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
             <span>Current</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-slate-400" />
+            <div className="w-3 h-3 rounded-full bg-amber-500" />
             <span>Available</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-slate-700" />
+            <div className="w-3 h-3 rounded-full bg-slate-600 opacity-60" />
             <span>Locked</span>
           </div>
         </div>
       </div>
 
       {/* Progress indicator */}
-      <div className="absolute top-4 left-4 z-20 bg-background/80 backdrop-blur-sm rounded-lg p-3">
-        <div className="text-sm font-medium">{mapConfig.name}</div>
-        <div className="text-xs text-muted-foreground mt-1">
-          {completedIds.length} / {milestones.filter(m => m.isRequired).length} milestones
+      <div className="absolute top-4 left-4 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg p-3 border border-amber-800">
+        <div className="text-sm font-medium text-amber-200">{mapConfig.name}</div>
+        <div className="text-xs text-amber-300/70 mt-1">
+          {completedIds.length} / {milestones.filter(m => m.isRequired).length} islands conquered
         </div>
-        <div className="w-32 h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+        <div className="w-32 h-2 bg-amber-900 rounded-full mt-2 overflow-hidden border border-amber-700">
           <motion.div
-            className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
+            className="h-full bg-gradient-to-r from-green-500 to-emerald-400"
             initial={{ width: 0 }}
             animate={{
               width: `${(completedIds.length / Math.max(milestones.filter(m => m.isRequired).length, 1)) * 100}%`,
@@ -281,8 +357,7 @@ export default function JourneyMapRenderer({
       {/* Map Container */}
       <div
         ref={containerRef}
-        className="w-full h-[500px] md:h-[600px] cursor-grab active:cursor-grabbing"
-        style={{ backgroundColor: mapConfig.backgroundColor || "#0F172A" }}
+        className="w-full h-[500px] md:h-[600px] cursor-grab active:cursor-grabbing overflow-hidden"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -292,112 +367,140 @@ export default function JourneyMapRenderer({
         onTouchEnd={handleMouseUp}
         onWheel={handleWheel}
       >
-        <svg
-          width="100%"
-          height="100%"
-          viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
+        {/* Map content wrapper */}
+        <div
+          className="relative"
           style={{
+            width: MAP_WIDTH,
+            height: MAP_HEIGHT,
             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-            transformOrigin: "center center",
+            transformOrigin: "top left",
           }}
         >
-          {/* Gradient definitions */}
-          <defs>
-            <linearGradient id="mapBgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0F172A" />
-              <stop offset="50%" stopColor="#1E293B" />
-              <stop offset="100%" stopColor="#0F172A" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-            <filter id="shadow">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
-            </filter>
-          </defs>
-
-          {/* Zone backgrounds */}
-          {mapConfig.zones.map((zone, index) => {
-            const zoneMilestones = milestones.filter(m => m.zoneId === zone.id);
-            if (zoneMilestones.length === 0) return null;
-
-            const xs = zoneMilestones.map(m => m.position.x);
-            const ys = zoneMilestones.map(m => m.position.y);
-            const padding = 60;
-            const x = Math.min(...xs) - padding;
-            const y = Math.min(...ys) - padding;
-            const width = Math.max(...xs) - Math.min(...xs) + padding * 2;
-            const height = Math.max(...ys) - Math.min(...ys) + padding * 2;
-
-            return (
-              <g key={zone.id}>
-                <rect
-                  x={x}
-                  y={y}
-                  width={width}
-                  height={height}
-                  rx={16}
-                  fill={zone.color}
-                  fillOpacity={0.05}
-                  stroke={zone.color}
-                  strokeOpacity={0.2}
-                  strokeWidth={2}
-                  strokeDasharray="10,5"
-                />
-                <text
-                  x={x + width / 2}
-                  y={y + 20}
-                  fill={zone.color}
-                  fontSize="14"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  opacity={0.7}
-                >
-                  {zone.name}
-                </text>
-              </g>
-            );
-          })}
+          {/* Treasure Map Background */}
+          <Image
+            src="/assets/treasure-map.png"
+            alt="Treasure Map"
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            className="absolute top-0 left-0 object-cover"
+            style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+            priority
+            draggable={false}
+          />
 
           {/* Path Connections */}
           {milestones.map(milestone =>
             milestone.connectedTo.map(targetId => {
               const target = milestones.find(m => m.id === targetId);
               if (!target) return null;
-
-              const sourceStatus = getMilestoneStatus(milestone.id);
-              const targetStatus = getMilestoneStatus(targetId);
-              const isActive = sourceStatus === "completed" || sourceStatus === "current";
-
-              return (
-                <PathConnection
-                  key={`${milestone.id}-${targetId}`}
-                  start={milestone.position}
-                  end={target.position}
-                  color={milestone.color}
-                  isActive={isActive}
-                  isBranch={milestone.nodeType === "branch"}
-                  animated={sourceStatus === "current"}
-                />
-              );
+              return renderPath(milestone, target);
             })
           )}
 
           {/* Milestone Nodes */}
-          {milestones.map(milestone => (
-            <MilestoneNode
-              key={milestone.id}
-              milestone={milestone}
-              status={getMilestoneStatus(milestone.id)}
-              onClick={() => handleMilestoneClick(milestone)}
-            />
-          ))}
-        </svg>
+          {milestones.map(milestone => {
+            const status = getMilestoneStatus(milestone.id);
+            const style = getNodeStyle(status, milestone.size);
+            
+            return (
+              <motion.div
+                key={milestone.id}
+                className="absolute"
+                style={{
+                  left: milestone.position.x - (style.width as number) / 2,
+                  top: milestone.position.y - (style.height as number) / 2,
+                }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.1, type: "spring" }}
+              >
+                {/* Node */}
+                <motion.div
+                  style={style as any}
+                  onClick={() => handleMilestoneClick(milestone)}
+                  whileHover={status !== "locked" ? { scale: 1.15 } : {}}
+                  whileTap={status !== "locked" ? { scale: 0.95 } : {}}
+                  className="relative"
+                >
+                  {/* Icon/Status indicator */}
+                  {status === "completed" ? (
+                    <span className="text-white">✓</span>
+                  ) : status === "locked" ? (
+                    <span>🔒</span>
+                  ) : status === "current" ? (
+                    <span>⭐</span>
+                  ) : (
+                    <span>🏝️</span>
+                  )}
+
+                  {/* XP Badge */}
+                  {status !== "locked" && milestone.rewards.xp > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-amber-500 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border border-amber-300">
+                      +{milestone.rewards.xp}
+                    </div>
+                  )}
+
+                  {/* Badge indicator */}
+                  {milestone.rewards.badgeId && status !== "locked" && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border border-purple-300">
+                      <span className="text-[8px]">🏆</span>
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Label */}
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 mt-1 text-center whitespace-nowrap"
+                  style={{ top: (style.height as number) }}
+                >
+                  <span 
+                    className={cn(
+                      "text-[10px] font-medium px-2 py-0.5 rounded",
+                      status === "completed" && "bg-green-900/80 text-green-200",
+                      status === "current" && "bg-blue-900/80 text-blue-200",
+                      status === "unlocked" && "bg-amber-900/80 text-amber-200",
+                      status === "locked" && "bg-slate-900/60 text-slate-400"
+                    )}
+                  >
+                    {milestone.name.length > 12 ? milestone.name.slice(0, 10) + "..." : milestone.name}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {/* Animated ship at current position */}
+          {currentMilestone && (
+            <motion.div
+              className="absolute pointer-events-none"
+              style={{
+                left: milestones.find(m => m.id === currentMilestone)?.position.x ?? 0,
+                top: (milestones.find(m => m.id === currentMilestone)?.position.y ?? 0) - 50,
+              }}
+              animate={{
+                y: [0, -5, 0],
+                rotate: [-2, 2, -2],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <span className="text-3xl drop-shadow-lg">⛵</span>
+            </motion.div>
+          )}
+        </div>
       </div>
+
+      {/* CSS for pulse animation */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 2px 4px rgba(255,255,255,0.3); }
+          50% { box-shadow: 0 0 35px rgba(59, 130, 246, 1), inset 0 2px 4px rgba(255,255,255,0.3); }
+        }
+      `}</style>
 
       {/* Milestone Detail Modal */}
       <AnimatePresence>
