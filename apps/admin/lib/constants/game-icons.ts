@@ -2,10 +2,27 @@
  * Game Icons Registry for Admin
  * 
  * Centralized mapping of game icons for consistent usage across the admin app.
- * All icons are located in /public/game-icons/
+ * Icons are served from the main app's /public/game-icons/ directory.
+ * 
+ * For white-label deployments:
+ * - Set NEXT_PUBLIC_APP_URL to point to the main app (e.g., https://app.yourcompany.com)
+ * - Icons will be loaded from {NEXT_PUBLIC_APP_URL}/game-icons/...
  */
 
-export const GAME_ICONS = {
+/**
+ * Get the base URL for assets (main app URL for white-label support)
+ * Falls back to empty string for local development where icons are in admin's public folder
+ */
+export function getAssetsBaseUrl(): string {
+  // In browser, use the env variable; in development, icons are copied locally
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_APP_URL || '';
+  }
+  return process.env.NEXT_PUBLIC_APP_URL || '';
+}
+
+// Relative paths to game icons (without base URL)
+const GAME_ICON_PATHS = {
   // ========================================
   // Navigation & Core
   // ========================================
@@ -258,15 +275,47 @@ export const GAME_ICONS = {
   crisisRecovery: '/game-icons/6. Crysis Recovery.png',
 } as const;
 
-// Type for icon names
-export type GameIconName = keyof typeof GAME_ICONS;
+// Type for icon names (based on the paths object)
+export type GameIconName = keyof typeof GAME_ICON_PATHS;
 
-// Helper to get icon path
+/**
+ * GAME_ICONS - Dynamic icon URL registry
+ * 
+ * Returns full URLs for icons, supporting white-label deployments.
+ * When NEXT_PUBLIC_APP_URL is set, icons load from the main app.
+ * Otherwise, falls back to local paths (for development).
+ */
+export const GAME_ICONS: Record<GameIconName, string> = Object.fromEntries(
+  Object.entries(GAME_ICON_PATHS).map(([key, path]) => [key, path])
+) as Record<GameIconName, string>;
+
+/**
+ * Helper to get icon path with dynamic base URL support
+ * Use this for runtime URL generation in white-label deployments
+ */
 export function getGameIconPath(name: GameIconName): string {
-  return GAME_ICONS[name];
+  const basePath = GAME_ICON_PATHS[name];
+  if (!basePath) return '';
+  
+  const baseUrl = getAssetsBaseUrl();
+  return baseUrl ? `${baseUrl}${basePath}` : basePath;
+}
+
+/**
+ * Get all icon paths with dynamic base URL
+ * Useful for preloading or listing all available icons
+ */
+export function getAllGameIconPaths(): Record<GameIconName, string> {
+  const baseUrl = getAssetsBaseUrl();
+  return Object.fromEntries(
+    Object.entries(GAME_ICON_PATHS).map(([key, path]) => [
+      key,
+      baseUrl ? `${baseUrl}${path}` : path
+    ])
+  ) as Record<GameIconName, string>;
 }
 
 // Check if a string is a valid GameIconName
 export function isValidGameIconName(name: string): name is GameIconName {
-  return name in GAME_ICONS;
+  return name in GAME_ICON_PATHS;
 }

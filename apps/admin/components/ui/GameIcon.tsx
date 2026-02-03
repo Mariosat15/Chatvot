@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { GAME_ICONS, type GameIconName, isValidGameIconName } from "@/lib/constants/game-icons";
+import { getGameIconPath, type GameIconName, isValidGameIconName } from "@/lib/constants/game-icons";
 
 interface GameIconProps {
   /** Icon name from the GAME_ICONS registry */
@@ -19,6 +19,7 @@ interface GameIconProps {
  * GameIcon Component for Admin
  * 
  * A reusable component for displaying game-themed icons in the admin panel.
+ * Supports white-label deployments by using dynamic asset URLs.
  * Uses Next.js Image component for optimization.
  */
 export function GameIcon({
@@ -33,10 +34,29 @@ export function GameIcon({
     return <span className={cn("flex-shrink-0", className)} style={{ fontSize: size * 0.75 }}>{name}</span>;
   }
 
-  const iconPath = GAME_ICONS[name];
+  // Get the full icon path (supports dynamic base URL for white-label)
+  const iconPath = getGameIconPath(name);
   
   if (!iconPath) {
     return <span className={cn("flex-shrink-0", className)} style={{ fontSize: size * 0.75 }}>{name}</span>;
+  }
+
+  // Use regular img tag for external URLs (white-label), Next Image for local
+  const isExternalUrl = iconPath.startsWith('http');
+  
+  if (isExternalUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={iconPath}
+        alt={alt || name.replace(/([A-Z])/g, ' $1').trim()}
+        width={size}
+        height={size}
+        className={cn("object-contain flex-shrink-0", className)}
+        draggable={false}
+        loading="lazy"
+      />
+    );
   }
 
   return (
