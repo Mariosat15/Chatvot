@@ -140,6 +140,97 @@ export async function awardXPForBadge(
 }
 
 /**
+ * Award XP to user from any source (milestone, action, etc.)
+ * This is a generic XP award function, separate from badge XP
+ */
+export async function awardXP(
+  userId: string,
+  amount: number,
+  source: "milestone" | "action" | "competition" | "referral" | "bonus" | "other",
+  sourceId?: string
+): Promise<{
+  xpGained: number;
+  newXP: number;
+  newLevel: number;
+  newTitle: string;
+  leveledUp: boolean;
+  oldLevel?: number;
+  oldTitle?: string;
+}> {
+  console.log(`💫 [XP AWARD] Awarding ${amount} XP to user ${userId} from ${source}`);
+  await connectToDatabase();
+
+  if (amount <= 0) {
+    throw new Error("XP amount must be positive");
+  }
+
+  // Get or create user level
+  let userLevel = await UserLevel.findOne({ userId });
+
+  if (!userLevel) {
+    console.log(`📝 [XP AWARD] Creating new UserLevel document for user ${userId}`);
+    userLevel = await UserLevel.create({
+      userId,
+      currentXP: 0,
+      currentLevel: 1,
+      currentTitle: "Novice Trader",
+      totalBadgesEarned: 0,
+    });
+  }
+
+  const oldXP = userLevel.currentXP;
+  const oldLevel = userLevel.currentLevel;
+  const oldTitle = userLevel.currentTitle;
+
+  // Add XP
+  const newXP = oldXP + amount;
+  console.log(`📈 [XP AWARD] XP progression: ${oldXP} → ${newXP} (+${amount})`);
+
+  const newTitleLevel = await getTitleByXP(newXP);
+  const leveledUp = newTitleLevel.level > oldLevel;
+
+  if (leveledUp) {
+    console.log(`🎉 [XP AWARD] LEVEL UP! ${oldLevel} → ${newTitleLevel.level}`);
+  }
+
+  // Update user level
+  userLevel.currentXP = newXP;
+  userLevel.currentLevel = newTitleLevel.level;
+  userLevel.currentTitle = newTitleLevel.title;
+  userLevel.lastXPGain = new Date();
+
+  // Add to XP history
+  userLevel.xpHistory.push({
+    amount,
+    source,
+    sourceId,
+    timestamp: new Date(),
+  });
+
+  await userLevel.save();
+
+  // Send level up notification if user leveled up
+  if (leveledUp) {
+    try {
+      const { notificationService } = await import("@/lib/services/notification.service");
+      await notificationService.notifyLevelUp(userId, newTitleLevel.level, newTitleLevel.title);
+    } catch (error) {
+      console.error(`❌ [XP AWARD] Error sending level up notification:`, error);
+    }
+  }
+
+  return {
+    xpGained: amount,
+    newXP,
+    newLevel: newTitleLevel.level,
+    newTitle: newTitleLevel.title,
+    leveledUp,
+    oldLevel: leveledUp ? oldLevel : undefined,
+    oldTitle: leveledUp ? oldTitle : undefined,
+  };
+}
+
+/**
  * Get user's current level and XP
  * Always fetches title, icon, and description from database configuration
  */

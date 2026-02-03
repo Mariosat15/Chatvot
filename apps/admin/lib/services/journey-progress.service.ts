@@ -708,14 +708,79 @@ export async function completeMilestone(
 
   await progress.save();
 
-  // Award XP if there's a badge reward
+  // ============================================
+  // UNIFIED REWARD SYSTEM
+  // ============================================
   let leveledUp = false;
+  let totalXPAwarded = 0;
+
+  // 1. Award MILESTONE XP directly to user level
+  if (milestone.rewards.xp > 0) {
+    try {
+      const { awardXP } = await import("@/lib/services/xp-level.service");
+      const xpResult = await awardXP(userId, milestone.rewards.xp, "milestone", milestoneId);
+      totalXPAwarded += milestone.rewards.xp;
+      leveledUp = xpResult.leveledUp;
+      console.log(`⭐ [JOURNEY] Awarded ${milestone.rewards.xp} XP for milestone completion`);
+    } catch (error) {
+      console.error(`⚠️ [JOURNEY] Error awarding milestone XP:`, error);
+    }
+  }
+
+  // 2. Award BADGE if milestone has one
   if (milestone.rewards.badgeId) {
     try {
-      const result = await awardXPForBadge(userId, milestone.rewards.badgeId);
-      leveledUp = result.leveledUp;
+      const UserBadge = (await import("@/database/models/user-badge.model")).default;
+      
+      // Check if user already has this badge
+      const existingBadge = await UserBadge.findOne({ 
+        userId, 
+        badgeId: milestone.rewards.badgeId 
+      });
+      
+      if (!existingBadge) {
+        // Award the badge
+        await UserBadge.create({
+          userId,
+          badgeId: milestone.rewards.badgeId,
+          earnedAt: new Date(),
+          progress: 100,
+          source: "milestone",
+          milestoneId,
+        });
+        console.log(`🏅 [JOURNEY] Awarded badge ${milestone.rewards.badgeId} for milestone`);
+
+        // Award badge XP (this is separate from milestone XP)
+        try {
+          const { awardXPForBadge } = await import("@/lib/services/xp-level.service");
+          const badgeXpResult = await awardXPForBadge(userId, milestone.rewards.badgeId);
+          totalXPAwarded += badgeXpResult.xpGained;
+          if (badgeXpResult.leveledUp) leveledUp = true;
+          console.log(`⭐ [JOURNEY] Awarded ${badgeXpResult.xpGained} XP for badge`);
+        } catch (badgeXpError) {
+          console.error(`⚠️ [JOURNEY] Error awarding badge XP:`, badgeXpError);
+        }
+
+        // Send badge notification
+        try {
+          const { notificationService } = await import("@/lib/services/notification.service");
+          const BadgeConfig = (await import("@/database/models/badge-config.model")).default;
+          const badge = await BadgeConfig.findOne({ id: milestone.rewards.badgeId });
+          if (badge) {
+            await notificationService.notifyBadgeEarned(
+              userId,
+              badge.name,
+              badge.description || `You've earned the ${badge.name} badge!`
+            );
+          }
+        } catch (notifError) {
+          console.error(`⚠️ [JOURNEY] Error sending badge notification:`, notifError);
+        }
+      } else {
+        console.log(`ℹ️ [JOURNEY] User already has badge ${milestone.rewards.badgeId}`);
+      }
     } catch (error) {
-      console.error(`⚠️ [JOURNEY] Error awarding badge XP:`, error);
+      console.error(`⚠️ [JOURNEY] Error awarding badge:`, error);
     }
   }
 
