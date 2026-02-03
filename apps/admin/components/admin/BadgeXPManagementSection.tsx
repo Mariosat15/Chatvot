@@ -1760,6 +1760,13 @@ export default function BadgeXPManagementSection() {
                           category: "",
                           rarity: "",
                           icon: "",
+                          condition: {
+                            type: "",
+                            value: undefined,
+                            comparison: "gte",
+                            minTrades: undefined,
+                            minCompletedCompetitions: undefined,
+                          },
                         });
                         setIsClosing(false);
                       }, 300);
