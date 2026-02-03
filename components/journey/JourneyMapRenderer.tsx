@@ -218,8 +218,9 @@ export default function JourneyMapRenderer({
 
   // Get node style based on status
   const getNodeStyle = (status: "completed" | "current" | "unlocked" | "locked", size: string) => {
-    const sizeMap = { small: 28, medium: 36, large: 48 };
-    const nodeSize = sizeMap[size as keyof typeof sizeMap] || 36;
+    // Bigger sizes for better visibility
+    const sizeMap = { small: 40, medium: 50, large: 60 };
+    const nodeSize = sizeMap[size as keyof typeof sizeMap] || 50;
     
     const baseStyle = {
       width: nodeSize,
@@ -230,7 +231,7 @@ export default function JourneyMapRenderer({
       justifyContent: "center",
       cursor: status === "locked" ? "not-allowed" : "pointer",
       transition: "all 0.3s ease",
-      fontSize: nodeSize * 0.5,
+      fontSize: nodeSize * 0.45,
     };
 
     switch (status) {
@@ -238,31 +239,31 @@ export default function JourneyMapRenderer({
         return {
           ...baseStyle,
           background: "linear-gradient(135deg, #22C55E, #16A34A)",
-          boxShadow: "0 0 20px rgba(34, 197, 94, 0.6), inset 0 2px 4px rgba(255,255,255,0.3)",
-          border: "3px solid #86EFAC",
+          boxShadow: "0 0 25px rgba(34, 197, 94, 0.7), 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3)",
+          border: "4px solid #86EFAC",
         };
       case "current":
         return {
           ...baseStyle,
           background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-          boxShadow: "0 0 25px rgba(59, 130, 246, 0.8), inset 0 2px 4px rgba(255,255,255,0.3)",
-          border: "3px solid #93C5FD",
+          boxShadow: "0 0 30px rgba(59, 130, 246, 0.9), 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3)",
+          border: "4px solid #93C5FD",
           animation: "pulse 2s infinite",
         };
       case "unlocked":
         return {
           ...baseStyle,
           background: "linear-gradient(135deg, #F59E0B, #D97706)",
-          boxShadow: "0 4px 12px rgba(245, 158, 11, 0.4), inset 0 2px 4px rgba(255,255,255,0.2)",
-          border: "3px solid #FCD34D",
+          boxShadow: "0 0 20px rgba(245, 158, 11, 0.5), 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)",
+          border: "4px solid #FCD34D",
         };
       case "locked":
         return {
           ...baseStyle,
-          background: "linear-gradient(135deg, #374151, #1F2937)",
-          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.4)",
-          border: "3px solid #4B5563",
-          opacity: 0.6,
+          background: "linear-gradient(135deg, #6B7280, #4B5563)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.3)",
+          border: "4px solid #9CA3AF",
+          opacity: 0.85,
         };
     }
   };
@@ -453,51 +454,51 @@ export default function JourneyMapRenderer({
                 <motion.div
                   style={style as any}
                   onClick={() => handleMilestoneClick(milestone)}
-                  whileHover={status !== "locked" ? { scale: 1.15 } : {}}
+                  whileHover={status !== "locked" ? { scale: 1.12 } : {}}
                   whileTap={status !== "locked" ? { scale: 0.95 } : {}}
                   className="relative"
                 >
-                  {/* Icon/Status indicator */}
+                  {/* Icon/Status indicator - bigger and clearer */}
                   {status === "completed" ? (
-                    <span className="text-white">✓</span>
+                    <span className="text-white text-2xl font-bold drop-shadow-lg">✓</span>
                   ) : status === "locked" ? (
-                    <span>🔒</span>
+                    <span className="text-xl drop-shadow-md">🔒</span>
                   ) : status === "current" ? (
-                    <span>⭐</span>
+                    <span className="text-2xl drop-shadow-lg">⭐</span>
                   ) : (
-                    <span>🏝️</span>
+                    <span className="text-xl drop-shadow-lg">🏝️</span>
                   )}
 
                   {/* XP Badge */}
                   {status !== "locked" && milestone.rewards.xp > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-amber-500 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border border-amber-300">
+                    <div className="absolute -top-2 -right-2 bg-amber-500 text-[11px] font-bold text-white px-2 py-0.5 rounded-full shadow-lg border-2 border-amber-300">
                       +{milestone.rewards.xp}
                     </div>
                   )}
 
                   {/* Badge indicator */}
                   {milestone.rewards.badgeId && status !== "locked" && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border border-purple-300">
-                      <span className="text-[8px]">🏆</span>
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border-2 border-purple-300">
+                      <span className="text-[10px]">🏆</span>
                     </div>
                   )}
                 </motion.div>
 
                 {/* Label */}
                 <div 
-                  className="absolute left-1/2 -translate-x-1/2 mt-1 text-center whitespace-nowrap"
+                  className="absolute left-1/2 -translate-x-1/2 mt-2 text-center whitespace-nowrap"
                   style={{ top: (style.height as number) }}
                 >
                   <span 
                     className={cn(
-                      "text-[10px] font-medium px-2 py-0.5 rounded",
-                      status === "completed" && "bg-green-900/80 text-green-200",
-                      status === "current" && "bg-blue-900/80 text-blue-200",
-                      status === "unlocked" && "bg-amber-900/80 text-amber-200",
-                      status === "locked" && "bg-slate-900/60 text-slate-400"
+                      "text-xs font-semibold px-2 py-1 rounded shadow-md",
+                      status === "completed" && "bg-green-900/90 text-green-100 border border-green-700",
+                      status === "current" && "bg-blue-900/90 text-blue-100 border border-blue-700",
+                      status === "unlocked" && "bg-amber-900/90 text-amber-100 border border-amber-700",
+                      status === "locked" && "bg-slate-800/90 text-slate-300 border border-slate-600"
                     )}
                   >
-                    {milestone.name.length > 12 ? milestone.name.slice(0, 10) + "..." : milestone.name}
+                    {milestone.name.length > 14 ? milestone.name.slice(0, 12) + "..." : milestone.name}
                   </span>
                 </div>
               </motion.div>

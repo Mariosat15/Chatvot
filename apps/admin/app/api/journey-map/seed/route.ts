@@ -6,6 +6,7 @@ import { DEFAULT_MAP_CONFIG, DEFAULT_MILESTONES } from "@/lib/constants/journey-
 
 /**
  * Seed the default journey map and milestones
+ * This will DELETE all existing milestones and create fresh ones from the template
  */
 async function seedJourneyMap() {
   await connectToDatabase();
@@ -13,6 +14,10 @@ async function seedJourneyMap() {
   console.log("🗺️ [SEED] Starting journey map seed...");
   console.log("📦 [SEED] Map config:", DEFAULT_MAP_CONFIG.mapId);
   console.log("📦 [SEED] Milestones count:", DEFAULT_MILESTONES.length);
+
+  // Delete ALL existing milestones for this map first
+  const deleteResult = await JourneyMilestone.deleteMany({ mapId: DEFAULT_MAP_CONFIG.mapId });
+  console.log(`🗑️ [SEED] Deleted ${deleteResult.deletedCount} existing milestones`);
 
   // Check if map already exists
   const existingMap = await JourneyMapConfig.findOne({ mapId: DEFAULT_MAP_CONFIG.mapId });
@@ -49,14 +54,11 @@ async function seedJourneyMap() {
     console.log("✨ [SEED] Created new map configuration");
   }
 
-  // Upsert all milestones
+  // Create all milestones fresh
   let created = 0;
-  let updated = 0;
 
   for (const milestone of DEFAULT_MILESTONES) {
     try {
-      const existing = await JourneyMilestone.findOne({ id: milestone.id });
-      
       const milestoneData = {
         id: milestone.id,
         mapId: DEFAULT_MAP_CONFIG.mapId,
@@ -82,29 +84,21 @@ async function seedJourneyMap() {
         isActive: true,
       };
       
-      if (existing) {
-        await JourneyMilestone.findOneAndUpdate(
-          { id: milestone.id },
-          milestoneData
-        );
-        updated++;
-      } else {
-        await JourneyMilestone.create(milestoneData);
-        created++;
-      }
+      await JourneyMilestone.create(milestoneData);
+      created++;
     } catch (err) {
       console.error(`Error seeding milestone ${milestone.id}:`, err);
     }
   }
 
-  console.log(`✅ [SEED] Complete: ${created} milestones created, ${updated} updated`);
+  console.log(`✅ [SEED] Complete: ${created} milestones created (${deleteResult.deletedCount} deleted)`);
 
   return {
     mapId: DEFAULT_MAP_CONFIG.mapId,
     mapName: DEFAULT_MAP_CONFIG.name,
     zonesCount: DEFAULT_MAP_CONFIG.zones.length,
+    milestonesDeleted: deleteResult.deletedCount,
     milestonesCreated: created,
-    milestonesUpdated: updated,
     totalMilestones: DEFAULT_MILESTONES.length,
   };
 }
