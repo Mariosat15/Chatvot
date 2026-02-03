@@ -340,7 +340,7 @@ export default function JourneyMapRenderer({
       <div className="absolute top-4 left-4 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg p-3 border border-amber-800">
         <div className="text-sm font-medium text-amber-200">{mapConfig.name}</div>
         <div className="text-xs text-amber-300/70 mt-1">
-          {completedIds.length} / {milestones.filter(m => m.isRequired).length} islands conquered
+          {completedIds.length} / {milestones.filter(m => m.isRequired).length} milestones conquered
         </div>
         <div className="w-32 h-2 bg-amber-900 rounded-full mt-2 overflow-hidden border border-amber-700">
           <motion.div
