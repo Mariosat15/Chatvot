@@ -14,6 +14,8 @@ interface UserStats {
   userId: string;
   // Competition stats
   competitionsEntered: number;
+  completedCompetitions: number; // NEW: Competitions with status "completed"
+  completedCompetitionsWithTrades: number; // NEW: Completed competitions with 5+ trades
   firstPlaceFinishes: number;
   podiumFinishes: number;
   totalWins: number;
@@ -45,6 +47,7 @@ interface UserStats {
   // Wallet
   totalDeposited: number;
   totalWithdrawn: number;
+  kycVerified: boolean;
 
   // Time
   accountAge: number; // days
@@ -60,6 +63,7 @@ interface UserStats {
   tradesOver7Days: number;
   tradesAtMarketOpen: number;
   tradesAtMarketClose: number;
+  tradesAtLateNight: number; // NEW: Trades between 22:00-06:00 UTC
 
   // Daily/Weekly/Monthly volumes
   maxTradesInOneDay: number;
@@ -107,10 +111,14 @@ export async function evaluateUserBadges(userId: string): Promise<{
     console.log(`📊 [BADGE EVAL] User stats:`, {
       trades: stats.totalTrades,
       competitions: stats.competitionsEntered,
+      completedCompetitions: stats.completedCompetitions,
+      completedCompetitionsWithTrades: stats.completedCompetitionsWithTrades,
       wins: stats.totalWins,
       deposits: stats.totalDeposited,
       winRate: stats.winRate,
       totalPnl: stats.totalPnl,
+      liquidations: stats.liquidationCount,
+      tradesAtLateNight: stats.tradesAtLateNight,
     });
 
     // 2. Get currently earned badges
@@ -185,6 +193,30 @@ export async function evaluateUserBadges(userId: string): Promise<{
       `🎉 [BADGE EVAL] Evaluation complete: ${newlyEarnedBadges.length} new badges earned`,
     );
 
+    // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
+    // Even if no badges earned, we create the record for tracking
+    try {
+      const { ensureUserLevel } =
+        await import("@/lib/services/xp-level.service");
+      await ensureUserLevel(userId);
+    } catch (levelError) {
+      console.error("❌ [BADGE EVAL] Error ensuring user level:", levelError);
+    }
+
+    // Check and complete journey milestones based on new stats/badges
+    try {
+      const { checkAndCompleteMilestones } =
+        await import("@/lib/services/journey-progress.service");
+      const journeyResult = await checkAndCompleteMilestones(userId);
+      if (journeyResult.completed.length > 0) {
+        console.log(
+          `🗺️ [BADGE EVAL] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+        );
+      }
+    } catch (journeyError) {
+      console.error("❌ [BADGE EVAL] Error checking journey milestones:", journeyError);
+    }
+
     return {
       newBadges: newlyEarnedBadges,
       totalBadges: existingBadges.length + newlyEarnedBadges.length,
@@ -197,8 +229,9 @@ export async function evaluateUserBadges(userId: string): Promise<{
 
 /**
  * Gather comprehensive user statistics for badge evaluation
+ * Exported for use by journey progress service
  */
-async function gatherUserStats(userId: string): Promise<UserStats> {
+export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Get competition stats
   const participations = await CompetitionParticipant.find({ userId }).lean();
   const firstPlaceFinishes = participations.filter(
@@ -206,6 +239,16 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
   ).length;
   const podiumFinishes = participations.filter(
     (p) => p.currentRank && p.currentRank <= 3,
+  ).length;
+
+  // NEW: Count completed competitions (status = "completed")
+  const completedCompetitions = participations.filter(
+    (p) => p.status === "completed",
+  ).length;
+
+  // NEW: Count completed competitions with 5+ trades (for realistic survival badges)
+  const completedCompetitionsWithTrades = participations.filter(
+    (p) => p.status === "completed" && (p.totalTrades || 0) >= 5,
   ).length;
 
   // Get trading stats
@@ -285,7 +328,7 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
     (p) => p.status === "liquidated",
   ).length;
 
-  // SL/TP usage
+  // SL/TP usage - Only count if user has placed trades
   const tradesWithSL = allPositions.filter(
     (p) => p.stopLoss && p.stopLoss > 0,
   ).length;
@@ -304,6 +347,7 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
   > | null;
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
+  const kycVerified = !!(wallet?.kycVerified || wallet?.kycStatus === "approved");
 
   // Account age (assuming user created with first participation or wallet)
   const firstParticipation = participations.sort(
@@ -381,6 +425,12 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
     return hour >= 20 && hour <= 21; // 8-9 PM UTC (market close)
   }).length;
 
+  // NEW: Trades at late night (22:00-06:00 UTC)
+  const tradesAtLateNight = closedTrades.filter((t) => {
+    const hour = new Date(t.openedAt || Date.now()).getUTCHours();
+    return hour >= 22 || hour < 6; // 22:00-06:00 UTC
+  }).length;
+
   // Daily/Weekly/Monthly volumes
   const tradesPerDay = new Map<string, number>();
   closedTrades.forEach((t) => {
@@ -390,6 +440,29 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
     tradesPerDay.set(dateKey, (tradesPerDay.get(dateKey) || 0) + 1);
   });
   const maxTradesInOneDay = Math.max(...Array.from(tradesPerDay.values()), 0);
+
+  // Weekly volumes
+  const tradesPerWeek = new Map<string, number>();
+  closedTrades.forEach((t) => {
+    const date = new Date(t.closedAt || Date.now());
+    // Get ISO week
+    const yearStart = new Date(date.getFullYear(), 0, 1);
+    const weekNumber = Math.ceil(
+      ((date.getTime() - yearStart.getTime()) / 86400000 + yearStart.getDay() + 1) / 7
+    );
+    const weekKey = `${date.getFullYear()}-W${weekNumber}`;
+    tradesPerWeek.set(weekKey, (tradesPerWeek.get(weekKey) || 0) + 1);
+  });
+  const maxTradesInOneWeek = Math.max(...Array.from(tradesPerWeek.values()), 0);
+
+  // Monthly volumes
+  const tradesPerMonth = new Map<string, number>();
+  closedTrades.forEach((t) => {
+    const date = new Date(t.closedAt || Date.now());
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    tradesPerMonth.set(monthKey, (tradesPerMonth.get(monthKey) || 0) + 1);
+  });
+  const maxTradesInOneMonth = Math.max(...Array.from(tradesPerMonth.values()), 0);
 
   // Competition specific stats
   const comebackWins = participations.filter((p) => {
@@ -403,8 +476,8 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
   }).length;
 
   const perfectCompetitionTrades = participations.filter((p) => {
-    // 100% win rate in a competition
-    return p.totalTrades >= 5 && p.winRate === 100;
+    // 100% win rate in a competition with at least 10 trades
+    return p.totalTrades >= 10 && p.winRate === 100;
   }).length;
 
   // Calculate risk metrics
@@ -493,6 +566,8 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
   return {
     userId,
     competitionsEntered: participations.length,
+    completedCompetitions,
+    completedCompetitionsWithTrades,
     firstPlaceFinishes,
     podiumFinishes,
     totalWins: firstPlaceFinishes,
@@ -514,6 +589,7 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
     totalWithdrawn,
+    kycVerified,
     accountAge,
     consecutiveTradingDays: consecutiveDays,
     weeklyTradingStreak: Math.floor(consecutiveDays / 7),
@@ -525,9 +601,10 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
     tradesOver7Days,
     tradesAtMarketOpen,
     tradesAtMarketClose,
+    tradesAtLateNight,
     maxTradesInOneDay,
-    maxTradesInOneWeek: 0, // Could calculate if needed
-    maxTradesInOneMonth: 0, // Could calculate if needed
+    maxTradesInOneWeek,
+    maxTradesInOneMonth,
     comebackWins,
     wireToWireWins,
     perfectCompetitionTrades,
@@ -544,13 +621,27 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
 
 /**
  * Check if a badge condition is met
+ * NEW: Now properly validates minTrades and minCompletedCompetitions requirements
  */
 async function checkBadgeCondition(
   badge: Badge,
   stats: UserStats,
 ): Promise<boolean> {
   const { condition } = badge;
-  const { type, value, comparison } = condition;
+  const { type, value, comparison, minTrades, minCompletedCompetitions } = condition;
+
+  // CRITICAL: First check minimum requirements before evaluating the condition
+  // This prevents "zero-baseline" badges from being awarded to new users
+  
+  // Check minimum trades requirement
+  if (minTrades !== undefined && stats.totalTrades < minTrades) {
+    return false;
+  }
+
+  // Check minimum completed competitions requirement
+  if (minCompletedCompetitions !== undefined && stats.completedCompetitionsWithTrades < minCompletedCompetitions) {
+    return false;
+  }
 
   switch (type) {
     // Competition badges
@@ -561,8 +652,9 @@ async function checkBadgeCondition(
     case "podium_finishes":
       return compareValue(stats.podiumFinishes, value, comparison);
     case "perfect_competition_win_rate":
+      // Must have completed at least minCompletedCompetitions (default 3)
       return (
-        stats.competitionsEntered >= 3 &&
+        stats.completedCompetitions >= (minCompletedCompetitions || 3) &&
         stats.firstPlaceFinishes === stats.competitionsEntered
       );
 
@@ -579,7 +671,8 @@ async function checkBadgeCondition(
     case "winning_trades":
       return compareValue(stats.winningTrades, value, comparison);
     case "total_pnl_positive":
-      return stats.totalPnl > 0;
+      // NEW: Require minimum trades before claiming "positive P&L"
+      return stats.totalTrades >= (minTrades || 10) && stats.totalPnl > 0;
     case "total_pnl":
       return compareValue(stats.totalPnl, value, comparison);
     case "single_trade_profit":
@@ -598,15 +691,25 @@ async function checkBadgeCondition(
         stats.totalPnl > 0 && stats.losingTrades > 0 && stats.maxWinStreak >= 3
       );
 
-    // Risk badges
+    // RISK BADGES - CRITICAL FIX: Now require actual activity
     case "no_liquidations":
-      return stats.liquidationCount === 0;
+      // FIXED: Must complete at least 1 competition with 5+ trades to earn "Survivor"
+      return (
+        stats.completedCompetitionsWithTrades >= (minCompletedCompetitions || 1) &&
+        stats.totalTrades >= (minTrades || 5) &&
+        stats.liquidationCount === 0
+      );
     case "zero_liquidations_lifetime":
-      return stats.liquidationCount === 0 && stats.competitionsEntered >= 5;
+      // FIXED: Must complete 10+ competitions with 50+ total trades
+      return (
+        stats.completedCompetitionsWithTrades >= (minCompletedCompetitions || 10) &&
+        stats.totalTrades >= (minTrades || 50) &&
+        stats.liquidationCount === 0
+      );
     case "always_uses_sl":
-      return stats.alwaysUsesSL && stats.totalTrades >= 10;
+      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50);
     case "always_uses_tp":
-      return stats.alwaysUsesTP && stats.totalTrades >= 10;
+      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50);
 
     // Social badges
     case "first_deposit":
@@ -633,7 +736,7 @@ async function checkBadgeCondition(
     // Legendary badges
     case "undefeated_in_comps":
       return (
-        stats.competitionsEntered >= 5 &&
+        stats.completedCompetitionsWithTrades >= (minCompletedCompetitions || 10) &&
         stats.firstPlaceFinishes === stats.competitionsEntered
       );
     case "all_legendary_badges":
@@ -646,28 +749,33 @@ async function checkBadgeCondition(
 
     // Risk management (advanced)
     case "max_drawdown":
-      return compareValue(stats.maxDrawdown, value, comparison);
+      // FIXED: Require minimum trades to prevent zero-baseline awards
+      // User must have at least 20 trades to claim "controlled risk"
+      return stats.totalTrades >= (minTrades || 20) && 
+             stats.completedCompetitionsWithTrades >= 1 &&
+             compareValue(stats.maxDrawdown, value, comparison);
     case "average_leverage_low":
-      return stats.totalTrades >= 10 && stats.averagePositionSize <= 1; // Conservative sizing
+      return stats.totalTrades >= (minTrades || 20) && stats.averagePositionSize <= 1; // Conservative sizing
     case "average_loss_small":
       return (
         stats.averageLoss > 0 &&
         stats.averageLoss < 50 &&
-        stats.totalTrades >= 10
+        stats.totalTrades >= (minTrades || 30)
       );
     case "risk_discipline":
       return (
         stats.alwaysUsesSL &&
         stats.alwaysUsesTP &&
         stats.liquidationCount === 0 &&
-        stats.totalTrades >= 20
+        stats.totalTrades >= (minTrades || 50) &&
+        stats.completedCompetitionsWithTrades >= (minCompletedCompetitions || 5)
       );
     case "sharpe_ratio_high":
-      return stats.sharpeRatio >= 2 && stats.totalTrades >= 30;
+      return stats.sharpeRatio >= 2 && stats.totalTrades >= (minTrades || 50);
     case "low_volatility":
       return (
         stats.profitVolatility < 100 &&
-        stats.totalTrades >= 30 &&
+        stats.totalTrades >= (minTrades || 50) &&
         stats.winRate >= 55
       );
     case "optimal_position_sizing":
@@ -675,10 +783,10 @@ async function checkBadgeCondition(
         stats.averagePositionSize > 0 &&
         stats.averagePositionSize <= 2 &&
         stats.liquidationCount === 0 &&
-        stats.totalTrades >= 20
+        stats.totalTrades >= (minTrades || 30)
       );
     case "strategy_diversity":
-      return stats.uniqueStrategiesUsed >= 5 && stats.totalTrades >= 50;
+      return stats.uniqueStrategiesUsed >= 5 && stats.totalTrades >= (minTrades || 50);
     case "balanced_risk_reward":
       return (
         stats.profitFactor >= 1.5 && stats.winRate >= 45 && stats.winRate <= 60
@@ -686,67 +794,73 @@ async function checkBadgeCondition(
     case "low_return_variance":
       return (
         stats.profitVolatility < 150 &&
-        stats.totalTrades >= 40 &&
+        stats.totalTrades >= (minTrades || 50) &&
         stats.winRate >= 50
       );
     case "predictable_results":
       return (
         stats.profitVolatility < 100 &&
-        stats.totalTrades >= 50 &&
+        stats.totalTrades >= (minTrades || 75) &&
         stats.winRate >= 55
       );
     case "exceptional_dd_control":
-      return stats.maxDrawdown <= 5 && stats.totalTrades >= 20;
+      // Require completed competitions to prevent zero-baseline
+      return stats.maxDrawdown <= 5 && 
+             stats.totalTrades >= (minTrades || 50) &&
+             stats.completedCompetitionsWithTrades >= 3;
+    case "hedging_strategy":
+      // Simplified: User has multiple positions and good risk management
+      return stats.totalTrades >= (minTrades || 30) && stats.alwaysUsesSL && stats.uniquePairsTraded >= 3;
 
     // Strategy detection (simplified)
     case "trend_following":
-      return stats.totalTrades >= 20 && stats.winRate >= 50;
+      return stats.totalTrades >= (minTrades || 30) && stats.winRate >= 50;
     case "counter_trend":
-      return stats.totalTrades >= 30 && stats.winRate >= 45;
+      return stats.totalTrades >= (minTrades || 40) && stats.winRate >= 45;
     case "breakout_trading":
-      return stats.bestSingleTrade >= 300 && stats.totalTrades >= 20;
+      return stats.bestSingleTrade >= 300 && stats.totalTrades >= (minTrades || 30);
     case "range_trading":
-      return stats.totalTrades >= 30 && stats.winRate >= 55;
+      return stats.totalTrades >= (minTrades || 40) && stats.winRate >= 55;
     case "momentum_trading":
-      return stats.maxWinStreak >= 5 && stats.totalTrades >= 25;
+      return stats.maxWinStreak >= 5 && stats.totalTrades >= (minTrades || 35);
     case "mean_reversion":
-      return stats.totalTrades >= 30 && stats.winRate >= 50;
+      return stats.totalTrades >= (minTrades || 40) && stats.winRate >= 50;
     case "multiple_strategies":
-      return stats.uniquePairsTraded >= 5 && stats.totalTrades >= 100;
+      return stats.uniquePairsTraded >= 5 && stats.totalTrades >= (minTrades || 100);
     case "technical_analysis":
-      return stats.totalTrades >= 50 && stats.alwaysUsesTP;
+      return stats.totalTrades >= (minTrades || 50) && stats.alwaysUsesTP;
     case "unique_strategy":
       return stats.profitFactor >= 3 && stats.uniquePairsTraded >= 8;
     case "news_trading":
-      return stats.tradesAtMarketOpen >= 10 && stats.totalTrades >= 30;
+      return stats.tradesAtMarketOpen >= 10 && stats.totalTrades >= (minTrades || 40);
     case "versatile":
-      return stats.uniquePairsTraded >= 5 && stats.totalTrades >= 100;
+      return stats.uniquePairsTraded >= 5 && stats.totalTrades >= (minTrades || 100);
 
     // Speed & Execution badges
     case "fast_order_execution":
-      return stats.totalTrades >= 20 && stats.tradesUnder5Minutes >= 10;
+      return stats.totalTrades >= (minTrades || 20) && stats.tradesUnder5Minutes >= 10;
     case "ultra_fast_execution":
       return stats.tradesUnder1Minute >= 5;
     case "quick_scalps":
-      return stats.tradesUnder5Minutes >= 50;
+      return stats.tradesUnder5Minutes >= (minTrades || 50);
     case "closes_all_daily":
-      return stats.tradesOver1Day === 0 && stats.totalTrades >= 20;
+      return stats.tradesOver1Day === 0 && stats.totalTrades >= (minTrades || 30);
     case "swing_trading_style":
-      return stats.tradesOver1Day >= 10;
+      return stats.tradesOver1Day >= (minTrades || 15);
     case "position_trading_style":
-      return stats.tradesOver7Days >= 5;
+      return stats.tradesOver7Days >= (minTrades || 10);
     case "precise_entry_timing":
-      return stats.winRate >= 70 && stats.totalTrades >= 30;
+      return stats.winRate >= 70 && stats.totalTrades >= (minTrades || 40);
     case "ninja_trading":
       return stats.tradesUnder5Minutes >= 20 && stats.winRate >= 60;
     case "patient_trading":
       return stats.averageTradeDuration >= 60 && stats.winRate >= 55; // 60+ minutes
     case "trades_at_open":
-      return stats.tradesAtMarketOpen >= 20;
+      return stats.tradesAtMarketOpen >= (minTrades || 20);
     case "trades_at_close":
-      return stats.tradesAtMarketClose >= 20;
+      return stats.tradesAtMarketClose >= (minTrades || 20);
     case "trades_all_hours":
-      return stats.totalTrades >= 100 && stats.uniquePairsTraded >= 5;
+      return stats.totalTrades >= (minTrades || 100) && stats.uniquePairsTraded >= 5;
 
     // Time-based trading volume
     case "daily_trade_volume":
@@ -768,7 +882,7 @@ async function checkBadgeCondition(
     case "consecutive_profitable_days":
       return stats.consecutiveProfitableDays >= (value || 7);
     case "perfect_attendance":
-      return stats.consecutiveTradingDays >= 90 && stats.totalTrades >= 200;
+      return stats.consecutiveTradingDays >= 90 && stats.totalTrades >= (minTrades || 200);
 
     // Advanced competition badges
     case "comeback_victory":
@@ -780,20 +894,28 @@ async function checkBadgeCondition(
     case "underdog_win":
       return stats.firstPlaceFinishes >= 1 && stats.averageRoi < 50;
     case "perfect_competition_trades":
-      return stats.perfectCompetitionTrades >= 1;
+      // FIXED: Require 10+ trades in a competition with 100% win rate
+      return stats.perfectCompetitionTrades >= 1 && stats.completedCompetitionsWithTrades >= 1;
     case "survived_full_competition":
-      return stats.competitionsEntered >= 10 && stats.liquidationCount === 0;
+      // FIXED: Must complete at least 1 competition with 10+ trades
+      return (
+        stats.completedCompetitionsWithTrades >= (minCompletedCompetitions || 1) &&
+        stats.totalTrades >= (minTrades || 10) &&
+        stats.liquidationCount === 0
+      );
     case "first_trade_in_comp":
       return stats.totalTrades >= 1 && stats.competitionsEntered >= 1;
+    
+    // FIXED: Late night trader now checks actual late-night trade count
     case "late_night_trader":
-      return stats.totalTrades >= 50; // Simplified
+      return stats.tradesAtLateNight >= (minTrades || 20);
 
     // Legendary badges
     case "perfect_month":
       return (
         stats.consecutiveTradingDays >= 30 &&
         stats.winRate >= 90 &&
-        stats.totalTrades >= 50
+        stats.totalTrades >= (minTrades || 100)
       );
     case "epic_comeback":
       return stats.comebackWins >= 3 && stats.totalPnl >= 5000;
@@ -807,7 +929,7 @@ async function checkBadgeCondition(
       return (
         stats.firstPlaceFinishes >= 20 &&
         stats.totalPnl >= 50000 &&
-        stats.competitionsEntered >= 50
+        stats.competitionsEntered >= (minCompletedCompetitions || 50)
       );
 
     // Default: false for unimplemented conditions
@@ -860,6 +982,6 @@ export async function getUserBadges(userId: string) {
     ...badge,
     earned: earnedBadgeIds.has(badge.id),
     earnedAt:
-      earnedBadges.find((b) => b.badgeId === badge.id)?.earnedAt || null,
+      earnedBadges.find((b) => b.badgeId === badge.id)?.earnedAt ?? undefined,
   }));
 }
