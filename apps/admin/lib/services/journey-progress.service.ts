@@ -57,8 +57,107 @@ export async function initializeUserJourney(
 }
 
 /**
+ * Quick sync to unlock milestones based on connectedFrom and start nodes ONLY
+ * Also auto-completes milestones with always-true conditions (account_created)
+ * Does NOT check expensive unlockConditions - only structural unlocks
+ * This is FAST and safe to run on every page load
+ */
+export async function quickSyncUnlocks(
+  userId: string,
+  mapId: string = "traders_journey"
+): Promise<void> {
+  await connectToDatabase();
+
+  const progress = await UserJourneyProgress.findOne({ userId, mapId });
+  if (!progress) return;
+
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true }).lean();
+  const unlockedIds = new Set(progress.unlockedMilestones);
+  const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
+
+  let hasChanges = false;
+
+  // PHASE 1: Unlock milestones
+  for (const milestone of allMilestones) {
+    if (unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
+      continue;
+    }
+
+    let shouldUnlock = false;
+
+    // Method 1: Start nodes with no prerequisites should be unlocked
+    if (milestone.nodeType === "start" && 
+        (!milestone.connectedFrom || milestone.connectedFrom.length === 0)) {
+      shouldUnlock = true;
+    }
+
+    // Method 2: Check if any prerequisite (connectedFrom) is completed
+    if (!shouldUnlock && milestone.connectedFrom && milestone.connectedFrom.length > 0) {
+      const hasCompletedPrereq = milestone.connectedFrom.some(prereqId => 
+        completedIds.has(prereqId)
+      );
+      if (hasCompletedPrereq) {
+        shouldUnlock = true;
+      }
+    }
+
+    if (shouldUnlock) {
+      progress.unlockedMilestones.push(milestone.id);
+      unlockedIds.add(milestone.id);
+      hasChanges = true;
+    }
+  }
+
+  // PHASE 2: Auto-complete unlocked milestones with always-true conditions
+  // These conditions don't require stats gathering
+  const alwaysTrueConditions = ["account_created"];
+  
+  for (const milestone of allMilestones) {
+    // Skip if not unlocked or already completed
+    if (!unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
+      continue;
+    }
+
+    // Check if this milestone has an always-true completion condition
+    if (milestone.completeCondition && 
+        alwaysTrueConditions.includes(milestone.completeCondition.type)) {
+      // Complete this milestone
+      progress.completedMilestones.push({
+        milestoneId: milestone.id,
+        completedAt: new Date(),
+        rewards: {
+          xp: milestone.rewards?.xp || 0,
+          badgeId: milestone.rewards?.badgeId,
+          title: milestone.rewards?.title,
+        },
+      });
+      completedIds.add(milestone.id);
+      progress.totalXPFromJourney = (progress.totalXPFromJourney || 0) + (milestone.rewards?.xp || 0);
+      progress.totalMilestonesCompleted = (progress.totalMilestonesCompleted || 0) + 1;
+      progress.currentMilestone = milestone.id;
+      progress.currentZone = milestone.zoneId;
+      progress.lastProgressAt = new Date();
+      hasChanges = true;
+
+      // Unlock connected milestones
+      for (const nextId of (milestone.connectedTo || [])) {
+        if (!unlockedIds.has(nextId)) {
+          progress.unlockedMilestones.push(nextId);
+          unlockedIds.add(nextId);
+        }
+      }
+    }
+  }
+
+  if (hasChanges) {
+    await progress.save();
+    console.log(`✅ [JOURNEY] Quick sync completed for user ${userId}`);
+  }
+}
+
+/**
  * Get user's journey progress with full milestone details
- * NOTE: Does NOT run expensive unlock checks on every view - use checkAndCompleteMilestones() for that
+ * Runs a FAST sync to ensure basic unlocks are in place (start nodes, completed prerequisites)
  */
 export async function getUserJourneyProgress(
   userId: string,
@@ -79,6 +178,11 @@ export async function getUserJourneyProgress(
     progress = await initializeUserJourney(userId, mapId);
     progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   }
+
+  // Quick sync to ensure basic unlocks are in place (fast, no stats gathering)
+  await quickSyncUnlocks(userId, mapId);
+  // Refresh progress after sync
+  progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
 
   // Get map config
   const mapConfig = await JourneyMapConfig.findOne({ mapId, isActive: true }).lean();
