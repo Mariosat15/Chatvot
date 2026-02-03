@@ -325,10 +325,17 @@ export default function JourneyMapRenderer({
     }
   };
 
-  // Draw path between nodes
+  // Draw path between nodes - completed paths are solid green, others are dashed white
   const renderPath = (from: Milestone, to: Milestone) => {
     const fromStatus = getMilestoneStatus(from.id);
-    const isCompleted = fromStatus === "completed";
+    const toStatus = getMilestoneStatus(to.id);
+    
+    // Path is "completed" (green) if FROM milestone is completed
+    const isCompletedPath = fromStatus === "completed";
+    
+    // Calculate a nice curved path
+    const midX = (from.position.x + to.position.x) / 2;
+    const midY = Math.min(from.position.y, to.position.y) - 20;
     
     return (
       <svg
@@ -337,24 +344,38 @@ export default function JourneyMapRenderer({
         style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
       >
         <defs>
-          <filter id="pathGlow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <filter id="greenGlow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
         </defs>
-        <path
-          d={`M ${from.position.x} ${from.position.y} Q ${(from.position.x + to.position.x) / 2} ${Math.min(from.position.y, to.position.y) - 30} ${to.position.x} ${to.position.y}`}
-          fill="none"
-          stroke={isCompleted ? "#22C55E" : "#FFFFFF"}
-          strokeWidth={isCompleted ? 4 : 3}
-          strokeDasharray={isCompleted ? "none" : "8,8"}
-          strokeLinecap="round"
-          opacity={isCompleted ? 0.9 : 0.4}
-          filter={isCompleted ? "url(#pathGlow)" : "none"}
-        />
+        {/* Completed path - thick solid green with glow */}
+        {isCompletedPath && (
+          <path
+            d={`M ${from.position.x} ${from.position.y} Q ${midX} ${midY} ${to.position.x} ${to.position.y}`}
+            fill="none"
+            stroke="#22C55E"
+            strokeWidth={5}
+            strokeLinecap="round"
+            opacity={1}
+            filter="url(#greenGlow)"
+          />
+        )}
+        {/* Incomplete path - thin dashed white */}
+        {!isCompletedPath && (
+          <path
+            d={`M ${from.position.x} ${from.position.y} Q ${midX} ${midY} ${to.position.x} ${to.position.y}`}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            strokeDasharray="6,6"
+            strokeLinecap="round"
+            opacity={0.3}
+          />
+        )}
       </svg>
     );
   };
@@ -500,36 +521,40 @@ export default function JourneyMapRenderer({
             const style = getNodeStyle(status, milestone.size);
             const nodeSize = style.width as number;
             
-            // Get the icon image path based on milestone icon
-            const getIconPath = () => {
-              // Map icon names to actual game-icons files
+            // Map icon names to emojis for reliable display
+            const getIconEmoji = (): string => {
               const iconMap: Record<string, string> = {
-                ship: "pirate-ship",
-                moneyDeposit: "money-bag",
-                trade: "trade",
-                buy: "arrow-up",
-                sell: "arrow-down",
-                target: "target",
-                profit: "gold-coins",
-                guideBook: "guide-book",
-                starBadge: "star-badge",
-                maps: "maps",
-                lightningSpell: "lightning-spell",
-                longTermInvestment: "long-term-investment",
-                shield1: "shield-1",
-                archer: "archer",
-                star1: "star-1",
-                magicShield3D: "magic-shield-3d",
-                trophy: "trophy",
-                trophyStar: "trophy-star",
-                goldMedal: "gold-medal",
-                champion: "champion",
-                fireSpell: "fire-spell",
-                crown: "crown",
-                treasureChest: "treasure-chest",
+                ship: "⛵",
+                moneyDeposit: "💰",
+                trade: "📈",
+                buy: "📈",
+                sell: "📉",
+                target: "🎯",
+                profit: "💎",
+                guideBook: "📖",
+                starBadge: "⭐",
+                maps: "🗺️",
+                lightningSpell: "⚡",
+                longTermInvestment: "💹",
+                shield1: "🛡️",
+                archer: "🏹",
+                star1: "⭐",
+                magicShield3D: "🛡️",
+                trophy: "🏆",
+                trophyStar: "🏆",
+                goldMedal: "🥇",
+                champion: "👑",
+                fireSpell: "🔥",
+                crown: "👑",
+                treasureChest: "📦",
+                // Additional common icons
+                flag: "🚩",
+                sword: "⚔️",
+                gems: "💎",
+                victory: "🏆",
+                lord: "👑",
               };
-              const iconName = iconMap[milestone.icon] || milestone.icon;
-              return `/game-icons/${iconName}.png`;
+              return iconMap[milestone.icon] || "🏝️";
             };
             
             return (
@@ -554,45 +579,23 @@ export default function JourneyMapRenderer({
                 >
                   {/* Content based on status */}
                   {status === "completed" ? (
-                    // Completed: Show checkmark with icon behind
-                    <div className="relative flex items-center justify-center">
-                      <Image
-                        src={getIconPath()}
-                        alt={milestone.name}
-                        width={nodeSize * 0.55}
-                        height={nodeSize * 0.55}
-                        className="opacity-60"
-                        draggable={false}
-                      />
-                      <span className="absolute text-white text-xl font-bold drop-shadow-lg">✓</span>
-                    </div>
+                    // Completed: Show checkmark
+                    <span className="text-white text-xl font-bold drop-shadow-lg">✓</span>
                   ) : status === "locked" || status === "level_locked" ? (
                     // Locked: Show order number in gray
                     <span className="text-slate-400 text-lg font-bold drop-shadow-md">
                       {milestone.order || "?"}
                     </span>
                   ) : status === "current" ? (
-                    // Current: Show icon with glow effect
-                    <div className="relative">
-                      <Image
-                        src={getIconPath()}
-                        alt={milestone.name}
-                        width={nodeSize * 0.6}
-                        height={nodeSize * 0.6}
-                        className="drop-shadow-lg"
-                        draggable={false}
-                      />
-                    </div>
+                    // Current: Show emoji icon with animation
+                    <span className="text-2xl drop-shadow-lg animate-bounce">
+                      {getIconEmoji()}
+                    </span>
                   ) : (
-                    // Unlocked/Available: Show icon
-                    <Image
-                      src={getIconPath()}
-                      alt={milestone.name}
-                      width={nodeSize * 0.55}
-                      height={nodeSize * 0.55}
-                      className="drop-shadow-md"
-                      draggable={false}
-                    />
+                    // Unlocked/Available: Show emoji icon
+                    <span className="text-xl drop-shadow-md">
+                      {getIconEmoji()}
+                    </span>
                   )}
 
                   {/* Level requirement badge for level_locked */}

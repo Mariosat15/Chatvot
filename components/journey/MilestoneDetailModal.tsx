@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import type { Milestone } from "./JourneyMapRenderer";
 
 interface MilestoneDetailModalProps {
@@ -111,35 +110,39 @@ export default function MilestoneDetailModal({
     return formatter ? formatter(condition.value) : condition.type.replace(/_/g, " ");
   };
 
-  // Get icon path for the milestone
-  const getIconPath = () => {
+  // Get emoji icon for the milestone
+  const getIconEmoji = (): string => {
     const iconMap: Record<string, string> = {
-      ship: "pirate-ship",
-      moneyDeposit: "money-bag",
-      trade: "trade",
-      buy: "arrow-up",
-      sell: "arrow-down",
-      target: "target",
-      profit: "gold-coins",
-      guideBook: "guide-book",
-      starBadge: "star-badge",
-      maps: "maps",
-      lightningSpell: "lightning-spell",
-      longTermInvestment: "long-term-investment",
-      shield1: "shield-1",
-      archer: "archer",
-      star1: "star-1",
-      magicShield3D: "magic-shield-3d",
-      trophy: "trophy",
-      trophyStar: "trophy-star",
-      goldMedal: "gold-medal",
-      champion: "champion",
-      fireSpell: "fire-spell",
-      crown: "crown",
-      treasureChest: "treasure-chest",
+      ship: "⛵",
+      moneyDeposit: "💰",
+      trade: "📈",
+      buy: "📈",
+      sell: "📉",
+      target: "🎯",
+      profit: "💎",
+      guideBook: "📖",
+      starBadge: "⭐",
+      maps: "🗺️",
+      lightningSpell: "⚡",
+      longTermInvestment: "💹",
+      shield1: "🛡️",
+      archer: "🏹",
+      star1: "⭐",
+      magicShield3D: "🛡️",
+      trophy: "🏆",
+      trophyStar: "🏆",
+      goldMedal: "🥇",
+      champion: "👑",
+      fireSpell: "🔥",
+      crown: "👑",
+      treasureChest: "📦",
+      flag: "🚩",
+      sword: "⚔️",
+      gems: "💎",
+      victory: "🏆",
+      lord: "👑",
     };
-    const iconName = iconMap[milestone.icon] || milestone.icon;
-    return `/game-icons/${iconName}.png`;
+    return iconMap[milestone.icon] || "🏝️";
   };
 
   return (
@@ -181,14 +184,9 @@ export default function MilestoneDetailModal({
                     borderColor: `${milestone.color}80`
                   }}
                 >
-                  <Image
-                    src={getIconPath()}
-                    alt={milestone.name}
-                    width={36}
-                    height={36}
-                    className="drop-shadow-lg"
-                    draggable={false}
-                  />
+                  <span className="text-3xl drop-shadow-lg">
+                    {getIconEmoji()}
+                  </span>
                 </div>
                 {/* Order number badge */}
                 <div className="absolute top-2 left-2 bg-slate-800/80 text-slate-300 text-xs px-2 py-1 rounded-full">
