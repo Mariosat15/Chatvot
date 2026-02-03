@@ -58,6 +58,10 @@ import {
   Hand,
   RotateCcw,
   AlertTriangle,
+  Wand2,
+  MapPin,
+  Link,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -186,6 +190,34 @@ export default function JourneyMapEditorSection() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Generator state
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generatorStep, setGeneratorStep] = useState(1);
+  const [generatorIslands, setGeneratorIslands] = useState<Array<{
+    id: number;
+    name: string;
+    position: { x: number; y: number };
+    milestonesCount: number;
+    zoneId: string;
+    isPlaced: boolean;
+  }>>([]);
+  const [generatorZones, setGeneratorZones] = useState<Array<{
+    id: string;
+    name: string;
+    color: string;
+    order: number;
+  }>>([
+    { id: "zone_1", name: "Starting Area", color: "#22C55E", order: 1 },
+    { id: "zone_2", name: "Learning Waters", color: "#3B82F6", order: 2 },
+    { id: "zone_3", name: "Challenge Zone", color: "#8B5CF6", order: 3 },
+    { id: "zone_4", name: "Mastery Islands", color: "#EF4444", order: 4 },
+  ]);
+  const [generatorIslandCount, setGeneratorIslandCount] = useState(10);
+  const [generatorPlacingMode, setGeneratorPlacingMode] = useState(false);
+  const [generatorCurrentIsland, setGeneratorCurrentIsland] = useState(0);
+  const generatorMapRef = useRef<HTMLDivElement>(null);
+  const [generatorMapScale, setGeneratorMapScale] = useState(0.6);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -393,6 +425,193 @@ export default function JourneyMapEditorSection() {
       setLoading(false);
     }
   };
+
+  // ============================================
+  // GENERATOR FUNCTIONS
+  // ============================================
+
+  // Initialize generator with island count
+  const initializeGenerator = () => {
+    const islands = Array.from({ length: generatorIslandCount }, (_, i) => ({
+      id: i + 1,
+      name: `Island ${i + 1}`,
+      position: { x: 0, y: 0 },
+      milestonesCount: 1,
+      zoneId: generatorZones[Math.floor(i / Math.ceil(generatorIslandCount / generatorZones.length))]?.id || "zone_1",
+      isPlaced: false,
+    }));
+    setGeneratorIslands(islands);
+    setGeneratorCurrentIsland(0);
+    setGeneratorStep(2);
+  };
+
+  // Handle click on generator map to place island
+  const handleGeneratorMapClick = (e: React.MouseEvent) => {
+    if (!generatorPlacingMode || !generatorMapRef.current) return;
+    
+    const rect = generatorMapRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / generatorMapScale;
+    const y = (e.clientY - rect.top) / generatorMapScale;
+    
+    // Update current island position
+    setGeneratorIslands(prev => prev.map((island, idx) => 
+      idx === generatorCurrentIsland 
+        ? { ...island, position: { x: Math.round(x), y: Math.round(y) }, isPlaced: true }
+        : island
+    ));
+    
+    // Move to next island
+    if (generatorCurrentIsland < generatorIslands.length - 1) {
+      setGeneratorCurrentIsland(prev => prev + 1);
+    } else {
+      setGeneratorPlacingMode(false);
+      toast.success("All islands placed!");
+    }
+  };
+
+  // Generate milestones from islands
+  const generateFromIslands = async () => {
+    if (!confirm("This will delete all existing milestones and generate new ones. Continue?")) return;
+    
+    setLoading(true);
+    try {
+      // First delete all existing milestones
+      await fetch(`/api/journey-milestones?all=true&mapId=traders_journey`, {
+        method: "DELETE",
+      });
+
+      // Create zones
+      const zonesData = generatorZones.map((z, idx) => ({
+        id: z.id,
+        name: z.name,
+        description: `Zone ${idx + 1}`,
+        order: z.order,
+        position: { x: 0, y: 0 },
+        color: z.color,
+        icon: "flag",
+        isUnlockable: idx > 0,
+        unlockCondition: idx > 0 ? { type: "milestone_complete", value: `island_${idx}_1` } : undefined,
+      }));
+
+      // Update map config with zones
+      await fetch("/api/journey-map", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mapId: "traders_journey",
+          name: "Trader's Journey",
+          description: "Navigate through the islands to become a master trader",
+          zones: zonesData,
+          defaultStartNode: "island_1_1",
+          backgroundColor: "#1a3a5c",
+          backgroundImage: "/assets/treasure-map.png",
+          isActive: true,
+        }),
+      });
+
+      // Generate milestones for each island
+      let milestoneOrder = 1;
+      const allMilestones: any[] = [];
+
+      for (const island of generatorIslands) {
+        if (!island.isPlaced) continue;
+
+        for (let m = 0; m < island.milestonesCount; m++) {
+          const milestoneId = `island_${island.id}_${m + 1}`;
+          const isFirst = island.id === 1 && m === 0;
+          const isLast = island.id === generatorIslands.length && m === island.milestonesCount - 1;
+          
+          // Calculate position offset for multiple milestones on same island
+          const offsetX = island.milestonesCount > 1 ? (m - (island.milestonesCount - 1) / 2) * 30 : 0;
+          const offsetY = island.milestonesCount > 1 ? Math.sin(m) * 20 : 0;
+
+          // Determine next milestone connection
+          const connectedTo: string[] = [];
+          if (m < island.milestonesCount - 1) {
+            connectedTo.push(`island_${island.id}_${m + 2}`);
+          } else if (island.id < generatorIslands.length) {
+            connectedTo.push(`island_${island.id + 1}_1`);
+          }
+
+          // Determine previous milestone connection
+          const connectedFrom: string[] = [];
+          if (m > 0) {
+            connectedFrom.push(`island_${island.id}_${m}`);
+          } else if (island.id > 1) {
+            const prevIsland = generatorIslands[island.id - 2];
+            connectedFrom.push(`island_${island.id - 1}_${prevIsland.milestonesCount}`);
+          }
+
+          const milestone = {
+            id: milestoneId,
+            mapId: "traders_journey",
+            name: island.milestonesCount > 1 ? `${island.name} - Step ${m + 1}` : island.name,
+            description: `Complete this milestone on ${island.name}`,
+            shortDescription: `Milestone ${milestoneOrder}`,
+            zoneId: island.zoneId,
+            position: { 
+              x: Math.round(island.position.x + offsetX), 
+              y: Math.round(island.position.y + offsetY) 
+            },
+            nodeType: isFirst ? "start" : isLast ? "legendary" : "milestone",
+            icon: isFirst ? "flag" : isLast ? "crown" : "target",
+            color: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
+            size: isFirst || isLast ? "large" : "medium",
+            completeCondition: { type: "total_trades", value: milestoneOrder * 5, comparison: "gte" },
+            rewards: { xp: milestoneOrder * 10 },
+            connectedTo,
+            connectedFrom,
+            isRequired: true,
+            isAutoComplete: isFirst,
+            order: milestoneOrder,
+            isActive: true,
+          };
+
+          allMilestones.push(milestone);
+          milestoneOrder++;
+        }
+      }
+
+      // Create all milestones
+      for (const milestone of allMilestones) {
+        await fetch("/api/journey-milestones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(milestone),
+        });
+      }
+
+      toast.success(`Generated ${allMilestones.length} milestones across ${generatorIslands.filter(i => i.isPlaced).length} islands`);
+      setGeneratorOpen(false);
+      setGeneratorStep(1);
+      fetchData();
+    } catch (error) {
+      console.error("Generation error:", error);
+      toast.error("Failed to generate map");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a zone to generator
+  const addGeneratorZone = () => {
+    const newId = `zone_${generatorZones.length + 1}`;
+    setGeneratorZones([...generatorZones, {
+      id: newId,
+      name: `Zone ${generatorZones.length + 1}`,
+      color: ["#22C55E", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"][generatorZones.length % 5],
+      order: generatorZones.length + 1,
+    }]);
+  };
+
+  // Remove a zone from generator
+  const removeGeneratorZone = (id: string) => {
+    setGeneratorZones(prev => prev.filter(z => z.id !== id));
+  };
+
+  // ============================================
+  // END GENERATOR FUNCTIONS
+  // ============================================
 
   // Save map config
   const saveMapConfig = async () => {
@@ -1081,6 +1300,10 @@ export default function JourneyMapEditorSection() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setGeneratorOpen(true)} className="bg-purple-600 hover:bg-purple-700">
+            <Wand2 className="h-4 w-4 mr-2" />
+            Generate Map
+          </Button>
           <Button variant="outline" onClick={seedDefaultMap} className="border-amber-600 text-amber-600 hover:bg-amber-600/10">
             <Download className="h-4 w-4 mr-2" />
             Reset to Default
@@ -1462,6 +1685,325 @@ export default function JourneyMapEditorSection() {
 
       {/* Milestone Editor Dialog */}
       {renderMilestoneEditor()}
+
+      {/* Generator Dialog */}
+      <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5" />
+              Journey Map Generator
+            </DialogTitle>
+            <DialogDescription>
+              Create a custom journey map by defining zones, placing islands, and setting milestones
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Step Indicator */}
+          <div className="flex items-center justify-center gap-2 my-4">
+            {[1, 2, 3].map(step => (
+              <div key={step} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  generatorStep >= step ? "bg-blue-500 text-white" : "bg-slate-700 text-slate-400"
+                }`}>
+                  {step}
+                </div>
+                {step < 3 && <div className={`w-12 h-1 ${generatorStep > step ? "bg-blue-500" : "bg-slate-700"}`} />}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center gap-8 text-sm text-muted-foreground mb-4">
+            <span className={generatorStep >= 1 ? "text-blue-400" : ""}>Configure</span>
+            <span className={generatorStep >= 2 ? "text-blue-400" : ""}>Place Islands</span>
+            <span className={generatorStep >= 3 ? "text-blue-400" : ""}>Review & Generate</span>
+          </div>
+
+          {/* Step 1: Configure */}
+          {generatorStep === 1 && (
+            <div className="space-y-6">
+              {/* Island Count */}
+              <div className="space-y-2">
+                <Label className="text-lg font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Number of Islands
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="number"
+                    min={2}
+                    max={30}
+                    value={generatorIslandCount}
+                    onChange={e => setGeneratorIslandCount(Math.max(2, Math.min(30, parseInt(e.target.value) || 2)))}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Each island can have 1 or more milestones
+                  </span>
+                </div>
+              </div>
+
+              {/* Zones */}
+              <div className="space-y-2">
+                <Label className="text-lg font-semibold flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Zones ({generatorZones.length})
+                </Label>
+                <div className="space-y-2">
+                  {generatorZones.map((zone, idx) => (
+                    <div key={zone.id} className="flex items-center gap-2 p-2 border rounded-lg">
+                      <span className="w-8 text-center text-sm text-muted-foreground">{idx + 1}</span>
+                      <Input
+                        value={zone.name}
+                        onChange={e => setGeneratorZones(prev => prev.map(z => 
+                          z.id === zone.id ? { ...z, name: e.target.value } : z
+                        ))}
+                        className="flex-1"
+                        placeholder="Zone name"
+                      />
+                      <Input
+                        type="color"
+                        value={zone.color}
+                        onChange={e => setGeneratorZones(prev => prev.map(z => 
+                          z.id === zone.id ? { ...z, color: e.target.value } : z
+                        ))}
+                        className="w-16"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeGeneratorZone(zone.id)}
+                        disabled={generatorZones.length <= 1}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button variant="outline" onClick={addGeneratorZone} className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Zone
+                  </Button>
+                </div>
+              </div>
+
+              <Button onClick={initializeGenerator} className="w-full">
+                Next: Place Islands
+                <MapPin className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          )}
+
+          {/* Step 2: Place Islands */}
+          {generatorStep === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Click on the map to place islands</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {generatorPlacingMode 
+                      ? `Placing Island ${generatorCurrentIsland + 1} of ${generatorIslands.length}`
+                      : "Click 'Start Placing' to begin"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={generatorPlacingMode ? "destructive" : "default"}
+                    onClick={() => setGeneratorPlacingMode(!generatorPlacingMode)}
+                  >
+                    {generatorPlacingMode ? "Stop Placing" : "Start Placing"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Map for placing */}
+              <div
+                ref={generatorMapRef}
+                className="relative w-full h-[400px] border-4 border-amber-900/50 rounded-lg overflow-hidden cursor-crosshair"
+                onClick={handleGeneratorMapClick}
+              >
+                <div
+                  style={{
+                    width: 1200,
+                    height: 800,
+                    transform: `scale(${generatorMapScale})`,
+                    transformOrigin: "top left",
+                  }}
+                >
+                  <Image
+                    src="/assets/treasure-map.png"
+                    alt="Treasure Map"
+                    width={1200}
+                    height={800}
+                    className="absolute top-0 left-0"
+                    draggable={false}
+                  />
+                  {/* Placed islands */}
+                  {generatorIslands.filter(i => i.isPlaced).map(island => (
+                    <div
+                      key={island.id}
+                      className="absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg"
+                      style={{
+                        left: island.position.x - 16,
+                        top: island.position.y - 16,
+                        backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
+                        border: island.id === generatorCurrentIsland + 1 ? "3px solid white" : "2px solid rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      {island.id}
+                    </div>
+                  ))}
+                  {/* Current placing indicator */}
+                  {generatorPlacingMode && (
+                    <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-1 rounded text-sm">
+                      Click to place Island {generatorCurrentIsland + 1}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Island list */}
+              <div className="max-h-48 overflow-y-auto border rounded-lg p-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {generatorIslands.map((island, idx) => (
+                    <div 
+                      key={island.id}
+                      className={`p-2 rounded border text-sm ${
+                        island.isPlaced ? "bg-green-900/20 border-green-600" : "bg-slate-800 border-slate-600"
+                      } ${idx === generatorCurrentIsland && generatorPlacingMode ? "ring-2 ring-blue-500" : ""}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">Island {island.id}</span>
+                        {island.isPlaced && <span className="text-green-500 text-xs">✓</span>}
+                      </div>
+                      <Input
+                        value={island.name}
+                        onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                          i.id === island.id ? { ...i, name: e.target.value } : i
+                        ))}
+                        className="h-7 text-xs mb-1"
+                        placeholder="Island name"
+                      />
+                      <div className="flex gap-1">
+                        <Select
+                          value={island.zoneId}
+                          onValueChange={value => setGeneratorIslands(prev => prev.map(i => 
+                            i.id === island.id ? { ...i, zoneId: value } : i
+                          ))}
+                        >
+                          <SelectTrigger className="h-7 text-xs flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {generatorZones.map(z => (
+                              <SelectItem key={z.id} value={z.id} className="text-xs">
+                                {z.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={5}
+                          value={island.milestonesCount}
+                          onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } : i
+                          ))}
+                          className="w-12 h-7 text-xs"
+                          title="Milestones on this island"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setGeneratorStep(1)}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={() => setGeneratorStep(3)}
+                  disabled={generatorIslands.filter(i => i.isPlaced).length < 2}
+                  className="flex-1"
+                >
+                  Next: Review & Generate
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Review & Generate */}
+          {generatorStep === 3 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Islands Placed</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {generatorIslands.filter(i => i.isPlaced).length} / {generatorIslands.length}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Total Milestones</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {generatorIslands.filter(i => i.isPlaced).reduce((sum, i) => sum + i.milestonesCount, 0)}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Zones</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{generatorZones.length}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Journey Path</h3>
+                <div className="flex flex-wrap gap-2">
+                  {generatorIslands.filter(i => i.isPlaced).map((island, idx, arr) => (
+                    <div key={island.id} className="flex items-center">
+                      <div 
+                        className="px-3 py-1 rounded-full text-sm text-white"
+                        style={{ backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color }}
+                      >
+                        {island.name} ({island.milestonesCount})
+                      </div>
+                      {idx < arr.length - 1 && <span className="mx-1 text-muted-foreground">→</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setGeneratorStep(2)}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={generateFromIslands}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4 mr-2" />
+                  )}
+                  Generate Journey Map
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
