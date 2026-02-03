@@ -40,6 +40,7 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       required: true,
       enum: [
         "Competition",
+        "Trading",
         "Volume",
         "Profit",
         "Risk",

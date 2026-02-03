@@ -907,6 +907,30 @@ export default function BadgeXPManagementSection() {
               </div>
               <div className="flex gap-2">
                 <Button
+                  onClick={async () => {
+                    try {
+                      toast.loading("Reseeding badges and XP config...");
+                      const response = await fetch("/api/seed-badges-xp", { method: "POST" });
+                      const data = await response.json();
+                      toast.dismiss();
+                      if (data.success) {
+                        toast.success(`Badges reset! ${data.counts?.badges || 120} badges restored from defaults.`);
+                        await fetchData();
+                      } else {
+                        toast.error(data.error || "Failed to reseed badges");
+                      }
+                    } catch (error) {
+                      toast.dismiss();
+                      toast.error("Error reseeding badges");
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reset to Defaults
+                </Button>
+                <Button
                   onClick={() => setManagingBadges(true)}
                   variant="default"
                   size="sm"
@@ -942,6 +966,7 @@ export default function BadgeXPManagementSection() {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="Competition">Competition</SelectItem>
+                  <SelectItem value="Trading">Trading</SelectItem>
                   <SelectItem value="Volume">Volume</SelectItem>
                   <SelectItem value="Profit">Profit</SelectItem>
                   <SelectItem value="Risk">Risk</SelectItem>
