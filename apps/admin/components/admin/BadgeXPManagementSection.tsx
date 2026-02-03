@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { GameIconPicker } from "@/components/ui/GameIconPicker";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import {
   Trophy,
   Award,
@@ -237,6 +239,13 @@ export default function BadgeXPManagementSection() {
     category: "",
     rarity: "",
     icon: "",
+    condition: {
+      type: "",
+      value: undefined as number | undefined,
+      comparison: "gte" as "gte" | "lte" | "eq" | undefined,
+      minTrades: undefined as number | undefined,
+      minCompletedCompetitions: undefined as number | undefined,
+    },
   });
   const [isClosing, setIsClosing] = useState(false);
 
@@ -620,17 +629,33 @@ export default function BadgeXPManagementSection() {
                         }}
                       />
                       <label className="text-xs text-muted-foreground">
-                        Icon (Emoji)
+                        Icon
                       </label>
-                      <Input
-                        placeholder="Icon"
+                      <Select
                         value={level.icon}
-                        onChange={(e) => {
+                        onValueChange={(value) => {
                           const newLevels = [...levels];
-                          newLevels[level.level - 1].icon = e.target.value;
+                          newLevels[level.level - 1].icon = value;
                           setLevels(newLevels);
                         }}
-                      />
+                      >
+                        <SelectTrigger className="h-10">
+                          <div className="flex items-center gap-2">
+                            <GameIcon name={level.icon as GameIconName} size={20} />
+                            <span className="text-xs truncate">{level.icon}</span>
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {Object.keys(GAME_ICONS).map((iconName) => (
+                            <SelectItem key={iconName} value={iconName}>
+                              <div className="flex items-center gap-2">
+                                <GameIcon name={iconName as GameIconName} size={24} />
+                                <span>{iconName}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <label className="text-xs text-muted-foreground">
                         Description
                       </label>
@@ -958,6 +983,13 @@ export default function BadgeXPManagementSection() {
                       category: badge.category,
                       rarity: badge.rarity,
                       icon: badge.icon,
+                      condition: badge.condition || {
+                        type: "",
+                        value: undefined,
+                        comparison: "gte",
+                        minTrades: undefined,
+                        minCompletedCompetitions: undefined,
+                      },
                     });
                   }}
                 >
@@ -984,6 +1016,13 @@ export default function BadgeXPManagementSection() {
                             category: badge.category,
                             rarity: badge.rarity,
                             icon: badge.icon,
+                            condition: badge.condition || {
+                              type: "",
+                              value: undefined,
+                              comparison: "gte",
+                              minTrades: undefined,
+                              minCompletedCompetitions: undefined,
+                            },
                           });
                         }}
                       >
@@ -1104,7 +1143,7 @@ export default function BadgeXPManagementSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <span className="text-3xl">{levelData.icon}</span>
+                        <GameIcon name={levelData.icon as GameIconName} size={36} />
                         <div>
                           <p className={`font-bold text-lg ${levelData.color}`}>
                             Level {user.currentLevel}
@@ -1196,6 +1235,13 @@ export default function BadgeXPManagementSection() {
                 category: "",
                 rarity: "",
                 icon: "",
+                condition: {
+                  type: "",
+                  value: undefined,
+                  comparison: "gte",
+                  minTrades: undefined,
+                  minCompletedCompetitions: undefined,
+                },
               });
               setIsClosing(false);
             }, 300);
@@ -1242,6 +1288,13 @@ export default function BadgeXPManagementSection() {
                         category: "",
                         rarity: "",
                         icon: "",
+                        condition: {
+                          type: "",
+                          value: undefined,
+                          comparison: "gte",
+                          minTrades: undefined,
+                          minCompletedCompetitions: undefined,
+                        },
                       });
                       setIsClosing(false);
                     }, 300);
@@ -1255,7 +1308,11 @@ export default function BadgeXPManagementSection() {
             <div className="space-y-8 px-8 py-6">
               {/* Badge Preview - Live Preview */}
               <div className="bg-muted rounded-xl p-6 flex items-center gap-4">
-                <span className="text-6xl">{badgeForm.icon || "🏆"}</span>
+                {badgeForm.icon && badgeForm.icon in GAME_ICONS ? (
+                  <GameIcon name={badgeForm.icon as GameIconName} size={64} />
+                ) : (
+                  <span className="text-6xl">{badgeForm.icon || "🏆"}</span>
+                )}
                 <div className="flex-1">
                   <p className="text-2xl font-bold">
                     {badgeForm.name || "New Badge"}
@@ -1377,110 +1434,151 @@ export default function BadgeXPManagementSection() {
                 <div className="space-y-3 col-span-2">
                   <Label className="text-xl font-semibold">Badge Icon *</Label>
                   <p className="text-base text-muted-foreground mb-3">
-                    Click an emoji to select it
+                    Click a game icon to select it
                   </p>
-                  <div className="grid grid-cols-12 gap-2 bg-muted/50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
-                    {[
-                      "🏆",
-                      "🥇",
-                      "🥈",
-                      "🥉",
-                      "🎯",
-                      "🎪",
-                      "🎭",
-                      "🎬",
-                      "🏛️",
-                      "👑",
-                      "⚡",
-                      "🌟",
-                      "🎖️",
-                      "🔄",
-                      "🚀",
-                      "⚔️",
-                      "🐕",
-                      "🧹",
-                      "🏃",
-                      "🐦",
-                      "🦉",
-                      "💚",
-                      "🟢",
-                      "💵",
-                      "💰",
-                      "💎",
-                      "🎰",
-                      "🏅",
-                      "🔥",
-                      "🌡️",
-                      "📈",
-                      "💹",
-                      "✨",
-                      "⭐",
-                      "🛡️",
-                      "🦾",
-                      "📉",
-                      "🔒",
-                      "📏",
-                      "🐢",
-                      "⚖️",
-                      "🔪",
-                      "🧘",
-                      "🧮",
-                      "🌈",
-                      "🎨",
-                      "🎲",
-                      "🎓",
-                      "🥁",
-                      "🎸",
-                      "🎮",
-                      "🏁",
-                      "🚦",
-                      "💡",
-                      "💫",
-                      "🌙",
-                      "☀️",
-                      "🎉",
-                      "🎊",
-                      "🎁",
-                      "🎈",
-                      "💝",
-                      "💖",
-                      "💗",
-                      "💓",
-                      "💞",
-                      "💕",
-                      "💟",
-                      "❤️",
-                      "🧡",
-                      "💛",
-                      "💙",
-                      "💜",
-                      "🤎",
-                      "🖤",
-                      "🤍",
-                      "👍",
-                      "👏",
-                      "🙌",
-                      "✊",
-                      "💪",
-                      "🤝",
-                      "🙏",
-                      "✌️",
-                    ].map((icon, idx) => (
-                      <button
-                        key={`${icon}-${idx}`}
-                        type="button"
-                        className={`text-4xl p-3 rounded hover:bg-background transition-colors ${
-                          badgeForm.icon === icon
-                            ? "bg-primary/20 ring-2 ring-primary"
-                            : ""
-                        }`}
-                        onClick={() => {
-                          setBadgeForm({ ...badgeForm, icon });
-                        }}
+                  <GameIconPicker
+                    value={badgeForm.icon}
+                    onChange={(iconName) => setBadgeForm({ ...badgeForm, icon: iconName })}
+                    iconSize={40}
+                    maxHeight="350px"
+                  />
+                </div>
+
+                {/* Condition Settings */}
+                <div className="col-span-2 border-t pt-6 mt-4">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Badge Condition (How to Earn)
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">Condition Type *</Label>
+                      <Select
+                        value={badgeForm.condition?.type || ""}
+                        onValueChange={(value) =>
+                          setBadgeForm({
+                            ...badgeForm,
+                            condition: { ...badgeForm.condition, type: value }
+                          })
+                        }
                       >
-                        {icon}
-                      </button>
-                    ))}
+                        <SelectTrigger className="text-base h-12">
+                          <SelectValue placeholder="Select condition type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="competitions_entered">Competitions Entered</SelectItem>
+                          <SelectItem value="first_place_finishes">First Place Finishes</SelectItem>
+                          <SelectItem value="podium_finishes">Podium Finishes (Top 3)</SelectItem>
+                          <SelectItem value="total_trades">Total Trades</SelectItem>
+                          <SelectItem value="winning_trades">Winning Trades</SelectItem>
+                          <SelectItem value="total_pnl">Total P&L</SelectItem>
+                          <SelectItem value="total_pnl_positive">Positive P&L</SelectItem>
+                          <SelectItem value="win_streak">Win Streak</SelectItem>
+                          <SelectItem value="win_rate">Win Rate %</SelectItem>
+                          <SelectItem value="no_liquidations">No Liquidations</SelectItem>
+                          <SelectItem value="zero_liquidations_lifetime">Zero Lifetime Liquidations</SelectItem>
+                          <SelectItem value="max_drawdown">Max Drawdown %</SelectItem>
+                          <SelectItem value="average_roi">Average ROI %</SelectItem>
+                          <SelectItem value="profit_factor">Profit Factor</SelectItem>
+                          <SelectItem value="single_trade_profit">Single Trade Profit</SelectItem>
+                          <SelectItem value="unique_pairs_traded">Unique Pairs Traded</SelectItem>
+                          <SelectItem value="daily_trade_volume">Daily Trade Volume</SelectItem>
+                          <SelectItem value="platform_age">Platform Age (Days)</SelectItem>
+                          <SelectItem value="global_rank">Global Rank</SelectItem>
+                          <SelectItem value="first_deposit">First Deposit</SelectItem>
+                          <SelectItem value="withdrawal_made">Withdrawal Made</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">Comparison</Label>
+                      <Select
+                        value={badgeForm.condition?.comparison || "gte"}
+                        onValueChange={(value) =>
+                          setBadgeForm({
+                            ...badgeForm,
+                            condition: { ...badgeForm.condition, comparison: value as "gte" | "lte" | "eq" }
+                          })
+                        }
+                      >
+                        <SelectTrigger className="text-base h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gte">Greater than or equal (≥)</SelectItem>
+                          <SelectItem value="lte">Less than or equal (≤)</SelectItem>
+                          <SelectItem value="eq">Exactly equal (=)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">Target Value</Label>
+                      <Input
+                        type="number"
+                        value={badgeForm.condition?.value ?? ""}
+                        onChange={(e) =>
+                          setBadgeForm({
+                            ...badgeForm,
+                            condition: { 
+                              ...badgeForm.condition, 
+                              value: e.target.value ? parseInt(e.target.value) : undefined 
+                            }
+                          })
+                        }
+                        placeholder="e.g., 10, 100, 1000"
+                        className="text-base h-12"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        The target number for the condition (e.g., 10 trades, 5 wins)
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">Minimum Trades Required</Label>
+                      <Input
+                        type="number"
+                        value={badgeForm.condition?.minTrades ?? ""}
+                        onChange={(e) =>
+                          setBadgeForm({
+                            ...badgeForm,
+                            condition: { 
+                              ...badgeForm.condition, 
+                              minTrades: e.target.value ? parseInt(e.target.value) : undefined 
+                            }
+                          })
+                        }
+                        placeholder="Optional (e.g., 50)"
+                        className="text-base h-12"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        User must have this many trades to earn badge
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 col-span-2">
+                      <Label className="text-lg font-semibold">Min Completed Competitions</Label>
+                      <Input
+                        type="number"
+                        value={badgeForm.condition?.minCompletedCompetitions ?? ""}
+                        onChange={(e) =>
+                          setBadgeForm({
+                            ...badgeForm,
+                            condition: { 
+                              ...badgeForm.condition, 
+                              minCompletedCompetitions: e.target.value ? parseInt(e.target.value) : undefined 
+                            }
+                          })
+                        }
+                        placeholder="Optional (e.g., 5)"
+                        className="text-base h-12 max-w-md"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        User must have completed this many competitions (with 5+ trades each) to earn badge
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
