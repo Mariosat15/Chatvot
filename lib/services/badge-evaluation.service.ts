@@ -749,7 +749,11 @@ async function checkBadgeCondition(
 
     // Risk management (advanced)
     case "max_drawdown":
-      return compareValue(stats.maxDrawdown, value, comparison);
+      // FIXED: Require minimum trades to prevent zero-baseline awards
+      // User must have at least 20 trades to claim "controlled risk"
+      return stats.totalTrades >= (minTrades || 20) && 
+             stats.completedCompetitionsWithTrades >= 1 &&
+             compareValue(stats.maxDrawdown, value, comparison);
     case "average_leverage_low":
       return stats.totalTrades >= (minTrades || 20) && stats.averagePositionSize <= 1; // Conservative sizing
     case "average_loss_small":
@@ -800,7 +804,10 @@ async function checkBadgeCondition(
         stats.winRate >= 55
       );
     case "exceptional_dd_control":
-      return stats.maxDrawdown <= 5 && stats.totalTrades >= (minTrades || 50);
+      // Require completed competitions to prevent zero-baseline
+      return stats.maxDrawdown <= 5 && 
+             stats.totalTrades >= (minTrades || 50) &&
+             stats.completedCompetitionsWithTrades >= 3;
     case "hedging_strategy":
       // Simplified: User has multiple positions and good risk management
       return stats.totalTrades >= (minTrades || 30) && stats.alwaysUsesSL && stats.uniquePairsTraded >= 3;
