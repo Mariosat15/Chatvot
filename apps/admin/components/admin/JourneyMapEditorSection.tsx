@@ -446,12 +446,26 @@ export default function JourneyMapEditorSection() {
   };
 
   // Handle click on generator map to place island
-  const handleGeneratorMapClick = (e: React.MouseEvent) => {
+  const handleGeneratorMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!generatorPlacingMode || !generatorMapRef.current) return;
     
+    // Get the image element (the clickable area)
     const rect = generatorMapRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / generatorMapScale;
-    const y = (e.clientY - rect.top) / generatorMapScale;
+    
+    // Calculate click position relative to the container
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Convert to map coordinates (1200x800 map space)
+    // The container shows the scaled map, so we need to convert back to original coordinates
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    
+    // Map coordinates = (click position / container size) * map size
+    const x = (clickX / containerWidth) * 1200;
+    const y = (clickY / containerHeight) * 800;
+    
+    console.log("Click:", { clickX, clickY, containerWidth, containerHeight, mapX: x, mapY: y });
     
     // Update current island position
     setGeneratorIslands(prev => prev.map((island, idx) => 
@@ -1931,143 +1945,14 @@ export default function JourneyMapEditorSection() {
             </div>
           )}
 
-          {/* Step 2: Place Islands */}
+          {/* Step 2: Place Islands - Show message to use fullscreen */}
           {generatorStep === 2 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">Click on the map to place islands</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {generatorPlacingMode 
-                      ? `Placing Island ${generatorCurrentIsland + 1} of ${generatorIslands.length}`
-                      : "Click 'Start Placing' to begin"}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={generatorPlacingMode ? "destructive" : "default"}
-                    onClick={() => setGeneratorPlacingMode(!generatorPlacingMode)}
-                  >
-                    {generatorPlacingMode ? "Stop Placing" : "Start Placing"}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Map for placing */}
-              <div
-                ref={generatorMapRef}
-                className="relative w-full h-[400px] border-4 border-amber-900/50 rounded-lg overflow-hidden cursor-crosshair"
-                onClick={handleGeneratorMapClick}
-              >
-                <div
-                  style={{
-                    width: 1200,
-                    height: 800,
-                    transform: `scale(${generatorMapScale})`,
-                    transformOrigin: "top left",
-                  }}
-                >
-                  <Image
-                    src="/assets/treasure-map.png"
-                    alt="Treasure Map"
-                    width={1200}
-                    height={800}
-                    className="absolute top-0 left-0"
-                    draggable={false}
-                  />
-                  {/* Placed islands */}
-                  {generatorIslands.filter(i => i.isPlaced).map(island => (
-                    <div
-                      key={island.id}
-                      className="absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg"
-                      style={{
-                        left: island.position.x - 16,
-                        top: island.position.y - 16,
-                        backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
-                        border: island.id === generatorCurrentIsland + 1 ? "3px solid white" : "2px solid rgba(255,255,255,0.5)",
-                      }}
-                    >
-                      {island.id}
-                    </div>
-                  ))}
-                  {/* Current placing indicator */}
-                  {generatorPlacingMode && (
-                    <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-1 rounded text-sm">
-                      Click to place Island {generatorCurrentIsland + 1}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Island list */}
-              <div className="max-h-48 overflow-y-auto border rounded-lg p-2">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {generatorIslands.map((island, idx) => (
-                    <div 
-                      key={island.id}
-                      className={`p-2 rounded border text-sm ${
-                        island.isPlaced ? "bg-green-900/20 border-green-600" : "bg-slate-800 border-slate-600"
-                      } ${idx === generatorCurrentIsland && generatorPlacingMode ? "ring-2 ring-blue-500" : ""}`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">Island {island.id}</span>
-                        {island.isPlaced && <span className="text-green-500 text-xs">✓</span>}
-                      </div>
-                      <Input
-                        value={island.name}
-                        onChange={e => setGeneratorIslands(prev => prev.map(i => 
-                          i.id === island.id ? { ...i, name: e.target.value } : i
-                        ))}
-                        className="h-7 text-xs mb-1"
-                        placeholder="Island name"
-                      />
-                      <div className="flex gap-1">
-                        <Select
-                          value={island.zoneId}
-                          onValueChange={value => setGeneratorIslands(prev => prev.map(i => 
-                            i.id === island.id ? { ...i, zoneId: value } : i
-                          ))}
-                        >
-                          <SelectTrigger className="h-7 text-xs flex-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {generatorZones.map(z => (
-                              <SelectItem key={z.id} value={z.id} className="text-xs">
-                                {z.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={5}
-                          value={island.milestonesCount}
-                          onChange={e => setGeneratorIslands(prev => prev.map(i => 
-                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } : i
-                          ))}
-                          className="w-12 h-7 text-xs"
-                          title="Milestones on this island"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setGeneratorStep(1)}>
-                  Back
-                </Button>
-                <Button 
-                  onClick={() => setGeneratorStep(3)}
-                  disabled={generatorIslands.filter(i => i.isPlaced).length < 2}
-                  className="flex-1"
-                >
-                  Next: Review & Generate
-                </Button>
-              </div>
+            <div className="text-center py-8">
+              <p className="text-lg mb-4">Island placement is now open in fullscreen mode.</p>
+              <p className="text-muted-foreground mb-4">Click on the map to place each island in order.</p>
+              <Button variant="outline" onClick={() => setGeneratorStep(1)}>
+                Back to Configure
+              </Button>
             </div>
           )}
 
@@ -2143,6 +2028,194 @@ export default function JourneyMapEditorSection() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Island Placement Overlay */}
+      {generatorOpen && generatorStep === 2 && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-700">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-blue-500" />
+                Place Islands on Map
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {generatorPlacingMode 
+                  ? `Click to place Island ${generatorCurrentIsland + 1} of ${generatorIslands.length}`
+                  : `${generatorIslands.filter(i => i.isPlaced).length} / ${generatorIslands.length} islands placed`}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant={generatorPlacingMode ? "destructive" : "default"}
+                onClick={() => setGeneratorPlacingMode(!generatorPlacingMode)}
+                size="lg"
+              >
+                {generatorPlacingMode ? "Stop Placing" : "Start Placing"}
+              </Button>
+              <Button variant="outline" onClick={() => setGeneratorStep(1)}>
+                Back
+              </Button>
+              <Button 
+                onClick={() => setGeneratorStep(3)}
+                disabled={generatorIslands.filter(i => i.isPlaced).length < 2}
+              >
+                Next: Review
+              </Button>
+            </div>
+          </div>
+
+          {/* Main Content - Map and Island List side by side */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Map Area */}
+            <div className="flex-1 relative overflow-auto bg-slate-800 p-4">
+              <div
+                ref={generatorMapRef}
+                className="relative mx-auto cursor-crosshair"
+                style={{ 
+                  width: "100%",
+                  maxWidth: 1200,
+                  aspectRatio: "1200/800",
+                }}
+                onClick={handleGeneratorMapClick}
+              >
+                {/* Map Image */}
+                <Image
+                  src="/assets/treasure-map.png"
+                  alt="Treasure Map"
+                  fill
+                  className="object-contain"
+                  draggable={false}
+                  priority
+                />
+                
+                {/* Placed island markers */}
+                {generatorIslands.filter(i => i.isPlaced).map(island => {
+                  // Convert map coordinates to percentage for responsive positioning
+                  const leftPercent = (island.position.x / 1200) * 100;
+                  const topPercent = (island.position.y / 800) * 100;
+                  
+                  return (
+                    <div
+                      key={island.id}
+                      className="absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transform hover:scale-110 transition-transform"
+                      style={{
+                        left: `${leftPercent}%`,
+                        top: `${topPercent}%`,
+                        backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
+                        border: island.id === generatorCurrentIsland + 1 ? "4px solid white" : "3px solid rgba(255,255,255,0.7)",
+                        boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
+                      }}
+                    >
+                      {island.id}
+                    </div>
+                  );
+                })}
+                
+                {/* Placing mode indicator */}
+                {generatorPlacingMode && (
+                  <div className="absolute top-4 left-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg animate-pulse">
+                    Click to place Island {generatorCurrentIsland + 1}: {generatorIslands[generatorCurrentIsland]?.name}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Island List Sidebar */}
+            <div className="w-80 bg-slate-900 border-l border-slate-700 overflow-y-auto p-4">
+              <h3 className="font-semibold mb-3 text-lg">Islands</h3>
+              <div className="space-y-2">
+                {generatorIslands.map((island, idx) => (
+                  <div 
+                    key={island.id}
+                    className={`p-3 rounded-lg border transition-all ${
+                      island.isPlaced 
+                        ? "bg-green-900/30 border-green-600" 
+                        : "bg-slate-800 border-slate-600"
+                    } ${idx === generatorCurrentIsland && generatorPlacingMode 
+                        ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900" 
+                        : ""}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium flex items-center gap-2">
+                        <span 
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white"
+                          style={{ backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color }}
+                        >
+                          {island.id}
+                        </span>
+                        Island {island.id}
+                      </span>
+                      {island.isPlaced ? (
+                        <span className="text-green-500 text-sm flex items-center gap-1">
+                          ✓ Placed
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-sm">Not placed</span>
+                      )}
+                    </div>
+                    
+                    <Input
+                      value={island.name}
+                      onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                        i.id === island.id ? { ...i, name: e.target.value } : i
+                      ))}
+                      className="h-8 text-sm mb-2"
+                      placeholder="Island name"
+                    />
+                    
+                    <div className="flex gap-2">
+                      <Select
+                        value={island.zoneId}
+                        onValueChange={value => setGeneratorIslands(prev => prev.map(i => 
+                          i.id === island.id ? { ...i, zoneId: value } : i
+                        ))}
+                      >
+                        <SelectTrigger className="h-8 text-sm flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {generatorZones.map(z => (
+                            <SelectItem key={z.id} value={z.id}>
+                              <span className="flex items-center gap-2">
+                                <span 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: z.color }}
+                                />
+                                {z.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={5}
+                          value={island.milestonesCount}
+                          onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } : i
+                          ))}
+                          className="w-14 h-8 text-sm text-center"
+                        />
+                        <span className="text-xs text-muted-foreground">MS</span>
+                      </div>
+                    </div>
+                    
+                    {island.isPlaced && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Position: ({island.position.x}, {island.position.y})
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
