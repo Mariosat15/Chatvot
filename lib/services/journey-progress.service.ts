@@ -933,31 +933,41 @@ export async function checkAndCompleteMilestones(
     return { completed: [], unlocked: newlyUnlocked, totalXPEarned: 0 };
   }
 
-  // STEP 2: Check all unlocked but not completed milestones
-  const completedIds = progress.completedMilestones.map(m => m.milestoneId);
-  const unlockedNotCompleted = progress.unlockedMilestones.filter(
-    id => !completedIds.includes(id)
-  );
+  // STEP 2: Check ALL milestones (not just unlocked) for completion
+  // This allows "out of order" completion - e.g., KYC done before first deposit
+  const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
+  
+  // Get ALL milestones sorted by order
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true })
+    .sort({ order: 1 })
+    .lean();
+  
+  // Filter to milestones not yet completed
+  const notCompleted = allMilestones.filter(m => !completedIds.has(m.id));
 
   // OPTIMIZATION: Gather stats once for all completion checks
   let preloadedStats: Record<string, any> | undefined;
-  if (unlockedNotCompleted.length > 0) {
+  if (notCompleted.length > 0) {
     const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
     preloadedStats = await gatherUserStats(userId);
   }
 
-  // Check each unlocked milestone for completion
-  for (const milestoneId of unlockedNotCompleted) {
-    const { canComplete } = await checkMilestoneCompletion(userId, milestoneId, mapId, preloadedStats);
+  // Check ALL non-completed milestones (allows out-of-order completion)
+  for (const milestone of notCompleted) {
+    // Check if this milestone's condition is met
+    if (!milestone.completeCondition) continue;
     
-    if (canComplete) {
-      const result = await completeMilestone(userId, milestoneId, mapId);
+    const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
+    
+    if (met) {
+      // Milestone condition is met - complete it even if not "unlocked"
+      const result = await completeMilestone(userId, milestone.id, mapId);
       if (result.success && result.rewards) {
-        completed.push(milestoneId);
+        completed.push(milestone.id);
         totalXPEarned += result.rewards.xp;
+        console.log(`✅ [JOURNEY] Completed milestone (parallel): ${milestone.name}`);
         
-        // Check for more unlocks after each completion (cascading)
-        // Note: This reuses the already-gathered stats from checkAndUnlockMilestones
+        // Cascade: check for new unlocks
         await checkAndUnlockMilestones(userId, mapId);
       }
     }
