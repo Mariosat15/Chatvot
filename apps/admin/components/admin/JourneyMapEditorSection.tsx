@@ -591,10 +591,20 @@ export default function JourneyMapEditorSection() {
       const posInZone = i - (zoneIndex * islandsPerZone);
       const islandName = zoneNames[posInZone % zoneNames.length] || `Island ${i + 1}`;
       
-      // Auto-calculate milestones: more milestones for later islands (harder zones)
-      // Early: 1-2 milestones, Mid: 2-3, Late: 3-5
-      const progress = i / generatorIslandCount;
-      const baseMilestones = progress < 0.3 ? 1 : progress < 0.6 ? 2 : progress < 0.85 ? 3 : 4;
+      // Auto-calculate milestones based on zone tier (more variety)
+      // Zone 1: 1-2 milestones, Zone 2: 2-3, Zone 3: 2-3, Zone 4: 3-4, Zone 5+: 3-5
+      const zoneBasedMilestones: Record<number, number[]> = {
+        0: [1, 1, 2, 1, 2],           // Beginner's Cove: mostly 1, some 2
+        1: [2, 2, 3, 2, 2],           // Training Grounds: mostly 2, some 3
+        2: [2, 3, 3, 2, 3],           // Proving Grounds: mix of 2-3
+        3: [3, 3, 4, 3, 3],           // Expert Territory: mostly 3, some 4
+        4: [3, 4, 4, 5, 4],           // Champion's Domain: 3-5
+        5: [4, 5, 5, 4, 5],           // Legend's Realm: mostly 4-5
+        6: [5, 5, 6, 5, 6],           // God's Peak: 5-6
+      };
+      
+      const milestoneOptions = zoneBasedMilestones[zoneIndex] || [3, 3, 4, 4, 5];
+      const baseMilestones = milestoneOptions[posInZone % milestoneOptions.length];
       
       return {
         id: i + 1,
@@ -2504,99 +2514,147 @@ export default function JourneyMapEditorSection() {
               </div>
             </div>
 
-            {/* Island List Sidebar */}
-            <div className="w-80 bg-slate-900 border-l border-slate-700 overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
-              <h3 className="font-semibold mb-3 text-lg">Islands</h3>
-              <div className="space-y-2">
-                {generatorIslands.map((island, idx) => (
-                  <div 
-                    key={island.id}
-                    className={`p-3 rounded-lg border transition-all ${
-                      island.isPlaced 
-                        ? "bg-green-900/30 border-green-600" 
-                        : "bg-slate-800 border-slate-600"
-                    } ${idx === generatorCurrentIsland && generatorPlacingMode 
-                        ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900" 
-                        : ""}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium flex items-center gap-2">
-                        <span 
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white"
-                          style={{ backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color }}
-                        >
-                          {island.id}
-                        </span>
-                        Island {island.id}
-                      </span>
-                      {island.isPlaced ? (
-                        <span className="text-green-500 text-sm flex items-center gap-1">
-                          ✓ Placed
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-sm">Not placed</span>
-                      )}
-                    </div>
-                    
-                    <Input
-                      value={island.name}
-                      onChange={e => setGeneratorIslands(prev => prev.map(i => 
-                        i.id === island.id ? { ...i, name: e.target.value } : i
-                      ))}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-8 text-sm mb-2"
-                      placeholder="Island name"
-                    />
-                    
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        value={island.zoneId}
-                        onValueChange={value => setGeneratorIslands(prev => prev.map(i => 
-                          i.id === island.id ? { ...i, zoneId: value } : i
-                        ))}
+            {/* Island List Sidebar - Grouped by Zone */}
+            <div className="w-96 bg-slate-900 border-l border-slate-700 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              {/* Summary Header */}
+              <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-3 z-10">
+                <h3 className="font-semibold text-lg mb-2">Islands by Zone</h3>
+                <div className="flex gap-2 text-xs">
+                  <span className="px-2 py-1 bg-slate-800 rounded">
+                    {generatorIslands.length} Islands
+                  </span>
+                  <span className="px-2 py-1 bg-slate-800 rounded">
+                    {generatorIslands.reduce((sum, i) => sum + i.milestonesCount, 0)} Milestones
+                  </span>
+                  <span className="px-2 py-1 bg-green-900/50 rounded text-green-400">
+                    {generatorIslands.filter(i => i.isPlaced).length} Placed
+                  </span>
+                </div>
+              </div>
+              
+              {/* Grouped Islands by Zone */}
+              <div className="p-3 space-y-4">
+                {generatorZones.map(zone => {
+                  const zoneIslands = generatorIslands.filter(i => i.zoneId === zone.id);
+                  const zoneMilestones = zoneIslands.reduce((sum, i) => sum + i.milestonesCount, 0);
+                  const zonePlaced = zoneIslands.filter(i => i.isPlaced).length;
+                  
+                  return (
+                    <div key={zone.id} className="space-y-2">
+                      {/* Zone Header */}
+                      <div 
+                        className="flex items-center justify-between p-2 rounded-lg"
+                        style={{ backgroundColor: zone.color + "20", borderLeft: `4px solid ${zone.color}` }}
                       >
-                        <SelectTrigger className="h-8 text-sm flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {generatorZones.map(z => (
-                            <SelectItem key={z.id} value={z.id}>
-                              <span className="flex items-center gap-2">
-                                <span 
-                                  className="w-3 h-3 rounded-full" 
-                                  style={{ backgroundColor: z.color }}
-                                />
-                                {z.name}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <span className="font-medium text-sm flex items-center gap-2">
+                          <span 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: zone.color }}
+                          />
+                          {zone.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {zoneIslands.length} islands • {zoneMilestones} MS • {zonePlaced}/{zoneIslands.length} placed
+                        </span>
+                      </div>
                       
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={5}
-                          value={island.milestonesCount}
-                          onChange={e => setGeneratorIslands(prev => prev.map(i => 
-                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) } : i
-                          ))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-14 h-8 text-sm text-center"
-                        />
-                        <span className="text-xs text-muted-foreground">MS</span>
+                      {/* Zone Islands */}
+                      <div className="space-y-2 pl-2">
+                        {zoneIslands.map((island) => {
+                          const idx = generatorIslands.findIndex(i => i.id === island.id);
+                          // Difficulty color based on milestone count
+                          const difficultyColor = island.milestonesCount <= 2 ? "text-green-400" 
+                            : island.milestonesCount <= 3 ? "text-yellow-400"
+                            : island.milestonesCount <= 4 ? "text-orange-400"
+                            : "text-red-400";
+                          const difficultyBg = island.milestonesCount <= 2 ? "bg-green-500/20" 
+                            : island.milestonesCount <= 3 ? "bg-yellow-500/20"
+                            : island.milestonesCount <= 4 ? "bg-orange-500/20"
+                            : "bg-red-500/20";
+                          
+                          return (
+                            <div 
+                              key={island.id}
+                              className={`p-2 rounded-lg border transition-all ${
+                                island.isPlaced 
+                                  ? "bg-green-900/20 border-green-700/50" 
+                                  : "bg-slate-800/50 border-slate-700/50"
+                              } ${idx === generatorCurrentIsland && generatorPlacingMode 
+                                  ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-slate-900" 
+                                  : ""}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex items-center gap-2 mb-1.5">
+                                {/* Island Number Badge */}
+                                <span 
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                                  style={{ backgroundColor: zone.color }}
+                                >
+                                  {island.id}
+                                </span>
+                                
+                                {/* Island Name */}
+                                <Input
+                                  value={island.name}
+                                  onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                                    i.id === island.id ? { ...i, name: e.target.value } : i
+                                  ))}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-7 text-sm flex-1 bg-transparent border-slate-600"
+                                  placeholder="Island name"
+                                />
+                                
+                                {/* Milestone Count with Difficulty Indicator */}
+                                <div 
+                                  className={`flex items-center gap-1 px-2 py-1 rounded ${difficultyBg}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={10}
+                                    value={island.milestonesCount}
+                                    onChange={e => setGeneratorIslands(prev => prev.map(i => 
+                                      i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) } : i
+                                    ))}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-10 h-6 text-sm text-center bg-transparent border-0 p-0 ${difficultyColor} font-bold`}
+                                  />
+                                  <span className={`text-xs ${difficultyColor}`}>MS</span>
+                                </div>
+                                
+                                {/* Placed Status */}
+                                {island.isPlaced ? (
+                                  <span className="text-green-500 text-lg">✓</span>
+                                ) : (
+                                  <span className="text-slate-600 text-lg">○</span>
+                                )}
+                              </div>
+                              
+                              {/* Position info when placed */}
+                              {island.isPlaced && (
+                                <div className="text-[10px] text-muted-foreground pl-8">
+                                  📍 ({island.position.x}, {island.position.y})
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    
-                    {island.isPlaced && (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        Position: ({island.position.x}, {island.position.y})
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+              
+              {/* Difficulty Legend */}
+              <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 p-3">
+                <div className="text-xs text-muted-foreground mb-1">Difficulty:</div>
+                <div className="flex gap-2 text-xs">
+                  <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded">1-2 Easy</span>
+                  <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">3 Medium</span>
+                  <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded">4 Hard</span>
+                  <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded">5+ Expert</span>
+                </div>
               </div>
             </div>
           </div>
