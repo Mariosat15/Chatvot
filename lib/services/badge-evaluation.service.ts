@@ -47,6 +47,7 @@ interface UserStats {
   // Wallet
   totalDeposited: number;
   totalWithdrawn: number;
+  kycVerified: boolean;
 
   // Time
   accountAge: number; // days
@@ -346,6 +347,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   > | null;
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
+  const kycVerified = !!(wallet?.kycVerified || wallet?.kycStatus === "approved");
 
   // Account age (assuming user created with first participation or wallet)
   const firstParticipation = participations.sort(
@@ -587,6 +589,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
     totalWithdrawn,
+    kycVerified,
     accountAge,
     consecutiveTradingDays: consecutiveDays,
     weeklyTradingStreak: Math.floor(consecutiveDays / 7),
