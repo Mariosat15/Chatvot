@@ -37,6 +37,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [progress, setProgress] = useState<JourneyProgress | null>(null);
+  const [userLevel, setUserLevel] = useState<number>(1);
 
   // Fetch journey data
   const fetchJourneyData = useCallback(async () => {
@@ -44,16 +45,18 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     setError(null);
 
     try {
-      // Fetch map config, milestones, and user progress
-      const [mapRes, milestonesRes, progressRes] = await Promise.all([
+      // Fetch map config, milestones, user progress, and user level
+      const [mapRes, milestonesRes, progressRes, levelRes] = await Promise.all([
         fetch("/api/journey-map?mapId=traders_journey"),
         fetch("/api/journey-milestones?mapId=traders_journey"),
         fetch(`/api/journey-progress?userId=${userId}`),
+        fetch(`/api/user-level?userId=${userId}`),
       ]);
 
       const mapData = await mapRes.json();
       const milestonesData = await milestonesRes.json();
       const progressData = await progressRes.json();
+      const levelData = await levelRes.json();
 
       if (mapData.success) {
         setMapConfig(mapData.mapConfig);
@@ -65,6 +68,10 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
 
       if (progressData.success) {
         setProgress(progressData.progress);
+      }
+
+      if (levelData.success && levelData.userLevel) {
+        setUserLevel(levelData.userLevel.currentLevel || 1);
       }
     } catch (err) {
       console.error("Error fetching journey data:", err);
@@ -289,6 +296,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
               completedIds={completedIds}
               unlockedIds={unlockedIds}
               currentMilestone={progress?.currentMilestone}
+              userLevel={userLevel}
               className="min-h-[500px]"
             />
           </CardContent>

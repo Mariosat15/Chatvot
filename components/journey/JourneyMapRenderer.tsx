@@ -20,6 +20,11 @@ export interface Milestone {
   icon: string;
   color: string;
   size: string;
+  unlockCondition?: {
+    type: string;
+    value?: number;
+    comparison?: string;
+  };
   completeCondition: {
     type: string;
     value?: number;
@@ -61,6 +66,7 @@ export interface JourneyMapRendererProps {
   completedIds: string[];
   unlockedIds: string[];
   currentMilestone?: string;
+  userLevel?: number; // User's current level for unlock condition checking
   onMilestoneClick?: (milestone: Milestone) => void;
   className?: string;
 }
@@ -75,6 +81,7 @@ export default function JourneyMapRenderer({
   completedIds,
   unlockedIds,
   currentMilestone,
+  userLevel = 1,
   onMilestoneClick,
   className,
 }: JourneyMapRendererProps) {
@@ -87,18 +94,51 @@ export default function JourneyMapRenderer({
   const [modalOpen, setModalOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Get milestone status
-  const getMilestoneStatus = (id: string): "completed" | "current" | "unlocked" | "locked" => {
+  // Check if unlock condition is met
+  const isUnlockConditionMet = (milestone: Milestone): boolean => {
+    if (!milestone.unlockCondition) return true;
+    
+    const { type, value } = milestone.unlockCondition;
+    
+    // Check level requirement
+    if (type === "level_reached" && value !== undefined) {
+      return userLevel >= value;
+    }
+    
+    // For other conditions, assume met if in unlocked list
+    return true;
+  };
+
+  // Get milestone status with level checking
+  const getMilestoneStatus = (id: string): "completed" | "current" | "unlocked" | "locked" | "level_locked" => {
+    const milestone = milestones.find(m => m.id === id);
+    
     if (completedIds.includes(id)) return "completed";
     if (id === currentMilestone) return "current";
-    if (unlockedIds.includes(id)) return "unlocked";
+    
+    // Check if unlocked but level-locked
+    if (unlockedIds.includes(id)) {
+      if (milestone && !isUnlockConditionMet(milestone)) {
+        return "level_locked";
+      }
+      return "unlocked";
+    }
+    
     return "locked";
+  };
+
+  // Get required level for a milestone
+  const getRequiredLevel = (milestone: Milestone): number | null => {
+    if (milestone.unlockCondition?.type === "level_reached") {
+      return milestone.unlockCondition.value || null;
+    }
+    return null;
   };
 
   // Handle milestone click
   const handleMilestoneClick = (milestone: Milestone) => {
     const status = getMilestoneStatus(milestone.id);
-    if (status === "locked") return;
+    if (status === "locked" || status === "level_locked") return;
     setSelectedMilestone(milestone);
     setModalOpen(true);
     onMilestoneClick?.(milestone);
@@ -217,7 +257,7 @@ export default function JourneyMapRenderer({
   }
 
   // Get node style based on status
-  const getNodeStyle = (status: "completed" | "current" | "unlocked" | "locked", size: string) => {
+  const getNodeStyle = (status: "completed" | "current" | "unlocked" | "locked" | "level_locked", size: string) => {
     // Bigger sizes for better visibility
     const sizeMap = { small: 40, medium: 50, large: 60 };
     const nodeSize = sizeMap[size as keyof typeof sizeMap] || 50;
@@ -229,7 +269,7 @@ export default function JourneyMapRenderer({
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      cursor: status === "locked" ? "not-allowed" : "pointer",
+      cursor: status === "locked" || status === "level_locked" ? "not-allowed" : "pointer",
       transition: "all 0.3s ease",
       fontSize: nodeSize * 0.45,
     };
@@ -256,6 +296,15 @@ export default function JourneyMapRenderer({
           background: "linear-gradient(135deg, #F59E0B, #D97706)",
           boxShadow: "0 0 20px rgba(245, 158, 11, 0.5), 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)",
           border: "4px solid #FCD34D",
+        };
+      case "level_locked":
+        // Shows as locked but with purple tint to indicate level requirement
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
+          boxShadow: "0 4px 12px rgba(124, 58, 237, 0.4), inset 0 2px 4px rgba(0,0,0,0.3)",
+          border: "4px solid #A78BFA",
+          opacity: 0.7,
         };
       case "locked":
         return {
@@ -366,6 +415,10 @@ export default function JourneyMapRenderer({
             <span>Available</span>
           </div>
           <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-purple-500 opacity-70" />
+            <span>Level Required</span>
+          </div>
+          <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-slate-600 opacity-60" />
             <span>Locked</span>
           </div>
@@ -454,8 +507,8 @@ export default function JourneyMapRenderer({
                 <motion.div
                   style={style as any}
                   onClick={() => handleMilestoneClick(milestone)}
-                  whileHover={status !== "locked" ? { scale: 1.12 } : {}}
-                  whileTap={status !== "locked" ? { scale: 0.95 } : {}}
+                  whileHover={status !== "locked" && status !== "level_locked" ? { scale: 1.12 } : {}}
+                  whileTap={status !== "locked" && status !== "level_locked" ? { scale: 0.95 } : {}}
                   className="relative"
                 >
                   {/* Icon/Status indicator - bigger and clearer */}
@@ -463,21 +516,30 @@ export default function JourneyMapRenderer({
                     <span className="text-white text-2xl font-bold drop-shadow-lg">✓</span>
                   ) : status === "locked" ? (
                     <span className="text-xl drop-shadow-md">🔒</span>
+                  ) : status === "level_locked" ? (
+                    <span className="text-xl drop-shadow-md">⭐</span>
                   ) : status === "current" ? (
                     <span className="text-2xl drop-shadow-lg">⭐</span>
                   ) : (
                     <span className="text-xl drop-shadow-lg">🏝️</span>
                   )}
 
+                  {/* Level requirement badge for level_locked */}
+                  {status === "level_locked" && (
+                    <div className="absolute -top-2 -right-2 bg-purple-600 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full shadow-lg border border-purple-400">
+                      Lv.{getRequiredLevel(milestone)}
+                    </div>
+                  )}
+
                   {/* XP Badge */}
-                  {status !== "locked" && milestone.rewards.xp > 0 && (
+                  {status !== "locked" && status !== "level_locked" && milestone.rewards.xp > 0 && (
                     <div className="absolute -top-2 -right-2 bg-amber-500 text-[11px] font-bold text-white px-2 py-0.5 rounded-full shadow-lg border-2 border-amber-300">
                       +{milestone.rewards.xp}
                     </div>
                   )}
 
                   {/* Badge indicator */}
-                  {milestone.rewards.badgeId && status !== "locked" && (
+                  {milestone.rewards.badgeId && status !== "locked" && status !== "level_locked" && (
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border-2 border-purple-300">
                       <span className="text-[10px]">🏆</span>
                     </div>
@@ -495,10 +557,16 @@ export default function JourneyMapRenderer({
                       status === "completed" && "bg-green-900/90 text-green-100 border border-green-700",
                       status === "current" && "bg-blue-900/90 text-blue-100 border border-blue-700",
                       status === "unlocked" && "bg-amber-900/90 text-amber-100 border border-amber-700",
+                      status === "level_locked" && "bg-purple-900/90 text-purple-200 border border-purple-600",
                       status === "locked" && "bg-slate-800/90 text-slate-300 border border-slate-600"
                     )}
                   >
-                    {milestone.name.length > 14 ? milestone.name.slice(0, 12) + "..." : milestone.name}
+                    {status === "level_locked" 
+                      ? `🔒 Lv.${getRequiredLevel(milestone)} Required`
+                      : milestone.name.length > 14 
+                        ? milestone.name.slice(0, 12) + "..." 
+                        : milestone.name
+                    }
                   </span>
                 </div>
               </motion.div>

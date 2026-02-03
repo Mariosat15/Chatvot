@@ -469,9 +469,33 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Generate milestones from islands
+  // Level requirements for progression
+  const LEVEL_REQUIREMENTS = [
+    { level: 1, title: "Novice Trader", minXP: 0, icon: "starBadge" },
+    { level: 2, title: "Apprentice", minXP: 50, icon: "guideBook" },
+    { level: 3, title: "Trainee", minXP: 125, icon: "sword" },
+    { level: 4, title: "Junior Trader", minXP: 250, icon: "trade" },
+    { level: 5, title: "Rising Trader", minXP: 375, icon: "profit" },
+    { level: 6, title: "Skilled Trader", minXP: 500, icon: "target" },
+    { level: 7, title: "Competent Trader", minXP: 750, icon: "archer" },
+    { level: 8, title: "Proficient Trader", minXP: 1100, icon: "shield1" },
+    { level: 9, title: "Expert Trader", minXP: 1450, icon: "swordNumbered" },
+    { level: 10, title: "Senior Trader", minXP: 1800, icon: "gems" },
+    { level: 11, title: "Elite Trader", minXP: 2000, icon: "star1" },
+    { level: 12, title: "Master Trader", minXP: 2500, icon: "crown" },
+    { level: 13, title: "Grand Master", minXP: 3000, icon: "fireSpell" },
+    { level: 14, title: "Trading Virtuoso", minXP: 3500, icon: "blueFireSpell" },
+    { level: 15, title: "Trading Champion", minXP: 4000, icon: "trophy" },
+    { level: 16, title: "Market Legend", minXP: 5000, icon: "starAward" },
+    { level: 17, title: "Trading Titan", minXP: 6000, icon: "goldMedal" },
+    { level: 18, title: "Market Overlord", minXP: 7500, icon: "lord" },
+    { level: 19, title: "Trading Immortal", minXP: 10000, icon: "champion" },
+    { level: 20, title: "Trading God", minXP: 15000, icon: "victory" },
+  ];
+
+  // Generate milestones from islands with progressive difficulty
   const generateFromIslands = async () => {
-    if (!confirm("This will delete all existing milestones and generate new ones. Continue?")) return;
+    if (!confirm("This will delete all existing milestones and generate new ones with progressive difficulty. Continue?")) return;
     
     setLoading(true);
     try {
@@ -500,7 +524,7 @@ export default function JourneyMapEditorSection() {
         body: JSON.stringify({
           mapId: "traders_journey",
           name: "Trader's Journey",
-          description: "Navigate through the islands to become a master trader",
+          description: "Navigate through the islands to become a Trading God",
           zones: zonesData,
           defaultStartNode: "island_1_1",
           backgroundColor: "#1a3a5c",
@@ -509,17 +533,81 @@ export default function JourneyMapEditorSection() {
         }),
       });
 
+      // Count total milestones to distribute levels
+      const placedIslands = generatorIslands.filter(i => i.isPlaced);
+      const totalMilestones = placedIslands.reduce((sum, i) => sum + i.milestonesCount, 0);
+      
+      // Calculate level distribution (spread 20 levels across all milestones)
+      const getLevelForMilestone = (order: number): typeof LEVEL_REQUIREMENTS[0] => {
+        // Map milestone order to level (1 to 20)
+        const levelIndex = Math.min(
+          19,
+          Math.floor((order - 1) / totalMilestones * 20)
+        );
+        return LEVEL_REQUIREMENTS[levelIndex];
+      };
+
+      // Progressive difficulty scaling
+      const getConditionForMilestone = (order: number, total: number) => {
+        const progress = order / total; // 0 to 1
+        
+        // Early milestones: simple trade counts
+        if (progress < 0.2) {
+          return {
+            type: "total_trades",
+            value: Math.ceil(order * 3),
+            comparison: "gte",
+          };
+        }
+        // Mid-early: winning trades
+        if (progress < 0.4) {
+          return {
+            type: "winning_trades",
+            value: Math.ceil(order * 2),
+            comparison: "gte",
+          };
+        }
+        // Mid: competition entries
+        if (progress < 0.6) {
+          return {
+            type: "competitions_entered",
+            value: Math.ceil(progress * 10),
+            comparison: "gte",
+          };
+        }
+        // Mid-late: podium finishes
+        if (progress < 0.8) {
+          return {
+            type: "podium_finishes",
+            value: Math.ceil((progress - 0.5) * 15),
+            comparison: "gte",
+          };
+        }
+        // Late: first place wins
+        return {
+          type: "first_place_finishes",
+          value: Math.ceil((progress - 0.7) * 20),
+          comparison: "gte",
+        };
+      };
+
+      // XP rewards scaling (exponential growth)
+      const getXPReward = (order: number, total: number): number => {
+        const progress = order / total;
+        // Early: 10-50 XP, Late: 100-500 XP
+        return Math.round(10 + (progress * progress) * 490);
+      };
+
       // Generate milestones for each island
       let milestoneOrder = 1;
       const allMilestones: any[] = [];
 
-      for (const island of generatorIslands) {
-        if (!island.isPlaced) continue;
-
+      for (const island of placedIslands) {
         for (let m = 0; m < island.milestonesCount; m++) {
           const milestoneId = `island_${island.id}_${m + 1}`;
-          const isFirst = island.id === 1 && m === 0;
-          const isLast = island.id === generatorIslands.length && m === island.milestonesCount - 1;
+          const isFirst = milestoneOrder === 1;
+          const isLast = milestoneOrder === totalMilestones;
+          const levelReq = getLevelForMilestone(milestoneOrder);
           
           // Calculate position offset for multiple milestones on same island
           const offsetX = island.milestonesCount > 1 ? (m - (island.milestonesCount - 1) / 2) * 30 : 0;
@@ -529,41 +617,92 @@ export default function JourneyMapEditorSection() {
           const connectedTo: string[] = [];
           if (m < island.milestonesCount - 1) {
             connectedTo.push(`island_${island.id}_${m + 2}`);
-          } else if (island.id < generatorIslands.length) {
-            connectedTo.push(`island_${island.id + 1}_1`);
+          } else {
+            const nextIsland = placedIslands.find(i => i.id === island.id + 1);
+            if (nextIsland) {
+              connectedTo.push(`island_${nextIsland.id}_1`);
+            }
           }
 
           // Determine previous milestone connection
           const connectedFrom: string[] = [];
           if (m > 0) {
             connectedFrom.push(`island_${island.id}_${m}`);
-          } else if (island.id > 1) {
-            const prevIsland = generatorIslands[island.id - 2];
-            connectedFrom.push(`island_${island.id - 1}_${prevIsland.milestonesCount}`);
+          } else {
+            const prevIsland = placedIslands.find(i => i.id === island.id - 1);
+            if (prevIsland) {
+              connectedFrom.push(`island_${prevIsland.id}_${prevIsland.milestonesCount}`);
+            }
           }
+
+          // Determine node type based on progress
+          let nodeType = "milestone";
+          let icon = levelReq.icon;
+          let size: "small" | "medium" | "large" = "medium";
+          
+          if (isFirst) {
+            nodeType = "start";
+            icon = "ship";
+            size = "large";
+          } else if (isLast) {
+            nodeType = "legendary";
+            icon = "victory"; // Trading God icon
+            size = "large";
+          } else if (milestoneOrder % 5 === 0) {
+            nodeType = "checkpoint";
+            size = "large";
+          } else if (levelReq.level >= 15) {
+            nodeType = "legendary";
+            size = "large";
+          }
+
+          // Build unlock condition with level requirement
+          const unlockCondition = isFirst ? undefined : {
+            type: "level_reached",
+            value: levelReq.level,
+            comparison: "gte",
+          };
 
           const milestone = {
             id: milestoneId,
             mapId: "traders_journey",
-            name: island.milestonesCount > 1 ? `${island.name} - Step ${m + 1}` : island.name,
-            description: `Complete this milestone on ${island.name}`,
-            shortDescription: `Milestone ${milestoneOrder}`,
+            name: isFirst 
+              ? "Set Sail" 
+              : isLast 
+                ? `${levelReq.title} - Final Destination`
+                : island.milestonesCount > 1 
+                  ? `${island.name} - ${levelReq.title}` 
+                  : `${island.name}`,
+            description: isFirst
+              ? "Your trading journey begins here!"
+              : isLast
+                ? `Reach ${levelReq.title} status to conquer this final milestone and become a Trading God!`
+                : `Requires ${levelReq.title} (Level ${levelReq.level}, ${levelReq.minXP}+ XP) to unlock`,
+            shortDescription: `${levelReq.title} (Lv.${levelReq.level})`,
             zoneId: island.zoneId,
             position: { 
               x: Math.round(island.position.x + offsetX), 
               y: Math.round(island.position.y + offsetY) 
             },
-            nodeType: isFirst ? "start" : isLast ? "legendary" : "milestone",
-            icon: isFirst ? "flag" : isLast ? "crown" : "target",
+            nodeType,
+            icon,
             color: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
-            size: isFirst || isLast ? "large" : "medium",
-            completeCondition: { type: "total_trades", value: milestoneOrder * 5, comparison: "gte" },
-            rewards: { xp: milestoneOrder * 10 },
+            size,
+            unlockCondition,
+            completeCondition: getConditionForMilestone(milestoneOrder, totalMilestones),
+            rewards: { 
+              xp: getXPReward(milestoneOrder, totalMilestones),
+              title: levelReq.level >= 10 ? levelReq.title : undefined,
+            },
             connectedTo,
             connectedFrom,
             isRequired: true,
             isAutoComplete: isFirst,
             order: milestoneOrder,
+            tooltipText: `Level ${levelReq.level}: ${levelReq.title}`,
+            celebrationText: isLast 
+              ? "🎉 CONGRATULATIONS! You have become a TRADING GOD! 🎉"
+              : `🏆 You've reached ${levelReq.title}!`,
             isActive: true,
           };
 
@@ -581,7 +720,7 @@ export default function JourneyMapEditorSection() {
         });
       }
 
-      toast.success(`Generated ${allMilestones.length} milestones across ${generatorIslands.filter(i => i.isPlaced).length} islands`);
+      toast.success(`Generated ${allMilestones.length} milestones with progressive difficulty (Novice → Trading God)`);
       setGeneratorOpen(false);
       setGeneratorStep(1);
       fetchData();
