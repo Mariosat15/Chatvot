@@ -10,6 +10,7 @@ import ProfileSettingsSection from "@/components/profile/ProfileSettingsSection"
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import TradingArsenalSection from "@/components/profile/TradingArsenalSection";
 import KYCVerification from "@/components/kyc/KYCVerification";
+import JourneyMapTab from "@/components/profile/JourneyMapTab";
 import { Badge } from "@/lib/constants/badges";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -100,6 +101,7 @@ export default function ModernProfilePage({
         <Suspense fallback={<TabsLoadingSkeleton />}>
           <ModernProfileTabs
             overviewContent={overviewContent}
+            journeyContent={<JourneyMapTab userId={session.user.id} />}
             badgesContent={
               <BadgesDisplay badges={badges} stats={badgeStats as any} />
             }
