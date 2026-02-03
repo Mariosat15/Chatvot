@@ -402,6 +402,11 @@ export default function UserFullDetailPanel({
     search: string;
   }>({
     type: "all",
+    status: "all",
+    dateFrom: "",
+    dateTo: "",
+    search: "",
+  });
 
   // Gamification Sync State
   const [syncingGamification, setSyncingGamification] = useState(false);
@@ -411,11 +416,6 @@ export default function UserFullDetailPanel({
     badges?: number;
     milestones?: number;
   } | null>(null);
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-    search: "",
-  });
   const [availableHistoryTypes, setAvailableHistoryTypes] = useState<string[]>(
     [],
   );
