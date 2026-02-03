@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import { getUserJourneyProgress, checkAndCompleteMilestones } from "@/lib/services/journey-progress.service";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 
 /**
