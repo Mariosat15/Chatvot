@@ -1964,8 +1964,8 @@ export default function JourneyMapEditorSection() {
       {/* Milestone Editor Dialog */}
       {renderMilestoneEditor()}
 
-      {/* Generator Dialog */}
-      <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
+      {/* Generator Dialog - Hide when step 2 is active (fullscreen mode) */}
+      <Dialog open={generatorOpen && generatorStep !== 2} onOpenChange={setGeneratorOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2154,11 +2154,18 @@ export default function JourneyMapEditorSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Fullscreen Island Placement Overlay */}
+      {/* Fullscreen Island Placement Overlay - Rendered outside dialog to avoid event conflicts */}
       {generatorOpen && generatorStep === 2 && (
-        <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+        <div 
+          className="fixed inset-0 z-[200] bg-slate-950 flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-700">
+          <div 
+            className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div>
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-blue-500" />
@@ -2173,16 +2180,28 @@ export default function JourneyMapEditorSection() {
             <div className="flex items-center gap-3">
               <Button
                 variant={generatorPlacingMode ? "destructive" : "default"}
-                onClick={() => setGeneratorPlacingMode(!generatorPlacingMode)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGeneratorPlacingMode(!generatorPlacingMode);
+                }}
                 size="lg"
               >
                 {generatorPlacingMode ? "Stop Placing" : "Start Placing"}
               </Button>
-              <Button variant="outline" onClick={() => setGeneratorStep(1)}>
+              <Button 
+                variant="outline" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGeneratorStep(1);
+                }}
+              >
                 Back
               </Button>
               <Button 
-                onClick={() => setGeneratorStep(3)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGeneratorStep(3);
+                }}
                 disabled={generatorIslands.filter(i => i.isPlaced).length < 2}
               >
                 Next: Review
@@ -2191,7 +2210,7 @@ export default function JourneyMapEditorSection() {
           </div>
 
           {/* Main Content - Map and Island List side by side */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* Map Area */}
             <div className="flex-1 relative overflow-auto bg-slate-800 p-4">
               <div
@@ -2202,14 +2221,17 @@ export default function JourneyMapEditorSection() {
                   maxWidth: 1200,
                   aspectRatio: "1200/800",
                 }}
-                onClick={handleGeneratorMapClick}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGeneratorMapClick(e);
+                }}
               >
                 {/* Map Image */}
                 <Image
                   src="/assets/treasure-map.png"
                   alt="Treasure Map"
                   fill
-                  className="object-contain"
+                  className="object-contain pointer-events-none"
                   draggable={false}
                   priority
                 />
@@ -2223,7 +2245,7 @@ export default function JourneyMapEditorSection() {
                   return (
                     <div
                       key={island.id}
-                      className="absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transform hover:scale-110 transition-transform"
+                      className="absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transform hover:scale-110 transition-transform pointer-events-none"
                       style={{
                         left: `${leftPercent}%`,
                         top: `${topPercent}%`,
@@ -2239,7 +2261,7 @@ export default function JourneyMapEditorSection() {
                 
                 {/* Placing mode indicator */}
                 {generatorPlacingMode && (
-                  <div className="absolute top-4 left-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg animate-pulse">
+                  <div className="absolute top-4 left-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg animate-pulse pointer-events-none">
                     Click to place Island {generatorCurrentIsland + 1}: {generatorIslands[generatorCurrentIsland]?.name}
                   </div>
                 )}
@@ -2247,7 +2269,7 @@ export default function JourneyMapEditorSection() {
             </div>
 
             {/* Island List Sidebar */}
-            <div className="w-80 bg-slate-900 border-l border-slate-700 overflow-y-auto p-4">
+            <div className="w-80 bg-slate-900 border-l border-slate-700 overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
               <h3 className="font-semibold mb-3 text-lg">Islands</h3>
               <div className="space-y-2">
                 {generatorIslands.map((island, idx) => (
@@ -2260,6 +2282,7 @@ export default function JourneyMapEditorSection() {
                     } ${idx === generatorCurrentIsland && generatorPlacingMode 
                         ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900" 
                         : ""}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium flex items-center gap-2">
@@ -2285,11 +2308,12 @@ export default function JourneyMapEditorSection() {
                       onChange={e => setGeneratorIslands(prev => prev.map(i => 
                         i.id === island.id ? { ...i, name: e.target.value } : i
                       ))}
+                      onClick={(e) => e.stopPropagation()}
                       className="h-8 text-sm mb-2"
                       placeholder="Island name"
                     />
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={island.zoneId}
                         onValueChange={value => setGeneratorIslands(prev => prev.map(i => 
@@ -2323,6 +2347,7 @@ export default function JourneyMapEditorSection() {
                           onChange={e => setGeneratorIslands(prev => prev.map(i => 
                             i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } : i
                           ))}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-14 h-8 text-sm text-center"
                         />
                         <span className="text-xs text-muted-foreground">MS</span>
