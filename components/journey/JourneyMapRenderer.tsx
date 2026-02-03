@@ -585,8 +585,10 @@ export default function JourneyMapRenderer({
                 >
                   {/* Content based on status */}
                   {status === "completed" ? (
-                    // Completed: Show checkmark
-                    <span className="text-white text-xl font-bold drop-shadow-lg">✓</span>
+                    // Completed: Show the actual icon (not checkmark)
+                    <span className="text-xl drop-shadow-lg">
+                      {getIconEmoji()}
+                    </span>
                   ) : status === "locked" || status === "level_locked" ? (
                     // Locked: Show order number in gray
                     <span className="text-slate-400 text-lg font-bold drop-shadow-md">
