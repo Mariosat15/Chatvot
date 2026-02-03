@@ -35,6 +35,8 @@ import {
   Heart,
   Users,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
 
 interface HelpPageContentProps {
   isLoggedIn: boolean;
@@ -1689,7 +1691,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{level.icon}</span>
+                        <GameIcon name={level.icon as GameIconName} size={28} />
                         <div>
                           <p className={`font-semibold ${level.color}`}>
                             {level.title}

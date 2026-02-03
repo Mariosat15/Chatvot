@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, BadgeCategory } from "@/lib/constants/badges";
 import { Lock, Sparkles } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
 import {
   Select,
   SelectContent,
@@ -267,7 +268,7 @@ export default function BadgesDisplay({ badges, stats }: BadgesDisplayProps) {
                     : "bg-gray-700/50 border border-gray-600"
                 } ${badge.earned ? "" : "opacity-50 grayscale"}`}
               >
-                <span className="text-3xl">{badge.icon}</span>
+                <GameIcon name={badge.icon as GameIconName} size={40} />
               </div>
 
               {/* Name */}

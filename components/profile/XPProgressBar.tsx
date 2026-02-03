@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import type { GameIconName } from "@/lib/constants/game-icons";
 
 interface XPProgressBarProps {
   currentXP: number;
@@ -93,7 +94,9 @@ export default function XPProgressBar({
         <div className="flex items-center gap-4">
           {/* Quick Info (visible when collapsed) */}
           <div className="hidden sm:flex items-center gap-3">
-            <div className="text-2xl">{levelData.icon}</div>
+            <div className="text-2xl">
+              <GameIcon name={levelData.icon as GameIconName} size={28} />
+            </div>
             <div className="text-right">
               <p className={`font-bold ${levelData.color}`}>{currentTitle}</p>
               <p className="text-xs text-gray-400">Level {currentLevel}</p>
@@ -136,7 +139,9 @@ export default function XPProgressBar({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="text-5xl">{levelData.icon}</div>
+                    <div className="text-5xl">
+                      <GameIcon name={levelData.icon as GameIconName} size={64} />
+                    </div>
                     <div>
                       <p className="text-sm text-gray-300 uppercase tracking-wide">
                         Current Title
@@ -250,9 +255,9 @@ export default function XPProgressBar({
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`text-3xl ${isLocked ? "grayscale opacity-40" : ""}`}
+                            className={`${isLocked ? "grayscale opacity-40" : ""}`}
                           >
-                            {level.icon}
+                            <GameIcon name={level.icon as GameIconName} size={36} />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">

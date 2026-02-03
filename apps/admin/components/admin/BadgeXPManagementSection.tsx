@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { GameIcon } from "@/components/ui/GameIcon";
 import {
   Trophy,
   Award,
@@ -568,7 +569,7 @@ export default function BadgeXPManagementSection() {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-4xl">{level.icon}</span>
+                      <GameIcon name={level.icon} size={48} />
                       <div>
                         <p className={`text-xl font-bold ${level.color}`}>
                           Level {level.level}
@@ -961,7 +962,7 @@ export default function BadgeXPManagementSection() {
                   }}
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <span className="text-5xl">{badge.icon}</span>
+                    <GameIcon name={badge.icon} size={56} />
                     <div className="flex flex-col gap-2 items-end">
                       <Badge
                         variant="outline"
