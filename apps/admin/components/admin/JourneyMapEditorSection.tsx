@@ -277,6 +277,28 @@ export default function JourneyMapEditorSection() {
     }
   };
 
+  // Seed default map template
+  const seedDefaultMap = async () => {
+    if (!confirm("This will seed/update the default journey map template. Continue?")) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch("/api/journey-map/seed");
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Map seeded: ${data.milestonesCreated} created, ${data.milestonesUpdated} updated`);
+        fetchData();
+      } else {
+        toast.error(data.error || "Failed to seed map");
+      }
+    } catch (error) {
+      toast.error("Failed to seed map");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter milestones
   const filteredMilestones = milestones.filter(m => {
     const matchesSearch = 
@@ -800,11 +822,23 @@ export default function JourneyMapEditorSection() {
           </p>
         </div>
         <div className="flex gap-2">
+          {(!mapConfig || milestones.length === 0) && (
+            <Button variant="default" onClick={seedDefaultMap} className="bg-amber-600 hover:bg-amber-700">
+              <Download className="h-4 w-4 mr-2" />
+              Seed Default Map
+            </Button>
+          )}
+          {mapConfig && milestones.length > 0 && (
+            <Button variant="outline" onClick={seedDefaultMap}>
+              <Download className="h-4 w-4 mr-2" />
+              Reset to Default
+            </Button>
+          )}
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={saveMapConfig}>
+          <Button onClick={saveMapConfig} disabled={!mapConfig}>
             <Save className="h-4 w-4 mr-2" />
             Save Map
           </Button>

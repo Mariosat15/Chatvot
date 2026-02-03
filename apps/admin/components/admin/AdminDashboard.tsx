@@ -63,6 +63,7 @@ import {
   Image,
   HeartPulse,
   FileWarning,
+  Map,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -118,6 +119,7 @@ import GameMasterManagementSection from "@/components/admin/GameMasterManagement
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
 import IncidentsSection from "@/components/admin/IncidentsSection";
+import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -264,6 +266,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Award className="h-5 w-5" />,
         color: "text-pink-400",
         bgColor: "bg-pink-500/10 hover:bg-pink-500/20",
+      },
+      {
+        id: "journey-map",
+        label: "Journey Map",
+        icon: <Map className="h-5 w-5" />,
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
       },
       {
         id: "customer-assignment",
@@ -942,6 +951,8 @@ export default function AdminDashboard({
         return <FraudMonitoringSection key={currentRefreshKey} />;
       case "badges":
         return <BadgeXPManagementSection key={currentRefreshKey} />;
+      case "journey-map":
+        return <JourneyMapEditorSection key={currentRefreshKey} />;
       case "wiki":
         return <AdminWikiSection key={currentRefreshKey} />;
       case "credentials":
