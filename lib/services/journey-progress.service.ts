@@ -236,7 +236,8 @@ export async function checkConditionMet(
 
     case "first_deposit":
     case "has_deposit":
-      currentValue = stats.totalDeposits || 0;
+      // totalDeposited is the amount, > 0 means at least one deposit
+      currentValue = (stats.totalDeposited || 0) > 0 ? 1 : 0;
       break;
 
     case "kyc_verified":
@@ -251,7 +252,9 @@ export async function checkConditionMet(
     // Trading Activity
     // ============================================
     case "total_deposits":
-      currentValue = stats.totalDepositAmount || stats.totalDeposits || 0;
+    case "total_deposited":
+      // Total amount deposited
+      currentValue = stats.totalDeposited || 0;
       break;
 
     case "first_trade":
