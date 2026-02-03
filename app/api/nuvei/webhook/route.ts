@@ -476,6 +476,22 @@ export async function POST(req: NextRequest) {
           `✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`,
         );
 
+        // Trigger journey milestone check after successful deposit
+        try {
+          const { checkAndCompleteMilestones } = await import(
+            "@/lib/services/journey-progress.service"
+          );
+          const journeyResult = await checkAndCompleteMilestones(transaction.userId);
+          if (journeyResult.completed.length > 0) {
+            console.log(
+              `🗺️ Journey milestones completed after deposit: ${journeyResult.completed.join(", ")}`,
+            );
+          }
+        } catch (journeyError) {
+          console.error("🗺️ Error checking journey milestones:", journeyError);
+          // Don't fail the deposit if milestone check fails
+        }
+
         // Track payment fingerprint for fraud detection (same as Stripe)
         // uniqueCC is Nuvei's unique card identifier (hash of card number)
         const cardFingerprint = params.uniqueCC;

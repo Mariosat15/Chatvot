@@ -220,6 +220,22 @@ async function handlePaymentIntentSucceeded(
 
     console.log("✅ Credits added for transaction", transactionId);
 
+    // Trigger journey milestone check after successful deposit
+    try {
+      const { checkAndCompleteMilestones } = await import(
+        "@/lib/services/journey-progress.service"
+      );
+      const journeyResult = await checkAndCompleteMilestones(userId);
+      if (journeyResult.completed.length > 0) {
+        console.log(
+          `🗺️ Journey milestones completed after deposit: ${journeyResult.completed.join(", ")}`,
+        );
+      }
+    } catch (journeyError) {
+      console.error("🗺️ Error checking journey milestones:", journeyError);
+      // Don't fail the deposit if milestone check fails
+    }
+
     // Track for fraud detection
     await trackPaymentFingerprint(paymentIntent, userId);
   } catch (error) {
