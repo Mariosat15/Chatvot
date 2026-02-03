@@ -241,26 +241,26 @@ export async function checkConditionMet(
       break;
 
     case "kyc_verified":
-      // Check actual KYC status from database
+      // Check actual KYC status from CreditWallet (where KYC data is stored)
       if (stats.kycVerified !== undefined) {
         currentValue = stats.kycVerified ? 1 : 0;
       } else {
-        const User = (await import("@/database/models/user.model")).default;
-        const user = await User.findById(userId).lean();
-        currentValue = (user as any)?.kycVerified || (user as any)?.kycStatus === "verified" ? 1 : 0;
+        const CreditWallet = (await import("@/database/models/trading/credit-wallet.model")).default;
+        const wallet = await CreditWallet.findOne({ userId }).lean();
+        currentValue = (wallet as any)?.kycVerified || (wallet as any)?.kycStatus === "approved" ? 1 : 0;
       }
       break;
 
     case "profile_complete":
-      // Check if user has filled required profile fields
+      // Check if user has profile data (stored in CreditWallet or has activity)
       if (stats.profileComplete !== undefined) {
         currentValue = stats.profileComplete ? 1 : 0;
       } else {
-        const UserModel = (await import("@/database/models/user.model")).default;
-        const userProfile = await UserModel.findById(userId).lean();
-        const profile = userProfile as any;
-        // Profile is complete if they have name, email, and avatar
-        const isComplete = !!(profile?.name && profile?.email && profile?.image);
+        // Profile is considered complete if user has made any activity
+        const CreditWalletModel = (await import("@/database/models/trading/credit-wallet.model")).default;
+        const walletProfile = await CreditWalletModel.findOne({ userId }).lean();
+        // Has profile if wallet exists with any deposits or activity
+        const isComplete = !!(walletProfile && ((walletProfile as any).totalDeposited > 0 || (walletProfile as any).creditBalance > 0));
         currentValue = isComplete ? 1 : 0;
       }
       break;
@@ -446,9 +446,9 @@ export async function checkConditionMet(
       if (stats.referralsMade !== undefined) {
         currentValue = stats.referralsMade;
       } else {
-        // Count actual referrals from database
-        const Referral = (await import("@/database/models/referral.model")).default;
-        currentValue = await Referral.countDocuments({ referrerId: userId });
+        // Count actual referrals from database (Game Master referrals)
+        const UserReferral = (await import("@/database/models/user-referral.model")).default;
+        currentValue = await UserReferral.countDocuments({ gameMasterId: userId });
       }
       break;
 
@@ -456,16 +456,13 @@ export async function checkConditionMet(
       if (stats.referralsActive !== undefined) {
         currentValue = stats.referralsActive;
       } else {
-        // Count referrals who have made at least one trade
-        const ReferralActive = (await import("@/database/models/referral.model")).default;
-        const referrals = await ReferralActive.find({ referrerId: userId }).lean();
-        const TradeHistory = (await import("@/database/models/trading/trade-history.model")).default;
-        let activeCount = 0;
-        for (const ref of referrals) {
-          const hasTrades = await TradeHistory.exists({ userId: (ref as any).referredId });
-          if (hasTrades) activeCount++;
-        }
-        currentValue = activeCount;
+        // Count active referrals (users who have entered competitions)
+        const UserReferralActive = (await import("@/database/models/user-referral.model")).default;
+        currentValue = await UserReferralActive.countDocuments({ 
+          gameMasterId: userId,
+          isActive: true,
+          competitionsEntered: { $gt: 0 }
+        });
       }
       break;
 
