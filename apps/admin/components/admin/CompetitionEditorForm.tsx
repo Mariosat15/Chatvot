@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { TITLE_LEVELS } from "@/lib/constants/levels";
 
 interface CompetitionEditorFormProps {
   competitionId: string;
@@ -317,19 +318,7 @@ export default function CompetitionEditorForm({
     return prizeDistribution.reduce((sum, prize) => sum + prize.percentage, 0);
   };
 
-  const levelNames = [
-    "",
-    "🌱 Novice Trader",
-    "📚 Apprentice Trader",
-    "⚔️ Skilled Trader",
-    "🎯 Expert Trader",
-    "💎 Elite Trader",
-    "👑 Master Trader",
-    "🔥 Grand Master",
-    "⚡ Trading Champion",
-    "🌟 Market Legend",
-    "👑 Trading God",
-  ];
+  // Using TITLE_LEVELS from constants for 20 levels
 
   return (
     <form
@@ -744,9 +733,9 @@ export default function CompetitionEditorForm({
                   }
                   className="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-lg px-3 py-2"
                 >
-                  {levelNames.slice(1).map((name, idx) => (
-                    <option key={idx + 1} value={idx + 1}>
-                      {name}
+                  {TITLE_LEVELS.map((level) => (
+                    <option key={level.level} value={level.level}>
+                      Level {level.level}: {level.title} ({level.minXP}+ XP)
                     </option>
                   ))}
                 </select>
@@ -769,16 +758,11 @@ export default function CompetitionEditorForm({
                   className="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-lg px-3 py-2"
                 >
                   <option value="">No Maximum</option>
-                  {levelNames
-                    .slice(levelRequirement.minLevel + 1)
-                    .map((name, idx) => {
-                      const level = levelRequirement.minLevel + idx + 1;
-                      return (
-                        <option key={level} value={level}>
-                          {name}
-                        </option>
-                      );
-                    })}
+                  {TITLE_LEVELS.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
+                    <option key={level.level} value={level.level}>
+                      Level {level.level}: {level.title}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

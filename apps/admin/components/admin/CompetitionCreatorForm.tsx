@@ -42,6 +42,7 @@ import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
 } from "@/lib/utils/competition-difficulty";
+import { TITLE_LEVELS } from "@/lib/constants/levels";
 
 export default function CompetitionCreatorForm() {
   const router = useRouter();
@@ -2530,22 +2531,11 @@ export default function CompetitionCreatorForm() {
                             }
                             className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
-                            <option value={1}>🌱 Level 1: Novice Trader</option>
-                            <option value={2}>
-                              📚 Level 2: Apprentice Trader
-                            </option>
-                            <option value={3}>
-                              ⚔️ Level 3: Skilled Trader
-                            </option>
-                            <option value={4}>🎯 Level 4: Expert Trader</option>
-                            <option value={5}>💎 Level 5: Elite Trader</option>
-                            <option value={6}>👑 Level 6: Master Trader</option>
-                            <option value={7}>🔥 Level 7: Grand Master</option>
-                            <option value={8}>
-                              ⚡ Level 8: Trading Champion
-                            </option>
-                            <option value={9}>🌟 Level 9: Market Legend</option>
-                            <option value={10}>👑 Level 10: Trading God</option>
+                            {TITLE_LEVELS.map((level) => (
+                              <option key={level.level} value={level.level}>
+                                Level {level.level}: {level.title} ({level.minXP}+ XP)
+                              </option>
+                            ))}
                           </select>
                         </div>
 
@@ -2566,28 +2556,11 @@ export default function CompetitionCreatorForm() {
                             className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
                             <option value="">No Maximum</option>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
-                              if (level < levelRequirement.minLevel)
-                                return null;
-                              const levelNames = [
-                                "",
-                                "🌱 Level 1",
-                                "📚 Level 2",
-                                "⚔️ Level 3",
-                                "🎯 Level 4",
-                                "💎 Level 5",
-                                "👑 Level 6",
-                                "🔥 Level 7",
-                                "⚡ Level 8",
-                                "🌟 Level 9",
-                                "👑 Level 10",
-                              ];
-                              return (
-                                <option key={level} value={level}>
-                                  {levelNames[level]}
-                                </option>
-                              );
-                            })}
+                            {TITLE_LEVELS.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
+                              <option key={level.level} value={level.level}>
+                                Level {level.level}: {level.title}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
