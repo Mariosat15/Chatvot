@@ -1958,9 +1958,10 @@ export default function BadgeXPManagementSection() {
                         className={`border-2 rounded-xl p-6 hover:scale-105 transition-transform ${getRarityColor(badge.badgeDetails?.rarity || "common")}`}
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <span className="text-5xl">
-                            {badge.badgeDetails?.icon}
-                          </span>
+                          <GameIcon 
+                            name={(badge.badgeDetails?.icon || "trophy") as GameIconName} 
+                            size={56} 
+                          />
                           <Badge
                             variant="outline"
                             className="text-sm font-semibold capitalize"
