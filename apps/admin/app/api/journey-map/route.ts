@@ -133,19 +133,88 @@ export async function PUT(request: NextRequest) {
 
 /**
  * DELETE /api/journey-map
- * Delete (deactivate) a journey map
+ * Delete a journey map, zones, or specific zone
+ * Query params:
+ * - mapId: the map to operate on (required)
+ * - zoneId: delete specific zone from the map
+ * - clearZones=true: delete all zones from the map
+ * - permanent=true: permanently delete the map (not just deactivate)
  */
 export async function DELETE(request: NextRequest) {
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const mapId = searchParams.get("mapId");
+    const zoneId = searchParams.get("zoneId");
+    const clearZones = searchParams.get("clearZones") === "true";
+    const permanent = searchParams.get("permanent") === "true";
 
     if (!mapId) {
       return NextResponse.json(
         { success: false, error: "Map ID is required" },
         { status: 400 }
       );
+    }
+
+    // Delete specific zone
+    if (zoneId) {
+      const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+        { mapId },
+        { $pull: { zones: { id: zoneId } } },
+        { new: true }
+      );
+
+      if (!mapConfig) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Zone '${zoneId}' deleted successfully`,
+        mapConfig,
+      });
+    }
+
+    // Clear all zones
+    if (clearZones) {
+      const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+        { mapId },
+        { zones: [] },
+        { new: true }
+      );
+
+      if (!mapConfig) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "All zones cleared successfully",
+        mapConfig,
+      });
+    }
+
+    // Permanent delete
+    if (permanent) {
+      const result = await JourneyMapConfig.deleteOne({ mapId });
+      
+      if (result.deletedCount === 0) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Journey map permanently deleted",
+      });
     }
 
     // Soft delete by setting isActive to false

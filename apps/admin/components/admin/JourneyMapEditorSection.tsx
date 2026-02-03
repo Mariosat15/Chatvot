@@ -57,6 +57,7 @@ import {
   MousePointer,
   Hand,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -275,9 +276,9 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Delete milestone
+  // Delete milestone (permanent)
   const deleteMilestone = async (id: string) => {
-    if (!confirm("Are you sure you want to deactivate this milestone?")) return;
+    if (!confirm("Are you sure you want to permanently delete this milestone?")) return;
 
     try {
       const res = await fetch(`/api/journey-milestones?id=${id}`, {
@@ -287,13 +288,109 @@ export default function JourneyMapEditorSection() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success("Milestone deactivated");
+        toast.success("Milestone deleted");
         fetchData();
       } else {
         toast.error(data.error || "Failed to delete milestone");
       }
     } catch (error) {
       toast.error("Failed to delete milestone");
+    }
+  };
+
+  // Delete ALL milestones
+  const deleteAllMilestones = async () => {
+    if (!confirm("Are you sure you want to DELETE ALL MILESTONES? This cannot be undone!")) return;
+    if (!confirm("FINAL WARNING: This will permanently delete all milestones. Continue?")) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/journey-milestones?all=true&mapId=traders_journey`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Deleted ${data.deletedCount} milestones`);
+        fetchData();
+      } else {
+        toast.error(data.error || "Failed to delete milestones");
+      }
+    } catch (error) {
+      toast.error("Failed to delete milestones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete zone
+  const deleteZone = async (zoneId: string) => {
+    if (!confirm(`Are you sure you want to delete zone "${zoneId}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/journey-map?mapId=traders_journey&zoneId=${zoneId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success("Zone deleted");
+        setMapConfig(data.mapConfig);
+      } else {
+        toast.error(data.error || "Failed to delete zone");
+      }
+    } catch (error) {
+      toast.error("Failed to delete zone");
+    }
+  };
+
+  // Delete ALL zones
+  const deleteAllZones = async () => {
+    if (!confirm("Are you sure you want to DELETE ALL ZONES? This cannot be undone!")) return;
+
+    try {
+      const res = await fetch(`/api/journey-map?mapId=traders_journey&clearZones=true`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success("All zones cleared");
+        setMapConfig(data.mapConfig);
+      } else {
+        toast.error(data.error || "Failed to clear zones");
+      }
+    } catch (error) {
+      toast.error("Failed to clear zones");
+    }
+  };
+
+  // Delete EVERYTHING (milestones + zones + map)
+  const deleteEverything = async () => {
+    if (!confirm("⚠️ DANGER: This will delete ALL milestones AND zones. Are you sure?")) return;
+    if (!confirm("FINAL WARNING: This action cannot be undone! Continue?")) return;
+
+    setLoading(true);
+    try {
+      // Delete all milestones first
+      await fetch(`/api/journey-milestones?all=true&mapId=traders_journey`, {
+        method: "DELETE",
+      });
+
+      // Clear all zones
+      await fetch(`/api/journey-map?mapId=traders_journey&clearZones=true`, {
+        method: "DELETE",
+      });
+
+      toast.success("All milestones and zones deleted");
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to delete everything");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -330,7 +427,7 @@ export default function JourneyMapEditorSection() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`Map seeded: ${data.milestonesCreated} created, ${data.milestonesUpdated} updated`);
+        toast.success(`Map seeded: ${data.milestonesCreated} milestones created`);
         setHasUnsavedChanges(false);
         fetchData();
       } else {
@@ -988,6 +1085,10 @@ export default function JourneyMapEditorSection() {
             <Download className="h-4 w-4 mr-2" />
             Reset to Default
           </Button>
+          <Button variant="outline" onClick={deleteEverything} className="border-red-600 text-red-600 hover:bg-red-600/10">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Delete All
+          </Button>
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -1125,6 +1226,15 @@ export default function JourneyMapEditorSection() {
               <Plus className="h-4 w-4 mr-2" />
               Add Milestone
             </Button>
+            <Button
+              variant="outline"
+              onClick={deleteAllMilestones}
+              className="border-red-600 text-red-600 hover:bg-red-600/10"
+              disabled={milestones.length === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
           </div>
 
           <Table>
@@ -1220,6 +1330,17 @@ export default function JourneyMapEditorSection() {
 
         {/* Zones Tab */}
         <TabsContent value="zones" className="mt-4">
+          <div className="flex justify-end mb-4">
+            <Button
+              variant="outline"
+              onClick={deleteAllZones}
+              className="border-red-600 text-red-600 hover:bg-red-600/10"
+              disabled={!mapConfig?.zones.length}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All Zones
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -1229,6 +1350,7 @@ export default function JourneyMapEditorSection() {
                 <TableHead>Color</TableHead>
                 <TableHead>Milestones</TableHead>
                 <TableHead>Unlock Condition</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1258,10 +1380,24 @@ export default function JourneyMapEditorSection() {
                       <span className="text-muted-foreground">Always unlocked</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteZone(zone.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          {(!mapConfig?.zones || mapConfig.zones.length === 0) && (
+            <div className="text-center py-8 text-muted-foreground">
+              No zones found. Use "Reset to Default" to create zones.
+            </div>
+          )}
         </TabsContent>
 
         {/* Settings Tab */}

@@ -175,14 +175,30 @@ export async function PUT(request: NextRequest) {
 
 /**
  * DELETE /api/journey-milestones
- * Delete (deactivate) a milestone
+ * Delete a milestone permanently or all milestones
+ * Query params:
+ * - id: delete specific milestone
+ * - all=true&mapId=xxx: delete all milestones for a map
  */
 export async function DELETE(request: NextRequest) {
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const milestoneId = searchParams.get("id");
+    const deleteAll = searchParams.get("all") === "true";
+    const mapId = searchParams.get("mapId") || "traders_journey";
 
+    // Delete all milestones for the map
+    if (deleteAll) {
+      const result = await JourneyMilestone.deleteMany({ mapId });
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${result.deletedCount} milestones`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    // Delete specific milestone
     if (!milestoneId) {
       return NextResponse.json(
         { success: false, error: "Milestone ID is required" },
@@ -190,14 +206,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Soft delete by setting isActive to false
-    const milestone = await JourneyMilestone.findOneAndUpdate(
-      { id: milestoneId },
-      { isActive: false },
-      { new: true }
-    );
+    // Permanently delete the milestone
+    const result = await JourneyMilestone.deleteOne({ id: milestoneId });
 
-    if (!milestone) {
+    if (result.deletedCount === 0) {
       return NextResponse.json(
         { success: false, error: "Milestone not found" },
         { status: 404 }
@@ -206,7 +218,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Milestone deactivated successfully",
+      message: "Milestone deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting milestone:", error);
