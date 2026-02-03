@@ -86,6 +86,23 @@ interface UserStats {
 
   // Global rank
   globalRank: number;
+  
+  // Additional milestone condition fields
+  secondPlaceFinishes: number;
+  thirdPlaceFinishes: number;
+  top10Finishes: number;
+  top50PercentFinishes: number;
+  competitionPnl: number;
+  currentLevel: number;
+  currentXP: number;
+  xpEarnedToday: number;
+  xpEarnedThisWeek: number;
+  totalBadgesEarned: number;
+  referralsMade: number;
+  referralsActive: number;
+  friendsAdded: number;
+  messagesSent: number;
+  loginStreak: number;
 }
 
 /**
@@ -563,6 +580,53 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Calculate global rank (placeholder - will be calculated separately)
   const globalRank = 999999;
 
+  // Calculate additional placement finishes from participations
+  const secondPlaceFinishes = participations.filter(
+    (p) => p.currentRank === 2,
+  ).length;
+  const thirdPlaceFinishes = participations.filter(
+    (p) => p.currentRank === 3,
+  ).length;
+  const top10Finishes = participations.filter(
+    (p) => p.currentRank && p.currentRank <= 10,
+  ).length;
+  const top50PercentFinishes = participations.filter(
+    (p) => p.currentRank && p.totalParticipants && p.currentRank <= Math.ceil(p.totalParticipants / 2),
+  ).length;
+  const competitionPnl = participations.reduce(
+    (sum, p) => sum + (p.totalPnl || 0), 0
+  );
+
+  // Fetch user level data for XP-based conditions
+  let currentLevel = 1;
+  let currentXP = 0;
+  let totalBadgesEarned = 0;
+  try {
+    const UserLevel = (await import("@/database/models/user-level.model")).default;
+    const userLevel = await UserLevel.findOne({ userId }).lean();
+    if (userLevel) {
+      currentLevel = (userLevel as any).currentLevel || 1;
+      currentXP = (userLevel as any).currentXP || 0;
+      totalBadgesEarned = (userLevel as any).totalBadgesEarned || 0;
+    }
+  } catch (error) {
+    // UserLevel may not exist yet
+  }
+
+  // Fetch referral stats
+  let referralsMade = 0;
+  let referralsActive = 0;
+  try {
+    const UserReferral = (await import("@/database/models/user-referral.model")).default;
+    referralsMade = await UserReferral.countDocuments({ gameMasterId: userId });
+    referralsActive = await UserReferral.countDocuments({ 
+      gameMasterId: userId, 
+      isActive: true 
+    });
+  } catch (error) {
+    // Referral model may not exist
+  }
+
   return {
     userId,
     competitionsEntered: participations.length,
@@ -616,6 +680,22 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     uniqueStrategiesUsed,
     consecutiveProfitableDays,
     globalRank,
+    // Additional milestone condition fields
+    secondPlaceFinishes,
+    thirdPlaceFinishes,
+    top10Finishes,
+    top50PercentFinishes,
+    competitionPnl,
+    currentLevel,
+    currentXP,
+    xpEarnedToday: 0, // Would need to track this separately
+    xpEarnedThisWeek: 0, // Would need to track this separately
+    totalBadgesEarned,
+    referralsMade,
+    referralsActive,
+    friendsAdded: 0, // Not implemented yet
+    messagesSent: 0, // Not implemented yet
+    loginStreak: consecutiveDays, // Use consecutive trading days as proxy
   };
 }
 
@@ -931,6 +1011,106 @@ async function checkBadgeCondition(
         stats.totalPnl >= 50000 &&
         stats.competitionsEntered >= (minCompletedCompetitions || 50)
       );
+
+    // ============================================
+    // MILESTONE CONDITION TYPES - Unified with Journey Map
+    // These allow creating badges with same conditions as milestones
+    // ============================================
+    
+    // Account & Setup
+    case "account_created":
+      return true; // Always true if user exists
+    case "has_deposit":
+      return stats.totalDeposited > 0;
+    case "kyc_verified":
+      return stats.kycVerified === true;
+    case "profile_complete":
+      return stats.totalDeposited > 0; // Has activity = profile complete
+    case "total_deposits":
+      return compareValue(stats.totalDeposited, value, comparison);
+    case "first_trade":
+      return stats.totalTrades >= 1;
+    case "losing_trades":
+      return compareValue(stats.losingTrades, value, comparison);
+    
+    // Trading Activity - Time Based
+    case "trades_today":
+      return compareValue(stats.maxTradesInOneDay, value, comparison);
+    case "trades_this_week":
+      return compareValue(stats.maxTradesInOneWeek, value, comparison);
+    case "trades_this_month":
+      return compareValue(stats.maxTradesInOneMonth, value, comparison);
+    case "different_assets_traded":
+      return compareValue(stats.uniquePairsTraded, value, comparison);
+    
+    // Performance - Additional
+    case "max_win_streak":
+      return compareValue(stats.maxWinStreak, value, comparison);
+    case "best_trade_pnl":
+    case "best_single_trade":
+      return compareValue(stats.bestSingleTrade, value, comparison);
+    case "average_trade_pnl":
+    case "average_win":
+      return compareValue(stats.averageWin, value, comparison);
+    case "risk_reward_ratio":
+      const riskReward = stats.averageLoss > 0 ? (stats.averageWin || 0) / stats.averageLoss : 0;
+      return compareValue(riskReward, value, comparison);
+    
+    // Competitions - Additional Placements
+    case "competitions_completed":
+      return compareValue(stats.completedCompetitions, value, comparison);
+    case "second_place_finishes":
+      return compareValue(stats.secondPlaceFinishes, value, comparison);
+    case "third_place_finishes":
+      return compareValue(stats.thirdPlaceFinishes, value, comparison);
+    case "top_10_finishes":
+      return compareValue(stats.top10Finishes, value, comparison);
+    case "top_50_percent_finishes":
+      return compareValue(stats.top50PercentFinishes, value, comparison);
+    case "competition_pnl":
+      return compareValue(stats.competitionPnl, value, comparison);
+    
+    // Progression & XP
+    case "level_reached":
+      return compareValue(stats.currentLevel, value, comparison);
+    case "xp_threshold":
+      return compareValue(stats.currentXP, value, comparison);
+    case "xp_earned_today":
+      return compareValue(stats.xpEarnedToday, value, comparison);
+    case "xp_earned_this_week":
+      return compareValue(stats.xpEarnedThisWeek, value, comparison);
+    case "total_badges":
+      return compareValue(stats.totalBadgesEarned, value, comparison);
+    
+    // Social & Community
+    case "referrals_made":
+      return compareValue(stats.referralsMade, value, comparison);
+    case "referrals_active":
+      return compareValue(stats.referralsActive, value, comparison);
+    case "friends_added":
+      return compareValue(stats.friendsAdded, value, comparison);
+    case "messages_sent":
+      return compareValue(stats.messagesSent, value, comparison);
+    
+    // Risk Management - Additional
+    case "stop_loss_used":
+      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 10);
+    case "take_profit_used":
+      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 10);
+    case "max_drawdown_under":
+      return stats.totalTrades >= (minTrades || 10) && stats.maxDrawdown <= (value || 50);
+    case "position_size_under":
+      return stats.totalTrades >= (minTrades || 10) && stats.averagePositionSize <= (value || 10);
+    
+    // Time-based - Additional
+    case "account_age_days":
+    case "account_age":
+      return compareValue(stats.accountAge, value, comparison);
+    case "active_days":
+    case "active_trading_days":
+      return compareValue(stats.consecutiveTradingDays, value, comparison);
+    case "login_streak":
+      return compareValue(stats.loginStreak || stats.consecutiveTradingDays, value, comparison);
 
     // Default: false for unimplemented conditions
     default:
