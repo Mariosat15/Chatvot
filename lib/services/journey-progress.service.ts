@@ -58,6 +58,7 @@ export async function initializeUserJourney(
 
 /**
  * Get user's journey progress with full milestone details
+ * Also checks and unlocks any eligible milestones
  */
 export async function getUserJourneyProgress(
   userId: string,
@@ -77,6 +78,16 @@ export async function getUserJourneyProgress(
   if (!progress) {
     progress = await initializeUserJourney(userId, mapId);
     progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
+  }
+
+  // Check if any new milestones can be unlocked or completed
+  // This ensures the progress is always up-to-date when viewed
+  try {
+    await checkAndUnlockMilestones(userId, mapId);
+    // Refresh progress after potential unlocks
+    progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
+  } catch (error) {
+    console.error("Error checking unlocks:", error);
   }
 
   // Get map config
@@ -401,35 +412,46 @@ export async function checkConditionMet(
  */
 export async function checkMilestoneCompletion(
   userId: string,
-  milestoneId: string
+  milestoneId: string,
+  mapId: string = "traders_journey"
 ): Promise<{
   canComplete: boolean;
   isCompleted: boolean;
   isUnlocked: boolean;
+  canUnlock: boolean;
   currentValue?: number;
   targetValue?: number;
 }> {
   await connectToDatabase();
 
   // Get user's progress
-  const progress = await UserJourneyProgress.findOne({ userId }).lean();
+  const progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   
   // Check if already completed
   const isCompleted = progress?.completedMilestones?.some(m => m.milestoneId === milestoneId) || false;
   if (isCompleted) {
-    return { canComplete: false, isCompleted: true, isUnlocked: true };
+    return { canComplete: false, isCompleted: true, isUnlocked: true, canUnlock: true };
+  }
+
+  // Get milestone
+  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true });
+  if (!milestone) {
+    return { canComplete: false, isCompleted: false, isUnlocked: false, canUnlock: false };
   }
 
   // Check if unlocked
   const isUnlocked = progress?.unlockedMilestones?.includes(milestoneId) || false;
-  if (!isUnlocked) {
-    return { canComplete: false, isCompleted: false, isUnlocked: false };
+  
+  // Check if can be unlocked (for display purposes)
+  let canUnlock = isUnlocked;
+  if (!isUnlocked && milestone.unlockCondition) {
+    const { met } = await checkConditionMet(userId, milestone.unlockCondition);
+    canUnlock = met;
   }
-
-  // Get milestone
-  const milestone = await JourneyMilestone.findOne({ id: milestoneId, isActive: true });
-  if (!milestone) {
-    return { canComplete: false, isCompleted: false, isUnlocked: false };
+  
+  // If not unlocked, can't complete
+  if (!isUnlocked) {
+    return { canComplete: false, isCompleted: false, isUnlocked: false, canUnlock };
   }
 
   // Check completion condition
@@ -439,6 +461,7 @@ export async function checkMilestoneCompletion(
     canComplete: met,
     isCompleted: false,
     isUnlocked: true,
+    canUnlock: true,
     currentValue,
     targetValue: milestone.completeCondition.value,
   };
@@ -449,7 +472,8 @@ export async function checkMilestoneCompletion(
  */
 export async function completeMilestone(
   userId: string,
-  milestoneId: string
+  milestoneId: string,
+  mapId: string = "traders_journey"
 ): Promise<{
   success: boolean;
   message: string;
@@ -461,7 +485,7 @@ export async function completeMilestone(
   await connectToDatabase();
 
   // Check if can complete
-  const { canComplete, isCompleted } = await checkMilestoneCompletion(userId, milestoneId);
+  const { canComplete, isCompleted } = await checkMilestoneCompletion(userId, milestoneId, mapId);
 
   if (isCompleted) {
     return { success: false, message: "Milestone already completed" };
@@ -472,13 +496,13 @@ export async function completeMilestone(
   }
 
   // Get milestone details
-  const milestone = await JourneyMilestone.findOne({ id: milestoneId, isActive: true });
+  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true });
   if (!milestone) {
     return { success: false, message: "Milestone not found" };
   }
 
   // Update user progress
-  const progress = await UserJourneyProgress.findOne({ userId });
+  const progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) {
     return { success: false, message: "Journey not initialized" };
   }
@@ -549,13 +573,95 @@ export async function completeMilestone(
 }
 
 /**
+ * Check and unlock milestones based on their unlockCondition
+ * This evaluates conditions like "level_reached" to unlock milestones
+ */
+export async function checkAndUnlockMilestones(
+  userId: string,
+  mapId: string = "traders_journey"
+): Promise<{
+  newlyUnlocked: string[];
+}> {
+  console.log(`🔓 [JOURNEY] Checking unlock conditions for user ${userId}`);
+  await connectToDatabase();
+
+  const newlyUnlocked: string[] = [];
+
+  // Get user's progress
+  let progress = await UserJourneyProgress.findOne({ userId, mapId });
+  if (!progress) {
+    progress = await initializeUserJourney(userId, mapId);
+  }
+
+  // Get all milestones for this map
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true });
+  
+  // Get already unlocked and completed milestone IDs
+  const unlockedIds = new Set(progress.unlockedMilestones);
+  const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
+
+  // Check each milestone that is NOT yet unlocked
+  for (const milestone of allMilestones) {
+    // Skip if already unlocked or completed
+    if (unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
+      continue;
+    }
+
+    // Check if this milestone can be unlocked
+    let canUnlock = false;
+
+    // Method 1: Check if any prerequisite milestone (connectedFrom) is completed
+    if (milestone.connectedFrom && milestone.connectedFrom.length > 0) {
+      const hasCompletedPrereq = milestone.connectedFrom.some(prereqId => 
+        completedIds.has(prereqId)
+      );
+      if (hasCompletedPrereq) {
+        canUnlock = true;
+      }
+    }
+
+    // Method 2: Check unlockCondition (e.g., level_reached)
+    if (!canUnlock && milestone.unlockCondition) {
+      const { met } = await checkConditionMet(userId, milestone.unlockCondition);
+      if (met) {
+        canUnlock = true;
+      }
+    }
+
+    // Method 3: Start nodes with no prerequisites should be unlocked
+    if (!canUnlock && milestone.nodeType === "start" && 
+        (!milestone.connectedFrom || milestone.connectedFrom.length === 0)) {
+      canUnlock = true;
+    }
+
+    // Unlock the milestone if conditions are met
+    if (canUnlock) {
+      progress.unlockedMilestones.push(milestone.id);
+      unlockedIds.add(milestone.id);
+      newlyUnlocked.push(milestone.id);
+      console.log(`🔓 [JOURNEY] Unlocked milestone: ${milestone.id} (${milestone.name})`);
+    }
+  }
+
+  // Save progress if there were any new unlocks
+  if (newlyUnlocked.length > 0) {
+    await progress.save();
+    console.log(`✅ [JOURNEY] Unlocked ${newlyUnlocked.length} new milestones for user ${userId}`);
+  }
+
+  return { newlyUnlocked };
+}
+
+/**
  * Check and complete all eligible milestones for a user
  * Call this after significant user actions (deposit, trade, competition)
  */
 export async function checkAndCompleteMilestones(
-  userId: string
+  userId: string,
+  mapId: string = "traders_journey"
 ): Promise<{
   completed: string[];
+  unlocked: string[];
   totalXPEarned: number;
 }> {
   console.log(`🔄 [JOURNEY] Checking milestones for user ${userId}`);
@@ -565,18 +671,27 @@ export async function checkAndCompleteMilestones(
   let totalXPEarned = 0;
 
   // Get user's progress
-  let progress = await UserJourneyProgress.findOne({ userId });
+  let progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) {
-    progress = await initializeUserJourney(userId);
+    progress = await initializeUserJourney(userId, mapId);
   }
 
-  // Get all unlocked but not completed milestones
+  // STEP 1: First check if any new milestones can be unlocked
+  const { newlyUnlocked } = await checkAndUnlockMilestones(userId, mapId);
+
+  // Refresh progress after unlocks
+  progress = await UserJourneyProgress.findOne({ userId, mapId });
+  if (!progress) {
+    return { completed: [], unlocked: newlyUnlocked, totalXPEarned: 0 };
+  }
+
+  // STEP 2: Check all unlocked but not completed milestones
   const completedIds = progress.completedMilestones.map(m => m.milestoneId);
   const unlockedNotCompleted = progress.unlockedMilestones.filter(
     id => !completedIds.includes(id)
   );
 
-  // Check each unlocked milestone
+  // Check each unlocked milestone for completion
   for (const milestoneId of unlockedNotCompleted) {
     const { canComplete } = await checkMilestoneCompletion(userId, milestoneId);
     
@@ -585,6 +700,9 @@ export async function checkAndCompleteMilestones(
       if (result.success && result.rewards) {
         completed.push(milestoneId);
         totalXPEarned += result.rewards.xp;
+        
+        // Check for more unlocks after each completion (cascading)
+        await checkAndUnlockMilestones(userId, mapId);
       }
     }
   }
@@ -593,7 +711,7 @@ export async function checkAndCompleteMilestones(
     console.log(`✅ [JOURNEY] Completed ${completed.length} milestones for user ${userId}`);
   }
 
-  return { completed, totalXPEarned };
+  return { completed, unlocked: newlyUnlocked, totalXPEarned };
 }
 
 /**

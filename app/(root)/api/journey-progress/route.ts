@@ -68,13 +68,25 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    
+    // Get mapId from request body if provided
+    let mapId = "traders_journey";
+    try {
+      const body = await request.json();
+      if (body.mapId) {
+        mapId = body.mapId;
+      }
+    } catch {
+      // No body or invalid JSON, use default mapId
+    }
 
-    // Check and complete any eligible milestones
-    const result = await checkAndCompleteMilestones(userId);
+    // Check and complete any eligible milestones (also checks unlocks first)
+    const result = await checkAndCompleteMilestones(userId, mapId);
 
     return NextResponse.json({
       success: true,
       completed: result.completed,
+      unlocked: result.unlocked,
       totalXPEarned: result.totalXPEarned,
     });
   } catch (error) {

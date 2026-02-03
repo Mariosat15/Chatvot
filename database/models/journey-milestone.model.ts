@@ -10,6 +10,7 @@ export interface IMilestoneCondition {
   minTrades?: number;
   minCompletedCompetitions?: number;
   badgeId?: string;
+  milestoneId?: string; // For milestone_complete condition type
   customCheck?: string;
 }
 
@@ -74,6 +75,7 @@ const MilestoneConditionSchema = new Schema<IMilestoneCondition>(
     minTrades: { type: Number },
     minCompletedCompetitions: { type: Number },
     badgeId: { type: String },
+    milestoneId: { type: String },
     customCheck: { type: String },
   },
   { _id: false }
