@@ -11,6 +11,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Map,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -29,6 +30,13 @@ const TABS: Tab[] = [
     icon: <LayoutDashboard className="w-4 h-4" />,
     color: "text-blue-400",
     gradient: "from-blue-500/20 to-blue-600/10",
+  },
+  {
+    id: "journey",
+    label: "Journey",
+    icon: <Map className="w-4 h-4" />,
+    color: "text-amber-400",
+    gradient: "from-amber-500/20 to-orange-500/10",
   },
   {
     id: "badges",
@@ -74,6 +82,7 @@ interface ModernProfileTabsProps {
   notificationsContent?: React.ReactNode;
   arsenalContent?: React.ReactNode;
   verificationContent?: React.ReactNode;
+  journeyContent?: React.ReactNode;
 }
 
 export default function ModernProfileTabs({
@@ -83,6 +92,7 @@ export default function ModernProfileTabs({
   notificationsContent,
   arsenalContent,
   verificationContent,
+  journeyContent,
 }: ModernProfileTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -135,6 +145,8 @@ export default function ModernProfileTabs({
     switch (activeTab) {
       case "overview":
         return overviewContent;
+      case "journey":
+        return journeyContent;
       case "badges":
         return badgesContent;
       case "arsenal":

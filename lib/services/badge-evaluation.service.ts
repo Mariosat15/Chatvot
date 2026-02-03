@@ -202,6 +202,20 @@ export async function evaluateUserBadges(userId: string): Promise<{
       console.error("❌ [BADGE EVAL] Error ensuring user level:", levelError);
     }
 
+    // Check and complete journey milestones based on new stats/badges
+    try {
+      const { checkAndCompleteMilestones } =
+        await import("@/lib/services/journey-progress.service");
+      const journeyResult = await checkAndCompleteMilestones(userId);
+      if (journeyResult.completed.length > 0) {
+        console.log(
+          `🗺️ [BADGE EVAL] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+        );
+      }
+    } catch (journeyError) {
+      console.error("❌ [BADGE EVAL] Error checking journey milestones:", journeyError);
+    }
+
     return {
       newBadges: newlyEarnedBadges,
       totalBadges: existingBadges.length + newlyEarnedBadges.length,
@@ -214,8 +228,9 @@ export async function evaluateUserBadges(userId: string): Promise<{
 
 /**
  * Gather comprehensive user statistics for badge evaluation
+ * Exported for use by journey progress service
  */
-async function gatherUserStats(userId: string): Promise<UserStats> {
+export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Get competition stats
   const participations = await CompetitionParticipant.find({ userId }).lean();
   const firstPlaceFinishes = participations.filter(
