@@ -85,6 +85,7 @@ export default function JourneyMapRenderer({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Get milestone status
   const getMilestoneStatus = (id: string): "completed" | "current" | "unlocked" | "locked" => {
@@ -103,12 +104,41 @@ export default function JourneyMapRenderer({
     onMilestoneClick?.(milestone);
   };
 
+  // Center the map in the container
+  const centerMap = (currentScale?: number) => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const useScale = currentScale ?? scale;
+    
+    // Calculate position to center the map
+    const scaledMapWidth = MAP_WIDTH * useScale;
+    const scaledMapHeight = MAP_HEIGHT * useScale;
+    const centerX = (containerWidth - scaledMapWidth) / 2;
+    const centerY = (containerHeight - scaledMapHeight) / 2;
+    
+    setPosition({ x: centerX, y: centerY });
+  };
+
   // Zoom controls
-  const handleZoomIn = () => setScale(s => Math.min(s + 0.15, 2));
-  const handleZoomOut = () => setScale(s => Math.max(s - 0.15, 0.4));
+  const handleZoomIn = () => {
+    const newScale = Math.min(scale + 0.15, 2);
+    setScale(newScale);
+    // Re-center after zoom
+    setTimeout(() => centerMap(newScale), 0);
+  };
+  
+  const handleZoomOut = () => {
+    const newScale = Math.max(scale - 0.15, 0.4);
+    setScale(newScale);
+    // Re-center after zoom
+    setTimeout(() => centerMap(newScale), 0);
+  };
+  
   const handleReset = () => {
     setScale(0.8);
-    setPosition({ x: 0, y: 0 });
+    setTimeout(() => centerMap(0.8), 0);
   };
 
   // Center on current milestone
@@ -160,18 +190,23 @@ export default function JourneyMapRenderer({
     });
   };
 
-  // Wheel zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    setScale(s => Math.min(Math.max(s + delta, 0.4), 2));
-  };
-
+  // Center map on initial load
   useEffect(() => {
-    if (currentMilestone) {
+    if (!isInitialized && containerRef.current) {
+      // Small delay to ensure container is rendered
+      setTimeout(() => {
+        centerMap(0.8);
+        setIsInitialized(true);
+      }, 100);
+    }
+  }, [isInitialized]);
+
+  // Center on current milestone if provided
+  useEffect(() => {
+    if (currentMilestone && isInitialized) {
       setTimeout(centerOnCurrent, 100);
     }
-  }, [currentMilestone]);
+  }, [currentMilestone, isInitialized]);
 
   if (!mapConfig) {
     return (
@@ -365,7 +400,6 @@ export default function JourneyMapRenderer({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleMouseUp}
-        onWheel={handleWheel}
       >
         {/* Map content wrapper */}
         <div
@@ -373,7 +407,7 @@ export default function JourneyMapRenderer({
           style={{
             width: MAP_WIDTH,
             height: MAP_HEIGHT,
-            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             transformOrigin: "top left",
           }}
         >
