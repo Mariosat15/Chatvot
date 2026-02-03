@@ -119,6 +119,9 @@ export async function checkConditionMet(
 
   // Map condition types to user stats
   switch (type) {
+    // ============================================
+    // Account & Setup
+    // ============================================
     case "account_created":
       return { met: true, currentValue: 1 };
 
@@ -127,8 +130,19 @@ export async function checkConditionMet(
       currentValue = stats.totalDeposits || 0;
       break;
 
+    case "kyc_verified":
+      currentValue = stats.kycVerified ? 1 : 0;
+      break;
+
+    case "profile_complete":
+      currentValue = stats.profileComplete ? 1 : 0;
+      break;
+
+    // ============================================
+    // Trading Activity
+    // ============================================
     case "total_deposits":
-      currentValue = stats.totalDeposits || 0;
+      currentValue = stats.totalDepositAmount || stats.totalDeposits || 0;
       break;
 
     case "first_trade":
@@ -140,6 +154,71 @@ export async function checkConditionMet(
       currentValue = stats.winningTrades || 0;
       break;
 
+    case "losing_trades":
+      currentValue = stats.losingTrades || 0;
+      break;
+
+    case "trades_today":
+      currentValue = stats.tradesToday || 0;
+      break;
+
+    case "trades_this_week":
+      currentValue = stats.tradesThisWeek || 0;
+      break;
+
+    case "trades_this_month":
+      currentValue = stats.tradesThisMonth || 0;
+      break;
+
+    case "consecutive_trading_days":
+      currentValue = stats.consecutiveTradingDays || 0;
+      break;
+
+    case "different_assets_traded":
+      currentValue = stats.differentAssetsTraded || 0;
+      break;
+
+    // ============================================
+    // Performance
+    // ============================================
+    case "win_rate":
+      currentValue = stats.winRate || 0;
+      break;
+
+    case "win_streak":
+      currentValue = stats.currentWinStreak || stats.maxWinStreak || 0;
+      break;
+
+    case "max_win_streak":
+      currentValue = stats.maxWinStreak || 0;
+      break;
+
+    case "total_pnl_positive":
+      return { met: (stats.totalPnl || 0) > 0, currentValue: stats.totalPnl || 0 };
+
+    case "total_pnl":
+      currentValue = stats.totalPnl || 0;
+      break;
+
+    case "profit_factor":
+      currentValue = stats.profitFactor || 0;
+      break;
+
+    case "best_trade_pnl":
+      currentValue = stats.bestTradePnl || 0;
+      break;
+
+    case "average_trade_pnl":
+      currentValue = stats.averageTradePnl || 0;
+      break;
+
+    case "risk_reward_ratio":
+      currentValue = stats.riskRewardRatio || 0;
+      break;
+
+    // ============================================
+    // Competitions
+    // ============================================
     case "competitions_entered":
       currentValue = stats.competitionsEntered || 0;
       break;
@@ -152,23 +231,57 @@ export async function checkConditionMet(
       currentValue = stats.firstPlaceFinishes || 0;
       break;
 
+    case "second_place_finishes":
+      currentValue = stats.secondPlaceFinishes || 0;
+      break;
+
+    case "third_place_finishes":
+      currentValue = stats.thirdPlaceFinishes || 0;
+      break;
+
     case "podium_finishes":
       currentValue = stats.podiumFinishes || 0;
       break;
 
-    case "total_pnl":
-      currentValue = stats.totalPnl || 0;
+    case "top_10_finishes":
+      currentValue = stats.top10Finishes || 0;
       break;
 
-    case "total_pnl_positive":
-      return { met: (stats.totalPnl || 0) > 0, currentValue: stats.totalPnl || 0 };
-
-    case "win_rate":
-      currentValue = stats.winRate || 0;
+    case "top_50_percent_finishes":
+      currentValue = stats.top50PercentFinishes || 0;
       break;
 
-    case "win_streak":
-      currentValue = stats.maxWinStreak || 0;
+    case "competition_pnl":
+      currentValue = stats.competitionPnl || 0;
+      break;
+
+    // ============================================
+    // Progression & XP
+    // ============================================
+    case "level_reached":
+      const UserLevelModel = (await import("@/database/models/user-level.model")).default;
+      const level = await UserLevelModel.findOne({ userId }).lean();
+      currentValue = (level as any)?.currentLevel || 1;
+      break;
+
+    case "xp_threshold":
+      const UserLevel = (await import("@/database/models/user-level.model")).default;
+      const userLevel = await UserLevel.findOne({ userId }).lean();
+      currentValue = (userLevel as any)?.currentXP || 0;
+      break;
+
+    case "xp_earned_today":
+      currentValue = stats.xpEarnedToday || 0;
+      break;
+
+    case "xp_earned_this_week":
+      currentValue = stats.xpEarnedThisWeek || 0;
+      break;
+
+    case "total_badges":
+      const UserBadgeCount = (await import("@/database/models/user-badge.model")).default;
+      const badgeCount = await UserBadgeCount.countDocuments({ userId });
+      currentValue = badgeCount;
       break;
 
     case "badge_earned":
@@ -180,16 +293,75 @@ export async function checkConditionMet(
       }
       return { met: false };
 
-    case "xp_threshold":
-      const UserLevel = (await import("@/database/models/user-level.model")).default;
-      const userLevel = await UserLevel.findOne({ userId }).lean();
-      currentValue = (userLevel as any)?.currentXP || 0;
+    case "milestone_complete":
+      // Check if user has completed a specific milestone
+      if (condition.milestoneId) {
+        const progress = await UserJourneyProgress.findOne({ userId }).lean();
+        const isComplete = progress?.completedMilestones?.some(
+          m => m.milestoneId === condition.milestoneId
+        );
+        return { met: !!isComplete, currentValue: isComplete ? 1 : 0 };
+      }
+      return { met: false };
+
+    // ============================================
+    // Social & Community
+    // ============================================
+    case "referrals_made":
+      currentValue = stats.referralsMade || 0;
       break;
 
-    case "level_reached":
-      const UserLevelModel = (await import("@/database/models/user-level.model")).default;
-      const level = await UserLevelModel.findOne({ userId }).lean();
-      currentValue = (level as any)?.currentLevel || 1;
+    case "referrals_active":
+      currentValue = stats.referralsActive || 0;
+      break;
+
+    case "friends_added":
+      currentValue = stats.friendsAdded || 0;
+      break;
+
+    case "messages_sent":
+      currentValue = stats.messagesSent || 0;
+      break;
+
+    // ============================================
+    // Risk Management
+    // ============================================
+    case "stop_loss_used":
+      currentValue = stats.stopLossUsed || 0;
+      break;
+
+    case "take_profit_used":
+      currentValue = stats.takeProfitUsed || 0;
+      break;
+
+    case "max_drawdown_under":
+      // For "under" conditions, we check if current is LESS than target
+      currentValue = stats.maxDrawdown || 0;
+      return { 
+        met: value !== undefined && currentValue <= value, 
+        currentValue 
+      };
+
+    case "position_size_under":
+      currentValue = stats.maxPositionSize || 0;
+      return { 
+        met: value !== undefined && currentValue <= value, 
+        currentValue 
+      };
+
+    // ============================================
+    // Time-based
+    // ============================================
+    case "account_age_days":
+      currentValue = stats.accountAgeDays || 0;
+      break;
+
+    case "active_days":
+      currentValue = stats.activeTradingDays || 0;
+      break;
+
+    case "login_streak":
+      currentValue = stats.loginStreak || 0;
       break;
 
     default:

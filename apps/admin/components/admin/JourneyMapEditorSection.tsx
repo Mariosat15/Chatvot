@@ -150,23 +150,122 @@ const NODE_TYPE_CONFIG: Record<string, { icon: typeof Flag; color: string; label
   optional: { icon: Target, color: "#6B7280", label: "Optional" },
 };
 
-// Condition types
+// Condition types - organized by category
 const CONDITION_TYPES = [
-  { value: "account_created", label: "Account Created" },
-  { value: "first_deposit", label: "First Deposit" },
-  { value: "total_deposits", label: "Total Deposits" },
-  { value: "total_trades", label: "Total Trades" },
-  { value: "winning_trades", label: "Winning Trades" },
-  { value: "competitions_entered", label: "Competitions Entered" },
-  { value: "competitions_completed", label: "Competitions Completed" },
-  { value: "first_place_finishes", label: "First Place Finishes" },
-  { value: "podium_finishes", label: "Podium Finishes (Top 3)" },
-  { value: "total_pnl_positive", label: "Positive Total P&L" },
-  { value: "win_rate", label: "Win Rate %" },
-  { value: "win_streak", label: "Win Streak" },
-  { value: "badge_earned", label: "Badge Earned" },
-  { value: "xp_threshold", label: "XP Threshold" },
-  { value: "level_reached", label: "Level Reached" },
+  // Account & Setup
+  { value: "account_created", label: "Account Created", category: "setup" },
+  { value: "first_deposit", label: "First Deposit", category: "setup" },
+  { value: "kyc_verified", label: "KYC Verified", category: "setup" },
+  { value: "profile_complete", label: "Profile Complete", category: "setup" },
+  
+  // Trading Activity
+  { value: "total_trades", label: "Total Trades", category: "trading" },
+  { value: "total_deposits", label: "Total Deposits ($)", category: "trading" },
+  { value: "winning_trades", label: "Winning Trades", category: "trading" },
+  { value: "losing_trades", label: "Losing Trades (Learn from losses)", category: "trading" },
+  { value: "trades_today", label: "Trades Today", category: "trading" },
+  { value: "trades_this_week", label: "Trades This Week", category: "trading" },
+  { value: "trades_this_month", label: "Trades This Month", category: "trading" },
+  { value: "consecutive_trading_days", label: "Consecutive Trading Days", category: "trading" },
+  { value: "different_assets_traded", label: "Different Assets Traded", category: "trading" },
+  
+  // Performance
+  { value: "win_rate", label: "Win Rate %", category: "performance" },
+  { value: "win_streak", label: "Current Win Streak", category: "performance" },
+  { value: "max_win_streak", label: "Best Win Streak Ever", category: "performance" },
+  { value: "total_pnl_positive", label: "Positive Total P&L", category: "performance" },
+  { value: "total_pnl", label: "Total P&L Amount ($)", category: "performance" },
+  { value: "profit_factor", label: "Profit Factor", category: "performance" },
+  { value: "best_trade_pnl", label: "Best Single Trade P&L ($)", category: "performance" },
+  { value: "average_trade_pnl", label: "Average Trade P&L ($)", category: "performance" },
+  { value: "risk_reward_ratio", label: "Risk/Reward Ratio", category: "performance" },
+  
+  // Competitions
+  { value: "competitions_entered", label: "Competitions Entered", category: "competitions" },
+  { value: "competitions_completed", label: "Competitions Completed", category: "competitions" },
+  { value: "first_place_finishes", label: "1st Place Finishes", category: "competitions" },
+  { value: "second_place_finishes", label: "2nd Place Finishes", category: "competitions" },
+  { value: "third_place_finishes", label: "3rd Place Finishes", category: "competitions" },
+  { value: "podium_finishes", label: "Podium Finishes (Top 3)", category: "competitions" },
+  { value: "top_10_finishes", label: "Top 10 Finishes", category: "competitions" },
+  { value: "top_50_percent_finishes", label: "Top 50% Finishes", category: "competitions" },
+  { value: "competition_pnl", label: "Competition P&L Total ($)", category: "competitions" },
+  
+  // Progression & XP
+  { value: "level_reached", label: "Level Reached", category: "progression" },
+  { value: "xp_threshold", label: "XP Threshold", category: "progression" },
+  { value: "xp_earned_today", label: "XP Earned Today", category: "progression" },
+  { value: "xp_earned_this_week", label: "XP Earned This Week", category: "progression" },
+  { value: "total_badges", label: "Total Badges Earned", category: "progression" },
+  { value: "badge_earned", label: "Specific Badge Earned", category: "progression" },
+  { value: "milestone_complete", label: "Specific Milestone Complete", category: "progression" },
+  
+  // Social & Community
+  { value: "referrals_made", label: "Referrals Made", category: "social" },
+  { value: "referrals_active", label: "Active Referrals", category: "social" },
+  { value: "friends_added", label: "Friends Added", category: "social" },
+  { value: "messages_sent", label: "Messages Sent", category: "social" },
+  
+  // Risk Management
+  { value: "stop_loss_used", label: "Stop Losses Used", category: "risk" },
+  { value: "take_profit_used", label: "Take Profits Used", category: "risk" },
+  { value: "max_drawdown_under", label: "Max Drawdown Under %", category: "risk" },
+  { value: "position_size_under", label: "Position Size Under %", category: "risk" },
+  
+  // Time-based
+  { value: "account_age_days", label: "Account Age (Days)", category: "time" },
+  { value: "active_days", label: "Active Trading Days", category: "time" },
+  { value: "login_streak", label: "Login Streak (Days)", category: "time" },
+];
+
+// Milestone templates for varied generation
+const MILESTONE_TEMPLATES = [
+  // Early game - Getting started
+  { name: "First Steps", desc: "Begin your trading journey", condition: { type: "account_created" }, xp: 10, tier: 1 },
+  { name: "Fund Your Account", desc: "Make your first deposit", condition: { type: "first_deposit" }, xp: 25, tier: 1 },
+  { name: "Identity Verified", desc: "Complete KYC verification", condition: { type: "kyc_verified" }, xp: 30, tier: 1 },
+  { name: "First Blood", desc: "Execute your first trade", condition: { type: "total_trades", value: 1 }, xp: 20, tier: 1 },
+  
+  // Early-mid - Learning the ropes
+  { name: "Getting Warmed Up", desc: "Complete 10 trades", condition: { type: "total_trades", value: 10 }, xp: 40, tier: 2 },
+  { name: "Taste of Victory", desc: "Win your first trade", condition: { type: "winning_trades", value: 1 }, xp: 35, tier: 2 },
+  { name: "Learning Curve", desc: "Experience your first loss (it happens!)", condition: { type: "losing_trades", value: 1 }, xp: 25, tier: 2 },
+  { name: "Consistent Trader", desc: "Trade for 5 consecutive days", condition: { type: "consecutive_trading_days", value: 5 }, xp: 50, tier: 2 },
+  { name: "Diversified", desc: "Trade 3 different assets", condition: { type: "different_assets_traded", value: 3 }, xp: 45, tier: 2 },
+  
+  // Mid game - Building skills
+  { name: "Centurion", desc: "Complete 100 trades", condition: { type: "total_trades", value: 100 }, xp: 100, tier: 3 },
+  { name: "Winning Ways", desc: "Achieve 50% win rate", condition: { type: "win_rate", value: 50 }, xp: 75, tier: 3 },
+  { name: "Hot Streak", desc: "Win 3 trades in a row", condition: { type: "win_streak", value: 3 }, xp: 60, tier: 3 },
+  { name: "In the Green", desc: "Achieve positive P&L", condition: { type: "total_pnl_positive" }, xp: 80, tier: 3 },
+  { name: "Arena Ready", desc: "Enter your first competition", condition: { type: "competitions_entered", value: 1 }, xp: 70, tier: 3 },
+  
+  // Mid-late - Proving yourself
+  { name: "Battle Tested", desc: "Complete 5 competitions", condition: { type: "competitions_completed", value: 5 }, xp: 120, tier: 4 },
+  { name: "Top Half", desc: "Finish in top 50% of a competition", condition: { type: "top_50_percent_finishes", value: 1 }, xp: 100, tier: 4 },
+  { name: "Sharpshooter", desc: "Achieve 60% win rate", condition: { type: "win_rate", value: 60 }, xp: 150, tier: 4 },
+  { name: "Endurance", desc: "Trade for 30 days", condition: { type: "active_days", value: 30 }, xp: 130, tier: 4 },
+  { name: "Risk Manager", desc: "Use stop loss on 50 trades", condition: { type: "stop_loss_used", value: 50 }, xp: 110, tier: 4 },
+  
+  // Late game - Excellence
+  { name: "Gladiator", desc: "Finish in top 10", condition: { type: "top_10_finishes", value: 1 }, xp: 200, tier: 5 },
+  { name: "Bronze Medal", desc: "Earn a 3rd place finish", condition: { type: "third_place_finishes", value: 1 }, xp: 250, tier: 5 },
+  { name: "Silver Medal", desc: "Earn a 2nd place finish", condition: { type: "second_place_finishes", value: 1 }, xp: 300, tier: 5 },
+  { name: "Veteran", desc: "Complete 500 trades", condition: { type: "total_trades", value: 500 }, xp: 280, tier: 5 },
+  { name: "Profit Machine", desc: "Earn $1000 in total P&L", condition: { type: "total_pnl", value: 1000 }, xp: 320, tier: 5 },
+  
+  // End game - Mastery
+  { name: "Champion", desc: "Win a competition", condition: { type: "first_place_finishes", value: 1 }, xp: 500, tier: 6 },
+  { name: "Legend", desc: "Win 3 competitions", condition: { type: "first_place_finishes", value: 3 }, xp: 750, tier: 6 },
+  { name: "Unbreakable", desc: "Win 10 trades in a row", condition: { type: "win_streak", value: 10 }, xp: 600, tier: 6 },
+  { name: "Trading Veteran", desc: "Complete 1000 trades", condition: { type: "total_trades", value: 1000 }, xp: 800, tier: 6 },
+  { name: "Master Strategist", desc: "Achieve 70% win rate", condition: { type: "win_rate", value: 70 }, xp: 700, tier: 6 },
+  
+  // Ultimate achievements
+  { name: "Hall of Fame", desc: "Win 10 competitions", condition: { type: "first_place_finishes", value: 10 }, xp: 1500, tier: 7 },
+  { name: "Perfect Record", desc: "Win 20 trades in a row", condition: { type: "max_win_streak", value: 20 }, xp: 1200, tier: 7 },
+  { name: "Trading Elite", desc: "Achieve 80% win rate", condition: { type: "win_rate", value: 80 }, xp: 1000, tier: 7 },
+  { name: "Trading God", desc: "Reach Level 20", condition: { type: "level_reached", value: 20 }, xp: 2000, tier: 7 },
 ];
 
 export default function JourneyMapEditorSection() {
@@ -507,7 +606,7 @@ export default function JourneyMapEditorSection() {
     { level: 20, title: "Trading God", minXP: 15000, icon: "victory" },
   ];
 
-  // Generate milestones from islands with progressive difficulty
+  // Generate milestones from islands with progressive difficulty and game-like balance
   const generateFromIslands = async () => {
     if (!confirm("This will delete all existing milestones and generate new ones with progressive difficulty. Continue?")) return;
     
@@ -518,18 +617,30 @@ export default function JourneyMapEditorSection() {
         method: "DELETE",
       });
 
-      // Create zones
-      const zonesData = generatorZones.map((z, idx) => ({
-        id: z.id,
-        name: z.name,
-        description: `Zone ${idx + 1}`,
-        order: z.order,
-        position: { x: 0, y: 0 },
-        color: z.color,
-        icon: "flag",
-        isUnlockable: idx > 0,
-        unlockCondition: idx > 0 ? { type: "milestone_complete", value: `island_${idx}_1` } : undefined,
-      }));
+      // Create zones with level requirements
+      const zonesData = generatorZones.map((z, idx) => {
+        // Each zone requires a certain level to enter
+        const zoneLevel = Math.min(20, Math.ceil((idx / generatorZones.length) * 20));
+        const zoneLevelReq = LEVEL_REQUIREMENTS[Math.max(0, zoneLevel - 1)];
+        
+        return {
+          id: z.id,
+          name: z.name,
+          description: idx === 0 
+            ? "Your journey begins here. Complete milestones to progress!"
+            : `Requires ${zoneLevelReq.title} (Level ${zoneLevelReq.level}) to enter this zone`,
+          order: z.order,
+          position: { x: 0, y: 0 },
+          color: z.color,
+          icon: idx === 0 ? "flag" : zoneLevelReq.icon,
+          isUnlockable: idx > 0,
+          unlockCondition: idx > 0 ? { 
+            type: "level_reached", 
+            value: zoneLevelReq.level,
+            comparison: "gte"
+          } : undefined,
+        };
+      });
 
       // Update map config with zones
       await fetch("/api/journey-map", {
@@ -538,7 +649,7 @@ export default function JourneyMapEditorSection() {
         body: JSON.stringify({
           mapId: "traders_journey",
           name: "Trader's Journey",
-          description: "Navigate through the islands to become a Trading God",
+          description: "Navigate through the islands to become a Trading God. Each zone requires higher levels to unlock!",
           zones: zonesData,
           defaultStartNode: "island_1_1",
           backgroundColor: "#1a3a5c",
@@ -547,85 +658,96 @@ export default function JourneyMapEditorSection() {
         }),
       });
 
-      // Count total milestones to distribute levels
+      // Count total milestones to distribute templates
       const placedIslands = generatorIslands.filter(i => i.isPlaced);
       const totalMilestones = placedIslands.reduce((sum, i) => sum + i.milestonesCount, 0);
       
-      // Calculate level distribution (spread 20 levels across all milestones)
-      const getLevelForMilestone = (order: number): typeof LEVEL_REQUIREMENTS[0] => {
-        // Map milestone order to level (1 to 20)
-        const levelIndex = Math.min(
-          19,
-          Math.floor((order - 1) / totalMilestones * 20)
-        );
+      // Get the appropriate tier templates based on progress
+      const getTemplatesForTier = (tier: number) => {
+        return MILESTONE_TEMPLATES.filter(t => t.tier === tier);
+      };
+
+      // Calculate which tier a milestone should be in (1-7)
+      const getTierForProgress = (progress: number): number => {
+        if (progress < 0.1) return 1;      // First 10%
+        if (progress < 0.25) return 2;     // 10-25%
+        if (progress < 0.4) return 3;      // 25-40%
+        if (progress < 0.55) return 4;     // 40-55%
+        if (progress < 0.75) return 5;     // 55-75%
+        if (progress < 0.9) return 6;      // 75-90%
+        return 7;                           // Final 10%
+      };
+
+      // Get level requirement based on progress through journey
+      const getLevelForProgress = (progress: number): typeof LEVEL_REQUIREMENTS[0] => {
+        const levelIndex = Math.min(19, Math.floor(progress * 20));
         return LEVEL_REQUIREMENTS[levelIndex];
       };
 
-      // Progressive difficulty scaling
-      const getConditionForMilestone = (order: number, total: number) => {
-        const progress = order / total; // 0 to 1
-        
-        // Early milestones: simple trade counts
-        if (progress < 0.2) {
-          return {
-            type: "total_trades",
-            value: Math.ceil(order * 3),
-            comparison: "gte",
-          };
-        }
-        // Mid-early: winning trades
-        if (progress < 0.4) {
-          return {
-            type: "winning_trades",
-            value: Math.ceil(order * 2),
-            comparison: "gte",
-          };
-        }
-        // Mid: competition entries
-        if (progress < 0.6) {
-          return {
-            type: "competitions_entered",
-            value: Math.ceil(progress * 10),
-            comparison: "gte",
-          };
-        }
-        // Mid-late: podium finishes
-        if (progress < 0.8) {
-          return {
-            type: "podium_finishes",
-            value: Math.ceil((progress - 0.5) * 15),
-            comparison: "gte",
-          };
-        }
-        // Late: first place wins
-        return {
-          type: "first_place_finishes",
-          value: Math.ceil((progress - 0.7) * 20),
-          comparison: "gte",
+      // Scale condition values based on progress
+      const scaleConditionValue = (baseValue: number, progress: number, type: string): number => {
+        // Different scaling for different condition types
+        const scalingFactors: Record<string, number> = {
+          "total_trades": 1.5,
+          "winning_trades": 1.3,
+          "win_rate": 1.0, // Don't scale percentages much
+          "win_streak": 1.2,
+          "competitions_entered": 1.4,
+          "competitions_completed": 1.4,
+          "first_place_finishes": 1.5,
+          "podium_finishes": 1.4,
+          "total_pnl": 2.0,
+          "active_days": 1.3,
         };
-      };
-
-      // XP rewards scaling (exponential growth)
-      const getXPReward = (order: number, total: number): number => {
-        const progress = order / total;
-        // Early: 10-50 XP, Late: 100-500 XP
-        return Math.round(10 + (progress * progress) * 490);
+        
+        const factor = scalingFactors[type] || 1.3;
+        return Math.ceil(baseValue * (1 + progress * factor));
       };
 
       // Generate milestones for each island
       let milestoneOrder = 1;
+      let templateIndex = 0;
       const allMilestones: any[] = [];
+      const usedTemplates = new Set<string>();
 
       for (const island of placedIslands) {
+        // Calculate what level is required to reach this island
+        const islandProgress = (island.id - 1) / placedIslands.length;
+        const islandLevelReq = getLevelForProgress(islandProgress);
+        
         for (let m = 0; m < island.milestonesCount; m++) {
           const milestoneId = `island_${island.id}_${m + 1}`;
           const isFirst = milestoneOrder === 1;
           const isLast = milestoneOrder === totalMilestones;
-          const levelReq = getLevelForMilestone(milestoneOrder);
+          const progress = milestoneOrder / totalMilestones;
+          
+          // Get the appropriate tier for this milestone
+          const tier = getTierForProgress(progress);
+          const tierTemplates = getTemplatesForTier(tier);
+          
+          // Pick a template (rotate through available templates)
+          let template = tierTemplates[templateIndex % tierTemplates.length];
+          
+          // Try to avoid duplicate templates if possible
+          let attempts = 0;
+          while (usedTemplates.has(template.name) && attempts < tierTemplates.length) {
+            templateIndex++;
+            template = tierTemplates[templateIndex % tierTemplates.length];
+            attempts++;
+          }
+          usedTemplates.add(template.name);
+          templateIndex++;
+          
+          // Get level requirement for this specific milestone
+          const levelReq = getLevelForProgress(progress);
           
           // Calculate position offset for multiple milestones on same island
-          const offsetX = island.milestonesCount > 1 ? (m - (island.milestonesCount - 1) / 2) * 30 : 0;
-          const offsetY = island.milestonesCount > 1 ? Math.sin(m) * 20 : 0;
+          const offsetX = island.milestonesCount > 1 
+            ? (m - (island.milestonesCount - 1) / 2) * 25 
+            : 0;
+          const offsetY = island.milestonesCount > 1 
+            ? (m % 2 === 0 ? -15 : 15) * Math.ceil((m + 1) / 2)
+            : 0;
 
           // Determine next milestone connection
           const connectedTo: string[] = [];
@@ -649,9 +771,15 @@ export default function JourneyMapEditorSection() {
             }
           }
 
-          // Determine node type based on progress
+          // Determine node type based on milestone importance
           let nodeType = "milestone";
-          let icon = levelReq.icon;
+          let icon = template.condition.type === "account_created" ? "ship" 
+            : template.condition.type === "first_deposit" ? "coins"
+            : template.condition.type === "kyc_verified" ? "shield1"
+            : template.condition.type.includes("competition") ? "trophy"
+            : template.condition.type.includes("win") ? "star1"
+            : template.condition.type.includes("trade") ? "trade"
+            : levelReq.icon;
           let size: "small" | "medium" | "large" = "medium";
           
           if (isFirst) {
@@ -660,22 +788,40 @@ export default function JourneyMapEditorSection() {
             size = "large";
           } else if (isLast) {
             nodeType = "legendary";
-            icon = "victory"; // Trading God icon
+            icon = "victory";
             size = "large";
-          } else if (milestoneOrder % 5 === 0) {
+          } else if (m === 0) {
+            // First milestone of each island is a checkpoint
             nodeType = "checkpoint";
             size = "large";
-          } else if (levelReq.level >= 15) {
+          } else if (tier >= 6) {
             nodeType = "legendary";
             size = "large";
+          } else if (tier >= 4) {
+            size = "medium";
+          } else {
+            size = m === island.milestonesCount - 1 ? "medium" : "small";
           }
 
-          // Build unlock condition with level requirement
+          // Build unlock condition - requires BOTH level AND previous milestone
           const unlockCondition = isFirst ? undefined : {
             type: "level_reached",
             value: levelReq.level,
             comparison: "gte",
           };
+
+          // Build completion condition from template
+          const completeCondition = {
+            type: template.condition.type,
+            value: template.condition.value 
+              ? scaleConditionValue(template.condition.value, progress, template.condition.type)
+              : undefined,
+            comparison: "gte" as const,
+          };
+
+          // Scale XP reward based on progress and tier
+          const baseXP = template.xp;
+          const scaledXP = Math.round(baseXP * (1 + progress * 2)); // Double XP at end
 
           const milestone = {
             id: milestoneId,
@@ -683,15 +829,13 @@ export default function JourneyMapEditorSection() {
             name: isFirst 
               ? "Set Sail" 
               : isLast 
-                ? `${levelReq.title} - Final Destination`
-                : island.milestonesCount > 1 
-                  ? `${island.name} - ${levelReq.title}` 
-                  : `${island.name}`,
+                ? "Trading God - Final Destination"
+                : `${template.name}`,
             description: isFirst
-              ? "Your trading journey begins here!"
+              ? "Your trading journey begins here! Complete challenges to progress across the map."
               : isLast
-                ? `Reach ${levelReq.title} status to conquer this final milestone and become a Trading God!`
-                : `Requires ${levelReq.title} (Level ${levelReq.level}, ${levelReq.minXP}+ XP) to unlock`,
+                ? "The ultimate achievement. Reach Level 20 and become a Trading God!"
+                : template.desc,
             shortDescription: `${levelReq.title} (Lv.${levelReq.level})`,
             zoneId: island.zoneId,
             position: { 
@@ -703,10 +847,10 @@ export default function JourneyMapEditorSection() {
             color: generatorZones.find(z => z.id === island.zoneId)?.color || "#3B82F6",
             size,
             unlockCondition,
-            completeCondition: getConditionForMilestone(milestoneOrder, totalMilestones),
+            completeCondition,
             rewards: { 
-              xp: getXPReward(milestoneOrder, totalMilestones),
-              title: levelReq.level >= 10 ? levelReq.title : undefined,
+              xp: scaledXP,
+              title: tier >= 5 ? levelReq.title : undefined,
             },
             connectedTo,
             connectedFrom,
@@ -716,7 +860,11 @@ export default function JourneyMapEditorSection() {
             tooltipText: `Level ${levelReq.level}: ${levelReq.title}`,
             celebrationText: isLast 
               ? "🎉 CONGRATULATIONS! You have become a TRADING GOD! 🎉"
-              : `🏆 You've reached ${levelReq.title}!`,
+              : tier >= 6
+                ? `🏆 LEGENDARY! You've completed "${template.name}"!`
+                : tier >= 4
+                  ? `⭐ Excellent! You've completed "${template.name}"!`
+                  : `✓ You've completed "${template.name}"!`,
             isActive: true,
           };
 
@@ -734,7 +882,7 @@ export default function JourneyMapEditorSection() {
         });
       }
 
-      toast.success(`Generated ${allMilestones.length} milestones with progressive difficulty (Novice → Trading God)`);
+      toast.success(`Generated ${allMilestones.length} milestones with varied challenges (Tier 1-7)! Journey from Novice → Trading God`);
       setGeneratorOpen(false);
       setGeneratorStep(1);
       fetchData();
@@ -2345,7 +2493,7 @@ export default function JourneyMapEditorSection() {
                           max={5}
                           value={island.milestonesCount}
                           onChange={e => setGeneratorIslands(prev => prev.map(i => 
-                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } : i
+                            i.id === island.id ? { ...i, milestonesCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) } : i
                           ))}
                           onClick={(e) => e.stopPropagation()}
                           className="w-14 h-8 text-sm text-center"
