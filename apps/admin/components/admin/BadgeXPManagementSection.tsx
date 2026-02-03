@@ -1466,28 +1466,98 @@ export default function BadgeXPManagementSection() {
                         <SelectTrigger className="text-base h-12">
                           <SelectValue placeholder="Select condition type" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="competitions_entered">Competitions Entered</SelectItem>
-                          <SelectItem value="first_place_finishes">First Place Finishes</SelectItem>
-                          <SelectItem value="podium_finishes">Podium Finishes (Top 3)</SelectItem>
+                        <SelectContent className="max-h-80">
+                          {/* Account & Setup */}
+                          <SelectItem value="account_created">Account Created</SelectItem>
+                          <SelectItem value="first_deposit">First Deposit</SelectItem>
+                          <SelectItem value="has_deposit">Has Any Deposit</SelectItem>
+                          <SelectItem value="kyc_verified">KYC Verified</SelectItem>
+                          <SelectItem value="profile_complete">Profile Complete</SelectItem>
+                          <SelectItem value="total_deposits">Total Deposited Amount</SelectItem>
+                          
+                          {/* Trading Activity */}
+                          <SelectItem value="first_trade">First Trade</SelectItem>
                           <SelectItem value="total_trades">Total Trades</SelectItem>
                           <SelectItem value="winning_trades">Winning Trades</SelectItem>
+                          <SelectItem value="losing_trades">Losing Trades</SelectItem>
+                          <SelectItem value="trades_today">Trades Today</SelectItem>
+                          <SelectItem value="trades_this_week">Trades This Week</SelectItem>
+                          <SelectItem value="trades_this_month">Trades This Month</SelectItem>
+                          <SelectItem value="consecutive_trading_days">Consecutive Trading Days</SelectItem>
+                          <SelectItem value="unique_pairs_traded">Unique Pairs Traded</SelectItem>
+                          <SelectItem value="different_assets_traded">Different Assets Traded</SelectItem>
+                          
+                          {/* Performance */}
+                          <SelectItem value="win_rate">Win Rate %</SelectItem>
+                          <SelectItem value="win_streak">Current Win Streak</SelectItem>
+                          <SelectItem value="max_win_streak">Max Win Streak</SelectItem>
                           <SelectItem value="total_pnl">Total P&L</SelectItem>
                           <SelectItem value="total_pnl_positive">Positive P&L</SelectItem>
-                          <SelectItem value="win_streak">Win Streak</SelectItem>
-                          <SelectItem value="win_rate">Win Rate %</SelectItem>
-                          <SelectItem value="no_liquidations">No Liquidations</SelectItem>
-                          <SelectItem value="zero_liquidations_lifetime">Zero Lifetime Liquidations</SelectItem>
-                          <SelectItem value="max_drawdown">Max Drawdown %</SelectItem>
-                          <SelectItem value="average_roi">Average ROI %</SelectItem>
                           <SelectItem value="profit_factor">Profit Factor</SelectItem>
                           <SelectItem value="single_trade_profit">Single Trade Profit</SelectItem>
-                          <SelectItem value="unique_pairs_traded">Unique Pairs Traded</SelectItem>
-                          <SelectItem value="daily_trade_volume">Daily Trade Volume</SelectItem>
+                          <SelectItem value="best_trade_pnl">Best Trade P&L</SelectItem>
+                          <SelectItem value="average_trade_pnl">Average Trade P&L</SelectItem>
+                          <SelectItem value="average_roi">Average ROI %</SelectItem>
+                          <SelectItem value="risk_reward_ratio">Risk Reward Ratio</SelectItem>
+                          
+                          {/* Competitions */}
+                          <SelectItem value="competitions_entered">Competitions Entered</SelectItem>
+                          <SelectItem value="competitions_completed">Competitions Completed</SelectItem>
+                          <SelectItem value="first_place_finishes">First Place Finishes</SelectItem>
+                          <SelectItem value="second_place_finishes">Second Place Finishes</SelectItem>
+                          <SelectItem value="third_place_finishes">Third Place Finishes</SelectItem>
+                          <SelectItem value="podium_finishes">Podium Finishes (Top 3)</SelectItem>
+                          <SelectItem value="top_10_finishes">Top 10 Finishes</SelectItem>
+                          <SelectItem value="top_50_percent_finishes">Top 50% Finishes</SelectItem>
+                          <SelectItem value="competition_pnl">Competition P&L</SelectItem>
+                          
+                          {/* Progression & XP */}
+                          <SelectItem value="level_reached">Level Reached</SelectItem>
+                          <SelectItem value="xp_threshold">XP Threshold</SelectItem>
+                          <SelectItem value="xp_earned_today">XP Earned Today</SelectItem>
+                          <SelectItem value="xp_earned_this_week">XP Earned This Week</SelectItem>
+                          <SelectItem value="total_badges">Total Badges Earned</SelectItem>
+                          
+                          {/* Social & Community */}
+                          <SelectItem value="referrals_made">Referrals Made</SelectItem>
+                          <SelectItem value="referrals_active">Active Referrals</SelectItem>
+                          <SelectItem value="friends_added">Friends Added</SelectItem>
+                          <SelectItem value="messages_sent">Messages Sent</SelectItem>
+                          
+                          {/* Risk Management */}
+                          <SelectItem value="no_liquidations">No Liquidations</SelectItem>
+                          <SelectItem value="zero_liquidations_lifetime">Zero Lifetime Liquidations</SelectItem>
+                          <SelectItem value="always_uses_sl">Always Uses Stop Loss</SelectItem>
+                          <SelectItem value="always_uses_tp">Always Uses Take Profit</SelectItem>
+                          <SelectItem value="stop_loss_used">Stop Loss Used (count)</SelectItem>
+                          <SelectItem value="take_profit_used">Take Profit Used (count)</SelectItem>
+                          <SelectItem value="max_drawdown">Max Drawdown %</SelectItem>
+                          <SelectItem value="max_drawdown_under">Max Drawdown Under %</SelectItem>
+                          <SelectItem value="position_size_under">Position Size Under</SelectItem>
+                          
+                          {/* Time-Based */}
                           <SelectItem value="platform_age">Platform Age (Days)</SelectItem>
-                          <SelectItem value="global_rank">Global Rank</SelectItem>
-                          <SelectItem value="first_deposit">First Deposit</SelectItem>
+                          <SelectItem value="account_age">Account Age (Days)</SelectItem>
+                          <SelectItem value="active_days">Active Trading Days</SelectItem>
+                          <SelectItem value="login_streak">Login Streak</SelectItem>
+                          <SelectItem value="consecutive_profitable_days">Consecutive Profitable Days</SelectItem>
+                          
+                          {/* Wallet */}
+                          <SelectItem value="total_deposited">Total Deposited</SelectItem>
                           <SelectItem value="withdrawal_made">Withdrawal Made</SelectItem>
+                          <SelectItem value="large_withdrawal">Large Withdrawal (500+)</SelectItem>
+                          <SelectItem value="net_profit_lifetime">Net Profit Lifetime</SelectItem>
+                          
+                          {/* Trading Speed */}
+                          <SelectItem value="daily_trade_volume">Daily Trade Volume</SelectItem>
+                          <SelectItem value="weekly_trade_volume">Weekly Trade Volume</SelectItem>
+                          <SelectItem value="monthly_trade_volume">Monthly Trade Volume</SelectItem>
+                          <SelectItem value="fast_order_execution">Fast Order Execution</SelectItem>
+                          <SelectItem value="quick_scalps">Quick Scalps</SelectItem>
+                          
+                          {/* Special */}
+                          <SelectItem value="global_rank">Global Rank</SelectItem>
+                          <SelectItem value="early_adopter">Early Adopter</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
