@@ -58,7 +58,7 @@ export async function initializeUserJourney(
 
 /**
  * Get user's journey progress with full milestone details
- * Also checks and unlocks any eligible milestones
+ * NOTE: Does NOT run expensive unlock checks on every view - use checkAndCompleteMilestones() for that
  */
 export async function getUserJourneyProgress(
   userId: string,
@@ -78,16 +78,6 @@ export async function getUserJourneyProgress(
   if (!progress) {
     progress = await initializeUserJourney(userId, mapId);
     progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
-  }
-
-  // Check if any new milestones can be unlocked or completed
-  // This ensures the progress is always up-to-date when viewed
-  try {
-    await checkAndUnlockMilestones(userId, mapId);
-    // Refresh progress after potential unlocks
-    progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
-  } catch (error) {
-    console.error("Error checking unlocks:", error);
   }
 
   // Get map config
@@ -113,18 +103,27 @@ export async function getUserJourneyProgress(
 
 /**
  * Check if a milestone condition is met based on user stats
+ * @param userId - The user ID to check
+ * @param condition - The condition to evaluate
+ * @param preloadedStats - Optional pre-gathered stats to avoid repeated DB queries
  */
 export async function checkConditionMet(
   userId: string,
-  condition: IMilestoneCondition
+  condition: IMilestoneCondition,
+  preloadedStats?: Record<string, any>
 ): Promise<{ met: boolean; currentValue?: number }> {
   await connectToDatabase();
 
   const { type, value, comparison = "gte" } = condition;
 
-  // Import stats gatherer from badge evaluation
-  const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
-  const stats = await gatherUserStats(userId);
+  // Use preloaded stats if provided, otherwise gather them
+  let stats: Record<string, any>;
+  if (preloadedStats) {
+    stats = preloadedStats;
+  } else {
+    const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
+    stats = await gatherUserStats(userId);
+  }
 
   let currentValue: number | undefined;
 
@@ -409,11 +408,13 @@ export async function checkConditionMet(
 
 /**
  * Check if a specific milestone can be completed
+ * @param preloadedStats - Optional pre-gathered stats to avoid repeated DB queries
  */
 export async function checkMilestoneCompletion(
   userId: string,
   milestoneId: string,
-  mapId: string = "traders_journey"
+  mapId: string = "traders_journey",
+  preloadedStats?: Record<string, any>
 ): Promise<{
   canComplete: boolean;
   isCompleted: boolean;
@@ -445,7 +446,7 @@ export async function checkMilestoneCompletion(
   // Check if can be unlocked (for display purposes)
   let canUnlock = isUnlocked;
   if (!isUnlocked && milestone.unlockCondition) {
-    const { met } = await checkConditionMet(userId, milestone.unlockCondition);
+    const { met } = await checkConditionMet(userId, milestone.unlockCondition, preloadedStats);
     canUnlock = met;
   }
   
@@ -455,7 +456,7 @@ export async function checkMilestoneCompletion(
   }
 
   // Check completion condition
-  const { met, currentValue } = await checkConditionMet(userId, milestone.completeCondition);
+  const { met, currentValue } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
 
   return {
     canComplete: met,
@@ -575,6 +576,7 @@ export async function completeMilestone(
 /**
  * Check and unlock milestones based on their unlockCondition
  * This evaluates conditions like "level_reached" to unlock milestones
+ * OPTIMIZED: Gathers stats once and reuses for all condition checks
  */
 export async function checkAndUnlockMilestones(
   userId: string,
@@ -600,6 +602,18 @@ export async function checkAndUnlockMilestones(
   const unlockedIds = new Set(progress.unlockedMilestones);
   const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
 
+  // Find milestones that need unlock condition checks
+  const milestonesToCheck = allMilestones.filter(m => 
+    !unlockedIds.has(m.id) && !completedIds.has(m.id) && m.unlockCondition
+  );
+
+  // OPTIMIZATION: Only gather stats once if there are conditions to check
+  let preloadedStats: Record<string, any> | undefined;
+  if (milestonesToCheck.length > 0) {
+    const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
+    preloadedStats = await gatherUserStats(userId);
+  }
+
   // Check each milestone that is NOT yet unlocked
   for (const milestone of allMilestones) {
     // Skip if already unlocked or completed
@@ -620,9 +634,9 @@ export async function checkAndUnlockMilestones(
       }
     }
 
-    // Method 2: Check unlockCondition (e.g., level_reached)
+    // Method 2: Check unlockCondition (e.g., level_reached) - uses preloaded stats
     if (!canUnlock && milestone.unlockCondition) {
-      const { met } = await checkConditionMet(userId, milestone.unlockCondition);
+      const { met } = await checkConditionMet(userId, milestone.unlockCondition, preloadedStats);
       if (met) {
         canUnlock = true;
       }
@@ -655,6 +669,7 @@ export async function checkAndUnlockMilestones(
 /**
  * Check and complete all eligible milestones for a user
  * Call this after significant user actions (deposit, trade, competition)
+ * OPTIMIZED: Gathers stats once and reuses for all condition checks
  */
 export async function checkAndCompleteMilestones(
   userId: string,
@@ -691,17 +706,25 @@ export async function checkAndCompleteMilestones(
     id => !completedIds.includes(id)
   );
 
+  // OPTIMIZATION: Gather stats once for all completion checks
+  let preloadedStats: Record<string, any> | undefined;
+  if (unlockedNotCompleted.length > 0) {
+    const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
+    preloadedStats = await gatherUserStats(userId);
+  }
+
   // Check each unlocked milestone for completion
   for (const milestoneId of unlockedNotCompleted) {
-    const { canComplete } = await checkMilestoneCompletion(userId, milestoneId);
+    const { canComplete } = await checkMilestoneCompletion(userId, milestoneId, mapId, preloadedStats);
     
     if (canComplete) {
-      const result = await completeMilestone(userId, milestoneId);
+      const result = await completeMilestone(userId, milestoneId, mapId);
       if (result.success && result.rewards) {
         completed.push(milestoneId);
         totalXPEarned += result.rewards.xp;
         
         // Check for more unlocks after each completion (cascading)
+        // Note: This reuses the already-gathered stats from checkAndUnlockMilestones
         await checkAndUnlockMilestones(userId, mapId);
       }
     }
