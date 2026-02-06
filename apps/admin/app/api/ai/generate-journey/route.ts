@@ -411,8 +411,9 @@ Analyze and return JSON with:
 
       case "generate_single_map": {
         // Generate milestones for a single map with specific theme and difficulty
-        const { sequenceOrder = 1, xpBudget } = body;
-        const mapConfig = getMapById(mapId) || MAP_SEQUENCE[sequenceOrder - 1];
+        const { sequenceOrder = 1, mapIndex, xpBudget, saveToDB = true } = body;
+        const mapOrder = mapIndex || sequenceOrder;
+        const mapConfig = getMapById(mapId) || MAP_SEQUENCE[mapOrder - 1];
         
         if (!mapConfig) {
           return NextResponse.json(
@@ -480,6 +481,63 @@ Generate exactly ${milestoneCount} milestones.`;
           })
         );
 
+        // Optionally save to database
+        let savedCount = 0;
+        if (saveToDB) {
+          for (const milestone of enhancedMilestones) {
+            try {
+              // Check if milestone exists
+              const existing = await JourneyMilestone.findOne({ id: milestone.id });
+              if (existing) {
+                // Update existing
+                await JourneyMilestone.updateOne({ id: milestone.id }, { $set: milestone });
+              } else {
+                // Create new
+                await JourneyMilestone.create(milestone);
+              }
+              savedCount++;
+            } catch (saveError) {
+              console.error(`Failed to save milestone ${milestone.id}:`, saveError);
+            }
+          }
+          
+          // Update or create map config
+          try {
+            const existingMap = await JourneyMapConfig.findOne({ mapId: mapConfig.mapId });
+            if (existingMap) {
+              await JourneyMapConfig.updateOne(
+                { mapId: mapConfig.mapId },
+                { 
+                  $set: { 
+                    totalMilestones: enhancedMilestones.length,
+                    estimatedXP: parsed.total_xp || budget,
+                    sequenceOrder: mapConfig.sequenceOrder,
+                    theme: mapConfig.theme,
+                    difficulty: mapConfig.difficulty,
+                  } 
+                }
+              );
+            } else {
+              await JourneyMapConfig.create({
+                mapId: mapConfig.mapId,
+                name: mapConfig.name,
+                description: mapConfig.description,
+                zones: mapConfig.zones,
+                backgroundColor: mapConfig.backgroundColor,
+                backgroundImage: mapConfig.backgroundImage,
+                sequenceOrder: mapConfig.sequenceOrder,
+                theme: mapConfig.theme,
+                difficulty: mapConfig.difficulty,
+                estimatedXP: parsed.total_xp || budget,
+                totalMilestones: enhancedMilestones.length,
+                isActive: true,
+              });
+            }
+          } catch (mapError) {
+            console.error(`Failed to save map config ${mapConfig.mapId}:`, mapError);
+          }
+        }
+
         return NextResponse.json({
           success: true,
           map: {
@@ -491,6 +549,7 @@ Generate exactly ${milestoneCount} milestones.`;
             xpBudget: budget,
           },
           milestones: enhancedMilestones,
+          savedCount,
           validation: parsed.validation,
           total_xp: parsed.total_xp,
           summary: parsed.summary,

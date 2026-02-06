@@ -377,34 +377,61 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Generate full 10-map sequence with AI
+  // Generate full 10-map sequence with AI (one map at a time to avoid timeout)
   const generateFullSequence = async () => {
     setSequenceGenerating(true);
     setShowSequenceDialog(false);
     
+    const mapNames = [
+      "Pirate Cove", "Space Station", "Medieval Castle", "Cyber City", "Ancient Temple",
+      "Volcanic Island", "Arctic Fortress", "Dragon Realm", "Celestial Kingdom", "Hall of Legends"
+    ];
+    
+    let totalMilestones = 0;
+    let successfulMaps = 0;
+    
     try {
-      toast.info("Generating full 10-map sequence... This may take a minute.");
+      for (let mapIndex = 1; mapIndex <= 10; mapIndex++) {
+        toast.info(`Generating Map ${mapIndex}/10: ${mapNames[mapIndex - 1]}...`);
+        
+        try {
+          const response = await fetch("/api/ai/generate-journey", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "generate_single_map",
+              mapIndex: mapIndex,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            totalMilestones += data.milestones?.length || 0;
+            successfulMaps++;
+            toast.success(`Map ${mapIndex} complete: ${data.milestones?.length || 0} milestones`);
+          } else {
+            toast.warning(`Map ${mapIndex} failed: ${data.error || "Unknown error"}`);
+          }
+        } catch (mapError) {
+          console.error(`Error generating map ${mapIndex}:`, mapError);
+          toast.warning(`Map ${mapIndex} failed, continuing...`);
+        }
+        
+        // Small delay between maps to avoid rate limiting
+        if (mapIndex < 10) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
       
-      const response = await fetch("/api/ai/generate-journey", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "generate_map_sequence",
-          startFromMap: 1,
-          endAtMap: 10,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`Generated ${data.totalMilestones} milestones across ${data.mapsGenerated} maps!`);
+      if (successfulMaps > 0) {
+        toast.success(`Generated ${totalMilestones} milestones across ${successfulMaps} maps!`);
         // Refresh the milestones list
         await fetchMilestones();
-        // Validate the sequence
-        await validateFullSequence();
+        // Connect maps in sequence
+        await connectMapsInSequence();
       } else {
-        toast.error(data.error || "Failed to generate sequence");
+        toast.error("Failed to generate any maps");
       }
     } catch (error) {
       console.error("Sequence generation error:", error);
