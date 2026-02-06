@@ -540,8 +540,58 @@ export default function JourneyMapEditorSection() {
     // Use admin-specified milestone count, falling back to state or blueprint length
     const targetCount = customMilestoneCount || mapMilestoneCounts[mapIndex] || fullBlueprint.length;
     
-    // Slice blueprint to match target count (or use all if target is larger)
-    const blueprint = fullBlueprint.slice(0, Math.min(targetCount, fullBlueprint.length));
+    // Start with the full blueprint
+    const blueprint = [...fullBlueprint];
+    
+    // Generate additional milestones if admin wants more than blueprint has
+    if (targetCount > fullBlueprint.length) {
+      const extraNeeded = targetCount - fullBlueprint.length;
+      console.log(`[Blueprint Gen] Generating ${extraNeeded} extra milestones beyond blueprint`);
+      
+      // Extra milestone templates based on common progression patterns
+      const extraConditionTypes = [
+        { type: "total_trades", baseValue: 10 + mapIndex * 15 },
+        { type: "winning_trades", baseValue: 5 + mapIndex * 8 },
+        { type: "win_streak", baseValue: 2 + mapIndex },
+        { type: "unique_pairs_traded", baseValue: 1 + Math.floor(mapIndex / 2) },
+        { type: "daily_trading_streak", baseValue: 1 + mapIndex },
+      ];
+      
+      const themeNames: Record<string, string[]> = {
+        pirate: ["Treasure Hunter", "Sea Wolf", "Corsair", "Buccaneer", "Marauder"],
+        space: ["Astronaut", "Cosmonaut", "Stargazer", "Navigator", "Explorer"],
+        medieval: ["Knight", "Squire", "Baron", "Duke", "Lord"],
+        cyber: ["Hacker", "Coder", "Programmer", "Developer", "Architect"],
+        ancient: ["Pharaoh", "Priest", "Oracle", "Sage", "Elder"],
+        volcanic: ["Phoenix", "Firewalker", "Lava Lord", "Flame Master", "Inferno"],
+        arctic: ["Frostbite", "Glacier", "Blizzard", "Avalanche", "Permafrost"],
+        dragon: ["Dragon Rider", "Flame Keeper", "Scale Master", "Fire Breather", "Wyrm"],
+        celestial: ["Archangel", "Seraph", "Divine", "Ethereal", "Astral"],
+        legendary: ["Legend", "Myth", "Immortal", "Titan", "God"],
+      };
+      
+      const names = themeNames[metadata.theme] || themeNames.pirate;
+      
+      for (let i = 0; i < extraNeeded; i++) {
+        const condTemplate = extraConditionTypes[i % extraConditionTypes.length];
+        const extraValue = condTemplate.baseValue + (i * 5);
+        const extraId = `extra_${i + 1}`;
+        const extraXP = 15 + (mapIndex * 3) + (i * 5);
+        
+        blueprint.push({
+          id: extraId,
+          name: `${names[i % names.length]} ${i + 1}`,
+          description: `Achieve ${condTemplate.type.replace(/_/g, " ")} of ${extraValue}`,
+          condition: { type: condTemplate.type, value: extraValue, comparison: "gte" },
+          xp: extraXP,
+          nodeType: i === extraNeeded - 1 ? "checkpoint" : "milestone",
+          icon: "trophy",
+        });
+      }
+    } else if (targetCount < fullBlueprint.length) {
+      // Trim to target count
+      blueprint.length = targetCount;
+    }
 
     // Validate blueprints to ensure no duplicates
     const validation = validateBlueprints();
