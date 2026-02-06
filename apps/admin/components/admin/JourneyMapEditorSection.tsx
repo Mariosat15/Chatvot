@@ -325,6 +325,24 @@ export default function JourneyMapEditorSection() {
   const [aiGeneratedMilestones, setAiGeneratedMilestones] = useState<Milestone[]>([]);
   const [aiValidation, setAiValidation] = useState<{ isValid: boolean; errors: any[]; warnings: any[] } | null>(null);
 
+  // Multi-map sequence management
+  const [mapSequence, setMapSequence] = useState<Array<{
+    mapId: string;
+    name: string;
+    theme: string;
+    sequenceOrder: number;
+    difficulty: number;
+    xpBudget: number;
+    estimatedXP: number;
+    milestoneCount: number;
+    isComplete: boolean;
+  }>>([]);
+  const [selectedSequenceMap, setSelectedSequenceMap] = useState<number>(1);
+  const [sequenceLoading, setSequenceLoading] = useState(false);
+  const [sequenceGenerating, setSequenceGenerating] = useState(false);
+  const [showSequenceDialog, setShowSequenceDialog] = useState(false);
+  const [sequenceValidation, setSequenceValidation] = useState<any>(null);
+
   // AI Journey Generation function
   const generateAIJourney = async () => {
     setAiGenerating(true);
@@ -1980,9 +1998,13 @@ export default function JourneyMapEditorSection() {
       {/* Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
-          <TabsTrigger value="map">
+          <TabsTrigger value="sequence">
             <Map className="h-4 w-4 mr-2" />
-            Visual Map
+            10 Maps
+          </TabsTrigger>
+          <TabsTrigger value="map">
+            <MapPin className="h-4 w-4 mr-2" />
+            Current Map
           </TabsTrigger>
           <TabsTrigger value="milestones">
             <Target className="h-4 w-4 mr-2" />
@@ -1997,6 +2019,206 @@ export default function JourneyMapEditorSection() {
             Settings
           </TabsTrigger>
         </TabsList>
+
+        {/* 10-Map Sequence Tab */}
+        <TabsContent value="sequence" className="mt-4">
+          <div className="space-y-6">
+            {/* Sequence Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">10-Map Journey Sequence</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage your multi-map progression system with themes, XP budgets, and difficulty scaling
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      setSequenceLoading(true);
+                      const res = await fetch("/api/ai/generate-journey", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "validate_sequence" }),
+                      });
+                      const data = await res.json();
+                      setSequenceValidation(data);
+                      toast.success("Sequence validated");
+                    } catch {
+                      toast.error("Failed to validate sequence");
+                    } finally {
+                      setSequenceLoading(false);
+                    }
+                  }}
+                  disabled={sequenceLoading}
+                >
+                  {sequenceLoading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
+                  Validate All
+                </Button>
+                <Button
+                  onClick={() => setShowSequenceDialog(true)}
+                  disabled={sequenceGenerating}
+                >
+                  {sequenceGenerating ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  Generate Full Sequence
+                </Button>
+              </div>
+            </div>
+
+            {/* Sequence Overview Cards */}
+            <div className="grid grid-cols-5 gap-4">
+              {[
+                { order: 1, name: "Pirate Cove", theme: "pirate", xp: 150, color: "#F59E0B" },
+                { order: 2, name: "Space Station", theme: "space", xp: 200, color: "#8B5CF6" },
+                { order: 3, name: "Medieval Castle", theme: "medieval", xp: 300, color: "#EF4444" },
+                { order: 4, name: "Cyber City", theme: "cyber", xp: 400, color: "#00FFFF" },
+                { order: 5, name: "Ancient Temple", theme: "ancient", xp: 500, color: "#D4A373" },
+                { order: 6, name: "Volcanic Island", theme: "volcanic", xp: 700, color: "#DC2626" },
+                { order: 7, name: "Arctic Fortress", theme: "arctic", xp: 1000, color: "#38BDF8" },
+                { order: 8, name: "Dragon Realm", theme: "dragon", xp: 1500, color: "#A855F7" },
+                { order: 9, name: "Celestial Kingdom", theme: "celestial", xp: 2500, color: "#FFD700" },
+                { order: 10, name: "Hall of Legends", theme: "legendary", xp: 5000, color: "#FF6B6B" },
+              ].map((map) => (
+                <Card 
+                  key={map.order}
+                  className={`cursor-pointer transition-all hover:scale-105 ${
+                    selectedSequenceMap === map.order ? "ring-2 ring-primary" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedSequenceMap(map.order);
+                    // Could load this specific map here
+                  }}
+                >
+                  <CardHeader className="p-3">
+                    <div 
+                      className="w-full h-2 rounded-full mb-2"
+                      style={{ backgroundColor: map.color }}
+                    />
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs">
+                        {map.order}
+                      </span>
+                      {map.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-xs space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Theme:</span>
+                        <span className="capitalize">{map.theme}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">XP Budget:</span>
+                        <span>{map.xp} XP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Difficulty:</span>
+                        <span>{map.order}/10</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* XP Economy Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">XP Economy Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div className="text-center p-4 bg-slate-800 rounded-lg">
+                    <div className="text-2xl font-bold text-green-500">12,250+</div>
+                    <div className="text-muted-foreground">Total XP</div>
+                  </div>
+                  <div className="text-center p-4 bg-slate-800 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-500">200</div>
+                    <div className="text-muted-foreground">Total Milestones</div>
+                  </div>
+                  <div className="text-center p-4 bg-slate-800 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-500">10</div>
+                    <div className="text-muted-foreground">Themed Maps</div>
+                  </div>
+                  <div className="text-center p-4 bg-slate-800 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-500">20</div>
+                    <div className="text-muted-foreground">Max Level</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Validation Results */}
+            {sequenceValidation && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    {sequenceValidation.overallValid ? (
+                      <Badge variant="default" className="bg-green-600">Valid</Badge>
+                    ) : (
+                      <Badge variant="destructive">Issues Found</Badge>
+                    )}
+                    Sequence Validation Results
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {sequenceValidation.sequenceValidation?.errors?.map((error: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-red-500 text-sm">
+                        <AlertTriangle className="h-4 w-4 mt-0.5" />
+                        <span>{error.message}</span>
+                      </div>
+                    ))}
+                    {sequenceValidation.sequenceValidation?.warnings?.map((warn: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-yellow-500 text-sm">
+                        <AlertTriangle className="h-4 w-4 mt-0.5" />
+                        <span>{warn.message}</span>
+                      </div>
+                    ))}
+                    {sequenceValidation.overallValid && (
+                      <div className="text-green-500 text-sm">All maps validated successfully!</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Quick Actions */}
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/ai/generate-journey", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "connect_maps" }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      toast.success(`Connected ${data.mapsConnected} maps in sequence`);
+                    }
+                  } catch {
+                    toast.error("Failed to connect maps");
+                  }
+                }}
+              >
+                <Link className="h-4 w-4 mr-2" />
+                Connect Maps
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedTab("map");
+                }}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Map {selectedSequenceMap}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
 
         {/* Visual Map Tab */}
         <TabsContent value="map" className="mt-4">

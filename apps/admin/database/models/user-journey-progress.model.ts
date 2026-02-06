@@ -17,6 +17,7 @@ export interface ICompletedMilestone {
 /**
  * User Journey Progress Model
  * Tracks individual user's progress on the journey map
+ * Supports multi-map sequences with cross-map statistics
  */
 export interface IUserJourneyProgress extends Document {
   userId: string;
@@ -32,6 +33,13 @@ export interface IUserJourneyProgress extends Document {
   lastProgressAt: Date;
   selectedBranches: Record<string, string>;
   metadata?: Record<string, unknown>;
+  // Multi-map tracking fields
+  completedMaps: string[]; // Array of completed mapIds
+  currentMapIndex: number; // Current map in sequence (1-10)
+  totalMapsCompleted: number; // Count of completed maps
+  allMapsXP: number; // Total XP across all maps
+  mapCompletedAt?: Date; // When this specific map was completed
+  isMapComplete: boolean; // Whether this map is 100% complete
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +114,32 @@ const UserJourneyProgressSchema = new Schema<IUserJourneyProgress>(
     },
     metadata: {
       type: Schema.Types.Mixed,
+    },
+    // Multi-map tracking fields
+    completedMaps: {
+      type: [String],
+      default: [],
+    },
+    currentMapIndex: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 10,
+    },
+    totalMapsCompleted: {
+      type: Number,
+      default: 0,
+    },
+    allMapsXP: {
+      type: Number,
+      default: 0,
+    },
+    mapCompletedAt: {
+      type: Date,
+    },
+    isMapComplete: {
+      type: Boolean,
+      default: false,
     },
   },
   {

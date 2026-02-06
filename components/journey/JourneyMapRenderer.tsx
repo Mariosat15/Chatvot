@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import MilestoneDetailModal from "./MilestoneDetailModal";
-import { ZoomIn, ZoomOut, RotateCcw, Compass, Ship } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw, Compass, Ship, ChevronLeft, ChevronRight, Lock, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
 
 // Types
 export interface Milestone {
@@ -59,6 +60,29 @@ export interface MapConfig {
   zones: Zone[];
   backgroundColor: string;
   backgroundImage?: string;
+  // Multi-map sequence fields
+  sequenceOrder?: number;
+  theme?: string;
+  difficulty?: number;
+  estimatedXP?: number;
+  previousMapId?: string | null;
+  nextMapId?: string | null;
+}
+
+// Map sequence info for navigation
+export interface MapSequenceInfo {
+  currentMapIndex: number;
+  totalMaps: number;
+  mapsCompleted: number;
+  maps: Array<{
+    mapId: string;
+    name: string;
+    theme: string;
+    sequenceOrder: number;
+    isUnlocked: boolean;
+    isComplete: boolean;
+    completionPercentage: number;
+  }>;
 }
 
 // Progress data for each milestone
@@ -78,6 +102,10 @@ export interface JourneyMapRendererProps {
   milestoneProgress?: MilestoneProgress[]; // Progress data for milestones
   onMilestoneClick?: (milestone: Milestone) => void;
   className?: string;
+  // Multi-map navigation props
+  sequenceInfo?: MapSequenceInfo;
+  onNavigateMap?: (direction: "prev" | "next" | number) => void;
+  showMapNavigation?: boolean;
 }
 
 // Treasure map dimensions (based on the image aspect ratio ~1.5:1)
@@ -94,6 +122,9 @@ export default function JourneyMapRenderer({
   milestoneProgress = [],
   onMilestoneClick,
   className,
+  sequenceInfo,
+  onNavigateMap,
+  showMapNavigation = false,
 }: JourneyMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.8);
@@ -388,6 +419,100 @@ export default function JourneyMapRenderer({
       <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-amber-700 rounded-bl-lg z-30" />
       <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-amber-700 rounded-br-lg z-30" />
 
+      {/* Multi-Map Navigation */}
+      {showMapNavigation && sequenceInfo && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {/* Previous Map Button */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onNavigateMap?.("prev")}
+            disabled={sequenceInfo.currentMapIndex <= 1}
+            className="bg-amber-900/90 hover:bg-amber-800 border border-amber-700 text-amber-100 disabled:opacity-50"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Prev
+          </Button>
+
+          {/* Map Selector */}
+          <div className="bg-amber-950/95 backdrop-blur-sm rounded-lg px-4 py-2 border border-amber-800 flex items-center gap-3">
+            <Map className="h-4 w-4 text-amber-400" />
+            <div className="text-center">
+              <div className="text-sm font-bold text-amber-100">
+                Map {sequenceInfo.currentMapIndex} of {sequenceInfo.totalMaps}
+              </div>
+              <div className="text-[10px] text-amber-300/70 capitalize">
+                {mapConfig?.theme || "pirate"} Theme
+              </div>
+            </div>
+            
+            {/* Mini map indicators */}
+            <div className="flex gap-1">
+              {sequenceInfo.maps.slice(0, 10).map((map, idx) => (
+                <button
+                  key={map.mapId}
+                  onClick={() => map.isUnlocked && onNavigateMap?.(idx + 1)}
+                  disabled={!map.isUnlocked}
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full transition-all",
+                    map.isComplete
+                      ? "bg-green-500"
+                      : sequenceInfo.currentMapIndex === idx + 1
+                      ? "bg-blue-500 animate-pulse"
+                      : map.isUnlocked
+                      ? "bg-amber-500"
+                      : "bg-slate-600",
+                    map.isUnlocked && "cursor-pointer hover:scale-125"
+                  )}
+                  title={`${map.name} ${map.isComplete ? "(Complete)" : map.isUnlocked ? "" : "(Locked)"}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Next Map Button */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onNavigateMap?.("next")}
+            disabled={
+              sequenceInfo.currentMapIndex >= sequenceInfo.totalMaps ||
+              !sequenceInfo.maps[sequenceInfo.currentMapIndex]?.isUnlocked
+            }
+            className="bg-amber-900/90 hover:bg-amber-800 border border-amber-700 text-amber-100 disabled:opacity-50"
+          >
+            Next
+            {sequenceInfo.maps[sequenceInfo.currentMapIndex]?.isUnlocked ? (
+              <ChevronRight className="h-4 w-4 ml-1" />
+            ) : (
+              <Lock className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Sequence Progress Bar (when multi-map is enabled) */}
+      {showMapNavigation && sequenceInfo && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg px-4 py-2 border border-amber-800">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-amber-300/70">Journey Progress:</span>
+            <div className="w-40 h-2 bg-amber-900 rounded-full overflow-hidden border border-amber-700">
+              <motion.div
+                className="h-full bg-gradient-to-r from-green-500 to-emerald-400"
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${(sequenceInfo.mapsCompleted / sequenceInfo.totalMaps) * 100}%`,
+                }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+            <span className="text-amber-100 font-semibold">
+              {sequenceInfo.mapsCompleted}/{sequenceInfo.totalMaps}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Map Controls */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         <Button
@@ -423,6 +548,40 @@ export default function JourneyMapRenderer({
           <Compass className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Current Map Info Card (when multi-map enabled) */}
+      {showMapNavigation && mapConfig && (
+        <div className="absolute bottom-4 right-4 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg p-3 border border-amber-800 min-w-[200px]">
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="secondary" className="text-[10px] capitalize bg-amber-800/50 text-amber-200">
+              {mapConfig.theme || "pirate"}
+            </Badge>
+            {mapConfig.difficulty !== undefined && (
+              <Badge variant="outline" className="text-[10px] border-amber-700 text-amber-300">
+                Difficulty: {mapConfig.difficulty}/10
+              </Badge>
+            )}
+          </div>
+          <h4 className="text-sm font-bold text-amber-100">{mapConfig.name}</h4>
+          <p className="text-[10px] text-amber-300/70 mt-1 line-clamp-2">
+            {mapConfig.description}
+          </p>
+          {mapConfig.estimatedXP && (
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-amber-300/70">XP Budget:</span>
+              <span className="text-amber-100 font-semibold">
+                {mapConfig.estimatedXP.toLocaleString()} XP
+              </span>
+            </div>
+          )}
+          <div className="mt-1 flex items-center justify-between text-[10px]">
+            <span className="text-amber-300/70">Milestones:</span>
+            <span className="text-amber-100">
+              {completedIds.length}/{milestones.length}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 z-20 bg-amber-950/90 backdrop-blur-sm rounded-lg p-3 border border-amber-800">

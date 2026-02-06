@@ -19,8 +19,24 @@ export interface IJourneyZone {
 }
 
 /**
+ * Map Theme types for visual styling
+ */
+export type MapTheme = 
+  | "pirate" 
+  | "space" 
+  | "medieval" 
+  | "cyber" 
+  | "ancient" 
+  | "volcanic" 
+  | "arctic" 
+  | "dragon" 
+  | "celestial" 
+  | "legendary";
+
+/**
  * Journey Map Configuration
  * Stores the overall map structure and zones
+ * Supports multi-map sequences (10 maps in progression)
  */
 export interface IJourneyMapConfig extends Document {
   mapId: string;
@@ -32,6 +48,16 @@ export interface IJourneyMapConfig extends Document {
   backgroundImage?: string;
   isActive: boolean;
   version: number;
+  // Multi-map sequence fields
+  sequenceOrder: number; // Position in sequence (1-10)
+  previousMapId: string | null; // Map that must be completed first
+  nextMapId: string | null; // Next map in sequence
+  theme: MapTheme; // Visual theme for the map
+  difficulty: number; // Difficulty rating (1-10)
+  estimatedXP: number; // Expected total XP from this map
+  requiredLevelToStart: number; // Minimum level suggestion
+  completionRequirement: number; // Percentage of milestones needed (default 100)
+  totalMilestones: number; // Cached count of milestones
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,11 +125,62 @@ const JourneyMapConfigSchema = new Schema<IJourneyMapConfig>(
       type: Number,
       default: 1,
     },
+    // Multi-map sequence fields
+    sequenceOrder: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 10,
+      index: true,
+    },
+    previousMapId: {
+      type: String,
+      default: null,
+    },
+    nextMapId: {
+      type: String,
+      default: null,
+    },
+    theme: {
+      type: String,
+      enum: ["pirate", "space", "medieval", "cyber", "ancient", "volcanic", "arctic", "dragon", "celestial", "legendary"],
+      default: "pirate",
+    },
+    difficulty: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 10,
+    },
+    estimatedXP: {
+      type: Number,
+      default: 150,
+      min: 0,
+    },
+    requiredLevelToStart: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 20,
+    },
+    completionRequirement: {
+      type: Number,
+      default: 100,
+      min: 1,
+      max: 100,
+    },
+    totalMilestones: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// Index for sequence queries
+JourneyMapConfigSchema.index({ sequenceOrder: 1 });
 
 const JourneyMapConfig: Model<IJourneyMapConfig> =
   mongoose.models.JourneyMapConfig ||
