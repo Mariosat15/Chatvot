@@ -318,6 +318,107 @@ export default function JourneyMapEditorSection() {
   const generatorMapRef = useRef<HTMLDivElement>(null);
   const [generatorMapScale, setGeneratorMapScale] = useState(0.6);
 
+  // AI Generator state
+  const [aiModeEnabled, setAiModeEnabled] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiTheme, setAiTheme] = useState<"pirate" | "space" | "medieval" | "modern">("pirate");
+  const [aiGeneratedMilestones, setAiGeneratedMilestones] = useState<Milestone[]>([]);
+  const [aiValidation, setAiValidation] = useState<{ isValid: boolean; errors: any[]; warnings: any[] } | null>(null);
+
+  // AI Journey Generation function
+  const generateAIJourney = async () => {
+    setAiGenerating(true);
+    try {
+      const response = await fetch("/api/ai/generate-journey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate_full_journey",
+          theme: aiTheme,
+          count: generatorIslandCount,
+          startOrder: 1,
+          mapId: "traders_journey",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAiGeneratedMilestones(data.milestones);
+        setAiValidation(data.validation);
+        toast.success(`AI generated ${data.milestones.length} milestones!`);
+        setGeneratorStep(3); // Jump to review step
+      } else {
+        toast.error(data.error || "AI generation failed");
+      }
+    } catch (error) {
+      console.error("AI generation error:", error);
+      toast.error("Failed to generate journey with AI");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  // Validate journey with AI
+  const validateJourney = async () => {
+    try {
+      const response = await fetch("/api/ai/generate-journey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "validate",
+          mapId: "traders_journey",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAiValidation(data.validation);
+        if (data.validation.isValid) {
+          toast.success("Journey validation passed!");
+        } else {
+          toast.warning(`Found ${data.validation.errors.length} errors, ${data.validation.warnings.length} warnings`);
+        }
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      toast.error("Failed to validate journey");
+    }
+  };
+
+  // Apply AI-generated milestones
+  const applyAIMilestones = async () => {
+    if (!aiGeneratedMilestones.length) return;
+
+    try {
+      // First, delete existing milestones
+      await fetch("/api/journey-milestones", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mapId: "traders_journey", deleteAll: true }),
+      });
+
+      // Create new milestones
+      for (const milestone of aiGeneratedMilestones) {
+        await fetch("/api/journey-milestones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(milestone),
+        });
+      }
+
+      toast.success(`Applied ${aiGeneratedMilestones.length} AI-generated milestones!`);
+      setGeneratorOpen(false);
+      setGeneratorStep(1);
+      setAiGeneratedMilestones([]);
+      fetchData();
+    } catch (error) {
+      console.error("Error applying AI milestones:", error);
+      toast.error("Failed to apply AI milestones");
+    }
+  };
+
   // Fetch data
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -1807,6 +1908,10 @@ export default function JourneyMapEditorSection() {
             <Wand2 className="h-4 w-4 mr-2" />
             Generate Map
           </Button>
+          <Button variant="outline" onClick={validateJourney} className="border-green-600 text-green-600 hover:bg-green-600/10">
+            <Star className="h-4 w-4 mr-2" />
+            Validate
+          </Button>
           <Button variant="outline" onClick={seedDefaultMap} className="border-amber-600 text-amber-600 hover:bg-amber-600/10">
             <Download className="h-4 w-4 mr-2" />
             Reset to Default
@@ -2224,7 +2329,94 @@ export default function JourneyMapEditorSection() {
           {/* Step 1: Configure */}
           {generatorStep === 1 && (
             <div className="space-y-6">
-              {/* Island Count */}
+              {/* AI Mode Toggle */}
+              <div className="p-4 rounded-lg border-2 border-dashed border-purple-500/50 bg-purple-500/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-500/20">
+                      <Wand2 className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <Label className="text-lg font-semibold text-purple-300">AI Journey Agent</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Let AI create a smart, progressively challenging journey
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={aiModeEnabled}
+                    onCheckedChange={setAiModeEnabled}
+                    className="data-[state=checked]:bg-purple-500"
+                  />
+                </div>
+
+                {aiModeEnabled && (
+                  <div className="mt-4 space-y-4 pt-4 border-t border-purple-500/30">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Theme</Label>
+                        <Select value={aiTheme} onValueChange={(v: any) => setAiTheme(v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pirate">🏴‍☠️ Pirate Adventure</SelectItem>
+                            <SelectItem value="space">🚀 Space Explorer</SelectItem>
+                            <SelectItem value="medieval">🏰 Medieval Quest</SelectItem>
+                            <SelectItem value="modern">💹 Modern Trading</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Milestone Count</Label>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={25}
+                          value={generatorIslandCount}
+                          onChange={e => setGeneratorIslandCount(Math.max(5, Math.min(25, parseInt(e.target.value) || 10)))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-slate-800/50 text-sm">
+                      <div className="font-medium text-green-400 mb-2 flex items-center gap-2">
+                        <Star className="h-4 w-4" />
+                        AI Agent Guarantees:
+                      </div>
+                      <ul className="space-y-1 text-muted-foreground text-xs">
+                        <li>✓ Strictly linear progression (must complete N to unlock N+1)</li>
+                        <li>✓ Progressive difficulty (each milestone harder than previous)</li>
+                        <li>✓ No duplicate conditions</li>
+                        <li>✓ Proper XP scaling (5-150 XP based on difficulty)</li>
+                        <li>✓ {aiTheme === "pirate" ? "Pirate-themed" : aiTheme === "space" ? "Space-themed" : aiTheme === "medieval" ? "Medieval-themed" : "Modern"} creative names</li>
+                      </ul>
+                    </div>
+
+                    <Button 
+                      onClick={generateAIJourney} 
+                      disabled={aiGenerating}
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      size="lg"
+                    >
+                      {aiGenerating ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          AI is Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-4 w-4 mr-2" />
+                          Generate with AI Agent
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Mode - Island Count */}
+              {!aiModeEnabled && (
               <div className="space-y-2">
                 <Label className="text-lg font-semibold flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
@@ -2244,6 +2436,7 @@ export default function JourneyMapEditorSection() {
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Auto-generation Preview */}
               <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
@@ -2330,71 +2523,205 @@ export default function JourneyMapEditorSection() {
           {/* Step 3: Review & Generate */}
           {generatorStep === 3 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Islands Placed</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {generatorIslands.filter(i => i.isPlaced).length} / {generatorIslands.length}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Total Milestones</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {generatorIslands.filter(i => i.isPlaced).reduce((sum, i) => sum + i.milestonesCount, 0)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Zones</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{generatorZones.length}</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-2">Journey Path</h3>
-                <div className="flex flex-wrap gap-2">
-                  {generatorIslands.filter(i => i.isPlaced).map((island, idx, arr) => (
-                    <div key={island.id} className="flex items-center">
-                      <div 
-                        className="px-3 py-1 rounded-full text-sm text-white"
-                        style={{ backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color }}
-                      >
-                        {island.name} ({island.milestonesCount})
+              {/* AI Generated View */}
+              {aiModeEnabled && aiGeneratedMilestones.length > 0 ? (
+                <>
+                  {/* AI Validation Status */}
+                  {aiValidation && (
+                    <div className={`p-4 rounded-lg border ${
+                      aiValidation.isValid 
+                        ? "border-green-500/50 bg-green-500/10" 
+                        : "border-amber-500/50 bg-amber-500/10"
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {aiValidation.isValid ? (
+                          <>
+                            <Star className="h-5 w-5 text-green-500" />
+                            <span className="font-semibold text-green-400">AI Validation Passed!</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            <span className="font-semibold text-amber-400">
+                              {aiValidation.errors?.length || 0} errors, {aiValidation.warnings?.length || 0} warnings
+                            </span>
+                          </>
+                        )}
                       </div>
-                      {idx < arr.length - 1 && <span className="mx-1 text-muted-foreground">→</span>}
+                      <div className="text-sm text-muted-foreground">
+                        ✓ Linear progression • ✓ No duplicates • ✓ Progressive difficulty
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setGeneratorStep(2)}>
-                  Back
-                </Button>
-                <Button 
-                  onClick={generateFromIslands}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Wand2 className="h-4 w-4 mr-2" />
                   )}
-                  Generate Journey Map
-                </Button>
-              </div>
+
+                  {/* AI Generated Stats */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Milestones</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-purple-400">{aiGeneratedMilestones.length}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Total XP</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-400">
+                          {aiGeneratedMilestones.reduce((sum, m) => sum + (m.rewards?.xp || 0), 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Theme</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-lg font-bold capitalize">{aiTheme}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Zones</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {new Set(aiGeneratedMilestones.map(m => m.zoneId)).size}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* AI Generated Milestones Preview */}
+                  <div className="border rounded-lg p-4 max-h-[300px] overflow-y-auto">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Wand2 className="h-4 w-4 text-purple-400" />
+                      AI Generated Journey Path
+                    </h3>
+                    <div className="space-y-2">
+                      {aiGeneratedMilestones.map((milestone, idx) => (
+                        <div 
+                          key={milestone.id || idx} 
+                          className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-sm font-bold text-purple-400">
+                            {idx + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{milestone.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {milestone.completeCondition?.type}
+                              {milestone.completeCondition?.value ? ` ≥ ${milestone.completeCondition.value}` : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {milestone.rewards?.xp || 0} XP
+                            </Badge>
+                            <Badge 
+                              className="text-xs"
+                              style={{ backgroundColor: milestone.color }}
+                            >
+                              {milestone.nodeType}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => {
+                      setGeneratorStep(1);
+                      setAiGeneratedMilestones([]);
+                    }}>
+                      Back
+                    </Button>
+                    <Button variant="outline" onClick={generateAIJourney} disabled={aiGenerating}>
+                      <RefreshCw className={`h-4 w-4 mr-2 ${aiGenerating ? "animate-spin" : ""}`} />
+                      Regenerate
+                    </Button>
+                    <Button 
+                      onClick={applyAIMilestones}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Apply AI Journey
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                /* Manual Generator View */
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Islands Placed</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {generatorIslands.filter(i => i.isPlaced).length} / {generatorIslands.length}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Total Milestones</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {generatorIslands.filter(i => i.isPlaced).reduce((sum, i) => sum + i.milestonesCount, 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Zones</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{generatorZones.length}</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">Journey Path</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {generatorIslands.filter(i => i.isPlaced).map((island, idx, arr) => (
+                        <div key={island.id} className="flex items-center">
+                          <div 
+                            className="px-3 py-1 rounded-full text-sm text-white"
+                            style={{ backgroundColor: generatorZones.find(z => z.id === island.zoneId)?.color }}
+                          >
+                            {island.name} ({island.milestonesCount})
+                          </div>
+                          {idx < arr.length - 1 && <span className="mx-1 text-muted-foreground">→</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setGeneratorStep(2)}>
+                      Back
+                    </Button>
+                    <Button 
+                      onClick={generateFromIslands}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-4 w-4 mr-2" />
+                      )}
+                      Generate Journey Map
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
