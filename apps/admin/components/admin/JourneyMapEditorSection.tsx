@@ -64,6 +64,7 @@ import {
   Palette,
   Sparkles,
   Zap,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -1061,6 +1062,50 @@ export default function JourneyMapEditorSection() {
     } catch (error) {
       console.error("Validation error:", error);
       toast.error("Failed to validate journey");
+    }
+  };
+
+  // Auto-fix validation issues
+  const fixValidationIssues = async () => {
+    try {
+      toast.info("Fixing validation issues...");
+      
+      const response = await fetch("/api/journey/fix-issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.fixCount > 0) {
+          toast.success(`Fixed ${data.fixCount} issues!`);
+          console.log("Fixes applied:", data.fixes);
+        } else {
+          toast.info("No issues to fix");
+        }
+        
+        if (data.errors?.length > 0) {
+          toast.warning(`${data.errors.length} errors during fix`);
+          console.error("Fix errors:", data.errors);
+        }
+
+        // Update validation state with new results
+        if (data.validation) {
+          setAiValidation(data.validation);
+        }
+
+        // Refresh data
+        await fetchData();
+        
+        // Re-validate after fix
+        await validateJourney();
+      } else {
+        toast.error(data.error || "Failed to fix issues");
+      }
+    } catch (error) {
+      console.error("Fix error:", error);
+      toast.error("Failed to fix validation issues");
     }
   };
 
@@ -2661,6 +2706,10 @@ export default function JourneyMapEditorSection() {
           <Button variant="outline" onClick={validateJourney} className="border-green-600 text-green-600 hover:bg-green-600/10">
             <Star className="h-4 w-4 mr-2" />
             Validate
+          </Button>
+          <Button variant="outline" onClick={fixValidationIssues} className="border-blue-600 text-blue-600 hover:bg-blue-600/10">
+            <Wrench className="h-4 w-4 mr-2" />
+            Fix Issues
           </Button>
           <Button variant="outline" onClick={seedDefaultMap} className="border-amber-600 text-amber-600 hover:bg-amber-600/10">
             <Download className="h-4 w-4 mr-2" />

@@ -455,7 +455,7 @@ Analyze and return JSON with:
         const milestoneCount = mapConfig.milestoneCount;
 
         // Reduce milestone count to 8 for faster generation
-        const reducedMilestoneCount = 8;
+        const reducedMilestoneCount = 15;
         
         // Simplified, shorter prompt for faster AI response
         const singleMapPrompt = `Generate ${reducedMilestoneCount} milestones for "${mapConfig.name}" (${mapConfig.theme} theme, Map ${mapOrder}/10).
