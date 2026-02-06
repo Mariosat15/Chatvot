@@ -154,6 +154,21 @@ export async function POST(request: NextRequest) {
     
     await progress.save();
 
+    // Debug info for troubleshooting
+    const debugInfo = {
+      mapsProcessed: maps.length,
+      totalMilestonesChecked: Object.values(mapMilestones).flat().length,
+      statsChecked: Object.keys(userStats).filter(k => userStats[k] === true || (typeof userStats[k] === "number" && userStats[k] > 0)),
+    };
+
+    console.log("[Journey Evaluate] Summary:", {
+      userId,
+      newlyCompleted: newlyCompleted.length,
+      newlyUnlocked: newlyUnlocked.length,
+      totalXPEarned,
+      ...debugInfo,
+    });
+
     return NextResponse.json({
       success: true,
       newlyCompleted,
@@ -161,6 +176,7 @@ export async function POST(request: NextRequest) {
       totalXPEarned,
       totalMilestonesCompleted: progress.totalMilestonesCompleted,
       userStats,
+      debug: debugInfo,
     });
   } catch (error) {
     console.error("Error evaluating journey progress:", error);
