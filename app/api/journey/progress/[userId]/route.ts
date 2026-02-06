@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/database/mongoose";
-import { UserJourneyProgress } from "@/database/models/user-journey-progress.model";
-import { JourneyMilestone } from "@/database/models/journey-milestone.model";
-import { JourneyMapConfig } from "@/database/models/journey-map-config.model";
+import { connectToDatabase } from "@/database/mongoose";
+import UserJourneyProgress from "@/database/models/user-journey-progress.model";
+import JourneyMilestone from "@/database/models/journey-milestone.model";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
 
 interface RouteParams {
   params: Promise<{ userId: string }>;
@@ -10,7 +10,7 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    await connectDB();
+    await connectToDatabase();
 
     const { userId } = await params;
     const searchParams = request.nextUrl.searchParams;

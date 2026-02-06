@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/database/mongoose";
-import { JourneyMapConfig } from "@/database/models/journey-map-config.model";
+import { connectToDatabase } from "@/database/mongoose";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
 
 export async function GET(request: NextRequest) {
   try {
-    await connectDB();
+    await connectToDatabase();
 
     const searchParams = request.nextUrl.searchParams;
     const whitelabelId = searchParams.get("whitelabelId");
