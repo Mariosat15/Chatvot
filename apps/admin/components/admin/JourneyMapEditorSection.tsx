@@ -348,6 +348,12 @@ export default function JourneyMapEditorSection() {
   const [sequenceValidation, setSequenceValidation] = useState<any>(null);
   const [syncingAllUsers, setSyncingAllUsers] = useState(false);
   
+  // Milestone counts per map (admin can customize)
+  const [mapMilestoneCounts, setMapMilestoneCounts] = useState<Record<number, number>>({
+    1: 12, 2: 10, 3: 10, 4: 10, 5: 10,
+    6: 10, 7: 10, 8: 10, 9: 10, 10: 10,
+  });
+  
   // Visual Placement Wizard State
   const [showPlacementWizard, setShowPlacementWizard] = useState(false);
   const [placementMapIndex, setPlacementMapIndex] = useState(1);
@@ -519,17 +525,23 @@ export default function JourneyMapEditorSection() {
   // Using predefined blueprints ensures NO duplicates and logical progression
   
   // Manual (non-AI) milestone generation using BLUEPRINT system
-  const generateMapManually = async (mapIndex: number, saveToDB: boolean = true) => {
+  const generateMapManually = async (mapIndex: number, saveToDB: boolean = true, customMilestoneCount?: number) => {
     // Dynamic import of the blueprint (admin app path)
     const { MAP_BLUEPRINTS, MAP_METADATA, validateBlueprints } = await import("../../lib/constants/milestone-blueprint");
     
-    const blueprint = MAP_BLUEPRINTS[mapIndex];
+    const fullBlueprint = MAP_BLUEPRINTS[mapIndex];
     const metadata = MAP_METADATA[mapIndex];
     
-    if (!blueprint || !metadata) {
+    if (!fullBlueprint || !metadata) {
       toast.error(`No blueprint found for map ${mapIndex}`);
       return null;
     }
+
+    // Use admin-specified milestone count, falling back to state or blueprint length
+    const targetCount = customMilestoneCount || mapMilestoneCounts[mapIndex] || fullBlueprint.length;
+    
+    // Slice blueprint to match target count (or use all if target is larger)
+    const blueprint = fullBlueprint.slice(0, Math.min(targetCount, fullBlueprint.length));
 
     // Validate blueprints to ensure no duplicates
     const validation = validateBlueprints();
@@ -537,7 +549,7 @@ export default function JourneyMapEditorSection() {
       console.warn("[Blueprint] Validation warnings:", validation.errors);
     }
 
-    console.log(`[Blueprint Gen] Generating Map ${mapIndex}: ${metadata.name} with ${blueprint.length} milestones`);
+    console.log(`[Blueprint Gen] Generating Map ${mapIndex}: ${metadata.name} with ${blueprint.length} milestones (requested: ${targetCount})`);
 
     // Convert blueprint to milestones
     const milestones = blueprint.map((bp, index) => {
@@ -2723,7 +2735,7 @@ export default function JourneyMapEditorSection() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-0">
-                    <div className="text-xs space-y-1">
+                    <div className="text-xs space-y-1.5">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Theme:</span>
                         <span className="capitalize">{map.theme}</span>
@@ -2735,6 +2747,23 @@ export default function JourneyMapEditorSection() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Difficulty:</span>
                         <span>{map.order}/10</span>
+                      </div>
+                      {/* Editable Milestone Count */}
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-700">
+                        <span className="text-muted-foreground">Milestones:</span>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={20}
+                          value={mapMilestoneCounts[map.order] || 10}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            const val = Math.min(20, Math.max(5, parseInt(e.target.value) || 10));
+                            setMapMilestoneCounts(prev => ({ ...prev, [map.order]: val }));
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-14 h-6 text-xs text-center p-1"
+                        />
                       </div>
                     </div>
                   </CardContent>
@@ -2929,12 +2958,13 @@ export default function JourneyMapEditorSection() {
                         className="flex flex-col h-auto py-2 hover:scale-105 transition-transform"
                         style={{ borderColor: map.color }}
                         disabled={sequenceGenerating}
-                        title="Generate with templates (fast)"
+                        title={`Generate ${mapMilestoneCounts[map.order] || 10} milestones with templates`}
                         onClick={async () => {
                           setSequenceGenerating(true);
-                          toast.info(`Generating Map ${map.order}: ${map.name} (templates)...`);
+                          const count = mapMilestoneCounts[map.order] || 10;
+                          toast.info(`Generating Map ${map.order}: ${map.name} with ${count} milestones...`);
                           try {
-                            const result = await generateMapManually(map.order, true);
+                            const result = await generateMapManually(map.order, true, count);
                             if (result?.success) {
                               toast.success(`Map ${map.order} generated: ${result.milestones?.length || 0} milestones!`);
                               await fetchData();
@@ -2970,10 +3000,11 @@ export default function JourneyMapEditorSection() {
                           size="sm"
                           className="h-6 flex-1 text-[10px] text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
                           disabled={sequenceGenerating}
-                          title="Generate with AI (creative)"
+                          title={`Generate ${mapMilestoneCounts[map.order] || 10} milestones with AI`}
                           onClick={async () => {
                             setSequenceGenerating(true);
-                            toast.info(`Generating Map ${map.order}: ${map.name} with AI...`);
+                            const count = mapMilestoneCounts[map.order] || 10;
+                            toast.info(`Generating Map ${map.order}: ${map.name} with ${count} milestones (AI)...`);
                             try {
                               const res = await fetch("/api/ai/generate-journey", {
                                 method: "POST",
@@ -2981,6 +3012,7 @@ export default function JourneyMapEditorSection() {
                                 body: JSON.stringify({
                                   action: "generate_single_map",
                                   mapIndex: map.order,
+                                  milestoneCount: count,
                                   saveToDB: true,
                                 }),
                               });

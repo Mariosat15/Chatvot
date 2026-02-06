@@ -411,7 +411,7 @@ Analyze and return JSON with:
 
       case "generate_single_map": {
         // Generate milestones for a single map with specific theme and difficulty
-        const { sequenceOrder = 1, mapIndex, xpBudget, saveToDB = true } = body;
+        const { sequenceOrder = 1, mapIndex, xpBudget, saveToDB = true, milestoneCount: customMilestoneCount } = body;
         const mapOrder = mapIndex || sequenceOrder;
         const mapConfig = getMapById(mapId) || MAP_SEQUENCE[mapOrder - 1];
         
@@ -452,13 +452,14 @@ Analyze and return JSON with:
         });
 
         const budget = xpBudget || mapConfig.xpBudget;
-        const milestoneCount = mapConfig.milestoneCount;
-
-        // Reduce milestone count to 8 for faster generation
-        const reducedMilestoneCount = 15;
+        
+        // Use custom milestone count from request, or default to map config, or 10
+        const targetMilestoneCount = customMilestoneCount || mapConfig.milestoneCount || 10;
+        
+        console.log(`[AI Gen] Generating ${targetMilestoneCount} milestones for Map ${mapOrder}: ${mapConfig.name}`);
         
         // Simplified, shorter prompt for faster AI response
-        const singleMapPrompt = `Generate ${reducedMilestoneCount} milestones for "${mapConfig.name}" (${mapConfig.theme} theme, Map ${mapOrder}/10).
+        const singleMapPrompt = `Generate ${targetMilestoneCount} milestones for "${mapConfig.name}" (${mapConfig.theme} theme, Map ${mapOrder}/10).
 
 ${previousMapsProgress.length > 0 ? `Previous max values: ${previousMapsProgress.slice(0, 5).map(p => `${p.type}=${p.maxValue}`).join(', ')}. Use HIGHER values.` : 'This is Map 1, start with low values (1-15).'}
 
@@ -468,7 +469,7 @@ Rules:
 - XP budget: ${budget}
 - Value range: ${mapOrder * 10}-${mapOrder * 30} for trades, proportional for others
 
-Generate exactly ${reducedMilestoneCount} milestones.`;
+Generate exactly ${targetMilestoneCount} milestones.`;
 
         const completion = await openai.chat.completions.create({
           model: config.model,
