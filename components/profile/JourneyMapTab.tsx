@@ -81,9 +81,15 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       const res = await fetch("/api/journey/maps/sequence");
       const data = await res.json();
       if (data.success && data.maps && data.maps.length > 0) {
-        // Filter to only include maps with proper sequenceOrder (exclude legacy maps)
+        // Filter to only include new generated maps (exclude legacy "Trader's Journey" map)
+        // Valid maps have mapId like "pirate_cove", "space_station", etc. NOT "traders_journey"
         const validMaps = data.maps.filter((m: MapData) => 
-          m.sequenceOrder && m.sequenceOrder >= 1 && m.sequenceOrder <= 10
+          m.sequenceOrder && 
+          m.sequenceOrder >= 1 && 
+          m.sequenceOrder <= 10 &&
+          m.mapId !== "traders_journey" && // Exclude legacy map
+          !m.mapId.includes("traders_journey") && // Exclude any traders_journey variants
+          m.name !== "Trader's Journey" // Also exclude by name
         );
         // Sort by sequenceOrder
         validMaps.sort((a: MapData, b: MapData) => a.sequenceOrder - b.sequenceOrder);
