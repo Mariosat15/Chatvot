@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { JourneyMapRenderer, type Milestone, type MapConfig, type Zone } from "@/components/journey";
+import { JourneyMapRenderer, type Milestone, type MapConfig, type Zone, type MapSequenceInfo } from "@/components/journey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Map, Target, Trophy, Star, Compass, Sparkles } from "lucide-react";
+import { RefreshCw, Map, Target, Trophy, Star, Compass, Sparkles, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 interface JourneyProgress {
   userId: string;
@@ -25,6 +26,22 @@ interface JourneyProgress {
   totalMilestonesCompleted: number;
   journeyStartedAt: string;
   lastProgressAt: string;
+  currentMapIndex?: number;
+  mapsCompleted?: number;
+}
+
+interface MapData {
+  mapId: string;
+  name: string;
+  description: string;
+  theme: string;
+  sequenceOrder: number;
+  difficulty: number;
+  estimatedXP: number;
+  zones: Zone[];
+  backgroundColor: string;
+  backgroundImage?: string;
+  totalMilestones?: number;
 }
 
 interface JourneyMapTabProps {
@@ -34,44 +51,129 @@ interface JourneyMapTabProps {
 export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
+  const [maps, setMaps] = useState<MapData[]>([]);
+  const [currentMapIndex, setCurrentMapIndex] = useState(1);
+  const [currentMapConfig, setCurrentMapConfig] = useState<MapConfig | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [progress, setProgress] = useState<JourneyProgress | null>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
 
-  // Fetch journey data
+  // Fetch all maps in sequence
+  const fetchMapsSequence = useCallback(async () => {
+    try {
+      const res = await fetch("/api/journey/maps/sequence");
+      const data = await res.json();
+      if (data.success && data.maps && data.maps.length > 0) {
+        setMaps(data.maps);
+        return data.maps;
+      }
+      return [];
+    } catch (err) {
+      console.error("Error fetching maps sequence:", err);
+      return [];
+    }
+  }, []);
+
+  // Fetch user progress
+  const fetchProgress = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/journey/progress/${userId}`);
+      const data = await res.json();
+      if (data.success) {
+        setProgress({
+          userId,
+          mapId: data.currentMapId || "pirate_cove",
+          currentZone: "",
+          currentMilestone: data.currentMilestone || "",
+          completedMilestones: data.completedMilestones?.map((id: string) => ({
+            milestoneId: id,
+            completedAt: new Date().toISOString(),
+            rewards: { xp: 0 },
+          })) || [],
+          unlockedMilestones: data.unlockedMilestones || [],
+          totalXPFromJourney: data.totalXP || 0,
+          totalMilestonesCompleted: data.completedMilestones?.length || 0,
+          journeyStartedAt: data.journeyStartedAt || new Date().toISOString(),
+          lastProgressAt: data.lastProgressAt || new Date().toISOString(),
+          currentMapIndex: data.currentMapIndex || 1,
+          mapsCompleted: data.mapsCompleted || 0,
+        });
+        return data;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error fetching progress:", err);
+      return null;
+    }
+  }, [userId]);
+
+  // Fetch milestones for a specific map
+  const fetchMapMilestones = useCallback(async (mapId: string) => {
+    try {
+      const res = await fetch(`/api/journey/maps/${mapId}/milestones`);
+      const data = await res.json();
+      if (data.success) {
+        return data.milestones || [];
+      }
+      return [];
+    } catch (err) {
+      console.error("Error fetching milestones:", err);
+      return [];
+    }
+  }, []);
+
+  // Fetch user level
+  const fetchUserLevel = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/user-level?userId=${userId}`);
+      const data = await res.json();
+      if (data.success && data.userLevel) {
+        setUserLevel(data.userLevel.currentLevel || 1);
+      }
+    } catch (err) {
+      console.error("Error fetching user level:", err);
+    }
+  }, [userId]);
+
+  // Load all journey data
   const fetchJourneyData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch map config, milestones, user progress, and user level
-      const [mapRes, milestonesRes, progressRes, levelRes] = await Promise.all([
-        fetch("/api/journey-map?mapId=traders_journey"),
-        fetch("/api/journey-milestones?mapId=traders_journey"),
-        fetch(`/api/journey-progress?userId=${userId}`),
-        fetch(`/api/user-level?userId=${userId}`),
+      // Fetch maps, progress, and user level in parallel
+      const [mapsData, progressData] = await Promise.all([
+        fetchMapsSequence(),
+        fetchProgress(),
+        fetchUserLevel(),
       ]);
 
-      const mapData = await mapRes.json();
-      const milestonesData = await milestonesRes.json();
-      const progressData = await progressRes.json();
-      const levelData = await levelRes.json();
-
-      if (mapData.success) {
-        setMapConfig(mapData.mapConfig);
+      if (mapsData.length === 0) {
+        setError("No journey maps found. Please ask an admin to generate the journey.");
+        return;
       }
 
-      if (milestonesData.success) {
-        setMilestones(milestonesData.milestones);
-      }
+      // Set current map based on progress or default to first
+      const startMapIndex = progressData?.currentMapIndex || 1;
+      setCurrentMapIndex(startMapIndex);
 
-      if (progressData.success) {
-        setProgress(progressData.progress);
-      }
-
-      if (levelData.success && levelData.userLevel) {
-        setUserLevel(levelData.userLevel.currentLevel || 1);
+      // Fetch milestones for the current map
+      const currentMap = mapsData.find((m: MapData) => m.sequenceOrder === startMapIndex);
+      if (currentMap) {
+        const milestonesData = await fetchMapMilestones(currentMap.mapId);
+        setMilestones(milestonesData);
+        setCurrentMapConfig({
+          mapId: currentMap.mapId,
+          name: currentMap.name,
+          description: currentMap.description,
+          zones: currentMap.zones || [],
+          backgroundColor: currentMap.backgroundColor || "#1a3a5c",
+          backgroundImage: currentMap.backgroundImage,
+          sequenceOrder: currentMap.sequenceOrder,
+          theme: currentMap.theme,
+          difficulty: currentMap.difficulty,
+          estimatedXP: currentMap.estimatedXP,
+        });
       }
     } catch (err) {
       console.error("Error fetching journey data:", err);
@@ -79,31 +181,116 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [fetchMapsSequence, fetchProgress, fetchUserLevel, fetchMapMilestones]);
+
+  // Load milestones when map changes
+  const loadMapData = useCallback(async (mapIndex: number) => {
+    const map = maps.find(m => m.sequenceOrder === mapIndex);
+    if (!map) return;
+
+    setLoading(true);
+    try {
+      const milestonesData = await fetchMapMilestones(map.mapId);
+      setMilestones(milestonesData);
+      setCurrentMapConfig({
+        mapId: map.mapId,
+        name: map.name,
+        description: map.description,
+        zones: map.zones || [],
+        backgroundColor: map.backgroundColor || "#1a3a5c",
+        backgroundImage: map.backgroundImage,
+        sequenceOrder: map.sequenceOrder,
+        theme: map.theme,
+        difficulty: map.difficulty,
+        estimatedXP: map.estimatedXP,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [maps, fetchMapMilestones]);
 
   useEffect(() => {
     fetchJourneyData();
   }, [fetchJourneyData]);
 
-  // Calculate stats
-  const requiredMilestones = milestones.filter(m => m.isRequired).length;
-  const completedCount = progress?.totalMilestonesCompleted || 0;
-  const completionPercentage = requiredMilestones > 0 
-    ? Math.round((completedCount / requiredMilestones) * 100)
-    : 0;
+  // Handle map navigation
+  const handleNavigateMap = (direction: "prev" | "next" | number) => {
+    const userCurrentMapIndex = progress?.currentMapIndex || 1;
+    
+    if (typeof direction === "number") {
+      if (direction >= 1 && direction <= maps.length) {
+        // Check if map is unlocked (user can view any map they've reached or the first)
+        if (direction <= userCurrentMapIndex || direction === 1) {
+          setCurrentMapIndex(direction);
+          loadMapData(direction);
+        } else {
+          toast.error("Complete the previous map to unlock this one!");
+        }
+      }
+    } else if (direction === "prev" && currentMapIndex > 1) {
+      const newIndex = currentMapIndex - 1;
+      setCurrentMapIndex(newIndex);
+      loadMapData(newIndex);
+    } else if (direction === "next" && currentMapIndex < maps.length) {
+      const newIndex = currentMapIndex + 1;
+      if (newIndex <= userCurrentMapIndex) {
+        setCurrentMapIndex(newIndex);
+        loadMapData(newIndex);
+      } else {
+        toast.error("Complete this map first!");
+      }
+    }
+  };
 
+  // Handle milestone click
+  const handleMilestoneClick = (milestone: Milestone) => {
+    const isCompleted = completedIds.includes(milestone.id);
+    const isUnlocked = unlockedIds.includes(milestone.id);
+    
+    toast.info(
+      <div>
+        <strong>{milestone.name}</strong>
+        <p className="text-sm opacity-80">{milestone.description}</p>
+        <p className="text-xs mt-1">
+          Reward: {milestone.rewards?.xp || 0} XP
+          {isCompleted && " ✓ Completed"}
+          {!isCompleted && isUnlocked && " - Available"}
+          {!isCompleted && !isUnlocked && " - Locked"}
+        </p>
+      </div>
+    );
+  };
+
+  // Calculate stats
   const completedIds = progress?.completedMilestones?.map(m => m.milestoneId) || [];
   const unlockedIds = progress?.unlockedMilestones || [];
-
-  // Get current zone name
-  const currentZone = mapConfig?.zones?.find(z => z.id === progress?.currentZone);
+  const milestonesOnThisMap = milestones.filter(m => completedIds.includes(m.id)).length;
+  const completionPercentage = milestones.length > 0 
+    ? Math.round((milestonesOnThisMap / milestones.length) * 100)
+    : 0;
 
   // Calculate days on journey
   const journeyDays = progress?.journeyStartedAt
     ? Math.floor((Date.now() - new Date(progress.journeyStartedAt).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
-  if (loading) {
+  // Build sequence info for multi-map navigation
+  const sequenceInfo: MapSequenceInfo | null = maps.length > 0 ? {
+    currentMapIndex,
+    totalMaps: maps.length,
+    mapsCompleted: progress?.mapsCompleted || 0,
+    maps: maps.map(map => ({
+      mapId: map.mapId,
+      name: map.name,
+      theme: map.theme,
+      sequenceOrder: map.sequenceOrder,
+      isUnlocked: map.sequenceOrder <= (progress?.currentMapIndex || 1) || map.sequenceOrder === 1,
+      isComplete: map.sequenceOrder < (progress?.currentMapIndex || 1),
+      completionPercentage: 0,
+    })),
+  } : null;
+
+  if (loading && maps.length === 0) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -187,7 +374,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                   <Target className="h-5 w-5 text-green-500" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{completedCount}</div>
+                  <div className="text-2xl font-bold">{progress?.totalMilestonesCompleted || 0}</div>
                   <div className="text-sm text-muted-foreground">Milestones</div>
                 </div>
               </div>
@@ -224,11 +411,11 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-purple-500/20">
-                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  <Trophy className="h-5 w-5 text-purple-500" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{completionPercentage}%</div>
-                  <div className="text-sm text-muted-foreground">Complete</div>
+                  <div className="text-2xl font-bold">{progress?.mapsCompleted || 0}/10</div>
+                  <div className="text-sm text-muted-foreground">Maps</div>
                 </div>
               </div>
             </CardContent>
@@ -236,38 +423,88 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         </motion.div>
       </div>
 
-      {/* Current Position Card */}
-      {currentZone && (
+      {/* Map Selector */}
+      {maps.length > 1 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <Card className="border-2" style={{ borderColor: currentZone.color + "40" }}>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {maps.map((map) => {
+              const userMapIndex = progress?.currentMapIndex || 1;
+              const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
+              const isComplete = map.sequenceOrder < userMapIndex;
+              const isCurrent = map.sequenceOrder === currentMapIndex;
+
+              return (
+                <Button
+                  key={map.mapId}
+                  variant={isCurrent ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleNavigateMap(map.sequenceOrder)}
+                  disabled={!isUnlocked}
+                  className={`flex items-center gap-2 whitespace-nowrap ${
+                    isComplete ? "border-green-500" : ""
+                  } ${isCurrent ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                >
+                  {!isUnlocked && <Lock className="h-3 w-3" />}
+                  {isComplete && <Star className="h-3 w-3 text-green-400" />}
+                  <span>{map.sequenceOrder}. {map.name}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Current Map Info */}
+      {currentMapConfig && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+        >
+          <Card className="border-amber-500/30">
             <CardContent className="py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: currentZone.color + "20" }}
-                  >
-                    <Map className="h-6 w-6" style={{ color: currentZone.color }} />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500/20">
+                    <Map className="h-6 w-6 text-amber-500" />
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground">Current Zone</div>
-                    <div className="font-semibold text-lg">{currentZone.name}</div>
-                    <div className="text-sm text-muted-foreground">{currentZone.description}</div>
+                    <div className="font-semibold text-lg">{currentMapConfig.name}</div>
+                    <div className="text-sm text-muted-foreground capitalize">
+                      {currentMapConfig.theme} theme • Difficulty {currentMapConfig.difficulty}/10
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <Badge variant="outline" className="mb-2">
-                    Zone {mapConfig?.zones?.findIndex(z => z.id === currentZone.id)! + 1} of {mapConfig?.zones?.length}
-                  </Badge>
-                  <div className="w-32">
-                    <Progress
-                      value={completionPercentage}
-                      className="h-2"
-                    />
+                <div className="text-right flex items-center gap-4">
+                  <div>
+                    <Badge variant="outline" className="mb-1">
+                      {milestonesOnThisMap} / {milestones.length} milestones
+                    </Badge>
+                    <div className="w-32">
+                      <Progress value={completionPercentage} className="h-2" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNavigateMap("prev")}
+                      disabled={currentMapIndex <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNavigateMap("next")}
+                      disabled={currentMapIndex >= maps.length || currentMapIndex >= (progress?.currentMapIndex || 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -291,12 +528,16 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
           </CardHeader>
           <CardContent>
             <JourneyMapRenderer
-              mapConfig={mapConfig}
+              mapConfig={currentMapConfig}
               milestones={milestones}
               completedIds={completedIds}
               unlockedIds={unlockedIds}
               currentMilestone={progress?.currentMilestone}
               userLevel={userLevel}
+              onMilestoneClick={handleMilestoneClick}
+              sequenceInfo={sequenceInfo}
+              onNavigateMap={handleNavigateMap}
+              showMapNavigation={false}
               className="min-h-[500px]"
             />
           </CardContent>
@@ -331,9 +572,9 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                         <div className="flex items-center gap-3">
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{ backgroundColor: milestone.color + "20" }}
+                            style={{ backgroundColor: (milestone.color || "#3B82F6") + "20" }}
                           >
-                            <Target className="h-5 w-5" style={{ color: milestone.color }} />
+                            <Target className="h-5 w-5" style={{ color: milestone.color || "#3B82F6" }} />
                           </div>
                           <div>
                             <div className="font-medium">{milestone.name}</div>
