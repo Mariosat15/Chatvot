@@ -586,7 +586,7 @@ export default function JourneyMapEditorSection() {
     if (saveToDB) {
       try {
         // Delete existing milestones for this map
-        await fetch(`/api/journey-milestones?all=true&mapId=${config.mapId}`, { method: "DELETE" });
+        await fetch(`/api/journey-milestones?all=true&mapId=${metadata.mapId}`, { method: "DELETE" });
 
         // Save new milestones
         for (const milestone of milestones) {
@@ -602,35 +602,35 @@ export default function JourneyMapEditorSection() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            mapId: config.mapId,
-            name: config.name,
-            description: `Navigate through the ${config.theme} challenges`,
+            mapId: metadata.mapId,
+            name: metadata.name,
+            description: `Navigate through the ${metadata.theme} challenges`,
             zones: [
               { id: "zone_1", name: "Starting Area", order: 1, color: "#22C55E" },
               { id: "zone_2", name: "Challenge Zone", order: 2, color: "#3B82F6" },
               { id: "zone_3", name: "Advanced Area", order: 3, color: "#F59E0B" },
               { id: "zone_4", name: "Final Stretch", order: 4, color: "#EF4444" },
             ],
-            defaultStartNode: `${config.mapId}_m1`,
+            defaultStartNode: `${metadata.mapId}_${blueprint[0].id}`,
             backgroundColor: "#1a3a5c",
-            backgroundImage: `/assets/maps/${config.mapId.replace(/_/g, "-")}.png`,
+            backgroundImage: `/assets/maps/${metadata.mapId.replace(/_/g, "-")}.png`,
             sequenceOrder: mapIndex,
-            theme: config.theme,
-            difficulty: config.difficulty,
-            estimatedXP: config.xpBudget,
-            totalMilestones: config.milestoneCount,
+            theme: metadata.theme,
+            difficulty: mapIndex,
+            estimatedXP: metadata.xpBudget,
+            totalMilestones: blueprint.length,
             isActive: true,
           }),
         });
 
-        return { success: true, milestones, config };
+        return { success: true, milestones, metadata };
       } catch (error) {
         console.error("Error saving manual milestones:", error);
         return { success: false, error };
       }
     }
 
-    return { success: true, milestones, config };
+    return { success: true, milestones, metadata };
   };
 
   // Visual placement map configs
