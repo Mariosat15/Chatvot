@@ -135,10 +135,11 @@ export async function PUT(request: NextRequest) {
  * DELETE /api/journey-map
  * Delete a journey map, zones, or specific zone
  * Query params:
- * - mapId: the map to operate on (required)
+ * - mapId: the map to operate on (required unless deleteAllMaps=true)
  * - zoneId: delete specific zone from the map
  * - clearZones=true: delete all zones from the map
  * - permanent=true: permanently delete the map (not just deactivate)
+ * - deleteAllMaps=true: delete ALL journey maps
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -148,6 +149,17 @@ export async function DELETE(request: NextRequest) {
     const zoneId = searchParams.get("zoneId");
     const clearZones = searchParams.get("clearZones") === "true";
     const permanent = searchParams.get("permanent") === "true";
+    const deleteAllMaps = searchParams.get("deleteAllMaps") === "true";
+
+    // Delete ALL journey maps
+    if (deleteAllMaps) {
+      const result = await JourneyMapConfig.deleteMany({});
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${result.deletedCount} journey maps`,
+        deletedCount: result.deletedCount,
+      });
+    }
 
     if (!mapId) {
       return NextResponse.json(

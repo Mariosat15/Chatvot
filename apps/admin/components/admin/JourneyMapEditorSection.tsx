@@ -737,24 +737,29 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Delete EVERYTHING (milestones + zones + map)
+  // Delete EVERYTHING (all milestones, all maps, all zones, all user progress)
   const deleteEverything = async () => {
-    if (!confirm("⚠️ DANGER: This will delete ALL milestones AND zones. Are you sure?")) return;
+    if (!confirm("⚠️ DANGER: This will delete ALL journey data (all 10 maps, all milestones, all user progress). Are you sure?")) return;
     if (!confirm("FINAL WARNING: This action cannot be undone! Continue?")) return;
 
     setLoading(true);
     try {
-      // Delete all milestones first
-      await fetch(`/api/journey-milestones?all=true&mapId=traders_journey`, {
+      // Delete ALL milestones from ALL maps
+      await fetch(`/api/journey-milestones?all=true&deleteAllMaps=true`, {
         method: "DELETE",
       });
 
-      // Clear all zones
-      await fetch(`/api/journey-map?mapId=traders_journey&clearZones=true`, {
+      // Delete ALL map configs
+      await fetch(`/api/journey-map?deleteAllMaps=true`, {
         method: "DELETE",
       });
 
-      toast.success("All milestones and zones deleted");
+      // Delete ALL user journey progress
+      await fetch(`/api/journey-progress?deleteAll=true`, {
+        method: "DELETE",
+      });
+
+      toast.success("All journey data deleted (maps, milestones, user progress)");
       fetchData();
     } catch (error) {
       toast.error("Failed to delete everything");

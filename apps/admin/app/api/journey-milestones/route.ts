@@ -179,6 +179,7 @@ export async function PUT(request: NextRequest) {
  * Query params:
  * - id: delete specific milestone
  * - all=true&mapId=xxx: delete all milestones for a map
+ * - all=true&deleteAllMaps=true: delete ALL milestones from ALL maps
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -186,9 +187,20 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const milestoneId = searchParams.get("id");
     const deleteAll = searchParams.get("all") === "true";
+    const deleteAllMaps = searchParams.get("deleteAllMaps") === "true";
     const mapId = searchParams.get("mapId") || "traders_journey";
 
-    // Delete all milestones for the map
+    // Delete ALL milestones from ALL maps
+    if (deleteAll && deleteAllMaps) {
+      const result = await JourneyMilestone.deleteMany({});
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${result.deletedCount} milestones from all maps`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    // Delete all milestones for a specific map
     if (deleteAll) {
       const result = await JourneyMilestone.deleteMany({ mapId });
       return NextResponse.json({

@@ -234,3 +234,50 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+/**
+ * DELETE /api/journey-progress
+ * Delete journey progress
+ * Query params:
+ * - userId: delete specific user's progress
+ * - deleteAll=true: delete ALL users' journey progress
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    await connectToDatabase();
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    const deleteAll = searchParams.get("deleteAll") === "true";
+
+    // Delete ALL users' journey progress
+    if (deleteAll) {
+      const result = await UserJourneyProgress.deleteMany({});
+      return NextResponse.json({
+        success: true,
+        message: `Deleted journey progress for ${result.deletedCount} users`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    // Delete specific user's progress
+    if (userId) {
+      const result = await UserJourneyProgress.deleteMany({ userId });
+      return NextResponse.json({
+        success: true,
+        message: `Deleted journey progress for user`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Either userId or deleteAll=true is required" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error deleting journey progress:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete journey progress" },
+      { status: 500 }
+    );
+  }
+}

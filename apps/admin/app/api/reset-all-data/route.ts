@@ -39,6 +39,9 @@ import UserNote from "@/database/models/user-notes.model";
 import PositionEvent from "@/database/models/position-event.model";
 import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
 import UserPresence from "@/database/models/user-presence.model";
+import JourneyMilestone from "@/database/models/journey-milestone.model";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import { resetBadgeAndXPConfigs } from "@/lib/services/badge-config-seed.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getAdminSession } from "@/lib/admin/auth";
@@ -77,6 +80,9 @@ import { getAdminSession } from "@/lib/admin/auth";
  * - All chat messages
  * - All friend requests
  * - All friendships
+ * - All journey milestones (all 10 maps)
+ * - All journey map configurations
+ * - All user journey progress
  *
  * ✅ PRESERVES (will NOT delete):
  * - User accounts (the actual users in 'user' collection)
@@ -213,6 +219,10 @@ export async function POST(request: Request) {
       // Additional collections
       userProfiles: await userProfilesCollection.countDocuments(),
       workerJobs: await workerJobsCollection.countDocuments(),
+      // Journey data
+      journeyMilestones: await JourneyMilestone.countDocuments(),
+      journeyMapConfigs: await JourneyMapConfig.countDocuments(),
+      userJourneyProgress: await UserJourneyProgress.countDocuments(),
     };
 
     console.log("📊 Before deletion:", before);
@@ -408,6 +418,22 @@ export async function POST(request: Request) {
     // Delete worker jobs
     const workerJobsDeleted = await workerJobsCollection.deleteMany({});
     console.log(`✅ Deleted ${workerJobsDeleted.deletedCount} worker jobs`);
+
+    // ============================================
+    // DELETE JOURNEY DATA
+    // ============================================
+
+    // Delete all journey milestones
+    const journeyMilestonesDeleted = await JourneyMilestone.deleteMany({});
+    console.log(`✅ Deleted ${journeyMilestonesDeleted.deletedCount} journey milestones`);
+
+    // Delete all journey map configs
+    const journeyMapConfigsDeleted = await JourneyMapConfig.deleteMany({});
+    console.log(`✅ Deleted ${journeyMapConfigsDeleted.deletedCount} journey map configs`);
+
+    // Delete all user journey progress
+    const userJourneyProgressDeleted = await UserJourneyProgress.deleteMany({});
+    console.log(`✅ Deleted ${userJourneyProgressDeleted.deletedCount} user journey progress records`);
 
     // ============================================
     // DELETE GAME MASTER DATA
@@ -656,6 +682,10 @@ export async function POST(request: Request) {
       // Additional collections
       userProfiles: await userProfilesCollection.countDocuments(),
       workerJobs: await workerJobsCollection.countDocuments(),
+      // Journey data
+      journeyMilestones: await JourneyMilestone.countDocuments(),
+      journeyMapConfigs: await JourneyMapConfig.countDocuments(),
+      userJourneyProgress: await UserJourneyProgress.countDocuments(),
     };
 
     console.log("📊 After deletion:", after);
@@ -733,6 +763,10 @@ export async function POST(request: Request) {
         // Additional collections
         userProfiles: before.userProfiles,
         workerJobs: before.workerJobs,
+        // Journey data
+        journeyMilestones: before.journeyMilestones,
+        journeyMapConfigs: before.journeyMapConfigs,
+        userJourneyProgress: before.userJourneyProgress,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
