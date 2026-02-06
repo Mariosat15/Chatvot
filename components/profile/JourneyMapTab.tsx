@@ -117,19 +117,31 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       const res = await fetch(`/api/journey/progress/${userId}`);
       const data = await res.json();
       if (data.success) {
+        // Handle completed milestones - they can be strings or objects
+        const formattedMilestones = (data.completedMilestones || []).map((item: any) => {
+          if (typeof item === "string") {
+            return {
+              milestoneId: item,
+              completedAt: new Date().toISOString(),
+              rewards: { xp: 0 },
+            };
+          }
+          return {
+            milestoneId: item.milestoneId || item.id || item,
+            completedAt: item.completedAt || new Date().toISOString(),
+            rewards: item.rewards || { xp: 0 },
+          };
+        });
+
         setProgress({
           userId,
           mapId: data.currentMapId || "pirate_cove",
           currentZone: "",
           currentMilestone: data.currentMilestone || "",
-          completedMilestones: data.completedMilestones?.map((id: string) => ({
-            milestoneId: id,
-            completedAt: new Date().toISOString(),
-            rewards: { xp: 0 },
-          })) || [],
+          completedMilestones: formattedMilestones,
           unlockedMilestones: data.unlockedMilestones || [],
           totalXPFromJourney: data.totalXP || 0,
-          totalMilestonesCompleted: data.completedMilestones?.length || 0,
+          totalMilestonesCompleted: formattedMilestones.length,
           journeyStartedAt: data.journeyStartedAt || new Date().toISOString(),
           lastProgressAt: data.lastProgressAt || new Date().toISOString(),
           currentMapIndex: data.currentMapIndex || 1,

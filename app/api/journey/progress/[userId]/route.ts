@@ -49,18 +49,37 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .select(["mapId", "sequenceOrder", "totalMilestones"])
       .lean();
 
-    // Get milestones for counting
+    // Get milestones for counting (need both _id and custom id field)
     const milestones = await JourneyMilestone.find({
       ...(whitelabelId ? { whitelabelId } : {}),
+      isActive: true,
     })
-      .select(["_id", "mapId"])
+      .select(["_id", "id", "mapId"])
       .lean();
 
+    // Extract completed milestone IDs (handle both formats: string array or object array)
+    const completedMilestoneIds: string[] = [];
+    if (Array.isArray(userProgress.completedMilestones)) {
+      for (const item of userProgress.completedMilestones) {
+        if (typeof item === "string") {
+          completedMilestoneIds.push(item);
+        } else if (item && typeof item === "object" && item.milestoneId) {
+          completedMilestoneIds.push(item.milestoneId);
+        }
+      }
+    }
+
     // Build progress per map
-    const mapProgress = maps.map((map) => {
-      const mapMilestones = milestones.filter((m) => m.mapId === map.mapId);
-      const completedInMap = userProgress.completedMilestones.filter(
-        (id: string) => mapMilestones.some((m) => m._id.toString() === id)
+    const mapProgress = maps.map((map: any) => {
+      const mapMilestones = milestones.filter((m: any) => m.mapId === map.mapId);
+      
+      // Match by custom id field OR _id
+      const completedInMap = completedMilestoneIds.filter((completedId) =>
+        mapMilestones.some((m: any) => 
+          m.id === completedId || 
+          m._id?.toString() === completedId ||
+          completedId.includes(m.id)
+        )
       );
 
       return {
@@ -90,14 +109,25 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       currentMapIndex = maps.length;
     }
 
+    // Format completed milestones for frontend (always as objects)
+    const formattedCompletedMilestones = (userProgress.completedMilestones || []).map((item: any) => {
+      if (typeof item === "string") {
+        return { milestoneId: item, completedAt: new Date(), rewards: { xp: 0 } };
+      }
+      return item;
+    });
+
     return NextResponse.json({
       success: true,
       currentMapIndex: userProgress.currentMapIndex || currentMapIndex,
       mapProgress,
-      totalXP: userProgress.allMapsXP || userProgress.totalXP || 0,
-      mapsCompleted: userProgress.totalMapsCompleted || mapProgress.filter((p) => p.isComplete).length,
-      completedMilestones: userProgress.completedMilestones || [],
+      totalXP: userProgress.totalXPFromJourney || userProgress.allMapsXP || userProgress.totalXP || 0,
+      mapsCompleted: userProgress.totalMapsCompleted || mapProgress.filter((p: any) => p.isComplete).length,
+      completedMilestones: formattedCompletedMilestones,
       unlockedMilestones: userProgress.unlockedMilestones || [],
+      currentMilestone: userProgress.currentMilestone || "",
+      journeyStartedAt: userProgress.journeyStartedAt,
+      lastProgressAt: userProgress.lastProgressAt,
     });
   } catch (error) {
     console.error("Error fetching user journey progress:", error);
