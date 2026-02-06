@@ -86,15 +86,23 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         const validMaps = data.maps.filter((m: MapData) => 
           m.sequenceOrder && 
           m.sequenceOrder >= 1 && 
-          m.sequenceOrder <= 10 &&
           m.mapId !== "traders_journey" && // Exclude legacy map
           !m.mapId.includes("traders_journey") && // Exclude any traders_journey variants
           m.name !== "Trader's Journey" // Also exclude by name
         );
+        
         // Sort by sequenceOrder
         validMaps.sort((a: MapData, b: MapData) => a.sequenceOrder - b.sequenceOrder);
-        setMaps(validMaps);
-        return validMaps;
+        
+        // IMPORTANT: Renumber the maps to ensure Pirate Cove is #1
+        // This fixes the issue where database has sequenceOrder starting at 2
+        const renumberedMaps = validMaps.map((map: MapData, index: number) => ({
+          ...map,
+          sequenceOrder: index + 1, // Renumber: 1, 2, 3, ...
+        }));
+        
+        setMaps(renumberedMaps);
+        return renumberedMaps;
       }
       return [];
     } catch (err) {
@@ -182,38 +190,20 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         return;
       }
 
-      // Set current map based on progress or default to first
-      const startMapIndex = progressData?.currentMapIndex || 1;
-      setCurrentMapIndex(startMapIndex);
-
-      // Fetch milestones for the current map
-      const currentMap = mapsData.find((m: MapData) => m.sequenceOrder === startMapIndex);
-      if (currentMap) {
-        const milestonesData = await fetchMapMilestones(currentMap.mapId);
-        setMilestones(milestonesData);
-        setCurrentMapConfig({
-          mapId: currentMap.mapId,
-          name: currentMap.name,
-          description: currentMap.description,
-          zones: currentMap.zones || [],
-          backgroundColor: currentMap.backgroundColor || "#1a3a5c",
-          // Ensure valid backgroundImage - fallback if old/invalid path
-          backgroundImage: currentMap.backgroundImage?.includes("treasure-map") 
-            ? `/assets/maps/${currentMap.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`
-            : currentMap.backgroundImage || `/assets/maps/${currentMap.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`,
-          sequenceOrder: currentMap.sequenceOrder,
-          theme: currentMap.theme,
-          difficulty: currentMap.difficulty,
-          estimatedXP: currentMap.estimatedXP,
-        });
-      }
+      // Default to showing overview (0) on initial load
+      // This lets users see the welcome screen first
+      setCurrentMapIndex(0);
+      setShowingOverview(true);
+      
+      // If user has progress, they can navigate directly to their current map
+      // via the map selector or "Continue" button
     } catch (err) {
       console.error("Error fetching journey data:", err);
       setError("Failed to load journey map. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [fetchMapsSequence, fetchProgress, fetchUserLevel, fetchMapMilestones]);
+  }, [fetchMapsSequence, fetchProgress, fetchUserLevel]);
 
   // Load milestones when map changes
   const loadMapData = useCallback(async (mapIndex: number) => {
