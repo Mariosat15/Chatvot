@@ -62,6 +62,8 @@ import {
   MapPin,
   Link,
   Palette,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -342,6 +344,20 @@ export default function JourneyMapEditorSection() {
   const [sequenceGenerating, setSequenceGenerating] = useState(false);
   const [showSequenceDialog, setShowSequenceDialog] = useState(false);
   const [sequenceValidation, setSequenceValidation] = useState<any>(null);
+  
+  // Visual Placement Wizard State
+  const [showPlacementWizard, setShowPlacementWizard] = useState(false);
+  const [placementMapIndex, setPlacementMapIndex] = useState(1);
+  const [placementIslands, setPlacementIslands] = useState<Array<{
+    id: number;
+    name: string;
+    position: { x: number; y: number };
+    isPlaced: boolean;
+    templateIndex: number;
+  }>>([]);
+  const [placementPlacingMode, setPlacementPlacingMode] = useState(false);
+  const [placementCurrentIsland, setPlacementCurrentIsland] = useState(0);
+  const placementMapRef = useRef<HTMLDivElement>(null);
 
   // AI Journey Generation function
   const generateAIJourney = async () => {
@@ -426,8 +442,8 @@ export default function JourneyMapEditorSection() {
       
       if (successfulMaps > 0) {
         toast.success(`Generated ${totalMilestones} milestones across ${successfulMaps} maps!`);
-        // Refresh the milestones list
-        await fetchMilestones();
+        // Refresh the data
+        await fetchData();
         // Connect maps in sequence
         await connectMapsInSequence();
       } else {
@@ -493,6 +509,338 @@ export default function JourneyMapEditorSection() {
     } catch (error) {
       console.error("Connect maps error:", error);
       toast.error("Failed to connect maps");
+    }
+  };
+
+  // Manual (non-AI) milestone generation for a single map using templates
+  const generateMapManually = async (mapIndex: number, saveToDB: boolean = true) => {
+    const MAP_CONFIGS = [
+      { mapId: "pirate_cove", name: "Pirate Cove", theme: "pirate", milestoneCount: 20, startTier: 1, endTier: 2, xpBudget: 150 },
+      { mapId: "space_station", name: "Space Station", theme: "space", milestoneCount: 20, startTier: 1, endTier: 3, xpBudget: 200 },
+      { mapId: "medieval_castle", name: "Medieval Castle", theme: "medieval", milestoneCount: 20, startTier: 2, endTier: 3, xpBudget: 300 },
+      { mapId: "cyber_city", name: "Cyber City", theme: "cyber", milestoneCount: 20, startTier: 2, endTier: 4, xpBudget: 400 },
+      { mapId: "ancient_temple", name: "Ancient Temple", theme: "ancient", milestoneCount: 20, startTier: 3, endTier: 4, xpBudget: 500 },
+      { mapId: "volcanic_island", name: "Volcanic Island", theme: "volcanic", milestoneCount: 20, startTier: 3, endTier: 5, xpBudget: 700 },
+      { mapId: "arctic_fortress", name: "Arctic Fortress", theme: "arctic", milestoneCount: 20, startTier: 4, endTier: 5, xpBudget: 1000 },
+      { mapId: "dragon_realm", name: "Dragon Realm", theme: "dragon", milestoneCount: 20, startTier: 4, endTier: 6, xpBudget: 1500 },
+      { mapId: "celestial_kingdom", name: "Celestial Kingdom", theme: "celestial", milestoneCount: 20, startTier: 5, endTier: 6, xpBudget: 2500 },
+      { mapId: "hall_of_legends", name: "Hall of Legends", theme: "legendary", milestoneCount: 20, startTier: 6, endTier: 7, xpBudget: 5000 },
+    ];
+
+    const config = MAP_CONFIGS[mapIndex - 1];
+    if (!config) {
+      toast.error("Invalid map index");
+      return null;
+    }
+
+    // Get templates for this map's tier range
+    const availableTemplates = MILESTONE_TEMPLATES.filter(
+      t => t.tier >= config.startTier && t.tier <= config.endTier
+    );
+
+    if (availableTemplates.length < config.milestoneCount) {
+      // Duplicate templates if not enough
+      while (availableTemplates.length < config.milestoneCount) {
+        const template = MILESTONE_TEMPLATES[availableTemplates.length % MILESTONE_TEMPLATES.length];
+        availableTemplates.push({ ...template, tier: config.startTier + Math.floor(availableTemplates.length / 5) });
+      }
+    }
+
+    // Scale XP to fit budget
+    const totalTemplateXP = availableTemplates.slice(0, config.milestoneCount).reduce((sum, t) => sum + t.xp, 0);
+    const xpScale = config.xpBudget / totalTemplateXP;
+
+    // Generate milestones
+    const milestones = availableTemplates.slice(0, config.milestoneCount).map((template, index) => {
+      const progress = index / config.milestoneCount;
+      const row = Math.floor(index / 5);
+      const col = index % 5;
+      
+      // Grid-like positioning with some randomness
+      const x = 100 + (col * 200) + (Math.random() * 50 - 25);
+      const y = 80 + (row * 150) + (Math.random() * 30 - 15);
+
+      // Scale condition values based on map difficulty
+      const scaledCondition = { ...template.condition };
+      if (scaledCondition.value && typeof scaledCondition.value === 'number') {
+        scaledCondition.value = Math.ceil(scaledCondition.value * (1 + (mapIndex - 1) * 0.3));
+      }
+
+      return {
+        id: `${config.mapId}_milestone_${index + 1}`,
+        mapId: config.mapId,
+        name: `${config.theme.charAt(0).toUpperCase() + config.theme.slice(1)} ${template.name}`,
+        description: template.desc,
+        shortDescription: template.desc.slice(0, 50),
+        zoneId: `zone_${Math.floor(progress * 4) + 1}`,
+        position: { x: Math.round(x), y: Math.round(y) },
+        nodeType: index === 0 ? "start" : index === config.milestoneCount - 1 ? "legendary" : "milestone",
+        icon: "target",
+        color: index === 0 ? "#22C55E" : index === config.milestoneCount - 1 ? "#F59E0B" : "#3B82F6",
+        size: index === config.milestoneCount - 1 ? "large" : "medium",
+        unlockCondition: index === 0 && mapIndex > 1 
+          ? { type: "map_completed", value: MAP_CONFIGS[mapIndex - 2].mapId }
+          : index > 0 
+          ? { type: "milestone_complete", milestoneId: `${config.mapId}_milestone_${index}` }
+          : undefined,
+        completeCondition: scaledCondition,
+        rewards: { xp: Math.round(template.xp * xpScale) },
+        connectedTo: index < config.milestoneCount - 1 ? [`${config.mapId}_milestone_${index + 2}`] : [],
+        connectedFrom: index > 0 ? [`${config.mapId}_milestone_${index}`] : [],
+        isRequired: true,
+        isAutoComplete: template.condition.type === "account_created",
+        order: index + 1,
+        orderInMap: index + 1,
+        isActive: true,
+      };
+    });
+
+    // Save to database if requested
+    if (saveToDB) {
+      try {
+        // Delete existing milestones for this map
+        await fetch(`/api/journey-milestones?all=true&mapId=${config.mapId}`, { method: "DELETE" });
+
+        // Save new milestones
+        for (const milestone of milestones) {
+          await fetch("/api/journey-milestones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(milestone),
+          });
+        }
+
+        // Create/update map config
+        await fetch("/api/journey-map", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mapId: config.mapId,
+            name: config.name,
+            description: `Navigate through the ${config.theme} challenges`,
+            zones: [
+              { id: "zone_1", name: "Starting Area", order: 1, color: "#22C55E" },
+              { id: "zone_2", name: "Challenge Zone", order: 2, color: "#3B82F6" },
+              { id: "zone_3", name: "Advanced Area", order: 3, color: "#F59E0B" },
+              { id: "zone_4", name: "Final Stretch", order: 4, color: "#EF4444" },
+            ],
+            defaultStartNode: `${config.mapId}_milestone_1`,
+            backgroundColor: "#1a3a5c",
+            backgroundImage: `/assets/maps/${config.mapId.replace(/_/g, "-")}.png`,
+            sequenceOrder: mapIndex,
+            theme: config.theme,
+            difficulty: mapIndex,
+            estimatedXP: config.xpBudget,
+            totalMilestones: config.milestoneCount,
+            isActive: true,
+          }),
+        });
+
+        return { success: true, milestones, config };
+      } catch (error) {
+        console.error("Error saving manual milestones:", error);
+        return { success: false, error };
+      }
+    }
+
+    return { success: true, milestones, config };
+  };
+
+  // Visual placement map configs
+  const PLACEMENT_MAP_CONFIGS = [
+    { mapId: "pirate_cove", name: "Pirate Cove", color: "#F59E0B", theme: "pirate" },
+    { mapId: "space_station", name: "Space Station", color: "#8B5CF6", theme: "space" },
+    { mapId: "medieval_castle", name: "Medieval Castle", color: "#EF4444", theme: "medieval" },
+    { mapId: "cyber_city", name: "Cyber City", color: "#00FFFF", theme: "cyber" },
+    { mapId: "ancient_temple", name: "Ancient Temple", color: "#D4A373", theme: "ancient" },
+    { mapId: "volcanic_island", name: "Volcanic Island", color: "#DC2626", theme: "volcanic" },
+    { mapId: "arctic_fortress", name: "Arctic Fortress", color: "#38BDF8", theme: "arctic" },
+    { mapId: "dragon_realm", name: "Dragon Realm", color: "#F97316", theme: "dragon" },
+    { mapId: "celestial_kingdom", name: "Celestial Kingdom", color: "#A78BFA", theme: "celestial" },
+    { mapId: "hall_of_legends", name: "Hall of Legends", color: "#FBBF24", theme: "legendary" },
+  ];
+
+  // Initialize visual placement for a specific map
+  const initializePlacementForMap = (mapIndex: number) => {
+    const milestonesCount = 20;
+    const startTier = Math.min(7, Math.ceil(mapIndex / 2));
+    const templates = MILESTONE_TEMPLATES.filter(t => t.tier >= startTier && t.tier <= startTier + 1);
+    
+    const islands = Array.from({ length: milestonesCount }, (_, i) => ({
+      id: i + 1,
+      name: templates[i % templates.length]?.name || `Milestone ${i + 1}`,
+      position: { x: 0, y: 0 },
+      isPlaced: false,
+      templateIndex: i % templates.length,
+    }));
+    
+    setPlacementIslands(islands);
+    setPlacementCurrentIsland(0);
+    setPlacementPlacingMode(false);
+    setPlacementMapIndex(mapIndex);
+    setShowPlacementWizard(true);
+  };
+
+  // Handle click on placement map
+  const handlePlacementMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!placementPlacingMode || !placementMapRef.current) return;
+    
+    const rect = placementMapRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 1200;
+    const y = ((e.clientY - rect.top) / rect.height) * 800;
+    
+    setPlacementIslands(prev => prev.map((island, idx) => 
+      idx === placementCurrentIsland 
+        ? { ...island, position: { x: Math.round(x), y: Math.round(y) }, isPlaced: true }
+        : island
+    ));
+    
+    if (placementCurrentIsland < placementIslands.length - 1) {
+      setPlacementCurrentIsland(prev => prev + 1);
+    } else {
+      setPlacementPlacingMode(false);
+      toast.success("All milestones placed!");
+    }
+  };
+
+  // Save placed milestones for current map
+  const savePlacedMilestones = async () => {
+    const mapConfig = PLACEMENT_MAP_CONFIGS[placementMapIndex - 1];
+    if (!mapConfig) return;
+    
+    const placedIslands = placementIslands.filter(i => i.isPlaced);
+    if (placedIslands.length < 2) {
+      toast.error("Please place at least 2 milestones");
+      return;
+    }
+
+    setSequenceGenerating(true);
+    try {
+      // Delete existing milestones for this map
+      await fetch(`/api/journey-milestones?all=true&mapId=${mapConfig.mapId}`, { method: "DELETE" });
+
+      // Calculate XP budget based on map index
+      const xpBudgets = [150, 200, 300, 400, 500, 700, 1000, 1500, 2500, 5000];
+      const xpBudget = xpBudgets[placementMapIndex - 1];
+      const xpPerMilestone = Math.round(xpBudget / placedIslands.length);
+
+      // Create milestones from placed islands
+      for (let i = 0; i < placedIslands.length; i++) {
+        const island = placedIslands[i];
+        const template = MILESTONE_TEMPLATES[island.templateIndex] || MILESTONE_TEMPLATES[0];
+        
+        // Scale condition values based on map difficulty
+        const scaledCondition = { ...template.condition };
+        if (scaledCondition.value && typeof scaledCondition.value === 'number') {
+          scaledCondition.value = Math.ceil(scaledCondition.value * (1 + (placementMapIndex - 1) * 0.3));
+        }
+
+        const milestone = {
+          id: `${mapConfig.mapId}_milestone_${i + 1}`,
+          mapId: mapConfig.mapId,
+          name: `${mapConfig.theme.charAt(0).toUpperCase() + mapConfig.theme.slice(1)} ${template.name}`,
+          description: template.desc,
+          shortDescription: template.desc.slice(0, 50),
+          position: island.position,
+          nodeType: i === 0 ? "start" : i === placedIslands.length - 1 ? "legendary" : "milestone",
+          icon: "target",
+          color: i === 0 ? "#22C55E" : i === placedIslands.length - 1 ? "#F59E0B" : "#3B82F6",
+          unlockCondition: i === 0 && placementMapIndex > 1
+            ? { type: "map_completed", value: PLACEMENT_MAP_CONFIGS[placementMapIndex - 2].mapId }
+            : i > 0
+            ? { type: "milestone_complete", milestoneId: `${mapConfig.mapId}_milestone_${i}` }
+            : undefined,
+          completeCondition: scaledCondition,
+          rewards: { xp: xpPerMilestone },
+          connectedTo: i < placedIslands.length - 1 ? [`${mapConfig.mapId}_milestone_${i + 2}`] : [],
+          connectedFrom: i > 0 ? [`${mapConfig.mapId}_milestone_${i}`] : [],
+          order: i + 1,
+          orderInMap: i + 1,
+          isActive: true,
+        };
+
+        await fetch("/api/journey-milestones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(milestone),
+        });
+      }
+
+      // Create/update map config
+      await fetch("/api/journey-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mapId: mapConfig.mapId,
+          name: mapConfig.name,
+          description: `Navigate through the ${mapConfig.theme} challenges`,
+          defaultStartNode: `${mapConfig.mapId}_milestone_1`,
+          backgroundImage: `/assets/maps/${mapConfig.mapId.replace(/_/g, "-")}.png`,
+          sequenceOrder: placementMapIndex,
+          theme: mapConfig.theme,
+          difficulty: placementMapIndex,
+          estimatedXP: xpBudget,
+          totalMilestones: placedIslands.length,
+          isActive: true,
+        }),
+      });
+
+      toast.success(`Map ${placementMapIndex} saved with ${placedIslands.length} milestones!`);
+      
+      // Ask if user wants to continue to next map
+      if (placementMapIndex < 10) {
+        const continueNext = window.confirm(`Map ${placementMapIndex} saved! Continue to Map ${placementMapIndex + 1}?`);
+        if (continueNext) {
+          initializePlacementForMap(placementMapIndex + 1);
+        } else {
+          setShowPlacementWizard(false);
+          await fetchData();
+        }
+      } else {
+        toast.success("All 10 maps completed!");
+        setShowPlacementWizard(false);
+        await fetchData();
+        await connectMapsInSequence();
+      }
+    } catch (error) {
+      console.error("Error saving placed milestones:", error);
+      toast.error("Failed to save milestones");
+    } finally {
+      setSequenceGenerating(false);
+    }
+  };
+
+  // Generate full sequence manually (without AI)
+  const generateFullSequenceManually = async () => {
+    setSequenceGenerating(true);
+    let totalMilestones = 0;
+    let successfulMaps = 0;
+
+    try {
+      for (let mapIndex = 1; mapIndex <= 10; mapIndex++) {
+        toast.info(`Generating Map ${mapIndex}/10 manually...`);
+        
+        const result = await generateMapManually(mapIndex, true);
+        
+        if (result?.success) {
+          totalMilestones += result.milestones?.length || 0;
+          successfulMaps++;
+        }
+        
+        // Small delay between maps
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      if (successfulMaps > 0) {
+        toast.success(`Manually generated ${totalMilestones} milestones across ${successfulMaps} maps!`);
+        await fetchData();
+        await connectMapsInSequence();
+      }
+    } catch (error) {
+      console.error("Manual generation error:", error);
+      toast.error("Failed to generate sequence manually");
+    } finally {
+      setSequenceGenerating(false);
     }
   };
 
@@ -2130,7 +2478,7 @@ export default function JourneyMapEditorSection() {
             <AlertTriangle className="h-4 w-4 mr-2" />
             Delete All
           </Button>
-          <Button variant="outline" onClick={fetchData}>
+          <Button variant="outline" onClick={() => fetchData()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -2394,17 +2742,90 @@ export default function JourneyMapEditorSection() {
               </Card>
             )}
 
-            {/* Individual Map Generation */}
+            {/* Generation Options */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Wand2 className="h-4 w-4 text-purple-400" />
+                  Generate Full Sequence
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Choose how to generate all 10 maps:
+                </p>
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Visual Placement */}
+                  <div className="border border-slate-700 rounded-lg p-4 hover:border-green-500 transition-colors">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2">
+                      <MousePointer className="h-4 w-4 text-green-400" />
+                      Visual Placement
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Click to place milestones on each map. Full control over positioning.
+                    </p>
+                    <Button
+                      onClick={() => initializePlacementForMap(1)}
+                      disabled={sequenceGenerating}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Place Visually
+                    </Button>
+                  </div>
+
+                  {/* Manual Generation */}
+                  <div className="border border-slate-700 rounded-lg p-4 hover:border-blue-500 transition-colors">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2">
+                      <Settings className="h-4 w-4 text-blue-400" />
+                      Template-Based
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Auto-generated positions with templates. Fast and reliable. ~10 seconds.
+                    </p>
+                    <Button
+                      onClick={generateFullSequenceManually}
+                      disabled={sequenceGenerating}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      {sequenceGenerating ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+                      Auto Generate
+                    </Button>
+                  </div>
+                  
+                  {/* AI Generation */}
+                  <div className="border border-slate-700 rounded-lg p-4 hover:border-purple-500 transition-colors">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2">
+                      <Sparkles className="h-4 w-4 text-purple-400" />
+                      AI-Powered
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      OpenAI generates unique, themed milestones. Creative. ~2-3 minutes.
+                    </p>
+                    <Button
+                      onClick={() => setShowSequenceDialog(true)}
+                      disabled={sequenceGenerating}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    >
+                      {sequenceGenerating ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                      AI Generate
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Individual Map Generation */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Map className="h-4 w-4 text-amber-400" />
                   Generate Individual Map
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Generate milestones for a specific map. Useful for regenerating a single map or generating step-by-step.
+                  Generate a specific map. Click for template-based, or use the AI button for creative generation.
                 </p>
                 <div className="grid grid-cols-5 gap-2">
                   {[
@@ -2419,51 +2840,94 @@ export default function JourneyMapEditorSection() {
                     { order: 9, name: "Celestial Kingdom", color: "#A78BFA" },
                     { order: 10, name: "Hall of Legends", color: "#FBBF24" },
                   ].map((map) => (
-                    <Button
-                      key={map.order}
-                      variant="outline"
-                      size="sm"
-                      className="flex flex-col h-auto py-2 hover:scale-105 transition-transform"
-                      style={{ borderColor: map.color }}
-                      disabled={sequenceGenerating}
-                      onClick={async () => {
-                        setSequenceGenerating(true);
-                        toast.info(`Generating Map ${map.order}: ${map.name}...`);
-                        try {
-                          const res = await fetch("/api/ai/generate-journey", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              action: "generate_single_map",
-                              mapIndex: map.order,
-                              saveToDB: true,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.success) {
-                            toast.success(`Map ${map.order} generated: ${data.milestones?.length || 0} milestones saved!`);
-                            // Refresh data
-                            await fetchData();
-                          } else {
-                            toast.error(data.error || `Failed to generate Map ${map.order}`);
+                    <div key={map.order} className="flex flex-col gap-1">
+                      {/* Template Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col h-auto py-2 hover:scale-105 transition-transform"
+                        style={{ borderColor: map.color }}
+                        disabled={sequenceGenerating}
+                        title="Generate with templates (fast)"
+                        onClick={async () => {
+                          setSequenceGenerating(true);
+                          toast.info(`Generating Map ${map.order}: ${map.name} (templates)...`);
+                          try {
+                            const result = await generateMapManually(map.order, true);
+                            if (result?.success) {
+                              toast.success(`Map ${map.order} generated: ${result.milestones?.length || 0} milestones!`);
+                              await fetchData();
+                            } else {
+                              toast.error(`Failed to generate Map ${map.order}`);
+                            }
+                          } catch (error) {
+                            console.error(`Error generating map ${map.order}:`, error);
+                            toast.error(`Failed to generate Map ${map.order}`);
+                          } finally {
+                            setSequenceGenerating(false);
                           }
-                        } catch (error) {
-                          console.error(`Error generating map ${map.order}:`, error);
-                          toast.error(`Failed to generate Map ${map.order}`);
-                        } finally {
-                          setSequenceGenerating(false);
-                        }
-                      }}
-                    >
-                      <span className="font-bold" style={{ color: map.color }}>{map.order}</span>
-                      <span className="text-[10px] truncate w-full text-center">{map.name}</span>
-                    </Button>
+                        }}
+                      >
+                        <span className="font-bold" style={{ color: map.color }}>{map.order}</span>
+                        <span className="text-[10px] truncate w-full text-center">{map.name}</span>
+                      </Button>
+                      <div className="flex gap-1">
+                        {/* Visual Placement Button (small) */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 flex-1 text-[10px] text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                          disabled={sequenceGenerating}
+                          title="Place milestones visually"
+                          onClick={() => initializePlacementForMap(map.order)}
+                        >
+                          <MapPin className="h-3 w-3" />
+                        </Button>
+                        {/* AI Button (small) */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 flex-1 text-[10px] text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                          disabled={sequenceGenerating}
+                          title="Generate with AI (creative)"
+                          onClick={async () => {
+                            setSequenceGenerating(true);
+                            toast.info(`Generating Map ${map.order}: ${map.name} with AI...`);
+                            try {
+                              const res = await fetch("/api/ai/generate-journey", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  action: "generate_single_map",
+                                  mapIndex: map.order,
+                                  saveToDB: true,
+                                }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                toast.success(`Map ${map.order} AI generated: ${data.milestones?.length || 0} milestones!`);
+                                await fetchData();
+                              } else {
+                                toast.error(data.error || `Failed to AI generate Map ${map.order}`);
+                              }
+                            } catch (error) {
+                              console.error(`Error AI generating map ${map.order}:`, error);
+                              toast.error(`Failed to AI generate Map ${map.order}`);
+                            } finally {
+                              setSequenceGenerating(false);
+                            }
+                          }}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
                 {sequenceGenerating && (
                   <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Generating... This may take up to 30 seconds.
+                    Generating...
                   </div>
                 )}
               </CardContent>
@@ -3558,6 +4022,232 @@ export default function JourneyMapEditorSection() {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Visual Placement Wizard Dialog */}
+      <Dialog open={showPlacementWizard} onOpenChange={setShowPlacementWizard}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-green-500" />
+              Visual Milestone Placement - Map {placementMapIndex}: {PLACEMENT_MAP_CONFIGS[placementMapIndex - 1]?.name || "Unknown"}
+            </DialogTitle>
+            <DialogDescription>
+              Click on the map to place milestones. Place them in order from start to finish.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex gap-4 h-[60vh]">
+            {/* Map Area */}
+            <div className="flex-1 relative bg-slate-900 rounded-lg overflow-hidden">
+              <div 
+                ref={placementMapRef}
+                className={`relative w-full h-full cursor-${placementPlacingMode ? 'crosshair' : 'default'}`}
+                onClick={handlePlacementMapClick}
+              >
+                {/* Map Background */}
+                <Image
+                  src={`/assets/maps/${PLACEMENT_MAP_CONFIGS[placementMapIndex - 1]?.mapId.replace(/_/g, "-") || "pirate-cove"}.png`}
+                  alt={`Map ${placementMapIndex}`}
+                  fill
+                  className="object-cover opacity-80"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/assets/treasure-map.png";
+                  }}
+                />
+                
+                {/* Placed Milestones */}
+                {placementIslands.filter(i => i.isPlaced).map((island, idx) => {
+                  const leftPercent = (island.position.x / 1200) * 100;
+                  const topPercent = (island.position.y / 800) * 100;
+                  return (
+                    <div
+                      key={island.id}
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+                      style={{ left: `${leftPercent}%`, top: `${topPercent}%` }}
+                    >
+                      <div 
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg ${
+                          idx === 0 ? "bg-green-500" : idx === placementIslands.filter(i => i.isPlaced).length - 1 ? "bg-amber-500" : "bg-blue-500"
+                        }`}
+                      >
+                        {island.id}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Connection Lines */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-5">
+                  {placementIslands.filter(i => i.isPlaced).map((island, idx, arr) => {
+                    if (idx === 0) return null;
+                    const prev = arr[idx - 1];
+                    const x1 = (prev.position.x / 1200) * 100;
+                    const y1 = (prev.position.y / 800) * 100;
+                    const x2 = (island.position.x / 1200) * 100;
+                    const y2 = (island.position.y / 800) * 100;
+                    return (
+                      <line
+                        key={`line-${island.id}`}
+                        x1={`${x1}%`}
+                        y1={`${y1}%`}
+                        x2={`${x2}%`}
+                        y2={`${y2}%`}
+                        stroke="rgba(255,255,255,0.5)"
+                        strokeWidth="2"
+                        strokeDasharray="5,5"
+                      />
+                    );
+                  })}
+                </svg>
+                
+                {/* Placing Mode Indicator */}
+                {placementPlacingMode && (
+                  <div className="absolute top-4 left-4 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg animate-pulse">
+                    Click to place Milestone {placementCurrentIsland + 1}: {placementIslands[placementCurrentIsland]?.name}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Sidebar */}
+            <div className="w-72 flex flex-col gap-4">
+              {/* Map Progress */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Map Progress</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    {PLACEMENT_MAP_CONFIGS.map((m, idx) => (
+                      <div
+                        key={m.mapId}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold cursor-pointer transition-transform hover:scale-110 ${
+                          idx + 1 === placementMapIndex ? "ring-2 ring-white" : ""
+                        } ${idx + 1 < placementMapIndex ? "bg-green-500" : idx + 1 === placementMapIndex ? "bg-blue-500" : "bg-slate-700"}`}
+                        style={{ borderColor: m.color, borderWidth: 2 }}
+                        onClick={() => {
+                          if (idx + 1 !== placementMapIndex) {
+                            initializePlacementForMap(idx + 1);
+                          }
+                        }}
+                        title={m.name}
+                      >
+                        {idx + 1}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Map {placementMapIndex} of 10 • {PLACEMENT_MAP_CONFIGS[placementMapIndex - 1]?.theme} theme
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Milestones List */}
+              <Card className="flex-1 overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex justify-between items-center">
+                    <span>Milestones ({placementIslands.filter(i => i.isPlaced).length}/{placementIslands.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-y-auto max-h-[250px]">
+                  <div className="space-y-1">
+                    {placementIslands.map((island, idx) => (
+                      <div 
+                        key={island.id}
+                        className={`text-xs p-2 rounded flex items-center gap-2 ${
+                          island.isPlaced ? "bg-green-500/10 text-green-400" : 
+                          idx === placementCurrentIsland && placementPlacingMode ? "bg-blue-500/20 text-blue-400" : 
+                          "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        <span className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-[10px]">
+                          {island.id}
+                        </span>
+                        <span className="flex-1 truncate">{island.name}</span>
+                        {island.isPlaced && <span className="text-green-400">✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Actions */}
+              <div className="space-y-2">
+                <Button
+                  onClick={() => setPlacementPlacingMode(!placementPlacingMode)}
+                  className={`w-full ${placementPlacingMode ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
+                >
+                  {placementPlacingMode ? (
+                    <>
+                      <X className="h-4 w-4 mr-2" />
+                      Stop Placing
+                    </>
+                  ) : (
+                    <>
+                      <MousePointer className="h-4 w-4 mr-2" />
+                      Start Placing
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setPlacementIslands(prev => prev.map(i => ({ ...i, isPlaced: false, position: { x: 0, y: 0 } })));
+                    setPlacementCurrentIsland(0);
+                    setPlacementPlacingMode(false);
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset Placements
+                </Button>
+                
+                <Button
+                  onClick={savePlacedMilestones}
+                  disabled={placementIslands.filter(i => i.isPlaced).length < 2 || sequenceGenerating}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  {sequenceGenerating ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Map {placementMapIndex}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <div className="flex justify-between w-full">
+              <Button 
+                variant="outline" 
+                onClick={() => placementMapIndex > 1 && initializePlacementForMap(placementMapIndex - 1)}
+                disabled={placementMapIndex <= 1}
+              >
+                Previous Map
+              </Button>
+              <Button variant="outline" onClick={() => setShowPlacementWizard(false)}>
+                Close
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => placementMapIndex < 10 && initializePlacementForMap(placementMapIndex + 1)}
+                disabled={placementMapIndex >= 10}
+              >
+                Next Map
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
