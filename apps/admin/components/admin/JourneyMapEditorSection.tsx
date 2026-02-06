@@ -512,88 +512,280 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Manual (non-AI) milestone generation for a single map using templates
-  const generateMapManually = async (mapIndex: number, saveToDB: boolean = true) => {
-    const MAP_CONFIGS = [
-      { mapId: "pirate_cove", name: "Pirate Cove", theme: "pirate", milestoneCount: 20, startTier: 1, endTier: 2, xpBudget: 150 },
-      { mapId: "space_station", name: "Space Station", theme: "space", milestoneCount: 20, startTier: 1, endTier: 3, xpBudget: 200 },
-      { mapId: "medieval_castle", name: "Medieval Castle", theme: "medieval", milestoneCount: 20, startTier: 2, endTier: 3, xpBudget: 300 },
-      { mapId: "cyber_city", name: "Cyber City", theme: "cyber", milestoneCount: 20, startTier: 2, endTier: 4, xpBudget: 400 },
-      { mapId: "ancient_temple", name: "Ancient Temple", theme: "ancient", milestoneCount: 20, startTier: 3, endTier: 4, xpBudget: 500 },
-      { mapId: "volcanic_island", name: "Volcanic Island", theme: "volcanic", milestoneCount: 20, startTier: 3, endTier: 5, xpBudget: 700 },
-      { mapId: "arctic_fortress", name: "Arctic Fortress", theme: "arctic", milestoneCount: 20, startTier: 4, endTier: 5, xpBudget: 1000 },
-      { mapId: "dragon_realm", name: "Dragon Realm", theme: "dragon", milestoneCount: 20, startTier: 4, endTier: 6, xpBudget: 1500 },
-      { mapId: "celestial_kingdom", name: "Celestial Kingdom", theme: "celestial", milestoneCount: 20, startTier: 5, endTier: 6, xpBudget: 2500 },
-      { mapId: "hall_of_legends", name: "Hall of Legends", theme: "legendary", milestoneCount: 20, startTier: 6, endTier: 7, xpBudget: 5000 },
-    ];
+  // Helper: Fetch cumulative progress from previous maps to ensure smart progression
+  const getCumulativeProgress = async (upToMapIndex: number): Promise<{
+    maxConditionValues: Record<string, number>;
+    totalMilestonesGenerated: number;
+    lastMilestonePerType: Record<string, { mapIndex: number; value: number }>;
+  }> => {
+    const maxConditionValues: Record<string, number> = {};
+    const lastMilestonePerType: Record<string, { mapIndex: number; value: number }> = {};
+    let totalMilestonesGenerated = 0;
 
-    const config = MAP_CONFIGS[mapIndex - 1];
+    // Fetch all milestones from maps 1 to upToMapIndex-1
+    for (let i = 1; i < upToMapIndex; i++) {
+      const mapId = MAP_CONFIGS_SMART[i - 1]?.mapId;
+      if (!mapId) continue;
+
+      try {
+        const res = await fetch(`/api/journey/maps/${mapId}/milestones`);
+        const data = await res.json();
+        
+        if (data.success && data.milestones) {
+          totalMilestonesGenerated += data.milestones.length;
+          
+          data.milestones.forEach((m: any) => {
+            const condType = m.completeCondition?.type;
+            const condValue = m.completeCondition?.value;
+            
+            if (condType && typeof condValue === 'number') {
+              // Track the maximum value used for each condition type
+              if (!maxConditionValues[condType] || condValue > maxConditionValues[condType]) {
+                maxConditionValues[condType] = condValue;
+              }
+              // Track the last milestone using this type
+              lastMilestonePerType[condType] = { mapIndex: i, value: condValue };
+            }
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to fetch milestones for map ${mapId}:`, err);
+      }
+    }
+
+    return { maxConditionValues, totalMilestonesGenerated, lastMilestonePerType };
+  };
+
+  // Smart map configurations with proper progression
+  const MAP_CONFIGS_SMART = [
+    { mapId: "pirate_cove", name: "Pirate Cove", theme: "pirate", milestoneCount: 15, difficulty: 1, xpBudget: 150 },
+    { mapId: "space_station", name: "Space Station", theme: "space", milestoneCount: 15, difficulty: 2, xpBudget: 200 },
+    { mapId: "medieval_castle", name: "Medieval Castle", theme: "medieval", milestoneCount: 15, difficulty: 3, xpBudget: 300 },
+    { mapId: "cyber_city", name: "Cyber City", theme: "cyber", milestoneCount: 15, difficulty: 4, xpBudget: 400 },
+    { mapId: "ancient_temple", name: "Ancient Temple", theme: "ancient", milestoneCount: 15, difficulty: 5, xpBudget: 500 },
+    { mapId: "volcanic_island", name: "Volcanic Island", theme: "volcanic", milestoneCount: 15, difficulty: 6, xpBudget: 700 },
+    { mapId: "arctic_fortress", name: "Arctic Fortress", theme: "arctic", milestoneCount: 15, difficulty: 7, xpBudget: 1000 },
+    { mapId: "dragon_realm", name: "Dragon Realm", theme: "dragon", milestoneCount: 15, difficulty: 8, xpBudget: 1500 },
+    { mapId: "celestial_kingdom", name: "Celestial Kingdom", theme: "celestial", milestoneCount: 15, difficulty: 9, xpBudget: 2500 },
+    { mapId: "hall_of_legends", name: "Hall of Legends", theme: "legendary", milestoneCount: 15, difficulty: 10, xpBudget: 5000 },
+  ];
+
+  // Smart milestone progression templates per map with CUMULATIVE values
+  // Format: { type, baseValue, incrementPerMap, incrementPerMilestone }
+  const SMART_CONDITION_PROGRESSION = [
+    // Map 1: Onboarding (values 1-10)
+    { conditions: [
+      { type: "account_created", value: 1 },
+      { type: "kyc_verified", value: 1 },
+      { type: "first_deposit", value: 1 },
+      { type: "total_trades", baseValue: 1, incrementPerMilestone: 1 }, // 1, 2, 3...
+      { type: "total_trades", baseValue: 5, incrementPerMilestone: 2 }, // 5, 7, 9...
+      { type: "winning_trades", baseValue: 1, incrementPerMilestone: 1 }, // 1, 2, 3...
+    ]},
+    // Map 2: Learning (values 10-25)
+    { conditions: [
+      { type: "total_trades", baseValue: 15, incrementPerMilestone: 3 },
+      { type: "winning_trades", baseValue: 8, incrementPerMilestone: 2 },
+      { type: "win_streak", baseValue: 2, incrementPerMilestone: 1 },
+    ]},
+    // Map 3: Competition Entry (values 25-50)
+    { conditions: [
+      { type: "total_trades", baseValue: 35, incrementPerMilestone: 5 },
+      { type: "winning_trades", baseValue: 18, incrementPerMilestone: 3 },
+      { type: "win_streak", baseValue: 5, incrementPerMilestone: 1 },
+      { type: "competitions_entered", baseValue: 1, incrementPerMilestone: 1 },
+    ]},
+    // Map 4: Growing (values 50-100)
+    { conditions: [
+      { type: "total_trades", baseValue: 60, incrementPerMilestone: 8 },
+      { type: "winning_trades", baseValue: 35, incrementPerMilestone: 5 },
+      { type: "win_streak", baseValue: 8, incrementPerMilestone: 2 },
+      { type: "competitions_entered", baseValue: 5, incrementPerMilestone: 2 },
+      { type: "competitions_completed", baseValue: 1, incrementPerMilestone: 1 },
+    ]},
+    // Map 5: First Podiums (values 100-150)
+    { conditions: [
+      { type: "total_trades", baseValue: 120, incrementPerMilestone: 10 },
+      { type: "winning_trades", baseValue: 70, incrementPerMilestone: 8 },
+      { type: "win_streak", baseValue: 12, incrementPerMilestone: 2 },
+      { type: "competitions_completed", baseValue: 8, incrementPerMilestone: 2 },
+      { type: "podium_finishes", baseValue: 1, incrementPerMilestone: 1 },
+    ]},
+    // Map 6: First Wins (values 150-250)
+    { conditions: [
+      { type: "total_trades", baseValue: 200, incrementPerMilestone: 15 },
+      { type: "winning_trades", baseValue: 120, incrementPerMilestone: 10 },
+      { type: "win_streak", baseValue: 18, incrementPerMilestone: 3 },
+      { type: "podium_finishes", baseValue: 5, incrementPerMilestone: 2 },
+      { type: "first_place_finishes", baseValue: 1, incrementPerMilestone: 1 },
+    ]},
+    // Map 7: Multiple Wins (values 250-400)
+    { conditions: [
+      { type: "total_trades", baseValue: 350, incrementPerMilestone: 20 },
+      { type: "winning_trades", baseValue: 200, incrementPerMilestone: 15 },
+      { type: "win_streak", baseValue: 25, incrementPerMilestone: 3 },
+      { type: "podium_finishes", baseValue: 15, incrementPerMilestone: 3 },
+      { type: "first_place_finishes", baseValue: 5, incrementPerMilestone: 2 },
+    ]},
+    // Map 8: Champion (values 400-600)
+    { conditions: [
+      { type: "total_trades", baseValue: 550, incrementPerMilestone: 25 },
+      { type: "winning_trades", baseValue: 350, incrementPerMilestone: 20 },
+      { type: "win_streak", baseValue: 35, incrementPerMilestone: 4 },
+      { type: "podium_finishes", baseValue: 30, incrementPerMilestone: 5 },
+      { type: "first_place_finishes", baseValue: 15, incrementPerMilestone: 3 },
+    ]},
+    // Map 9: Near Legendary (values 600-1000)
+    { conditions: [
+      { type: "total_trades", baseValue: 800, incrementPerMilestone: 30 },
+      { type: "winning_trades", baseValue: 550, incrementPerMilestone: 25 },
+      { type: "win_streak", baseValue: 50, incrementPerMilestone: 5 },
+      { type: "podium_finishes", baseValue: 50, incrementPerMilestone: 8 },
+      { type: "first_place_finishes", baseValue: 30, incrementPerMilestone: 5 },
+    ]},
+    // Map 10: Legendary (values 1000+)
+    { conditions: [
+      { type: "total_trades", baseValue: 1200, incrementPerMilestone: 50 },
+      { type: "winning_trades", baseValue: 800, incrementPerMilestone: 40 },
+      { type: "win_streak", baseValue: 75, incrementPerMilestone: 10 },
+      { type: "podium_finishes", baseValue: 100, incrementPerMilestone: 15 },
+      { type: "first_place_finishes", baseValue: 60, incrementPerMilestone: 10 },
+    ]},
+  ];
+
+  // Manual (non-AI) milestone generation for a single map using SMART templates
+  const generateMapManually = async (mapIndex: number, saveToDB: boolean = true) => {
+    const config = MAP_CONFIGS_SMART[mapIndex - 1];
     if (!config) {
       toast.error("Invalid map index");
       return null;
     }
 
-    // Get templates for this map's tier range
-    const availableTemplates = MILESTONE_TEMPLATES.filter(
-      t => t.tier >= config.startTier && t.tier <= config.endTier
-    );
+    // Get cumulative progress from previous maps to ensure proper progression
+    const { maxConditionValues, lastMilestonePerType } = await getCumulativeProgress(mapIndex);
+    console.log(`[Smart Gen] Map ${mapIndex}: Previous max values:`, maxConditionValues);
 
-    if (availableTemplates.length < config.milestoneCount) {
-      // Duplicate templates if not enough
-      while (availableTemplates.length < config.milestoneCount) {
-        const template = MILESTONE_TEMPLATES[availableTemplates.length % MILESTONE_TEMPLATES.length];
-        availableTemplates.push({ ...template, tier: config.startTier + Math.floor(availableTemplates.length / 5) });
-      }
-    }
-
-    // Scale XP to fit budget
-    const totalTemplateXP = availableTemplates.slice(0, config.milestoneCount).reduce((sum, t) => sum + t.xp, 0);
-    const xpScale = config.xpBudget / totalTemplateXP;
-
-    // Generate milestones
-    const milestones = availableTemplates.slice(0, config.milestoneCount).map((template, index) => {
+    // Get condition templates for this map
+    const mapConditions = SMART_CONDITION_PROGRESSION[mapIndex - 1]?.conditions || [];
+    
+    // Generate milestones with smart progression
+    const milestones = [];
+    const usedConditions = new Set<string>(); // Track used conditions in THIS map
+    
+    for (let index = 0; index < config.milestoneCount; index++) {
       const progress = index / config.milestoneCount;
       const row = Math.floor(index / 5);
       const col = index % 5;
       
-      // Grid-like positioning with some randomness
+      // Grid-like positioning
       const x = 100 + (col * 200) + (Math.random() * 50 - 25);
       const y = 80 + (row * 150) + (Math.random() * 30 - 15);
 
-      // Scale condition values based on map difficulty
-      const scaledCondition = { ...template.condition };
-      if (scaledCondition.value && typeof scaledCondition.value === 'number') {
-        scaledCondition.value = Math.ceil(scaledCondition.value * (1 + (mapIndex - 1) * 0.3));
+      // Select condition for this milestone
+      let selectedCondition: { type: string; value?: number | string; comparison?: string };
+      
+      // First milestone of each map (except map 1) requires completing previous map
+      if (index === 0 && mapIndex > 1) {
+        selectedCondition = { 
+          type: "map_completed", 
+          value: MAP_CONFIGS_SMART[mapIndex - 2].mapId,
+          comparison: "eq" 
+        };
+      } else if (index === 0 && mapIndex === 1) {
+        // First milestone of first map
+        selectedCondition = { type: "account_created", value: 1, comparison: "eq" };
+      } else {
+        // Smart condition selection - cycle through available conditions ensuring progression
+        const condIndex = (index - 1) % mapConditions.length;
+        const condTemplate = mapConditions[condIndex];
+        
+        if (condTemplate) {
+          // Calculate the value ensuring it's higher than any previous use
+          let value = condTemplate.baseValue || 1;
+          
+          // Add increments based on position in map
+          const incrementPerMilestone = condTemplate.incrementPerMilestone || 1;
+          value += index * incrementPerMilestone;
+          
+          // Ensure this value is higher than any previous use of this condition type
+          const previousMax = maxConditionValues[condTemplate.type] || 0;
+          if (value <= previousMax) {
+            value = previousMax + incrementPerMilestone;
+          }
+          
+          // Make sure we haven't used this exact condition in this map
+          const condKey = `${condTemplate.type}:${value}`;
+          while (usedConditions.has(condKey)) {
+            value += incrementPerMilestone;
+          }
+          usedConditions.add(`${condTemplate.type}:${value}`);
+          
+          // Update our tracking
+          maxConditionValues[condTemplate.type] = Math.max(maxConditionValues[condTemplate.type] || 0, value);
+          
+          selectedCondition = {
+            type: condTemplate.type,
+            value: value,
+            comparison: "gte"
+          };
+        } else {
+          // Fallback
+          selectedCondition = { type: "total_trades", value: 5 + index * 5, comparison: "gte" };
+        }
       }
 
-      return {
-        id: `${config.mapId}_milestone_${index + 1}`,
+      // Calculate XP based on map position and milestone position
+      const baseXP = 5 + (mapIndex * 3) + (index * 2);
+      
+      // Theme-appropriate naming
+      const themeNames: Record<string, string[]> = {
+        pirate: ["Set Sail", "Treasure Hunter", "Sea Dog", "Buccaneer", "Captain", "Admiral", "Pirate Legend"],
+        space: ["Launch", "Orbit", "Galaxy Explorer", "Cosmic", "Stellar", "Nebula Master", "Space Commander"],
+        medieval: ["Squire", "Knight", "Baron", "Duke", "Lord", "King", "Royal Legend"],
+        cyber: ["Boot Up", "Connected", "Encrypted", "Hacker", "Digital Master", "Cyber Lord", "Neural God"],
+        ancient: ["Initiate", "Seeker", "Oracle", "Sage", "High Priest", "Pharaoh", "Eternal One"],
+        volcanic: ["Ember", "Flame", "Inferno", "Lava Walker", "Fire Lord", "Volcano King", "Magma God"],
+        arctic: ["Frost", "Blizzard", "Ice Walker", "Glacier", "Frost King", "Ice Emperor", "Arctic Legend"],
+        dragon: ["Hatchling", "Drake", "Dragon Rider", "Dragon Slayer", "Dragon Lord", "Dragon King", "Dragon God"],
+        celestial: ["Starborn", "Lunar", "Solar", "Celestial", "Divine", "Titan", "Cosmic Entity"],
+        legendary: ["Legend Born", "Myth Maker", "Icon", "Immortal", "Eternal", "Transcendent", "Trading God"],
+      };
+      
+      const names = themeNames[config.theme] || themeNames.pirate;
+      const nameIndex = Math.min(Math.floor((index / config.milestoneCount) * names.length), names.length - 1);
+      const milestone = {
+        id: `${config.mapId}_m${index + 1}`,
         mapId: config.mapId,
-        name: `${config.theme.charAt(0).toUpperCase() + config.theme.slice(1)} ${template.name}`,
-        description: template.desc,
-        shortDescription: template.desc.slice(0, 50),
+        name: `${names[nameIndex]} ${index + 1}`,
+        description: `Complete: ${selectedCondition.type.replace(/_/g, ' ')} ${selectedCondition.value || ''}`,
+        shortDescription: `${selectedCondition.type.replace(/_/g, ' ')}`,
         zoneId: `zone_${Math.floor(progress * 4) + 1}`,
         position: { x: Math.round(x), y: Math.round(y) },
         nodeType: index === 0 ? "start" : index === config.milestoneCount - 1 ? "legendary" : "milestone",
         icon: "target",
         color: index === 0 ? "#22C55E" : index === config.milestoneCount - 1 ? "#F59E0B" : "#3B82F6",
         size: index === config.milestoneCount - 1 ? "large" : "medium",
-        unlockCondition: index === 0 && mapIndex > 1 
-          ? { type: "map_completed", value: MAP_CONFIGS[mapIndex - 2].mapId }
-          : index > 0 
-          ? { type: "milestone_complete", milestoneId: `${config.mapId}_milestone_${index}` }
+        unlockCondition: index > 0 
+          ? { type: "milestone_complete", milestoneId: `${config.mapId}_m${index}` }
+          : mapIndex > 1 
+          ? { type: "map_completed", value: MAP_CONFIGS_SMART[mapIndex - 2].mapId }
           : undefined,
-        completeCondition: scaledCondition,
-        rewards: { xp: Math.round(template.xp * xpScale) },
-        connectedTo: index < config.milestoneCount - 1 ? [`${config.mapId}_milestone_${index + 2}`] : [],
-        connectedFrom: index > 0 ? [`${config.mapId}_milestone_${index}`] : [],
+        completeCondition: selectedCondition,
+        rewards: { xp: baseXP },
+        connectedTo: index < config.milestoneCount - 1 ? [`${config.mapId}_m${index + 2}`] : [],
+        connectedFrom: index > 0 ? [`${config.mapId}_m${index}`] : [],
         isRequired: true,
-        isAutoComplete: template.condition.type === "account_created",
+        isAutoComplete: selectedCondition.type === "account_created",
         order: index + 1,
         orderInMap: index + 1,
         isActive: true,
       };
-    });
+      
+      milestones.push(milestone);
+    }
+    
+    console.log(`[Smart Gen] Generated ${milestones.length} milestones for ${config.name}`);
+    console.log(`[Smart Gen] Final max values after Map ${mapIndex}:`, maxConditionValues);
 
     // Save to database if requested
     if (saveToDB) {
@@ -624,12 +816,12 @@ export default function JourneyMapEditorSection() {
               { id: "zone_3", name: "Advanced Area", order: 3, color: "#F59E0B" },
               { id: "zone_4", name: "Final Stretch", order: 4, color: "#EF4444" },
             ],
-            defaultStartNode: `${config.mapId}_milestone_1`,
+            defaultStartNode: `${config.mapId}_m1`,
             backgroundColor: "#1a3a5c",
             backgroundImage: `/assets/maps/${config.mapId.replace(/_/g, "-")}.png`,
             sequenceOrder: mapIndex,
             theme: config.theme,
-            difficulty: mapIndex,
+            difficulty: config.difficulty,
             estimatedXP: config.xpBudget,
             totalMilestones: config.milestoneCount,
             isActive: true,

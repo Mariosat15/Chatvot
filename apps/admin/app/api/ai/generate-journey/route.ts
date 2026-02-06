@@ -422,6 +422,35 @@ Analyze and return JSON with:
           );
         }
 
+        // SMART: Fetch milestones from ALL previous maps to ensure progression
+        const previousMapsProgress: { type: string; maxValue: number }[] = [];
+        let cumulativeMaxValues: Record<string, number> = {};
+        
+        for (let i = 1; i < mapOrder; i++) {
+          const prevMapId = MAP_SEQUENCE[i - 1]?.mapId;
+          if (prevMapId) {
+            const prevMilestones = await JourneyMilestone.find({ mapId: prevMapId, isActive: true })
+              .sort({ order: 1 })
+              .lean();
+            
+            prevMilestones.forEach((m: any) => {
+              const condType = m.completeCondition?.type;
+              const condValue = m.completeCondition?.value;
+              
+              if (condType && typeof condValue === 'number') {
+                if (!cumulativeMaxValues[condType] || condValue > cumulativeMaxValues[condType]) {
+                  cumulativeMaxValues[condType] = condValue;
+                }
+              }
+            });
+          }
+        }
+        
+        // Convert to array for the prompt
+        Object.entries(cumulativeMaxValues).forEach(([type, maxValue]) => {
+          previousMapsProgress.push({ type, maxValue });
+        });
+
         const budget = xpBudget || mapConfig.xpBudget;
         const milestoneCount = mapConfig.milestoneCount;
 
@@ -436,11 +465,30 @@ REQUIRED LEVEL TO START: ${mapConfig.requiredLevelToStart}
 ${sequenceOrder > 1 ? `PREREQUISITE: Player must complete Map ${sequenceOrder - 1} first
 First milestone should require: { type: "map_completed", milestoneId: "${MAP_SEQUENCE[sequenceOrder - 2]?.mapId}" }` : ''}
 
+CRITICAL - PREVIOUS MAPS' MAXIMUM VALUES (your new milestones MUST have HIGHER values):
+${previousMapsProgress.length > 0 
+  ? previousMapsProgress.map(p => `- ${p.type}: ${p.maxValue} (your values must be HIGHER)`).join('\n')
+  : '- No previous maps (this is Map 1, start from low values)'}
+
+PROGRESSION REQUIREMENTS:
+1. ALL numeric values MUST be STRICTLY HIGHER than the previous maps' maximums shown above
+2. For example, if previous max "total_trades" was 50, your FIRST milestone using "total_trades" must be at least 55+
+3. Each subsequent milestone in THIS map must also be higher than the previous one
+4. NEVER create a milestone with a lower value than what was already achieved in previous maps
+
+SUGGESTED VALUE RANGES FOR MAP ${mapOrder}:
+${mapOrder === 1 ? '- total_trades: 1-15, winning_trades: 1-8, win_streak: 1-3' : ''}
+${mapOrder === 2 ? '- total_trades: 15-35, winning_trades: 8-20, win_streak: 3-6' : ''}
+${mapOrder === 3 ? '- total_trades: 35-60, winning_trades: 20-40, win_streak: 6-10, competitions_entered: 1-5' : ''}
+${mapOrder === 4 ? '- total_trades: 60-100, winning_trades: 40-70, win_streak: 10-15, competitions_completed: 1-10' : ''}
+${mapOrder === 5 ? '- total_trades: 100-150, winning_trades: 70-100, win_streak: 15-20, podium_finishes: 1-5' : ''}
+${mapOrder >= 6 ? '- Continue the progression, values should be ${mapOrder * 50}+ for trades, wins proportional' : ''}
+
 IMPORTANT:
 - Use ${mapConfig.theme}-themed names throughout
-- Start easy, end with a legendary milestone
+- Start with the lowest values in the suggested range, end with highest
 - Total XP must not exceed ${budget}
-- Each milestone progressively harder than previous
+- Each milestone MUST be progressively harder than previous
 - Include a mix of: trades, wins, win streaks${sequenceOrder >= 3 ? ', competitions' : ''}${sequenceOrder >= 5 ? ', podium finishes' : ''}${sequenceOrder >= 6 ? ', competition wins' : ''}
 
 Generate exactly ${milestoneCount} milestones.`;
