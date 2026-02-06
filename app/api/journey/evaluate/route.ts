@@ -3,7 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
-import User from "@/database/models/user.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
@@ -25,16 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user data
-    const user = await User.findById(userId).lean();
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    // Gather user's actual stats
+    // Gather user's actual stats (this also validates the user exists via wallet/trades)
     const userStats = await getUserStats(userId);
     console.log(`[Journey Evaluate] User ${userId} stats:`, userStats);
 
@@ -159,21 +150,25 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
   };
 
   try {
-    // Get user for KYC status
-    const user = await User.findById(userId).lean() as any;
-    if (user) {
-      stats.kyc_verified = user.kycVerified === true || user.kycStatus === "verified";
+    // Get wallet for KYC status and deposit info
+    const wallet = await CreditWallet.findOne({ userId }).lean() as any;
+    if (wallet) {
+      stats.kyc_verified = wallet.kycVerified === true || wallet.kycStatus === "approved" || wallet.kycStatus === "verified";
+      stats.first_deposit = (wallet.totalDeposited || 0) > 0;
+      stats.total_deposits = wallet.totalDeposited || 0;
+      stats.first_withdrawal = (wallet.totalWithdrawn || 0) > 0;
     }
 
-    // Get wallet transactions for deposits
+    // Get wallet transactions for more detailed deposit tracking
     const deposits = await WalletTransaction.find({ 
       userId, 
       type: "deposit",
       status: "completed"
     }).lean();
-    stats.first_deposit = deposits.length > 0;
-    stats.total_deposits = deposits.length;
-    stats.deposit_amount = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+    if (deposits.length > 0) {
+      stats.first_deposit = true;
+      stats.deposit_amount = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+    }
 
     // Get trades from trade history
     const trades = await TradeHistory.find({ userId }).lean() as any[];
