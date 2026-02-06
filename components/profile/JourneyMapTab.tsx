@@ -219,18 +219,20 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     fetchJourneyData();
   }, [fetchJourneyData]);
 
-  // Handle map navigation
+  // Handle map navigation - allow viewing all maps for reference
   const handleNavigateMap = (direction: "prev" | "next" | number) => {
     const userCurrentMapIndex = progress?.currentMapIndex || 1;
     
     if (typeof direction === "number") {
       if (direction >= 1 && direction <= maps.length) {
-        // Check if map is unlocked (user can view any map they've reached or the first)
-        if (direction <= userCurrentMapIndex || direction === 1) {
-          setCurrentMapIndex(direction);
-          loadMapData(direction);
-        } else {
-          toast.error("Complete the previous map to unlock this one!");
+        // Allow viewing any map for reference
+        setCurrentMapIndex(direction);
+        loadMapData(direction);
+        
+        // Show info toast for locked maps
+        if (direction > userCurrentMapIndex && direction !== 1) {
+          const map = maps.find(m => m.sequenceOrder === direction);
+          toast.info(`Previewing "${map?.name || 'Map ' + direction}" - Complete previous maps to unlock!`);
         }
       }
     } else if (direction === "prev" && currentMapIndex > 1) {
@@ -239,11 +241,13 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       loadMapData(newIndex);
     } else if (direction === "next" && currentMapIndex < maps.length) {
       const newIndex = currentMapIndex + 1;
-      if (newIndex <= userCurrentMapIndex) {
-        setCurrentMapIndex(newIndex);
-        loadMapData(newIndex);
-      } else {
-        toast.error("Complete this map first!");
+      setCurrentMapIndex(newIndex);
+      loadMapData(newIndex);
+      
+      // Show info toast for locked maps
+      if (newIndex > userCurrentMapIndex) {
+        const map = maps.find(m => m.sequenceOrder === newIndex);
+        toast.info(`Previewing "${map?.name || 'Map ' + newIndex}" - Complete previous maps to unlock!`);
       }
     }
   };
@@ -429,7 +433,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         </motion.div>
       </div>
 
-      {/* Map Selector - Gamified */}
+      {/* Map Selector - Gamified with Arrow Navigation */}
       {maps.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -443,84 +447,133 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                 <span className="text-sm font-medium text-amber-500">Select Your Voyage</span>
                 <div className="flex-1 h-px bg-gradient-to-r from-amber-500/50 to-transparent" />
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-amber-500/20">
-                {maps.map((map) => {
-                  const userMapIndex = progress?.currentMapIndex || 1;
-                  const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
-                  const isComplete = map.sequenceOrder < userMapIndex;
-                  const isCurrent = map.sequenceOrder === currentMapIndex;
-                  
-                  // Theme colors for each map
-                  const themeColors: Record<string, { bg: string; border: string; text: string }> = {
-                    pirate: { bg: "from-amber-600 to-orange-700", border: "border-amber-500", text: "text-amber-200" },
-                    space: { bg: "from-purple-600 to-indigo-700", border: "border-purple-500", text: "text-purple-200" },
-                    medieval: { bg: "from-red-600 to-rose-700", border: "border-red-500", text: "text-red-200" },
-                    cyber: { bg: "from-cyan-500 to-blue-600", border: "border-cyan-400", text: "text-cyan-200" },
-                    ancient: { bg: "from-yellow-600 to-amber-700", border: "border-yellow-500", text: "text-yellow-200" },
-                    volcanic: { bg: "from-red-600 to-orange-700", border: "border-red-500", text: "text-orange-200" },
-                    arctic: { bg: "from-blue-400 to-cyan-600", border: "border-blue-400", text: "text-blue-200" },
-                    dragon: { bg: "from-orange-500 to-red-600", border: "border-orange-500", text: "text-orange-200" },
-                    celestial: { bg: "from-violet-500 to-purple-600", border: "border-violet-400", text: "text-violet-200" },
-                    legendary: { bg: "from-yellow-400 to-amber-500", border: "border-yellow-400", text: "text-yellow-100" },
-                  };
-                  
-                  const colors = themeColors[map.theme] || themeColors.pirate;
+              
+              {/* Arrow Navigation Container */}
+              <div className="flex items-center gap-2">
+                {/* Left Arrow */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const container = document.getElementById('map-selector-container');
+                    if (container) container.scrollBy({ left: -220, behavior: 'smooth' });
+                  }}
+                  className="shrink-0 h-10 w-10 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
+                >
+                  <ChevronLeft className="h-5 w-5 text-amber-400" />
+                </Button>
+                
+                {/* Maps Container - Hidden Scrollbar */}
+                <div 
+                  id="map-selector-container"
+                  className="flex gap-3 overflow-x-auto scrollbar-hide"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {maps.map((map) => {
+                    const userMapIndex = progress?.currentMapIndex || 1;
+                    const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
+                    const isComplete = map.sequenceOrder < userMapIndex;
+                    const isCurrent = map.sequenceOrder === currentMapIndex;
+                    const isViewing = map.sequenceOrder === currentMapIndex;
+                    
+                    // Theme colors for each map
+                    const themeColors: Record<string, { bg: string; border: string; text: string }> = {
+                      pirate: { bg: "from-amber-600 to-orange-700", border: "border-amber-500", text: "text-amber-200" },
+                      space: { bg: "from-purple-600 to-indigo-700", border: "border-purple-500", text: "text-purple-200" },
+                      medieval: { bg: "from-red-600 to-rose-700", border: "border-red-500", text: "text-red-200" },
+                      cyber: { bg: "from-cyan-500 to-blue-600", border: "border-cyan-400", text: "text-cyan-200" },
+                      ancient: { bg: "from-yellow-600 to-amber-700", border: "border-yellow-500", text: "text-yellow-200" },
+                      volcanic: { bg: "from-red-600 to-orange-700", border: "border-red-500", text: "text-orange-200" },
+                      arctic: { bg: "from-blue-400 to-cyan-600", border: "border-blue-400", text: "text-blue-200" },
+                      dragon: { bg: "from-orange-500 to-red-600", border: "border-orange-500", text: "text-orange-200" },
+                      celestial: { bg: "from-violet-500 to-purple-600", border: "border-violet-400", text: "text-violet-200" },
+                      legendary: { bg: "from-yellow-400 to-amber-500", border: "border-yellow-400", text: "text-yellow-100" },
+                    };
+                    
+                    const colors = themeColors[map.theme] || themeColors.pirate;
 
-                  return (
-                    <motion.button
-                      key={map.mapId}
-                      onClick={() => handleNavigateMap(map.sequenceOrder)}
-                      disabled={!isUnlocked}
-                      whileHover={isUnlocked ? { scale: 1.05, y: -2 } : {}}
-                      whileTap={isUnlocked ? { scale: 0.98 } : {}}
-                      className={`relative flex flex-col items-center min-w-[100px] p-3 rounded-xl border-2 transition-all ${
-                        isCurrent 
-                          ? `bg-gradient-to-b ${colors.bg} ${colors.border} shadow-lg shadow-amber-500/20` 
-                          : isComplete
-                          ? "bg-green-900/30 border-green-500/50"
-                          : isUnlocked
-                          ? "bg-slate-800/50 border-slate-600 hover:border-amber-500/50"
-                          : "bg-slate-900/50 border-slate-700 opacity-50 cursor-not-allowed"
-                      }`}
-                    >
-                      {/* Map Number Badge */}
-                      <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isComplete ? "bg-green-500 text-white" : isCurrent ? "bg-amber-500 text-black" : "bg-slate-700 text-slate-300"
-                      }`}>
-                        {map.sequenceOrder}
-                      </div>
-                      
-                      {/* Status Icon */}
-                      <div className="mb-1">
-                        {!isUnlocked && <Lock className="h-5 w-5 text-slate-500" />}
-                        {isComplete && <Star className="h-5 w-5 text-green-400 fill-green-400" />}
-                        {isCurrent && !isComplete && <Compass className="h-5 w-5 text-amber-300 animate-pulse" />}
-                        {isUnlocked && !isCurrent && !isComplete && <Map className="h-5 w-5 text-slate-400" />}
-                      </div>
-                      
-                      {/* Map Name */}
-                      <span className={`text-xs font-medium text-center leading-tight ${
-                        isCurrent ? colors.text : isComplete ? "text-green-300" : "text-slate-300"
-                      }`}>
-                        {map.name}
-                      </span>
-                      
-                      {/* Difficulty Dots */}
-                      <div className="flex gap-0.5 mt-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              i < Math.ceil(map.difficulty / 2) 
-                                ? isCurrent ? "bg-amber-300" : "bg-amber-500/60"
-                                : "bg-slate-600"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </motion.button>
-                  );
-                })}
+                    return (
+                      <motion.button
+                        key={map.mapId}
+                        onClick={() => {
+                          // Allow viewing any map for reference, but show lock status
+                          setCurrentMapIndex(map.sequenceOrder);
+                          loadMapData(map.sequenceOrder);
+                          if (!isUnlocked) {
+                            toast.info(`Map "${map.name}" is locked. Complete previous maps to unlock!`);
+                          }
+                        }}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`relative flex flex-col items-center min-w-[100px] p-3 rounded-xl border-2 transition-all ${
+                          isViewing 
+                            ? `bg-gradient-to-b ${colors.bg} ${colors.border} shadow-lg shadow-amber-500/20` 
+                            : isComplete
+                            ? "bg-green-900/30 border-green-500/50 hover:border-green-400"
+                            : isUnlocked
+                            ? "bg-slate-800/50 border-slate-600 hover:border-amber-500/50"
+                            : "bg-slate-900/50 border-slate-700/50 hover:border-slate-500 opacity-70"
+                        }`}
+                      >
+                        {/* Map Number Badge */}
+                        <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          isComplete ? "bg-green-500 text-white" : isViewing ? "bg-amber-500 text-black" : isUnlocked ? "bg-slate-600 text-slate-200" : "bg-slate-800 text-slate-400"
+                        }`}>
+                          {map.sequenceOrder}
+                        </div>
+                        
+                        {/* Lock Badge for Locked Maps */}
+                        {!isUnlocked && (
+                          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center border border-slate-500">
+                            <Lock className="h-3 w-3 text-slate-400" />
+                          </div>
+                        )}
+                        
+                        {/* Status Icon */}
+                        <div className="mb-1">
+                          {!isUnlocked && <Lock className="h-5 w-5 text-slate-500" />}
+                          {isComplete && <Star className="h-5 w-5 text-green-400 fill-green-400" />}
+                          {isViewing && !isComplete && isUnlocked && <Compass className="h-5 w-5 text-amber-300 animate-pulse" />}
+                          {isUnlocked && !isViewing && !isComplete && <Map className="h-5 w-5 text-slate-400" />}
+                        </div>
+                        
+                        {/* Map Name */}
+                        <span className={`text-xs font-medium text-center leading-tight ${
+                          isViewing ? colors.text : isComplete ? "text-green-300" : isUnlocked ? "text-slate-300" : "text-slate-500"
+                        }`}>
+                          {map.name}
+                        </span>
+                        
+                        {/* Difficulty Dots */}
+                        <div className="flex gap-0.5 mt-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                i < Math.ceil(map.difficulty / 2) 
+                                  ? isViewing ? "bg-amber-300" : isUnlocked ? "bg-amber-500/60" : "bg-slate-600"
+                                  : "bg-slate-700"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+                
+                {/* Right Arrow */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const container = document.getElementById('map-selector-container');
+                    if (container) container.scrollBy({ left: 220, behavior: 'smooth' });
+                  }}
+                  className="shrink-0 h-10 w-10 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
+                >
+                  <ChevronRight className="h-5 w-5 text-amber-400" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -528,31 +581,51 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       )}
 
       {/* Current Map Info - Enhanced */}
-      {currentMapConfig && (
+      {currentMapConfig && (() => {
+        const userMapIndex = progress?.currentMapIndex || 1;
+        const isMapLocked = currentMapIndex > userMapIndex && currentMapIndex !== 1;
+        
+        return (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
         >
-          <Card className="border-2 border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/20 overflow-hidden">
+          <Card className={`border-2 overflow-hidden ${
+            isMapLocked 
+              ? "border-slate-500/30 bg-gradient-to-r from-slate-900/50 via-slate-800/50 to-slate-900/50" 
+              : "border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/20"
+          }`}>
             <CardContent className="py-4 relative">
               {/* Decorative Elements */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl" />
+              <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl ${isMapLocked ? "bg-slate-500/5" : "bg-amber-500/5"}`} />
+              <div className={`absolute bottom-0 left-0 w-24 h-24 rounded-full blur-2xl ${isMapLocked ? "bg-slate-500/5" : "bg-orange-500/5"}`} />
               
-              <div className="flex items-center justify-between relative">
+              {/* Locked Map Banner */}
+              {isMapLocked && (
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-slate-700/90 via-slate-600/90 to-slate-700/90 py-1.5 px-4 flex items-center justify-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-slate-300" />
+                  <span className="text-xs font-medium text-slate-200">Preview Mode - Complete previous maps to unlock</span>
+                </div>
+              )}
+              
+              <div className={`flex items-center justify-between relative ${isMapLocked ? "mt-6" : ""}`}>
                 <div className="flex items-center gap-4">
                   <motion.div 
-                    className="w-16 h-16 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500/30 to-orange-600/30 border border-amber-500/30"
-                    animate={{ rotate: [0, 5, -5, 0] }}
+                    className={`w-16 h-16 rounded-xl flex items-center justify-center border ${
+                      isMapLocked 
+                        ? "bg-gradient-to-br from-slate-600/30 to-slate-700/30 border-slate-500/30" 
+                        : "bg-gradient-to-br from-amber-500/30 to-orange-600/30 border-amber-500/30"
+                    }`}
+                    animate={{ rotate: isMapLocked ? [0] : [0, 5, -5, 0] }}
                     transition={{ duration: 4, repeat: Infinity }}
                   >
-                    <span className="text-3xl">🗺️</span>
+                    <span className="text-3xl">{isMapLocked ? "🔒" : "🗺️"}</span>
                   </motion.div>
                   <div>
-                    <div className="font-bold text-xl text-amber-100">{currentMapConfig.name}</div>
+                    <div className={`font-bold text-xl ${isMapLocked ? "text-slate-300" : "text-amber-100"}`}>{currentMapConfig.name}</div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="capitalize border-amber-500/50 text-amber-300">
+                      <Badge variant="outline" className={`capitalize ${isMapLocked ? "border-slate-500/50 text-slate-400" : "border-amber-500/50 text-amber-300"}`}>
                         {currentMapConfig.theme}
                       </Badge>
                       <div className="flex items-center gap-1">
@@ -627,7 +700,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                       variant="outline"
                       size="icon"
                       onClick={() => handleNavigateMap("next")}
-                      disabled={currentMapIndex >= maps.length || currentMapIndex >= (progress?.currentMapIndex || 1)}
+                      disabled={currentMapIndex >= maps.length}
                       className="border-amber-500/30 hover:bg-amber-500/20"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -638,7 +711,8 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
             </CardContent>
           </Card>
         </motion.div>
-      )}
+        );
+      })()}
 
       {/* Journey Map */}
       <motion.div
