@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Journey Validator Service
  * 

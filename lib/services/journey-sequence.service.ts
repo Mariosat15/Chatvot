@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Journey Sequence Service
  * 
