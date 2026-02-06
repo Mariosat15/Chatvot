@@ -172,6 +172,29 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     }
   }, [userId]);
 
+  // Auto-evaluate user's progress and complete milestones they've already achieved
+  const evaluateProgress = useCallback(async () => {
+    try {
+      const res = await fetch("/api/journey/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        if (data.newlyCompleted?.length > 0) {
+          toast.success(`Auto-completed ${data.newlyCompleted.length} milestones! +${data.totalXPEarned} XP`);
+          console.log("[Journey] Auto-completed milestones:", data.newlyCompleted);
+        }
+        // Refresh progress after evaluation
+        await fetchProgress();
+      }
+    } catch (err) {
+      console.error("Error evaluating progress:", err);
+    }
+  }, [userId, fetchProgress]);
+
   // Load all journey data
   const fetchJourneyData = useCallback(async () => {
     setLoading(true);
@@ -179,7 +202,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
 
     try {
       // Fetch maps, progress, and user level in parallel
-      const [mapsData, progressData] = await Promise.all([
+      const [mapsData] = await Promise.all([
         fetchMapsSequence(),
         fetchProgress(),
         fetchUserLevel(),
@@ -189,6 +212,9 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         setError("No journey maps found. Please ask an admin to generate the journey.");
         return;
       }
+
+      // Auto-evaluate user's progress to complete milestones they've already achieved
+      await evaluateProgress();
 
       // Default to showing overview (0) on initial load
       // This lets users see the welcome screen first
@@ -203,7 +229,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [fetchMapsSequence, fetchProgress, fetchUserLevel]);
+  }, [fetchMapsSequence, fetchProgress, fetchUserLevel, evaluateProgress]);
 
   // Load milestones when map changes
   const loadMapData = useCallback(async (mapIndex: number) => {
