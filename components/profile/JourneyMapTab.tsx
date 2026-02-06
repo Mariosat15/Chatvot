@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Map, Target, Trophy, Star, Compass, Sparkles, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { RefreshCw, Map, Target, Trophy, Star, Compass, Sparkles, ChevronLeft, ChevronRight, Lock, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface JourneyProgress {
   userId: string;
@@ -48,15 +49,31 @@ interface JourneyMapTabProps {
   userId: string;
 }
 
+// Special overview "map" for Trader's Journey intro
+const TRADERS_JOURNEY_OVERVIEW = {
+  mapId: "traders_journey_overview",
+  name: "Trader's Journey",
+  description: "Welcome to your trading adventure! This overview shows all the lands you'll explore on your path to becoming a legendary trader.",
+  theme: "overview",
+  sequenceOrder: 0,
+  difficulty: 0,
+  estimatedXP: 0,
+  zones: [],
+  backgroundColor: "#1a1a2e",
+  backgroundImage: "/assets/maps/traders-journey-overview.png",
+  isOverview: true,
+};
+
 export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapData[]>([]);
-  const [currentMapIndex, setCurrentMapIndex] = useState(1);
+  const [currentMapIndex, setCurrentMapIndex] = useState(0); // Start at overview (0)
   const [currentMapConfig, setCurrentMapConfig] = useState<MapConfig | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [progress, setProgress] = useState<JourneyProgress | null>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
+  const [showingOverview, setShowingOverview] = useState(true); // Track if showing overview
 
   // Fetch all maps in sequence
   const fetchMapsSequence = useCallback(async () => {
@@ -224,28 +241,45 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
     const userCurrentMapIndex = progress?.currentMapIndex || 1;
     
     if (typeof direction === "number") {
-      if (direction >= 1 && direction <= maps.length) {
-        // Allow viewing any map for reference
+      // 0 = overview, 1-10 = actual maps
+      if (direction >= 0 && direction <= maps.length) {
         setCurrentMapIndex(direction);
-        loadMapData(direction);
         
-        // Show info toast for locked maps
-        if (direction > userCurrentMapIndex && direction !== 1) {
-          const map = maps.find(m => m.sequenceOrder === direction);
-          toast.info(`Previewing "${map?.name || 'Map ' + direction}" - Complete previous maps to unlock!`);
+        if (direction === 0) {
+          // Show overview
+          setShowingOverview(true);
+          setMilestones([]);
+        } else {
+          // Show actual map
+          setShowingOverview(false);
+          loadMapData(direction);
+          
+          // Show info toast for locked maps (maps 2+ need previous completed)
+          if (direction > userCurrentMapIndex && direction > 1) {
+            const map = maps.find(m => m.sequenceOrder === direction);
+            toast.info(`Previewing "${map?.name || 'Map ' + direction}" - Complete previous maps to unlock!`);
+          }
         }
       }
-    } else if (direction === "prev" && currentMapIndex > 1) {
+    } else if (direction === "prev" && currentMapIndex > 0) {
       const newIndex = currentMapIndex - 1;
       setCurrentMapIndex(newIndex);
-      loadMapData(newIndex);
+      
+      if (newIndex === 0) {
+        setShowingOverview(true);
+        setMilestones([]);
+      } else {
+        setShowingOverview(false);
+        loadMapData(newIndex);
+      }
     } else if (direction === "next" && currentMapIndex < maps.length) {
       const newIndex = currentMapIndex + 1;
       setCurrentMapIndex(newIndex);
+      setShowingOverview(false);
       loadMapData(newIndex);
       
       // Show info toast for locked maps
-      if (newIndex > userCurrentMapIndex) {
+      if (newIndex > userCurrentMapIndex && newIndex > 1) {
         const map = maps.find(m => m.sequenceOrder === newIndex);
         toast.info(`Previewing "${map?.name || 'Map ' + newIndex}" - Complete previous maps to unlock!`);
       }
@@ -441,39 +475,71 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
           transition={{ delay: 0.5 }}
         >
           <Card className="bg-gradient-to-r from-slate-900/50 via-amber-950/20 to-slate-900/50 border-amber-500/20">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3 mb-3">
+            <CardContent className="py-5">
+              <div className="flex items-center gap-3 mb-4">
                 <Compass className="h-5 w-5 text-amber-500" />
                 <span className="text-sm font-medium text-amber-500">Select Your Voyage</span>
                 <div className="flex-1 h-px bg-gradient-to-r from-amber-500/50 to-transparent" />
               </div>
               
               {/* Arrow Navigation Container */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {/* Left Arrow */}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => {
                     const container = document.getElementById('map-selector-container');
-                    if (container) container.scrollBy({ left: -220, behavior: 'smooth' });
+                    if (container) container.scrollBy({ left: -240, behavior: 'smooth' });
                   }}
-                  className="shrink-0 h-10 w-10 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
+                  className="shrink-0 h-12 w-12 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
                 >
-                  <ChevronLeft className="h-5 w-5 text-amber-400" />
+                  <ChevronLeft className="h-6 w-6 text-amber-400" />
                 </Button>
                 
                 {/* Maps Container - Hidden Scrollbar */}
                 <div 
                   id="map-selector-container"
-                  className="flex gap-3 overflow-x-auto scrollbar-hide"
+                  className="flex gap-3 overflow-x-auto scrollbar-hide py-2"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
+                  {/* Overview Tab - Trader's Journey */}
+                  <motion.button
+                    onClick={() => handleNavigateMap(0)}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative flex flex-col items-center min-w-[115px] h-[100px] p-4 rounded-xl border-2 transition-all justify-center ${
+                      currentMapIndex === 0 
+                        ? "bg-gradient-to-b from-amber-600 to-orange-700 border-amber-500 shadow-lg shadow-amber-500/20" 
+                        : "bg-slate-800/50 border-slate-600 hover:border-amber-500/50"
+                    }`}
+                  >
+                    {/* Info Badge */}
+                    <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center ${
+                      currentMapIndex === 0 ? "bg-amber-500" : "bg-slate-600"
+                    }`}>
+                      <Info className="h-4 w-4 text-white" />
+                    </div>
+                    
+                    {/* Icon */}
+                    <div className="mb-2">
+                      <Compass className={`h-6 w-6 ${currentMapIndex === 0 ? "text-amber-200" : "text-amber-500"}`} />
+                    </div>
+                    
+                    {/* Name */}
+                    <span className={`text-xs font-semibold text-center leading-tight ${
+                      currentMapIndex === 0 ? "text-amber-100" : "text-slate-300"
+                    }`}>
+                      Trader&apos;s<br/>Journey
+                    </span>
+                  </motion.button>
+                  
+                  {/* Actual Maps */}
                   {maps.map((map) => {
                     const userMapIndex = progress?.currentMapIndex || 1;
-                    const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
+                    // Map 1 (Pirate Cove) is always unlocked, others need previous completed
+                    const isUnlocked = map.sequenceOrder === 1 || map.sequenceOrder <= userMapIndex;
                     const isComplete = map.sequenceOrder < userMapIndex;
-                    const isCurrent = map.sequenceOrder === currentMapIndex;
                     const isViewing = map.sequenceOrder === currentMapIndex;
                     
                     // Theme colors for each map
@@ -495,17 +561,10 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                     return (
                       <motion.button
                         key={map.mapId}
-                        onClick={() => {
-                          // Allow viewing any map for reference, but show lock status
-                          setCurrentMapIndex(map.sequenceOrder);
-                          loadMapData(map.sequenceOrder);
-                          if (!isUnlocked) {
-                            toast.info(`Map "${map.name}" is locked. Complete previous maps to unlock!`);
-                          }
-                        }}
+                        onClick={() => handleNavigateMap(map.sequenceOrder)}
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`relative flex flex-col items-center min-w-[100px] p-3 rounded-xl border-2 transition-all ${
+                        className={`relative flex flex-col items-center min-w-[115px] h-[100px] p-4 rounded-xl border-2 transition-all justify-center ${
                           isViewing 
                             ? `bg-gradient-to-b ${colors.bg} ${colors.border} shadow-lg shadow-amber-500/20` 
                             : isComplete
@@ -516,7 +575,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                         }`}
                       >
                         {/* Map Number Badge */}
-                        <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
                           isComplete ? "bg-green-500 text-white" : isViewing ? "bg-amber-500 text-black" : isUnlocked ? "bg-slate-600 text-slate-200" : "bg-slate-800 text-slate-400"
                         }`}>
                           {map.sequenceOrder}
@@ -530,26 +589,26 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                         )}
                         
                         {/* Status Icon */}
-                        <div className="mb-1">
-                          {!isUnlocked && <Lock className="h-5 w-5 text-slate-500" />}
-                          {isComplete && <Star className="h-5 w-5 text-green-400 fill-green-400" />}
-                          {isViewing && !isComplete && isUnlocked && <Compass className="h-5 w-5 text-amber-300 animate-pulse" />}
-                          {isUnlocked && !isViewing && !isComplete && <Map className="h-5 w-5 text-slate-400" />}
+                        <div className="mb-2">
+                          {!isUnlocked && <Lock className="h-6 w-6 text-slate-500" />}
+                          {isComplete && <Star className="h-6 w-6 text-green-400 fill-green-400" />}
+                          {isViewing && !isComplete && isUnlocked && <Compass className="h-6 w-6 text-amber-300 animate-pulse" />}
+                          {isUnlocked && !isViewing && !isComplete && <Map className="h-6 w-6 text-slate-400" />}
                         </div>
                         
                         {/* Map Name */}
-                        <span className={`text-xs font-medium text-center leading-tight ${
+                        <span className={`text-xs font-semibold text-center leading-tight ${
                           isViewing ? colors.text : isComplete ? "text-green-300" : isUnlocked ? "text-slate-300" : "text-slate-500"
                         }`}>
                           {map.name}
                         </span>
                         
                         {/* Difficulty Dots */}
-                        <div className="flex gap-0.5 mt-1">
+                        <div className="flex gap-0.5 mt-1.5">
                           {Array.from({ length: 5 }).map((_, i) => (
                             <div
                               key={i}
-                              className={`w-1.5 h-1.5 rounded-full ${
+                              className={`w-2 h-2 rounded-full ${
                                 i < Math.ceil(map.difficulty / 2) 
                                   ? isViewing ? "bg-amber-300" : isUnlocked ? "bg-amber-500/60" : "bg-slate-600"
                                   : "bg-slate-700"
@@ -568,11 +627,11 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                   size="icon"
                   onClick={() => {
                     const container = document.getElementById('map-selector-container');
-                    if (container) container.scrollBy({ left: 220, behavior: 'smooth' });
+                    if (container) container.scrollBy({ left: 240, behavior: 'smooth' });
                   }}
-                  className="shrink-0 h-10 w-10 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
+                  className="shrink-0 h-12 w-12 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30"
                 >
-                  <ChevronRight className="h-5 w-5 text-amber-400" />
+                  <ChevronRight className="h-6 w-6 text-amber-400" />
                 </Button>
               </div>
             </CardContent>
@@ -580,10 +639,76 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         </motion.div>
       )}
 
-      {/* Current Map Info - Enhanced */}
-      {currentMapConfig && (() => {
+      {/* Overview Section - Trader's Journey */}
+      {showingOverview && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+        >
+          <Card className="border-2 border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/20 overflow-hidden">
+            <CardContent className="py-6 relative">
+              {/* Decorative Elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl" />
+              
+              <div className="text-center mb-6 relative">
+                <h2 className="text-2xl font-bold text-amber-100 mb-2">Welcome to Your Trading Journey!</h2>
+                <p className="text-sm text-amber-300/70 max-w-2xl mx-auto">
+                  Embark on an epic adventure across 10 unique trading lands. Complete milestones, earn XP, and unlock badges as you progress from novice trader to legendary master.
+                </p>
+              </div>
+              
+              {/* Overview Image */}
+              <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border-4 border-amber-900/50">
+                <Image
+                  src="/assets/maps/traders-journey-overview.png"
+                  alt="Trader's Journey Overview"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+                
+                {/* Overlay with CTA */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-8">
+                  <Button
+                    onClick={() => handleNavigateMap(1)}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold px-8 py-3 text-lg shadow-lg shadow-amber-500/30"
+                  >
+                    <Compass className="h-5 w-5 mr-2" />
+                    Start Your Adventure
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-4 mt-6">
+                <div className="text-center p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <div className="text-2xl font-bold text-amber-400">10</div>
+                  <div className="text-xs text-amber-300/70">Unique Maps</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="text-2xl font-bold text-green-400">{progress?.mapsCompleted || 0}</div>
+                  <div className="text-xs text-green-300/70">Completed</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="text-2xl font-bold text-blue-400">{progress?.totalMilestonesCompleted || 0}</div>
+                  <div className="text-xs text-blue-300/70">Milestones</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <div className="text-2xl font-bold text-purple-400">{progress?.totalXPFromJourney || 0}</div>
+                  <div className="text-xs text-purple-300/70">Total XP</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Current Map Info - Enhanced (only when not showing overview) */}
+      {!showingOverview && currentMapConfig && (() => {
         const userMapIndex = progress?.currentMapIndex || 1;
-        const isMapLocked = currentMapIndex > userMapIndex && currentMapIndex !== 1;
+        const isMapLocked = currentMapIndex > userMapIndex && currentMapIndex > 1;
         
         return (
         <motion.div
@@ -691,7 +816,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                       variant="outline"
                       size="icon"
                       onClick={() => handleNavigateMap("prev")}
-                      disabled={currentMapIndex <= 1}
+                      disabled={currentMapIndex <= 0}
                       className="border-amber-500/30 hover:bg-amber-500/20"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -714,7 +839,8 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         );
       })()}
 
-      {/* Journey Map */}
+      {/* Journey Map (only when not showing overview) */}
+      {!showingOverview && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -744,6 +870,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       {/* Recent Achievements */}
       {progress?.completedMilestones && progress.completedMilestones.length > 0 && (
