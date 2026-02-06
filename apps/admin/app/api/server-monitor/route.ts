@@ -78,9 +78,9 @@ interface DatabaseStats {
   indexes: number;
   indexSizeMB: number;
   // Atlas-specific (if available)
-  dataUsedMB?: number;
-  dataLimitMB?: number;
-  dataUsagePercent?: number;
+  totalSizeMB: number;
+  storageLimitMB: number;
+  storageUsagePercent: number;
 }
 
 interface CollectionStats {
@@ -89,6 +89,43 @@ interface CollectionStats {
   sizeMB: number;
   storageSizeMB: number;
   indexSizeMB: number;
+  category: "users" | "trading" | "competitions" | "journey" | "candles" | "marketplace" | "system" | "other";
+}
+
+// Categorize collection by name
+function categorizeCollection(name: string): CollectionStats["category"] {
+  const lowerName = name.toLowerCase();
+  
+  // User-related
+  if (lowerName.includes("user") || lowerName.includes("session") || lowerName.includes("account") || lowerName.includes("kyc") || lowerName.includes("verification")) {
+    return "users";
+  }
+  // Trading-related
+  if (lowerName.includes("trade") || lowerName.includes("wallet") || lowerName.includes("credit") || lowerName.includes("transaction") || lowerName.includes("order") || lowerName.includes("position")) {
+    return "trading";
+  }
+  // Competition-related
+  if (lowerName.includes("competition") || lowerName.includes("challenge") || lowerName.includes("participant") || lowerName.includes("leaderboard")) {
+    return "competitions";
+  }
+  // Journey/Gamification
+  if (lowerName.includes("journey") || lowerName.includes("milestone") || lowerName.includes("badge") || lowerName.includes("xp") || lowerName.includes("level") || lowerName.includes("progress")) {
+    return "journey";
+  }
+  // Candles/Market data
+  if (lowerName.includes("candle") || lowerName.includes("price") || lowerName.includes("market")) {
+    return "candles";
+  }
+  // Marketplace
+  if (lowerName.includes("marketplace") || lowerName.includes("product") || lowerName.includes("purchase") || lowerName.includes("vendor")) {
+    return "marketplace";
+  }
+  // System collections
+  if (lowerName.startsWith("system.") || lowerName === "sessions" || lowerName.includes("config") || lowerName.includes("setting")) {
+    return "system";
+  }
+  
+  return "other";
 }
 
 async function getDatabaseStats(): Promise<{
@@ -103,29 +140,26 @@ async function getDatabaseStats(): Promise<{
     // Get database stats
     const dbStats = await db.stats();
 
-    // Get all collections from database
+    // Get ALL collections from database
     const allCollections = await db.listCollections().toArray();
-
-    // Filter for candle-related collections (both exact matches and pattern matches)
-    const candlePatterns = ["candles_1m", "candles_historical_"];
-    const candleCollectionNames = allCollections
-      .map((c) => c.name)
-      .filter((name) =>
-        candlePatterns.some(
-          (pattern) => name.startsWith(pattern) || name === pattern,
-        ),
-      );
+    const allCollectionNames = allCollections.map((c) => c.name);
 
     const collectionStats: CollectionStats[] = [];
 
-    for (const collName of candleCollectionNames) {
+    // Process ALL collections
+    for (const collName of allCollectionNames) {
       try {
         const collection = db.collection(collName);
 
-        // Use countDocuments for accurate count (works on all MongoDB versions)
-        const docCount = await collection.countDocuments();
+        // Use estimatedDocumentCount for faster results (or countDocuments for accuracy)
+        let docCount = 0;
+        try {
+          docCount = await collection.estimatedDocumentCount();
+        } catch {
+          docCount = await collection.countDocuments();
+        }
 
-        // Try to get collection stats using aggregate $collStats (works on Atlas)
+        // Try to get collection stats
         let sizeMB = 0;
         let storageSizeMB = 0;
         let indexSizeMB = 0;
@@ -133,15 +167,9 @@ async function getDatabaseStats(): Promise<{
         try {
           // Method 1: Try collStats command
           const statsResult = await db.command({ collStats: collName });
-          sizeMB =
-            Math.round(((statsResult.size || 0) / (1024 * 1024)) * 100) / 100;
-          storageSizeMB =
-            Math.round(((statsResult.storageSize || 0) / (1024 * 1024)) * 100) /
-            100;
-          indexSizeMB =
-            Math.round(
-              ((statsResult.totalIndexSize || 0) / (1024 * 1024)) * 100,
-            ) / 100;
+          sizeMB = Math.round(((statsResult.size || 0) / (1024 * 1024)) * 100) / 100;
+          storageSizeMB = Math.round(((statsResult.storageSize || 0) / (1024 * 1024)) * 100) / 100;
+          indexSizeMB = Math.round(((statsResult.totalIndexSize || 0) / (1024 * 1024)) * 100) / 100;
         } catch {
           // Method 2: Try aggregate $collStats (Atlas-compatible)
           try {
@@ -151,20 +179,13 @@ async function getDatabaseStats(): Promise<{
 
             if (aggStats.length > 0 && aggStats[0].storageStats) {
               const storage = aggStats[0].storageStats;
-              sizeMB =
-                Math.round(((storage.size || 0) / (1024 * 1024)) * 100) / 100;
-              storageSizeMB =
-                Math.round(((storage.storageSize || 0) / (1024 * 1024)) * 100) /
-                100;
-              indexSizeMB =
-                Math.round(
-                  ((storage.totalIndexSize || 0) / (1024 * 1024)) * 100,
-                ) / 100;
+              sizeMB = Math.round(((storage.size || 0) / (1024 * 1024)) * 100) / 100;
+              storageSizeMB = Math.round(((storage.storageSize || 0) / (1024 * 1024)) * 100) / 100;
+              indexSizeMB = Math.round(((storage.totalIndexSize || 0) / (1024 * 1024)) * 100) / 100;
             }
           } catch {
-            // Method 3: Estimate size from document count (rough estimate)
-            // Assume ~200 bytes per candle document
-            sizeMB = Math.round(((docCount * 200) / (1024 * 1024)) * 100) / 100;
+            // Method 3: Estimate size (rough estimate based on avg doc size)
+            sizeMB = Math.round(((docCount * 500) / (1024 * 1024)) * 100) / 100;
           }
         }
 
@@ -174,27 +195,39 @@ async function getDatabaseStats(): Promise<{
           sizeMB,
           storageSizeMB,
           indexSizeMB,
+          category: categorizeCollection(collName),
         });
       } catch (err) {
         console.error(`Error getting stats for ${collName}:`, err);
       }
     }
 
-    // Sort by document count descending
-    collectionStats.sort((a, b) => b.documents - a.documents);
+    // Sort by size descending (largest first)
+    collectionStats.sort((a, b) => b.sizeMB - a.sizeMB);
+
+    // Calculate totals
+    const totalSizeMB = Math.round(((dbStats.dataSize || 0) / (1024 * 1024)) * 100) / 100;
+    const totalStorageMB = Math.round(((dbStats.storageSize || 0) / (1024 * 1024)) * 100) / 100;
+    const totalIndexMB = Math.round(((dbStats.indexSize || 0) / (1024 * 1024)) * 100) / 100;
+    
+    // MongoDB Atlas M0 (free tier) = 512MB, M2 = 2GB, M5 = 5GB, M10 = 10GB
+    // You can configure this via environment variable
+    const storageLimitMB = parseInt(process.env.MONGODB_STORAGE_LIMIT_MB || "512", 10);
+    const totalUsedMB = totalSizeMB + totalIndexMB;
+    const storageUsagePercent = Math.min(100, (totalUsedMB / storageLimitMB) * 100);
 
     return {
       database: {
         name: db.databaseName,
-        sizeMB:
-          Math.round(((dbStats.dataSize || 0) / (1024 * 1024)) * 100) / 100,
-        storageSizeMB:
-          Math.round(((dbStats.storageSize || 0) / (1024 * 1024)) * 100) / 100,
-        collections: dbStats.collections || 0,
+        sizeMB: totalSizeMB,
+        storageSizeMB: totalStorageMB,
+        collections: dbStats.collections || allCollectionNames.length,
         documents: dbStats.objects || 0,
         indexes: dbStats.indexes || 0,
-        indexSizeMB:
-          Math.round(((dbStats.indexSize || 0) / (1024 * 1024)) * 100) / 100,
+        indexSizeMB: totalIndexMB,
+        totalSizeMB: totalUsedMB,
+        storageLimitMB,
+        storageUsagePercent: Math.round(storageUsagePercent * 100) / 100,
       },
       collections: collectionStats,
     };

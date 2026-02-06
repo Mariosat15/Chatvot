@@ -77,6 +77,7 @@ interface CollectionStats {
   sizeMB: number;
   storageSizeMB: number;
   indexSizeMB: number;
+  category: "users" | "trading" | "competitions" | "journey" | "candles" | "marketplace" | "system" | "other";
 }
 
 interface DatabaseStats {
@@ -88,6 +89,9 @@ interface DatabaseStats {
     documents: number;
     indexes: number;
     indexSizeMB: number;
+    totalSizeMB: number;
+    storageLimitMB: number;
+    storageUsagePercent: number;
   };
   collections: CollectionStats[];
 }
@@ -386,21 +390,69 @@ export default function ServerMonitorSection() {
               <Badge variant="outline" className="ml-2 text-xs">
                 {stats.database.database.name}
               </Badge>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "ml-2 text-xs",
+                  stats.database.database.storageUsagePercent > 80 
+                    ? "border-red-500 text-red-400" 
+                    : stats.database.database.storageUsagePercent > 60 
+                      ? "border-yellow-500 text-yellow-400"
+                      : "border-green-500 text-green-400"
+                )}
+              >
+                {stats.database.database.storageUsagePercent.toFixed(1)}% used
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Storage Usage Bar */}
+            <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-zinc-400">Total Storage Used</span>
+                <span className="text-sm font-bold">
+                  <span className={cn(
+                    stats.database.database.storageUsagePercent > 80 ? "text-red-400" :
+                    stats.database.database.storageUsagePercent > 60 ? "text-yellow-400" : "text-green-400"
+                  )}>
+                    {stats.database.database.totalSizeMB.toFixed(2)} MB
+                  </span>
+                  <span className="text-zinc-500"> / {stats.database.database.storageLimitMB} MB</span>
+                </span>
+              </div>
+              <Progress 
+                value={stats.database.database.storageUsagePercent} 
+                className={cn(
+                  "h-3",
+                  stats.database.database.storageUsagePercent > 80 ? "[&>div]:bg-red-500" :
+                  stats.database.database.storageUsagePercent > 60 ? "[&>div]:bg-yellow-500" : "[&>div]:bg-green-500"
+                )}
+              />
+              <div className="flex justify-between mt-2 text-xs text-zinc-500">
+                <span>Data: {stats.database.database.sizeMB.toFixed(2)} MB</span>
+                <span>Indexes: {stats.database.database.indexSizeMB.toFixed(2)} MB</span>
+                <span>Available: {(stats.database.database.storageLimitMB - stats.database.database.totalSizeMB).toFixed(2)} MB</span>
+              </div>
+            </div>
+
             {/* Database Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Collections</div>
+                <div className="text-xl font-bold text-blue-400">
+                  {stats.database.database.collections}
+                </div>
+              </div>
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Documents</div>
+                <div className="text-xl font-bold text-green-400">
+                  {stats.database.database.documents.toLocaleString()}
+                </div>
+              </div>
               <div className="bg-zinc-800/50 rounded-lg p-3">
                 <div className="text-zinc-400 text-xs mb-1">Data Size</div>
                 <div className="text-xl font-bold text-cyan-400">
                   {stats.database.database.sizeMB.toFixed(2)} MB
-                </div>
-              </div>
-              <div className="bg-zinc-800/50 rounded-lg p-3">
-                <div className="text-zinc-400 text-xs mb-1">Storage Size</div>
-                <div className="text-xl font-bold text-blue-400">
-                  {stats.database.database.storageSizeMB.toFixed(2)} MB
                 </div>
               </div>
               <div className="bg-zinc-800/50 rounded-lg p-3">
@@ -410,75 +462,119 @@ export default function ServerMonitorSection() {
                 </div>
               </div>
               <div className="bg-zinc-800/50 rounded-lg p-3">
-                <div className="text-zinc-400 text-xs mb-1">
-                  Total Documents
-                </div>
-                <div className="text-xl font-bold text-green-400">
-                  {stats.database.database.documents.toLocaleString()}
+                <div className="text-zinc-400 text-xs mb-1">Indexes</div>
+                <div className="text-xl font-bold text-orange-400">
+                  {stats.database.database.indexes}
                 </div>
               </div>
             </div>
 
-            {/* Collection Stats Table */}
-            <div className="text-zinc-400 text-xs mb-2">
-              Candle Collections:
+            {/* Collection Stats Table - ALL Collections */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-zinc-400 text-xs">
+                All Collections ({stats.database.collections.length}):
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {/* Category legend */}
+                {[
+                  { cat: "users", color: "bg-blue-500", label: "Users" },
+                  { cat: "trading", color: "bg-green-500", label: "Trading" },
+                  { cat: "competitions", color: "bg-purple-500", label: "Competitions" },
+                  { cat: "journey", color: "bg-amber-500", label: "Journey" },
+                  { cat: "candles", color: "bg-cyan-500", label: "Candles" },
+                  { cat: "marketplace", color: "bg-pink-500", label: "Marketplace" },
+                  { cat: "system", color: "bg-zinc-500", label: "System" },
+                  { cat: "other", color: "bg-slate-500", label: "Other" },
+                ].map(({ cat, color, label }) => {
+                  const count = stats.database.collections.filter(c => c.category === cat).length;
+                  if (count === 0) return null;
+                  return (
+                    <Badge key={cat} variant="outline" className="text-[10px] gap-1">
+                      <span className={cn("w-2 h-2 rounded-full", color)} />
+                      {label} ({count})
+                    </Badge>
+                  );
+                })}
+              </div>
             </div>
-            <div className="bg-zinc-800/30 rounded-lg overflow-hidden">
+            <div className="bg-zinc-800/30 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-zinc-900">
                   <tr className="text-zinc-500 text-xs border-b border-zinc-700/50">
                     <th className="text-left px-3 py-2">Collection</th>
+                    <th className="text-center px-2 py-2">Category</th>
                     <th className="text-right px-3 py-2">Documents</th>
                     <th className="text-right px-3 py-2">Size</th>
                     <th className="text-right px-3 py-2">Index</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.database.collections.map((col) => (
-                    <tr
-                      key={col.name}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
-                    >
-                      <td className="px-3 py-2 font-mono text-zinc-300">
-                        {col.name}
-                      </td>
-                      <td className="px-3 py-2 text-right text-zinc-400">
-                        {col.documents.toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <span
-                          className={cn(
-                            col.sizeMB > 100
-                              ? "text-yellow-400"
-                              : col.sizeMB > 50
-                                ? "text-blue-400"
-                                : "text-green-400",
-                          )}
-                        >
-                          {col.sizeMB.toFixed(2)} MB
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right text-zinc-500">
-                        {col.indexSizeMB.toFixed(2)} MB
-                      </td>
-                    </tr>
-                  ))}
+                  {stats.database.collections.map((col) => {
+                    const categoryColors: Record<string, string> = {
+                      users: "bg-blue-500",
+                      trading: "bg-green-500",
+                      competitions: "bg-purple-500",
+                      journey: "bg-amber-500",
+                      candles: "bg-cyan-500",
+                      marketplace: "bg-pink-500",
+                      system: "bg-zinc-500",
+                      other: "bg-slate-500",
+                    };
+                    return (
+                      <tr
+                        key={col.name}
+                        className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
+                      >
+                        <td className="px-3 py-2 font-mono text-zinc-300 text-xs">
+                          {col.name}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className={cn(
+                            "inline-block w-2 h-2 rounded-full",
+                            categoryColors[col.category] || "bg-slate-500"
+                          )} title={col.category} />
+                        </td>
+                        <td className="px-3 py-2 text-right text-zinc-400">
+                          {col.documents.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span
+                            className={cn(
+                              col.sizeMB > 100
+                                ? "text-red-400"
+                                : col.sizeMB > 50
+                                  ? "text-yellow-400"
+                                  : col.sizeMB > 10
+                                    ? "text-blue-400"
+                                    : "text-green-400",
+                            )}
+                          >
+                            {col.sizeMB.toFixed(2)} MB
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-zinc-500">
+                          {col.indexSizeMB.toFixed(2)} MB
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {stats.database.collections.length === 0 && (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-3 py-4 text-center text-zinc-500"
                       >
-                        No candle collections found
+                        No collections found
                       </td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t border-zinc-700/50 bg-zinc-800/30">
+                <tfoot className="sticky bottom-0 bg-zinc-900">
+                  <tr className="border-t border-zinc-700/50 bg-zinc-800/50">
                     <td className="px-3 py-2 font-medium text-zinc-300">
-                      Total
+                      Total ({stats.database.collections.length} collections)
                     </td>
+                    <td className="px-2 py-2"></td>
                     <td className="px-3 py-2 text-right font-medium text-zinc-300">
                       {stats.database.collections
                         .reduce((sum, c) => sum + c.documents, 0)
