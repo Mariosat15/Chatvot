@@ -454,44 +454,21 @@ Analyze and return JSON with:
         const budget = xpBudget || mapConfig.xpBudget;
         const milestoneCount = mapConfig.milestoneCount;
 
-        const singleMapPrompt = `Generate milestones for Map ${mapConfig.sequenceOrder}: "${mapConfig.name}"
+        // Reduce milestone count to 8 for faster generation
+        const reducedMilestoneCount = 8;
+        
+        // Simplified, shorter prompt for faster AI response
+        const singleMapPrompt = `Generate ${reducedMilestoneCount} milestones for "${mapConfig.name}" (${mapConfig.theme} theme, Map ${mapOrder}/10).
 
-THEME: ${mapConfig.theme}
-DIFFICULTY LEVEL: ${mapConfig.difficulty}/10
-XP BUDGET: ${budget} XP total
-MILESTONE COUNT: ${milestoneCount} milestones
-REQUIRED LEVEL TO START: ${mapConfig.requiredLevelToStart}
+${previousMapsProgress.length > 0 ? `Previous max values: ${previousMapsProgress.slice(0, 5).map(p => `${p.type}=${p.maxValue}`).join(', ')}. Use HIGHER values.` : 'This is Map 1, start with low values (1-15).'}
 
-${sequenceOrder > 1 ? `PREREQUISITE: Player must complete Map ${sequenceOrder - 1} first
-First milestone should require: { type: "map_completed", milestoneId: "${MAP_SEQUENCE[sequenceOrder - 2]?.mapId}" }` : ''}
+Rules:
+- ${mapConfig.theme}-themed names
+- Progressive difficulty (each harder than previous)
+- XP budget: ${budget}
+- Value range: ${mapOrder * 10}-${mapOrder * 30} for trades, proportional for others
 
-CRITICAL - PREVIOUS MAPS' MAXIMUM VALUES (your new milestones MUST have HIGHER values):
-${previousMapsProgress.length > 0 
-  ? previousMapsProgress.map(p => `- ${p.type}: ${p.maxValue} (your values must be HIGHER)`).join('\n')
-  : '- No previous maps (this is Map 1, start from low values)'}
-
-PROGRESSION REQUIREMENTS:
-1. ALL numeric values MUST be STRICTLY HIGHER than the previous maps' maximums shown above
-2. For example, if previous max "total_trades" was 50, your FIRST milestone using "total_trades" must be at least 55+
-3. Each subsequent milestone in THIS map must also be higher than the previous one
-4. NEVER create a milestone with a lower value than what was already achieved in previous maps
-
-SUGGESTED VALUE RANGES FOR MAP ${mapOrder}:
-${mapOrder === 1 ? '- total_trades: 1-15, winning_trades: 1-8, win_streak: 1-3' : ''}
-${mapOrder === 2 ? '- total_trades: 15-35, winning_trades: 8-20, win_streak: 3-6' : ''}
-${mapOrder === 3 ? '- total_trades: 35-60, winning_trades: 20-40, win_streak: 6-10, competitions_entered: 1-5' : ''}
-${mapOrder === 4 ? '- total_trades: 60-100, winning_trades: 40-70, win_streak: 10-15, competitions_completed: 1-10' : ''}
-${mapOrder === 5 ? '- total_trades: 100-150, winning_trades: 70-100, win_streak: 15-20, podium_finishes: 1-5' : ''}
-${mapOrder >= 6 ? '- Continue the progression, values should be ${mapOrder * 50}+ for trades, wins proportional' : ''}
-
-IMPORTANT:
-- Use ${mapConfig.theme}-themed names throughout
-- Start with the lowest values in the suggested range, end with highest
-- Total XP must not exceed ${budget}
-- Each milestone MUST be progressively harder than previous
-- Include a mix of: trades, wins, win streaks${sequenceOrder >= 3 ? ', competitions' : ''}${sequenceOrder >= 5 ? ', podium finishes' : ''}${sequenceOrder >= 6 ? ', competition wins' : ''}
-
-Generate exactly ${milestoneCount} milestones.`;
+Generate exactly ${reducedMilestoneCount} milestones.`;
 
         const completion = await openai.chat.completions.create({
           model: config.model,
@@ -499,8 +476,8 @@ Generate exactly ${milestoneCount} milestones.`;
             { role: "system", content: JOURNEY_AGENT_SYSTEM_PROMPT },
             { role: "user", content: singleMapPrompt },
           ],
-          temperature: 0.7,
-          max_tokens: 6000,
+          temperature: 0.5,
+          max_tokens: 2500, // Reduced for faster response
           response_format: { type: "json_object" },
         });
 
