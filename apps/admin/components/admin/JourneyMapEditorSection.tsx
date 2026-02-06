@@ -2345,7 +2345,7 @@ export default function JourneyMapEditorSection() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
-                    {sequenceValidation.overallValid ? (
+                    {sequenceValidation.overallValid || sequenceValidation.success ? (
                       <Badge variant="default" className="bg-green-600">Valid</Badge>
                     ) : (
                       <Badge variant="destructive">Issues Found</Badge>
@@ -2354,26 +2354,120 @@ export default function JourneyMapEditorSection() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {sequenceValidation.sequenceValidation?.errors?.map((error: any, i: number) => (
-                      <div key={i} className="flex items-start gap-2 text-red-500 text-sm">
-                        <AlertTriangle className="h-4 w-4 mt-0.5" />
-                        <span>{error.message}</span>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {/* Handle different error formats */}
+                    {(sequenceValidation.sequenceValidation?.errors || sequenceValidation.errors || []).map((error: any, i: number) => (
+                      <div key={`err-${i}`} className="flex items-start gap-2 text-red-400 text-sm bg-red-500/10 p-2 rounded">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span>{typeof error === 'string' ? error : error.message || error.error || JSON.stringify(error)}</span>
                       </div>
                     ))}
-                    {sequenceValidation.sequenceValidation?.warnings?.map((warn: any, i: number) => (
-                      <div key={i} className="flex items-start gap-2 text-yellow-500 text-sm">
-                        <AlertTriangle className="h-4 w-4 mt-0.5" />
-                        <span>{warn.message}</span>
+                    {/* Handle different warning formats */}
+                    {(sequenceValidation.sequenceValidation?.warnings || sequenceValidation.warnings || []).map((warn: any, i: number) => (
+                      <div key={`warn-${i}`} className="flex items-start gap-2 text-yellow-400 text-sm bg-yellow-500/10 p-2 rounded">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span>{typeof warn === 'string' ? warn : warn.message || warn.warning || JSON.stringify(warn)}</span>
                       </div>
                     ))}
-                    {sequenceValidation.overallValid && (
-                      <div className="text-green-500 text-sm">All maps validated successfully!</div>
+                    {/* Per-map validation results */}
+                    {sequenceValidation.mapValidations && Object.entries(sequenceValidation.mapValidations).map(([mapId, validation]: [string, any]) => (
+                      <div key={mapId} className="border border-slate-700 rounded p-2 mt-2">
+                        <div className="font-medium text-sm mb-1 capitalize">{mapId.replace(/_/g, ' ')}</div>
+                        {validation.errors?.map((e: any, i: number) => (
+                          <div key={i} className="text-red-400 text-xs ml-2">• {typeof e === 'string' ? e : e.message}</div>
+                        ))}
+                        {validation.warnings?.map((w: any, i: number) => (
+                          <div key={i} className="text-yellow-400 text-xs ml-2">• {typeof w === 'string' ? w : w.message}</div>
+                        ))}
+                        {validation.isValid && <div className="text-green-400 text-xs ml-2">✓ Valid</div>}
+                      </div>
+                    ))}
+                    {(sequenceValidation.overallValid || sequenceValidation.success) && 
+                     !(sequenceValidation.errors?.length) && 
+                     !(sequenceValidation.warnings?.length) && (
+                      <div className="text-green-400 text-sm bg-green-500/10 p-2 rounded">
+                        ✓ All maps validated successfully!
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Individual Map Generation */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Wand2 className="h-4 w-4 text-purple-400" />
+                  Generate Individual Map
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Generate milestones for a specific map. Useful for regenerating a single map or generating step-by-step.
+                </p>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { order: 1, name: "Pirate Cove", color: "#F59E0B" },
+                    { order: 2, name: "Space Station", color: "#8B5CF6" },
+                    { order: 3, name: "Medieval Castle", color: "#EF4444" },
+                    { order: 4, name: "Cyber City", color: "#00FFFF" },
+                    { order: 5, name: "Ancient Temple", color: "#D4A373" },
+                    { order: 6, name: "Volcanic Island", color: "#DC2626" },
+                    { order: 7, name: "Arctic Fortress", color: "#38BDF8" },
+                    { order: 8, name: "Dragon Realm", color: "#F97316" },
+                    { order: 9, name: "Celestial Kingdom", color: "#A78BFA" },
+                    { order: 10, name: "Hall of Legends", color: "#FBBF24" },
+                  ].map((map) => (
+                    <Button
+                      key={map.order}
+                      variant="outline"
+                      size="sm"
+                      className="flex flex-col h-auto py-2 hover:scale-105 transition-transform"
+                      style={{ borderColor: map.color }}
+                      disabled={sequenceGenerating}
+                      onClick={async () => {
+                        setSequenceGenerating(true);
+                        toast.info(`Generating Map ${map.order}: ${map.name}...`);
+                        try {
+                          const res = await fetch("/api/ai/generate-journey", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "generate_single_map",
+                              mapIndex: map.order,
+                              saveToDB: true,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            toast.success(`Map ${map.order} generated: ${data.milestones?.length || 0} milestones saved!`);
+                            // Refresh data
+                            await fetchData();
+                          } else {
+                            toast.error(data.error || `Failed to generate Map ${map.order}`);
+                          }
+                        } catch (error) {
+                          console.error(`Error generating map ${map.order}:`, error);
+                          toast.error(`Failed to generate Map ${map.order}`);
+                        } finally {
+                          setSequenceGenerating(false);
+                        }
+                      }}
+                    >
+                      <span className="font-bold" style={{ color: map.color }}>{map.order}</span>
+                      <span className="text-[10px] truncate w-full text-center">{map.name}</span>
+                    </Button>
+                  ))}
+                </div>
+                {sequenceGenerating && (
+                  <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Generating... This may take up to 30 seconds.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Quick Actions */}
             <div className="flex gap-4">
