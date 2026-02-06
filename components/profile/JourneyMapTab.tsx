@@ -64,8 +64,14 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       const res = await fetch("/api/journey/maps/sequence");
       const data = await res.json();
       if (data.success && data.maps && data.maps.length > 0) {
-        setMaps(data.maps);
-        return data.maps;
+        // Filter to only include maps with proper sequenceOrder (exclude legacy maps)
+        const validMaps = data.maps.filter((m: MapData) => 
+          m.sequenceOrder && m.sequenceOrder >= 1 && m.sequenceOrder <= 10
+        );
+        // Sort by sequenceOrder
+        validMaps.sort((a: MapData, b: MapData) => a.sequenceOrder - b.sequenceOrder);
+        setMaps(validMaps);
+        return validMaps;
       }
       return [];
     } catch (err) {
@@ -423,85 +429,206 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         </motion.div>
       </div>
 
-      {/* Map Selector */}
-      {maps.length > 1 && (
+      {/* Map Selector - Gamified */}
+      {maps.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {maps.map((map) => {
-              const userMapIndex = progress?.currentMapIndex || 1;
-              const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
-              const isComplete = map.sequenceOrder < userMapIndex;
-              const isCurrent = map.sequenceOrder === currentMapIndex;
+          <Card className="bg-gradient-to-r from-slate-900/50 via-amber-950/20 to-slate-900/50 border-amber-500/20">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Compass className="h-5 w-5 text-amber-500" />
+                <span className="text-sm font-medium text-amber-500">Select Your Voyage</span>
+                <div className="flex-1 h-px bg-gradient-to-r from-amber-500/50 to-transparent" />
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-amber-500/20">
+                {maps.map((map) => {
+                  const userMapIndex = progress?.currentMapIndex || 1;
+                  const isUnlocked = map.sequenceOrder <= userMapIndex || map.sequenceOrder === 1;
+                  const isComplete = map.sequenceOrder < userMapIndex;
+                  const isCurrent = map.sequenceOrder === currentMapIndex;
+                  
+                  // Theme colors for each map
+                  const themeColors: Record<string, { bg: string; border: string; text: string }> = {
+                    pirate: { bg: "from-amber-600 to-orange-700", border: "border-amber-500", text: "text-amber-200" },
+                    space: { bg: "from-purple-600 to-indigo-700", border: "border-purple-500", text: "text-purple-200" },
+                    medieval: { bg: "from-red-600 to-rose-700", border: "border-red-500", text: "text-red-200" },
+                    cyber: { bg: "from-cyan-500 to-blue-600", border: "border-cyan-400", text: "text-cyan-200" },
+                    ancient: { bg: "from-yellow-600 to-amber-700", border: "border-yellow-500", text: "text-yellow-200" },
+                    volcanic: { bg: "from-red-600 to-orange-700", border: "border-red-500", text: "text-orange-200" },
+                    arctic: { bg: "from-blue-400 to-cyan-600", border: "border-blue-400", text: "text-blue-200" },
+                    dragon: { bg: "from-orange-500 to-red-600", border: "border-orange-500", text: "text-orange-200" },
+                    celestial: { bg: "from-violet-500 to-purple-600", border: "border-violet-400", text: "text-violet-200" },
+                    legendary: { bg: "from-yellow-400 to-amber-500", border: "border-yellow-400", text: "text-yellow-100" },
+                  };
+                  
+                  const colors = themeColors[map.theme] || themeColors.pirate;
 
-              return (
-                <Button
-                  key={map.mapId}
-                  variant={isCurrent ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleNavigateMap(map.sequenceOrder)}
-                  disabled={!isUnlocked}
-                  className={`flex items-center gap-2 whitespace-nowrap ${
-                    isComplete ? "border-green-500" : ""
-                  } ${isCurrent ? "bg-amber-600 hover:bg-amber-700" : ""}`}
-                >
-                  {!isUnlocked && <Lock className="h-3 w-3" />}
-                  {isComplete && <Star className="h-3 w-3 text-green-400" />}
-                  <span>{map.sequenceOrder}. {map.name}</span>
-                </Button>
-              );
-            })}
-          </div>
+                  return (
+                    <motion.button
+                      key={map.mapId}
+                      onClick={() => handleNavigateMap(map.sequenceOrder)}
+                      disabled={!isUnlocked}
+                      whileHover={isUnlocked ? { scale: 1.05, y: -2 } : {}}
+                      whileTap={isUnlocked ? { scale: 0.98 } : {}}
+                      className={`relative flex flex-col items-center min-w-[100px] p-3 rounded-xl border-2 transition-all ${
+                        isCurrent 
+                          ? `bg-gradient-to-b ${colors.bg} ${colors.border} shadow-lg shadow-amber-500/20` 
+                          : isComplete
+                          ? "bg-green-900/30 border-green-500/50"
+                          : isUnlocked
+                          ? "bg-slate-800/50 border-slate-600 hover:border-amber-500/50"
+                          : "bg-slate-900/50 border-slate-700 opacity-50 cursor-not-allowed"
+                      }`}
+                    >
+                      {/* Map Number Badge */}
+                      <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        isComplete ? "bg-green-500 text-white" : isCurrent ? "bg-amber-500 text-black" : "bg-slate-700 text-slate-300"
+                      }`}>
+                        {map.sequenceOrder}
+                      </div>
+                      
+                      {/* Status Icon */}
+                      <div className="mb-1">
+                        {!isUnlocked && <Lock className="h-5 w-5 text-slate-500" />}
+                        {isComplete && <Star className="h-5 w-5 text-green-400 fill-green-400" />}
+                        {isCurrent && !isComplete && <Compass className="h-5 w-5 text-amber-300 animate-pulse" />}
+                        {isUnlocked && !isCurrent && !isComplete && <Map className="h-5 w-5 text-slate-400" />}
+                      </div>
+                      
+                      {/* Map Name */}
+                      <span className={`text-xs font-medium text-center leading-tight ${
+                        isCurrent ? colors.text : isComplete ? "text-green-300" : "text-slate-300"
+                      }`}>
+                        {map.name}
+                      </span>
+                      
+                      {/* Difficulty Dots */}
+                      <div className="flex gap-0.5 mt-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              i < Math.ceil(map.difficulty / 2) 
+                                ? isCurrent ? "bg-amber-300" : "bg-amber-500/60"
+                                : "bg-slate-600"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       )}
 
-      {/* Current Map Info */}
+      {/* Current Map Info - Enhanced */}
       {currentMapConfig && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
         >
-          <Card className="border-amber-500/30">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
+          <Card className="border-2 border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/20 overflow-hidden">
+            <CardContent className="py-4 relative">
+              {/* Decorative Elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl" />
+              
+              <div className="flex items-center justify-between relative">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500/20">
-                    <Map className="h-6 w-6 text-amber-500" />
-                  </div>
+                  <motion.div 
+                    className="w-16 h-16 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500/30 to-orange-600/30 border border-amber-500/30"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                  >
+                    <span className="text-3xl">🗺️</span>
+                  </motion.div>
                   <div>
-                    <div className="font-semibold text-lg">{currentMapConfig.name}</div>
-                    <div className="text-sm text-muted-foreground capitalize">
-                      {currentMapConfig.theme} theme • Difficulty {currentMapConfig.difficulty}/10
+                    <div className="font-bold text-xl text-amber-100">{currentMapConfig.name}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="capitalize border-amber-500/50 text-amber-300">
+                        {currentMapConfig.theme}
+                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">Difficulty:</span>
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 10 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-2 h-2 rounded-full ${
+                                i < (currentMapConfig.difficulty || 1)
+                                  ? "bg-gradient-to-t from-red-500 to-orange-400"
+                                  : "bg-slate-700"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-4">
-                  <div>
-                    <Badge variant="outline" className="mb-1">
-                      {milestonesOnThisMap} / {milestones.length} milestones
-                    </Badge>
-                    <div className="w-32">
-                      <Progress value={completionPercentage} className="h-2" />
+                
+                <div className="flex items-center gap-6">
+                  {/* Progress Circle */}
+                  <div className="relative w-16 h-16">
+                    <svg className="w-16 h-16 transform -rotate-90">
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        className="text-slate-700"
+                      />
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        strokeDasharray={`${2 * Math.PI * 28}`}
+                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - completionPercentage / 100)}`}
+                        className="text-amber-500 transition-all duration-500"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-lg font-bold text-amber-400">{completionPercentage}%</span>
                     </div>
                   </div>
+                  
+                  {/* Milestone Counter */}
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">{milestonesOnThisMap}</div>
+                    <div className="text-xs text-muted-foreground">of {milestones.length}</div>
+                    <div className="text-xs text-amber-400 font-medium">Milestones</div>
+                  </div>
+                  
+                  {/* Navigation */}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleNavigateMap("prev")}
                       disabled={currentMapIndex <= 1}
+                      className="border-amber-500/30 hover:bg-amber-500/20"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleNavigateMap("next")}
                       disabled={currentMapIndex >= maps.length || currentMapIndex >= (progress?.currentMapIndex || 1)}
+                      className="border-amber-500/30 hover:bg-amber-500/20"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>

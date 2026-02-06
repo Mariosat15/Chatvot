@@ -653,16 +653,21 @@ export default function JourneyMapRenderer({
             transformOrigin: "top left",
           }}
         >
-          {/* Treasure Map Background */}
+          {/* Dynamic Map Background */}
           <Image
-            src="/assets/treasure-map.png"
-            alt="Treasure Map"
+            src={mapConfig?.backgroundImage || "/assets/maps/pirate-cove.png"}
+            alt={mapConfig?.name || "Journey Map"}
             width={MAP_WIDTH}
             height={MAP_HEIGHT}
-            className="absolute top-0 left-0 object-cover"
+            className="absolute top-0 left-0 object-cover rounded-lg"
             style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
             priority
             draggable={false}
+            onError={(e) => {
+              // Fallback to default treasure map if image fails to load
+              const target = e.target as HTMLImageElement;
+              target.src = "/assets/maps/pirate-cove.png";
+            }}
           />
 
           {/* Path Connections - SEQUENTIAL by order */}
