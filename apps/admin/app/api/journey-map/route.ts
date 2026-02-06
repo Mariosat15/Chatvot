@@ -37,43 +37,53 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/journey-map
- * Create a new journey map configuration
+ * Create or update a journey map configuration (upsert)
  */
 export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
     const data = await request.json();
 
-    // Check if map with this ID already exists
-    const existing = await JourneyMapConfig.findOne({ mapId: data.mapId });
-    if (existing) {
-      return NextResponse.json(
-        { success: false, error: "Map with this ID already exists" },
-        { status: 400 }
-      );
-    }
+    const mapId = data.mapId || "traders_journey";
 
-    const mapConfig = await JourneyMapConfig.create({
-      mapId: data.mapId || "traders_journey",
-      name: data.name || "Trader's Journey",
-      description: data.description || "",
-      zones: data.zones || [],
-      defaultStartNode: data.defaultStartNode || "account_created",
-      backgroundColor: data.backgroundColor || "#0F172A",
-      backgroundImage: data.backgroundImage,
-      isActive: data.isActive ?? true,
-      version: 1,
-    });
+    // Upsert: Create if not exists, update if exists
+    const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+      { mapId },
+      {
+        $set: {
+          mapId,
+          name: data.name || "Trader's Journey",
+          description: data.description || "",
+          zones: data.zones || [],
+          defaultStartNode: data.defaultStartNode || "account_created",
+          backgroundColor: data.backgroundColor || "#0F172A",
+          backgroundImage: data.backgroundImage,
+          isActive: data.isActive ?? true,
+          sequenceOrder: data.sequenceOrder,
+          theme: data.theme,
+          difficulty: data.difficulty,
+          estimatedXP: data.estimatedXP,
+          totalMilestones: data.totalMilestones,
+          requiredLevelToStart: data.requiredLevelToStart || 1,
+        },
+        $inc: { version: 1 },
+      },
+      { 
+        upsert: true, 
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      message: "Journey map created successfully",
+      message: "Journey map saved successfully",
       mapConfig,
     });
   } catch (error) {
-    console.error("Error creating journey map:", error);
+    console.error("Error saving journey map:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to create journey map" },
+      { success: false, error: "Failed to save journey map" },
       { status: 500 }
     );
   }
