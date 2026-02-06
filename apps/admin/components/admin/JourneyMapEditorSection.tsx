@@ -556,24 +556,49 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Fetch data
-  const fetchData = useCallback(async () => {
+  // Map ID lookup from sequence order
+  const MAP_IDS = [
+    "pirate_cove", "space_station", "medieval_castle", "cyber_city", "ancient_temple",
+    "volcanic_island", "arctic_fortress", "dragon_realm", "celestial_kingdom", "hall_of_legends"
+  ];
+
+  // Get mapId from sequence order
+  const getMapIdFromOrder = (order: number) => MAP_IDS[order - 1] || "traders_journey";
+
+  // Fetch data for a specific map
+  const fetchData = useCallback(async (mapId?: string) => {
+    const targetMapId = mapId || getMapIdFromOrder(selectedSequenceMap);
     setLoading(true);
     try {
       const [mapRes, milestonesRes] = await Promise.all([
-        fetch("/api/journey-map?mapId=traders_journey"),
-        fetch("/api/journey-milestones?mapId=traders_journey"),
+        fetch(`/api/journey-map?mapId=${targetMapId}`),
+        fetch(`/api/journey-milestones?mapId=${targetMapId}`),
       ]);
 
       const mapData = await mapRes.json();
       const milestonesData = await milestonesRes.json();
 
-      if (mapData.success) {
+      if (mapData.success && mapData.mapConfig) {
         setMapConfig(mapData.mapConfig);
+      } else {
+        // If map doesn't exist, create a placeholder config
+        setMapConfig({
+          mapId: targetMapId,
+          name: MAP_IDS[selectedSequenceMap - 1]?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Journey Map",
+          description: "Journey map awaiting generation",
+          zones: [],
+          defaultStartNode: "start",
+          backgroundColor: "#1a3a5c",
+          backgroundImage: `/assets/maps/${targetMapId.replace(/_/g, "-")}.png`,
+          isActive: true,
+          version: 1,
+        } as MapConfig);
       }
 
       if (milestonesData.success) {
-        setMilestones(milestonesData.milestones);
+        setMilestones(milestonesData.milestones || []);
+      } else {
+        setMilestones([]);
       }
     } catch (error) {
       console.error("Error fetching journey data:", error);
@@ -581,7 +606,15 @@ export default function JourneyMapEditorSection() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedSequenceMap]);
+
+  // Load a specific map from the 10-map sequence
+  const loadSequenceMap = async (sequenceOrder: number) => {
+    setSelectedSequenceMap(sequenceOrder);
+    const mapId = getMapIdFromOrder(sequenceOrder);
+    await fetchData(mapId);
+    setSelectedTab("map"); // Switch to map view
+  };
 
   useEffect(() => {
     fetchData();
@@ -1349,9 +1382,40 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Render visual map with treasure map background
+  // Render visual map with dynamic background
   const renderVisualMap = () => (
     <div className="space-y-4">
+      {/* Current Map Header */}
+      <div className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 p-4 rounded-lg border border-slate-700">
+        <div>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Map className="h-5 w-5 text-amber-400" />
+            {mapConfig?.name || "Journey Map"}
+          </h3>
+          <p className="text-sm text-slate-400">
+            Map {selectedSequenceMap} of 10 • {milestones.length} milestones
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => loadSequenceMap(Math.max(1, selectedSequenceMap - 1))}
+            disabled={selectedSequenceMap <= 1}
+          >
+            ← Prev Map
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => loadSequenceMap(Math.min(10, selectedSequenceMap + 1))}
+            disabled={selectedSequenceMap >= 10}
+          >
+            Next Map →
+          </Button>
+        </div>
+      </div>
+
       {/* Map Toolbar */}
       <div className="flex items-center justify-between bg-slate-800 p-3 rounded-lg">
         <div className="flex items-center gap-2">
@@ -1441,16 +1505,20 @@ export default function JourneyMapEditorSection() {
             transformOrigin: "top left",
           }}
         >
-          {/* Treasure Map Background */}
+          {/* Map Background */}
           <Image
-            src="/assets/treasure-map.png"
-            alt="Treasure Map"
+            src={mapConfig?.backgroundImage || "/assets/maps/pirate-cove.png"}
+            alt={mapConfig?.name || "Journey Map"}
             width={MAP_WIDTH}
             height={MAP_HEIGHT}
             className="absolute top-0 left-0"
             style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
             priority
             draggable={false}
+            onError={(e) => {
+              // Fallback to default map if image not found
+              (e.target as HTMLImageElement).src = "/assets/maps/pirate-cove.png";
+            }}
           />
 
           {/* Path Connections */}
@@ -2209,10 +2277,9 @@ export default function JourneyMapEditorSection() {
                   className={`cursor-pointer transition-all hover:scale-105 ${
                     selectedSequenceMap === map.order ? "ring-2 ring-primary" : ""
                   }`}
-                  onClick={() => {
-                    setSelectedSequenceMap(map.order);
-                    // Could load this specific map here
-                  }}
+                  onClick={() => setSelectedSequenceMap(map.order)}
+                  onDoubleClick={() => loadSequenceMap(map.order)}
+                  title="Click to select, double-click to view"
                 >
                   <CardHeader className="p-3">
                     <div 
@@ -2333,9 +2400,7 @@ export default function JourneyMapEditorSection() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setSelectedTab("map");
-                }}
+                onClick={() => loadSequenceMap(selectedSequenceMap)}
               >
                 <Eye className="h-4 w-4 mr-2" />
                 View Map {selectedSequenceMap}
