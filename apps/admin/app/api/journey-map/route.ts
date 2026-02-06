@@ -16,15 +16,20 @@ export async function GET(request: NextRequest) {
     const mapConfig = await JourneyMapConfig.findOne({ mapId }).lean();
 
     if (!mapConfig) {
+      // Return empty config instead of 404 for better UX
+      // The UI can then prompt to generate the map
       return NextResponse.json({
-        success: false,
-        error: "Map not found",
-      }, { status: 404 });
+        success: true,
+        mapConfig: null,
+        exists: false,
+        message: `Map "${mapId}" not found. Please generate it first.`,
+      });
     }
 
     return NextResponse.json({
       success: true,
       mapConfig,
+      exists: true,
     });
   } catch (error) {
     console.error("Error fetching journey map:", error);
