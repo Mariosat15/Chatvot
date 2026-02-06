@@ -5,7 +5,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
  */
 export interface IMilestoneCondition {
   type: string;
-  value?: number;
+  value?: number | string; // Number for counts, string for IDs (e.g., map_completed uses mapId)
   comparison?: "gte" | "lte" | "eq" | "gt" | "lt";
   minTrades?: number;
   minCompletedCompetitions?: number;
@@ -70,7 +70,7 @@ export interface IJourneyMilestone extends Document {
 const MilestoneConditionSchema = new Schema<IMilestoneCondition>(
   {
     type: { type: String, required: true },
-    value: { type: Number },
+    value: { type: Schema.Types.Mixed }, // Mixed to support both numbers (counts) and strings (IDs)
     comparison: { type: String, enum: ["gte", "lte", "eq", "gt", "lt"] },
     minTrades: { type: Number },
     minCompletedCompetitions: { type: Number },
