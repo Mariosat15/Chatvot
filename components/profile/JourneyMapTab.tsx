@@ -197,7 +197,10 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
           description: currentMap.description,
           zones: currentMap.zones || [],
           backgroundColor: currentMap.backgroundColor || "#1a3a5c",
-          backgroundImage: currentMap.backgroundImage,
+          // Ensure valid backgroundImage - fallback if old/invalid path
+          backgroundImage: currentMap.backgroundImage?.includes("treasure-map") 
+            ? `/assets/maps/${currentMap.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`
+            : currentMap.backgroundImage || `/assets/maps/${currentMap.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`,
           sequenceOrder: currentMap.sequenceOrder,
           theme: currentMap.theme,
           difficulty: currentMap.difficulty,
@@ -227,7 +230,10 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
         description: map.description,
         zones: map.zones || [],
         backgroundColor: map.backgroundColor || "#1a3a5c",
-        backgroundImage: map.backgroundImage,
+        // Ensure valid backgroundImage - fallback if old/invalid path
+        backgroundImage: map.backgroundImage?.includes("treasure-map") 
+          ? `/assets/maps/${map.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`
+          : map.backgroundImage || `/assets/maps/${map.mapId?.replace(/_/g, "-") || "pirate-cove"}.png`,
         sequenceOrder: map.sequenceOrder,
         theme: map.theme,
         difficulty: map.difficulty,
