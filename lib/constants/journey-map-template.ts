@@ -6,7 +6,7 @@ import type { IMilestoneCondition, IMilestoneReward, MilestoneNodeType } from "@
  * Treasure Map themed progression system
  * 
  * Map dimensions: 1200 x 800
- * Islands positioned to match the treasure-map.png background
+ * Islands positioned to match the pirate-cove.png background
  */
 
 // ============================================
@@ -648,7 +648,7 @@ export const DEFAULT_MAP_CONFIG = {
   zones: DEFAULT_ZONES,
   defaultStartNode: "account_created",
   backgroundColor: "#1a3a5c",
-  backgroundImage: "/assets/treasure-map.png",
+  backgroundImage: "/assets/maps/pirate-cove.png",
   isActive: true,
   version: 1,
 };

@@ -1354,7 +1354,7 @@ export default function JourneyMapEditorSection() {
           zones: zonesData,
           defaultStartNode: "island_1_1",
           backgroundColor: "#1a3a5c",
-          backgroundImage: "/assets/treasure-map.png",
+          backgroundImage: "/assets/maps/pirate-cove.png",
           isActive: true,
         }),
       });
@@ -3770,8 +3770,8 @@ export default function JourneyMapEditorSection() {
               >
                 {/* Map Image */}
                 <Image
-                  src="/assets/treasure-map.png"
-                  alt="Treasure Map"
+                  src="/assets/maps/pirate-cove.png"
+                  alt="Journey Map"
                   fill
                   className="object-contain pointer-events-none"
                   draggable={false}
@@ -4055,7 +4055,7 @@ export default function JourneyMapEditorSection() {
                   className="object-cover opacity-80"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = "/assets/treasure-map.png";
+                    target.src = "/assets/maps/pirate-cove.png";
                   }}
                 />
                 
