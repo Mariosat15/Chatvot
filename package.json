@@ -85,7 +85,7 @@
     "openai": "^6.15.0",
     "pdf-lib": "^1.17.1",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react-dom": "19.2.3",
     "react-grid-layout": "^1.5.2",
     "react-hook-form": "^7.62.0",
     "react-select-country-list": "^2.2.3",
