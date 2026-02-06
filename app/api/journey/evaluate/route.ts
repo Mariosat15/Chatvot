@@ -43,17 +43,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Get first milestone from first map for default
+    const firstMapMilestones = await JourneyMilestone.find({ 
+      mapId: (maps[0] as any).mapId, 
+      isActive: true 
+    }).sort({ order: 1 }).limit(1).lean();
+    const firstMilestoneId = (firstMapMilestones[0] as any)?.id || "account_created";
+
     // Get or create user progress
     let progress = await UserJourneyProgress.findOne({ userId });
     if (!progress) {
       progress = await UserJourneyProgress.create({
         userId,
-        mapId: maps[0].mapId,
+        mapId: (maps[0] as any).mapId,
         currentMapIndex: 1,
         currentZone: "zone_1",
-        currentMilestone: "",
+        currentMilestone: firstMilestoneId,
         completedMilestones: [],
-        unlockedMilestones: [],
+        unlockedMilestones: [firstMilestoneId],
         totalXPFromJourney: 0,
         totalMilestonesCompleted: 0,
         journeyStartedAt: new Date(),

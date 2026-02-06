@@ -65,6 +65,7 @@ import {
   Sparkles,
   Zap,
   Wrench,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -345,6 +346,7 @@ export default function JourneyMapEditorSection() {
   const [sequenceGenerating, setSequenceGenerating] = useState(false);
   const [showSequenceDialog, setShowSequenceDialog] = useState(false);
   const [sequenceValidation, setSequenceValidation] = useState<any>(null);
+  const [syncingAllUsers, setSyncingAllUsers] = useState(false);
   
   // Visual Placement Wizard State
   const [showPlacementWizard, setShowPlacementWizard] = useState(false);
@@ -900,6 +902,41 @@ export default function JourneyMapEditorSection() {
     } catch (error) {
       console.error("Fix error:", error);
       toast.error("Failed to fix validation issues");
+    }
+  };
+
+  // Sync all users' journey progress
+  const syncAllUsersProgress = async () => {
+    try {
+      setSyncingAllUsers(true);
+      toast.info("Syncing all users' journey progress...");
+      
+      const response = await fetch("/api/journey/sync-all-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          `Synced ${data.usersProcessed} users! ` +
+          `${data.totalMilestonesCompleted} milestones completed, ` +
+          `${data.totalXPAwarded} XP awarded.`
+        );
+        
+        if (data.errors?.length > 0) {
+          console.warn("Sync errors:", data.errors);
+          toast.warning(`${data.errors.length} users had errors`);
+        }
+      } else {
+        toast.error(data.error || "Failed to sync users");
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast.error("Failed to sync all users");
+    } finally {
+      setSyncingAllUsers(false);
     }
   };
 
@@ -2512,6 +2549,15 @@ export default function JourneyMapEditorSection() {
           <Button variant="outline" onClick={deleteEverything} className="border-red-600 text-red-600 hover:bg-red-600/10">
             <AlertTriangle className="h-4 w-4 mr-2" />
             Delete All
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={syncAllUsersProgress} 
+            disabled={syncingAllUsers}
+            className="border-purple-600 text-purple-600 hover:bg-purple-600/10"
+          >
+            {syncingAllUsers ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />}
+            {syncingAllUsers ? "Syncing..." : "Sync All Users"}
           </Button>
           <Button variant="outline" onClick={() => fetchData()}>
             <RefreshCw className="h-4 w-4 mr-2" />

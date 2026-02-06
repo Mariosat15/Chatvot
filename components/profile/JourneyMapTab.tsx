@@ -66,7 +66,6 @@ const TRADERS_JOURNEY_OVERVIEW = {
 
 export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapData[]>([]);
   const [currentMapIndex, setCurrentMapIndex] = useState(0); // Start at overview (0)
@@ -186,13 +185,8 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   }, [userId]);
 
   // Auto-evaluate user's progress and complete milestones they've already achieved
-  const evaluateProgress = useCallback(async (showToast = false) => {
+  const evaluateProgress = useCallback(async () => {
     try {
-      setSyncing(true);
-      if (showToast) {
-        toast.info("Syncing your progress...");
-      }
-      
       const res = await fetch("/api/journey/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,43 +194,13 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
       });
       const data = await res.json();
       
-      console.log("[Journey] Evaluation result:", data);
-      
-      if (data.success) {
-        if (data.newlyCompleted?.length > 0) {
-          toast.success(`Completed ${data.newlyCompleted.length} milestones! +${data.totalXPEarned} XP`);
-          console.log("[Journey] Completed milestones:", data.newlyCompleted);
-        } else if (showToast) {
-          toast.info("Progress is up to date!");
-        }
-        
-        if (data.newlyUnlocked?.length > 0) {
-          console.log("[Journey] Unlocked milestones:", data.newlyUnlocked);
-        }
-        
-        // Log debug info
-        if (data.debug) {
-          console.log("[Journey] Debug:", data.debug);
-        }
-        if (data.userStats) {
-          console.log("[Journey] User stats:", data.userStats);
-        }
-        
+      if (data.success && data.newlyCompleted?.length > 0) {
+        toast.success(`Completed ${data.newlyCompleted.length} milestones! +${data.totalXPEarned} XP`);
         // Refresh progress after evaluation
         await fetchProgress();
-      } else {
-        console.error("[Journey] Evaluation failed:", data.error);
-        if (showToast) {
-          toast.error("Failed to sync progress");
-        }
       }
     } catch (err) {
       console.error("Error evaluating progress:", err);
-      if (showToast) {
-        toast.error("Failed to sync progress");
-      }
-    } finally {
-      setSyncing(false);
     }
   }, [userId, fetchProgress]);
 
@@ -882,18 +846,6 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
                     <div className="text-xs text-muted-foreground">of {milestones.length}</div>
                     <div className="text-xs text-amber-400 font-medium">Milestones</div>
                   </div>
-                  
-                  {/* Sync Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => evaluateProgress(true)}
-                    disabled={syncing}
-                    className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-1.5 ${syncing ? "animate-spin" : ""}`} />
-                    {syncing ? "Syncing..." : "Sync"}
-                  </Button>
                   
                   {/* Navigation */}
                   <div className="flex gap-2">
