@@ -7,7 +7,6 @@ export type BadgeCategory =
   | "Risk"
   | "Speed"
   | "Consistency"
-  | "Volume"
   | "Strategy"
   | "Social"
   | "Legendary";
@@ -31,17 +30,9 @@ export interface Badge {
 
 export const BADGES: Badge[] = [
   // ============================================
-  // COMPETITION BADGES (20)
+  // COMPETITION BADGES - MASTERY (5+ entries, 3+ wins, 5+ podiums)
+  // "First" achievements are handled by Journey Milestones only
   // ============================================
-  {
-    id: "comp_first_entry",
-    name: "First Competition",
-    description: "Joined first competition",
-    category: "Competition",
-    icon: "target",
-    rarity: "common",
-    condition: { type: "competitions_entered", value: 1, comparison: "gte" },
-  },
   {
     id: "comp_5_entries",
     name: "Competition Regular",
@@ -79,44 +70,44 @@ export const BADGES: Badge[] = [
     condition: { type: "competitions_entered", value: 50, comparison: "gte" },
   },
   {
-    id: "comp_first_win",
-    name: "First Victory",
-    description: "Won first place",
-    category: "Competition",
-    icon: "goldMedal",
-    rarity: "rare",
-    condition: { type: "first_place_finishes", value: 1, comparison: "gte" },
-  },
-  {
     id: "comp_3_wins",
     name: "Champion",
-    description: "Won 3 times",
+    description: "Won 3 competitions",
     category: "Competition",
     icon: "crown",
-    rarity: "epic",
+    rarity: "rare",
     condition: { type: "first_place_finishes", value: 3, comparison: "gte" },
+  },
+  {
+    id: "comp_5_wins",
+    name: "Serial Winner",
+    description: "Won 5 competitions",
+    category: "Competition",
+    icon: "goldMedal",
+    rarity: "epic",
+    condition: { type: "first_place_finishes", value: 5, comparison: "gte" },
   },
   {
     id: "comp_10_wins",
     name: "Dominator",
-    description: "Won 10 times",
+    description: "Won 10 competitions",
     category: "Competition",
     icon: "lightningSpell",
     rarity: "legendary",
     condition: { type: "first_place_finishes", value: 10, comparison: "gte" },
   },
   {
-    id: "comp_podium",
-    name: "Podium Finisher",
-    description: "Top 3 finish",
+    id: "comp_5_podiums",
+    name: "Podium Regular",
+    description: "5 podium finishes",
     category: "Competition",
     icon: "trophy",
     rarity: "common",
-    condition: { type: "podium_finishes", value: 1, comparison: "gte" },
+    condition: { type: "podium_finishes", value: 5, comparison: "gte" },
   },
   {
     id: "comp_10_podiums",
-    name: "Podium Regular",
+    name: "Podium Pro",
     description: "10 podium finishes",
     category: "Competition",
     icon: "starAward",
@@ -220,31 +211,23 @@ export const BADGES: Badge[] = [
   },
 
   // ============================================
-  // TRADING VOLUME BADGES (15)
+  // TRADING VOLUME BADGES - MASTERY (25+ trades)
+  // "First Trade" and early trades are Journey Milestones only
   // ============================================
   {
-    id: "trade_first",
-    name: "First Trade",
-    description: "Placed first trade",
-    category: "Volume",
-    icon: "profit",
-    rarity: "common",
-    condition: { type: "total_trades", value: 1, comparison: "gte" },
-  },
-  {
-    id: "trade_10",
+    id: "trade_25",
     name: "Active Trader",
-    description: "Placed 10 trades",
-    category: "Volume",
+    description: "Placed 25 trades",
+    category: "Trading",
     icon: "trade",
     rarity: "common",
-    condition: { type: "total_trades", value: 10, comparison: "gte" },
+    condition: { type: "total_trades", value: 25, comparison: "gte" },
   },
   {
     id: "trade_50",
     name: "Frequent Trader",
     description: "Placed 50 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "portfolio",
     rarity: "common",
     condition: { type: "total_trades", value: 50, comparison: "gte" },
@@ -253,7 +236,7 @@ export const BADGES: Badge[] = [
     id: "trade_100",
     name: "Century Mark",
     description: "Placed 100 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "starBadge",
     rarity: "rare",
     condition: { type: "total_trades", value: 100, comparison: "gte" },
@@ -262,7 +245,7 @@ export const BADGES: Badge[] = [
     id: "trade_500",
     name: "Heavy Trader",
     description: "Placed 500 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "fireSpell",
     rarity: "epic",
     condition: { type: "total_trades", value: 500, comparison: "gte" },
@@ -271,7 +254,7 @@ export const BADGES: Badge[] = [
     id: "trade_1000",
     name: "Trading Machine",
     description: "Placed 1000 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "joystick1",
     rarity: "legendary",
     condition: { type: "total_trades", value: 1000, comparison: "gte" },
@@ -280,7 +263,7 @@ export const BADGES: Badge[] = [
     id: "trade_2500",
     name: "High Volume",
     description: "Placed 2500 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "headset",
     rarity: "legendary",
     condition: { type: "total_trades", value: 2500, comparison: "gte" },
@@ -289,7 +272,7 @@ export const BADGES: Badge[] = [
     id: "trade_5000",
     name: "Ultra Trader",
     description: "Placed 5000 trades",
-    category: "Volume",
+    category: "Trading",
     icon: "star3",
     rarity: "legendary",
     condition: { type: "total_trades", value: 5000, comparison: "gte" },
@@ -298,16 +281,16 @@ export const BADGES: Badge[] = [
     id: "trade_day_trader",
     name: "Day Trader",
     description: "10+ trades daily",
-    category: "Volume",
+    category: "Trading",
     icon: "timer",
     rarity: "rare",
-    condition: { type: "daily_trade_volume", value: 10, comparison: "gte", minTrades: 10 },
+    condition: { type: "daily_trade_volume", value: 10, comparison: "gte", minTrades: 25 },
   },
   {
     id: "trade_scalper",
     name: "Scalper",
     description: "50+ trades daily",
-    category: "Volume",
+    category: "Trading",
     icon: "lightningSpell",
     rarity: "epic",
     condition: { type: "daily_trade_volume", value: 50, comparison: "gte", minTrades: 50 },
@@ -316,7 +299,7 @@ export const BADGES: Badge[] = [
     id: "trade_marathon_session",
     name: "Marathon Session",
     description: "100+ trades single day",
-    category: "Volume",
+    category: "Trading",
     icon: "war",
     rarity: "legendary",
     condition: { type: "single_day_trades", value: 100, comparison: "gte", minTrades: 100 },
@@ -325,7 +308,7 @@ export const BADGES: Badge[] = [
     id: "trade_busy_week",
     name: "Busy Week",
     description: "100+ trades weekly",
-    category: "Volume",
+    category: "Trading",
     icon: "flag",
     rarity: "rare",
     condition: { type: "weekly_trade_volume", value: 100, comparison: "gte", minTrades: 100 },
@@ -334,7 +317,7 @@ export const BADGES: Badge[] = [
     id: "trade_monthly_grind",
     name: "Monthly Grinder",
     description: "500+ trades monthly",
-    category: "Volume",
+    category: "Trading",
     icon: "banner",
     rarity: "epic",
     condition: { type: "monthly_trade_volume", value: 500, comparison: "gte", minTrades: 500 },
@@ -343,41 +326,78 @@ export const BADGES: Badge[] = [
     id: "trade_diverse",
     name: "Diverse Trader",
     description: "Traded 10+ pairs",
-    category: "Volume",
+    category: "Trading",
     icon: "maps",
     rarity: "rare",
-    condition: { type: "unique_pairs_traded", value: 10, comparison: "gte", minTrades: 30 },
+    condition: { type: "unique_pairs_traded", value: 10, comparison: "gte", minTrades: 50 },
   },
   {
     id: "trade_specialist",
     name: "Pair Specialist",
     description: "100+ trades one pair",
-    category: "Volume",
+    category: "Trading",
     icon: "target",
     rarity: "rare",
     condition: { type: "single_pair_focus", value: 100, comparison: "gte", minTrades: 100 },
   },
 
   // ============================================
-  // PROFIT & LOSS BADGES (20)
+  // PROFIT & LOSS BADGES - MASTERY (5+ wins, 25+ trades minimum)
+  // "First Profit" is a Journey Milestone only
   // ============================================
   {
-    id: "profit_first",
-    name: "First Profit",
-    description: "First winning trade",
+    id: "profit_5_wins",
+    name: "Winning Trader",
+    description: "Won 5 trades",
     category: "Profit",
     icon: "profit",
     rarity: "common",
-    condition: { type: "winning_trades", value: 1, comparison: "gte" },
+    condition: { type: "winning_trades", value: 5, comparison: "gte", minTrades: 10 },
+  },
+  {
+    id: "profit_10_wins",
+    name: "Consistent Winner",
+    description: "Won 10 trades",
+    category: "Profit",
+    icon: "gain",
+    rarity: "common",
+    condition: { type: "winning_trades", value: 10, comparison: "gte", minTrades: 15 },
+  },
+  {
+    id: "profit_25_wins",
+    name: "Profit Hunter",
+    description: "Won 25 trades",
+    category: "Profit",
+    icon: "treasure",
+    rarity: "rare",
+    condition: { type: "winning_trades", value: 25, comparison: "gte", minTrades: 35 },
+  },
+  {
+    id: "profit_50_wins",
+    name: "Profit Master",
+    description: "Won 50 trades",
+    category: "Profit",
+    icon: "chest",
+    rarity: "epic",
+    condition: { type: "winning_trades", value: 50, comparison: "gte", minTrades: 70 },
+  },
+  {
+    id: "profit_100_wins",
+    name: "Century Winner",
+    description: "Won 100 trades",
+    category: "Profit",
+    icon: "crown",
+    rarity: "legendary",
+    condition: { type: "winning_trades", value: 100, comparison: "gte", minTrades: 130 },
   },
   {
     id: "profit_positive",
     name: "In The Green",
     description: "Positive total P&L",
     category: "Profit",
-    icon: "gain",
+    icon: "dollarPlant",
     rarity: "common",
-    condition: { type: "total_pnl_positive", minTrades: 10 }, // Must have 10+ trades first
+    condition: { type: "total_pnl_positive", minTrades: 25 }, // Must have 25+ trades first
   },
   {
     id: "profit_1k",
@@ -995,7 +1015,8 @@ export const BADGES: Badge[] = [
   },
 
   // ============================================
-  // SOCIAL & ACHIEVEMENT BADGES (8)
+  // SOCIAL & ACHIEVEMENT BADGES - MASTERY (requires sustained activity)
+  // "First Deposit" is a Journey Milestone only
   // ============================================
   {
     id: "social_early_adopter",
@@ -1004,7 +1025,16 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "star1",
     rarity: "rare",
-    condition: { type: "early_adopter" },
+    condition: { type: "early_adopter", minTrades: 10 },
+  },
+  {
+    id: "social_3_months",
+    name: "Seasoned Trader",
+    description: "3 months active",
+    category: "Social",
+    icon: "pirateHat",
+    rarity: "rare",
+    condition: { type: "platform_age", value: 90, comparison: "gte", minTrades: 25 },
   },
   {
     id: "social_veteran",
@@ -1013,7 +1043,7 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "starAward",
     rarity: "epic",
-    condition: { type: "platform_age", value: 180, comparison: "gte", minTrades: 50 },
+    condition: { type: "platform_age", value: 180, comparison: "gte", minTrades: 75 },
   },
   {
     id: "social_og",
@@ -1022,16 +1052,16 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "lord",
     rarity: "legendary",
-    condition: { type: "platform_age", value: 365, comparison: "gte", minTrades: 100 },
+    condition: { type: "platform_age", value: 365, comparison: "gte", minTrades: 150 },
   },
   {
-    id: "social_deposit",
-    name: "First Deposit",
-    description: "Made first deposit",
+    id: "social_depositor",
+    name: "Consistent Depositor",
+    description: "Made 5+ deposits",
     category: "Social",
     icon: "moneyDeposit",
     rarity: "common",
-    condition: { type: "first_deposit" },
+    condition: { type: "total_deposits", value: 5, comparison: "gte" },
   },
   {
     id: "social_whale",
@@ -1040,16 +1070,16 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "treasure",
     rarity: "epic",
-    condition: { type: "total_deposited", value: 1000, comparison: "gte" },
+    condition: { type: "total_deposited", value: 1000, comparison: "gte", minTrades: 25 },
   },
   {
     id: "social_cashout",
     name: "Cash Out King",
-    description: "Withdrew profits",
+    description: "Made 3+ withdrawals",
     category: "Social",
     icon: "coin",
     rarity: "rare",
-    condition: { type: "withdrawal_made" },
+    condition: { type: "total_withdrawals", value: 3, comparison: "gte", minTrades: 25 },
   },
   {
     id: "social_big_cashout",
@@ -1058,7 +1088,7 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "gems",
     rarity: "epic",
-    condition: { type: "large_withdrawal" },
+    condition: { type: "large_withdrawal", minTrades: 50 },
   },
   {
     id: "social_net_positive",
@@ -1067,7 +1097,7 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "profit",
     rarity: "legendary",
-    condition: { type: "net_profit_lifetime", minTrades: 50 },
+    condition: { type: "net_profit_lifetime", minTrades: 75 },
   },
 
   // ============================================

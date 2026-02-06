@@ -150,7 +150,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "medium",
     unlockCondition: { type: "account_created" },
     completeCondition: { type: "first_deposit" },
-    rewards: { xp: 0, badgeId: "social_deposit" }, // Badge gives XP, not milestone
+    rewards: { xp: 25 }, // Journey milestone - XP only, no badge
     connectedTo: ["first_trade"],
     connectedFrom: ["account_created"],
     isRequired: true,
@@ -172,7 +172,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "medium",
     unlockCondition: { type: "first_deposit" },
     completeCondition: { type: "total_trades", value: 1, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "trade_first" },
+    rewards: { xp: 30 }, // Journey milestone - XP only, no badge
     connectedTo: ["first_buy", "first_sell"],
     connectedFrom: ["first_deposit"],
     isRequired: true,
@@ -262,7 +262,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "medium",
     unlockCondition: { type: "total_trades", value: 5, comparison: "gte" },
     completeCondition: { type: "winning_trades", value: 1, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "profit_first" },
+    rewards: { xp: 35 }, // Journey milestone - XP only, no badge
     connectedTo: ["active_trader", "choose_path"],
     connectedFrom: ["close_trade"],
     isRequired: true,
@@ -306,7 +306,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "medium",
     unlockCondition: { type: "winning_trades", value: 1, comparison: "gte" },
     completeCondition: { type: "total_trades", value: 10, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "trade_10" },
+    rewards: { xp: 40 }, // Journey milestone - XP only, badges start at 25+ trades
     connectedTo: ["choose_path"],
     connectedFrom: ["first_profit", "market_lesson"],
     isRequired: true,
@@ -486,7 +486,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "large",
     unlockCondition: { type: "total_trades", value: 30, comparison: "gte" },
     completeCondition: { type: "competitions_entered", value: 1, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "comp_first_entry" },
+    rewards: { xp: 50 }, // Journey milestone - XP only, badges start at 5+ entries
     connectedTo: ["competition_regular", "first_podium"],
     connectedFrom: ["scalper_cove", "consistent_winner", "risk_master"],
     isRequired: true,
@@ -530,7 +530,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "large",
     unlockCondition: { type: "competitions_entered", value: 1, comparison: "gte" },
     completeCondition: { type: "podium_finishes", value: 1, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "comp_podium" },
+    rewards: { xp: 75 }, // Journey milestone - XP only, badges start at 5+ podiums
     connectedTo: ["champion", "hot_streak"],
     connectedFrom: ["enter_arena", "competition_regular"],
     isRequired: true,
@@ -556,7 +556,7 @@ export const DEFAULT_MILESTONES: MilestoneTemplate[] = [
     size: "large",
     unlockCondition: { type: "podium_finishes", value: 1, comparison: "gte" },
     completeCondition: { type: "first_place_finishes", value: 1, comparison: "gte" },
-    rewards: { xp: 0, badgeId: "comp_first_win" },
+    rewards: { xp: 100 }, // Journey milestone - XP only, badges start at 3+ wins
     connectedTo: ["legendary_captain"],
     connectedFrom: ["first_podium"],
     isRequired: false,

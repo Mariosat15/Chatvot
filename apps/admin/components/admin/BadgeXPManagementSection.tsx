@@ -967,7 +967,6 @@ export default function BadgeXPManagementSection() {
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="Competition">Competition</SelectItem>
                   <SelectItem value="Trading">Trading</SelectItem>
-                  <SelectItem value="Volume">Volume</SelectItem>
                   <SelectItem value="Profit">Profit</SelectItem>
                   <SelectItem value="Risk">Risk</SelectItem>
                   <SelectItem value="Speed">Speed</SelectItem>
@@ -1421,7 +1420,7 @@ export default function BadgeXPManagementSection() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Competition">Competition</SelectItem>
-                      <SelectItem value="Volume">Volume</SelectItem>
+                      <SelectItem value="Trading">Trading</SelectItem>
                       <SelectItem value="Profit">Profit</SelectItem>
                       <SelectItem value="Risk">Risk</SelectItem>
                       <SelectItem value="Speed">Speed</SelectItem>
