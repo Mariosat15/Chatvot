@@ -377,6 +377,98 @@ export default function JourneyMapEditorSection() {
     }
   };
 
+  // Generate full 10-map sequence with AI
+  const generateFullSequence = async () => {
+    setSequenceGenerating(true);
+    setShowSequenceDialog(false);
+    
+    try {
+      toast.info("Generating full 10-map sequence... This may take a minute.");
+      
+      const response = await fetch("/api/ai/generate-journey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate_map_sequence",
+          startFromMap: 1,
+          endAtMap: 10,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Generated ${data.totalMilestones} milestones across ${data.mapsGenerated} maps!`);
+        // Refresh the milestones list
+        await fetchMilestones();
+        // Validate the sequence
+        await validateFullSequence();
+      } else {
+        toast.error(data.error || "Failed to generate sequence");
+      }
+    } catch (error) {
+      console.error("Sequence generation error:", error);
+      toast.error("Failed to generate full sequence");
+    } finally {
+      setSequenceGenerating(false);
+    }
+  };
+
+  // Validate full 10-map sequence
+  const validateFullSequence = async () => {
+    setSequenceLoading(true);
+    
+    try {
+      const response = await fetch("/api/ai/generate-journey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "validate_sequence",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSequenceValidation(data.validation);
+        if (data.validation.isValid) {
+          toast.success("All maps validated successfully!");
+        } else {
+          toast.warning(`Found ${data.validation.errors?.length || 0} errors across maps`);
+        }
+      }
+    } catch (error) {
+      console.error("Sequence validation error:", error);
+      toast.error("Failed to validate sequence");
+    } finally {
+      setSequenceLoading(false);
+    }
+  };
+
+  // Connect maps in sequence (set previousMapId/nextMapId)
+  const connectMapsInSequence = async () => {
+    try {
+      const response = await fetch("/api/ai/generate-journey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "connect_maps",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Connected ${data.mapsConnected} maps in sequence!`);
+      } else {
+        toast.error(data.error || "Failed to connect maps");
+      }
+    } catch (error) {
+      console.error("Connect maps error:", error);
+      toast.error("Failed to connect maps");
+    }
+  };
+
   // Validate journey with AI
   const validateJourney = async () => {
     try {
@@ -3209,6 +3301,75 @@ export default function JourneyMapEditorSection() {
           </div>
         </div>
       )}
+
+      {/* Full Sequence Generation Dialog */}
+      <Dialog open={showSequenceDialog} onOpenChange={setShowSequenceDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-purple-500" />
+              Generate Full 10-Map Sequence
+            </DialogTitle>
+            <DialogDescription>
+              This will use AI to generate milestones for all 10 maps with proper difficulty progression and XP economy.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <h4 className="font-semibold text-amber-400 mb-2">⚠️ Warning</h4>
+              <p className="text-sm text-muted-foreground">
+                This will generate new milestones for all maps. Existing milestones will be preserved unless you manually clear them first.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">What will be generated:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• 200 total milestones across 10 themed maps</li>
+                <li>• Progressive difficulty from Pirate Cove (easy) to Hall of Legends (legendary)</li>
+                <li>• Front-loaded XP economy (12,250+ total XP)</li>
+                <li>• Linear prerequisite chains within each map</li>
+                <li>• Map completion conditions to unlock next maps</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="bg-slate-800 rounded-lg p-3">
+                <div className="text-2xl font-bold text-green-400">~2 min</div>
+                <div className="text-xs text-muted-foreground">Estimated Time</div>
+              </div>
+              <div className="bg-slate-800 rounded-lg p-3">
+                <div className="text-2xl font-bold text-blue-400">10</div>
+                <div className="text-xs text-muted-foreground">Maps to Generate</div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSequenceDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={generateFullSequence}
+              disabled={sequenceGenerating}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            >
+              {sequenceGenerating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Start Generation
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
