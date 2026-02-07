@@ -1122,9 +1122,9 @@ export async function checkBadgeCondition(
 
 /**
  * Helper function to compare values
- * EXPORTED: For testing/simulation in admin panel
+ * Internal use only - not exported due to "use server" async requirement
  */
-export function compareValue(
+function compareValue(
   actual: number | undefined,
   expected: number | undefined,
   comparison: "gte" | "lte" | "eq" | undefined,
