@@ -7,6 +7,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { evaluateMilestoneCondition } from "@/lib/services/journey-milestone-evaluation.service";
 
 /**
  * POST /api/journey/evaluate
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
           );
           isMet = allRequiredCompleted || completedMaps.has(requiredMapId);
         } else {
-          isMet = evaluateCondition(condition, userStats);
+          isMet = evaluateMilestoneCondition(condition, userStats);
         }
         
         if (isMet) {
@@ -380,82 +381,6 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
   }
 
   return stats;
-}
-
-/**
- * Evaluate if a milestone condition is met - COMPREHENSIVE VERSION
- */
-function evaluateCondition(
-  condition: { type: string; value?: number | string; comparison?: string } | undefined,
-  userStats: Record<string, number | boolean>
-): boolean {
-  if (!condition) return false;
-
-  const { type, value, comparison = "gte" } = condition;
-  const userValue = userStats[type];
-
-  // === BOOLEAN CONDITIONS (value of 1 means "true") ===
-  const booleanConditions = [
-    "account_created",
-    "kyc_verified", 
-    "first_deposit",
-    "has_deposit",
-    "first_trade",
-    "first_withdrawal",
-    "withdrawal_made",
-    "first_winning_trade",
-    "first_losing_trade",
-    "first_stop_loss",
-    "first_take_profit",
-    "total_pnl_positive",
-  ];
-  
-  if (booleanConditions.includes(type)) {
-    // If value is 1, we're checking for true
-    if (value === 1 || value === "1") {
-      return userStats[type] === true;
-    }
-    return userStats[type] === true;
-  }
-
-  // === MAP COMPLETED CONDITIONS (special string comparison) ===
-  if (type === "map_completed") {
-    // For map_completed, we'd need to check user's progress
-    // This will be checked separately in the progression logic
-    // For now, return false as this needs map progression check
-    return false;
-  }
-
-  // === NUMERIC CONDITIONS ===
-  const numericValue = typeof value === "string" ? parseFloat(value) : value;
-  const numericUserValue = typeof userValue === "number" ? userValue : 0;
-
-  // If value is not provided or user value is not numeric, return false
-  if (numericValue === undefined || numericValue === null || isNaN(numericValue as number)) {
-    return false;
-  }
-
-  switch (comparison) {
-    case "gte":
-    case ">=":
-      return numericUserValue >= (numericValue as number);
-    case "gt":
-    case ">":
-      return numericUserValue > (numericValue as number);
-    case "lte":
-    case "<=":
-      return numericUserValue <= (numericValue as number);
-    case "lt":
-    case "<":
-      return numericUserValue < (numericValue as number);
-    case "eq":
-    case "=":
-    case "==":
-      return numericUserValue === numericValue;
-    default:
-      // Default to >= comparison
-      return numericUserValue >= (numericValue as number);
-  }
 }
 
 /**

@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import {
+  evaluateMilestoneCondition,
+  type MilestoneCondition,
+} from "@root/lib/services/journey-milestone-evaluation.service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-interface MilestoneCondition {
-  type: string;
-  value?: number | string;
-  comparison?: string;
-}
 
 interface MilestoneTestResult {
   milestoneId: string;
@@ -25,77 +23,6 @@ interface MilestoneTestResult {
   passed: boolean;
   reason: string;
   duration: number;
-}
-
-/**
- * Direct copy of evaluateCondition from production code
- * This ensures we're testing the actual evaluation logic
- */
-function evaluateCondition(
-  condition: MilestoneCondition | undefined,
-  userStats: Record<string, number | boolean>
-): boolean {
-  if (!condition) return false;
-
-  const { type, value, comparison = "gte" } = condition;
-  const userValue = userStats[type];
-
-  // === BOOLEAN CONDITIONS (value of 1 means "true") ===
-  const booleanConditions = [
-    "account_created",
-    "kyc_verified", 
-    "first_deposit",
-    "has_deposit",
-    "first_trade",
-    "first_withdrawal",
-    "withdrawal_made",
-    "first_winning_trade",
-    "first_losing_trade",
-    "first_stop_loss",
-    "first_take_profit",
-    "total_pnl_positive",
-  ];
-  
-  if (booleanConditions.includes(type)) {
-    if (value === 1 || value === "1") {
-      return userStats[type] === true;
-    }
-    return userStats[type] === true;
-  }
-
-  // === MAP COMPLETED CONDITIONS (special string comparison) ===
-  if (type === "map_completed") {
-    return false; // Requires special map progression check
-  }
-
-  // === NUMERIC CONDITIONS ===
-  const numericValue = typeof value === "string" ? parseFloat(value) : value;
-  const numericUserValue = typeof userValue === "number" ? userValue : 0;
-
-  if (numericValue === undefined || numericValue === null || isNaN(numericValue as number)) {
-    return false;
-  }
-
-  switch (comparison) {
-    case "gte":
-    case ">=":
-      return numericUserValue >= (numericValue as number);
-    case "gt":
-    case ">":
-      return numericUserValue > (numericValue as number);
-    case "lte":
-    case "<=":
-      return numericUserValue <= (numericValue as number);
-    case "lt":
-    case "<":
-      return numericUserValue < (numericValue as number);
-    case "eq":
-    case "=":
-    case "==":
-      return numericUserValue === numericValue;
-    default:
-      return numericUserValue >= (numericValue as number);
-  }
 }
 
 /**
@@ -353,7 +280,7 @@ export async function POST(request: Request) {
         reason = "No condition defined - milestone always passes";
       } else {
         try {
-          actual = evaluateCondition(condition, mockStats);
+          actual = evaluateMilestoneCondition(condition, mockStats);
           
           if (actual) {
             reason = "Milestone condition correctly evaluated to TRUE with valid stats";
@@ -402,7 +329,7 @@ export async function POST(request: Request) {
         let reasonFail = "";
         
         try {
-          actualFail = evaluateCondition(condition, failingStats);
+          actualFail = evaluateMilestoneCondition(condition, failingStats);
           
           if (!actualFail) {
             reasonFail = "Milestone condition correctly evaluated to FALSE with invalid stats";

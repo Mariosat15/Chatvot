@@ -7,6 +7,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { evaluateMilestoneCondition } from "@root/lib/services/journey-milestone-evaluation.service";
 
 /**
  * POST /api/journey/sync-all-users
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
               const allCompleted = requiredMilestones.every((m: any) => completedIds.includes(m.id));
               isMet = allCompleted || completedMaps.has(requiredMapId);
             } else {
-              isMet = evaluateCondition(condition, userStats);
+              isMet = evaluateMilestoneCondition(condition, userStats);
             }
 
             if (isMet) {
@@ -263,44 +264,3 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
   return stats;
 }
 
-/**
- * Evaluate condition against user stats
- */
-function evaluateCondition(
-  condition: { type: string; value?: number | string; comparison?: string } | undefined,
-  userStats: Record<string, number | boolean>
-): boolean {
-  if (!condition) return false;
-
-  const { type, value, comparison = "gte" } = condition;
-
-  const booleanConditions = [
-    "account_created", "kyc_verified", "first_deposit", "has_deposit",
-    "first_trade", "first_withdrawal", "first_winning_trade", "first_losing_trade",
-    "first_stop_loss", "first_take_profit",
-  ];
-  
-  if (booleanConditions.includes(type)) {
-    return userStats[type] === true;
-  }
-
-  if (type === "map_completed") {
-    return false; // Handled separately
-  }
-
-  const numericValue = typeof value === "string" ? parseFloat(value) : value;
-  const userValue = typeof userStats[type] === "number" ? userStats[type] as number : 0;
-
-  if (numericValue === undefined || numericValue === null || isNaN(numericValue as number)) {
-    return false;
-  }
-
-  switch (comparison) {
-    case "gte": case ">=": return userValue >= (numericValue as number);
-    case "gt": case ">": return userValue > (numericValue as number);
-    case "lte": case "<=": return userValue <= (numericValue as number);
-    case "lt": case "<": return userValue < (numericValue as number);
-    case "eq": case "=": case "==": return userValue === numericValue;
-    default: return userValue >= (numericValue as number);
-  }
-}
