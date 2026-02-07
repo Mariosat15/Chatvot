@@ -313,8 +313,8 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 35);
       break;
     case "range_trading":
-      baseStats.winRate = 52;
-      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 30);
+      baseStats.winRate = 56; // production: winRate >= 55
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 40);
       break;
     case "momentum_trading":
       baseStats.winRate = 50;
@@ -341,7 +341,7 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       baseStats.tradesUnder5Minutes = numericValue + 5;
       break;
     case "quick_scalps":
-      baseStats.tradesUnder5Minutes = 20;
+      baseStats.tradesUnder5Minutes = Math.max(55, (minTrades || 50) + 5); // production: >= 50
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 30);
       break;
     case "swing_trading_style":
@@ -353,13 +353,15 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 30);
       break;
     case "trades_at_market_open":
-      baseStats.tradesAtMarketOpen = numericValue + 5;
+    case "trades_at_open":
+      baseStats.tradesAtMarketOpen = Math.max(numericValue + 5, 25); // production: >= 20
       break;
     case "trades_at_market_close":
-      baseStats.tradesAtMarketClose = numericValue + 5;
+    case "trades_at_close":
+      baseStats.tradesAtMarketClose = Math.max(numericValue + 5, 25); // production: >= 20
       break;
     case "late_night_trader":
-      baseStats.tradesAtLateNight = numericValue + 5;
+      baseStats.tradesAtLateNight = Math.max((minTrades || 20) + 5, 25); // production: >= (minTrades || 20)
       break;
 
     // Consistency conditions
@@ -382,14 +384,18 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       baseStats.consecutiveTradingDays = numericValue + 5;
       break;
 
-    // Volume conditions
+    // Volume conditions (production uses these for daily/monthly/single_day volume badges)
     case "max_trades_in_one_day":
+    case "daily_trade_volume":
+    case "single_day_trades":
       baseStats.maxTradesInOneDay = numericValue + 5;
       break;
     case "max_trades_in_one_week":
+    case "weekly_trade_volume":
       baseStats.maxTradesInOneWeek = numericValue + 10;
       break;
     case "max_trades_in_one_month":
+    case "monthly_trade_volume":
       baseStats.maxTradesInOneMonth = numericValue + 20;
       break;
 
@@ -399,6 +405,47 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       break;
     case "wire_to_wire_wins":
       baseStats.wireToWireWins = numericValue + 1;
+      break;
+
+    // Conditions with no value (production uses fixed thresholds)
+    case "precise_entry_timing":
+      baseStats.winRate = 75; // production: winRate >= 70 && totalTrades >= 40
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 40);
+      break;
+    case "hall_of_fame_status":
+      baseStats.firstPlaceFinishes = 25; // production: >= 20
+      baseStats.totalPnl = 60000; // production: >= 50000
+      baseStats.competitionsEntered = Math.max(55, minCompletedCompetitions || 50);
+      break;
+    case "closes_all_daily":
+      baseStats.tradesOver1Day = 0; // production: === 0 && totalTrades >= 30
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 30);
+      break;
+    case "unique_strategy":
+      baseStats.profitFactor = 3.5; // production: >= 3
+      baseStats.uniquePairsTraded = 10; // production: >= 8
+      break;
+    case "patient_trading":
+      baseStats.averageTradeDuration = 90; // production: >= 60 minutes
+      baseStats.winRate = 60; // production: >= 55
+      break;
+    case "perfect_attendance":
+      baseStats.consecutiveTradingDays = 100; // production: >= 90
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 200);
+      break;
+    case "perfect_month":
+      baseStats.consecutiveTradingDays = 35; // production: >= 30
+      baseStats.winRate = 92; // production: >= 90
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 100);
+      break;
+    case "epic_comeback":
+      baseStats.comebackWins = 5; // production: >= 3
+      baseStats.totalPnl = Math.max(baseStats.totalPnl!, 5000); // production: >= 5000
+      break;
+    case "perfect_year":
+      baseStats.consecutiveTradingDays = 370; // production: >= 365
+      baseStats.totalPnl = 5000; // production: > 0
+      baseStats.winRate = 60; // production: >= 55
       break;
 
     default:

@@ -9,6 +9,7 @@ import UserBadge from "@/database/models/user-badge.model";
 import { Badge } from "@/lib/constants/badges";
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
+import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
 // Exported for testing/simulation purposes
 export interface UserStats {
@@ -578,8 +579,14 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     );
   }
 
-  // Calculate global rank (placeholder - will be calculated separately)
-  const globalRank = 999999;
+  // Global rank from leaderboard (lower = better; 1 = first). Uses cached leaderboard when available.
+  let globalRank = 999999;
+  try {
+    const rankResult = await getUserGlobalRank(userId);
+    if (rankResult.rank > 0) globalRank = rankResult.rank;
+  } catch (err) {
+    console.warn("[gatherUserStats] getUserGlobalRank failed, using fallback rank:", err);
+  }
 
   // Calculate additional placement finishes from participations
   const secondPlaceFinishes = participations.filter(
@@ -628,6 +635,26 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     // Referral model may not exist
   }
 
+  // Max drawdown: largest peak-to-trough decline in cumulative PnL, as % of peak (for badge thresholds like <= 10%)
+  let maxDrawdown = 0;
+  if (closedTrades.length > 0) {
+    const byClose = [...closedTrades].sort(
+      (a, b) => new Date(a.closedAt || 0).getTime() - new Date(b.closedAt || 0).getTime()
+    );
+    let running = 0;
+    let peak = 0;
+    let maxDrop = 0;
+    for (const t of byClose) {
+      running += t.realizedPnl || 0;
+      peak = Math.max(peak, running);
+      const drop = peak - running;
+      if (drop > maxDrop) maxDrop = drop;
+    }
+    if (peak > 0 && maxDrop > 0) {
+      maxDrawdown = Math.round((maxDrop / peak) * 100);
+    }
+  }
+
   return {
     userId,
     competitionsEntered: participations.length,
@@ -648,7 +675,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     currentWinStreak,
     maxWinStreak,
     liquidationCount,
-    maxDrawdown: 0, // Calculate separately if needed
+    maxDrawdown,
     alwaysUsesSL,
     alwaysUsesTP,
     averageTradesDuration: averageTradeDuration,
@@ -1121,23 +1148,21 @@ export async function checkBadgeCondition(
 }
 
 /**
- * Helper function to compare values
- * Internal use only - not exported due to "use server" async requirement
+ * Helper function to compare values.
+ * Production-safe: defaults comparison to "gte" when missing (e.g. from DB),
+ * and treats NaN as failure so bad stats don't award badges.
  */
 function compareValue(
   actual: number | undefined,
   expected: number | undefined,
   comparison: "gte" | "lte" | "eq" | undefined,
 ): boolean {
-  if (
-    actual === undefined ||
-    expected === undefined ||
-    comparison === undefined
-  ) {
-    return false;
-  }
+  if (actual === undefined || expected === undefined) return false;
+  if (Number.isNaN(actual) || Number.isNaN(expected)) return false;
 
-  switch (comparison) {
+  const comp = comparison ?? "gte";
+
+  switch (comp) {
     case "gte":
       return actual >= expected;
     case "lte":
@@ -1145,7 +1170,7 @@ function compareValue(
     case "eq":
       return actual === expected;
     default:
-      return false;
+      return actual >= expected;
   }
 }
 
