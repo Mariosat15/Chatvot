@@ -57,11 +57,15 @@ import {
   MemoryStick,
   Timer,
   Loader2,
+  Award,
+  Flag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EndLogicTestsTab from "./EndLogicTestsTab";
 import TradingTestsTab from "./TradingTestsTab";
 import DatabaseIndexesTab from "./DatabaseIndexesTab";
+import BadgeSimulatorTab from "./BadgeSimulatorTab";
+import MilestoneSimulatorTab from "./MilestoneSimulatorTab";
 import {
   LineChart,
   Line,
@@ -821,6 +825,20 @@ export default function PerformanceSimulatorSection() {
           >
             <Database className="h-4 w-4 mr-2" />
             DB Indexes
+          </TabsTrigger>
+          <TabsTrigger
+            value="badge-simulator"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <Award className="h-4 w-4 mr-2" />
+            Badge Simulator
+          </TabsTrigger>
+          <TabsTrigger
+            value="milestone-simulator"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <Flag className="h-4 w-4 mr-2" />
+            Milestone Simulator
           </TabsTrigger>
         </TabsList>
 
@@ -2969,6 +2987,16 @@ export default function PerformanceSimulatorSection() {
         {/* Database Indexes Tab */}
         <TabsContent value="db-indexes">
           <DatabaseIndexesTab />
+        </TabsContent>
+
+        {/* Badge Simulator Tab */}
+        <TabsContent value="badge-simulator">
+          <BadgeSimulatorTab />
+        </TabsContent>
+
+        {/* Milestone Simulator Tab */}
+        <TabsContent value="milestone-simulator">
+          <MilestoneSimulatorTab />
         </TabsContent>
       </Tabs>
     </div>

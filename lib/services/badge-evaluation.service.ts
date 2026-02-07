@@ -10,7 +10,8 @@ import { Badge } from "@/lib/constants/badges";
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
 
-interface UserStats {
+// Exported for testing/simulation purposes
+export interface UserStats {
   userId: string;
   // Competition stats
   competitionsEntered: number;
@@ -702,8 +703,9 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
 /**
  * Check if a badge condition is met
  * NEW: Now properly validates minTrades and minCompletedCompetitions requirements
+ * EXPORTED: For testing/simulation in admin panel
  */
-async function checkBadgeCondition(
+export async function checkBadgeCondition(
   badge: Badge,
   stats: UserStats,
 ): Promise<boolean> {
@@ -1120,8 +1122,9 @@ async function checkBadgeCondition(
 
 /**
  * Helper function to compare values
+ * EXPORTED: For testing/simulation in admin panel
  */
-function compareValue(
+export function compareValue(
   actual: number | undefined,
   expected: number | undefined,
   comparison: "gte" | "lte" | "eq" | undefined,
