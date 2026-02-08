@@ -705,8 +705,8 @@ export default function ServerMonitorSection() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[200px]" style={{ minHeight: 1, minWidth: 1 }}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={1}>
                   <AreaChart data={history}>
                     <defs>
                       <linearGradient
@@ -788,8 +788,8 @@ export default function ServerMonitorSection() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[200px]" style={{ minHeight: 1, minWidth: 1 }}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={1}>
                   <AreaChart data={history}>
                     <defs>
                       <linearGradient
@@ -871,8 +871,8 @@ export default function ServerMonitorSection() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[200px]" style={{ minHeight: 1, minWidth: 1 }}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={1}>
                   <LineChart data={history}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis dataKey="time" stroke="#6b7280" fontSize={10} />
@@ -907,8 +907,8 @@ export default function ServerMonitorSection() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[200px]" style={{ minHeight: 1, minWidth: 1 }}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={1}>
                   <AreaChart data={history}>
                     <defs>
                       <linearGradient
