@@ -30,6 +30,12 @@ So: **high heap + many restarts** = process is running out of memory; **increasi
 
 The admin app can run with a larger Node.js heap so it doesn’t hit the default limit under load.
 
+- **Deploy default**  
+  When you run `pm2 start ecosystem.config.js`, the admin app gets a **4 GB** heap by default. No extra step needed.
+
+- **Variable: use more than 4 GB**  
+  Set **`ADMIN_HEAP_MB`** in your server `.env` (e.g. `ADMIN_HEAP_MB=8192` for 8 GB), then `pm2 restart chartvolt-admin` or redeploy. Min 1024.
+
 - **Production / start script**  
   In `apps/admin/package.json`, the `start` script is set to use a **4 GB** heap:
 

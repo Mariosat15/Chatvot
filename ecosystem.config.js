@@ -14,6 +14,10 @@
 // Load environment variables from .env file
 require('dotenv').config();
 
+// Admin app heap: set ADMIN_HEAP_MB in .env (e.g. 8192 for 8 GB). Default 4096.
+const ADMIN_HEAP_MB = Math.max(1024, parseInt(process.env.ADMIN_HEAP_MB || '4096', 10) || 4096);
+const ADMIN_MAX_MEMORY_RESTART = `${Math.ceil(ADMIN_HEAP_MB / 1024)}G`;
+
 module.exports = {
   apps: [
     // ============================================
@@ -55,13 +59,14 @@ module.exports = {
         PORT: 3001,
         IS_ADMIN: 'true',   // Prevents WebSocket connection - admin reads via API
         MAIN_APP_URL: 'http://localhost:3000',
-        NODE_OPTIONS: '--max-old-space-size=4096',
+        NODE_OPTIONS: `--max-old-space-size=${ADMIN_HEAP_MB}`,
+        ADMIN_HEAP_MB: String(ADMIN_HEAP_MB),
       },
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '4G',
+      max_memory_restart: ADMIN_MAX_MEMORY_RESTART,
       error_file: './logs/admin-error.log',
       out_file: './logs/admin-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',

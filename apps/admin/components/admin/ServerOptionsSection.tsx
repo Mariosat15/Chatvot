@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -26,9 +26,32 @@ import {
 const NODE_HEAP_ENV = "NODE_OPTIONS=--max-old-space-size=4096";
 const NODE_HEAP_VALUE = "--max-old-space-size=4096";
 
+const TARGET_HEAP_MB = 4096;
+
 export default function ServerOptionsSection() {
   const [copied, setCopied] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [heapInfo, setHeapInfo] = useState<{
+    heapLimitMB: number;
+    heapUsedMB: number;
+    nodeOptions: string | null;
+    configuredHeapMB: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/server-options/heap-info")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) =>
+        data &&
+        setHeapInfo({
+          heapLimitMB: data.heapLimitMB,
+          heapUsedMB: data.heapUsedMB,
+          nodeOptions: data.nodeOptions ?? null,
+          configuredHeapMB: data.configuredHeapMB ?? TARGET_HEAP_MB,
+        })
+      )
+      .catch(() => setHeapInfo(null));
+  }, []);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -87,6 +110,50 @@ export default function ServerOptionsSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {heapInfo != null && (
+            <div
+              className={`rounded-lg border p-3 ${
+                heapInfo.heapLimitMB >= (heapInfo.configuredHeapMB || TARGET_HEAP_MB) - 50
+                  ? "bg-green-500/10 border-green-500/30"
+                  : "bg-amber-500/10 border-amber-500/30"
+              }`}
+            >
+              <Label className="text-gray-300 text-sm font-medium">
+                Current process (this admin app)
+              </Label>
+              <p className="text-sm mt-1">
+                Heap limit: <strong className="text-white">{heapInfo.heapLimitMB} MB</strong>
+                {heapInfo.heapLimitMB >= (heapInfo.configuredHeapMB || TARGET_HEAP_MB) - 50 ? (
+                  <span className="text-green-400 ml-2">
+                    ✓ {heapInfo.configuredHeapMB >= 1024 ? `${heapInfo.configuredHeapMB / 1024} GB` : `${heapInfo.configuredHeapMB} MB`} applied
+                  </span>
+                ) : (
+                  <span className="text-amber-400 ml-2">
+                    — restart/redeploy to apply configured {heapInfo.configuredHeapMB} MB
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-gray-500">
+                Used: {heapInfo.heapUsedMB} MB
+                {heapInfo.nodeOptions && (
+                  <> · NODE_OPTIONS: <code className="text-gray-400">{heapInfo.nodeOptions}</code></>
+                )}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-lg bg-lime-500/10 border border-lime-500/30 p-3">
+            <p className="text-sm text-lime-200/90">
+              <strong>Deploy default:</strong> 4 GB heap is applied automatically when you start with{" "}
+              <code className="text-lime-100">pm2 start ecosystem.config.js</code> (no extra step).
+            </p>
+            <p className="text-xs text-lime-200/70 mt-2">
+              To use <strong>more than 4 GB</strong> (e.g. 8 GB): on the server add{" "}
+              <code className="text-lime-100">ADMIN_HEAP_MB=8192</code> to your <code className="text-lime-100">.env</code>, then{" "}
+              <code className="text-lime-100">pm2 restart chartvolt-admin</code> or redeploy. Min 1024, no upper limit.
+            </p>
+          </div>
+
           <div className="rounded-lg bg-gray-900/80 border border-gray-600 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <Label className="text-gray-300 text-sm font-medium">
