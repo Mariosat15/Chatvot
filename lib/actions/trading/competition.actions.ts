@@ -836,6 +836,31 @@ export const isUserInCompetition = async (competitionId: string) => {
   }
 };
 
+/** Batch: get competition IDs the user is in (avoids N+1 when listing many competitions). */
+export const getCompetitionIdsUserIsIn = async (
+  userId: string,
+  competitionIds: string[],
+): Promise<string[]> => {
+  if (!userId || competitionIds.length === 0) return [];
+  try {
+    await connectToDatabase();
+    const validIds = competitionIds.filter((id) =>
+      mongoose.Types.ObjectId.isValid(id),
+    );
+    if (validIds.length === 0) return [];
+    const participants = await CompetitionParticipant.find({
+      userId,
+      competitionId: { $in: validIds },
+    })
+      .select("competitionId")
+      .lean();
+    return participants.map((p: any) => p.competitionId?.toString()).filter(Boolean);
+  } catch (error) {
+    console.error("Error getCompetitionIdsUserIsIn:", error);
+    return [];
+  }
+};
+
 // Get user's participant data for a competition
 export const getUserParticipant = async (competitionId: string) => {
   try {

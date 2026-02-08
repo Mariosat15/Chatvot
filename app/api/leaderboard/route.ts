@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
-import {
-  getGlobalLeaderboard,
-  getMyLeaderboardPosition,
-} from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { getGlobalLeaderboard } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { getUsersWithTitles } from "@/lib/services/xp-level.service";
+import { getTitleByXP } from "@/lib/constants/levels";
+import type { GlobalLeaderboardEntry } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 /**
  * GET /api/leaderboard?page=1&limit=50
- * Returns a paginated slice of the global leaderboard so the client never loads 4000+ entries.
- * Auth required.
+ * Returns a paginated slice. Builds full list once (cached 60s); titles loaded only for the requested page.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +18,10 @@ export async function GET(request: NextRequest) {
       headers: request.headers,
     });
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized", message: "Please sign in to view the leaderboard." },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -32,9 +34,31 @@ export async function GET(request: NextRequest) {
     const full = await getGlobalLeaderboard(0);
     const totalCount = full.length;
     const offset = (page - 1) * limit;
-    const entries = full.slice(offset, offset + limit);
+    const pageEntries = full.slice(offset, offset + limit);
 
-    const myPosition = await getMyLeaderboardPosition();
+    const pageUserIds = pageEntries.map((e) => e.userId);
+    const userLevels = pageUserIds.length
+      ? await getUsersWithTitles(pageUserIds)
+      : new Map();
+    const entries: GlobalLeaderboardEntry[] = pageEntries.map((entry) => {
+      const level = userLevels.get(entry.userId);
+      const titleLevel = level ? getTitleByXP(level.currentXP) : getTitleByXP(0);
+      return {
+        ...entry,
+        userTitle: titleLevel.title,
+        userTitleIcon: titleLevel.icon,
+        userTitleColor: titleLevel.color,
+      };
+    });
+
+    const userEntry = full.find((e) => e.userId === session.user.id);
+    const myPosition = {
+      rank: userEntry?.rank ?? 0,
+      totalUsers: full.length,
+      percentile: userEntry
+        ? ((full.length - userEntry.rank + 1) / full.length) * 100
+        : 0,
+    };
 
     return NextResponse.json({
       entries,
@@ -45,8 +69,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[api/leaderboard] error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to load leaderboard";
     return NextResponse.json(
-      { error: "Failed to load leaderboard" },
+      { error: "Server error", message },
       { status: 500 }
     );
   }

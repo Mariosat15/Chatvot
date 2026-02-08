@@ -7,9 +7,7 @@ import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getAllUsers } from "@/lib/utils/user-lookup";
-// Static imports for better performance (no dynamic import overhead)
-import { getUsersWithTitles } from "@/lib/services/xp-level.service";
-import { getTitleByXP } from "@/lib/constants/levels";
+// Titles are added per-page in the API to avoid loading 4000+ UserLevel docs on every cache build
 
 export interface GlobalLeaderboardEntry {
   userId: string;
@@ -50,14 +48,15 @@ export interface GlobalLeaderboardEntry {
 }
 
 // ============================================
-// CACHING - 30 second cache for leaderboard
+// CACHING - 60s TTL to avoid repeated heavy builds
 // ============================================
 interface CachedLeaderboard {
   data: GlobalLeaderboardEntry[];
   timestamp: number;
 }
 let leaderboardCache: CachedLeaderboard | null = null;
-const CACHE_TTL = 30000; // 30 seconds
+const CACHE_TTL = 60000; // 60 seconds - reduce DB load when many users hit leaderboard
+const MAX_LEADERBOARD_USERS = 15000; // Cap to avoid memory exhaustion and event-loop blocking
 
 function isCacheValid(): boolean {
   return (
@@ -70,7 +69,7 @@ function isCacheValid(): boolean {
  * Get global leaderboard - ranks ALL users (including those without competition/challenge history)
  *
  * OPTIMIZED VERSION:
- * - 30-second in-memory cache
+ * - 60s in-memory cache; titles loaded per-page in API only
  * - Parallel database queries
  * - O(n) lookups with Maps instead of O(n²)
  * - Static imports (no dynamic import overhead)
@@ -144,8 +143,9 @@ export async function getGlobalLeaderboard(
       }
     >();
 
-    // Initialize all users with zero stats
-    for (const user of allUsers) {
+    // Initialize users with zero stats (cap to avoid blocking with 10k+ users)
+    const usersToProcess = allUsers.slice(0, MAX_LEADERBOARD_USERS);
+    for (const user of usersToProcess) {
       if (!user.id || !user.email) continue;
 
       userStatsMap.set(user.id, {
@@ -277,11 +277,10 @@ export async function getGlobalLeaderboard(
     // Sort by overall score (descending)
     leaderboardEntries.sort((a, b) => b.overallScore - a.overallScore);
 
-    // Assign ranks with tie detection
+    // Assign ranks with tie detection (single pass - no O(n²) tiedWith expansion)
     const epsilon = 0.0001;
     for (let i = 0; i < leaderboardEntries.length; i++) {
       const current = leaderboardEntries[i];
-
       if (i === 0) {
         current.rank = 1;
         current.isTied = false;
@@ -289,33 +288,14 @@ export async function getGlobalLeaderboard(
         const previous = leaderboardEntries[i - 1];
         const isTied =
           Math.abs(current.overallScore - previous.overallScore) < epsilon;
-
         if (isTied) {
           current.rank = previous.rank;
           current.isTied = true;
           previous.isTied = true;
-
           if (!current.tiedWith) current.tiedWith = [];
           if (!previous.tiedWith) previous.tiedWith = [];
-
           current.tiedWith.push(previous.userId);
           previous.tiedWith.push(current.userId);
-
-          for (let j = i - 2; j >= 0; j--) {
-            if (
-              leaderboardEntries[j].rank === current.rank &&
-              leaderboardEntries[j].isTied
-            ) {
-              if (!current.tiedWith!.includes(leaderboardEntries[j].userId)) {
-                current.tiedWith!.push(leaderboardEntries[j].userId);
-              }
-              if (!leaderboardEntries[j].tiedWith!.includes(current.userId)) {
-                leaderboardEntries[j].tiedWith!.push(current.userId);
-              }
-            } else {
-              break;
-            }
-          }
         } else {
           current.rank = i + 1;
           current.isTied = false;
@@ -323,32 +303,13 @@ export async function getGlobalLeaderboard(
       }
     }
 
-    // Get user titles in batch
-    const userIds = leaderboardEntries.map((entry) => entry.userId);
-    const userLevels = await getUsersWithTitles(userIds);
-
-    // Add title information to each entry
-    const entriesWithTitles = leaderboardEntries.map((entry) => {
-      const userLevel = userLevels.get(entry.userId);
-      const titleLevel = userLevel
-        ? getTitleByXP(userLevel.currentXP)
-        : getTitleByXP(0);
-
-      return {
-        ...entry,
-        userTitle: titleLevel.title,
-        userTitleIcon: titleLevel.icon,
-        userTitleColor: titleLevel.color,
-      };
-    });
-
-    // Update cache
+    // Cache entries without titles; API adds titles only for the requested page slice
     leaderboardCache = {
-      data: entriesWithTitles,
+      data: leaderboardEntries,
       timestamp: Date.now(),
     };
 
-    return limit > 0 ? entriesWithTitles.slice(0, limit) : entriesWithTitles;
+    return limit > 0 ? leaderboardEntries.slice(0, limit) : leaderboardEntries;
   } catch (error) {
     console.error("Error getting global leaderboard:", error);
     return [];

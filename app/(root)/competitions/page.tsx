@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
+import { auth } from "@/lib/better-auth/auth";
 import {
   getCompetitions,
-  isUserInCompetition,
+  getCompetitionIdsUserIsIn,
 } from "@/lib/actions/trading/competition.actions";
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import CompetitionsPageContent from "./page-content";
@@ -9,20 +11,19 @@ import CompetitionsPageContent from "./page-content";
 export const dynamic = "force-dynamic";
 
 const CompetitionsPage = async () => {
-  // Fetch all competitions on server
+  // Fetch competitions with limits so list doesn't grow unbounded (50 upcoming, 50 active, etc.)
   const [
     upcomingCompetitions,
     activeCompetitions,
     completedCompetitions,
     cancelledCompetitions,
   ] = await Promise.all([
-    getCompetitions({ status: "upcoming" }),
-    getCompetitions({ status: "active" }),
-    getCompetitions({ status: "completed", limit: 10 }),
-    getCompetitions({ status: "cancelled", limit: 5 }),
+    getCompetitions({ status: "upcoming", limit: 50 }),
+    getCompetitions({ status: "active", limit: 50 }),
+    getCompetitions({ status: "completed", limit: 20 }),
+    getCompetitions({ status: "cancelled", limit: 10 }),
   ]);
 
-  // Combine all competitions
   const allCompetitions = [
     ...activeCompetitions,
     ...upcomingCompetitions,
@@ -30,21 +31,14 @@ const CompetitionsPage = async () => {
     ...cancelledCompetitions,
   ];
 
-  // Get user wallet balance (server action)
   const walletBalance = await getWalletBalance();
 
-  // Check which competitions user has entered (parallel requests)
-  const userCompetitionChecks = await Promise.all(
-    allCompetitions.map(async (comp) => ({
-      id: comp._id.toString(),
-      isUserIn: await isUserInCompetition(comp._id.toString()),
-    })),
-  );
-
-  // Create a map for quick lookup
-  const userInCompetitionIds = userCompetitionChecks
-    .filter((check) => check.isUserIn)
-    .map((check) => check.id);
+  // Single batch query for user's participations (avoids N+1)
+  const session = await auth.api.getSession({ headers: await headers() });
+  const competitionIds = allCompetitions.map((c) => c._id.toString());
+  const userInCompetitionIds = session?.user?.id
+    ? await getCompetitionIdsUserIsIn(session.user.id, competitionIds)
+    : [];
 
   return (
     <CompetitionsPageContent

@@ -139,23 +139,23 @@ export async function getAllUsers(): Promise<UserInfo[]> {
     // Exclude: role='admin', role='backoffice'
     const users = await db
       .collection("user")
-      .find({
-        $and: [
-          // Must have email
-          { email: { $exists: true, $ne: null } },
-          { email: { $nin: [""] } },
-          // Role filter - only traders
-          {
-            $or: [
-              { role: "trader" }, // Explicitly set as trader
-              { role: { $exists: false } }, // No role field = legacy user, treat as trader
-              { role: null }, // Null role = treat as trader
-            ],
-          },
-          // Exclude admin email (extra safety check)
-          ...(adminEmail ? [{ email: { $ne: adminEmail } }] : []),
-        ],
-      })
+      .find(
+        {
+          $and: [
+            { email: { $exists: true, $ne: null } },
+            { email: { $nin: [""] } },
+            {
+              $or: [
+                { role: "trader" },
+                { role: { $exists: false } },
+                { role: null },
+              ],
+            },
+            ...(adminEmail ? [{ email: { $ne: adminEmail } }] : []),
+          ],
+        },
+        { projection: { id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 } }
+      )
       .toArray();
 
     // Deduplicate by EMAIL (not by name) - email is the unique identifier

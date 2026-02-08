@@ -17,7 +17,7 @@ const REQUIRED_INDEXES = {
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
   ],
   userlevels: [
-    { keys: { odod: 1 }, options: { unique: true, name: "userId_1" } },
+    { keys: { userId: 1 }, options: { unique: true, name: "userId_1" } },
     { keys: { currentXP: -1 }, options: { name: "currentXP_-1" } },
     { keys: { level: -1 }, options: { name: "level_-1" } },
   ],
@@ -137,7 +137,7 @@ const REQUIRED_INDEXES = {
     { keys: { balance: -1 }, options: { name: "balance_-1" } },
   ],
   creditwallets: [
-    { keys: { odod: 1 }, options: { unique: true, name: "userId_1" } },
+    { keys: { userId: 1 }, options: { unique: true, name: "userId_1" } },
   ],
   wallettransactions: [
     {
@@ -279,7 +279,7 @@ const REQUIRED_INDEXES = {
   ],
   userpurchases: [
     {
-      keys: { odod: 1, itemId: 1 },
+      keys: { userId: 1, itemId: 1 },
       options: { unique: true, name: "userId_1_itemId_1" },
     },
     { keys: { userId: 1 }, options: { name: "userId_1" } },

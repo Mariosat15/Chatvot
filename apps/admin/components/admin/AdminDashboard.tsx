@@ -64,6 +64,7 @@ import {
   HeartPulse,
   FileWarning,
   Map,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -107,6 +108,7 @@ import KYCHistorySection from "@/components/admin/KYCHistorySection";
 import MarketSettingsSection from "@/components/admin/MarketSettingsSection";
 import MarketDataSection from "@/components/admin/MarketDataSection";
 import DependencyUpdatesSection from "@/components/admin/DependencyUpdatesSection";
+import DataCleanupSection from "@/components/admin/DataCleanupSection";
 import AdminOverviewDashboard from "@/components/admin/AdminOverviewDashboard";
 import AIAgentSection from "@/components/admin/AIAgentSection";
 import AIKnowledgeSection from "@/components/admin/AIKnowledgeSection";
@@ -603,6 +605,11 @@ const menuGroups: MenuGroup[] = [
             label: "Dependency Updates",
             icon: <Package className="h-4 w-4" />,
           },
+          {
+            id: "data-cleanup",
+            label: "Data Cleanup",
+            icon: <Trash2 className="h-4 w-4" />,
+          },
         ],
       },
     ],
@@ -1010,6 +1017,8 @@ export default function AdminDashboard({
         return <DependencyUpdatesSection key={currentRefreshKey} />;
       case "image-optimizer":
         return <ImageOptimizerSection key={currentRefreshKey} />;
+      case "data-cleanup":
+        return <DataCleanupSection key={currentRefreshKey} />;
       case "ai-agent":
         return <AIAgentSection key={currentRefreshKey} />;
       case "ai-knowledge":
