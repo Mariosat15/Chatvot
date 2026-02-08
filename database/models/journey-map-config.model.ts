@@ -179,8 +179,6 @@ const JourneyMapConfigSchema = new Schema<IJourneyMapConfig>(
   }
 );
 
-// Index for sequence queries
-JourneyMapConfigSchema.index({ sequenceOrder: 1 });
 
 const JourneyMapConfig: Model<IJourneyMapConfig> =
   mongoose.models.JourneyMapConfig ||
