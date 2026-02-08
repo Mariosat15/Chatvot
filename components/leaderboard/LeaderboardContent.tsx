@@ -11,9 +11,12 @@ import {
   Search,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Users,
   Filter,
   ArrowUpDown,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
@@ -71,6 +74,12 @@ interface LeaderboardContentProps {
   leaderboard: LeaderboardEntry[];
   myPosition: MyPosition | null;
   currentUserId: string;
+  /** When set, show pagination (client fetches one page at a time). */
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  loading?: boolean;
 }
 
 // Sort columns
@@ -97,7 +106,14 @@ export default function LeaderboardContent({
   leaderboard,
   myPosition,
   currentUserId,
+  totalCount: propTotalCount,
+  page = 1,
+  pageSize = 50,
+  onPageChange,
+  loading: paginationLoading = false,
 }: LeaderboardContentProps) {
+  const isPaginated = typeof propTotalCount === "number" && typeof onPageChange === "function";
+  const totalCount = propTotalCount ?? leaderboard.length;
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(
     null,
@@ -558,7 +574,11 @@ export default function LeaderboardContent({
                     <div className="w-full h-10 px-4 rounded-lg bg-gray-800/50 border border-gray-700 flex items-center justify-center gap-2">
                       <Users className="h-4 w-4 text-gray-500" />
                       <span className="text-sm font-semibold text-gray-300">
-                        {filteredLeaderboard.length} traders
+                        {isPaginated
+                          ? totalCount === 0
+                            ? "0 traders"
+                            : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalCount)} of ${totalCount}`
+                          : `${filteredLeaderboard.length} traders`}
                       </span>
                     </div>
                   </div>
@@ -826,6 +846,41 @@ export default function LeaderboardContent({
                 })
               )}
             </div>
+
+            {/* Pagination - when data is loaded via API (one page at a time) */}
+            {isPaginated && totalCount > pageSize && (
+              <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-gray-800 bg-gray-950/30">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                  disabled={page <= 1 || paginationLoading}
+                  onClick={() => onPageChange?.(page - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-400">
+                  {paginationLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin inline" />
+                  ) : (
+                    `Page ${page} of ${Math.ceil(totalCount / pageSize)}`
+                  )}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                  disabled={
+                    page >= Math.ceil(totalCount / pageSize) || paginationLoading
+                  }
+                  onClick={() => onPageChange?.(page + 1)}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Mobile Cards - Only visible on small screens */}
