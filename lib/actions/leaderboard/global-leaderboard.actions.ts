@@ -79,7 +79,7 @@ export async function getGlobalLeaderboard(
 ): Promise<GlobalLeaderboardEntry[]> {
   if (isCacheValid()) {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'global-leaderboard.actions.ts',message:'CACHE HIT',data:{age:Date.now()-(leaderboardCache?.timestamp||0),entries:leaderboardCache?.data?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard CACHE HIT age=${Date.now()-(leaderboardCache?.timestamp||0)}ms entries=${leaderboardCache?.data?.length}`);
     // #endregion
     const cached = leaderboardCache!.data;
     return limit > 0 ? cached.slice(0, limit) : cached;
@@ -124,7 +124,7 @@ export async function getGlobalLeaderboard(
           .lean(),
       ]);
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'global-leaderboard.actions.ts',message:'getGlobalLeaderboard phases',data:{getAllUsersMs:_usersMs,participantQueriesMs:Date.now()-_partsT0,userCount:userIds.length,compParts:allCompetitionParticipants.length,challParts:allChallengeParticipants.length,badges:allUserBadges.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard phases: getAllUsers=${_usersMs}ms participants=${Date.now()-_partsT0}ms users=${userIds.length} compParts=${allCompetitionParticipants.length} challParts=${allChallengeParticipants.length} badges=${allUserBadges.length}`);
     // #endregion
 
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)

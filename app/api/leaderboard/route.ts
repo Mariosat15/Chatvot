@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       headers: request.headers,
     });
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/leaderboard/route.ts:GET',message:'auth.getSession',data:{ms:Date.now()-_tAuth0,hasUser:!!session?.user},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard auth.getSession: ${Date.now()-_tAuth0}ms hasUser=${!!session?.user}`);
     // #endregion
     if (!session?.user) {
       return NextResponse.json(
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // #endregion
     const full = await getGlobalLeaderboard(0);
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/leaderboard/route.ts:GET',message:'getGlobalLeaderboard',data:{ms:Date.now()-_tLb0,count:full.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard getGlobalLeaderboard: ${Date.now()-_tLb0}ms count=${full.length}`);
     // #endregion
     const totalCount = full.length;
     const offset = (page - 1) * limit;
@@ -59,7 +59,8 @@ export async function GET(request: NextRequest) {
       ? await getUsersWithTitles(pageUserIds)
       : new Map();
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/leaderboard/route.ts:GET',message:'getUsersWithTitles',data:{ms:Date.now()-_tTitles0,pageUsers:pageUserIds.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard getUsersWithTitles: ${Date.now()-_tTitles0}ms pageUsers=${pageUserIds.length}`);
+    // #endregion
     const entries: GlobalLeaderboardEntry[] = pageEntries.map((entry) => {
       const level = userLevels.get(entry.userId);
       const titleLevel = level ? getTitleByXP(level.currentXP) : getTitleByXP(0);
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     };
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/leaderboard/route.ts:GET',message:'TOTAL',data:{ms:Date.now()-_t0,entries:entries.length,totalCount},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    console.log(`[PERF] leaderboard TOTAL: ${Date.now()-_t0}ms entries=${entries.length} totalCount=${totalCount}`);
     // #endregion
     return NextResponse.json({
       entries,

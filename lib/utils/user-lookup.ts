@@ -164,7 +164,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       )
       .toArray();
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'user-lookup.ts:getAllUsers',message:'user collection query',data:{ms:Date.now()-_queryT0,userCount:users.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    console.log(`[PERF] getAllUsers DB query: ${Date.now()-_queryT0}ms userCount=${users.length}`);
     // #endregion
 
     // Deduplicate by EMAIL (not by name) - email is the unique identifier

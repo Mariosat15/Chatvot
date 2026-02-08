@@ -18,7 +18,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
   // #endregion
   const session = await auth.api.getSession({ headers: await headers() });
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx',message:'layout auth.getSession',data:{ms:Date.now()-_layoutAuthT0,hasUser:!!session?.user},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+  console.log(`[PERF] layout auth.getSession: ${Date.now()-_layoutAuthT0}ms hasUser=${!!session?.user}`);
   // #endregion
 
   if (!session?.user) redirect("/sign-in");
@@ -46,7 +46,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         const verified = user?.emailVerified === true;
         emailVerifiedCache.set(userId, { verified, ts: now });
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx',message:'emailVerified DB check',data:{ms:Date.now()-_emailT0,verified},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+        console.log(`[PERF] layout emailVerified DB: ${Date.now()-_emailT0}ms verified=${verified}`);
         // #endregion
         if (user && !verified) redirect("/verify-email-required");
       }
