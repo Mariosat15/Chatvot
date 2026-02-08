@@ -6,15 +6,36 @@ import mongoose from "mongoose";
 
 // Define required indexes for optimal performance
 // COMPREHENSIVE LIST - includes leaderboard, trading, and all critical queries
-const REQUIRED_INDEXES = {
+// Collection names must match actual DB: "user" = Better Auth, Mongoose defaults = lowercase plural
+const REQUIRED_INDEXES: Record<
+  string,
+  Array<{ keys: Record<string, number>; options: { name: string; unique?: boolean; expireAfterSeconds?: number } }
+> = {
   // ============================================
   // USER & AUTH INDEXES
   // ============================================
+  /** Better Auth collection - used by getAllUsers (leaderboard) and getUserById; critical for scale */
+  user: [
+    { keys: { id: 1 }, options: { name: "id_1" } },
+    { keys: { email: 1 }, options: { unique: true, name: "email_1" } },
+    { keys: { role: 1 }, options: { name: "role_1" } },
+    { keys: { email: 1, role: 1 }, options: { name: "email_1_role_1" } },
+  ],
   users: [
     { keys: { email: 1 }, options: { unique: true, name: "email_1" } },
     { keys: { username: 1 }, options: { name: "username_1" } },
-    { keys: { role: 1 }, options: { name: "role_1" } }, // For getAllUsers filtering
+    { keys: { role: 1 }, options: { name: "role_1" } },
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
+  ],
+  /** Matchmaking / presence - find({ userId: { $in } }) */
+  userpresences: [
+    { keys: { userId: 1 }, options: { unique: true, name: "userId_1" } },
+    { keys: { status: 1 }, options: { name: "status_1" } },
+    { keys: { lastHeartbeat: -1 }, options: { name: "lastHeartbeat_-1" } },
+    {
+      keys: { status: 1, acceptingChallenges: 1 },
+      options: { name: "status_1_acceptingChallenges_1" },
+    },
   ],
   userlevels: [
     { keys: { userId: 1 }, options: { unique: true, name: "userId_1" } },
@@ -130,6 +151,20 @@ const REQUIRED_INDEXES = {
   ],
 
   // ============================================
+  // WITHDRAWAL REQUESTS (wallet/withdraw hot path)
+  // ============================================
+  withdrawalrequests: [
+    {
+      keys: { userId: 1, status: 1, createdAt: -1 },
+      options: { name: "userId_1_status_1_createdAt_-1" },
+    },
+    { keys: { status: 1, createdAt: -1 }, options: { name: "status_1_createdAt_-1" } },
+    { keys: { isSandbox: 1, status: 1 }, options: { name: "isSandbox_1_status_1" } },
+    { keys: { requestedAt: -1 }, options: { name: "requestedAt_-1" } },
+    { keys: { payoutId: 1 }, options: { name: "payoutId_1" } },
+  ],
+
+  // ============================================
   // WALLET & FINANCIAL INDEXES
   // ============================================
   wallets: [
@@ -161,14 +196,19 @@ const REQUIRED_INDEXES = {
   ],
 
   // ============================================
-  // NOTIFICATION INDEXES
+  // NOTIFICATION INDEXES (model uses isRead, not read)
   // ============================================
   notifications: [
-    { keys: { userId: 1, read: 1 }, options: { name: "userId_1_read_1" } },
+    { keys: { userId: 1, isRead: 1 }, options: { name: "userId_1_isRead_1" } },
     {
-      keys: { userId: 1, createdAt: -1 },
-      options: { name: "userId_1_createdAt_-1" },
+      keys: { userId: 1, isRead: 1, createdAt: -1 },
+      options: { name: "userId_1_isRead_1_createdAt_-1" },
     },
+    {
+      keys: { userId: 1, category: 1, createdAt: -1 },
+      options: { name: "userId_1_category_1_createdAt_-1" },
+    },
+    { keys: { userId: 1, createdAt: -1 }, options: { name: "userId_1_createdAt_-1" } },
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
   ],
 
