@@ -55,7 +55,7 @@ interface CachedLeaderboard {
   timestamp: number;
 }
 let leaderboardCache: CachedLeaderboard | null = null;
-const CACHE_TTL = 120000; // 2 minutes - reduce rebuilds under load
+const CACHE_TTL = 300000; // 5 minutes - rebuild is ~7s on free tier, minimize cold starts
 const MAX_LEADERBOARD_USERS = 5000; // Cap to keep memory and query size bounded
 
 function isCacheValid(): boolean {
@@ -103,25 +103,31 @@ export async function getGlobalLeaderboard(
       return [];
     }
 
-    // Load participants and badges for users we rank
+    // PERF FIX: Fetch ALL participants/badges (tiny collections: 5+2+33 docs)
+    // instead of $in with 4952 IDs (was 1.8s due to huge $in filter on free tier).
+    // Join in JS via the userIdsSet — O(n) and instant.
     // #region agent log
     const _partsT0 = Date.now();
     // #endregion
+    const userIdsSet = new Set(userIds);
     const [allCompetitionParticipants, allChallengeParticipants, allUserBadges] =
       await Promise.all([
-        CompetitionParticipant.find({ userId: { $in: userIds } })
+        CompetitionParticipant.find({})
           .select(
             "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
           )
-          .lean(),
-        ChallengeParticipant.find({ userId: { $in: userIds } })
+          .lean()
+          .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
+        ChallengeParticipant.find({})
           .select(
             "userId pnl startingCapital totalTrades winningTrades losingTrades isWinner",
           )
-          .lean(),
-        UserBadge.find({ userId: { $in: userIds } })
+          .lean()
+          .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
+        UserBadge.find({})
           .select("userId badgeId")
-          .lean(),
+          .lean()
+          .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
       ]);
     // #region agent log
     console.log(`[PERF] leaderboard phases: getAllUsers=${_usersMs}ms participants=${Date.now()-_partsT0}ms users=${userIds.length} compParts=${allCompetitionParticipants.length} challParts=${allChallengeParticipants.length} badges=${allUserBadges.length}`);

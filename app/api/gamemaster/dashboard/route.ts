@@ -118,7 +118,9 @@ export async function GET() {
           canEarnFromChallenges:
             currentPackage.gameMasterConfig.canEarnFromChallenges === true,
           challengeReferralFeePercentage:
-            currentPackage.gameMasterConfig.challengeReferralFeePercentage,
+            currentPackage.gameMasterConfig.challengeReferralFeePercentage ??
+            currentPackage.gameMasterConfig.referralFeePercentage ??
+            0,
         };
         console.log(
           `[GM Dashboard] Using current package settings for ${subscription.packageName}:`,

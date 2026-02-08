@@ -134,63 +134,45 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       return [];
     }
 
-    // Get admin email to exclude it
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || "";
-
-    // Get ONLY traders - filter by ROLE field (the proper way to identify user types)
-    // Include: role='trader', no role field (legacy), null role
-    // Exclude: role='admin', role='backoffice'
+    // PERF FIX: Simple query with projection — filter in JS instead of
+    // complex $and/$or that prevents index use (was 5.4s, should be <1s).
     // #region agent log
     const _queryT0 = Date.now();
     // #endregion
     const users = await db
       .collection("user")
       .find(
-        {
-          $and: [
-            { email: { $exists: true, $ne: null } },
-            { email: { $nin: [""] } },
-            {
-              $or: [
-                { role: "trader" },
-                { role: { $exists: false } },
-                { role: null },
-              ],
-            },
-            ...(adminEmail ? [{ email: { $ne: adminEmail } }] : []),
-          ],
-        },
-        { projection: { id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 } }
+        {},
+        { projection: { id: 1, _id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 } }
       )
       .toArray();
     // #region agent log
     console.log(`[PERF] getAllUsers DB query: ${Date.now()-_queryT0}ms userCount=${users.length}`);
     // #endregion
 
-    // Deduplicate by EMAIL (not by name) - email is the unique identifier
+    // Filter in JS (fast for ~5000 docs): traders only, dedupe by email
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || "";
     const uniqueUsersMap = new Map<string, UserInfo>();
 
     for (const user of users) {
       const id = user.id || user._id?.toString() || "";
-      const email = user.email?.toLowerCase() || "";
+      const email = (user.email || "").toLowerCase();
 
       if (!id || !email) continue;
-
-      // Skip if we already have this user by email (dedupe by email)
       if (uniqueUsersMap.has(email)) continue;
 
-      // Double-check role: skip if explicitly set to non-trader
-      const role = user.role || "trader"; // Default to trader if no role
+      // Only traders: role='trader', undefined, or null
+      const role = user.role || "trader";
       if (role !== "trader") continue;
 
-      // Skip admin email (extra safety)
+      // Skip admin
       if (adminEmail && email === adminEmail) continue;
 
       uniqueUsersMap.set(email, {
         id,
         email,
-        name: user.name || email.split("@")[0] || "Unknown User", // Name is for display only
-        profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
+        name: user.name || email.split("@")[0] || "Unknown User",
+        profileImage: user.profileImage || user.image,
         bio: user.bio,
         role: "trader",
         country: user.country,
