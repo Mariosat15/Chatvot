@@ -173,6 +173,7 @@ const SECTION_LABELS: Record<string, string> = {
   // Dev Zone
   "dev-zone-menu": "Dev Zone",
   "server-monitor": "Server Monitor",
+  "server-options": "Server Options",
   redis: "Redis Cache",
   "dev-settings": "Test",
   "performance-simulator": "Performance Simulator",
@@ -229,6 +230,7 @@ const SECTION_GROUPS = {
   "Dev Zone": [
     "dev-zone-menu",
     "server-monitor",
+    "server-options",
     "redis",
     "dev-settings",
     "performance-simulator",

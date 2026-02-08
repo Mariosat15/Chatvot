@@ -95,6 +95,7 @@ import MarketplaceSection from "@/components/admin/MarketplaceSection";
 import LandingPageBuilder from "@/components/admin/LandingPageBuilder";
 import RedisSettingsSection from "@/components/admin/RedisSettingsSection";
 import ServerMonitorSection from "@/components/admin/ServerMonitorSection";
+import ServerOptionsSection from "@/components/admin/ServerOptionsSection";
 import DevSettingsSection from "@/components/admin/DevSettingsSection";
 import ImageOptimizerSection from "@/components/admin/ImageOptimizerSection";
 import TradingHistorySection from "@/components/admin/TradingHistorySection";
@@ -573,6 +574,11 @@ const menuGroups: MenuGroup[] = [
             icon: <Activity className="h-4 w-4" />,
           },
           {
+            id: "server-options",
+            label: "Server Options",
+            icon: <Cog className="h-4 w-4" />,
+          },
+          {
             id: "redis",
             label: "Redis Cache",
             icon: <Server className="h-4 w-4" />,
@@ -988,6 +994,8 @@ export default function AdminDashboard({
         return <PaymentProvidersSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
+      case "server-options":
+        return <ServerOptionsSection key={currentRefreshKey} />;
       case "redis":
         return <RedisSettingsSection key={currentRefreshKey} />;
       case "database":

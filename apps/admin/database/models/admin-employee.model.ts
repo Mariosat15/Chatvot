@@ -62,6 +62,7 @@ export const ADMIN_SECTIONS = [
   // Dev Zone (main + subsections)
   "dev-zone-menu",
   "server-monitor",
+  "server-options",
   "redis",
   "dev-settings",
   "performance-simulator",

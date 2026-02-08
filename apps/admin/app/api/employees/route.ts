@@ -577,6 +577,7 @@ async function sendEmployeeCredentialsEmail(
       // Dev Zone
       "dev-zone-menu": "Dev Zone",
       "server-monitor": "Server Monitor",
+      "server-options": "Server Options",
       redis: "Redis Cache",
       "dev-settings": "Test",
       "performance-simulator": "Performance Simulator",

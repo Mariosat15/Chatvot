@@ -170,10 +170,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const pathname = usePathname();
 
   const [users, setUsers] = useState<UserData[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Pagination
+  // Pagination (server-side: API returns one page at a time)
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -205,7 +206,6 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
     fetchAssignments();
     fetchEmployees();
     fetchOnlineStatus();
@@ -214,6 +214,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     const onlineInterval = setInterval(fetchOnlineStatus, 30000);
     return () => clearInterval(onlineInterval);
   }, []);
+
+  // Fetch users when page, pageSize, search, or sort changes (server-side pagination)
+  useEffect(() => {
+    fetchUsers();
+  }, [currentPage, pageSize, searchQuery, sortField, sortDirection]);
 
   // Handle initial user ID to open specific user
   useEffect(() => {
@@ -247,11 +252,20 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/users");
+      const params = new URLSearchParams();
+      params.set("page", String(currentPage));
+      params.set("limit", String(pageSize));
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      params.set("sort", sortField);
+      params.set("order", sortDirection);
+      const response = await fetch(`/api/users?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users);
-        toast.success(`Loaded ${data.total} users`);
+        setUsers(data.users || []);
+        setTotalCount(data.total ?? 0);
+        if (currentPage === 1 && !searchQuery.trim()) {
+          toast.success(`Loaded ${data.total ?? 0} users`);
+        }
       } else {
         toast.error("Failed to fetch users");
       }
@@ -438,14 +452,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     sortDirection,
   ]);
 
-  // Paginated users
-  const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    const end = start + pageSize;
-    return filteredAndSortedUsers.slice(start, end);
-  }, [filteredAndSortedUsers, currentPage, pageSize]);
+  // Current page users (from server); client-side filters apply to this page only
+  const paginatedUsers = useMemo(
+    () => filteredAndSortedUsers,
+    [filteredAndSortedUsers],
+  );
 
-  const totalPages = Math.ceil(filteredAndSortedUsers.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const showingStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingEnd = Math.min(currentPage * pageSize, totalCount);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -487,10 +502,10 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     </button>
   );
 
-  // Stats calculations
+  // Stats calculations (totalUsers = server total; others from current page)
   const stats = useMemo(
     () => ({
-      totalUsers: users.length,
+      totalUsers: totalCount,
       totalTraders: users.filter((u) => u.role === "trader").length,
       verifiedEmails: users.filter((u) => u.emailVerified).length,
       totalBalance: users.reduce((sum, u) => sum + u.wallet.balance, 0),
@@ -499,7 +514,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       onlineUsers: enrichedUsers.filter((u) => u.isOnline).length,
       offlineUsers: enrichedUsers.filter((u) => !u.isOnline).length,
     }),
-    [users, assignments, enrichedUsers],
+    [totalCount, users, assignments, enrichedUsers],
   );
 
   return (
@@ -707,7 +722,8 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
           </Select>
 
           <span className="text-sm text-gray-400">
-            Showing {paginatedUsers.length} of {filteredAndSortedUsers.length}
+            Showing {totalCount === 0 ? 0 : `${showingStart}–${showingEnd}`} of{" "}
+            {totalCount}
           </span>
         </div>
       </div>

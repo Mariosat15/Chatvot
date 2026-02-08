@@ -181,6 +181,7 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "overview",
       "dev-zone-menu",
       "server-monitor",
+      "server-options",
       "redis",
       "dev-settings",
       "performance-simulator",
