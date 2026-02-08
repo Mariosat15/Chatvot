@@ -31,9 +31,6 @@ async function checkAlertStatus(userIds: string[]): Promise<{
   });
 
   if (restrictions.length > 0) {
-    console.log(
-      `🔇 Alert suppressed: ${restrictions.length} account(s) already restricted (banned/suspended)`,
-    );
     return { shouldSuppress: true, hasActiveAlert: false };
   }
 
@@ -45,9 +42,6 @@ async function checkAlertStatus(userIds: string[]): Promise<{
   });
 
   if (existingAlerts) {
-    console.log(
-      `📝 Active alert exists (${existingAlerts.status}) - will MERGE new evidence via AlertManagerService`,
-    );
     return {
       shouldSuppress: false,
       hasActiveAlert: true,
@@ -178,19 +172,7 @@ export async function POST(request: Request) {
         });
 
         if (existingDeviceAnyUser) {
-          console.log(
-            `🔍 AGGRESSIVE FUZZY MATCH: Same hardware, different browser detected!`,
-          );
-          console.log(`   User trying to hide by switching browsers:`);
-          console.log(
-            `   Original: ${existingDeviceAnyUser.browser} ${existingDeviceAnyUser.browserVersion}`,
-          );
-          console.log(
-            `   New:      ${fingerprintData.browser} ${fingerprintData.browserVersion}`,
-          );
-          console.log(
-            `   Match:    Same canvas + screen (${fingerprintData.screenResolution}) + timezone (${fingerprintData.timezone})`,
-          );
+          // Same hardware, different browser - fuzzy match
         }
       }
 
@@ -209,23 +191,12 @@ export async function POST(request: Request) {
         });
 
         if (existingDeviceAnyUser) {
-          console.log(`🔍 GPU MATCH: Same graphics card detected!`);
-          console.log(
-            `   Original: ${existingDeviceAnyUser.browser} on ${existingDeviceAnyUser.os}`,
-          );
-          console.log(
-            `   New:      ${fingerprintData.browser} on ${fingerprintData.os}`,
-          );
-          console.log(
-            `   Match:    Same GPU (${fingerprintData.webgl.substring(0, 50)}...) + screen + timezone`,
-          );
+          // Same GPU + screen + timezone
         }
       }
 
       if (existingDeviceAnyUser) {
-        console.log(
-          `   Device IDs: ${existingDeviceAnyUser.fingerprintId} vs ${fingerprintData.fingerprintId}`,
-        );
+        // Device match found
       }
     }
 
@@ -275,24 +246,9 @@ export async function POST(request: Request) {
           existingFingerprint.userId,
           ...existingFingerprint.linkedUserIds,
         ];
-        console.log(
-          `🔍 Known device with linked accounts detected: ${allLinkedUsers.length} accounts (max allowed: ${fraudSettings.maxAccountsPerDevice})`,
-        );
-
         // Check if accounts exceed the max allowed
         const exceedsMaxAllowed =
           allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
-
-        // ALWAYS log for debugging
-        if (exceedsMaxAllowed) {
-          console.log(
-            `🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`,
-          );
-        } else {
-          console.log(
-            `ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`,
-          );
-        }
 
         // Only alert if accounts EXCEED the max allowed setting
         if (exceedsMaxAllowed) {
@@ -369,9 +325,6 @@ export async function POST(request: Request) {
             `${existingFingerprint.browser} on ${existingFingerprint.os}`,
           );
 
-          console.log(
-            `🚨 FRAUD ALERT: Known multi-account user ${userId} logged in`,
-          );
         }
       }
 
@@ -453,9 +406,6 @@ export async function POST(request: Request) {
         lastSeen: new Date(),
       });
 
-      console.log(
-        `✅ Created separate fingerprint for user ${userId} with ${newUserFingerprint.browser} (linked to ${existingDeviceAnyUser.userId})`,
-      );
 
       // Create or update fraud alert
       // Only alert when accounts EXCEED the max allowed setting
@@ -466,9 +416,6 @@ export async function POST(request: Request) {
 
       // Include current user in the count - they were just added to linkedUserIds
       // allLinkedUsers = owner + all linked users (including the new user)
-      console.log(
-        `🔍 Multi-account detected: ${allLinkedUsers.length} accounts on same device (max allowed: ${fraudSettings.maxAccountsPerDevice})`,
-      );
 
       // Check if accounts exceed the max allowed
       const exceedsMaxAllowed =
@@ -476,13 +423,6 @@ export async function POST(request: Request) {
 
       // ALWAYS log for debugging
       if (exceedsMaxAllowed) {
-        console.log(
-          `🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`,
-        );
-      } else {
-        console.log(
-          `ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`,
-        );
       }
 
       // Only create alert if accounts EXCEED the max allowed setting
@@ -510,18 +450,12 @@ export async function POST(request: Request) {
           userId: { $in: allLinkedUsers },
         }).lean();
 
-        console.log(
-          `📊 Building evidence for ${allLinkedUsers.length} accounts with ${allDevices.length} total devices`,
-        );
 
         // Build detailed evidence for each account
         // CRITICAL FIX: Only show devices that THIS user actually owns/used
         const accountsEvidence = allLinkedUsers.map((linkedUserId) => {
           const userDevices = allDevices.filter(
             (d) => d.userId === linkedUserId, // Only devices owned by THIS user
-          );
-          console.log(
-            `   User ${linkedUserId}: ${userDevices.length} device(s)`,
           );
           return {
             userId: linkedUserId,
@@ -558,17 +492,9 @@ export async function POST(request: Request) {
           };
         });
 
-        console.log(
-          `✅ Evidence built with ${accountsEvidence.length} accounts`,
-        );
-        console.log(`   Sample:`, JSON.stringify(accountsEvidence[0], null, 2));
-
         if (existingAlert) {
           // Use AlertManagerService to MERGE new device evidence into existing alert
           // This properly handles alerts of ANY type (similarity, mirror, payment, etc.)
-          console.log(
-            `📝 Found existing ${existingAlert.alertType} alert (${existingAlert.status}) - merging device evidence via AlertManagerService`,
-          );
 
           await AlertManagerService.createOrUpdateAlert({
             alertType: "same_device",
@@ -616,15 +542,11 @@ export async function POST(request: Request) {
             `${fingerprintData.browser} on ${fingerprintData.os}`,
           );
 
-          console.log(`✅ MERGED device evidence into existing alert`);
         } else {
           // Check if we should suppress alerts for these accounts
           const alertStatus = await checkAlertStatus(allLinkedUsers);
 
           if (alertStatus.shouldSuppress) {
-            console.log(
-              `⏭️ Skipping alert creation - accounts are restricted (banned/suspended)`,
-            );
             return NextResponse.json({
               success: true,
               suspicious: false,
@@ -698,16 +620,10 @@ export async function POST(request: Request) {
           }
         }
       } else {
-        console.log(
-          `ℹ️ Multi-account within limits: ${allLinkedUsers.length} accounts (max allowed: ${fraudSettings.maxAccountsPerDevice})`,
-        );
       }
 
       const exceedsLimit =
         allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
-      console.log(
-        `🔍 User ${userId} using device shared with ${allLinkedUsers.length - 1} other account(s) - ${exceedsLimit ? "🚨 EXCEEDS LIMIT" : "✓ Within limits"}`,
-      );
 
       return NextResponse.json({
         success: true,
@@ -738,10 +654,6 @@ export async function POST(request: Request) {
       }).lean();
 
       if (sameIPBrowserDevices.length > 0) {
-        console.log(
-          `🔍 SAME IP + BROWSER DETECTED: ${sameIPBrowserDevices.length} other account(s) using ${currentBrowserName} from ${ipAddress}`,
-        );
-
         // Get all unique users
         const allLinkedUserIds = [
           ...new Set(sameIPBrowserDevices.map((d) => d.userId)),
@@ -750,9 +662,6 @@ export async function POST(request: Request) {
 
         const exceedsLimit =
           allLinkedUserIds.length > fraudSettings.maxAccountsPerDevice;
-        console.log(
-          `📊 ${exceedsLimit ? "Creating" : "Skipping"} fraud alert for ${allLinkedUserIds.length} accounts (Same IP + Same Browser) - max allowed: ${fraudSettings.maxAccountsPerDevice}`,
-        );
 
         // Create new fingerprint for current user first
         const newFingerprint = await DeviceFingerprint.create({
@@ -794,8 +703,6 @@ export async function POST(request: Request) {
           riskScore: 30, // Higher initial risk for same IP + browser
         });
 
-        console.log("✅ Saved fingerprint to database:", newFingerprint._id);
-
         // Update existing devices to link to this user
         for (const device of sameIPBrowserDevices) {
           await DeviceFingerprint.findByIdAndUpdate(device._id, {
@@ -832,9 +739,6 @@ export async function POST(request: Request) {
           const alertStatus = await checkAlertStatus(allLinkedUserIds);
 
           if (alertStatus.shouldSuppress) {
-            console.log(
-              `⏭️ Skipping IP+Browser alert creation - accounts are restricted (banned/suspended)`,
-            );
             return NextResponse.json({
               success: true,
               suspicious: false,
@@ -845,9 +749,6 @@ export async function POST(request: Request) {
 
           // Log if merging into existing alert
           if (existingAlert) {
-            console.log(
-              `📝 Found existing ${existingAlert.alertType} alert (${existingAlert.status}) - merging IP+Browser evidence via AlertManagerService`,
-            );
           }
 
           // Get all devices for evidence
@@ -943,18 +844,6 @@ export async function POST(request: Request) {
       // New device fingerprint - create record
       const baseRiskScore = ipRiskScore;
 
-      // Log what we're receiving for debugging
-      console.log("📥 Received fingerprint data:", {
-        fingerprintId: fingerprintData.fingerprintId,
-        browser: fingerprintData.browser,
-        browserVersion: fingerprintData.browserVersion,
-        os: fingerprintData.os,
-        osVersion: fingerprintData.osVersion,
-        colorDepth: fingerprintData.colorDepth,
-        userAgent: fingerprintData.userAgent ? "present" : "MISSING",
-        ipAddress: ipAddress,
-      });
-
       const newFingerprint = await DeviceFingerprint.create({
         fingerprintId: fingerprintData.fingerprintId || "unknown",
         userId: userId,
@@ -994,8 +883,6 @@ export async function POST(request: Request) {
         riskScore: baseRiskScore,
       });
 
-      console.log("✅ Saved fingerprint to database:", newFingerprint._id);
-
       // Create alert if VPN/Proxy/Tor detected (and risk exceeds threshold)
       if (
         (isTor ||
@@ -1032,9 +919,6 @@ export async function POST(request: Request) {
         const alertStatus = await checkAlertStatus([userId]);
 
         if (alertStatus.shouldSuppress) {
-          console.log(
-            `⏭️ Skipping VPN/Proxy alert creation - user is restricted (banned/suspended)`,
-          );
           return NextResponse.json({
             success: true,
             suspicious: false,
@@ -1074,9 +958,6 @@ export async function POST(request: Request) {
         });
       }
 
-      console.log(
-        `✅ New device registered for user ${userId}: ${fingerprintData.fingerprintId} (Risk: ${baseRiskScore})`,
-      );
 
       return NextResponse.json({
         success: true,

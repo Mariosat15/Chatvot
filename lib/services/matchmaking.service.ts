@@ -241,11 +241,12 @@ export async function getMatchableTraders(
 ): Promise<MatchableTrader[]> {
   await connectToDatabase();
 
-  // Get leaderboard data - this has all the pre-calculated stats and scores
   const leaderboardData = await getGlobalLeaderboard();
-
-  // Get online status for all users
-  const onlineStatuses = await UserPresence.find({}).lean();
+  const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
+  const onlineStatuses =
+    userIds.length > 0
+      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
+      : [];
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert leaderboard entries to matchable traders
@@ -280,20 +281,19 @@ export async function findBestMatch(
 ): Promise<MatchResult | null> {
   await connectToDatabase();
 
-  // Get leaderboard data
   const leaderboardData = await getGlobalLeaderboard();
-
-  // Find current user in leaderboard
   const currentUserEntry = leaderboardData.find(
     (e) => e.userId === currentUserId,
   );
   if (!currentUserEntry) {
-    console.error("Current user not found in leaderboard");
     return null;
   }
 
-  // Get online statuses
-  const onlineStatuses = await UserPresence.find({}).lean();
+  const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
+  const onlineStatuses =
+    userIds.length > 0
+      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
+      : [];
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert current user
@@ -347,20 +347,19 @@ export async function getRankedMatches(
 ): Promise<MatchResult[]> {
   await connectToDatabase();
 
-  // Get leaderboard data
   const leaderboardData = await getGlobalLeaderboard();
-
-  // Find current user in leaderboard
   const currentUserEntry = leaderboardData.find(
     (e) => e.userId === currentUserId,
   );
   if (!currentUserEntry) {
-    console.error("Current user not found in leaderboard");
     return [];
   }
 
-  // Get online statuses
-  const onlineStatuses = await UserPresence.find({}).lean();
+  const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
+  const onlineStatuses =
+    userIds.length > 0
+      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
+      : [];
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert current user

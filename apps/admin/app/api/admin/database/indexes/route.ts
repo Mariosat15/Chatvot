@@ -320,6 +320,9 @@ interface IndexInfo {
   exists: boolean;
   unique?: boolean;
   ttl?: number;
+  /** When exists: true by same keys but different name (avoids duplicate create) */
+  equivalentIndexName?: string;
+  matchedByKeys?: boolean;
 }
 
 interface IndexStatus {
@@ -363,12 +366,20 @@ export async function GET() {
           existingIndexes = await db.collection(collectionName).indexes();
         }
 
+        const keysToString = (key: Record<string, number>) =>
+          JSON.stringify(key);
+
         for (const required of requiredIndexes) {
           const indexName = required.options.name;
-          const existingIndex = existingIndexes.find(
-            (idx) => idx.name === indexName,
+          const requiredKeysStr = keysToString(required.keys);
+          const byName = existingIndexes.find((idx) => idx.name === indexName);
+          const byKeys = existingIndexes.find(
+            (idx) => keysToString(idx.key) === requiredKeysStr,
           );
-          const exists = !!existingIndex;
+          const exists = !!byName || !!byKeys;
+          const equivalentIndexName =
+            !byName && byKeys ? byKeys.name : undefined;
+          const matchedByKeys = !byName && !!byKeys;
 
           indexes.push({
             collection: collectionName,
@@ -378,6 +389,8 @@ export async function GET() {
             exists,
             unique: required.options.unique,
             ttl: required.options.expireAfterSeconds,
+            equivalentIndexName,
+            matchedByKeys,
           });
 
           if (exists) {
@@ -413,6 +426,9 @@ export async function GET() {
                 (totalExisting / (totalExisting + totalMissing)) * 100,
               ),
       },
+      /** System-wide: required = app-defined; existing = in DB (by name or same keys). Create only adds indexes not already present (no duplicates). */
+      message:
+        "Required indexes are defined by the app. 'Existing' includes indexes matched by same key spec (different name). Create Missing only adds indexes that do not already exist in the DB.",
       collections: results,
     });
   } catch (error) {
@@ -481,16 +497,11 @@ export async function POST(request: Request) {
           );
 
           if (existingWithSameKeys) {
-            // Index with same keys exists but different name/options
-            // Skip to avoid IndexOptionsConflict error
-            console.log(
-              `⏭️ Skipping ${indexName} on ${collectionName} - equivalent index "${existingWithSameKeys.name}" already exists`,
-            );
             results.push({
               collection: collectionName,
               index: indexName,
               status: "exists",
-              error: `Equivalent index "${existingWithSameKeys.name}" already exists`,
+              error: `Equivalent index "${existingWithSameKeys.name}" already exists (no duplicate created)`,
             });
             continue;
           }
@@ -507,8 +518,6 @@ export async function POST(request: Request) {
               index: indexName,
               status: "created",
             });
-
-            console.log(`✅ Created index ${indexName} on ${collectionName}`);
           } catch (indexError) {
             // Handle IndexOptionsConflict gracefully
             const errorMessage =
@@ -529,13 +538,14 @@ export async function POST(request: Request) {
                 : errorMessage,
             });
 
-            if (isConflict) {
-              console.log(
-                "⏭️", indexName, "on", collectionName, ": equivalent index already exists"
-              );
-            } else {
+            if (!isConflict) {
               console.error(
-                "❌ Failed to create index", indexName, "on", collectionName, ":", indexError
+                "Failed to create index",
+                indexName,
+                "on",
+                collectionName,
+                ":",
+                indexError,
               );
             }
           }

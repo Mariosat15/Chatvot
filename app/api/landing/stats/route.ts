@@ -24,53 +24,44 @@ export async function GET() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Aggregate all stats in parallel for performance
     const [
       totalUsers,
       activeCompetitions,
-      completedCompetitions,
+      completedAgg,
       activeChallenges,
       completedChallenges,
       totalTrades,
       tradesToday,
       platformFinancials,
     ] = await Promise.all([
-      // Total registered users
       db.collection("user").countDocuments({}),
-
-      // Active competitions count
       db.collection("competitions").countDocuments({ status: "active" }),
-
-      // Completed competitions (for prize calculation)
-      db.collection("competitions").find({ status: "completed" }).toArray(),
-
-      // Active challenges
+      db
+        .collection("competitions")
+        .aggregate([
+          { $match: { status: "completed" } },
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 },
+              totalPrizePool: { $sum: "$prizePool" },
+            },
+          },
+        ])
+        .toArray(),
       db.collection("challenges").countDocuments({
         status: { $in: ["pending", "accepted", "active"] },
       }),
-
-      // Completed challenges
       db.collection("challenges").countDocuments({ status: "completed" }),
-
-      // Total trades ever
       db.collection("positions").countDocuments({}),
-
-      // Trades today
       db.collection("positions").countDocuments({
         createdAt: { $gte: today },
       }),
-
-      // Platform financials for total prizes
       db.collection("platformfinancials").findOne({ type: "aggregate" }),
     ]);
 
-    // Calculate total prizes from completed competitions
-    const totalPrizesFromCompetitions = completedCompetitions.reduce(
-      (sum, comp) => {
-        return sum + (comp.prizePool || 0);
-      },
-      0,
-    );
+    const completedCount = completedAgg[0]?.count ?? 0;
+    const totalPrizesFromCompetitions = completedAgg[0]?.totalPrizePool ?? 0;
 
     // Calculate total prizes from platform financials (more accurate)
     const totalPrizesPaid =
@@ -102,7 +93,7 @@ export async function GET() {
 
       // Competition stats
       activeCompetitions,
-      totalCompetitions: completedCompetitions.length + activeCompetitions,
+      totalCompetitions: completedCount + activeCompetitions,
       activePrizePool: activePrizePool[0]?.total || 0,
 
       // Challenge stats
@@ -122,7 +113,7 @@ export async function GET() {
         activeTraders: formatNumber(activeTraders[0]?.count || 0),
         activeCompetitions: activeCompetitions.toString(),
         totalCompetitions: formatNumber(
-          completedCompetitions.length + activeCompetitions,
+          completedCount + activeCompetitions,
         ),
         activePrizePool: formatCurrency(activePrizePool[0]?.total || 0),
         totalPrizesPaid: formatCurrency(totalPrizesPaid),

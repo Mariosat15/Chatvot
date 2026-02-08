@@ -120,7 +120,7 @@ export async function GET() {
       ).default;
       storedUPOs = await NuveiUserPaymentOption.getActiveUPOs(session.user.id);
     } catch {
-      console.log("Could not fetch stored UPOs (model may not exist yet)");
+      // UPO model may not exist yet
     }
 
     // Add stored UPOs as card options (these have valid UPO IDs for Nuvei refunds)
@@ -313,9 +313,6 @@ export async function POST(request: NextRequest) {
       });
 
       if (!rateLimitResult.success) {
-        console.log(
-          `🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`,
-        );
         return NextResponse.json(
           {
             success: false,
@@ -429,11 +426,7 @@ export async function POST(request: NextRequest) {
       }).session(mongoSession);
 
       if (!storedUpo) {
-        // UPO not found in our records, but might still be valid in Nuvei
-        // For manual processing, just record the card details
-        console.log(
-          `⚠️ UPO ${upoId} not found in local records, proceeding with manual withdrawal`,
-        );
+        // UPO not found in our records, but might still be valid in Nuvei; proceed with manual withdrawal
       }
 
       payoutMethodType = "card_payout";
@@ -462,9 +455,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if this bank account has a Nuvei UPO (created when account was added)
-      if (bankAccount.nuveiUpoId && bankAccount.nuveiStatus === "active") {
-        console.log("💳 Bank account has Nuvei UPO:", bankAccount.nuveiUpoId);
-      } else if (!bankAccount.nuveiUpoId) {
+      if (!bankAccount.nuveiUpoId) {
         // Try to find a bank UPO for this user in case it was created separately
         const NuveiUserPaymentOption = (
           await import("@/database/models/nuvei-user-payment-option.model")
@@ -476,10 +467,6 @@ export async function POST(request: NextRequest) {
         }).sort({ lastUsed: -1 });
 
         if (bankUpo) {
-          console.log(
-            "💳 Found bank UPO from separate record:",
-            bankUpo.userPaymentOptionId,
-          );
           bankAccount.nuveiUpoId = String(bankUpo.userPaymentOptionId);
         }
       }
@@ -709,9 +696,6 @@ export async function POST(request: NextRequest) {
 
     // NOTE: Don't record withdrawal fee to platform financials here either!
     // It will be recorded when the withdrawal is completed.
-    console.log(
-      `💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`,
-    );
 
     // Check for auto-approval
     // Important: Only auto-approve if Nuvei automatic processing is enabled
@@ -722,18 +706,11 @@ export async function POST(request: NextRequest) {
     if (isManualMode) {
       // In manual mode, all withdrawals stay in 'pending' status
       // Admin must manually approve/process them
-      console.log(
-        "💼 Manual mode: Withdrawal stays in pending for admin review",
-      );
 
       // If usePaymentProcessorForManual is enabled, create the request in Nuvei
       // This allows Nuvei to process the payout when admin approves
       if (withdrawalSettings.usePaymentProcessorForManual) {
         try {
-          console.log(
-            "🏦 Creating withdrawal request in Nuvei (manual mode with processor)...",
-          );
-
           // Get user's UPO for the withdrawal method
           let userPaymentOptionId: string | undefined;
 
@@ -772,7 +749,7 @@ export async function POST(request: NextRequest) {
 
             if ("error" in nuveiResult && nuveiResult.error) {
               console.error(
-                "❌ Failed to create Nuvei withdrawal request:",
+                "Failed to create Nuvei withdrawal request:",
                 nuveiResult.error,
               );
               // Don't fail the withdrawal - just mark for manual processing
@@ -782,10 +759,6 @@ export async function POST(request: NextRequest) {
                 requiresManualProcessing: true,
               };
             } else if ("wdRequestId" in nuveiResult) {
-              console.log(
-                "✅ Nuvei withdrawal request created:",
-                nuveiResult.wdRequestId,
-              );
               withdrawalRequest[0].metadata = {
                 ...(withdrawalRequest[0].metadata || {}),
                 nuveiWdRequestId: nuveiResult.wdRequestId,
@@ -795,10 +768,7 @@ export async function POST(request: NextRequest) {
               };
             }
             await withdrawalRequest[0].save();
-          } else {
-            console.log(
-              "⚠️ No UPO available for Nuvei - will require full manual processing",
-            );
+            } else {
             withdrawalRequest[0].metadata = {
               ...(withdrawalRequest[0].metadata || {}),
               requiresManualProcessing: true,
@@ -808,7 +778,7 @@ export async function POST(request: NextRequest) {
           }
         } catch (nuveiError) {
           console.error(
-            "❌ Error creating Nuvei withdrawal request:",
+            "Error creating Nuvei withdrawal request:",
             nuveiError,
           );
           // Don't fail - just mark for manual processing
@@ -902,7 +872,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     await mongoSession.abortTransaction();
     console.error("Error creating withdrawal:", error);
-
     // SECURITY: Log failed withdrawal request
     await securityLogger.log({
       statusCode: 500,
@@ -1123,12 +1092,7 @@ async function checkWithdrawalEligibility(
 
       // If participant is 'active' but competition is NOT active, auto-fix the participant status
       if (participantRecords.length > activeCompetitionCount) {
-        const staleCount = participantRecords.length - activeCompetitionCount;
-        console.log(
-          `⚠️ Found ${staleCount} orphaned 'active' participant(s) - competition already ended. Auto-fixing...`,
-        );
-
-        // Get competitions that are NOT active
+        // Get competitions that are NOT active (auto-fix orphaned participant status)
         const nonActiveCompetitions = await Competition.find({
           _id: { $in: competitionIds },
           status: { $ne: "active" },
@@ -1142,9 +1106,6 @@ async function checkWithdrawalEligibility(
           await CompetitionParticipant.updateMany(
             { userId, competitionId: (comp as any)._id, status: "active" },
             { $set: { status: newStatus } },
-          );
-          console.log(
-            `   ✅ Fixed participant status to '${newStatus}' for competition ${(comp as any)._id}`,
           );
         }
       }
@@ -1161,17 +1122,7 @@ async function checkWithdrawalEligibility(
       .select("_id status challengerId challengedId acceptDeadline createdAt")
       .lean();
 
-    // Debug log to help identify stale challenges
     if (activeChallenges.length > 0) {
-      console.log(
-        `🔍 Found ${activeChallenges.length} blocking challenge(s) for user ${userId}:`,
-      );
-      activeChallenges.forEach((c: any, i: number) => {
-        console.log(
-          `   Challenge ${i + 1}: id=${c._id}, status=${c.status}, challengerId=${c.challengerId}, challengedId=${c.challengedId}, acceptDeadline=${c.acceptDeadline}, createdAt=${c.createdAt}`,
-        );
-      });
-
       // Check if any pending challenges have expired accept deadlines
       const now = new Date();
       const expiredPending = activeChallenges.filter(
@@ -1182,9 +1133,6 @@ async function checkWithdrawalEligibility(
       );
 
       if (expiredPending.length > 0) {
-        console.log(
-          `⚠️  Found ${expiredPending.length} expired pending challenge(s) - these should have been auto-expired!`,
-        );
         // Auto-expire these stale challenges
         for (const expiredChallenge of expiredPending) {
           try {
@@ -1192,12 +1140,9 @@ async function checkWithdrawalEligibility(
               { _id: expiredChallenge._id, status: "pending" },
               { $set: { status: "expired", expiredAt: now } },
             );
-            console.log(
-              `   ✅ Auto-expired stale challenge ${expiredChallenge._id}`,
-            );
           } catch (err) {
             console.error(
-              `   ❌ Failed to expire challenge ${expiredChallenge._id}:`,
+              `Failed to expire challenge ${expiredChallenge._id}:`,
               err,
             );
           }
@@ -1214,9 +1159,6 @@ async function checkWithdrawalEligibility(
         );
 
         if (remainingChallenges.length === 0) {
-          console.log(
-            `   ✅ All blocking challenges were expired - user can now withdraw`,
-          );
           // Continue to next check instead of blocking
         } else {
           const pendingCount = remainingChallenges.filter(

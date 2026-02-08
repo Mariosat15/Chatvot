@@ -6,6 +6,12 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { seedMarketplaceItems } from "@/lib/services/marketplace-seed.service";
 
+const MARKETPLACE_CACHE_TTL_MS = 60 * 1000;
+const marketplaceListCache = new Map<
+  string,
+  { data: { success: true; items: unknown[] }; ts: number }
+>();
+
 // Escape special regex characters to prevent ReDoS attacks
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -32,13 +38,6 @@ export async function GET(request: NextRequest) {
       status: "active",
     });
     if (publishedGMCount === 0) {
-      // Check if they exist at all (might be unpublished)
-      const totalGMCount = await MarketplaceItem.countDocuments({
-        category: "gamemaster",
-      });
-      console.log(
-        `Game Master packages: ${publishedGMCount} published, ${totalGMCount} total. Running seed to fix...`,
-      );
       await seedMarketplaceItems();
     }
 
@@ -76,41 +75,61 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const items = await MarketplaceItem.find(query)
-      .sort({ isFeatured: -1, totalPurchases: -1, createdAt: -1 })
-      .lean();
-
-    // Get user's purchases if authenticated
-    let userPurchases: string[] = [];
+    let userId: string | null = null;
     try {
       const session = await auth.api.getSession({ headers: await headers() });
-      if (session?.user?.id) {
-        const purchases = await UserPurchase.find({
-          userId: session.user.id,
-        }).lean();
-        userPurchases = purchases.map((p) => p.itemId.toString());
-      }
+      userId = session?.user?.id ?? null;
     } catch {
-      // Not authenticated, continue without purchases
+      // not authenticated
     }
 
-    // Add owned flag to items
+    const cacheKey = searchParams.toString() + "|" + (userId ?? "anon");
+    if (!search) {
+      const cached = marketplaceListCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < MARKETPLACE_CACHE_TTL_MS) {
+        return NextResponse.json(cached.data, {
+          headers: {
+            "Cache-Control":
+              "private, s-maxage=60, stale-while-revalidate=120",
+          },
+        });
+      }
+    }
+
+    const items = await MarketplaceItem.find(query)
+      .sort({ isFeatured: -1, totalPurchases: -1, createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    let userPurchases: string[] = [];
+    if (userId) {
+      const purchases = await UserPurchase.find({
+        userId,
+      })
+          .select("itemId")
+          .limit(500)
+          .lean();
+      userPurchases = purchases.map((p) => p.itemId.toString());
+    }
+
     const itemsWithOwnership = items.map((item) => ({
       ...item,
       owned: userPurchases.includes(item._id.toString()),
     }));
 
-    return NextResponse.json({
-      success: true,
-      items: itemsWithOwnership,
-    });
-  } catch (error) {
-    console.error("Error fetching marketplace items:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+    const payload = { success: true as const, items: itemsWithOwnership };
+    if (!search) {
+      marketplaceListCache.set(cacheKey, { data: payload, ts: Date.now() });
+    }
+
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "private, s-maxage=60, stale-while-revalidate=120",
       },
+    });
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch marketplace items" },
       { status: 500 },
     );
   }

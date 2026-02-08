@@ -341,12 +341,6 @@ export async function GET(req: NextRequest) {
         currentRank?: number;
       } | null;
 
-      console.log("🔍 DEBUG - Competition Stats Query:");
-      console.log("  competitionId:", competitionId);
-      console.log("  userId:", userId);
-      console.log("  participation found:", !!participation);
-      console.log("  participation._id:", participation?._id?.toString());
-
       if (participation) {
         const competition = (await Competition.findById(
           competitionId,
@@ -362,10 +356,6 @@ export async function GET(req: NextRequest) {
         // Get all positions for this competition
         // Note: participantId is stored as string in DB, so convert ObjectId to string
         const participantIdStr = participation._id.toString();
-        console.log(
-          "  Querying positions with participantId:",
-          participantIdStr,
-        );
 
         const positions = await TradingPosition.find({
           competitionId,
@@ -373,56 +363,6 @@ export async function GET(req: NextRequest) {
         })
           .sort({ openedAt: 1 })
           .lean();
-
-        console.log("  Positions found:", positions.length);
-
-        // Also try querying just by competitionId and userId to see if positions exist
-        const altPositions = await TradingPosition.find({
-          competitionId,
-          userId,
-        }).lean();
-        console.log("  Alt query (by userId) found:", altPositions.length);
-        if (altPositions.length > 0) {
-          console.log(
-            "  First position participantId:",
-            altPositions[0].participantId,
-          );
-          console.log("  Expected participantId:", participantIdStr);
-          console.log(
-            "  Match:",
-            altPositions[0].participantId === participantIdStr,
-          );
-        }
-
-        // DEBUG: Check position statuses and PnL values
-        const openCount = positions.filter((p) => p.status === "open").length;
-        const closedCount = positions.filter(
-          (p) => p.status === "closed",
-        ).length;
-        console.log("  Open positions:", openCount);
-        console.log("  Closed positions:", closedCount);
-
-        if (positions.length > 0) {
-          console.log("  Sample position fields:", Object.keys(positions[0]));
-          console.log("  First position status:", positions[0].status);
-          console.log(
-            "  First position unrealizedPnl:",
-            positions[0].unrealizedPnl,
-          );
-
-          // Show all closed positions PnL
-          const closedOnes = positions.filter((p) => p.status === "closed");
-          if (closedOnes.length > 0) {
-            console.log(
-              "  Closed positions PnL values:",
-              closedOnes.map((p) => ({
-                symbol: p.symbol,
-                pnl: p.unrealizedPnl,
-                side: p.side,
-              })),
-            );
-          }
-        }
 
         // Calculate live stats
         const openPositions = positions.filter((p) => p.status === "open");
@@ -434,14 +374,6 @@ export async function GET(req: NextRequest) {
         })
           .sort({ closedAt: 1 })
           .lean();
-
-        console.log("  TradeHistory records found:", tradeHistory.length);
-        if (tradeHistory.length > 0) {
-          console.log(
-            "  Sample trade realizedPnl:",
-            tradeHistory[0].realizedPnl,
-          );
-        }
 
         // Unrealized P&L from open positions
         const unrealizedPnL = openPositions.reduce(
@@ -766,8 +698,7 @@ export async function GET(req: NextRequest) {
       equityCurve,
       challengeEquityCurve,
     });
-  } catch (error) {
-    console.error("Error fetching stats:", error);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch stats" },
       { status: 500 },

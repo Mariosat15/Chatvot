@@ -86,25 +86,33 @@ export async function getGlobalLeaderboard(
   await connectToDatabase();
 
   try {
-    // OPTIMIZATION: Run all queries in parallel
+    const allUsersRaw = await getAllUsers();
+    const usersToProcess = allUsersRaw.slice(0, MAX_LEADERBOARD_USERS);
+    const userIds = usersToProcess.map((u) => u.id).filter(Boolean);
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    // Only load participants and badges for users we rank (avoids loading 100k+ rows when DB is large)
     const [
-      allUsers,
       allCompetitionParticipants,
       allChallengeParticipants,
       allUserBadges,
     ] = await Promise.all([
-      getAllUsers(),
-      CompetitionParticipant.find({})
+      CompetitionParticipant.find({ userId: { $in: userIds } })
         .select(
           "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
         )
         .lean(),
-      ChallengeParticipant.find({})
+      ChallengeParticipant.find({ userId: { $in: userIds } })
         .select(
           "userId pnl startingCapital totalTrades winningTrades losingTrades isWinner",
         )
         .lean(),
-      UserBadge.find({}).select("userId badgeId").lean(),
+      UserBadge.find({ userId: { $in: userIds } })
+        .select("userId badgeId")
+        .lean(),
     ]);
 
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)
@@ -143,8 +151,6 @@ export async function getGlobalLeaderboard(
       }
     >();
 
-    // Initialize users with zero stats (cap to avoid blocking with 10k+ users)
-    const usersToProcess = allUsers.slice(0, MAX_LEADERBOARD_USERS);
     for (const user of usersToProcess) {
       if (!user.id || !user.email) continue;
 

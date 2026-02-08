@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Zap,
   Shield,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,8 @@ interface IndexInfo {
   exists: boolean;
   unique?: boolean;
   ttl?: number;
+  equivalentIndexName?: string;
+  matchedByKeys?: boolean;
 }
 
 interface CollectionStatus {
@@ -58,6 +61,7 @@ export default function DatabaseIndexesTab() {
   const [creating, setCreating] = useState(false);
   const [summary, setSummary] = useState<IndexSummary | null>(null);
   const [collections, setCollections] = useState<CollectionStatus[]>([]);
+  const [indexMessage, setIndexMessage] = useState<string | null>(null);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
     new Set(),
   );
@@ -72,6 +76,7 @@ export default function DatabaseIndexesTab() {
       if (data.success) {
         setSummary(data.summary);
         setCollections(data.collections);
+        setIndexMessage(data.message ?? null);
         setLastChecked(new Date());
 
         if (data.summary.totalMissing > 0) {
@@ -157,7 +162,9 @@ export default function DatabaseIndexesTab() {
             Database Indexes
           </h2>
           <p className="text-muted-foreground">
-            Monitor and manage MongoDB indexes for optimal performance
+            System-wide index health: required by app vs existing in DB. Create
+            only adds indexes that do not already exist (same keys = no
+            duplicate).
           </p>
         </div>
         <div className="flex gap-2">
@@ -179,10 +186,20 @@ export default function DatabaseIndexesTab() {
             ) : (
               <Zap className="w-4 h-4 mr-2" />
             )}
-            Create Missing Indexes
+            Create Missing (no duplicates)
           </Button>
         </div>
       </div>
+
+      {/* System message */}
+      {indexMessage && (
+        <Card className="border-blue-500/30 bg-blue-500/5">
+          <CardContent className="pt-4 pb-4 flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">{indexMessage}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       {summary && (
@@ -334,17 +351,25 @@ export default function DatabaseIndexesTab() {
                         <div
                           key={idx.name}
                           className={cn(
-                            "flex items-center justify-between p-2 rounded",
+                            "flex items-center justify-between p-2 rounded gap-2 flex-wrap",
                             idx.exists ? "bg-green-500/10" : "bg-red-500/10",
                           )}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {idx.exists ? (
                               <CheckCircle className="w-4 h-4 text-green-500" />
                             ) : (
                               <XCircle className="w-4 h-4 text-red-500" />
                             )}
                             <code className="text-sm">{idx.name}</code>
+                            {idx.matchedByKeys && idx.equivalentIndexName && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-blue-500/10 text-blue-600"
+                              >
+                                same as {idx.equivalentIndexName}
+                              </Badge>
+                            )}
                             {idx.unique && (
                               <Badge variant="secondary" className="text-xs">
                                 unique
