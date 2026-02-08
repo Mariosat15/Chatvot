@@ -66,6 +66,25 @@ After that, re-run the Performance Simulator; heap usage should stay below 100% 
 
 ---
 
+## .env on the server (optional)
+
+You don’t have to put `NODE_OPTIONS` in `.env` for the admin app to get 4 GB: **ecosystem.config.js** and **package.json** already set the heap when you run `pm2 start ecosystem.config.js`. If you want it explicit in `.env` (or to use more than 4 GB), add one of:
+
+- **`ADMIN_HEAP_MB=4096`** — used by `ecosystem.config.js` for the admin app (default 4096 if omitted).
+- **`NODE_OPTIONS=--max-old-space-size=4096`** — optional; same effect if something else reads it.
+
+**How to see `.env` on the server**
+
+1. SSH into the server.
+2. Go to the project root (e.g. `cd /var/www/chartvolt`).
+3. Run:
+   - **`cat .env`** — shows the whole file (contains secrets; don’t share or paste in public).
+   - **`grep -E 'NODE_OPTIONS|ADMIN_HEAP' .env`** — shows only those lines.
+
+If the file doesn’t exist, create it in the project root and add the line(s) above, then restart: `pm2 restart chartvolt-admin`.
+
+---
+
 ## Checking logs after restarts
 
 When you see high **Restarts** in metadata:
