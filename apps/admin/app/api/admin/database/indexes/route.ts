@@ -7,10 +7,7 @@ import mongoose from "mongoose";
 // Define required indexes for optimal performance
 // COMPREHENSIVE LIST - includes leaderboard, trading, and all critical queries
 // Collection names must match actual DB: "user" = Better Auth, Mongoose defaults = lowercase plural
-const REQUIRED_INDEXES: Record<
-  string,
-  Array<{ keys: Record<string, number>; options: { name: string; unique?: boolean; expireAfterSeconds?: number } }
-> = {
+const REQUIRED_INDEXES = {
   // ============================================
   // USER & AUTH INDEXES
   // ============================================
