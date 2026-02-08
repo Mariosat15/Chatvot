@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "100");
     const skip = parseInt(searchParams.get("skip") || "0");
     const employeeId = searchParams.get("employeeId");
+    const customerIdsParam = searchParams.get("customerIds");
+    const customerIds = customerIdsParam
+      ? customerIdsParam.split(",").map((id) => id.trim()).filter(Boolean)
+      : null;
     const includeStats = searchParams.get("includeStats") === "true";
 
     await connectToDatabase();
@@ -27,12 +31,15 @@ export async function GET(request: NextRequest) {
     let result;
 
     if (employeeId) {
-      // Get assignments for specific employee
       const assignments =
         await customerAssignmentService.getEmployeeAssignments(employeeId);
       result = { assignments, total: assignments.length };
+    } else if (customerIds && customerIds.length > 0) {
+      // Only assignments for current page (scales with 4k+ users)
+      const assignments =
+        await customerAssignmentService.getAssignmentsByCustomerIds(customerIds);
+      result = { assignments, total: assignments.length };
     } else {
-      // Get all assignments
       result = await customerAssignmentService.getAllAssignments({
         limit,
         skip,

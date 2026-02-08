@@ -4,9 +4,9 @@ import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * GET /api/users/presence
- * Get online/offline status for all users
+ * Get online/offline status. Optional ?userIds=id1,id2,... to return only those users (scales with 4k+ users).
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await connectToDatabase();
 
@@ -18,9 +18,20 @@ export async function GET() {
       );
     }
 
-    // Get all presence records from userpresences collection (the main user presence, not messaging)
-    // The UserPresence model uses 'userId' field, collection is 'userpresences'
-    const presences = await db.collection("userpresences").find({}).toArray();
+    const { searchParams } = new URL(request.url);
+    const userIdsParam = searchParams.get("userIds");
+    const userIds =
+      userIdsParam?.split(",").map((id) => id.trim()).filter(Boolean) || null;
+
+    const query =
+      userIds && userIds.length > 0
+        ? { userId: { $in: userIds } }
+        : {};
+
+    const presences = await db
+      .collection("userpresences")
+      .find(query)
+      .toArray();
 
     // Define threshold for "offline" (45 seconds without heartbeat)
     const offlineThreshold = new Date(Date.now() - 45 * 1000);

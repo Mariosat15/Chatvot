@@ -94,6 +94,23 @@ class CustomerAssignmentService {
   }
 
   /**
+   * Get assignments for specific customers (e.g. current page only). Use this to avoid loading 4k+ when only showing 25 users.
+   */
+  async getAssignmentsByCustomerIds(
+    customerIds: string[],
+  ): Promise<ICustomerAssignment[]> {
+    if (customerIds.length === 0) return [];
+    await connectToDatabase();
+    return CustomerAssignment.find({
+      customerId: { $in: customerIds },
+      isActive: true,
+    })
+      .sort({ assignedAt: -1 })
+      .lean()
+      .then((r) => r as unknown as ICustomerAssignment[]);
+  }
+
+  /**
    * Get all active assignments
    */
   async getAllAssignments(

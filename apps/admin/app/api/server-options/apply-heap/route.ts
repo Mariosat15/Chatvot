@@ -29,8 +29,8 @@ export async function POST() {
       );
     }
 
-    // Fixed commands only (no user input) for security. Quote value so PM2 doesn't treat --max-old-space-size as its own option.
-    const setEnv = `pm2 set ${PM2_APP_NAME}:env.NODE_OPTIONS "--max-old-space-size=${HEAP_MB}"`;
+    // Use -- so PM2 treats the value as positional; otherwise it parses --max-old-space-size as a PM2 option.
+    const setEnv = `pm2 set ${PM2_APP_NAME}:env.NODE_OPTIONS -- --max-old-space-size=${HEAP_MB}`;
     const restart = `pm2 restart ${PM2_APP_NAME}`;
 
     try {

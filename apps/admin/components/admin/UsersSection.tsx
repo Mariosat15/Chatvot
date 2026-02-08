@@ -206,19 +206,30 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
 
   useEffect(() => {
-    fetchAssignments();
     fetchEmployees();
-    fetchOnlineStatus();
-
-    // Refresh online status every 30 seconds
-    const onlineInterval = setInterval(fetchOnlineStatus, 30000);
-    return () => clearInterval(onlineInterval);
   }, []);
 
   // Fetch users when page, pageSize, search, or sort changes (server-side pagination)
   useEffect(() => {
     fetchUsers();
   }, [currentPage, pageSize, searchQuery, sortField, sortDirection]);
+
+  // After users load, fetch presence and assignments for this page only (avoids loading 4k+ on User Management)
+  useEffect(() => {
+    if (users.length === 0) return;
+    const ids = users.map((u) => u.id);
+    fetchAssignmentsForIds(ids);
+    fetchOnlineStatusForIds(ids);
+  }, [users]);
+
+  // Refresh online status for current page every 30 seconds
+  useEffect(() => {
+    if (users.length === 0) return;
+    const interval = setInterval(() => {
+      fetchOnlineStatusForIds(users.map((u) => u.id));
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [users]);
 
   // Handle initial user ID to open specific user
   useEffect(() => {
@@ -277,9 +288,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     }
   };
 
-  const fetchAssignments = async () => {
+  const fetchAssignmentsForIds = async (customerIds: string[]) => {
+    if (customerIds.length === 0) {
+      setAssignments(new Map());
+      return;
+    }
     try {
-      const response = await fetch("/api/customer-assignments?limit=10000");
+      const params = new URLSearchParams();
+      params.set("customerIds", customerIds.join(","));
+      const response = await fetch(`/api/customer-assignments?${params}`);
       if (response.ok) {
         const data = await response.json();
         const assignmentMap = new Map<string, Assignment>();
@@ -311,9 +328,15 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
     }
   };
 
-  const fetchOnlineStatus = async () => {
+  const fetchOnlineStatusForIds = async (userIds: string[]) => {
+    if (userIds.length === 0) {
+      setOnlineStatus(new Map());
+      return;
+    }
     try {
-      const response = await fetch("/api/users/presence");
+      const params = new URLSearchParams();
+      params.set("userIds", userIds.join(","));
+      const response = await fetch(`/api/users/presence?${params}`);
       if (response.ok) {
         const data = await response.json();
         const statusMap = new Map<
@@ -1082,7 +1105,6 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
           user={selectedUser}
           onRefresh={() => {
             fetchUsers();
-            fetchAssignments();
           }}
         />
       )}
