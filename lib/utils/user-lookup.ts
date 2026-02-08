@@ -123,6 +123,9 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
  */
 export async function getAllUsers(): Promise<UserInfo[]> {
   try {
+    // #region agent log
+    const _allUsersT0 = Date.now();
+    // #endregion
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 
@@ -137,6 +140,9 @@ export async function getAllUsers(): Promise<UserInfo[]> {
     // Get ONLY traders - filter by ROLE field (the proper way to identify user types)
     // Include: role='trader', no role field (legacy), null role
     // Exclude: role='admin', role='backoffice'
+    // #region agent log
+    const _queryT0 = Date.now();
+    // #endregion
     const users = await db
       .collection("user")
       .find(
@@ -157,6 +163,9 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         { projection: { id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 } }
       )
       .toArray();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'user-lookup.ts:getAllUsers',message:'user collection query',data:{ms:Date.now()-_queryT0,userCount:users.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     // Deduplicate by EMAIL (not by name) - email is the unique identifier
     const uniqueUsersMap = new Map<string, UserInfo>();

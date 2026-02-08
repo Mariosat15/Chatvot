@@ -12,7 +12,14 @@ const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
 const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
+  // #region agent log
+  const _layoutT0 = Date.now();
+  const _layoutAuthT0 = Date.now();
+  // #endregion
   const session = await auth.api.getSession({ headers: await headers() });
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx',message:'layout auth.getSession',data:{ms:Date.now()-_layoutAuthT0,hasUser:!!session?.user},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+  // #endregion
 
   if (!session?.user) redirect("/sign-in");
 
@@ -23,6 +30,9 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     if (!cached.verified) redirect("/verify-email-required");
   } else {
     try {
+      // #region agent log
+      const _emailT0 = Date.now();
+      // #endregion
       const mongoose = await connectToDatabase();
       const db = mongoose.connection.db;
       if (db) {
@@ -35,6 +45,9 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
           .findOne(query, { projection: { emailVerified: 1 } });
         const verified = user?.emailVerified === true;
         emailVerifiedCache.set(userId, { verified, ts: now });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx',message:'emailVerified DB check',data:{ms:Date.now()-_emailT0,verified},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         if (user && !verified) redirect("/verify-email-required");
       }
     } catch (error: unknown) {

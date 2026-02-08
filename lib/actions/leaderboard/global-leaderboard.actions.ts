@@ -6,7 +6,7 @@ import ChallengeParticipant from "@/database/models/trading/challenge-participan
 import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
-import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { getAllUsers } from "@/lib/utils/user-lookup";
 // Titles are added per-page in the API to avoid loading 4000+ UserLevel docs on every cache build
 
 export interface GlobalLeaderboardEntry {
@@ -66,18 +66,21 @@ function isCacheValid(): boolean {
 }
 
 /**
- * Get global leaderboard - ranks users who have at least one competition or challenge.
+ * Get global leaderboard - ranks ALL users (including those without competition/challenge history)
  *
- * SCALABLE: Does not scan the whole user collection. Gets ranked userIds from
- * participations (indexed), then loads only those users + their stats.
- * - 2 min cache; titles per-page in API only
- * - Single user lookup by id $in (no full user scan)
- * - Cap 5000 users to keep memory and query size bounded
+ * OPTIMIZED VERSION:
+ * - 2 min in-memory cache; titles loaded per-page in API only
+ * - Parallel database queries
+ * - O(n) lookups with Maps instead of O(n²)
+ * - Static imports (no dynamic import overhead)
  */
 export async function getGlobalLeaderboard(
   limit: number = 0,
 ): Promise<GlobalLeaderboardEntry[]> {
   if (isCacheValid()) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'global-leaderboard.actions.ts',message:'CACHE HIT',data:{age:Date.now()-(leaderboardCache?.timestamp||0),entries:leaderboardCache?.data?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     const cached = leaderboardCache!.data;
     return limit > 0 ? cached.slice(0, limit) : cached;
   }
@@ -85,23 +88,27 @@ export async function getGlobalLeaderboard(
   await connectToDatabase();
 
   try {
-    // Get ranked user IDs from participations only (indexed; no full user scan)
-    const [compUserIds, challengeUserIds] = await Promise.all([
-      CompetitionParticipant.distinct("userId"),
-      ChallengeParticipant.distinct("userId"),
-    ]);
-    const merged = new Set<string>([...compUserIds, ...challengeUserIds]);
-    const userIds = [...merged].slice(0, MAX_LEADERBOARD_USERS);
+    // #region agent log
+    const _glbT0 = Date.now();
+    // #endregion
+    const allUsersRaw = await getAllUsers();
+    // #region agent log
+    const _usersMs = Date.now() - _glbT0;
+    // #endregion
+    const usersToProcess = allUsersRaw.slice(0, MAX_LEADERBOARD_USERS);
+    const userIds = usersToProcess.map((u) => u.id).filter(Boolean);
 
     if (userIds.length === 0) {
       leaderboardCache = { data: [], timestamp: Date.now() };
       return [];
     }
 
-    // Load only these users (one query by id $in) and their participants + badges
-    const [usersMap, allCompetitionParticipants, allChallengeParticipants, allUserBadges] =
+    // Load participants and badges for users we rank
+    // #region agent log
+    const _partsT0 = Date.now();
+    // #endregion
+    const [allCompetitionParticipants, allChallengeParticipants, allUserBadges] =
       await Promise.all([
-        getUsersByIds(userIds),
         CompetitionParticipant.find({ userId: { $in: userIds } })
           .select(
             "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
@@ -116,6 +123,9 @@ export async function getGlobalLeaderboard(
           .select("userId badgeId")
           .lean(),
       ]);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'global-leaderboard.actions.ts',message:'getGlobalLeaderboard phases',data:{getAllUsersMs:_usersMs,participantQueriesMs:Date.now()-_partsT0,userCount:userIds.length,compParts:allCompetitionParticipants.length,challParts:allChallengeParticipants.length,badges:allUserBadges.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)
     const badgeCounts = new Map<string, { total: number; legendary: number }>();
@@ -153,9 +163,8 @@ export async function getGlobalLeaderboard(
       }
     >();
 
-    for (const userId of userIds) {
-      const user = usersMap.get(userId);
-      if (!user?.id) continue;
+    for (const user of usersToProcess) {
+      if (!user.id || !user.email) continue;
 
       userStatsMap.set(user.id, {
         userId: user.id,
