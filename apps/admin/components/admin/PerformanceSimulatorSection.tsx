@@ -391,9 +391,21 @@ export default function PerformanceSimulatorSection() {
             fetchRuns();
           } else if (data.run.status === "running") {
             setIsRunning(true);
+          } else if (
+            (data.run.status === "cancelled" ||
+              data.run.status === "failed") &&
+            completedRunIdRef.current !== data.run._id
+          ) {
+            completedRunIdRef.current = data.run._id;
+            setCurrentRun(data.run);
+            setIsRunning(false);
+            if (data.run.status === "cancelled") {
+              toast.info("Simulation was stopped");
+            }
+            fetchRuns();
           }
         } else {
-          setIsRunning(data.isRunning);
+          setIsRunning(data.isRunning ?? false);
         }
       }
     } catch (error) {
@@ -518,7 +530,23 @@ export default function PerformanceSimulatorSection() {
       if (data.success) {
         toast.success("Simulation stopped");
         setIsRunning(false);
+        setCurrentRun((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "cancelled",
+                endTime: new Date().toISOString(),
+                progress: {
+                  ...prev.progress,
+                  phase: "Cancelled",
+                  message: "Stopped by user",
+                },
+              }
+            : null,
+        );
         fetchRuns();
+      } else {
+        toast.error(data.error || "Failed to stop simulation");
       }
     } catch (error) {
       toast.error("Failed to stop simulation");

@@ -32,14 +32,30 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // When no active run, get the most recent run (might just have completed)
-      const recentRun = await SimulatorRun.findOne()
+      // When no active run in memory, get the most recent run
+      const recentRun = (await SimulatorRun.findOne()
         .sort({ createdAt: -1 })
-        .lean();
+        .lean()) as { _id: unknown; status?: string } | null;
+
+      // Stale "running" run (e.g. server was restarted): mark as cancelled so UI stops showing "running"
+      if (recentRun?.status === "running" && recentRun._id) {
+        await SimulatorRun.findByIdAndUpdate(recentRun._id, {
+          status: "cancelled",
+          endTime: new Date(),
+          "progress.phase": "Cancelled",
+          "progress.message": "Stopped (no active process; server may have restarted)",
+        });
+        const updated = await SimulatorRun.findById(recentRun._id).lean();
+        return NextResponse.json({
+          success: true,
+          isRunning: false,
+          run: updated,
+        });
+      }
 
       return NextResponse.json({
         success: true,
-        isRunning,
+        isRunning: false,
         run: recentRun || null,
       });
     }
@@ -121,7 +137,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "stop") {
-      await stopSimulation();
+      const activeRunId = getActiveRunId();
+      stopSimulation();
+      // Persist cancelled in DB immediately so UI and future status calls see "stopped"
+      if (activeRunId) {
+        await SimulatorRun.findByIdAndUpdate(activeRunId, {
+          status: "cancelled",
+          endTime: new Date(),
+          "progress.phase": "Cancelled",
+          "progress.message": "Stopped by user",
+        });
+      }
       return NextResponse.json({
         success: true,
         message: "Simulation stopped",
