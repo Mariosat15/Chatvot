@@ -69,6 +69,7 @@ interface SystemStats {
   memoryUsagePercent: number;
   loadAverage: number[];
   uptime: number;
+  adminHeapLimitMB?: number;
 }
 
 interface CollectionStats {
@@ -377,6 +378,25 @@ export default function ServerMonitorSection() {
               </div>
             </CardContent>
           </Card>
+
+          {typeof stats.system.adminHeapLimitMB === "number" && (
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-amber-400" />
+                    <span className="text-zinc-400 text-sm">Admin heap limit</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">
+                    {stats.system.adminHeapLimitMB} MB
+                    {stats.system.adminHeapLimitMB >= 4095 && (
+                      <span className="text-green-400 text-sm font-normal ml-1">✓ 4 GB</span>
+                    )}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

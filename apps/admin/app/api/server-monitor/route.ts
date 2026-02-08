@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import os from "os";
+import v8 from "v8";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { connectToDatabase } from "@/database/mongoose";
@@ -266,6 +267,9 @@ export async function GET() {
       restarts: proc.pm2_env?.restart_time || 0,
     }));
 
+    const heapStats = v8.getHeapStatistics();
+    const adminHeapLimitMB = Math.round(heapStats.heap_size_limit / 1024 / 1024);
+
     const systemStats = {
       hostname: os.hostname(),
       platform: os.platform(),
@@ -277,6 +281,7 @@ export async function GET() {
       memoryUsagePercent: (usedMemory / totalMemory) * 100,
       loadAverage: os.loadavg(),
       uptime: os.uptime(),
+      adminHeapLimitMB,
     };
 
     return NextResponse.json({

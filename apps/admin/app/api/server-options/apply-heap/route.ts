@@ -33,7 +33,15 @@ export async function POST() {
 
     try {
       await execAsync(restart, { timeout: 15000 });
-    } catch (err) {
+    } catch (err: unknown) {
+      const sig = err && typeof err === "object" && "signal" in err ? (err as { signal: string }).signal : null;
+      // When we restart ourselves, PM2 kills this process so the exec gets SIGINT. Restart still succeeded.
+      if (sig === "SIGINT" || sig === "SIGTERM") {
+        return NextResponse.json({
+          success: true,
+          message: `${PM2_APP_NAME} restarted. This tab may have disconnected; reload to confirm.`,
+        });
+      }
       console.error("[apply-heap] pm2 restart failed:", err);
       return NextResponse.json(
         {
@@ -48,7 +56,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `${PM2_APP_NAME} restarted (4 GB heap from ecosystem/package.json). This tab may disconnect briefly.`,
+      message: `${PM2_APP_NAME} restarted (4 GB heap from config). This tab may disconnect briefly.`,
     });
   } catch (error) {
     console.error("[apply-heap] error:", error);
