@@ -673,6 +673,7 @@ export default function PerformanceSimulatorSection() {
       case "running":
         return <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />;
       case "skipped":
+      case "cancelled":
         return <AlertCircle className="h-5 w-5 text-gray-500" />;
       default:
         return <Clock className="h-5 w-5 text-amber-500" />;
@@ -688,11 +689,19 @@ export default function PerformanceSimulatorSection() {
       case "running":
         return "bg-blue-500/10 text-blue-400 border-blue-500/30";
       case "skipped":
+      case "cancelled":
         return "bg-gray-500/10 text-gray-400 border-gray-500/30";
       default:
         return "bg-amber-500/10 text-amber-400 border-amber-500/30";
     }
   };
+
+  /** When run is cancelled, test cases still "running" should display as cancelled (no spinner) */
+  const getTestDisplayStatus = (
+    tc: TestCaseResult,
+    runStatus: string | undefined,
+  ) =>
+    runStatus === "cancelled" && tc.status === "running" ? "cancelled" : tc.status;
 
   if (loading) {
     return (
@@ -1463,22 +1472,27 @@ export default function PerformanceSimulatorSection() {
                 <CardContent>
                   <ScrollArea className="h-64">
                     <div className="space-y-2">
-                      {currentRun.testCases.map((tc) => (
+                      {currentRun.testCases.map((tc) => {
+                        const displayStatus = getTestDisplayStatus(
+                          tc,
+                          currentRun.status,
+                        );
+                        return (
                         <div
                           key={tc.id}
                           className={cn(
                             "flex items-center justify-between p-3 rounded-lg border",
-                            tc.status === "running"
+                            displayStatus === "running"
                               ? "bg-blue-500/10 border-blue-500/30"
-                              : tc.status === "passed"
+                              : displayStatus === "passed"
                                 ? "bg-emerald-500/5 border-gray-700"
-                                : tc.status === "failed"
+                                : displayStatus === "failed"
                                   ? "bg-red-500/5 border-gray-700"
                                   : "bg-gray-800/30 border-gray-700",
                           )}
                         >
                           <div className="flex items-center gap-3">
-                            {getStatusIcon(tc.status)}
+                            {getStatusIcon(displayStatus)}
                             <div>
                               <p className="text-white font-medium">
                                 {tc.name}
@@ -1499,7 +1513,8 @@ export default function PerformanceSimulatorSection() {
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2677,32 +2692,39 @@ export default function PerformanceSimulatorSection() {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                          {categoryTests.map((tc) => (
+                          {categoryTests.map((tc) => {
+                            const displayStatus = getTestDisplayStatus(
+                              tc,
+                              currentRun.status,
+                            );
+                            return (
                             <div
                               key={tc.id}
                               className={cn(
                                 "flex items-center justify-between p-2 rounded text-xs",
-                                tc.status === "passed" && "bg-emerald-500/10",
-                                tc.status === "failed" && "bg-red-500/10",
-                                tc.status === "skipped" && "bg-gray-500/10",
-                                tc.status === "running" && "bg-blue-500/10",
-                                tc.status === "pending" && "bg-amber-500/10",
+                                displayStatus === "passed" && "bg-emerald-500/10",
+                                displayStatus === "failed" && "bg-red-500/10",
+                                displayStatus === "skipped" && "bg-gray-500/10",
+                                displayStatus === "cancelled" && "bg-gray-500/10",
+                                displayStatus === "running" && "bg-blue-500/10",
+                                displayStatus === "pending" && "bg-amber-500/10",
                               )}
                             >
                               <div className="flex items-center gap-2">
-                                {tc.status === "passed" && (
+                                {displayStatus === "passed" && (
                                   <CheckCircle className="h-3 w-3 text-emerald-400" />
                                 )}
-                                {tc.status === "failed" && (
+                                {displayStatus === "failed" && (
                                   <XCircle className="h-3 w-3 text-red-400" />
                                 )}
-                                {tc.status === "skipped" && (
+                                {(displayStatus === "skipped" ||
+                                  displayStatus === "cancelled") && (
                                   <AlertCircle className="h-3 w-3 text-gray-400" />
                                 )}
-                                {tc.status === "running" && (
+                                {displayStatus === "running" && (
                                   <Loader2 className="h-3 w-3 text-blue-400 animate-spin" />
                                 )}
-                                {tc.status === "pending" && (
+                                {displayStatus === "pending" && (
                                   <Clock className="h-3 w-3 text-amber-400" />
                                 )}
                                 <span className="text-gray-300 truncate max-w-[150px]">
@@ -2714,7 +2736,8 @@ export default function PerformanceSimulatorSection() {
                                   `${tc.successCount}/${tc.iterations}`}
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </CardContent>
                       </Card>
                     );
@@ -2851,25 +2874,31 @@ export default function PerformanceSimulatorSection() {
                       <div className="space-y-2">
                         {currentRun.testCases
                           .filter((tc) => tc.category === category)
-                          .map((tc) => (
+                          .map((tc) => {
+                            const displayStatus = getTestDisplayStatus(
+                              tc,
+                              currentRun.status,
+                            );
+                            return (
                             <div
                               key={tc.id}
                               className={cn(
                                 "flex items-center justify-between p-4 rounded-lg border",
-                                tc.status === "passed" &&
+                                displayStatus === "passed" &&
                                   "bg-emerald-500/5 border-emerald-500/30",
-                                tc.status === "failed" &&
+                                displayStatus === "failed" &&
                                   "bg-red-500/5 border-red-500/30",
-                                tc.status === "running" &&
+                                displayStatus === "running" &&
                                   "bg-blue-500/10 border-blue-500/30",
-                                tc.status === "skipped" &&
+                                (displayStatus === "skipped" ||
+                                  displayStatus === "cancelled") &&
                                   "bg-gray-500/5 border-gray-700",
-                                tc.status === "pending" &&
+                                displayStatus === "pending" &&
                                   "bg-amber-500/5 border-amber-500/30",
                               )}
                             >
                               <div className="flex items-center gap-4">
-                                {getStatusIcon(tc.status)}
+                                {getStatusIcon(displayStatus)}
                                 <div>
                                   <p className="text-white font-medium">
                                     {tc.name}
@@ -2885,8 +2914,8 @@ export default function PerformanceSimulatorSection() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <Badge className={getStatusColor(tc.status)}>
-                                  {tc.status}
+                                <Badge className={getStatusColor(displayStatus)}>
+                                  {displayStatus}
                                 </Badge>
                                 {tc.iterations > 0 && (
                                   <p className="text-xs text-gray-500 mt-1">
@@ -2900,7 +2929,8 @@ export default function PerformanceSimulatorSection() {
                                 )}
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     </div>
                   ))}
