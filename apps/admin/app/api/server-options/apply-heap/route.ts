@@ -6,11 +6,11 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
 const execAsync = promisify(exec);
 
 const PM2_APP_NAME = process.env.PM2_ADMIN_APP_NAME || "chartvolt-admin";
-const HEAP_MB = 4096;
 
 /**
  * POST /api/server-options/apply-heap
- * Sets NODE_OPTIONS=--max-old-space-size=4096 for the admin PM2 process and restarts it.
+ * Restarts the admin PM2 process so it picks up the 4 GB heap from ecosystem.config.js and package.json.
+ * Does NOT run "pm2 set" from inside this process (that process gets killed on restart and would fail with SIGINT).
  * Requires admin auth with server-options access or super admin.
  */
 export async function POST() {
@@ -29,24 +29,7 @@ export async function POST() {
       );
     }
 
-    // Use -- so PM2 treats the value as positional; otherwise it parses --max-old-space-size as a PM2 option.
-    const setEnv = `pm2 set ${PM2_APP_NAME}:env.NODE_OPTIONS -- --max-old-space-size=${HEAP_MB}`;
     const restart = `pm2 restart ${PM2_APP_NAME}`;
-
-    try {
-      await execAsync(setEnv, { timeout: 10000 });
-    } catch (err) {
-      console.error("[apply-heap] pm2 set failed:", err);
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "PM2 set failed. Is the app running under PM2 with this name? Check PM2_ADMIN_APP_NAME env.",
-          detail: err instanceof Error ? err.message : String(err),
-        },
-        { status: 500 }
-      );
-    }
 
     try {
       await execAsync(restart, { timeout: 15000 });
@@ -55,7 +38,8 @@ export async function POST() {
       return NextResponse.json(
         {
           success: false,
-          message: "PM2 restart failed. Admin app may be restarting.",
+          message:
+            "PM2 restart failed. Is the app running under PM2 with this name? Check PM2_ADMIN_APP_NAME env.",
           detail: err instanceof Error ? err.message : String(err),
         },
         { status: 500 }
@@ -64,7 +48,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Heap set to ${HEAP_MB} MB and ${PM2_APP_NAME} restarted. This tab may disconnect briefly.`,
+      message: `${PM2_APP_NAME} restarted (4 GB heap from ecosystem/package.json). This tab may disconnect briefly.`,
     });
   } catch (error) {
     console.error("[apply-heap] error:", error);

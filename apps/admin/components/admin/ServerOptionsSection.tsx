@@ -119,17 +119,14 @@ export default function ServerOptionsSection() {
           <div className="rounded-lg bg-gray-900/80 border border-gray-600 p-4 space-y-3">
             <Label className="text-gray-300 text-sm font-medium flex items-center gap-1">
               <Terminal className="h-4 w-4" />
-              PM2 (set for chartvolt-admin)
+              PM2 (restart chartvolt-admin)
             </Label>
             <p className="text-xs text-gray-400">
-              Set before starting, or for an already running app:
+              Heap is set in <code className="text-gray-300">ecosystem.config.js</code> and <code className="text-gray-300">package.json</code>. To apply without redeploy:
             </p>
             <code className="block text-sm text-amber-200 font-mono break-all">
-              pm2 set chartvolt-admin:env.NODE_OPTIONS --max-old-space-size=4096
+              pm2 restart chartvolt-admin
             </code>
-            <p className="text-xs text-gray-500">
-              Then <code className="text-gray-400">pm2 restart chartvolt-admin</code>.
-            </p>
             <Button
               onClick={applyHeapNow}
               disabled={applying}
@@ -140,10 +137,10 @@ export default function ServerOptionsSection() {
               ) : (
                 <Zap className="h-4 w-4 mr-2" />
               )}
-              Apply 4 GB heap now (PM2 set + restart)
+              Restart admin (applies 4 GB heap from config)
             </Button>
             <p className="text-xs text-amber-200/80">
-              Runs <code className="text-amber-100">pm2 set</code> and <code className="text-amber-100">pm2 restart</code> on the server. This tab may disconnect briefly after success.
+              Runs <code className="text-amber-100">pm2 restart chartvolt-admin</code>. Heap is set in <code className="text-amber-100">ecosystem.config.js</code> and <code className="text-amber-100">package.json</code>. This tab may disconnect briefly.
             </p>
           </div>
 
