@@ -201,11 +201,15 @@ export async function getAllUsers(): Promise<UserInfo[]> {
 /**
  * Get multiple users by their IDs
  * Returns a Map keyed by the original userIds passed in
+ * Uses a single find with $in for scale (no N+1 queries)
  */
 export async function getUsersByIds(
   userIds: string[],
 ): Promise<Map<string, UserInfo>> {
   const userMap = new Map<string, UserInfo>();
+  if (userIds.length === 0) return userMap;
+
+  const uniqueIds = [...new Set(userIds)];
 
   try {
     const mongoose = await connectToDatabase();
@@ -216,48 +220,41 @@ export async function getUsersByIds(
       return userMap;
     }
 
-    const { ObjectId } = await import("mongodb");
+    const projection = {
+      id: 1,
+      _id: 1,
+      email: 1,
+      name: 1,
+      profileImage: 1,
+      image: 1,
+      bio: 1,
+      role: 1,
+      country: 1,
+      address: 1,
+      city: 1,
+      postalCode: 1,
+    };
 
-    // Process each userId individually to ensure correct key mapping
-    for (const originalId of userIds) {
-      if (userMap.has(originalId)) continue; // Already found
+    const users = await db
+      .collection("user")
+      .find({ id: { $in: uniqueIds } }, { projection })
+      .toArray();
 
-      let user = null;
-
-      // Try finding by 'id' field first (better-auth uses this)
-      user = await db.collection("user").findOne({ id: originalId });
-
-      // If not found, try by _id as ObjectId
-      if (!user && ObjectId.isValid(originalId)) {
-        try {
-          user = await db
-            .collection("user")
-            .findOne({ _id: new ObjectId(originalId) });
-        } catch {
-          // Not a valid ObjectId, skip
-        }
-      }
-
-      // If still not found, try as string _id
-      if (!user) {
-        user = await db.collection("user").findOne({ _id: originalId as any });
-      }
-
-      if (user) {
-        // Key by the ORIGINAL id that was passed in, so lookups work
-        userMap.set(originalId, {
-          id: user.id || user._id?.toString() || originalId,
-          email: user.email || "unknown",
-          name: user.name || user.email || "Unknown User",
-          profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
-          bio: user.bio,
-          role: user.role || "trader",
-          country: user.country,
-          address: user.address,
-          city: user.city,
-          postalCode: user.postalCode,
-        });
-      }
+    for (const user of users) {
+      const id = user.id || user._id?.toString() || "";
+      if (!id) continue;
+      userMap.set(id, {
+        id,
+        email: user.email || "unknown",
+        name: user.name || user.email || "Unknown User",
+        profileImage: user.profileImage || user.image,
+        bio: user.bio,
+        role: user.role || "trader",
+        country: user.country,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+      });
     }
 
     return userMap;
