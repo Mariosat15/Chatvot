@@ -88,22 +88,8 @@ export async function GET() {
     const user = await findUserById(db, session.user.id);
 
     if (!user) {
-      console.error("User not found for ID:", session.user.id);
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    // Log all user fields to debug missing data
-    console.log(`📋 Profile API - User found:`, {
-      id: user.id || user._id?.toString(),
-      email: user.email,
-      name: user.name,
-      country: user.country,
-      address: user.address,
-      city: user.city,
-      postalCode: user.postalCode,
-      phone: user.phone,
-      allKeys: Object.keys(user),
-    });
 
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
     const userImage = user.profileImage || user.image || "";

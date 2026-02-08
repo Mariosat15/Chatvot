@@ -12,7 +12,7 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { getRealPrice } from "@/lib/services/real-forex-prices.service";
+import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
@@ -231,11 +231,10 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const userId = session.user.id;
   await connectToDatabase();
 
-  // Parallel fetch all data
+  // Fetch user-scoped data first (no load-all)
   const [
     competitionParticipations,
     challengeParticipations,
-    allCompetitions,
     allChallenges,
     allTrades,
     wallet,
@@ -243,18 +242,27 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   ] = await Promise.all([
     CompetitionParticipant.find({ userId }).lean(),
     ChallengeParticipant.find({ userId }).lean(),
-    Competition.find({}).lean(),
     Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
     }).lean(),
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
-    // Wallet is the SOURCE OF TRUTH for financial data (prizes won, etc.)
     CreditWallet.findOne({ userId }).lean(),
-    // Wallet transactions for balance history chart
     WalletTransaction.find({ userId, status: "completed" })
       .sort({ createdAt: 1 })
       .lean(),
   ]);
+
+  const userCompIds = [
+    ...new Set(
+      (competitionParticipations as any[])
+        .map((p: any) => p.competitionId)
+        .filter(Boolean),
+    ),
+  ];
+  const allCompetitions =
+    userCompIds.length > 0
+      ? await Competition.find({ _id: { $in: userCompIds } }).lean()
+      : [];
 
   // Process competitions
   const competitionsMap = new Map(
@@ -621,43 +629,48 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       contestType: t.competitionId ? "competition" : "challenge",
     }));
 
-  // Get open positions
   const openPositions = await TradingPosition.find({
     userId,
     status: "open",
   }).lean();
-  const positionsWithPrices: PositionData[] = [];
-
-  for (const pos of openPositions as any[]) {
-    const price = await getRealPrice(pos.symbol as ForexSymbol);
-    const currentPrice = price
-      ? pos.side === "long"
-        ? price.bid
-        : price.ask
-      : pos.entryPrice;
-    const unrealizedPnL = calculateUnrealizedPnL(
-      pos.side,
-      pos.entryPrice,
-      currentPrice,
-      pos.quantity,
-      pos.symbol,
-    );
-
-    positionsWithPrices.push({
-      id: pos._id.toString(),
-      symbol: pos.symbol,
-      side: pos.side,
-      entryPrice: pos.entryPrice,
-      currentPrice,
-      quantity: pos.quantity,
-      unrealizedPnL,
-      unrealizedPnLPercentage:
-        pos.marginUsed > 0 ? (unrealizedPnL / pos.marginUsed) * 100 : 0,
-      openedAt: pos.openedAt,
-      contestName: pos.competitionId ? "Competition" : "Challenge",
-      contestType: pos.competitionId ? "competition" : "challenge",
-    });
-  }
+  const uniqueSymbols = [
+    ...new Set((openPositions as any[]).map((p: any) => p.symbol).filter(Boolean)),
+  ] as ForexSymbol[];
+  const pricesMap =
+    uniqueSymbols.length > 0
+      ? await fetchRealForexPrices(uniqueSymbols)
+      : new Map<ForexSymbol, { bid: number; ask: number }>();
+  const positionsWithPrices: PositionData[] = (openPositions as any[]).map(
+    (pos: any) => {
+      const price = pricesMap.get(pos.symbol as ForexSymbol);
+      const currentPrice = price
+        ? pos.side === "long"
+          ? price.bid
+          : price.ask
+        : pos.entryPrice;
+      const unrealizedPnL = calculateUnrealizedPnL(
+        pos.side,
+        pos.entryPrice,
+        currentPrice,
+        pos.quantity,
+        pos.symbol,
+      );
+      return {
+        id: pos._id.toString(),
+        symbol: pos.symbol,
+        side: pos.side,
+        entryPrice: pos.entryPrice,
+        currentPrice,
+        quantity: pos.quantity,
+        unrealizedPnL,
+        unrealizedPnLPercentage:
+          pos.marginUsed > 0 ? (unrealizedPnL / pos.marginUsed) * 100 : 0,
+        openedAt: pos.openedAt,
+        contestName: pos.competitionId ? "Competition" : "Challenge",
+        contestType: pos.competitionId ? "competition" : "challenge",
+      };
+    },
+  );
 
   // Calculate streaks
   const streaks = calculateStreaks(allTrades as any[]);

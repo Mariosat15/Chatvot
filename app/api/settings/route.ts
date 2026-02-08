@@ -47,11 +47,6 @@ export async function GET() {
     // Also fetch WhiteLabel settings for branding assets (no cache)
     const whiteLabel = await WhiteLabel.findOne().lean();
 
-    console.log(
-      "[Settings API] WhiteLabel appLogo from DB:",
-      whiteLabel?.appLogo,
-    );
-
     // Merge branding assets into settings
     const mergedSettings = {
       ...JSON.parse(JSON.stringify(settings)),
@@ -63,11 +58,6 @@ export async function GET() {
         profileImage: whiteLabel?.profileImage || "/assets/images/PROFILE.png",
       },
     };
-
-    console.log(
-      "[Settings API] Returning appLogo:",
-      mergedSettings.branding.appLogo,
-    );
 
     return NextResponse.json(
       {

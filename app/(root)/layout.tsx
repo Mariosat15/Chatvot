@@ -8,54 +8,41 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 
+const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
+const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
+
 const Layout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) redirect("/sign-in");
 
-  // SECURITY: Check if user's email is verified
-  // This prevents users who registered but haven't verified their email from accessing the app
-  try {
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (db) {
-      // Build query to match user by id (string) or _id (ObjectId)
-      const userIdString = session.user.id;
-      const query: { $or: object[] } = {
-        $or: [{ id: userIdString }],
-      };
-
-      // Also try ObjectId if it's a valid 24-character hex string
-      if (userIdString && /^[0-9a-fA-F]{24}$/.test(userIdString)) {
-        query.$or.push({ _id: new ObjectId(userIdString) });
+  const userId = session.user.id;
+  const now = Date.now();
+  const cached = emailVerifiedCache.get(userId);
+  if (cached && now - cached.ts < EMAIL_VERIFIED_TTL_MS) {
+    if (!cached.verified) redirect("/verify-email-required");
+  } else {
+    try {
+      const mongoose = await connectToDatabase();
+      const db = mongoose.connection.db;
+      if (db) {
+        const query: { $or: object[] } = { $or: [{ id: userId }] };
+        if (userId && /^[0-9a-fA-F]{24}$/.test(userId)) {
+          query.$or.push({ _id: new ObjectId(userId) });
+        }
+        const user = await db
+          .collection("user")
+          .findOne(query, { projection: { emailVerified: 1 } });
+        const verified = user?.emailVerified === true;
+        emailVerifiedCache.set(userId, { verified, ts: now });
+        if (user && !verified) redirect("/verify-email-required");
       }
-
-      const user = await db.collection("user").findOne(query);
-
-      console.log(
-        `🔍 Email verification check for ${session.user.email}: found=${!!user}, emailVerified=${user?.emailVerified}`,
-      );
-
-      // Block if user exists and email is NOT verified
-      // emailVerified can be false, null, or undefined - all mean not verified
-      if (user && user.emailVerified !== true) {
-        console.log(
-          `🚫 Blocking unverified user from accessing app: ${session.user.email}`,
-        );
-        redirect("/verify-email-required");
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "digest" in error) {
+        const digest = (error as { digest?: string }).digest;
+        if (digest?.startsWith("NEXT_REDIRECT")) throw error;
       }
     }
-  } catch (error: unknown) {
-    // IMPORTANT: Re-throw NEXT_REDIRECT errors - these are intentional redirects from redirect()
-    // Next.js redirect() throws an error with digest starting with 'NEXT_REDIRECT'
-    if (error && typeof error === "object" && "digest" in error) {
-      const digest = (error as { digest?: string }).digest;
-      if (digest?.startsWith("NEXT_REDIRECT")) {
-        throw error;
-      }
-    }
-    console.error("Error checking email verification:", error);
-    // Continue if check fails - don't block users due to database errors
   }
 
   const user = {
