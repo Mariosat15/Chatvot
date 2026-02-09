@@ -419,6 +419,11 @@ export function clearCache(symbol?: string, timeframe?: string): void {
 // Timeframes that use aggregator (excluding 1d/W/M which don't use it)
 const WARM_TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h"];
 
+// Max 1m candles to fetch per symbol during warming
+// 7 days of 1-minute candles = 7 * 24 * 60 = 10,080
+// This is enough to produce 500 candles for any timeframe up to 4h
+const MAX_WARM_CANDLES = 10_080;
+
 let cacheWarmingComplete = false;
 let cacheWarmingInProgress = false;
 
@@ -470,9 +475,48 @@ async function getEnabledSymbols(): Promise<string[]> {
 }
 
 /**
- * Pre-warm the aggregator cache for all enabled symbols and timeframes
- * Call this on server startup to ensure first users don't hit cold cache
- * Uses parallel warming for faster completion
+ * Warm cache for a single symbol: fetch 1m candles ONCE,
+ * then aggregate into all timeframes in-memory.
+ *
+ * Previously each timeframe triggered a separate DB query per symbol,
+ * meaning 5 queries per symbol (5m, 15m, 30m, 1h, 4h) fetching overlapping data.
+ * Now it's 1 query per symbol, ~5x fewer DB round-trips.
+ */
+async function warmCacheForSymbol(symbol: string): Promise<void> {
+  // Fetch 1m candles ONCE — enough for all timeframes
+  const candles1m = await Candle1m.getCandles(symbol, MAX_WARM_CANDLES);
+
+  if (candles1m.length === 0) return;
+
+  // Get the forming candle for this symbol
+  const forming1m = getFormingCandle(symbol);
+
+  // Aggregate into all warm timeframes from the SAME fetched data
+  for (const timeframe of WARM_TIMEFRAMES) {
+    const timeframeMinutes = TIMEFRAME_MINUTES[timeframe];
+    if (!timeframeMinutes) continue;
+
+    const aggregated = aggregateCandles(candles1m, timeframeMinutes);
+
+    // Populate cache directly
+    const cacheKey = getCacheKey(symbol, timeframe);
+    aggregatedCandleCache.set(cacheKey, {
+      candles: aggregated,
+      formingCandle: null, // Recalculated on each request
+      cachedAt: Date.now(),
+      symbol,
+      timeframe,
+    });
+  }
+}
+
+/**
+ * Pre-warm the aggregator cache for all enabled symbols and timeframes.
+ * Call this on server startup to ensure first users don't hit cold cache.
+ *
+ * Optimization: processes by SYMBOL (1 DB query each) not by symbol×timeframe
+ * (which was 5 DB queries each). With 33 symbols this is 33 queries instead of 165.
+ * Concurrency kept low (3 symbols at a time) to avoid saturating the DB.
  */
 export async function warmCache(): Promise<void> {
   if (cacheWarmingComplete || cacheWarmingInProgress) {
@@ -480,7 +524,6 @@ export async function warmCache(): Promise<void> {
   }
 
   cacheWarmingInProgress = true;
-  const startTime = Date.now();
 
   try {
     await connectToDatabase();
@@ -488,35 +531,21 @@ export async function warmCache(): Promise<void> {
     // Fetch enabled symbols from admin configuration
     const enabledSymbols = await getEnabledSymbols();
 
-    // Build list of all symbol/timeframe combinations to warm
-    const warmTasks: Array<{ symbol: string; timeframe: string }> = [];
-    for (const symbol of enabledSymbols) {
-      for (const timeframe of WARM_TIMEFRAMES) {
-        warmTasks.push({ symbol, timeframe });
-      }
-    }
+    // Process 3 symbols at a time (each = 1 DB query, not 5)
+    const BATCH_SIZE = 3;
 
-    // Process in parallel batches of 10 for faster warming
-    const BATCH_SIZE = 10;
-    let completed = 0;
-
-    for (let i = 0; i < warmTasks.length; i += BATCH_SIZE) {
-      const batch = warmTasks.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < enabledSymbols.length; i += BATCH_SIZE) {
+      const batch = enabledSymbols.slice(i, i + BATCH_SIZE);
 
       await Promise.all(
-        batch.map(async ({ symbol, timeframe }) => {
+        batch.map(async (symbol) => {
           try {
-            // Use full count for warming (500 candles = matches user requests)
-            await getAggregatedCandles(symbol, timeframe, 500);
-            completed++;
+            await warmCacheForSymbol(symbol);
           } catch {
             // Don't fail the whole warming if one symbol fails
-            completed++;
           }
         }),
       );
-
-      // Silently track progress
     }
 
     cacheWarmingComplete = true;

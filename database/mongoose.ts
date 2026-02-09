@@ -47,26 +47,7 @@ function enableQueryProfiling() {
   if (global.mongooseProfilingEnabled) return;
   global.mongooseProfilingEnabled = true;
 
-  // Hook into mongoose to profile all queries
-  mongoose.set(
-    "debug",
-    (collectionName: string, methodName: string, ...methodArgs: unknown[]) => {
-      const start = Date.now();
-
-      // Log slow queries after completion (via process.nextTick to not block)
-      process.nextTick(() => {
-        const duration = Date.now() - start;
-        if (duration > SLOW_QUERY_THRESHOLD_MS) {
-          console.warn(
-            `🐢 SLOW QUERY [${duration}ms]: ${collectionName}.${methodName}`,
-            JSON.stringify(methodArgs[0] || {}).slice(0, 200),
-          );
-        }
-      });
-    },
-  );
-
-  // Alternative: Use mongoose middleware for more accurate timing
+  // Use mongoose middleware for accurate query timing (pre/post hooks)
   mongoose.plugin((schema) => {
     // Pre-hook to capture start time
     schema.pre(
