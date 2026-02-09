@@ -24,6 +24,8 @@ import {
   PlatformTransaction,
   PlatformBalanceSnapshot,
 } from "@/database/models/platform-financials.model";
+import VendorPayment from "@/database/models/vendor-payment.model";
+import VendorSubscription from "@/database/models/vendor-subscription.model";
 import VATPayment from "@/database/models/vat-payment.model";
 import Invoice from "@/database/models/invoice.model";
 import AuditLog from "@/database/models/audit-log.model";
@@ -61,6 +63,8 @@ import { getAdminSession } from "@/lib/admin/auth";
  * - All trading behavior profiles
  * - All user restrictions
  * - All platform financial data (fees, unclaimed pools, earnings, etc.)
+ * - All vendor payment records (keeps vendor subscriptions, clears payment history)
+ * - All account lockouts
  * - All invoices
  * - All audit logs
  * - All sent notifications
@@ -191,6 +195,7 @@ export async function POST(request: Request) {
       tradingBehaviorProfiles: await TradingBehaviorProfile.countDocuments(),
       platformTransactions: await PlatformTransaction.countDocuments(),
       platformSnapshots: await PlatformBalanceSnapshot.countDocuments(),
+      vendorPayments: await VendorPayment.countDocuments(),
       vatPayments: await VATPayment.countDocuments(),
       invoices: await Invoice.countDocuments(),
       auditLogs: await AuditLog.countDocuments(),
@@ -296,6 +301,26 @@ export async function POST(request: Request) {
 
     await PlatformBalanceSnapshot.deleteMany({});
     console.log("✅ Deleted all platform balance snapshots");
+
+    // Delete vendor payment records (keeps vendor subscriptions, clears payment history)
+    await VendorPayment.deleteMany({});
+    console.log("✅ Deleted all vendor payment records");
+
+    // Clear payment history from vendor subscriptions and reset last payment date
+    await VendorSubscription.updateMany(
+      {},
+      { $set: { paymentHistory: [], reminderSent: false }, $unset: { lastPaymentDate: "" } },
+    );
+    console.log("✅ Cleared vendor subscription payment history");
+
+    // Delete account lockouts
+    const accountLockoutsCollection = mongoose.connection.collection("accountlockouts");
+    try {
+      const lockoutsDeleted = await accountLockoutsCollection.deleteMany({});
+      console.log(`✅ Deleted ${lockoutsDeleted.deletedCount} account lockouts`);
+    } catch (e) {
+      console.log("⚠️ No account lockouts collection found");
+    }
 
     // Delete VAT payments
     await VATPayment.deleteMany({});
@@ -654,6 +679,7 @@ export async function POST(request: Request) {
       tradingBehaviorProfiles: await TradingBehaviorProfile.countDocuments(),
       platformTransactions: await PlatformTransaction.countDocuments(),
       platformSnapshots: await PlatformBalanceSnapshot.countDocuments(),
+      vendorPayments: await VendorPayment.countDocuments(),
       vatPayments: await VATPayment.countDocuments(),
       invoices: await Invoice.countDocuments(),
       auditLogs: await AuditLog.countDocuments(),
@@ -737,6 +763,7 @@ export async function POST(request: Request) {
         tradingBehaviorProfiles: before.tradingBehaviorProfiles,
         platformTransactions: before.platformTransactions,
         platformSnapshots: before.platformSnapshots,
+        vendorPayments: before.vendorPayments,
         vatPayments: before.vatPayments,
         invoices: before.invoices,
         auditLogs: before.auditLogs,
