@@ -22,9 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ assignedAgent: null });
     }
 
-    console.log(
-      `🔍 [Support] Looking for assignment for user: ${session.user.id}`,
-    );
+    // Looking for support assignment
 
     // Check if user has an ACTIVE assigned employee
     const assignment = await db.collection("customer_assignments").findOne({
@@ -32,10 +30,7 @@ export async function GET(request: NextRequest) {
       isActive: true,
     });
 
-    console.log(
-      `📋 [Support] Assignment found:`,
-      assignment ? `Yes - ${assignment.employeeName}` : "No",
-    );
+    // Support assignment resolved
 
     if (!assignment || !assignment.employeeId) {
       return NextResponse.json({ assignedAgent: null });

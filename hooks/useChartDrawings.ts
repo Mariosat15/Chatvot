@@ -76,7 +76,7 @@ export function useChartDrawings(
   // Ensure manager exists
   if (!managerRef.current) {
     managerRef.current = new DrawingManager(managerOptions);
-    console.log("[useChartDrawings] Created DrawingManager");
+    // DrawingManager created
   }
 
   // State

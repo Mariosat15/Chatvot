@@ -38,9 +38,7 @@ export async function GET(request: NextRequest) {
       .sort({ lastActivityAt: -1 })
       .toArray();
 
-    console.log(
-      `📋 [Support History] Found ${conversations.length} tickets for user ${session.user.name}`,
-    );
+    // Support history resolved
 
     const tickets = conversations.map((conv) => ({
       id: conv._id.toString(),

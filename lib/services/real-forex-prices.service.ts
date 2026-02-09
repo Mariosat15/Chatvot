@@ -678,7 +678,7 @@ export async function getMarketStatusFromAPI(): Promise<MarketStatus> {
     marketStatusCache &&
     Date.now() - marketStatusCache.timestamp < MARKET_STATUS_CACHE_DURATION
   ) {
-    console.log("📦 Using cached market status");
+    // Using cached market status
     return marketStatusCache.status;
   }
 
@@ -694,8 +694,7 @@ export async function getMarketStatusFromAPI(): Promise<MarketStatus> {
     // Reference: https://massive.com/docs/rest/forex/market-operations/market-status
     const url = `${MASSIVE_API_BASE_URL}/marketstatus/now?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`;
 
-    console.log("📡 Fetching forex market status from Massive.com API...");
-    console.log(`🔗 URL: ${MASSIVE_API_BASE_URL}/marketstatus/now`);
+    // Fetching forex market status from Massive.com API
 
     const response = await fetch(url, {
       method: "GET",
@@ -717,10 +716,6 @@ export async function getMarketStatusFromAPI(): Promise<MarketStatus> {
     }
 
     const data = await response.json();
-    console.log(
-      "📊 Market status API response:",
-      JSON.stringify(data, null, 2),
-    );
 
     // Parse response according to Massive.com API schema
     // currencies.fx can be: "open", "closed", "pre-market", "after-hours"
@@ -738,10 +733,7 @@ export async function getMarketStatusFromAPI(): Promise<MarketStatus> {
     // Update cache
     marketStatusCache = { status, timestamp: Date.now() };
 
-    console.log(
-      `✅ Forex market status: ${fxStatus?.toUpperCase() || "UNKNOWN"} (isOpen: ${isOpen})`,
-    );
-    console.log(`🕒 Server time: ${data.serverTime}`);
+    // Market status resolved: fxStatus, isOpen
 
     return status;
   } catch (error) {

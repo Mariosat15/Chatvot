@@ -39,10 +39,7 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
       settings = created.toObject() as IFraudSettings;
     }
 
-    // Log when cache is refreshed with key values
-    console.log(
-      `📋 [FraudSettings] Cache refreshed: maxAccountsPerDevice=${settings.maxAccountsPerDevice}, multiAccountDetectionEnabled=${settings.multiAccountDetectionEnabled}`,
-    );
+    // FraudSettings cache refreshed
 
     // Update cache
     cachedSettings = settings;

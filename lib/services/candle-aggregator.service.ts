@@ -358,12 +358,7 @@ export async function getAggregatedCandles(
     }
   }
 
-  // Log occasionally
-  if (Math.random() < 0.1) {
-    console.log(
-      `📊 [Aggregator] ${symbol} ${timeframe}: ${candles1m.length} 1m → ${aggregated.length} candles (cache: ${cacheHits} hits, ${cacheMisses} misses)`,
-    );
-  }
+  // Aggregation complete (logging removed for performance)
 
   return {
     candles: result.slice(-count),

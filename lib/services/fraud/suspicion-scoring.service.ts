@@ -73,7 +73,7 @@ export class SuspicionScoringService {
         scoreHistory: [],
       });
 
-      console.log(`✅ Created new suspicion score for user ${userId}`);
+      // console.log(`✅ Created new suspicion score for user ${userId}`);
     }
 
     return score;
@@ -110,17 +110,17 @@ export class SuspicionScoringService {
 
     await score.save();
 
-    console.log(`📊 Updated suspicion score for user ${userId}:`);
-    console.log(`   Method: ${update.method}`);
-    console.log(`   Percentage Added: +${update.percentage}%`);
-    console.log(`   Old Score: ${oldScore} → New Score: ${score.totalScore}`);
-    console.log(`   Risk Level: ${oldRiskLevel} → ${score.riskLevel}`);
+    // console.log(`📊 Updated suspicion score for user ${userId}:`);
+    // console.log(`   Method: ${update.method}`);
+    // console.log(`   Percentage Added: +${update.percentage}%`);
+    // console.log(`   Old Score: ${oldScore} → New Score: ${score.totalScore}`);
+    // console.log(`   Risk Level: ${oldRiskLevel} → ${score.riskLevel}`);
 
     // Check if crossed threshold
     if (oldRiskLevel !== score.riskLevel) {
-      console.log(
-        `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${score.riskLevel}`,
-      );
+      // console.log(
+        // `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${score.riskLevel}`,
+      // );
 
       // Check if auto-suspend is enabled in fraud settings before auto-restricting
       if (
@@ -441,7 +441,7 @@ export class SuspicionScoringService {
     score.resetScore();
     await score.save();
 
-    console.log(`🔄 Reset suspicion score for user ${userId}`);
+    // console.log(`🔄 Reset suspicion score for user ${userId}`);
 
     return score;
   }
@@ -475,23 +475,23 @@ export class SuspicionScoringService {
 
       // ⚠️ IMPORTANT: Only auto-restrict if admin has explicitly enabled it
       if (!settings.autoSuspendEnabled) {
-        console.log(
-          `⏭️ Auto-suspend is DISABLED in admin settings. User ${userId} NOT auto-restricted.`,
-        );
-        console.log(
-          `   Score: ${score.totalScore}/100, Threshold: ${settings.autoSuspendThreshold}`,
-        );
-        console.log(
-          `   To enable auto-suspension, admin must enable it in Fraud Settings.`,
-        );
+        // console.log(
+          // `⏭️ Auto-suspend is DISABLED in admin settings. User ${userId} NOT auto-restricted.`,
+        // );
+        // console.log(
+          // `   Score: ${score.totalScore}/100, Threshold: ${settings.autoSuspendThreshold}`,
+        // );
+        // console.log(
+          // `   To enable auto-suspension, admin must enable it in Fraud Settings.`,
+        // );
         return;
       }
 
       // Check if score meets auto-suspend threshold
       if (score.totalScore < settings.autoSuspendThreshold) {
-        console.log(
-          `⏭️ User ${userId} score (${score.totalScore}) below auto-suspend threshold (${settings.autoSuspendThreshold}). Not auto-restricting.`,
-        );
+        // console.log(
+          // `⏭️ User ${userId} score (${score.totalScore}) below auto-suspend threshold (${settings.autoSuspendThreshold}). Not auto-restricting.`,
+        // );
         return;
       }
 
@@ -502,17 +502,17 @@ export class SuspicionScoringService {
       });
 
       if (existingRestriction) {
-        console.log(
-          `⏭️ User ${userId} already restricted, skipping auto-restriction`,
-        );
+        // console.log(
+          // `⏭️ User ${userId} already restricted, skipping auto-restriction`,
+        // );
         return;
       }
 
       // Auto-suspend enabled and threshold met - create restriction
-      console.log(`🚨 AUTO-SUSPEND ENABLED: Restricting user ${userId}`);
-      console.log(
-        `   Score: ${score.totalScore}/100, Threshold: ${settings.autoSuspendThreshold}`,
-      );
+      // console.log(`🚨 AUTO-SUSPEND ENABLED: Restricting user ${userId}`);
+      // console.log(
+        // `   Score: ${score.totalScore}/100, Threshold: ${settings.autoSuspendThreshold}`,
+      // );
 
       await UserRestriction.create({
         userId,
@@ -586,9 +586,9 @@ export class SuspicionScoringService {
         );
       }
 
-      console.log(
-        "🚨 AUTO-SUSPENDED user", userId, "- Score:", score.totalScore, "%/", settings.autoSuspendThreshold, "% threshold"
-      );
+      // console.log(
+        // "🚨 AUTO-SUSPENDED user", userId, "- Score:", score.totalScore, "%/", settings.autoSuspendThreshold, "% threshold"
+      // );
     } catch (error) {
       console.error("❌ Failed to check/auto-restrict user", userId, ":", error);
     }

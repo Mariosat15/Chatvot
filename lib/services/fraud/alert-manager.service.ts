@@ -56,17 +56,17 @@ export class AlertManagerService {
       competitionId,
     } = params;
 
-    console.log(`🔍 [ALERT] ========== NEW FRAUD DETECTION ==========`);
-    console.log(`   User IDs: ${JSON.stringify(userIds)}`);
-    console.log(`   Alert type: ${alertType}`);
-    console.log(`   Title: ${title}`);
+    // console.log(`🔍 [ALERT] ========== NEW FRAUD DETECTION ==========`);
+    // console.log(`   User IDs: ${JSON.stringify(userIds)}`);
+    // console.log(`   Alert type: ${alertType}`);
+    // console.log(`   Title: ${title}`);
     if (competitionId) {
-      console.log(`   Competition ID: ${competitionId}`);
+      // console.log(`   Competition ID: ${competitionId}`);
     }
 
     // Convert userIds to strings for query (schema stores strings, not ObjectIds)
     const userIdStrings = userIds.map((id) => id.toString());
-    console.log(`   User ID strings: ${userIdStrings.join(", ")}`);
+    // console.log(`   User ID strings: ${userIdStrings.join(", ")}`);
 
     // Build the query to find existing alerts for these users
     // NOTE: suspiciousUserIds and primaryUserId are stored as STRINGS in the schema
@@ -95,14 +95,14 @@ export class AlertManagerService {
     let shouldBlockNewAlert = false;
 
     if (resolvedAlertOfSameType) {
-      console.log(
-        `⏭️ [ALERT] Found resolved/dismissed alert with same alert type`,
-      );
-      console.log(`   Previous alert ID: ${resolvedAlertOfSameType._id}`);
-      console.log(`   Status: ${resolvedAlertOfSameType.status}`);
-      console.log(
-        `   Investigation cleared at: ${resolvedAlertOfSameType.investigationClearedAt || "Not set"}`,
-      );
+      // console.log(
+        // `⏭️ [ALERT] Found resolved/dismissed alert with same alert type`,
+      // );
+      // console.log(`   Previous alert ID: ${resolvedAlertOfSameType._id}`);
+      // console.log(`   Status: ${resolvedAlertOfSameType.status}`);
+      // console.log(
+        // `   Investigation cleared at: ${resolvedAlertOfSameType.investigationClearedAt || "Not set"}`,
+      // );
 
       // Check if user was CLEARED (unbanned/unsuspended) after this investigation
       // If investigationClearedAt is set, it means the user was unbanned/unsuspended
@@ -111,35 +111,35 @@ export class AlertManagerService {
         const clearanceDate = new Date(
           resolvedAlertOfSameType.investigationClearedAt,
         );
-        console.log(
-          `   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`,
-        );
-        console.log(
-          `   → NEW fraud activity after clearance will create a NEW alert`,
-        );
+        // console.log(
+          // `   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`,
+        // );
+        // console.log(
+          // `   → NEW fraud activity after clearance will create a NEW alert`,
+        // );
         shouldBlockNewAlert = false; // Allow new alert since user was cleared
       } else {
         // User was NOT cleared (still banned/suspended or alert was just dismissed)
         // Don't create new alert for the same type of fraud
-        console.log(
-          `   ⚠️ User was NOT cleared - blocking new alert of same type`,
-        );
+        // console.log(
+          // `   ⚠️ User was NOT cleared - blocking new alert of same type`,
+        // );
         shouldBlockNewAlert = true;
       }
 
-      console.log(`   Continuing to check for active alerts...`);
+      // console.log(`   Continuing to check for active alerts...`);
     } else {
-      console.log(
-        `   No resolved/dismissed alert found with this alert type - continuing`,
-      );
+      // console.log(
+        // `   No resolved/dismissed alert found with this alert type - continuing`,
+      // );
     }
 
     // ALWAYS find ANY existing ACTIVE alert for these users (regardless of type)
     // This ensures ALL detections for same users are MERGED into ONE alert
     // Check both pending AND investigating status
-    console.log(
-      `   Searching for active alerts with status: pending OR investigating`,
-    );
+    // console.log(
+      // `   Searching for active alerts with status: pending OR investigating`,
+    // );
 
     const existingAlert = await FraudAlert.findOne({
       ...userQuery,
@@ -147,42 +147,42 @@ export class AlertManagerService {
     }).sort({ updatedAt: -1 }); // Get most recently updated if multiple
 
     if (existingAlert) {
-      console.log(`\n   ✅✅✅ EXISTING ACTIVE ALERT FOUND ✅✅✅`);
-      console.log(`      Alert ID: ${existingAlert._id}`);
-      console.log(`      Status: ${existingAlert.status.toUpperCase()}`);
-      console.log(
-        `      Current evidence count: ${existingAlert.evidence?.length || 0}`,
-      );
-      console.log(`      Current title: ${existingAlert.title}`);
+      // console.log(`\n   ✅✅✅ EXISTING ACTIVE ALERT FOUND ✅✅✅`);
+      // console.log(`      Alert ID: ${existingAlert._id}`);
+      // console.log(`      Status: ${existingAlert.status.toUpperCase()}`);
+      // console.log(
+        // `      Current evidence count: ${existingAlert.evidence?.length || 0}`,
+      // );
+      // console.log(`      Current title: ${existingAlert.title}`);
 
       if (existingAlert.status === "investigating") {
-        console.log(`\n   🔍🔍🔍 THIS ALERT IS IN INVESTIGATION CENTER 🔍🔍🔍`);
-        console.log(`   New fraud will be MERGED into this investigation!`);
+        // console.log(`\n   🔍🔍🔍 THIS ALERT IS IN INVESTIGATION CENTER 🔍🔍🔍`);
+        // console.log(`   New fraud will be MERGED into this investigation!`);
       }
     } else {
-      console.log(`\n   ❌ No active alert found for these users`);
+      // console.log(`\n   ❌ No active alert found for these users`);
       // Debug: Log all alerts for these users to see what's happening
       const allAlertsForUsers = await FraudAlert.find(userQuery)
         .select("_id status alertType title")
         .lean();
       if (allAlertsForUsers.length > 0) {
-        console.log(`   📊 All alerts for these users:`);
+        // console.log(`   📊 All alerts for these users:`);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         allAlertsForUsers.forEach((a: any, i: number) => {
-          console.log(
-            `      ${i + 1}. ID: ${a._id}, Status: ${a.status}, Type: ${a.alertType}`,
-          );
+          // console.log(
+            // `      ${i + 1}. ID: ${a._id}, Status: ${a.status}, Type: ${a.alertType}`,
+          // );
         });
       } else {
-        console.log(`   📊 No alerts exist for these users yet`);
+        // console.log(`   📊 No alerts exist for these users yet`);
       }
     }
 
     // If we have an existing active alert, ALWAYS merge into it
     if (existingAlert) {
-      console.log(
-        `\n📝 [ALERT] ⬇️⬇️⬇️ MERGING NEW FRAUD INTO ${existingAlert.status.toUpperCase()} ALERT ⬇️⬇️⬇️`,
-      );
+      // console.log(
+        // `\n📝 [ALERT] ⬇️⬇️⬇️ MERGING NEW FRAUD INTO ${existingAlert.status.toUpperCase()} ALERT ⬇️⬇️⬇️`,
+      // );
       await this.updateExistingAlert(
         existingAlert,
         alertType,
@@ -197,15 +197,15 @@ export class AlertManagerService {
 
     // If the same alert type was already dismissed AND user was NOT cleared, don't create new alert
     if (shouldBlockNewAlert) {
-      console.log(
-        `⏭️ [ALERT] No active alert exists and this type was dismissed (user NOT cleared) - NOT creating`,
-      );
+      // console.log(
+        // `⏭️ [ALERT] No active alert exists and this type was dismissed (user NOT cleared) - NOT creating`,
+      // );
       return;
     }
 
     // No existing alert found - create new one
     // (Either no previous alert, or user was cleared after previous dismissal)
-    console.log(`🆕 [ALERT] Creating NEW alert for these users`);
+    // console.log(`🆕 [ALERT] Creating NEW alert for these users`);
     await this.createNewAlert(params);
   }
 
@@ -225,12 +225,12 @@ export class AlertManagerService {
     userIds: string[],
     competitionId?: string,
   ): Promise<void> {
-    console.log(`📝 [ALERT] ========== MERGING NEW EVIDENCE ==========`);
-    console.log(`   Alert ID: ${existingAlert._id}`);
-    console.log(`   Alert Status: ${existingAlert.status}`);
-    console.log(`   Original Type: ${existingAlert.alertType}`);
-    console.log(`   New Evidence Type: ${alertType}`);
-    console.log(`   Evidence items to add: ${evidence.length}`);
+    // console.log(`📝 [ALERT] ========== MERGING NEW EVIDENCE ==========`);
+    // console.log(`   Alert ID: ${existingAlert._id}`);
+    // console.log(`   Alert Status: ${existingAlert.status}`);
+    // console.log(`   Original Type: ${existingAlert.alertType}`);
+    // console.log(`   New Evidence Type: ${alertType}`);
+    // console.log(`   Evidence items to add: ${evidence.length}`);
 
     // Add timestamp and competitionId to each new evidence item
     const timestampedEvidence = evidence.map((e) => ({
@@ -284,11 +284,11 @@ export class AlertManagerService {
     );
 
     if (newUniqueEvidence.length === 0) {
-      console.log(`⏭️ [ALERT] All evidence already exists, skipping update`);
+      // console.log(`⏭️ [ALERT] All evidence already exists, skipping update`);
       return;
     }
 
-    console.log(`   Adding ${newUniqueEvidence.length} new evidence items`);
+    // console.log(`   Adding ${newUniqueEvidence.length} new evidence items`);
 
     // Add new evidence to existing alert
     existingAlert.evidence.push(...newUniqueEvidence);
@@ -334,9 +334,9 @@ export class AlertManagerService {
       severityLevels[severity] >
       severityLevels[existingAlert.severity as keyof typeof severityLevels]
     ) {
-      console.log(
-        `⬆️ [ALERT] Upgrading severity: ${existingAlert.severity} → ${severity}`,
-      );
+      // console.log(
+        // `⬆️ [ALERT] Upgrading severity: ${existingAlert.severity} → ${severity}`,
+      // );
       existingAlert.severity = severity;
     }
 
@@ -364,21 +364,21 @@ export class AlertManagerService {
       details: `${alertType} detection #${existingAlert.detectionCount}`,
     });
 
-    console.log(
-      `📊 [ALERT] Detection count: ${existingAlert.detectionCount} (history: ${existingAlert.detectionHistory.length} entries)`,
-    );
+    // console.log(
+      // `📊 [ALERT] Detection count: ${existingAlert.detectionCount} (history: ${existingAlert.detectionHistory.length} entries)`,
+    // );
 
     try {
       await existingAlert.save();
 
-      console.log(`✅ [ALERT] ========== MERGE SUCCESSFUL ==========`);
-      console.log(`   Alert ID: ${existingAlert._id}`);
-      console.log(`   New Title: ${existingAlert.title}`);
-      console.log(`   Detection Methods: ${methodNames}`);
-      console.log(`   Total Evidence: ${existingAlert.evidence.length} items`);
-      console.log(`   Detection Count: ${existingAlert.detectionCount}`);
-      console.log(`   Severity: ${existingAlert.severity}`);
-      console.log(`   Status: ${existingAlert.status}`);
+      // console.log(`✅ [ALERT] ========== MERGE SUCCESSFUL ==========`);
+      // console.log(`   Alert ID: ${existingAlert._id}`);
+      // console.log(`   New Title: ${existingAlert.title}`);
+      // console.log(`   Detection Methods: ${methodNames}`);
+      // console.log(`   Total Evidence: ${existingAlert.evidence.length} items`);
+      // console.log(`   Detection Count: ${existingAlert.detectionCount}`);
+      // console.log(`   Severity: ${existingAlert.severity}`);
+      // console.log(`   Status: ${existingAlert.status}`);
     } catch (saveError) {
       console.error(`❌ [ALERT] FAILED to save merged alert:`, saveError);
       throw saveError;
@@ -402,7 +402,7 @@ export class AlertManagerService {
       competitionId,
     } = params;
 
-    console.log(`🆕 [ALERT] Creating new ${alertType} alert`);
+    // console.log(`🆕 [ALERT] Creating new ${alertType} alert`);
 
     // Count previous alerts for these users (dismissed/resolved)
     const userIdStrings = userIds.map((id) => id.toString());
@@ -414,7 +414,7 @@ export class AlertManagerService {
       status: { $in: ["dismissed", "resolved"] },
     });
 
-    console.log(`   Previous alerts for these users: ${previousAlertCount}`);
+    // console.log(`   Previous alerts for these users: ${previousAlertCount}`);
 
     // Add competitionId to evidence data if provided
     const enhancedEvidence = evidence.map((e) => ({
@@ -456,14 +456,14 @@ export class AlertManagerService {
       ...(competitionId && { competitionId }),
     });
 
-    console.log(
-      `✅ [ALERT] Created new ${alertType} alert for ${userIds.length} accounts`,
-    );
-    console.log(
-      `   Detection count: 1, Previous alerts: ${previousAlertCount}`,
-    );
+    // console.log(
+      // `✅ [ALERT] Created new ${alertType} alert for ${userIds.length} accounts`,
+    // );
+    // console.log(
+      // `   Detection count: 1, Previous alerts: ${previousAlertCount}`,
+    // );
     if (competitionId) {
-      console.log(`   Competition: ${competitionId}`);
+      // console.log(`   Competition: ${competitionId}`);
     }
   }
 

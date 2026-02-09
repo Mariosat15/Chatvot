@@ -122,10 +122,7 @@ export async function GET() {
             currentPackage.gameMasterConfig.referralFeePercentage ??
             0,
         };
-        console.log(
-          `[GM Dashboard] Using current package settings for ${subscription.packageName}:`,
-          currentPackageLimits,
-        );
+        // GM Dashboard: using package settings
       }
     }
 

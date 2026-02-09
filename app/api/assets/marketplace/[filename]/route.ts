@@ -86,7 +86,7 @@ export async function GET(
 
     // Log if we used the webp fallback
     if (actualFilename !== sanitizedFilename) {
-      console.log("📷 Serving optimized WebP instead of:", sanitizedFilename);
+      // Serving optimized WebP fallback
     }
 
     const fileBuffer = await readFile(filePath);
