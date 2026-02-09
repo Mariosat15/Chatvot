@@ -87,20 +87,24 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
       return result;
     }
 
-    // Collect all unique symbols needed
+    // Load ALL open positions in a single query (much faster than N queries)
+    const allParticipantIds = participantsWithPositions.map((p) => p._id);
+    const allPositions = await TradingPosition.find({
+      participantId: { $in: allParticipantIds },
+      status: "open",
+    });
+
+    // Group positions by participant and collect unique symbols
     const allSymbols = new Set<ForexSymbol>();
     const participantPositions = new Map<string, any[]>();
 
-    for (const participant of participantsWithPositions) {
-      const positions = await TradingPosition.find({
-        participantId: participant._id,
-        status: "open",
-      });
-
-      if (positions.length > 0) {
-        participantPositions.set(participant._id.toString(), positions);
-        positions.forEach((p) => allSymbols.add(p.symbol as ForexSymbol));
+    for (const position of allPositions) {
+      const participantId = position.participantId.toString();
+      if (!participantPositions.has(participantId)) {
+        participantPositions.set(participantId, []);
       }
+      participantPositions.get(participantId)!.push(position);
+      allSymbols.add(position.symbol as ForexSymbol);
     }
 
     // Fetch current prices for all symbols at once (efficient)
@@ -180,9 +184,7 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
               currentOpenPositions: 0,
             },
           });
-          console.log(
-            `   📝 Participant ${participant.userId} marked as 'liquidated' for disqualification tracking`,
-          );
+          // Participant marked as liquidated
 
           // Send liquidation notification
           try {
@@ -214,9 +216,7 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
                   reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
                 },
               });
-              console.log(
-                `   🔔 Sent disqualification notification to ${participant.userId}`,
-              );
+              // Disqualification notification sent
             }
           } catch (notifError) {
             console.error(

@@ -78,9 +78,6 @@ export async function getGlobalLeaderboard(
   limit: number = 0,
 ): Promise<GlobalLeaderboardEntry[]> {
   if (isCacheValid()) {
-    // #region agent log
-    console.log(`[PERF] leaderboard CACHE HIT age=${Date.now()-(leaderboardCache?.timestamp||0)}ms entries=${leaderboardCache?.data?.length}`);
-    // #endregion
     const cached = leaderboardCache!.data;
     return limit > 0 ? cached.slice(0, limit) : cached;
   }
@@ -88,13 +85,7 @@ export async function getGlobalLeaderboard(
   await connectToDatabase();
 
   try {
-    // #region agent log
-    const _glbT0 = Date.now();
-    // #endregion
     const allUsersRaw = await getAllUsers();
-    // #region agent log
-    const _usersMs = Date.now() - _glbT0;
-    // #endregion
     const usersToProcess = allUsersRaw.slice(0, MAX_LEADERBOARD_USERS);
     const userIds = usersToProcess.map((u) => u.id).filter(Boolean);
 
@@ -106,9 +97,6 @@ export async function getGlobalLeaderboard(
     // PERF FIX: Fetch ALL participants/badges (tiny collections: 5+2+33 docs)
     // instead of $in with 4952 IDs (was 1.8s due to huge $in filter on free tier).
     // Join in JS via the userIdsSet — O(n) and instant.
-    // #region agent log
-    const _partsT0 = Date.now();
-    // #endregion
     const userIdsSet = new Set(userIds);
     const [allCompetitionParticipants, allChallengeParticipants, allUserBadges] =
       await Promise.all([
@@ -132,9 +120,6 @@ export async function getGlobalLeaderboard(
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
       ]);
-    // #region agent log
-    console.log(`[PERF] leaderboard phases: getAllUsers=${_usersMs}ms participants=${Date.now()-_partsT0}ms users=${userIds.length} compParts=${allCompetitionParticipants.length} challParts=${allChallengeParticipants.length} badges=${allUserBadges.length}`);
-    // #endregion
 
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)
     const badgeCounts = new Map<string, { total: number; legendary: number }>();

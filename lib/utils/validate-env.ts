@@ -218,8 +218,6 @@ function hasLowEntropy(str: string): boolean {
 export function validateEnvironment(): void {
   const isProduction = process.env.NODE_ENV === "production";
 
-  console.log("🔐 Validating environment security...");
-
   const authResult = validateAuthSecret();
 
   // Log warnings
@@ -246,9 +244,7 @@ export function validateEnvironment(): void {
     process.exit(1);
   }
 
-  if (authResult.valid && authResult.warnings.length === 0) {
-    console.log("✅ Environment security validated");
-  }
+  // Environment security validated silently (errors/warnings already logged above)
 }
 
 /**

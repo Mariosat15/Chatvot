@@ -42,18 +42,8 @@ async function fetchPricesFromCacheOrAPI(
       }
     }
 
-    // If we have some from cache, log it
-    if (priceMap.size > 0) {
-      console.log(
-        `   📦 Got ${priceMap.size}/${symbols.length} prices from MongoDB cache`,
-      );
-    }
-
     // Fetch missing symbols from REST API
     if (missingSymbols.length > 0) {
-      console.log(
-        `   🌐 Fetching ${missingSymbols.length} prices from REST API`,
-      );
       const apiPrices = await fetchRealForexPrices(missingSymbols);
       for (const [symbol, price] of apiPrices.entries()) {
         priceMap.set(symbol, { bid: price.bid, ask: price.ask });
@@ -63,7 +53,7 @@ async function fetchPricesFromCacheOrAPI(
     return priceMap;
   } catch (error) {
     // If cache fails, fall back to REST API entirely
-    console.log(`   ⚠️ Cache error, using REST API: ${error}`);
+    console.error(`[TRADE QUEUE] Cache error, falling back to REST API: ${error}`);
     const apiPrices = await fetchRealForexPrices(symbols);
     for (const [symbol, price] of apiPrices.entries()) {
       priceMap.set(symbol, { bid: price.bid, ask: price.ask });

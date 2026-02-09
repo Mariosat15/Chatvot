@@ -10,22 +10,13 @@ const MAX_LIMIT = 100;
 
 /**
  * GET /api/leaderboard?page=1&limit=50
- * Returns a paginated slice. Builds full list once (cached 60s); titles loaded only for the requested page.
+ * Returns a paginated slice. Builds full list once (cached 5min); titles loaded only for the requested page.
  */
 export async function GET(request: NextRequest) {
-  // #region agent log
-  const _t0 = Date.now();
-  // #endregion
   try {
-    // #region agent log
-    const _tAuth0 = Date.now();
-    // #endregion
     const session = await auth.api.getSession({
       headers: request.headers,
     });
-    // #region agent log
-    console.log(`[PERF] leaderboard auth.getSession: ${Date.now()-_tAuth0}ms hasUser=${!!session?.user}`);
-    // #endregion
     if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized", message: "Please sign in to view the leaderboard." },
@@ -40,27 +31,16 @@ export async function GET(request: NextRequest) {
       Math.max(10, parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT)))
     );
 
-    // #region agent log
-    const _tLb0 = Date.now();
-    // #endregion
     const full = await getGlobalLeaderboard(0);
-    // #region agent log
-    console.log(`[PERF] leaderboard getGlobalLeaderboard: ${Date.now()-_tLb0}ms count=${full.length}`);
-    // #endregion
     const totalCount = full.length;
     const offset = (page - 1) * limit;
     const pageEntries = full.slice(offset, offset + limit);
 
     const pageUserIds = pageEntries.map((e) => e.userId);
-    // #region agent log
-    const _tTitles0 = Date.now();
-    // #endregion
     const userLevels = pageUserIds.length
       ? await getUsersWithTitles(pageUserIds)
       : new Map();
-    // #region agent log
-    console.log(`[PERF] leaderboard getUsersWithTitles: ${Date.now()-_tTitles0}ms pageUsers=${pageUserIds.length}`);
-    // #endregion
+
     const entries: GlobalLeaderboardEntry[] = pageEntries.map((entry) => {
       const level = userLevels.get(entry.userId);
       const titleLevel = level ? getTitleByXP(level.currentXP) : getTitleByXP(0);
@@ -81,9 +61,6 @@ export async function GET(request: NextRequest) {
         : 0,
     };
 
-    // #region agent log
-    console.log(`[PERF] leaderboard TOTAL: ${Date.now()-_t0}ms entries=${entries.length} totalCount=${totalCount}`);
-    // #endregion
     return NextResponse.json({
       entries,
       totalCount,

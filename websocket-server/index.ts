@@ -65,6 +65,7 @@ interface JWTPayload {
 // State Management
 // ==========================================
 
+const MAX_CONNECTIONS = 6000; // Hard limit (~20% buffer above expected 5K users)
 const connections = new Map<string, Connection>();
 const conversationSubscribers = new Map<string, Set<string>>(); // conversationId -> connectionIds
 const participantConnections = new Map<string, Set<string>>(); // participantId -> connectionIds
@@ -194,7 +195,7 @@ const server = createServer(async (req, res) => {
                   message: data.message,
                 },
               });
-              console.log(`📤 Broadcast message to ${data.conversationId}`);
+              // Message broadcast sent
             }
             break;
 
@@ -355,9 +356,7 @@ const server = createServer(async (req, res) => {
               // Also notify the user themselves (for multi-tab/device sync)
               broadcastToParticipant(data.userId, profileUpdateEvent);
 
-              console.log(
-                `👤 Profile updated: ${data.userId} -> notified ${data.affectedUserIds.length} users`,
-              );
+              // Profile update broadcast sent
             }
             break;
 
@@ -476,14 +475,7 @@ const server = createServer(async (req, res) => {
                 }
               });
 
-              // Log only ~once per minute (or when completed candles are sent)
-              if (completedCandles.length > 0 || Math.random() < 0.003) {
-                const msg =
-                  completedCandles.length > 0
-                    ? `📊 WS: ${clientCount} clients | ${completedCandles.length} COMPLETED candles sent`
-                    : `📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`;
-                console.log(msg);
-              }
+              // Price broadcasts happen silently
             }
             break;
 
@@ -548,6 +540,12 @@ const server = createServer(async (req, res) => {
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 wss.on("connection", (ws, req) => {
+  // Enforce connection limit to prevent memory exhaustion
+  if (connections.size >= MAX_CONNECTIONS) {
+    console.error(`⚠️ Connection limit reached (${MAX_CONNECTIONS}), rejecting new connection`);
+    ws.close(1008, "Server at capacity");
+    return;
+  }
   handleConnection(ws, req);
 });
 
@@ -587,9 +585,7 @@ function handleConnection(ws: WebSocket, req: any) {
       // Looks like a MongoDB ObjectId, admin ID, or email
       participantId = token;
       participantName = type === "employee" ? "Employee" : "User";
-      console.log(
-        `🔑 Using raw ID auth for ${type}: ${token.length > 10 ? token.substring(0, 10) + "..." : token}`,
-      );
+      // Auth via raw ID
     } else {
       console.error(
         "Authentication failed: Invalid token format:",
@@ -664,9 +660,7 @@ function handleConnection(ws: WebSocket, req: any) {
   // Broadcast presence
   broadcastPresence(participantId, "online");
 
-  console.log(
-    `✅ Connected: ${participantId} (${participantType}) - Total: ${connections.size}`,
-  );
+  // Connection tracked silently (visible via /stats endpoint)
 }
 
 function handleMessage(connectionId: string, message: any) {
@@ -681,9 +675,6 @@ function handleMessage(connectionId: string, message: any) {
       if (data.conversationId) {
         connection.conversationIds.add(data.conversationId);
         addSubscriber(data.conversationId, connectionId);
-        console.log(
-          `📌 ${connection.participantId} subscribed to ${data.conversationId}`,
-        );
       }
       break;
 
@@ -760,9 +751,7 @@ function handleMessage(connectionId: string, message: any) {
         for (const targetId of data.participantIds) {
           subscribeToPresence(connectionId, targetId);
         }
-        console.log(
-          `👁️ ${connection.participantId} watching presence of ${data.participantIds.length} users`,
-        );
+        // Presence watch registered silently
       }
       break;
 
@@ -789,7 +778,7 @@ function handleMessage(connectionId: string, message: any) {
       break;
 
     default:
-      console.log(`Unknown message type: ${type}`);
+      console.error(`Unknown WS message type: ${type}`);
   }
 }
 
@@ -820,9 +809,6 @@ function handleDisconnect(connectionId: string) {
   }
 
   connections.delete(connectionId);
-  console.log(
-    `❌ Disconnected: ${connection.participantId} - Total: ${connections.size}`,
-  );
 }
 
 // ==========================================
@@ -930,9 +916,7 @@ function broadcastPresence(participantId: string, status: string) {
         send(connection.ws, event);
       }
     }
-    console.log(
-      `📡 Presence ${status} for ${participantId} sent to ${subscribers.size} subscribers`,
-    );
+    // Presence broadcast sent silently
   }
 
   // Also notify the participant themselves (for multi-device sync)
@@ -960,7 +944,7 @@ setInterval(() => {
   for (const [connectionId, connection] of connections) {
     if (!connection.isAlive) {
       // Connection didn't respond to last ping
-      console.log(`⏰ Connection timeout: ${connection.participantId}`);
+      // Connection timeout - terminate silently
       connection.ws.terminate();
       handleDisconnect(connectionId);
       continue;
@@ -1091,17 +1075,13 @@ process.on("SIGINT", shutdown);
 // ==========================================
 
 async function start() {
-  console.log("🚀 Starting Chartvolt WebSocket Server...");
-  console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log("🚀 Starting WebSocket Server...");
 
   // Connect to MongoDB (optional - for presence persistence)
   await connectToMongoDB();
 
   server.listen(PORT, () => {
     console.log(`✅ WebSocket server running on port ${PORT}`);
-    console.log(`📡 WebSocket endpoint: ws://localhost:${PORT}/ws`);
-    console.log(`❤️ Health check: http://localhost:${PORT}/health`);
-    console.log(`📊 Stats: http://localhost:${PORT}/stats`);
   });
 }
 

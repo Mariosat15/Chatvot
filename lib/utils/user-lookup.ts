@@ -124,9 +124,6 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
  */
 export async function getAllUsers(): Promise<UserInfo[]> {
   try {
-    // #region agent log
-    const _allUsersT0 = Date.now();
-    // #endregion
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 
@@ -137,9 +134,6 @@ export async function getAllUsers(): Promise<UserInfo[]> {
 
     // PERF FIX: Simple query with projection — filter in JS instead of
     // complex $and/$or that prevents index use (was 5.4s, should be <1s).
-    // #region agent log
-    const _queryT0 = Date.now();
-    // #endregion
     const users = await db
       .collection("user")
       .find(
@@ -150,9 +144,6 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         }
       )
       .toArray();
-    // #region agent log
-    console.log(`[PERF] getAllUsers DB query: ${Date.now()-_queryT0}ms userCount=${users.length}`);
-    // #endregion
 
     // Filter in JS (fast for ~5000 docs): traders only, dedupe by email
     const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || "";

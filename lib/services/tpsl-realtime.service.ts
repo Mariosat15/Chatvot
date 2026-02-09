@@ -306,11 +306,6 @@ export async function refreshPositionsCache(): Promise<void> {
     );
     const symbolCount = positionsCache.size;
 
-    if (totalPositions > 0) {
-      console.log(
-        `📊 [TP/SL Cache] Refreshed: ${totalPositions} positions across ${symbolCount} symbols`,
-      );
-    }
   } catch (error) {
     console.error("❌ [TP/SL Cache] Failed to refresh:", error);
   }
@@ -387,7 +382,6 @@ export function getTPSLCacheStats(): {
  * Initialize the cache (call on startup)
  */
 export async function initializeTPSLCache(): Promise<void> {
-  console.log("🚀 [TP/SL Cache] Initializing real-time TP/SL service...");
   await refreshPositionsCache();
 
   // Set up periodic refresh
@@ -395,5 +389,5 @@ export async function initializeTPSLCache(): Promise<void> {
     refreshPositionsCache().catch(console.error);
   }, CACHE_REFRESH_INTERVAL);
 
-  console.log("✅ [TP/SL Cache] Ready for real-time TP/SL triggering");
+  // TP/SL cache initialized and ready
 }

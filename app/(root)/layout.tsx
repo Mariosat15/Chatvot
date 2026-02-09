@@ -12,14 +12,7 @@ const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
 const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
-  // #region agent log
-  const _layoutT0 = Date.now();
-  const _layoutAuthT0 = Date.now();
-  // #endregion
   const session = await auth.api.getSession({ headers: await headers() });
-  // #region agent log
-  console.log(`[PERF] layout auth.getSession: ${Date.now()-_layoutAuthT0}ms hasUser=${!!session?.user}`);
-  // #endregion
 
   if (!session?.user) redirect("/sign-in");
 
@@ -30,9 +23,6 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     if (!cached.verified) redirect("/verify-email-required");
   } else {
     try {
-      // #region agent log
-      const _emailT0 = Date.now();
-      // #endregion
       const mongoose = await connectToDatabase();
       const db = mongoose.connection.db;
       if (db) {
@@ -45,9 +35,6 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
           .findOne(query, { projection: { emailVerified: 1 } });
         const verified = user?.emailVerified === true;
         emailVerifiedCache.set(userId, { verified, ts: now });
-        // #region agent log
-        console.log(`[PERF] layout emailVerified DB: ${Date.now()-_emailT0}ms verified=${verified}`);
-        // #endregion
         if (user && !verified) redirect("/verify-email-required");
       }
     } catch (error: unknown) {

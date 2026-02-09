@@ -26,7 +26,7 @@ async function ensureTPSLCacheInitialized(): Promise<void> {
     const { initializeTPSLCache } =
       await import("@/lib/services/tpsl-realtime.service");
     await initializeTPSLCache();
-    console.log("✅ [PRICES API] TP/SL cache initialized");
+    // TP/SL cache initialized
   } catch (error) {
     console.error("⚠️ [PRICES API] Failed to initialize TP/SL cache:", error);
     tpslCacheInitialized = false; // Retry next time

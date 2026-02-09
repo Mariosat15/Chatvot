@@ -117,35 +117,15 @@ export async function evaluateUserBadges(userId: string): Promise<{
   await connectToDatabase();
 
   try {
-    console.log(`🔍 [BADGE EVAL] Starting badge evaluation for user ${userId}`);
-
     // 0. Fetch badges from database
     const badges = await getBadgesFromDB();
-    console.log(
-      `📋 [BADGE EVAL] Loaded ${badges.length} badge definitions from database`,
-    );
 
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
-    console.log(`📊 [BADGE EVAL] User stats:`, {
-      trades: stats.totalTrades,
-      competitions: stats.competitionsEntered,
-      completedCompetitions: stats.completedCompetitions,
-      completedCompetitionsWithTrades: stats.completedCompetitionsWithTrades,
-      wins: stats.totalWins,
-      deposits: stats.totalDeposited,
-      winRate: stats.winRate,
-      totalPnl: stats.totalPnl,
-      liquidations: stats.liquidationCount,
-      tradesAtLateNight: stats.tradesAtLateNight,
-    });
 
     // 2. Get currently earned badges
     const existingBadges = await UserBadge.find({ userId }).lean();
     const existingBadgeIds = new Set(existingBadges.map((b) => b.badgeId));
-    console.log(
-      `🏅 [BADGE EVAL] User already has ${existingBadges.length} badges`,
-    );
 
     // 3. Evaluate each badge
     const newlyEarnedBadges: Badge[] = [];
@@ -158,26 +138,17 @@ export async function evaluateUserBadges(userId: string): Promise<{
       const earned = await checkBadgeCondition(badge as Badge, stats);
 
       if (earned) {
-        console.log(
-          `✅ [BADGE EVAL] User earned badge: ${badge.name} (${badge.id})`,
-        );
-
         // Award the badge
-        const userBadge = await UserBadge.create({
+        await UserBadge.create({
           userId,
           badgeId: badge.id,
           earnedAt: new Date(),
           progress: 100,
         });
-        console.log(`💾 [BADGE EVAL] Badge saved to database:`, userBadge._id);
 
         // Award XP for the badge
         try {
-          console.log(`⭐ [BADGE EVAL] Awarding XP for badge ${badge.id}...`);
-          const xpResult = await awardXPForBadge(userId, badge.id);
-          console.log(
-            `✅ [BADGE EVAL] XP awarded: ${xpResult.xpGained} XP (total: ${xpResult.newXP})`,
-          );
+          await awardXPForBadge(userId, badge.id);
         } catch (error) {
           console.error(
             `❌ [BADGE EVAL] Error awarding XP for badge ${badge.id}:`,
@@ -194,9 +165,6 @@ export async function evaluateUserBadges(userId: string): Promise<{
             badge.name,
             badge.description || `You've earned the ${badge.name} badge!`,
           );
-          console.log(
-            `🔔 [BADGE EVAL] Badge notification sent for ${badge.name}`,
-          );
         } catch (error) {
           console.error(
             `❌ [BADGE EVAL] Error sending badge notification:`,
@@ -207,10 +175,6 @@ export async function evaluateUserBadges(userId: string): Promise<{
         newlyEarnedBadges.push(badge as Badge);
       }
     }
-
-    console.log(
-      `🎉 [BADGE EVAL] Evaluation complete: ${newlyEarnedBadges.length} new badges earned`,
-    );
 
     // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
     // Even if no badges earned, we create the record for tracking
@@ -227,11 +191,7 @@ export async function evaluateUserBadges(userId: string): Promise<{
       const { checkAndCompleteMilestones } =
         await import("@/lib/services/journey-progress.service");
       const journeyResult = await checkAndCompleteMilestones(userId);
-      if (journeyResult.completed.length > 0) {
-        console.log(
-          `🗺️ [BADGE EVAL] Journey milestones completed: ${journeyResult.completed.join(", ")}`
-        );
-      }
+      // Journey milestones checked silently
     } catch (journeyError) {
       console.error("❌ [BADGE EVAL] Error checking journey milestones:", journeyError);
     }
@@ -270,9 +230,9 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (p) => p.status === "completed" && (p.totalTrades || 0) >= 5,
   ).length;
 
-  // Get trading stats
-  const allPositions = await TradingPosition.find({ userId }).lean();
-  const closedTrades = await TradeHistory.find({ userId }).lean();
+  // Get trading stats (cap at 10K most recent for performance)
+  const allPositions = await TradingPosition.find({ userId }).sort({ createdAt: -1 }).limit(10000).lean();
+  const closedTrades = await TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(10000).lean();
 
   const totalTrades = closedTrades.length;
   const winningTrades = closedTrades.filter(

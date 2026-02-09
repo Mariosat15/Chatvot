@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Gather user's actual stats (this also validates the user exists via wallet/trades)
     const userStats = await getUserStats(userId);
-    console.log(`[Journey Evaluate] User ${userId} stats:`, userStats);
+    // console.log(`[Journey Evaluate] User ${userId} stats:`, userStats);
 
     // Get all maps and milestones
     const maps = await JourneyMapConfig.find({ isActive: true })
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
             totalXPEarned += milestone.rewards?.xp || 0;
             completedIds.push(milestone.id);
             
-            console.log(`[Journey Evaluate] Auto-completed: "${milestone.name}" (${condition?.type})`);
+            // console.log(`[Journey Evaluate] Auto-completed: "${milestone.name}" (${condition?.type})`);
           }
         }
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       const mapCompleted = milestones.every((m: any) => completedIds.includes(m.id));
       if (mapCompleted && milestones.length > 0) {
         completedMaps.add(map.mapId);
-        console.log(`[Journey Evaluate] Map fully completed: ${map.mapId}`);
+        // console.log(`[Journey Evaluate] Map fully completed: ${map.mapId}`);
       }
     }
 
@@ -168,14 +168,6 @@ export async function POST(request: NextRequest) {
       totalMilestonesChecked: Object.values(mapMilestones).flat().length,
       statsChecked: Object.keys(userStats).filter(k => userStats[k] === true || (typeof userStats[k] === "number" && userStats[k] > 0)),
     };
-
-    console.log("[Journey Evaluate] Summary:", {
-      userId,
-      newlyCompleted: newlyCompleted.length,
-      newlyUnlocked: newlyUnlocked.length,
-      totalXPEarned,
-      ...debugInfo,
-    });
 
     return NextResponse.json({
       success: true,
@@ -232,8 +224,11 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
       stats.deposit_amount = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
     }
 
-    // Get trades from trade history
-    const trades = await TradeHistory.find({ userId }).lean() as any[];
+    // Get trades from trade history (cap at 10K most recent for performance)
+    const trades = await TradeHistory.find({ userId })
+      .sort({ closedAt: -1 })
+      .limit(10000)
+      .lean() as any[];
     stats.total_trades = trades.length;
     stats.first_trade = trades.length > 0;
     
@@ -365,16 +360,6 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
       (p.finalRank === 1 || p.rank === 1) && p.underdogWin === true
     );
     stats.underdog_win = underdogWins.length;
-
-    console.log(`[getUserStats] User ${userId} comprehensive stats:`, {
-      trades: stats.total_trades,
-      wins: stats.winning_trades,
-      streak: stats.win_streak,
-      comps_entered: stats.competitions_entered,
-      comps_completed: stats.competitions_completed,
-      podiums: stats.podium_finishes,
-      first_places: stats.first_place_finishes,
-    });
 
   } catch (err) {
     console.error("Error getting user stats:", err);

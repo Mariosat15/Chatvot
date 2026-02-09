@@ -79,22 +79,17 @@ const agenda = new Agenda({
  * Runs every 5 minutes as backup to client-side checks
  */
 agenda.define("margin-check", async () => {
-  const startTime = Date.now();
-  console.log("\n📊 [MARGIN CHECK] Starting...");
-
   try {
     const result = await runMarginCheck();
-    const duration = Date.now() - startTime;
 
-    console.log(`📊 [MARGIN CHECK] Completed in ${duration}ms`);
-    console.log(`   Checked: ${result.checkedParticipants} participants`);
-    console.log(
-      `   Liquidated: ${result.liquidatedUsers} users (${result.liquidatedPositions} positions)`,
-    );
+    // Only log when liquidations happen
+    if (result.liquidatedUsers > 0) {
+      console.log(`📊 [MARGIN CHECK] Liquidated: ${result.liquidatedUsers} users (${result.liquidatedPositions} positions)`);
+    }
 
     if (result.errors.length > 0) {
-      console.log(`   Errors: ${result.errors.length}`);
-      result.errors.forEach((e) => console.log(`     - ${e}`));
+      console.error(`📊 [MARGIN CHECK] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`📊 [MARGIN CHECK] Failed:`, error);
@@ -106,25 +101,16 @@ agenda.define("margin-check", async () => {
  * Runs every minute to catch competitions at exact end time
  */
 agenda.define("competition-end", async () => {
-  const startTime = Date.now();
-  console.log("\n🏆 [COMPETITION END] Starting...");
-
   try {
     const result = await runCompetitionEndCheck();
-    const duration = Date.now() - startTime;
 
-    // Always log completion with result
-    console.log(`🏆 [COMPETITION END] Completed in ${duration}ms`);
-    console.log(
-      `   Checked: ${result.checkedCompetitions} expired competitions`,
-    );
-
+    // Only log when actual work was done
     if (result.checkedCompetitions > 0) {
-      console.log(`   Ended: ${result.endedCompetitions}`);
+      console.log(`🏆 [COMPETITION END] Ended: ${result.endedCompetitions}/${result.checkedCompetitions}`);
 
       if (result.failedCompetitions.length > 0) {
-        console.log(`   ❌ Failed: ${result.failedCompetitions.length}`);
-        result.failedCompetitions.forEach((e) => console.log(`     - ${e}`));
+        console.error(`🏆 [COMPETITION END] Failed: ${result.failedCompetitions.length}`);
+        result.failedCompetitions.forEach((e) => console.error(`     - ${e}`));
       }
     }
   } catch (error) {
@@ -137,33 +123,25 @@ agenda.define("competition-end", async () => {
  * Runs every minute to finalize ended challenges
  */
 agenda.define("challenge-finalize", async () => {
-  const startTime = Date.now();
-  console.log("\n⚔️ [CHALLENGE FINALIZE] Starting...");
-
   try {
     const result = await runChallengeFinalizeCheck();
-    const duration = Date.now() - startTime;
 
-    // Log if any work was done
-    if (result.checkedChallenges > 0 || result.expiredPendingChallenges > 0) {
-      console.log(`⚔️ [CHALLENGE FINALIZE] Completed in ${duration}ms`);
+    // Only log when actual work was done
+    if (result.expiredPendingChallenges > 0) {
+      console.log(
+        `⚔️ [CHALLENGE FINALIZE] Expired pending: ${result.expiredPendingChallenges} (refunded ${result.refundedAmount} credits)`,
+      );
+    }
 
-      if (result.expiredPendingChallenges > 0) {
-        console.log(
-          `   ⏰ Expired pending: ${result.expiredPendingChallenges} (refunded ${result.refundedAmount} credits)`,
-        );
-      }
+    if (result.finalizedChallenges > 0) {
+      console.log(
+        `⚔️ [CHALLENGE FINALIZE] Finalized: ${result.finalizedChallenges}/${result.checkedChallenges}`,
+      );
+    }
 
-      if (result.checkedChallenges > 0) {
-        console.log(
-          `   🏁 Finalized active: ${result.finalizedChallenges}/${result.checkedChallenges}`,
-        );
-      }
-
-      if (result.failedChallenges.length > 0) {
-        console.log(`   ❌ Failed: ${result.failedChallenges.length}`);
-        result.failedChallenges.forEach((e) => console.log(`     - ${e}`));
-      }
+    if (result.failedChallenges.length > 0) {
+      console.error(`⚔️ [CHALLENGE FINALIZE] Failed: ${result.failedChallenges.length}`);
+      result.failedChallenges.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`⚔️ [CHALLENGE FINALIZE] Failed:`, error);
@@ -196,8 +174,8 @@ agenda.define("trade-queue", async () => {
     }
 
     if (result.errors.length > 0) {
-      console.log(`   Errors: ${result.errors.length}`);
-      result.errors.slice(0, 3).forEach((e) => console.log(`     - ${e}`));
+      console.error(`📋 [TRADE QUEUE] Errors: ${result.errors.length}`);
+      result.errors.slice(0, 3).forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`📋 [TRADE QUEUE] Failed:`, error);
@@ -215,8 +193,8 @@ agenda.define("price-cache", async () => {
 
     // Silent unless errors
     if (result.errors.length > 0) {
-      console.log(`\n💱 [PRICE CACHE] Errors:`);
-      result.errors.forEach((e) => console.log(`     - ${e}`));
+      console.error(`💱 [PRICE CACHE] Errors:`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`💱 [PRICE CACHE] Failed:`, error);
@@ -229,20 +207,17 @@ agenda.define("price-cache", async () => {
  * (Replaces Inngest: chatvolt-evaluate-badges)
  */
 agenda.define("evaluate-badges", async () => {
-  const startTime = Date.now();
-  console.log("\n🏅 [BADGE EVALUATION] Starting...");
-
   try {
     const result = await runBadgeEvaluation();
-    const duration = Date.now() - startTime;
 
-    console.log(`🏅 [BADGE EVALUATION] Completed in ${duration}ms`);
-    console.log(`   Users evaluated: ${result.usersEvaluated}`);
-    console.log(`   Badges awarded: ${result.badgesAwarded}`);
+    // Only log when badges are actually awarded
+    if (result.badgesAwarded > 0) {
+      console.log(`🏅 [BADGE EVALUATION] Awarded ${result.badgesAwarded} badges to ${result.usersEvaluated} users`);
+    }
 
     if (result.errors.length > 0) {
-      console.log(`   Errors: ${result.errors.length}`);
-      result.errors.forEach((e) => console.log(`     - ${e}`));
+      console.error(`🏅 [BADGE EVALUATION] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`🏅 [BADGE EVALUATION] Failed:`, error);
@@ -254,25 +229,17 @@ agenda.define("evaluate-badges", async () => {
  * Runs daily to check for expiring KYC verifications and send reminders
  */
 agenda.define("kyc-expiry-check", async () => {
-  const startTime = Date.now();
-  console.log("\n🔐 [KYC EXPIRY CHECK] Starting...");
-
   try {
     const result = await runKYCExpiryCheck();
-    const duration = Date.now() - startTime;
 
-    console.log(`🔐 [KYC EXPIRY CHECK] Completed in ${duration}ms`);
-    console.log(`   Users checked: ${result.checkedUsers}`);
-    console.log(`   Expiring in 30 days: ${result.expiringSoon30Days}`);
-    console.log(`   Expiring in 7 days: ${result.expiringSoon7Days}`);
-    console.log(`   Expiring in 1 day: ${result.expiringSoon1Day}`);
-    console.log(`   Expired (reset): ${result.expired}`);
-    console.log(`   Data retention expiring: ${result.dataRetentionExpiring}`);
-    console.log(`   Notifications sent: ${result.notificationsSent}`);
+    // Only log when there are actual actions taken
+    if (result.expired > 0 || result.notificationsSent > 0) {
+      console.log(`🔐 [KYC EXPIRY CHECK] Expired: ${result.expired}, Notifications: ${result.notificationsSent}`);
+    }
 
     if (result.errors.length > 0) {
-      console.log(`   Errors: ${result.errors.length}`);
-      result.errors.forEach((e) => console.log(`     - ${e}`));
+      console.error(`🔐 [KYC EXPIRY CHECK] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`🔐 [KYC EXPIRY CHECK] Failed:`, error);
@@ -327,8 +294,8 @@ agenda.define("early-end-check", async () => {
     }
 
     if (result.errors.length > 0) {
-      console.log(`   Errors: ${result.errors.length}`);
-      result.errors.forEach((e) => console.log(`     - ${e}`));
+      console.error(`🏁 [EARLY END CHECK] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
     }
   } catch (error) {
     console.error(`🏁 [EARLY END CHECK] Failed:`, error);
@@ -367,13 +334,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 // ============================================
 
 async function startWorker(): Promise<void> {
-  console.log("\n");
-  console.log("╔══════════════════════════════════════════════════════════╗");
-  console.log("║           CHARTVOLT BACKGROUND WORKER                    ║");
-  console.log("║           No Redis Required - Uses MongoDB               ║");
-  console.log("║           Real-Time TP/SL + Backup Sweep                 ║");
-  console.log("╚══════════════════════════════════════════════════════════╝");
-  console.log("\n");
+  console.log("🚀 Chartvolt Worker starting...");
 
   try {
     // Connect to database
@@ -381,60 +342,25 @@ async function startWorker(): Promise<void> {
 
     // Start Agenda
     await agenda.start();
-    console.log("✅ Agenda started");
 
-    // Schedule recurring jobs (replaces ALL Inngest functions)
+    // Schedule recurring jobs
     await agenda.every("5 minutes", "margin-check");
-    await agenda.every("1 minute", "competition-end"); // BACKUP - client-side auto-finalizes on access
-    await agenda.every("1 minute", "challenge-finalize"); // BACKUP - client-side auto-finalizes on access
-    await agenda.every("1 minute", "early-end-check"); // Check if all players eliminated
-    await agenda.every("1 minute", "trade-queue"); // BACKUP sweep - real-time happens in main app
+    await agenda.every("1 minute", "competition-end");
+    await agenda.every("1 minute", "challenge-finalize");
+    await agenda.every("1 minute", "early-end-check");
+    await agenda.every("1 minute", "trade-queue");
     await agenda.every("1 minute", "price-cache");
     await agenda.every("1 hour", "evaluate-badges");
-    await agenda.every("1 day", "kyc-expiry-check"); // Daily KYC expiry check
-    await agenda.every("5 minutes", "market-data-maintenance"); // Market data cleanup check
-    await agenda.every("1 day", "gamemaster-renewal"); // Daily game master subscription renewal
+    await agenda.every("1 day", "kyc-expiry-check");
+    await agenda.every("5 minutes", "market-data-maintenance");
+    await agenda.every("1 day", "gamemaster-renewal");
 
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);
 
-    console.log("\n📅 Scheduled Jobs:");
-    console.log("   • margin-check: every 5 minutes");
-    console.log(
-      "   • competition-end: every 1 minute (backup - client auto-finalizes on access)",
-    );
-    console.log(
-      "   • challenge-finalize: every 1 minute (backup - client auto-finalizes on access)",
-    );
-    console.log(
-      "   • early-end-check: every 1 minute (end if all players eliminated)",
-    );
-    console.log(
-      "   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)",
-    );
-    console.log("   • price-cache: every 1 minute");
-    console.log("   • evaluate-badges: every 1 hour");
-    console.log(
-      "   • kyc-expiry-check: every 1 day (expiry reminders & auto-reset)",
-    );
-    console.log(
-      "   • market-data-maintenance: every 5 minutes (auto cleanup check)",
-    );
-    console.log(
-      "   • check-pending-withdrawals: every 1 hour (status summary)",
-    );
-    console.log("   • check-stuck-withdrawals: every 6 hours");
-    console.log("   • check-old-pending-withdrawals: every 12 hours");
-    console.log(
-      "\n⚡ TP/SL Note: Real-time triggers happen in main app on price updates!",
-    );
-    console.log(
-      "   Worker trade-queue is a BACKUP sweep to catch any missed closures.",
-    );
-    console.log("\n🚀 Worker is running! Press Ctrl+C to stop.\n");
+    console.log("✅ Chartvolt Worker running (silent mode - only errors/actions logged)");
 
     // Run initial checks immediately
-    console.log("🔄 Running initial checks...");
     await agenda.now("margin-check", {});
     await agenda.now("competition-end", {});
     await agenda.now("challenge-finalize", {});

@@ -480,7 +480,6 @@ export async function warmCache(): Promise<void> {
   }
 
   cacheWarmingInProgress = true;
-  console.log("🔥 [Aggregator] Starting cache pre-warming (parallel mode)...");
   const startTime = Date.now();
 
   try {
@@ -488,9 +487,6 @@ export async function warmCache(): Promise<void> {
 
     // Fetch enabled symbols from admin configuration
     const enabledSymbols = await getEnabledSymbols();
-    console.log(
-      `📊 [Aggregator] Found ${enabledSymbols.length} enabled symbols to warm`,
-    );
 
     // Build list of all symbol/timeframe combinations to warm
     const warmTasks: Array<{ symbol: string; timeframe: string }> = [];
@@ -520,19 +516,10 @@ export async function warmCache(): Promise<void> {
         }),
       );
 
-      // Progress log every 50 completions
-      if (completed % 50 === 0 || completed === warmTasks.length) {
-        console.log(
-          `🔄 [Aggregator] Warming progress: ${completed}/${warmTasks.length}`,
-        );
-      }
+      // Silently track progress
     }
 
     cacheWarmingComplete = true;
-    const duration = Date.now() - startTime;
-    console.log(
-      `✅ [Aggregator] Cache pre-warming complete in ${(duration / 1000).toFixed(1)}s (${enabledSymbols.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`,
-    );
   } catch (err) {
     console.error("❌ [Aggregator] Cache pre-warming failed:", err);
   } finally {

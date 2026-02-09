@@ -81,11 +81,8 @@ class PriceSnapshotService {
    */
   start(): void {
     if (this.state.isRunning) {
-      console.log("📸 [PriceSnapshot] Already running");
       return;
     }
-
-    console.log("📸 [PriceSnapshot] Starting automatic snapshot collection");
     this.state.isRunning = true;
 
     // Take initial snapshot
@@ -106,7 +103,6 @@ class PriceSnapshotService {
       this.state.snapshotTimer = null;
     }
     this.state.isRunning = false;
-    console.log("📸 [PriceSnapshot] Stopped");
   }
 
   /**
@@ -183,13 +179,6 @@ class PriceSnapshotService {
         await this.cleanupOldSnapshots(competitionId);
       }
 
-      // Log occasionally
-      if (this.state.snapshotCount % 10 === 0) {
-        console.log(
-          `📸 [PriceSnapshot] Snapshot #${this.state.snapshotCount}: ${healthyCount}/${prices.length} healthy (${healthSnapshot.overallStatus})`,
-        );
-      }
-
       return {
         success: true,
         snapshotId: snapshot._id.toString(),
@@ -260,10 +249,6 @@ class PriceSnapshotService {
 
         const ids = oldSnapshots.map((s) => s._id);
         await PriceSnapshot.deleteMany({ _id: { $in: ids } });
-
-        console.log(
-          `📸 [PriceSnapshot] Cleaned up ${toDelete} old snapshots for competition ${competitionId}`,
-        );
       }
     } catch (error) {
       console.error("Error cleaning up snapshots:", error);

@@ -34,14 +34,25 @@ export async function runBadgeEvaluation(): Promise<BadgeEvaluationResult> {
       status: "active",
     }).distinct("userId");
 
-    // Evaluate badges for each active user
-    for (const userId of activeParticipants) {
-      try {
-        const evalResult = await evaluateUserBadges(userId.toString());
-        result.usersEvaluated++;
-        result.badgesAwarded += evalResult.newBadges?.length || 0;
-      } catch (userError) {
-        result.errors.push(`User ${userId} badge error: ${userError}`);
+    // Evaluate badges in parallel batches for performance at scale
+    const BATCH_SIZE = 20;
+    for (let i = 0; i < activeParticipants.length; i += BATCH_SIZE) {
+      const batch = activeParticipants.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (userId) => {
+          const evalResult = await evaluateUserBadges(userId.toString());
+          return evalResult.newBadges?.length || 0;
+        })
+      );
+
+      for (let j = 0; j < batchResults.length; j++) {
+        const batchResult = batchResults[j];
+        if (batchResult.status === "fulfilled") {
+          result.usersEvaluated++;
+          result.badgesAwarded += batchResult.value;
+        } else {
+          result.errors.push(`User ${batch[j]} badge error: ${batchResult.reason}`);
+        }
       }
     }
 

@@ -57,9 +57,6 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
       .toArray();
 
     if (expiredPendingChallenges.length > 0) {
-      console.log(
-        `   📋 Found ${expiredPendingChallenges.length} pending challenge(s) past accept deadline`,
-      );
 
       for (const challenge of expiredPendingChallenges) {
         try {
@@ -89,16 +86,10 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
 
             if (refundResult.modifiedCount > 0) {
               result.refundedAmount += challenge.entryFee;
-              console.log(
-                `   💰 Refunded ${challenge.entryFee} credits to challenger ${challenge.challengerId}`,
-              );
             }
           }
 
           result.expiredPendingChallenges++;
-          console.log(
-            `   ⏰ Expired pending challenge ${challenge._id} (deadline was ${challenge.acceptDeadline})`,
-          );
         } catch (error) {
           result.failedChallenges.push(
             `${challenge._id}: Failed to expire - ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -120,10 +111,6 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
     result.checkedChallenges = expiredActiveChallenges.length;
 
     if (expiredActiveChallenges.length > 0) {
-      console.log(
-        `   🏁 Found ${expiredActiveChallenges.length} active challenge(s) to finalize`,
-      );
-
       // Import the finalization function
       const { finalizeChallenge } =
         await import("../../lib/actions/trading/challenge-finalize.actions");
