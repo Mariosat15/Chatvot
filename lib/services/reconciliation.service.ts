@@ -89,8 +89,8 @@ export async function runFullReconciliation(): Promise<ReconciliationResult> {
   const startTime = Date.now();
   const issues: ReconciliationIssue[] = [];
 
-  // Get all wallets
-  const wallets = await CreditWallet.find({}).lean();
+  // Get wallets (capped to prevent OOM on very large user bases)
+  const wallets = await CreditWallet.find({}).select("userId creditBalance").limit(5000).lean();
   let totalTransactions = 0;
   let totalWithdrawals = 0;
   let totalDiscrepancy = 0;
@@ -445,21 +445,25 @@ async function verifyPlatformTransactions(): Promise<ReconciliationIssue[]> {
   // Check for deposit fees without matching deposits
   const depositFees = (await PlatformTransaction.find({
     transactionType: "deposit_fee",
-  }).lean()) as Array<{ _id: { toString(): string }; sourceId?: string }>;
+  }).limit(2000).lean()) as Array<{ _id: { toString(): string }; sourceId?: string }>;
+
+  // PERF: Batch-fetch all referenced deposits instead of N+1 findById in loop
+  const sourceIds = depositFees.map((f) => f.sourceId).filter(Boolean);
+  const existingDeposits = sourceIds.length > 0
+    ? await WalletTransaction.find({ _id: { $in: sourceIds } }).select("_id").lean()
+    : [];
+  const existingDepositIds = new Set(existingDeposits.map((d: any) => d._id.toString()));
 
   for (const fee of depositFees) {
-    if (fee.sourceId) {
-      const deposit = await WalletTransaction.findById(fee.sourceId).lean();
-      if (!deposit) {
-        issues.push({
-          type: "orphan_transaction",
-          severity: "info",
-          details: {
-            transactionId: fee._id.toString(),
-            description: `Deposit fee ${fee._id} references non-existent deposit ${fee.sourceId}`,
-          },
-        });
-      }
+    if (fee.sourceId && !existingDepositIds.has(fee.sourceId)) {
+      issues.push({
+        type: "orphan_transaction",
+        severity: "info",
+        details: {
+          transactionId: fee._id.toString(),
+          description: `Deposit fee ${fee._id} references non-existent deposit ${fee.sourceId}`,
+        },
+      });
     }
   }
 

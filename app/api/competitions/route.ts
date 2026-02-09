@@ -19,11 +19,12 @@ export async function GET(request: NextRequest) {
       // Not logged in, continue without user data
     }
 
-    // Fetch all non-draft competitions
+    // Fetch non-draft competitions (capped to prevent unbounded scan)
     const competitions = await Competition.find({
       status: { $ne: "draft" },
     })
       .sort({ startTime: -1 })
+      .limit(200)
       .lean();
 
     // Get user's participation status if logged in

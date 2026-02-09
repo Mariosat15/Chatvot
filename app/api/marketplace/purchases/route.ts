@@ -39,11 +39,22 @@ export async function GET(request: NextRequest) {
       query.isEnabled = false;
     }
 
-    // Get purchases with populated item data
-    let purchases = await UserPurchase.find(query)
-      .populate("itemId")
+    // Get purchases (limit to prevent unbounded scan, avoid .populate N+1)
+    const rawPurchases = await UserPurchase.find(query)
       .sort({ purchasedAt: -1 })
+      .limit(200)
       .lean();
+
+    // PERF: Batch-fetch items instead of N+1 .populate()
+    const itemIds = [...new Set(rawPurchases.map((p: any) => p.itemId?.toString()).filter(Boolean))];
+    const itemDocs = itemIds.length > 0
+      ? await _MarketplaceItem.find({ _id: { $in: itemIds } }).lean()
+      : [];
+    const itemMap = new Map(itemDocs.map((i: any) => [i._id.toString(), i]));
+    let purchases = rawPurchases.map((p: any) => ({
+      ...p,
+      itemId: itemMap.get(p.itemId?.toString()) || p.itemId,
+    }));
 
     // Filter by category if specified
     if (category) {

@@ -99,37 +99,25 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
     participant.status === "disqualified";
   const participantStatus = participant.status;
 
-  // Get user's positions
-  const positions = await getUserPositions(competitionId);
+  // PERF: Fetch all independent data in parallel instead of sequentially
+  const { getTradingRiskSettings } =
+    await import("@/lib/actions/trading/risk-settings.actions");
 
-  // Get trade history
-  const tradeHistoryResult = await getCompetitionTradeHistory(competitionId);
+  const [positions, tradeHistoryResult, pendingOrders, _walletBalance, marginThresholdsResult, riskSettingsResult] =
+    await Promise.all([
+      getUserPositions(competitionId),
+      getCompetitionTradeHistory(competitionId),
+      getUserOrders(competitionId, "pending"),
+      getWalletBalance(),
+      getMarginThresholds().catch(() => undefined),
+      getTradingRiskSettings().catch(() => ({ defaultLeverage: 10 })),
+    ]);
+
   const tradeHistory = tradeHistoryResult.success
     ? tradeHistoryResult.trades
     : [];
-
-  // Get pending orders
-  const pendingOrders = await getUserOrders(competitionId, "pending");
-
-  // Get wallet balance
-  const _walletBalance = await getWalletBalance();
-
-  // Load admin risk settings (fail gracefully to defaults)
-  let marginThresholds;
-  let defaultLeverage = 10; // Fallback default
-  try {
-    marginThresholds = await getMarginThresholds();
-    const { getTradingRiskSettings } =
-      await import("@/lib/actions/trading/risk-settings.actions");
-    const riskSettings = await getTradingRiskSettings();
-    defaultLeverage = riskSettings?.defaultLeverage || 10;
-  } catch (error) {
-    console.error(
-      "⚠️ Failed to load admin risk settings, using defaults:",
-      error,
-    );
-    marginThresholds = undefined; // Will use DEFAULT_MARGIN_THRESHOLDS in components
-  }
+  const marginThresholds = marginThresholdsResult;
+  const defaultLeverage = riskSettingsResult?.defaultLeverage || 10;
 
   // Calculate stats
   const equity = participant.currentCapital + participant.unrealizedPnl;

@@ -27,9 +27,10 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Get all competitions sorted by start time (newest first)
+    // Get competitions sorted by start time (newest first, capped for safety)
     const competitions = await Competition.find()
       .sort({ startTime: -1 })
+      .limit(500)
       .lean();
 
     return NextResponse.json({

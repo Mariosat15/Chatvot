@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     const firstMapId = (maps[0] as any).mapId;
     const firstMilestoneId = mapMilestones[firstMapId]?.[0]?.id || "account_created";
 
-    // Get all users who have wallets (indicating they're active users)
-    const wallets = await CreditWallet.find({}).select("userId").lean();
+    // Get users who have wallets (capped to prevent OOM with very large user bases)
+    const wallets = await CreditWallet.find({}).select("userId").limit(5000).lean();
     const userIds = wallets.map((w: any) => w.userId).filter(Boolean);
 
     console.log(`[Sync All] Found ${userIds.length} users to sync`);

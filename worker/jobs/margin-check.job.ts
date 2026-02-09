@@ -110,6 +110,12 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
     // Fetch current prices for all symbols at once (efficient)
     const pricesMap = await fetchRealForexPrices(Array.from(allSymbols));
 
+    // PERF: Pre-fetch all active competitions once to avoid N+1 Competition.findById in the loop
+    const competitionMap = new Map<string, any>();
+    for (const comp of activeCompetitions) {
+      competitionMap.set(comp._id.toString(), comp);
+    }
+
     // Check each participant
     for (const participant of participantsWithPositions) {
       result.checkedParticipants++;
@@ -201,9 +207,8 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
 
           // Send disqualification notification if competition has disqualifyOnLiquidation enabled
           try {
-            const competition = await Competition.findById(
-              participant.competitionId,
-            ).lean();
+            // PERF: Use pre-fetched map instead of N+1 Competition.findById
+            const competition = competitionMap.get(participant.competitionId?.toString());
             if ((competition as any)?.rules?.disqualifyOnLiquidation) {
               const { sendNotification } =
                 await import("../../lib/services/notification.service");

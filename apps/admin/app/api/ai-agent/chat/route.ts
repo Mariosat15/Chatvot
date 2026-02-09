@@ -2108,13 +2108,13 @@ async function executeGetCompetitionLeaderboard(
   }
 
   // Try partial ID match (user might provide short form like "695b7444")
+  // PERF: Use regex instead of loading all competitions into memory
   if (!competition) {
-    const allComps = await db.collection("competitions").find({}).toArray();
-    competition = allComps.find(
-      (c) =>
-        c._id.toString().startsWith(searchId) ||
-        c._id.toString().includes(searchId),
-    );
+    competition = await db.collection("competitions").findOne({
+      $expr: {
+        $regexMatch: { input: { $toString: "$_id" }, regex: searchId, options: "i" },
+      },
+    });
   }
 
   if (!competition) {
@@ -2265,13 +2265,13 @@ async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
   }
 
   // Try partial ID match
+  // PERF: Use regex instead of loading all competitions into memory
   if (!competition) {
-    const allComps = await db.collection("competitions").find({}).toArray();
-    competition = allComps.find(
-      (c) =>
-        c._id.toString().startsWith(searchId) ||
-        c._id.toString().includes(searchId),
-    );
+    competition = await db.collection("competitions").findOne({
+      $expr: {
+        $regexMatch: { input: { $toString: "$_id" }, regex: searchId, options: "i" },
+      },
+    });
   }
 
   if (!competition) {

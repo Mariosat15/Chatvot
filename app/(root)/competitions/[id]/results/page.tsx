@@ -33,12 +33,15 @@ const CompetitionResultsPage = async ({
     redirect("/competitions");
   }
 
-  // Check if user was a participant
+  // PERF: Fetch participant + trade history in parallel (both only need competitionId)
   await connectToDatabase();
-  const participantDoc = await CompetitionParticipant.findOne({
-    competitionId,
-    userId: session.user.id,
-  }).lean();
+  const [participantDoc, tradeHistoryResult] = await Promise.all([
+    CompetitionParticipant.findOne({
+      competitionId,
+      userId: session.user.id,
+    }).lean(),
+    getCompetitionTradeHistory(competitionId),
+  ]);
 
   if (!participantDoc) {
     redirect(`/competitions/${competitionId}`);
@@ -46,9 +49,6 @@ const CompetitionResultsPage = async ({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
-
-  // Get trade history
-  const tradeHistoryResult = await getCompetitionTradeHistory(competitionId);
   const tradeHistory = tradeHistoryResult.success
     ? tradeHistoryResult.trades
     : [];

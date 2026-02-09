@@ -213,15 +213,14 @@ export async function getUserCompetitionStats(
 
     await connectToDatabase();
 
-    // Get all participations
-    const participations = await CompetitionParticipant.find({
-      userId: targetUserId,
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Get wallet for prize info
-    const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
+    // Get participations (capped to avoid unbounded scan)
+    const [participations, wallet] = await Promise.all([
+      CompetitionParticipant.find({ userId: targetUserId })
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+      CreditWallet.findOne({ userId: targetUserId }).lean(),
+    ]);
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -445,22 +444,20 @@ export async function getUserChallengeStats(
 
     await connectToDatabase();
 
-    // Get all challenges where user is a participant
-    const challenges = await Challenge.find({
-      $or: [{ challengerId: targetUserId }, { challengedId: targetUserId }],
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Get all participations
-    const participations = await ChallengeParticipant.find({
-      userId: targetUserId,
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Get wallet for prize info
-    const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
+    // Fetch challenges, participations and wallet in parallel with limits
+    const [challenges, participations, wallet] = await Promise.all([
+      Challenge.find({
+        $or: [{ challengerId: targetUserId }, { challengedId: targetUserId }],
+      })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+      ChallengeParticipant.find({ userId: targetUserId })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+      CreditWallet.findOne({ userId: targetUserId }).lean(),
+    ]);
 
     // Calculate stats
     const completedChallenges = challenges.filter(

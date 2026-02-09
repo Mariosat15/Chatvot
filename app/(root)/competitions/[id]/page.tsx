@@ -46,13 +46,17 @@ const CompetitionDetailsPage = async ({
   const userId = session?.user?.id || "";
 
   try {
-    // Get competition data
-    const competition = await getCompetitionById(id);
-    const leaderboard = await getCompetitionLeaderboard(id, 50);
-    const isUserIn = await isUserInCompetition(id);
+    // PERF: Fetch independent data in parallel instead of sequentially
+    const [competition, leaderboard, isUserIn, walletBalance, riskSettings] =
+      await Promise.all([
+        getCompetitionById(id),
+        getCompetitionLeaderboard(id, 50),
+        isUserInCompetition(id),
+        getWalletBalance(),
+        getTradingRiskSettings(),
+      ]);
+    // getUserParticipant depends on isUserIn — must be sequential
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
-    const walletBalance = await getWalletBalance();
-    const riskSettings = await getTradingRiskSettings();
 
     // Get user level for level requirement check (client-side)
     let userLevel = { level: 1, title: "Novice Trader", icon: "🌱" };

@@ -173,11 +173,12 @@ export async function GET(request: NextRequest) {
     const userDetails: UserReconciliationDetail[] = [];
 
     // Get actual users from the user collection (Better Auth users)
+    // PERF: Fetch users + wallets in parallel; only select needed fields
     const userCollection = mongoose.connection.collection("user");
-    const allUsers = await userCollection.find({}).toArray();
-
-    // Also get wallets to find orphans
-    const wallets = await CreditWallet.find({}).lean();
+    const [allUsers, wallets] = await Promise.all([
+      userCollection.find({}, { projection: { _id: 1, id: 1, email: 1, name: 1 } }).toArray(),
+      CreditWallet.find({}).select("userId creditBalance").lean(),
+    ]);
     const walletUserIds = new Set(wallets.map((w) => w.userId.toString()));
     const userIds = new Set(allUsers.map((u) => u._id.toString()));
 
@@ -737,7 +738,11 @@ async function verifyUserWallet(userId: string, userEmail: string) {
 
 async function verifyWithdrawalRequests() {
   const issues: ReconciliationIssue[] = [];
-  const withdrawals = await WithdrawalRequest.find({}).lean();
+  // PERF: Add limit and select only needed fields to avoid full collection scan
+  const withdrawals = await WithdrawalRequest.find({})
+    .select("userId amount status platformFee currency paymentDetails createdAt completedAt")
+    .limit(5000)
+    .lean();
 
   for (const withdrawal of withdrawals) {
     // Check completed withdrawals have platform transaction

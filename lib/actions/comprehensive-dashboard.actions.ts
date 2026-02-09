@@ -240,15 +240,16 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     wallet,
     walletTransactions,
   ] = await Promise.all([
-    CompetitionParticipant.find({ userId }).lean(),
-    ChallengeParticipant.find({ userId }).lean(),
+    CompetitionParticipant.find({ userId }).sort({ createdAt: -1 }).limit(200).lean(),
+    ChallengeParticipant.find({ userId }).sort({ createdAt: -1 }).limit(200).lean(),
     Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
-    }).lean(),
+    }).sort({ createdAt: -1 }).limit(100).lean(),
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
     CreditWallet.findOne({ userId }).lean(),
     WalletTransaction.find({ userId, status: "completed" })
       .sort({ createdAt: 1 })
+      .limit(1000)
       .lean(),
   ]);
 
@@ -292,7 +293,10 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
 
   const allActiveParticipants = await CompetitionParticipant.find({
     competitionId: { $in: activeCompetitionIds },
-  }).lean();
+  })
+    .select("userId competitionId pnl currentCapital startingCapital currentRank totalTrades winningTrades losingTrades status")
+    .limit(10000)
+    .lean();
 
   // Group participants by competition
   const participantsByCompetition = new Map<string, any[]>();

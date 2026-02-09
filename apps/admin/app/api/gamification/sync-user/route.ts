@@ -114,9 +114,10 @@ async function syncUserGamification(userId: string) {
 async function syncAllUsers() {
   console.log("🔄 [SYNC] Starting sync for ALL users...");
 
-  // Get all wallets (users who have interacted with the platform)
-  const wallets = await CreditWallet.find({}).select("userId").lean();
-  console.log(`📊 [SYNC] Found ${wallets.length} users to sync`);
+  // Get wallets in batches to avoid loading all into memory at once
+  // Cap at 5000 to prevent OOM on very large datasets
+  const wallets = await CreditWallet.find({}).select("userId").limit(5000).lean();
+  console.log(`📊 [SYNC] Found ${wallets.length} users to sync (capped at 5000)`);
 
   const results = {
     processed: 0,

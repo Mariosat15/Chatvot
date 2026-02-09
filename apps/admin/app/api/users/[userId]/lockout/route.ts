@@ -35,12 +35,13 @@ export async function GET(
       const mongoose = await import("mongoose");
       const db = mongoose.connection.db;
       if (db) {
-        const user = await db.collection("user").findOne({
-          $or: [
-            { id: userId },
-            { _id: new (await import("mongodb")).ObjectId(userId) },
-          ],
-        });
+        // Build query — only attempt ObjectId conversion if valid (UUIDs are NOT valid ObjectIds)
+        const userQuery: Record<string, unknown>[] = [{ id: userId }];
+        const { ObjectId } = await import("mongodb");
+        if (ObjectId.isValid(userId) && String(new ObjectId(userId)) === userId) {
+          userQuery.push({ _id: new ObjectId(userId) });
+        }
+        const user = await db.collection("user").findOne({ $or: userQuery });
 
         if (user?.email) {
           lockout = await AccountLockout.findOne({
@@ -102,12 +103,13 @@ export async function DELETE(
     let userEmail = "";
 
     if (db) {
-      const user = await db.collection("user").findOne({
-        $or: [
-          { id: userId },
-          { _id: new (await import("mongodb")).ObjectId(userId) },
-        ],
-      });
+      // Build query — only attempt ObjectId conversion if valid (UUIDs are NOT valid ObjectIds)
+      const userQuery: Record<string, unknown>[] = [{ id: userId }];
+      const { ObjectId } = await import("mongodb");
+      if (ObjectId.isValid(userId) && String(new ObjectId(userId)) === userId) {
+        userQuery.push({ _id: new ObjectId(userId) });
+      }
+      const user = await db.collection("user").findOne({ $or: userQuery });
       userEmail = user?.email || "";
     }
 

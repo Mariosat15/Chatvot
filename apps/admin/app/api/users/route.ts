@@ -91,11 +91,12 @@ export async function GET(request: NextRequest) {
 
       // Get paginated users
       if (limit === 0) {
-        // Get all (backward compatibility)
+        // Cap at 1000 to prevent full collection scan (was unbounded)
         users = await db
           .collection("user")
           .find(query)
           .sort({ [sortField]: sortOrder })
+          .limit(1000)
           .toArray();
       } else {
         const skip = (page - 1) * limit;
