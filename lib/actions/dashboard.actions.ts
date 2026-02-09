@@ -75,12 +75,12 @@ export const getUserDashboardDataForApi = async (userId: string) => {
               const priceQuote = pricesMap.get(pos.symbol as ForexSymbol);
               if (priceQuote) {
                 const currentPrice =
-                  pos.type === "long" ? priceQuote.bid : priceQuote.ask;
+                  pos.side === "long" ? priceQuote.bid : priceQuote.ask;
                 const unrealizedPnL = calculateUnrealizedPnL(
-                  pos.type,
+                  pos.side,
                   pos.entryPrice,
                   currentPrice,
-                  pos.size,
+                  pos.quantity,
                   pos.symbol as ForexSymbol,
                 );
                 totalUnrealizedPnL += unrealizedPnL;

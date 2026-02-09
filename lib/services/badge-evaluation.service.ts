@@ -213,9 +213,9 @@ export async function evaluateUserBadges(userId: string): Promise<{
 export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Fetch independent data in parallel (all queries depend only on userId)
   const [participations, allPositions, closedTrades, wallet] = await Promise.all([
-    CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt").lean(),
+    CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
     TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(10000).lean(),
-    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol").sort({ closedAt: -1 }).limit(10000).lean(),
+    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume").sort({ closedAt: -1 }).limit(10000).lean(),
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
   ]);
 
