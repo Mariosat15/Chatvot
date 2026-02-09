@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,7 @@ import {
   Save,
   X,
   Shield,
+  ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -218,6 +219,13 @@ export default function BadgeXPManagementSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalFilteredUsers, setTotalFilteredUsers] = useState(0);
+  const PAGE_SIZE = 25;
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedUser, setSelectedUser] = useState<{
     user: { id: string; name: string; email: string; image: string | null };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -249,29 +257,57 @@ export default function BadgeXPManagementSection() {
   });
   const [isClosing, setIsClosing] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Fetch a specific page of users (server-side pagination + search)
+  const fetchData = useCallback(
+    async (page = 1, search = "") => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        });
+        if (search) params.set("search", search);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/badges-xp");
-      const data = await response.json();
+        const response = await fetch(`/api/badges-xp?${params}`);
+        const data = await response.json();
 
-      if (data.success) {
-        setUsers(data.users || []);
-        setStats(data.stats);
-      } else {
-        toast.error("Failed to load badge/XP data");
+        if (data.success) {
+          setUsers(data.users || []);
+          setStats(data.stats);
+          if (data.pagination) {
+            setCurrentPage(data.pagination.page);
+            setTotalPages(data.pagination.totalPages);
+            setTotalFilteredUsers(data.pagination.totalUsers);
+          }
+        } else {
+          toast.error("Failed to load badge/XP data");
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error("Error loading data");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Error loading data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [],
+  );
+
+  // Initial load
+  useEffect(() => {
+    fetchData(1, "");
+  }, [fetchData]);
+
+  // Debounced search: wait 400ms after user stops typing, then fetch page 1
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setCurrentPage(1);
+      fetchData(1, searchTerm);
+    }, 400);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchTerm, fetchData]);
 
   const triggerBadgeEvaluation = async (userId?: string) => {
     try {
@@ -286,7 +322,7 @@ export default function BadgeXPManagementSection() {
 
       if (data.success) {
         toast.success(data.message || "Badge evaluation completed");
-        await fetchData();
+        await fetchData(currentPage, searchTerm);
       } else {
         toast.error(data.error || "Failed to trigger evaluation");
       }
@@ -318,11 +354,8 @@ export default function BadgeXPManagementSection() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Users are now server-side filtered — just use the array directly
+  const filteredUsers = users;
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
@@ -1135,7 +1168,7 @@ export default function BadgeXPManagementSection() {
                 return (
                   <TableRow key={user.userId} className="h-20">
                     <TableCell className="font-bold text-lg text-muted-foreground">
-                      #{index + 1}
+                      #{(currentPage - 1) * PAGE_SIZE + index + 1}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -1241,6 +1274,51 @@ export default function BadgeXPManagementSection() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 px-2">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(currentPage * PAGE_SIZE, totalFilteredUsers)} of{" "}
+              {totalFilteredUsers.toLocaleString()} users
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => {
+                  const prev = currentPage - 1;
+                  setCurrentPage(prev);
+                  fetchData(prev, searchTerm);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+              </Button>
+              <span className="text-sm font-medium px-2">
+                Page {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages || loading}
+                onClick={() => {
+                  const next = currentPage + 1;
+                  setCurrentPage(next);
+                  fetchData(next, searchTerm);
+                }}
+              >
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+        {totalPages <= 1 && totalFilteredUsers > 0 && (
+          <p className="text-sm text-muted-foreground mt-4 px-2">
+            Showing all {totalFilteredUsers.toLocaleString()} users
+          </p>
+        )}
       </div>
 
       {/* Badge Edit/Create Dialog - Full Screen */}

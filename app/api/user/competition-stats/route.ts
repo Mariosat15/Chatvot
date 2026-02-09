@@ -31,25 +31,79 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Get all user's competition participations
-    const allCompetitionParticipations = await CompetitionParticipant.find({
-      userId,
-    })
-      .populate(
-        "competitionId",
-        "name status prizePool entryFee startTime endTime startingCapital",
-      )
-      .lean();
+    // -------------------------------------------------------------------------
+    // PERF FIX: replaced .populate() with manual batch-fetch to avoid N+1.
+    // .populate("competitionId") fires an individual Competition.findOne per
+    // document which, at 40+ participations, amplifies into 40+ round-trips.
+    // Instead we: 1) fetch participations, 2) collect unique IDs, 3) one
+    // $in query for the referenced docs, 4) join in JS via a Map.
+    // -------------------------------------------------------------------------
 
-    // Get all user's challenge participations
-    const allChallengeParticipations = await ChallengeParticipant.find({
-      userId,
-    })
-      .populate(
-        "challengeId",
-        "name status prizePool entryFee startTime endTime startingCapital",
-      )
-      .lean();
+    // 1. Fetch raw participations (no populate)
+    const [rawCompParticipations, rawChalParticipations] = await Promise.all([
+      CompetitionParticipant.find({ userId }).lean(),
+      ChallengeParticipant.find({ userId }).lean(),
+    ]);
+
+    // 2. Collect unique competition / challenge IDs
+    const compIds = [
+      ...new Set(
+        rawCompParticipations
+          .map((p) => p.competitionId?.toString())
+          .filter(Boolean),
+      ),
+    ];
+    const chalIds = [
+      ...new Set(
+        rawChalParticipations
+          .map((p) => (p as any).challengeId?.toString())
+          .filter(Boolean),
+      ),
+    ];
+
+    // 3. Batch-fetch the referenced documents (1 query each, not N)
+    const [competitionDocs, challengeDocs] = await Promise.all([
+      compIds.length > 0
+        ? Competition.find({ _id: { $in: compIds } })
+            .select(
+              "name status prizePool entryFee startTime endTime startingCapital",
+            )
+            .lean()
+        : Promise.resolve([]),
+      chalIds.length > 0
+        ? Challenge.find({ _id: { $in: chalIds } })
+            .select(
+              "name status prizePool entryFee startTime endTime startingCapital",
+            )
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    // 4. Build lookup maps (O(1) per join)
+    const competitionMap = new Map<string, any>();
+    for (const doc of competitionDocs) {
+      competitionMap.set((doc as any)._id.toString(), doc);
+    }
+    const challengeMap = new Map<string, any>();
+    for (const doc of challengeDocs) {
+      challengeMap.set((doc as any)._id.toString(), doc);
+    }
+
+    // 5. Attach the referenced doc to each participation (mirrors .populate())
+    // Cast to any — the rest of this handler already treats fields loosely.
+    const allCompetitionParticipations: any[] = rawCompParticipations.map(
+      (p: any) => ({
+        ...p,
+        competitionId: competitionMap.get(p.competitionId?.toString()) || null,
+      }),
+    );
+    const allChallengeParticipations: any[] = rawChalParticipations.map(
+      (p: any) => ({
+        ...p,
+        challengeId:
+          challengeMap.get(p.challengeId?.toString()) || null,
+      }),
+    );
 
     // Calculate all-time stats (combining competitions + challenges)
     const allTimeStats = {

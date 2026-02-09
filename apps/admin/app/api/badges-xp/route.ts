@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       throw new Error("Database connection not found");
     }
 
-    // If userId provided, get specific user's data
+    // ── Single-user detail view (unchanged) ──────────────────────────────
     if (userId) {
       const [userLevel, userBadges, userDoc] = await Promise.all([
         UserLevel.findOne({ userId }).lean(),
@@ -63,31 +63,97 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all users with badge/XP data
-    const allUserLevels = await UserLevel.find({})
-      .sort({ currentXP: -1 })
-      .lean();
-    const allUsersArray = await db.collection("user").find({}).toArray();
-
-    // Create user map - handle both 'id' and '_id' fields from Better Auth
-    const userMap = new Map(
-      allUsersArray.map((u: any) => {
-        const userId = u.id || u._id?.toString();
-        return [
-          userId,
-          {
-            id: userId,
-            name: u.name,
-            email: u.email,
-            image: u.image || null,
-          },
-        ];
-      }),
+    // ── Paginated user list ──────────────────────────────────────────────
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "25", 10)),
     );
+    const search = (searchParams.get("search") || "").trim();
+    const skip = (page - 1) * limit;
 
-    const usersWithLevels = allUserLevels.map((ul) => {
+    // 1. Compute stats with aggregation (fast — no full scan to JS)
+    const [statsResult] = await UserLevel.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          totalXPAwarded: { $sum: "$currentXP" },
+          totalBadgesAwarded: { $sum: "$totalBadgesEarned" },
+          averageLevel: { $avg: "$currentLevel" },
+        },
+      },
+    ]);
+
+    const stats = statsResult
+      ? {
+          totalUsers: statsResult.totalUsers,
+          totalXPAwarded: statsResult.totalXPAwarded,
+          totalBadgesAwarded: statsResult.totalBadgesAwarded,
+          averageLevel: statsResult.averageLevel,
+        }
+      : { totalUsers: 0, totalXPAwarded: 0, totalBadgesAwarded: 0, averageLevel: 0 };
+
+    // 2. If searching, resolve matching userIds from the user collection first
+    let matchingUserIds: string[] | null = null; // null = no filter
+
+    if (search) {
+      const regex = new RegExp(search, "i");
+      const matchedUsers = await db
+        .collection("user")
+        .find(
+          { $or: [{ name: regex }, { email: regex }] },
+          { projection: { id: 1, _id: 1 } },
+        )
+        .limit(500) // Reasonable cap — search should narrow results
+        .toArray();
+
+      matchingUserIds = matchedUsers.map(
+        (u: any) => u.id || u._id?.toString(),
+      );
+
+      // No matches → return empty page immediately
+      if (matchingUserIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          users: [],
+          stats,
+          pagination: { page, limit, totalUsers: 0, totalPages: 0 },
+        });
+      }
+    }
+
+    // 3. Fetch paginated UserLevel docs (with optional userId filter for search)
+    const levelFilter: Record<string, unknown> = {};
+    if (matchingUserIds) {
+      levelFilter.userId = { $in: matchingUserIds };
+    }
+
+    const [pagedLevels, filteredCount] = await Promise.all([
+      UserLevel.find(levelFilter)
+        .sort({ currentXP: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      UserLevel.countDocuments(levelFilter),
+    ]);
+
+    // 4. Batch-fetch only the users we need (tiny set: ≤ limit)
+    const userIdsInPage = pagedLevels.map((ul) => ul.userId);
+    const userDocs = await db
+      .collection("user")
+      .find({ id: { $in: userIdsInPage } }, { projection: { id: 1, name: 1, email: 1, image: 1 } })
+      .toArray();
+
+    const userMap = new Map<string, any>();
+    for (const u of userDocs) {
+      const uid = u.id || u._id?.toString();
+      userMap.set(uid, { id: uid, name: u.name, email: u.email, image: u.image || null });
+    }
+
+    // 5. Assemble response
+    const usersWithLevels = pagedLevels.map((ul) => {
       const user = userMap.get(ul.userId);
-
       return {
         userId: ul.userId,
         name:
@@ -104,26 +170,17 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`📊 Returning ${usersWithLevels.length} users with levels`);
+    const totalPages = Math.ceil(filteredCount / limit);
 
     return NextResponse.json({
       success: true,
       users: usersWithLevels,
-      stats: {
-        totalUsers: usersWithLevels.length,
-        totalXPAwarded: allUserLevels.reduce(
-          (sum, ul) => sum + ul.currentXP,
-          0,
-        ),
-        totalBadgesAwarded: allUserLevels.reduce(
-          (sum, ul) => sum + ul.totalBadgesEarned,
-          0,
-        ),
-        averageLevel:
-          allUserLevels.length > 0
-            ? allUserLevels.reduce((sum, ul) => sum + ul.currentLevel, 0) /
-              allUserLevels.length
-            : 0,
+      stats,
+      pagination: {
+        page,
+        limit,
+        totalUsers: filteredCount,
+        totalPages,
       },
     });
   } catch (error) {
