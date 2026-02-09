@@ -3,7 +3,6 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import PositionEvent from "@/database/models/position-event.model";
-import crypto from "crypto";
 
 /**
  * SSE Endpoint for Real-Time Position Events
@@ -11,7 +10,14 @@ import crypto from "crypto";
  * Clients subscribe to this endpoint to receive instant notifications
  * when positions are closed (TP/SL), opened, or modified.
  *
- * This replaces polling and provides < 100ms latency updates.
+ * This replaces polling and provides < 2s latency updates.
+ *
+ * Architecture:
+ * - Each SSE connection tracks a cursor (lastCheckedAt timestamp)
+ * - Polls MongoDB with { userId, competitionId, createdAt: { $gt: lastCheckedAt } }
+ * - This query is FULLY COVERED by the compound index {userId, competitionId, createdAt}
+ * - No write operations needed (old approach used $addToSet on every poll)
+ * - Events auto-delete after 60s (TTL), so the collection stays tiny
  *
  * Usage:
  * const eventSource = new EventSource('/api/trading/position-events?competitionId=xxx');
@@ -31,9 +37,6 @@ export async function GET(request: NextRequest) {
       return new Response("Missing competitionId", { status: 400 });
     }
 
-    // Generate unique session ID for this connection using crypto for better randomness
-    const sessionId = `${session.user.id}-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
-
     await connectToDatabase();
 
     // Create SSE stream
@@ -41,10 +44,14 @@ export async function GET(request: NextRequest) {
       async start(controller) {
         const encoder = new TextEncoder();
 
+        // Cursor: track the last event time we've seen
+        // Start from 60s ago to catch any recent events (TTL is 60s so nothing older exists)
+        let lastCheckedAt = new Date(Date.now() - 60_000);
+
         // Send initial connection message
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ type: "connected", sessionId })}\n\n`,
+            `data: ${JSON.stringify({ type: "connected" })}\n\n`,
           ),
         );
 
@@ -58,28 +65,30 @@ export async function GET(request: NextRequest) {
           }
         }, 15000);
 
-        // Poll for new events (every 500ms for near-instant updates)
-        // This is server-side polling of MongoDB, not client polling
+        // Poll for new events using cursor-based approach
+        // Query uses compound index {userId, competitionId, createdAt} — no collection scan
+        // No write operations (old $addToSet approach wrote on every poll)
         const pollInterval = setInterval(async () => {
           try {
             const events = await PositionEvent.find({
               userId: session.user.id,
               competitionId,
-              deliveredTo: { $ne: sessionId },
+              createdAt: { $gt: lastCheckedAt },
             })
               .sort({ createdAt: -1 })
               .limit(10)
               .lean();
 
             if (events.length > 0) {
-              // Mark as delivered
-              await PositionEvent.updateMany(
-                { _id: { $in: events.map((e) => e._id) } },
-                { $addToSet: { deliveredTo: sessionId } },
-              );
+              // Advance cursor to the newest event's timestamp
+              const newestEvent = events[0] as any;
+              if (newestEvent.createdAt > lastCheckedAt) {
+                lastCheckedAt = newestEvent.createdAt;
+              }
 
-              // Send each event
-              for (const event of events as any[]) {
+              // Send each event (oldest first for chronological order)
+              for (let i = events.length - 1; i >= 0; i--) {
+                const event = events[i] as any;
                 const eventData = {
                   type: "position_event",
                   event: {
@@ -103,7 +112,7 @@ export async function GET(request: NextRequest) {
           } catch (error) {
             console.error("[SSE] Error polling events:", error);
           }
-        }, 500); // Check every 500ms
+        }, 1500); // Poll every 1.5s (was 500ms — 3x fewer queries, still fast enough for trade events)
 
         // Cleanup on close
         request.signal.addEventListener("abort", () => {
