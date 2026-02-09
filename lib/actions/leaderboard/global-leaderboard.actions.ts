@@ -116,16 +116,19 @@ export async function getGlobalLeaderboard(
           .select(
             "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
           )
+          .read("secondaryPreferred")
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
         ChallengeParticipant.find({})
           .select(
             "userId pnl startingCapital totalTrades winningTrades losingTrades isWinner",
           )
+          .read("secondaryPreferred")
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
         UserBadge.find({})
           .select("userId badgeId")
+          .read("secondaryPreferred")
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
       ]);

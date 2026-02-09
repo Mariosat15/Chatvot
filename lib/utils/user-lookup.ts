@@ -1,4 +1,5 @@
 import { connectToDatabase } from "@/database/mongoose";
+import { ReadPreference } from "mongodb";
 import { userCache } from "./cache";
 
 export interface UserInfo {
@@ -143,7 +144,10 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       .collection("user")
       .find(
         {},
-        { projection: { id: 1, _id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 } }
+        {
+          projection: { id: 1, _id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 },
+          readPreference: ReadPreference.SECONDARY_PREFERRED,
+        }
       )
       .toArray();
     // #region agent log

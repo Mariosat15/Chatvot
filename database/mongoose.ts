@@ -30,10 +30,9 @@ const connectionOptions: mongoose.ConnectOptions = {
   connectTimeoutMS: 10000, // Connection timeout
   // Performance options
   maxIdleTimeMS: 60000, // Keep connections alive 60s under load
-  // Read preference: offload heavy reads to secondary nodes
-  // M10 has 3 nodes — let secondaries handle read-heavy queries (leaderboard, stats)
-  // Writes still go to primary automatically
-  readPreference: "secondaryPreferred" as mongoose.ConnectOptions["readPreference"],
+  // NOTE: readPreference is NOT set globally because MongoDB transactions
+  // require primary reads. Instead, use .read("secondaryPreferred") on
+  // specific read-heavy queries (leaderboard, stats) that don't use transactions.
   // Retry options for resilience
   retryWrites: true,
   retryReads: true,
