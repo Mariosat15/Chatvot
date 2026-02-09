@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
       tradeHistory: 0,
       competitionParticipants: 0,
       challengeParticipants: 0,
+      userBadges: 0,
+      sessions: 0,
       simulatorRuns: 0,
       simulatorConfigs: 0,
     };
@@ -204,7 +206,22 @@ export async function POST(request: NextRequest) {
     });
     result.competitions = compDeleteResult.deletedCount;
 
-    // 12. Delete simulator users LAST
+    // 12. Delete user badges for sim users (leaderboard reads these!)
+    const badgeDeleteResult = await db.collection("userbadges").deleteMany({
+      userId: { $in: simUserIds },
+    });
+    result.userBadges = badgeDeleteResult.deletedCount;
+
+    // 13. Delete sessions for sim users
+    const sessionDeleteResult = await db.collection("session").deleteMany({
+      $or: [
+        { userId: { $in: simUserIds } },
+        { "user.email": { $regex: /@test\.simulator$/i } },
+      ],
+    });
+    result.sessions = sessionDeleteResult.deletedCount;
+
+    // 14. Delete simulator users LAST
     const userDeleteResult = await db.collection("user").deleteMany({
       $or: [
         { email: { $regex: /@test\.simulator$/i } },
@@ -213,7 +230,7 @@ export async function POST(request: NextRequest) {
     });
     result.users = userDeleteResult.deletedCount;
 
-    // 13. Delete all simulator runs (results/stats)
+    // 15. Delete all simulator runs (results/stats)
     const runsDeleteResult = await db
       .collection("simulatorruns")
       .deleteMany({});
@@ -223,7 +240,7 @@ export async function POST(request: NextRequest) {
     // Configs are reused across simulations
     result.simulatorConfigs = 0;
 
-    // 14. Also try alternative collection names (in case of different casing)
+    // 16. Also try alternative collection names (in case of different casing)
     try {
       await db.collection("transactions").deleteMany({
         $or: [
@@ -236,6 +253,20 @@ export async function POST(request: NextRequest) {
       });
     } catch {
       // Ignore if collections don't exist
+    }
+
+    // 17. Invalidate the leaderboard cache on the main app
+    // The leaderboard has a 5-minute in-memory cache — without this,
+    // deleted users would still appear for up to 5 minutes.
+    try {
+      const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+      });
+    } catch {
+      // Main app might not be running — cache will expire naturally in 5 min
     }
 
     console.log("✅ Global simulation cleanup completed:", result);
@@ -400,6 +431,23 @@ export async function GET() {
           { browser: "SimBrowser" },
           { userId: { $in: simUserIds } },
           { fingerprintId: { $regex: /^sim_fingerprint_/ } },
+        ],
+      });
+
+    // Count user badges for sim users
+    counts.userBadges = await db
+      .collection("userbadges")
+      .countDocuments({
+        userId: { $in: simUserIds },
+      });
+
+    // Count sessions for sim users
+    counts.sessions = await db
+      .collection("session")
+      .countDocuments({
+        $or: [
+          { userId: { $in: simUserIds } },
+          { "user.email": { $regex: /@test\.simulator$/i } },
         ],
       });
 

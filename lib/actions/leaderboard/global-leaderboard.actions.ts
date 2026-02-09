@@ -66,6 +66,14 @@ function isCacheValid(): boolean {
 }
 
 /**
+ * Clear the leaderboard cache.
+ * Called after simulator cleanup or manual data deletion to force a fresh build.
+ */
+export function clearLeaderboardCache(): void {
+  leaderboardCache = null;
+}
+
+/**
  * Get global leaderboard - ranks ALL users (including those without competition/challenge history)
  *
  * OPTIMIZED VERSION:
