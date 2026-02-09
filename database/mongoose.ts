@@ -18,19 +18,22 @@ if (!cached) {
   cached = global.mongooseCache = { conn: null, promise: null };
 }
 
-// Optimized connection options for performance
+// Optimized connection options for M10+ (3-node replica set)
 const connectionOptions: mongoose.ConnectOptions = {
   bufferCommands: false,
-  // Connection pool settings - INCREASED for peak load handling
-  // Rule of thumb: maxPoolSize = expectedConcurrentUsers / 5
-  maxPoolSize: 50, // Increased from 20 for better throughput under load
-  minPoolSize: 10, // Keep more connections warm for faster response
-  // Timeouts - CRITICAL for preventing 30+ second hangs
+  // Connection pool settings
+  maxPoolSize: 50, // M10 supports 1500 connections; 50 per process is safe
+  minPoolSize: 10, // Keep connections warm for faster response
+  // Timeouts
   serverSelectionTimeoutMS: 5000, // Fail fast if can't connect
-  socketTimeoutMS: 10000, // Reduced from 45s to 10s - prevents long hangs
+  socketTimeoutMS: 30000, // 30s — allows leaderboard build to complete without killing socket
   connectTimeoutMS: 10000, // Connection timeout
   // Performance options
-  maxIdleTimeMS: 60000, // Increased to 60s - keep connections alive longer under load
+  maxIdleTimeMS: 60000, // Keep connections alive 60s under load
+  // Read preference: offload heavy reads to secondary nodes
+  // M10 has 3 nodes — let secondaries handle read-heavy queries (leaderboard, stats)
+  // Writes still go to primary automatically
+  readPreference: "secondaryPreferred" as mongoose.ConnectOptions["readPreference"],
   // Retry options for resilience
   retryWrites: true,
   retryReads: true,
@@ -129,13 +132,8 @@ export const connectToDatabase = async () => {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    // Enable profiling before connecting
-    if (
-      process.env.NODE_ENV === "development" ||
-      process.env.ENABLE_QUERY_PROFILING === "true"
-    ) {
-      enableQueryProfiling();
-    }
+    // Enable slow query profiling (always on — logs queries >500ms)
+    enableQueryProfiling();
 
     cached.promise = connectWithRetry(mongoUri);
   }

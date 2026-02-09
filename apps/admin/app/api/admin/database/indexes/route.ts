@@ -7,13 +7,30 @@ import mongoose from "mongoose";
 // Define required indexes for optimal performance
 // COMPREHENSIVE LIST - includes leaderboard, trading, and all critical queries
 // Collection names must match actual DB: "user" = Better Auth, Mongoose defaults = lowercase plural
-const REQUIRED_INDEXES = {
+interface RequiredIndex {
+  keys: Record<string, number>;
+  options: { name: string; unique?: boolean; expireAfterSeconds?: number };
+}
+const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
   // ============================================
-  // USER & AUTH INDEXES
+  // BETTER-AUTH CORE INDEXES (session, user, account)
+  // These are critical — auth.api.getSession() runs on EVERY request
+  // Without these indexes, every request does full collection scans
   // ============================================
-  /** Better Auth collection - used by getAllUsers (leaderboard) and getUserById; critical for scale */
+  /** Session collection - looked up by token on EVERY request via cookie */
+  session: [
+    { keys: { token: 1 }, options: { unique: true, name: "token_1" } }, // CRITICAL: session lookup by cookie
+    { keys: { userId: 1 }, options: { name: "userId_1" } }, // Find sessions by user
+    { keys: { expiresAt: 1 }, options: { expireAfterSeconds: 0, name: "expiresAt_ttl" } }, // Auto-delete expired sessions
+  ],
+  /** Account collection - credentials and OAuth provider data */
+  account: [
+    { keys: { userId: 1 }, options: { name: "userId_1" } }, // Find accounts by user
+    { keys: { providerId: 1, accountId: 1 }, options: { name: "providerId_1_accountId_1" } }, // Provider login lookup
+  ],
+  /** Better Auth user collection - used by auth session lookup, getAllUsers (leaderboard), getUserById */
   user: [
-    { keys: { id: 1 }, options: { name: "id_1" } },
+    { keys: { id: 1 }, options: { name: "id_1" } }, // CRITICAL: auth session resolves user by this field
     { keys: { email: 1 }, options: { unique: true, name: "email_1" } },
     { keys: { role: 1 }, options: { name: "role_1" } },
     { keys: { email: 1, role: 1 }, options: { name: "email_1_role_1" } },
@@ -394,16 +411,16 @@ export async function GET() {
         const indexes: IndexInfo[] = [];
         let existingIndexes: Array<{
           name?: string;
-          key: Record<string, number>;
+          key: Record<string, unknown>;
           unique?: boolean;
           expireAfterSeconds?: number;
         }> = [];
 
         if (collectionExists) {
-          existingIndexes = await db.collection(collectionName).indexes();
+          existingIndexes = (await db.collection(collectionName).indexes()) as typeof existingIndexes;
         }
 
-        const keysToString = (key: Record<string, number>) =>
+        const keysToString = (key: Record<string, unknown>) =>
           JSON.stringify(key);
 
         for (const required of requiredIndexes) {

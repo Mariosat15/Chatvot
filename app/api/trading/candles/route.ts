@@ -92,12 +92,12 @@ async function getMarketDataSettings(): Promise<{
       .findOne({ key: "market_data_settings" });
 
     // Debug: Log raw database values
-    console.log(
+      // // console.log(
       `🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}, useLocalHistory=${settings?.useLocalHistory}`,
     );
 
     if (!settings) {
-      console.log("📋 [Settings] No settings found, using defaults");
+      // // console.log("📋 [Settings] No settings found, using defaults");
       return {
         useLocalHistory: true,
         autoFetchHistory: false,
@@ -143,7 +143,7 @@ async function getMarketDataSettings(): Promise<{
       return `${d}d ${h}h ${m}m`;
     };
 
-    console.log(
+      // // console.log(
       `📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? formatTime(result.chartHistoryLimitMinutesTotal) : "OFF"}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${formatTime(result.seedingMinutesTotal)}`,
     );
 
@@ -230,7 +230,7 @@ async function seedHistoricalCandles(
 ): Promise<void> {
   // Prevent duplicate seeding for same symbol
   if (seedingInProgress.has(symbol)) {
-    console.log(
+      // // console.log(
       `⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`,
     );
     // Wait a bit for the other request to finish
@@ -254,7 +254,7 @@ async function seedHistoricalCandles(
   const daysNeeded = Math.max(1, Math.ceil(seedingMinutes / (24 * 60))); // At least 1 day for API
 
   try {
-    console.log(
+      // // console.log(
       `🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol} (${barsToFetch} bars)...`,
     );
 
@@ -272,13 +272,13 @@ async function seedHistoricalCandles(
       const newestTime = new Date(
         candles[candles.length - 1].time * 1000,
       ).toISOString();
-      console.log(
+      // // console.log(
         `🔍 [Seeding Debug] Massive.com returned ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
       );
     }
 
     if (candles.length === 0) {
-      console.log(
+      // // console.log(
         `⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`,
       );
       return;
@@ -289,7 +289,7 @@ async function seedHistoricalCandles(
     const limitedCandles =
       candles.length > barsToFetch ? candles.slice(-barsToFetch) : candles;
 
-    console.log(
+      // // console.log(
       `📊 [Seeding] Limiting ${candles.length} candles to ${limitedCandles.length} (configured: ${barsToFetch})`,
     );
 
@@ -309,7 +309,7 @@ async function seedHistoricalCandles(
     // Save LIMITED candles to MongoDB
     await Candle1m.bulkUpsertCandles(candlesToSave);
 
-    console.log(
+      // // console.log(
       "✅ [Candles API] Seeded", limitedCandles.length, "candles", "(", formatTime(seedingMinutes), ") for", symbol, "to MongoDB"
     );
   } catch (error) {
@@ -399,7 +399,7 @@ async function autoFillGaps(
 
     (async () => {
       try {
-        console.log(
+      // // console.log(
           `🔧 [Auto Gap Fill] Filling ${gaps.length} gaps for ${symbol}...`,
         );
         let filledCount = 0;
@@ -446,7 +446,7 @@ async function autoFillGaps(
           }
         }
 
-        console.log(
+      // // console.log(
           `✅ [Auto Gap Fill] Completed for ${symbol} - filled ${filledCount} candles`,
         );
         // Notify clients to refresh if we filled any gaps
@@ -483,7 +483,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     // Check if auto gap fill is enabled
     const MarketDataSettings = mongoose.models.MarketDataSettings;
     if (!MarketDataSettings) {
-      console.log(
+      // // console.log(
         `⚠️ [Collection Gap] ${symbol}: MarketDataSettings model not found`,
       );
       return;
@@ -493,13 +493,13 @@ async function fillCollectionGap(symbol: string): Promise<void> {
       key: "market_data_settings",
     });
     if (!settings?.gapFill?.enabled) {
-      console.log(
+      // // console.log(
         `⚠️ [Collection Gap] ${symbol}: Gap fill is DISABLED in admin settings`,
       );
       return;
     }
     if (settings?.gapFill?.mode !== "auto") {
-      console.log(
+      // // console.log(
         `⚠️ [Collection Gap] ${symbol}: Gap fill mode is "${settings?.gapFill?.mode}", not "auto"`,
       );
       return;
@@ -523,7 +523,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
 
     if (!oldest1m || !newestHistorical) {
       // Missing data in one of the collections, can't detect gap
-      console.log(
+      // // console.log(
         `⚠️ [Collection Gap] ${symbol}: Missing data - oldest1m: ${!!oldest1m}, newestHistorical: ${!!newestHistorical}`,
       );
       return;
@@ -535,11 +535,11 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     ); // in seconds
 
     // Log the timestamps for debugging
-    console.log("🔍 [Collection Gap Check]", symbol);
-    console.log(
+      // // console.log("🔍 [Collection Gap Check]", symbol);
+      // // console.log(
       `   candles_1m oldest: ${new Date(oldest1mTime * 1000).toISOString()}`,
     );
-    console.log(
+      // // console.log(
       `   candles_historical_1m newest: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
     );
 
@@ -548,7 +548,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
 
     // If gap is less than 10 minutes, no need to fill
     if (gapMinutes <= 10) {
-      console.log(
+      // // console.log(
         `✅ [Collection Gap] ${symbol}: No significant gap (${gapMinutes} minutes)`,
       );
       return;
@@ -556,19 +556,19 @@ async function fillCollectionGap(symbol: string): Promise<void> {
 
     // If gap is too large (> 7 days = 10080 minutes), don't auto-fill - user should download manually
     if (gapMinutes > 10080) {
-      console.log(
+      // // console.log(
         `⚠️ [Collection Gap] ${symbol}: Gap of ${gapMinutes} minutes (${Math.round(gapMinutes / 1440)} days) is too large. Please download manually from Admin.`,
       );
       return;
     }
 
-    console.log(
+      // // console.log(
       `🔍 [Collection Gap] ${symbol}: Detected ${gapMinutes} minute gap between live and historical data`,
     );
-    console.log(
+      // // console.log(
       `   Historical ends: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
     );
-    console.log(
+      // // console.log(
       `   Live starts: ${new Date(oldest1mTime * 1000).toISOString()}`,
     );
 
@@ -580,7 +580,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
         const gapStartMs = newestHistoricalTime * 1000 + 60000; // Start 1 minute after newest historical
         const gapEndMs = oldest1mTime * 1000 - 60000; // End 1 minute before oldest live
 
-        console.log(
+      // // console.log(
           `🔧 [Collection Gap Fill] ${symbol}: Fetching ${gapMinutes} minutes from Massive.com...`,
         );
 
@@ -592,13 +592,13 @@ async function fillCollectionGap(symbol: string): Promise<void> {
         );
 
         if (gapCandles.length === 0) {
-          console.log(
+      // // console.log(
             `⚠️ [Collection Gap Fill] ${symbol}: No candles available for gap period`,
           );
           return;
         }
 
-        console.log(
+      // // console.log(
           `📥 [Collection Gap Fill] ${symbol}: Got ${gapCandles.length} candles, inserting to historical...`,
         );
 
@@ -633,7 +633,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
           }
         }
 
-        console.log(
+      // // console.log(
           `✅ [Collection Gap Fill] ${symbol}: Inserted ${insertedCount} candles, gap filled!`,
         );
 
@@ -672,7 +672,7 @@ async function handleCandleRequest(
     count ||
     (before ? settings.lazyLoadBatchSize : settings.initialCandleCount);
 
-  console.log(
+      // // console.log(
     `📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || "none"}, limit=${limit}, before=${before || "none"}`,
   );
 
@@ -691,7 +691,7 @@ async function handleCandleRequest(
       (settings.chartHistoryLimitMinutesTotal % (24 * 60)) / 60,
     );
     const m = settings.chartHistoryLimitMinutesTotal % 60;
-    console.log(
+      // // console.log(
       `📊 [Candles] History limit enabled: ${d}d ${h}h ${m}m (since ${historyLimitDate.toISOString()})`,
     );
   }
@@ -709,7 +709,7 @@ async function handleCandleRequest(
         const newestTime = new Date(
           candles[candles.length - 1].time * 1000,
         ).toISOString();
-        console.log(
+      // // console.log(
           `📊 [1m Debug] Got ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
         );
       }
@@ -721,19 +721,19 @@ async function handleCandleRequest(
       }
 
       // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
-      console.log(
+      // // console.log(
         `📊 [1m Lazy] before=${before}, candles_1m.length=${candles.length}, limit=${limit}, useLocalHistory=${settings.useLocalHistory}`,
       );
 
       if (before && candles.length < limit && settings.useLocalHistory) {
         const historicalModel = getHistoricalModel("1m");
-        console.log(
+      // // console.log(
           `📊 [1m Lazy] Checking historical... historicalModel exists: ${!!historicalModel}`,
         );
 
         if (historicalModel) {
           const cutoffDate = new Date(before * 1000);
-          console.log(
+      // // console.log(
             `📊 [1m Lazy] Querying candles_historical_1m before ${cutoffDate.toISOString()}...`,
           );
 
@@ -742,7 +742,7 @@ async function handleCandleRequest(
             limit: limit - candles.length,
           });
 
-          console.log(
+      // // console.log(
             `📊 [1m Lazy] Got ${historicalCandles.length} candles from candles_historical_1m`,
           );
 
@@ -811,7 +811,7 @@ async function handleCandleRequest(
         const d = Math.floor(settings.seedingMinutesTotal / (24 * 60));
         const h = Math.floor((settings.seedingMinutesTotal % (24 * 60)) / 60);
         const m = settings.seedingMinutesTotal % 60;
-        console.log(
+      // // console.log(
           `⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${d}d ${h}h ${m}m)...`,
         );
 
@@ -823,7 +823,7 @@ async function handleCandleRequest(
           settings.seedingMinutesTotal,
         )
           .then(() => {
-            console.log(
+      // // console.log(
               `✅ [Candles API] Background seeding completed for ${symbol}`,
             );
             // Notify all clients viewing this symbol to refresh their data
@@ -878,11 +878,11 @@ async function handleCandleRequest(
 
           if (olderExists) {
             hasMore = true;
-            console.log(
+      // // console.log(
               `📊 [1m hasMore] Found historical data before ${checkBeforeDate.toISOString()}`,
             );
           } else {
-            console.log(
+      // // console.log(
               `📊 [1m hasMore] No historical data before ${checkBeforeDate.toISOString()}`,
             );
           }
@@ -1130,7 +1130,7 @@ async function handleCandleRequest(
           };
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
-            console.log(
+      // // console.log(
               `📥 [${normalizedTf} Lazy] ${symbol}: DB has ${historicalCandles.length}, fetching more from API...`,
             );
             const apiCandles = await getRecentCandles(
@@ -1172,7 +1172,7 @@ async function handleCandleRequest(
               .sort((a, b) => a.time - b.time)
               .slice(-limit);
 
-            console.log(
+      // // console.log(
               `✅ [${normalizedTf} Lazy] ${symbol}: Merged to ${historicalCandles.length} candles`,
             );
           }
@@ -1200,16 +1200,16 @@ async function handleCandleRequest(
             ) {
               const newestDbCandle = dbCandles[dbCandles.length - 1];
               const oldestDbCandle = dbCandles[0];
-              console.log(
+      // // console.log(
                 `🔍 [${normalizedTf} DEBUG] ${symbol}: DB returned ${dbCandles.length} candles`,
               );
-              console.log(
+      // // console.log(
                 `   Query: before ${currentPeriodDate.toISOString()}, limit ${limit - 1}`,
               );
-              console.log(
+      // // console.log(
                 `   Oldest: ${new Date(oldestDbCandle.timestamp).toISOString()}`,
               );
-              console.log(
+      // // console.log(
                 `   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`,
               );
             }
@@ -1231,7 +1231,7 @@ async function handleCandleRequest(
             // Deduplicate after alignment (merges candles that align to same timestamp)
             historicalCandles = deduplicateCandles(rawCandles);
 
-            console.log(
+      // // console.log(
               `⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`,
             );
 
@@ -1240,7 +1240,7 @@ async function handleCandleRequest(
             // This ensures users always see data on higher timeframes
             // =====================================================
             if (historicalCandles.length < 50) {
-              console.log(
+      // // console.log(
                 `⚠️ [${normalizedTf}] ${symbol}: Historical has only ${historicalCandles.length} candles, fetching from API...`,
               );
 
@@ -1263,7 +1263,7 @@ async function handleCandleRequest(
                     massiveTf,
                     limit,
                   );
-                  console.log(
+      // // console.log(
                     `📥 [${normalizedTf}] ${symbol}: API returned ${apiCandles.length} candles`,
                   );
 
@@ -1301,7 +1301,7 @@ async function handleCandleRequest(
                       (a, b) => a.time - b.time,
                     );
 
-                    console.log(
+      // // console.log(
                       `✅ [${normalizedTf}] ${symbol}: Merged to ${historicalCandles.length} candles`,
                     );
 
@@ -1336,7 +1336,7 @@ async function handleCandleRequest(
                           /* ignore duplicates */
                         }
                       }
-                      console.log(
+      // // console.log(
                         `💾 [${normalizedTf}] ${symbol}: Saved ${savedCount} candles to historical collection`,
                       );
                     })();
@@ -1392,18 +1392,18 @@ async function handleCandleRequest(
             low: lastHistorical.close,
             close: lastHistorical.close,
           };
-          console.log(
+      // // console.log(
             `📌 [${normalizedTf}] ${symbol}: Created forming placeholder from last historical close`,
           );
         }
 
         // Log what we're returning (no augmentation, no gap filling from aggregator)
-        console.log(
+      // // console.log(
           `🎯 [${normalizedTf} UNIFIED] ${symbol}: Using WebSocket as single source of truth`,
         );
 
         // Final count log
-        console.log(
+      // // console.log(
           `✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`,
         );
       }
@@ -1442,7 +1442,7 @@ async function handleCandleRequest(
           const gapCandlesCount = Math.floor(
             actualGapSeconds / (gapTfMinutes * 60),
           );
-          console.log(
+      // // console.log(
             `⚠️ [${normalizedTf} Gap] ${symbol}: ${gapCandlesCount} candle gap detected (WebSocket will fill on next completion)`,
           );
         }

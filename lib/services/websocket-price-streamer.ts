@@ -122,7 +122,7 @@ function getGlobalState(): WebSocketGlobalState {
   if (!(globalThis as Record<string, unknown>)[GLOBAL_KEY]) {
     // Only log once per context to reduce spam
     if (!hasLoggedInit) {
-      console.log("🔧 [WebSocket] Initializing WebSocket state");
+      // console.log("🔧 [WebSocket] Initializing WebSocket state");
       hasLoggedInit = true;
     }
     (globalThis as Record<string, unknown>)[GLOBAL_KEY] = {
@@ -267,7 +267,7 @@ async function flushPricesToMongo(): Promise<void> {
     if (Math.random() < 0.1) {
       // Log only occasionally (1% of writes)
       if (Math.random() < 0.01) {
-        console.log(`📦 MongoDB cache: ${updates.length} prices`);
+        // console.log(`📦 MongoDB cache: ${updates.length} prices`);
       }
     }
   } catch (error) {
@@ -416,14 +416,14 @@ export async function initializeWebSocket(): Promise<void> {
   // Check if we already have an active connection
   if (existingWs && existingWs.readyState <= 1) {
     // CONNECTING (0) or OPEN (1)
-    console.log(
+    // console.log(
       `🔄 WebSocket already ${existingWs.readyState === 1 ? "connected" : "connecting"} (ID: ${state.connectionId})`,
     );
     return;
   }
 
   if (state.isConnecting) {
-    console.log(
+    // console.log(
       `🔄 WebSocket connection already in progress (ID: ${state.connectionId})`,
     );
     return;
@@ -454,7 +454,7 @@ async function connectWebSocket(): Promise<void> {
 
   // Generate new connection ID for debugging
   state.connectionId = Math.random().toString(36).substring(7);
-  console.log(
+  // console.log(
     `🔌 Connecting to Massive.com WebSocket... (ID: ${state.connectionId})`,
   );
 
@@ -466,7 +466,7 @@ async function connectWebSocket(): Promise<void> {
     state.ws = newWs;
 
     newWs.on("open", () => {
-      console.log(`✅ WebSocket connected (ID: ${state.connectionId})`);
+      // console.log(`✅ WebSocket connected (ID: ${state.connectionId})`);
       state.isConnecting = false;
       state.reconnectAttempts = 0;
 
@@ -494,7 +494,7 @@ async function connectWebSocket(): Promise<void> {
 
     newWs.on("close", (code: number, reason: Buffer) => {
       const reasonStr = reason.toString() || "No reason";
-      console.log(
+      // console.log(
         `🔌 WebSocket closed: ${code} - ${reasonStr} (ID: ${state.connectionId})`,
       );
 
@@ -546,7 +546,7 @@ function authenticate(): void {
   const ws = state.ws;
   if (!ws || ws.readyState !== 1) return;
 
-  console.log("🔐 Authenticating...");
+  // console.log("🔐 Authenticating...");
 
   // Send auth message
   // Format: {"action":"auth","params":"YOUR_API_KEY"}
@@ -566,7 +566,7 @@ function subscribeToFeeds(): void {
   const ws = state.ws;
   if (!ws || ws.readyState !== 1 || !state.isAuthenticated) return;
 
-  console.log("📊 Subscribing to forex feeds...");
+  // console.log("📊 Subscribing to forex feeds...");
 
   // Subscribe to:
   // - C.* = All forex quotes (bid/ask)
@@ -601,7 +601,7 @@ function handleMessage(data: string): void {
           break;
         case "connected":
           // Initial connection message - now authenticate
-          console.log("📡 Received connected status");
+          // console.log("📡 Received connected status");
           authenticate();
           break;
         case "C":
@@ -622,7 +622,7 @@ function handleMessage(data: string): void {
           break;
         case "auth_success": {
           const state = getState();
-          console.log("✅ Authentication successful");
+          // console.log("✅ Authentication successful");
           state.isAuthenticated = true;
           subscribeToFeeds();
           break;
@@ -637,17 +637,17 @@ function handleMessage(data: string): void {
           const state = getState();
           // Check if it's a status update
           if (msg.status === "auth_success") {
-            console.log("✅ Authentication successful");
+            // console.log("✅ Authentication successful");
             state.isAuthenticated = true;
             subscribeToFeeds();
           } else if (
             msg.status === "success" &&
             msg.message?.includes("subscribed")
           ) {
-            console.log("✅ Subscribed to feeds:", msg.message);
+            // console.log("✅ Subscribed to feeds:", msg.message);
             state.isSubscribed = true;
           } else if (msg.message) {
-            console.log("📨 Server message:", msg.message);
+            // console.log("📨 Server message:", msg.message);
           }
         }
       }
@@ -655,7 +655,7 @@ function handleMessage(data: string): void {
   } catch (error) {
     // Sometimes Massive sends non-JSON status messages
     if (data.includes("connected")) {
-      console.log("📡 Connected to Massive.com");
+      // console.log("📡 Connected to Massive.com");
       authenticate();
     }
   }
@@ -673,17 +673,17 @@ function handleStatusMessage(msg: {
   const status = msg.status || msg.ev;
 
   if (status === "auth_success") {
-    console.log("✅ Authenticated with Massive.com");
+    // console.log("✅ Authenticated with Massive.com");
     state.isAuthenticated = true;
     subscribeToFeeds();
   } else if (status === "auth_failed") {
     console.error("❌ Auth failed:", msg.message);
     state.ws?.close();
   } else if (status === "connected") {
-    console.log("📡 Connected, authenticating...");
+    // console.log("📡 Connected, authenticating...");
     authenticate();
   } else if (msg.message?.includes("subscribed")) {
-    console.log("✅ Subscription confirmed");
+    // console.log("✅ Subscription confirmed");
     state.isSubscribed = true;
   }
 }
@@ -1135,7 +1135,7 @@ async function saveCompletedCandleToMongoDB(
 
     // Log only EUR/USD as sample (not all 33 symbols)
     if (candle.symbol === "EUR/USD") {
-      console.log(
+      // console.log(
         `💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`,
       );
     }
@@ -1227,7 +1227,7 @@ async function saveCompletedHigherTimeframeCandle(
         }
 
         if (candle.symbol === "EUR/USD") {
-          console.log(
+          // console.log(
             `🔄 [${timeframe}] Augmented with ${candles1m.length} 1m candles | O:${candle.open.toFixed(5)}→${finalOpen.toFixed(5)} H:${candle.high.toFixed(5)}→${finalHigh.toFixed(5)} L:${candle.low.toFixed(5)}→${finalLow.toFixed(5)}`,
           );
         }
@@ -1278,7 +1278,7 @@ async function saveCompletedHigherTimeframeCandle(
 
     // Log only EUR/USD as sample (to avoid log spam)
     if (candle.symbol === "EUR/USD") {
-      console.log(
+      // console.log(
         `💾 [${timeframe}] Completed candle saved & queued for broadcast: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`,
       );
     }
@@ -1478,7 +1478,7 @@ async function saveCandleToMongoDB(
         if (!dbConnected) {
           await connectToDatabase();
           dbConnected = true;
-          console.log("🔌 [Candle DB] Connected to MongoDB for candle storage");
+          // console.log("🔌 [Candle DB] Connected to MongoDB for candle storage");
         }
 
         // Bulk upsert all queued candles
@@ -1497,7 +1497,7 @@ async function saveCandleToMongoDB(
         // Log occasionally (not every batch to reduce noise)
         if (Math.random() < 0.1) {
           // 10% of the time
-          console.log(
+          // console.log(
             `🕯️ [Candle DB] Saved ${candlesToSave.length} candles to MongoDB`,
           );
         }
@@ -1596,7 +1596,7 @@ function scheduleReconnect(): void {
   const delay =
     RECONNECT_BASE_DELAY_MS * Math.pow(1.5, state.reconnectAttempts - 1);
 
-  console.log(
+  // console.log(
     `🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
   );
 
@@ -1743,7 +1743,7 @@ export function closeWebSocket(): void {
   }
 
   cleanup();
-  console.log("🔌 WebSocket closed");
+  // console.log("🔌 WebSocket closed");
 }
 
 /**
@@ -1951,7 +1951,7 @@ export async function broadcastDataUpdated(
         reason,
       }),
     });
-    console.log(
+    // console.log(
       `🔄 [Broadcast] Data updated: ${symbol} ${timeframe} (${reason})`,
     );
   } catch (error) {
@@ -1977,7 +1977,7 @@ function isWorkerProcess(): boolean {
   // PM2 sets this in ecosystem.config.js: IS_WORKER: 'true'
   const isWorkerEnv = process.env.IS_WORKER === "true";
   if (isWorkerEnv) {
-    console.log("✅ [WEBSOCKET] IS_WORKER=true detected from environment");
+    // console.log("✅ [WEBSOCKET] IS_WORKER=true detected from environment");
     return true;
   }
 
@@ -1989,7 +1989,7 @@ function isWorkerProcess(): boolean {
     args.includes("dist/worker") ||
     args.includes("dist\\worker")
   ) {
-    console.log(
+    // console.log(
       "✅ [WEBSOCKET] Worker detected from process.argv:",
       args.substring(0, 100),
     );
@@ -1998,13 +1998,13 @@ function isWorkerProcess(): boolean {
 
   // Check 3: npm_lifecycle_event (if running via npm run worker)
   if (process.env.npm_lifecycle_event === "worker") {
-    console.log("✅ [WEBSOCKET] Worker detected from npm_lifecycle_event");
+    // console.log("✅ [WEBSOCKET] Worker detected from npm_lifecycle_event");
     return true;
   }
 
   // Debug: Log what we found (only on first check)
   if (!hasLoggedInit) {
-    console.log(
+    // console.log(
       "ℹ️ [WEBSOCKET] Worker detection: IS_WORKER=" +
         process.env.IS_WORKER +
         ", argv=" +
@@ -2111,7 +2111,7 @@ async function checkAndUpdateBroadcastInterval(): Promise<void> {
   const newInterval = await loadBroadcastInterval();
 
   if (newInterval !== currentBroadcastIntervalMs) {
-    console.log(
+    // console.log(
       `📡 [Broadcast] Interval changed: ${currentBroadcastIntervalMs}ms → ${newInterval}ms`,
     );
     currentBroadcastIntervalMs = newInterval;
@@ -2296,7 +2296,7 @@ async function broadcastFormingCandles(): Promise<void> {
     // Clear the completed candles queue after successful broadcast
     if (response.ok) {
       if (state.completedCandlesToBroadcast.length > 0) {
-        console.log(
+        // console.log(
           `📤 [Broadcast] Sent ${state.completedCandlesToBroadcast.length} completed candles`,
         );
       }
@@ -2329,7 +2329,7 @@ async function startBroadcastTimer(): Promise<void> {
     broadcastFormingCandles,
     currentBroadcastIntervalMs,
   );
-  console.log(
+  // console.log(
     `📡 [Broadcast] Started broadcasting forming candles every ${currentBroadcastIntervalMs}ms`,
   );
 }
@@ -2338,7 +2338,7 @@ function stopBroadcastTimer(): void {
   if (broadcastTimer) {
     clearInterval(broadcastTimer);
     broadcastTimer = null;
-    console.log("📡 [Broadcast] Stopped broadcasting");
+    // console.log("📡 [Broadcast] Stopped broadcasting");
   }
 }
 
@@ -2355,7 +2355,7 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
     // Get symbols from FOREX_PAIRS
     const symbols = Object.keys(FOREX_PAIRS);
 
-    console.log(
+    // console.log(
       `🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`,
     );
 
@@ -2380,7 +2380,7 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
       }
     }
 
-    console.log(
+    // console.log(
       `✅ [Buffer Seed] Seeded ${state.completedCandlesBuffer.size} symbols with completed candles`,
     );
   } catch (error) {
@@ -2406,7 +2406,7 @@ async function seedHigherTimeframeCaches(): Promise<void> {
     const now = Date.now();
     const currentTime = Math.floor(now / 1000);
 
-    console.log(
+    // console.log(
       `🌱 [HT Seed] Seeding higher timeframe caches for ${symbols.length} symbols...`,
     );
 
@@ -2521,7 +2521,7 @@ async function seedHigherTimeframeCaches(): Promise<void> {
       }
     }
 
-    console.log(
+    // console.log(
       `✅ [HT Seed] Seeded: 5m=${state.formingCandles5m.size}, 15m=${state.formingCandles15m.size}, 30m=${state.formingCandles30m.size}, 1h=${state.formingCandles1h.size}, 4h=${state.formingCandles4h.size}, D=${state.formingCandlesD.size}, W=${state.formingCandlesW.size}, M=${state.formingCandlesM.size}`,
     );
   } catch (error) {
@@ -2537,7 +2537,7 @@ async function autoInitialize(): Promise<void> {
 
   // Use global state to prevent re-initialization across HMR
   if (state.initialized) {
-    console.log(
+    // console.log(
       `ℹ️ [AUTO-INIT] Already initialized (ID: ${state.connectionId})`,
     );
     return;
@@ -2551,20 +2551,20 @@ async function autoInitialize(): Promise<void> {
   // Worker and ADMIN use MongoDB cache for prices (written by WEB)
   // This prevents the "1 connection per asset class" conflict with Massive.com
   if (isWorkerProcess()) {
-    console.log("ℹ️ [WEBSOCKET] Worker detected - skipping WebSocket init");
-    console.log(
+    // console.log("ℹ️ [WEBSOCKET] Worker detected - skipping WebSocket init");
+    // console.log(
       "   Worker will read prices from MongoDB cache (written by WEB app)",
     );
     return;
   }
 
   if (isAdminProcess()) {
-    console.log("ℹ️ [WEBSOCKET] Admin app detected - skipping WebSocket init");
-    console.log("   Admin will read WebSocket status from WEB app via API");
+    // console.log("ℹ️ [WEBSOCKET] Admin app detected - skipping WebSocket init");
+    // console.log("   Admin will read WebSocket status from WEB app via API");
     return;
   }
 
-  console.log(
+  // console.log(
     "🚀 [AUTO-INIT] Starting WebSocket and TP/SL cache initialization...",
   );
 
@@ -2585,7 +2585,7 @@ async function autoInitialize(): Promise<void> {
     try {
       const { priceSnapshotService } = await import("./price-snapshot.service");
       priceSnapshotService.start();
-      console.log("📸 [AUTO-INIT] Price snapshot service started");
+      // console.log("📸 [AUTO-INIT] Price snapshot service started");
     } catch (snapshotError) {
       console.error(
         "⚠️ [AUTO-INIT] Failed to start price snapshot service:",
@@ -2593,7 +2593,7 @@ async function autoInitialize(): Promise<void> {
       );
     }
 
-    console.log(
+    // console.log(
       "✅ [AUTO-INIT] WebSocket, TP/SL cache, snapshots, and broadcast ready",
     );
   } catch (error) {
