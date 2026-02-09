@@ -22,8 +22,8 @@ if (!cached) {
 const connectionOptions: mongoose.ConnectOptions = {
   bufferCommands: false,
   // Connection pool settings
-  maxPoolSize: 50, // M10 supports 1500 connections; 50 per process is safe
-  minPoolSize: 10, // Keep connections warm for faster response
+  maxPoolSize: 10, // Reduced from 50 — M2 shared tier doesn't need large pools
+  minPoolSize: 2, // Reduced from 10 — keep 2 warm connections per process
   // Timeouts
   serverSelectionTimeoutMS: 5000, // Fail fast if can't connect
   socketTimeoutMS: 30000, // 30s — allows leaderboard build to complete without killing socket

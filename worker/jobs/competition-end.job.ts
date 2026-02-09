@@ -38,14 +38,14 @@ export async function runCompetitionEndCheck(): Promise<CompetitionEndResult> {
 
     const competitionsCollection = db.collection("competitions");
 
+    // Early exit: skip all work if no active competitions exist
+    const activeCount = await competitionsCollection.countDocuments({ status: "active" });
+    if (activeCount === 0) {
+      return result;
+    }
+
     // Find all active competitions that should have ended
     const now = new Date();
-
-    // Debug: Check what competitions exist
-    const allActiveCompetitions = await competitionsCollection
-      .find({ status: "active" })
-      .toArray();
-    // Active competitions are checked silently
 
     const expiredCompetitions = await competitionsCollection
       .find({

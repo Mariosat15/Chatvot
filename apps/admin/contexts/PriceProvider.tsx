@@ -10,7 +10,6 @@ import React, {
   useRef,
 } from "react";
 import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
-import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 // Disable debug logging in production
 const DEBUG = false;
@@ -79,8 +78,9 @@ interface PriceState {
 
 const PriceContext = createContext<PriceContextValue | undefined>(undefined);
 
-// Polling interval - 2000ms reduces CPU load significantly while still being responsive
-const POLLING_INTERVAL = PERFORMANCE_INTERVALS.PRICE_POLLING;
+// Admin polling interval - 5s is sufficient for a monitoring dashboard
+// User-facing app still uses PERFORMANCE_INTERVALS.PRICE_POLLING (2s) for live trading
+const POLLING_INTERVAL = 5000;
 
 export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   // Combined state to batch all updates into single re-render

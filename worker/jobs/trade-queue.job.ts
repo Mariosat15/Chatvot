@@ -82,6 +82,21 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
   try {
     await connectToDatabase();
 
+    // Early exit: skip all work if no pending orders and no open positions with TP/SL
+    const [pendingCount, tpSlCount] = await Promise.all([
+      TradingOrder.countDocuments({ status: "pending", orderType: { $in: ["limit", "stop"] } }),
+      TradingPosition.countDocuments({
+        status: "open",
+        $or: [
+          { takeProfit: { $exists: true, $ne: null } },
+          { stopLoss: { $exists: true, $ne: null } },
+        ],
+      }),
+    ]);
+    if (pendingCount === 0 && tpSlCount === 0) {
+      return result;
+    }
+
     // ========== PART 1: Process Pending Limit Orders ==========
     const pendingOrders = await TradingOrder.find({
       status: "pending",

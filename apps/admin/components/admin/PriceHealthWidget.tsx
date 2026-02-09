@@ -88,8 +88,8 @@ export default function PriceHealthWidget() {
   useEffect(() => {
     fetchHealth();
 
-    // Poll every 10 seconds
-    const interval = setInterval(fetchHealth, 10000);
+    // Poll every 30 seconds — health status doesn't change rapidly
+    const interval = setInterval(fetchHealth, 30000);
     return () => clearInterval(interval);
   }, [fetchHealth]);
 

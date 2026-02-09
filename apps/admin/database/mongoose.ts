@@ -21,7 +21,11 @@ export const connectToDatabase = async () => {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, { bufferCommands: false });
+    cached.promise = mongoose.connect(MONGODB_URI, {
+      bufferCommands: false,
+      maxPoolSize: 10, // Admin panel doesn't need large pool — 10 is plenty
+      minPoolSize: 2,
+    });
   }
 
   try {

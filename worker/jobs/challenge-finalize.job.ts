@@ -44,6 +44,15 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
 
     const challengesCollection = db.collection("challenges");
     const walletsCollection = db.collection("creditwallets");
+
+    // Early exit: skip all work if no pending or active challenges exist
+    const relevantCount = await challengesCollection.countDocuments({
+      status: { $in: ["pending", "active"] },
+    });
+    if (relevantCount === 0) {
+      return result;
+    }
+
     const now = new Date();
 
     // ============================================

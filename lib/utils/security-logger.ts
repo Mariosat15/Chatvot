@@ -3,10 +3,52 @@
  *
  * Logs all security-relevant API requests for auditing
  * Automatically sanitizes sensitive data before logging
+ *
+ * Uses a write buffer to batch successful request logs (flushed every 30s)
+ * to reduce individual MongoDB write operations. Failed/rate-limited requests
+ * are still logged immediately for real-time suspicious activity detection.
  */
 
 import { NextRequest } from "next/server";
 import { getClientIP } from "./rate-limiter";
+
+// =============================================================================
+// WRITE BUFFER — batches successful log entries, flushes every 30 seconds
+// =============================================================================
+const LOG_BUFFER: Record<string, unknown>[] = [];
+const FLUSH_INTERVAL_MS = 30_000; // 30 seconds
+let flushTimer: ReturnType<typeof setInterval> | null = null;
+
+async function flushLogBuffer(): Promise<void> {
+  if (LOG_BUFFER.length === 0) return;
+
+  // Drain the buffer
+  const entries = LOG_BUFFER.splice(0, LOG_BUFFER.length);
+
+  try {
+    const { connectToDatabase } = await import("@/database/mongoose");
+    const SecurityLog = (await import("@/database/models/security-log.model"))
+      .default;
+    await connectToDatabase();
+
+    // Bulk insert all buffered entries (none are suspicious — those are logged immediately)
+    await SecurityLog.insertMany(entries, { ordered: false });
+  } catch (error) {
+    console.error(`Failed to flush ${entries.length} security log entries:`, error);
+    // Don't re-queue — these are informational logs, not critical data
+  }
+}
+
+function ensureFlushTimer(): void {
+  if (flushTimer) return;
+  flushTimer = setInterval(() => {
+    flushLogBuffer().catch(console.error);
+  }, FLUSH_INTERVAL_MS);
+  // Allow the process to exit without waiting for this timer
+  if (flushTimer && typeof flushTimer === "object" && "unref" in flushTimer) {
+    flushTimer.unref();
+  }
+}
 
 // Fields to never log (sensitive data)
 const SENSITIVE_FIELDS = [
@@ -128,13 +170,6 @@ export async function logSecurityRequest(
   params: LogRequestParams,
 ): Promise<void> {
   try {
-    // Dynamic import to avoid issues with server components
-    const { connectToDatabase } = await import("@/database/mongoose");
-    const SecurityLog = (await import("@/database/models/security-log.model"))
-      .default;
-
-    await connectToDatabase();
-
     const endpoint = new URL(params.request.url).pathname;
     const method = params.request.method as
       | "GET"
@@ -159,7 +194,7 @@ export async function logSecurityRequest(
       }
     });
 
-    await SecurityLog.logRequest({
+    const logData = {
       userId: params.userId,
       userEmail: params.userEmail,
       ipAddress,
@@ -176,7 +211,28 @@ export async function logSecurityRequest(
       errorMessage: params.errorMessage,
       rateLimitRemaining: params.rateLimitRemaining,
       rateLimitExceeded: params.rateLimitExceeded || false,
-    });
+    };
+
+    // Failed or rate-limited requests are logged IMMEDIATELY for suspicious activity detection
+    const needsImmediateLog =
+      !params.success || params.rateLimitExceeded || (params.statusCode >= 400);
+
+    if (needsImmediateLog) {
+      // Use full SecurityLog.logRequest which includes suspicious activity checks
+      const { connectToDatabase } = await import("@/database/mongoose");
+      const SecurityLog = (await import("@/database/models/security-log.model"))
+        .default;
+      await connectToDatabase();
+      await SecurityLog.logRequest(logData);
+    } else {
+      // Buffer successful requests — flushed every 30 seconds via insertMany
+      LOG_BUFFER.push({
+        ...logData,
+        suspicious: false,
+        createdAt: new Date(),
+      });
+      ensureFlushTimer();
+    }
   } catch (error) {
     // Don't fail the request if logging fails
     console.error("Failed to log security request:", error);

@@ -826,8 +826,8 @@ export default function AdminDashboard({
     // Check immediately on mount
     checkSession();
 
-    // Then check every 10 seconds
-    const sessionCheckInterval = setInterval(checkSession, 10000);
+    // Then check every 30 seconds — session won't expire in 10s, forced logout still takes effect within 30s
+    const sessionCheckInterval = setInterval(checkSession, 30000);
 
     return () => clearInterval(sessionCheckInterval);
   }, [router]);

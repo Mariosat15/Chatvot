@@ -39,6 +39,15 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
       "challengeparticipants",
     );
 
+    // Early exit: skip all work if no active competitions or challenges exist
+    const [activeCompCount, activeChallengeCount] = await Promise.all([
+      competitionsCollection.countDocuments({ status: "active" }),
+      challengesCollection.countDocuments({ status: "active" }),
+    ]);
+    if (activeCompCount === 0 && activeChallengeCount === 0) {
+      return result;
+    }
+
     const now = new Date();
 
     // ============================================
