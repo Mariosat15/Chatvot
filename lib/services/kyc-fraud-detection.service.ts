@@ -193,11 +193,20 @@ export async function checkForDuplicateKYC(
   // Found duplicates!
   result.isDuplicate = true;
 
+  // Batch-fetch wallets for all duplicate users (avoid N+1)
+  const duplicateUserIds = [
+    ...new Set(duplicateSessions.map((s) => s.userId)),
+  ];
+  const wallets = await CreditWallet.find({
+    userId: { $in: duplicateUserIds },
+  }).lean();
+  const walletByUserId = new Map(
+    wallets.map((w: any) => [String(w.userId), w]),
+  );
+
   // Enrich with user details
   for (const session of duplicateSessions) {
-    const _wallet = await CreditWallet.findOne({
-      userId: session.userId,
-    }).lean();
+    const _wallet = walletByUserId.get(String(session.userId)) || null;
 
     result.duplicateAccounts.push({
       userId: session.userId,

@@ -37,7 +37,7 @@ async function getMarketSettings(): Promise<IMarketSettings | null> {
 
   try {
     await connectToDatabase();
-    let settings = await MarketSettings.findOne();
+    let settings = await MarketSettings.findOne().lean();
     if (!settings) {
       settings = await MarketSettings.create({});
     }

@@ -29,14 +29,23 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Collect all milestones per map
+    // Collect all milestones across all maps in a single query
+    const allMapIds = (maps as any[]).map((m) => m.mapId);
+    const allMilestones = await JourneyMilestone.find({
+      mapId: { $in: allMapIds },
+      isActive: true,
+    })
+      .sort({ order: 1 })
+      .lean();
+
     const mapMilestones: Record<string, any[]> = {};
-    for (const map of maps as any[]) {
-      const milestones = await JourneyMilestone.find({ 
-        mapId: map.mapId, 
-        isActive: true 
-      }).sort({ order: 1 }).lean();
-      mapMilestones[map.mapId] = milestones;
+    for (const mapId of allMapIds) {
+      mapMilestones[mapId] = [];
+    }
+    for (const milestone of allMilestones as any[]) {
+      if (mapMilestones[milestone.mapId]) {
+        mapMilestones[milestone.mapId].push(milestone);
+      }
     }
 
     // Get first milestone for defaults
@@ -191,7 +200,14 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
   };
 
   try {
-    const wallet = await CreditWallet.findOne({ userId }).lean() as any;
+    // Run all independent queries in parallel
+    const [wallet, deposits, trades, participants] = await Promise.all([
+      CreditWallet.findOne({ userId }).lean() as Promise<any>,
+      WalletTransaction.find({ userId, type: "deposit", status: "completed" }).lean(),
+      TradeHistory.find({ userId }).lean() as Promise<any[]>,
+      CompetitionParticipant.find({ userId }).lean() as Promise<any[]>,
+    ]);
+
     if (wallet) {
       stats.kyc_verified = wallet.kycVerified === true || wallet.kycStatus === "approved";
       stats.first_deposit = (wallet.totalDeposited || 0) > 0;
@@ -199,13 +215,11 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
       stats.first_withdrawal = (wallet.totalWithdrawn || 0) > 0;
     }
 
-    const deposits = await WalletTransaction.find({ userId, type: "deposit", status: "completed" }).lean();
     if (deposits.length > 0) {
       stats.first_deposit = true;
       stats.has_deposit = true;
     }
 
-    const trades = await TradeHistory.find({ userId }).lean() as any[];
     stats.total_trades = trades.length;
     stats.first_trade = trades.length > 0;
     
@@ -245,7 +259,6 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
     stats.always_uses_tp = tradesWithTP.length;
 
     // Competitions
-    const participants = await CompetitionParticipant.find({ userId }).lean() as any[];
     stats.competitions_entered = participants.length;
     stats.competitions_completed = participants.filter(p => 
       p.status === "completed" || p.finalRank !== undefined || p.rank !== undefined

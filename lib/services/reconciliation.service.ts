@@ -184,31 +184,36 @@ export async function verifyUserWallet(
     return { issues: [], transactionCount: 0, balanceDifference: 0 };
   }
 
-  // Get all completed transactions
-  const completedTransactions = await WalletTransaction.find({
-    userId,
-    status: "completed",
-  }).lean();
-
-  // Get pending transactions (withdrawals that have already deducted credits)
-  const pendingWithdrawalTx = await WalletTransaction.find({
-    userId,
-    transactionType: "withdrawal",
-    status: { $in: ["pending", "processing"] },
-  }).lean();
-
-  // Get pending deposits (not yet credited)
-  const pendingDepositTx = await WalletTransaction.find({
-    userId,
-    transactionType: "deposit",
-    status: "pending",
-  }).lean();
-
-  // Get pending withdrawal requests (credits already deducted from wallet)
-  const pendingWithdrawalRequests = await WithdrawalRequest.find({
-    userId,
-    status: { $in: ["pending", "approved", "processing"] },
-  }).lean();
+  // Fetch all independent transaction queries in parallel
+  const [completedTransactions, pendingWithdrawalTx, pendingDepositTx, pendingWithdrawalRequests, completedWithdrawals] = await Promise.all([
+    // All completed transactions
+    WalletTransaction.find({
+      userId,
+      status: "completed",
+    }).lean(),
+    // Pending withdrawals (already deducted credits)
+    WalletTransaction.find({
+      userId,
+      transactionType: "withdrawal",
+      status: { $in: ["pending", "processing"] },
+    }).lean(),
+    // Pending deposits (not yet credited)
+    WalletTransaction.find({
+      userId,
+      transactionType: "deposit",
+      status: "pending",
+    }).lean(),
+    // Pending withdrawal requests (credits already deducted from wallet)
+    WithdrawalRequest.find({
+      userId,
+      status: { $in: ["pending", "approved", "processing"] },
+    }).lean(),
+    // Completed withdrawal requests (for withdrawal total check)
+    WithdrawalRequest.find({
+      userId,
+      status: "completed",
+    }).lean(),
+  ]);
 
   // Calculate balance from completed transactions
   const completedBalance = completedTransactions.reduce(
@@ -295,11 +300,7 @@ export async function verifyUserWallet(
     });
   }
 
-  // Calculate withdrawal total from completed withdrawal requests
-  const completedWithdrawals = await WithdrawalRequest.find({
-    userId,
-    status: "completed",
-  }).lean();
+  // Calculate withdrawal total from completed withdrawal requests (fetched in parallel above)
   const calculatedWithdrawals = completedWithdrawals.reduce(
     (sum, w) => sum + (w.amountCredits || 0),
     0,

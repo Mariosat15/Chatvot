@@ -563,29 +563,36 @@ export async function getPendingWithdrawalsForAdmin(): Promise<any[]> {
     .sort({ requestedAt: -1 })
     .lean();
 
-  // Fetch bank details for each withdrawal
-  const withdrawalsWithBankDetails = await Promise.all(
-    withdrawals.map(async (withdrawal) => {
-      const bankAccount = await UserBankAccount.findOne({
-        userId: withdrawal.userId,
-        isDefault: true,
-        isActive: true,
-      }).lean();
-
-      return {
-        ...withdrawal,
-        fullBankDetails: bankAccount
-          ? {
-              accountHolderName: bankAccount.accountHolderName,
-              iban: bankAccount.iban,
-              bankName: bankAccount.bankName,
-              swiftBic: bankAccount.swiftBic,
-              country: bankAccount.country,
-            }
-          : null,
-      };
-    }),
+  // Batch-fetch default active bank accounts for all users (avoid N+1)
+  const withdrawalUserIds = [
+    ...new Set(withdrawals.map((w: any) => String(w.userId))),
+  ];
+  const bankAccounts = await UserBankAccount.find({
+    userId: { $in: withdrawalUserIds },
+    isDefault: true,
+    isActive: true,
+  }).lean();
+  const bankAccountByUserId = new Map(
+    bankAccounts.map((ba: any) => [String(ba.userId), ba]),
   );
+
+  const withdrawalsWithBankDetails = withdrawals.map((withdrawal) => {
+    const bankAccount =
+      bankAccountByUserId.get(String(withdrawal.userId)) || null;
+
+    return {
+      ...withdrawal,
+      fullBankDetails: bankAccount
+        ? {
+            accountHolderName: bankAccount.accountHolderName,
+            iban: bankAccount.iban,
+            bankName: bankAccount.bankName,
+            swiftBic: bankAccount.swiftBic,
+            country: bankAccount.country,
+          }
+        : null,
+    };
+  });
 
   return withdrawalsWithBankDetails;
 }

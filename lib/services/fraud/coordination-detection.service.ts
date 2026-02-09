@@ -28,6 +28,28 @@ export class CoordinationDetectionService {
   // Minimum accounts for coordinated entry alert
   private static readonly MIN_COORDINATED_ACCOUNTS = 2;
 
+  // Concurrency limit for parallel score updates
+  private static readonly SCORE_UPDATE_CONCURRENCY = 10;
+
+  /**
+   * Run async operations with a concurrency limit (batched Promise.all).
+   * Processes items in batches of `concurrencyLimit`, awaiting each batch
+   * before starting the next.
+   */
+  private static async runWithConcurrency<T, R>(
+    items: T[],
+    fn: (item: T) => Promise<R>,
+    concurrencyLimit: number = this.SCORE_UPDATE_CONCURRENCY,
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += concurrencyLimit) {
+      const batch = items.slice(i, i + concurrencyLimit);
+      const batchResults = await Promise.all(batch.map(fn));
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
   /**
    * Detect coordinated competition entries
    */
@@ -119,17 +141,17 @@ export class CoordinationDetectionService {
     console.log(`   Time span: ${timeSpan}s`);
     console.log(`   Severity: ${severity}`);
 
-    // Update suspicion scores (+25 for coordinated entry)
-    for (const userId of involvedUsers) {
-      await SuspicionScoringService.updateScore(userId, {
+    // Update suspicion scores (+25 for coordinated entry) - parallel with concurrency limit
+    await this.runWithConcurrency(involvedUsers, (userId) =>
+      SuspicionScoringService.updateScore(userId, {
         method: "coordinatedEntry",
         percentage: 25,
         evidence: `Coordinated competition entry with ${involvedUsers.length - 1} other accounts (${Math.round(averageGap)}s avg gap)`,
         linkedUserIds: involvedUsers.filter((id) => id !== userId),
         confidence:
           severity === "high" ? 0.9 : severity === "medium" ? 0.75 : 0.6,
-      });
-    }
+      }),
+    );
 
     // Create fraud alert - PER COMPETITION (allows separate alerts for each competition)
     await AlertManagerService.createOrUpdateAlert({
@@ -289,17 +311,17 @@ export class CoordinationDetectionService {
       });
     }
 
-    // Update suspicion scores for rapid creation
+    // Update suspicion scores for rapid creation - parallel with concurrency limit
     for (const group of groups) {
-      for (const userId of group.userIds) {
-        await SuspicionScoringService.updateScore(userId, {
+      await this.runWithConcurrency(group.userIds, (userId) =>
+        SuspicionScoringService.updateScore(userId, {
           method: "rapidCreation",
           percentage: 20,
           evidence: `Account created within ${Math.round(group.timeSpan)}s of ${group.userIds.length - 1} other accounts`,
           linkedUserIds: group.userIds.filter((id) => id !== userId),
           confidence: 0.7,
-        });
-      }
+        }),
+      );
 
       // Create fraud alert
       await AlertManagerService.createOrUpdateAlert({

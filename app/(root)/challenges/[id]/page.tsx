@@ -64,7 +64,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     await connectToDatabase();
 
     // Fetch challenge with potential auto-finalization
-    let challenge = await Challenge.findById(id);
+    let challenge = await Challenge.findById(id).lean();
 
     if (!challenge) {
       notFound();
@@ -89,17 +89,17 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
         const { finalizeChallenge } =
           await import("@/lib/actions/trading/challenge-finalize.actions");
         await finalizeChallenge(id);
-        challenge = await Challenge.findById(id);
+        challenge = await Challenge.findById(id).lean();
       } catch (error) {
         console.error(`Failed to auto-finalize challenge ${id}:`, error);
       }
     }
 
-    // Get participants
-    const _participants = await ChallengeParticipant.find({
-      challengeId: id,
-    }).lean();
-    const _riskSettings = await getTradingRiskSettings();
+    // Get participants and risk settings in parallel (both independent after challenge validation)
+    const [_participants, _riskSettings] = await Promise.all([
+      ChallengeParticipant.find({ challengeId: id }).lean(),
+      getTradingRiskSettings(),
+    ]);
 
     const isChallenger = challenge.challengerId === session.user.id;
     const isChallenged = challenge.challengedId === session.user.id;

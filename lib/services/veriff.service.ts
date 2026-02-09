@@ -56,14 +56,14 @@ interface VeriffDecisionPayload {
 class VeriffService {
   private async getSettings() {
     await connectToDatabase();
-    const settings = await KYCSettings.findOne();
+    const settings = await KYCSettings.findOne().lean() as any;
     if (!settings) {
       throw new Error("KYC settings not configured");
     }
 
     // Override with environment variables if available
     return {
-      ...settings.toObject(),
+      ...settings,
       veriffApiKey: process.env.VERIFF_API_KEY || settings.veriffApiKey,
       veriffApiSecret:
         process.env.VERIFF_API_SECRET || settings.veriffApiSecret,
@@ -131,11 +131,14 @@ class VeriffService {
       throw new Error(message);
     }
 
-    // Check if user has pending session
-    const existingSession = await KYCSession.findOne({
-      userId,
-      status: { $in: ["created", "started"] },
-    });
+    // Fetch pending session and wallet in parallel (both depend only on userId)
+    const [existingSession, wallet] = await Promise.all([
+      KYCSession.findOne({
+        userId,
+        status: { $in: ["created", "started"] },
+      }).lean() as Promise<any>,
+      CreditWallet.findOne({ userId }).lean() as Promise<any>,
+    ]);
 
     if (existingSession) {
       // Check if session is old (over 5 minutes) - mark as expired and allow new session
@@ -160,7 +163,6 @@ class VeriffService {
     }
 
     // Check max attempts
-    const wallet = await CreditWallet.findOne({ userId });
     if (wallet && wallet.kycAttempts >= settings.maxVerificationAttempts) {
       throw new Error(
         "Maximum verification attempts exceeded. Please contact support.",
@@ -579,7 +581,7 @@ class VeriffService {
   async isKYCRequired(userId: string, amount?: number): Promise<boolean> {
     await connectToDatabase();
 
-    const settings = await KYCSettings.findOne();
+    const settings = await KYCSettings.findOne().lean() as any;
     if (!settings || !settings.enabled) {
       return false;
     }

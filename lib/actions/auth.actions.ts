@@ -276,7 +276,7 @@ export const signUpWithEmail = async ({
       try {
         const template = await EmailTemplate.findOne({
           templateType: "welcome",
-        });
+        }).lean();
         if (template?.isActive !== false) {
           const introText =
             template?.introText ||

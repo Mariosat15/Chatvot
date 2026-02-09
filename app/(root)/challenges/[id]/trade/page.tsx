@@ -87,56 +87,56 @@ const ChallengeTradingPage = async ({
     redirect(`/challenges/${challengeId}`);
   }
 
-  // Get participant data
-  const participantDoc = await ChallengeParticipant.findOne({
-    challengeId,
-    userId: session.user.id,
-  }).lean();
+  // Get participant and opponent data in parallel (both are independent DB queries)
+  const [participantDoc, opponentDoc] = await Promise.all([
+    ChallengeParticipant.findOne({
+      challengeId,
+      userId: session.user.id,
+    }).lean(),
+    ChallengeParticipant.findOne({
+      challengeId,
+      userId: { $ne: session.user.id },
+    }).lean(),
+  ]);
 
   if (!participantDoc) {
     redirect(`/challenges/${challengeId}`);
   }
 
-  // Serialize to plain object for Client Components
+  // Serialize to plain objects for Client Components
   const participant = JSON.parse(JSON.stringify(participantDoc));
-
-  // Get opponent participant for display
-  const opponentDoc = await ChallengeParticipant.findOne({
-    challengeId,
-    userId: { $ne: session.user.id },
-  }).lean();
-
-  // Serialize to plain object for Client Components
   const opponent = opponentDoc ? JSON.parse(JSON.stringify(opponentDoc)) : null;
 
-  // Get user's positions - using challengeId as the contextId (works with existing trading system)
-  const positions = await getUserPositions(challengeId);
+  // Fetch positions, trade history, pending orders, and risk settings in parallel
+  const { getTradingRiskSettings } =
+    await import("@/lib/actions/trading/risk-settings.actions");
 
-  // Get trade history
-  const tradeHistoryResult = await getCompetitionTradeHistory(challengeId);
+  let marginThresholds;
+  let defaultLeverage = 10;
+
+  const [positions, tradeHistoryResult, pendingOrders, riskResults] =
+    await Promise.all([
+      getUserPositions(challengeId),
+      getCompetitionTradeHistory(challengeId),
+      getUserOrders(challengeId, "pending"),
+      Promise.all([getMarginThresholds(), getTradingRiskSettings()]).catch(
+        (error) => {
+          console.error(
+            "⚠️ Failed to load admin risk settings, using defaults:",
+            error,
+          );
+          return [undefined, undefined] as const;
+        },
+      ),
+    ]);
+
   const tradeHistory = tradeHistoryResult.success
     ? tradeHistoryResult.trades
     : [];
 
-  // Get pending orders
-  const pendingOrders = await getUserOrders(challengeId, "pending");
-
-  // Load admin risk settings
-  let marginThresholds;
-  let defaultLeverage = 10;
-  try {
-    marginThresholds = await getMarginThresholds();
-    const { getTradingRiskSettings } =
-      await import("@/lib/actions/trading/risk-settings.actions");
-    const riskSettings = await getTradingRiskSettings();
-    defaultLeverage = riskSettings?.defaultLeverage || 10;
-  } catch (error) {
-    console.error(
-      "⚠️ Failed to load admin risk settings, using defaults:",
-      error,
-    );
-    marginThresholds = undefined;
-  }
+  marginThresholds = riskResults[0];
+  const riskSettings = riskResults[1];
+  defaultLeverage = riskSettings?.defaultLeverage || 10;
 
   // Calculate stats
   const equity = participant.currentCapital + participant.unrealizedPnl;

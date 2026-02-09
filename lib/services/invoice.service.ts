@@ -91,7 +91,7 @@ export const InvoiceService = {
       await Promise.all([
         InvoiceSettings.getSingleton(),
         CompanySettings.getSingleton(),
-        WhiteLabel.findOne(),
+        WhiteLabel.findOne().lean(),
       ]);
 
     // Get next invoice number

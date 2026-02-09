@@ -308,41 +308,56 @@ export class SimilarityDetectionService {
 
     console.log("🔄 Starting full similarity analysis...");
 
-    // Get all profiles with sufficient data
+    // Get profiles with sufficient data — cap at 200 to prevent O(N²) explosion
+    // With 200 profiles: 19,900 pairs. With 1000: 499,500 pairs.
+    const MAX_PROFILES = 200;
     const profiles = await TradingBehaviorProfile.find({
       totalTradesAnalyzed: { $gte: 5 },
-    });
+    })
+      .sort({ updatedAt: -1 }) // Most recently active profiles first
+      .limit(MAX_PROFILES)
+      .lean();
 
-    console.log(`📊 Found ${profiles.length} profiles to analyze`);
+    console.log(`📊 Found ${profiles.length} profiles to analyze (capped at ${MAX_PROFILES})`);
+
+    if (profiles.length < 2) {
+      return { profilesAnalyzed: profiles.length, pairsCompared: 0, highSimilarityPairs: 0 };
+    }
 
     let pairsCompared = 0;
     let highSimilarityPairs = 0;
 
-    // Compare all pairs
+    // Build pairs array and process in batches of 10 (concurrency limit)
+    const BATCH_SIZE = 10;
+    const pairs: [number, number][] = [];
     for (let i = 0; i < profiles.length; i++) {
       for (let j = i + 1; j < profiles.length; j++) {
-        try {
-          const similarity = await this.calculateSimilarity(
+        pairs.push([i, j]);
+      }
+    }
+
+    for (let batchStart = 0; batchStart < pairs.length; batchStart += BATCH_SIZE) {
+      const batch = pairs.slice(batchStart, batchStart + BATCH_SIZE);
+
+      const results = await Promise.allSettled(
+        batch.map(([i, j]) =>
+          this.calculateSimilarity(
             profiles[i].userId.toString(),
             profiles[j].userId.toString(),
-          );
+          )
+        )
+      );
 
-          pairsCompared++;
-
-          if (similarity.similarityScore >= this.SIMILARITY_THRESHOLD) {
-            highSimilarityPairs++;
-          }
-
-          // Log progress every 100 pairs
-          if (pairsCompared % 100 === 0) {
-            console.log(`   Compared ${pairsCompared} pairs...`);
-          }
-        } catch (error) {
-          console.error(
-            `Error comparing ${profiles[i].userId} and ${profiles[j].userId}:`,
-            error,
-          );
+      for (const result of results) {
+        pairsCompared++;
+        if (result.status === "fulfilled" && result.value.similarityScore >= this.SIMILARITY_THRESHOLD) {
+          highSimilarityPairs++;
         }
+      }
+
+      // Log progress every 100 pairs
+      if (pairsCompared % 100 < BATCH_SIZE) {
+        console.log(`   Compared ${pairsCompared}/${pairs.length} pairs...`);
       }
     }
 

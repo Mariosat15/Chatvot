@@ -50,8 +50,8 @@ export class MirrorTradingService {
     );
 
     // Get recent trades for both users
-    const profile1 = await TradingBehaviorProfile.findOne({ userId: userId1 });
-    const profile2 = await TradingBehaviorProfile.findOne({ userId: userId2 });
+    const profile1 = await TradingBehaviorProfile.findOne({ userId: userId1 }).lean();
+    const profile2 = await TradingBehaviorProfile.findOne({ userId: userId2 }).lean();
 
     if (!profile1 || !profile2) {
       return {

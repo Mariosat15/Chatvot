@@ -123,6 +123,8 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
 // Indexes for fast queries
 // Note: userId already has unique index from schema definition (unique: true)
 CreditWalletSchema.index({ isActive: 1 });
+// PERFORMANCE: Speeds up KYC expiry check job
+CreditWalletSchema.index({ kycVerified: 1, kycExpiresAt: 1 });
 
 // Virtual for total profit/loss
 CreditWalletSchema.virtual("totalProfitLoss").get(function () {

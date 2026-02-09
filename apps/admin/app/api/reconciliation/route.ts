@@ -744,29 +744,35 @@ async function verifyWithdrawalRequests() {
     .limit(5000)
     .lean();
 
-  for (const withdrawal of withdrawals) {
-    // Check completed withdrawals have platform transaction
-    if (
-      withdrawal.status === "completed" &&
-      (withdrawal.platformFee || 0) > 0
-    ) {
-      const platformTx = await PlatformTransaction.findOne({
-        transactionType: "withdrawal_fee",
-        sourceId: withdrawal._id.toString(),
-      }).lean();
+  // Batch query: collect IDs of completed withdrawals with platform fees
+  const completedWithFee = withdrawals.filter(
+    (w) => w.status === "completed" && (w.platformFee || 0) > 0,
+  );
+  const withdrawalIds = completedWithFee.map((w) => w._id.toString());
 
-      if (!platformTx) {
-        issues.push({
-          type: "missing_platform_transaction",
-          severity: "warning",
-          userId: withdrawal.userId,
-          userEmail: withdrawal.userEmail,
-          details: {
-            withdrawalId: withdrawal._id.toString(),
-            description: `Completed withdrawal missing platform fee record (€${withdrawal.platformFee})`,
-          },
-        });
-      }
+  const platformTxs = await PlatformTransaction.find({
+    transactionType: "withdrawal_fee",
+    sourceId: { $in: withdrawalIds },
+  }).lean();
+
+  const platformTxBySourceId = new Map(
+    platformTxs.map((tx) => [tx.sourceId, tx]),
+  );
+
+  for (const withdrawal of completedWithFee) {
+    const platformTx = platformTxBySourceId.get(withdrawal._id.toString());
+
+    if (!platformTx) {
+      issues.push({
+        type: "missing_platform_transaction",
+        severity: "warning",
+        userId: withdrawal.userId,
+        userEmail: withdrawal.userEmail,
+        details: {
+          withdrawalId: withdrawal._id.toString(),
+          description: `Completed withdrawal missing platform fee record (€${withdrawal.platformFee})`,
+        },
+      });
     }
   }
 

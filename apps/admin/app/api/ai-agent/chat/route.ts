@@ -3115,7 +3115,7 @@ async function executeGetUserBadges(args: any): Promise<AgentResult> {
     .toArray();
 
   // Get badge names
-  const badgeConfigs = await db.collection("badgeconfigs").find({}).toArray();
+  const badgeConfigs = await db.collection("badgeconfigs").find({}).limit(500).toArray();
   const badgeMap = new Map(badgeConfigs.map((b: any) => [b._id.toString(), b]));
 
   const data = badgeStats.map((b: any) => {
@@ -3246,7 +3246,7 @@ async function executeGetOnlineUsers(args: any): Promise<AgentResult> {
 async function executeGetPaymentProviders(args: any): Promise<AgentResult> {
   const db = mongoose.connection.db!;
 
-  const providers = await db.collection("paymentproviders").find({}).toArray();
+  const providers = await db.collection("paymentproviders").find({}).limit(100).toArray();
 
   const data = providers.map((p: any) => ({
     name: p.name,
@@ -4205,7 +4205,7 @@ async function executeGetWithdrawalSettings(args: any): Promise<AgentResult> {
 async function executeGetAllBadges(args: any): Promise<AgentResult> {
   const db = mongoose.connection.db!;
 
-  const badges = await db.collection("badges").find({}).toArray();
+  const badges = await db.collection("badges").find({}).limit(1000).toArray();
 
   if (badges.length === 0) {
     return {

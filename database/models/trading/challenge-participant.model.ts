@@ -235,6 +235,8 @@ ChallengeParticipantSchema.index(
 );
 ChallengeParticipantSchema.index({ userId: 1, status: 1 });
 ChallengeParticipantSchema.index({ challengeId: 1, pnl: -1 });
+// PERFORMANCE: Speeds up early-end-check job's participant lookup
+ChallengeParticipantSchema.index({ challengeId: 1, status: 1 });
 
 const ChallengeParticipant =
   models?.ChallengeParticipant ||

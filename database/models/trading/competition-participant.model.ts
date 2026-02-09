@@ -234,6 +234,8 @@ CompetitionParticipantSchema.index({ userId: 1, status: 1 });
 CompetitionParticipantSchema.index({ competitionId: 1, status: 1, pnl: -1 }); // Active participants leaderboard
 CompetitionParticipantSchema.index({ userId: 1, enteredAt: -1 }); // User's competition history
 CompetitionParticipantSchema.index({ competitionId: 1, currentCapital: -1 }); // Capital-based ranking
+// PERFORMANCE: Speeds up margin-check job's participant lookup
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, currentOpenPositions: 1 });
 
 // Virtual for profit factor (average win / average loss)
 CompetitionParticipantSchema.virtual("profitFactor").get(function () {

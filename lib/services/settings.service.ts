@@ -26,7 +26,7 @@ export async function getSettings() {
 
     await connectToDatabase();
 
-    let settings = await WhiteLabel.findOne();
+    let settings = await WhiteLabel.findOne().lean();
 
     // Create default settings if none exist
     if (!settings) {
@@ -78,7 +78,7 @@ export async function getPaymentProviders() {
 
     await connectToDatabase();
 
-    const providers = await PaymentProvider.find({ isActive: true });
+    const providers = await PaymentProvider.find({ isActive: true }).lean();
 
     paymentProvidersCache = providers;
     lastFetch = now;
@@ -111,7 +111,7 @@ export async function getPaymentProviderCredentials(slug: string) {
   try {
     await connectToDatabase();
 
-    const provider = await PaymentProvider.findOne({ slug, isActive: true });
+    const provider = await PaymentProvider.findOne({ slug, isActive: true }).lean();
 
     if (!provider) {
       return null;

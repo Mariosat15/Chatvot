@@ -130,7 +130,8 @@ export class MessagingService {
     return Conversation.find(query)
       .sort({ lastActivityAt: -1 })
       .skip(options.offset || 0)
-      .limit(options.limit || 50);
+      .limit(options.limit || 50)
+      .lean() as unknown as IConversation[];
   }
 
   static async getConversationById(
@@ -157,7 +158,7 @@ export class MessagingService {
       query.deletedByUsers = { $nin: [participantId] };
     }
 
-    const conv = await Conversation.findOne(query);
+    const conv = await Conversation.findOne(query).lean() as IConversation | null;
 
     // Debug logging for production troubleshooting
     if (!conv) {

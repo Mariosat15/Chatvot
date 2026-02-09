@@ -244,7 +244,7 @@ export class PaymentFraudService {
     });
 
     // Count unique users with shared payments
-    const sharedPayments = await PaymentFingerprint.find({ isShared: true });
+    const sharedPayments = await PaymentFingerprint.find({ isShared: true }).lean();
     const affectedUserIds = new Set<string>();
     sharedPayments.forEach((payment) => {
       affectedUserIds.add(payment.userId.toString());

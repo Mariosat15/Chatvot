@@ -221,6 +221,8 @@ async function searchKnowledgeBase(
         isActive: true,
         audience: { $in: ["customer", "both"] }, // SECURITY FILTER
       })
+      .project({ content: 1, embedding: 1, sourceId: 1, headingPath: 1, title: 1 })
+      .limit(1000)
       .toArray();
 
     if (chunks.length === 0) {

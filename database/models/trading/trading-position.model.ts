@@ -229,6 +229,8 @@ TradingPositionSchema.index({ competitionId: 1, userId: 1, status: 1 });
 TradingPositionSchema.index({ userId: 1, competitionId: 1, openedAt: -1 }); // User's positions in competition
 TradingPositionSchema.index({ status: 1, lastPriceUpdate: 1 }); // For price update jobs
 TradingPositionSchema.index({ competitionId: 1, symbol: 1, status: 1 }); // Symbol-based queries in competition
+// PERFORMANCE: Speeds up trade-queue job's TP/SL position lookup
+TradingPositionSchema.index({ status: 1, takeProfit: 1, stopLoss: 1 });
 
 // Virtual for is profitable
 TradingPositionSchema.virtual("isProfitable").get(function () {

@@ -9,10 +9,14 @@ import WalletContent from "@/components/trading/WalletContent";
 export const dynamic = "force-dynamic";
 
 const WalletPage = async () => {
-  // Get wallet data
-  const _wallet = await getOrCreateWallet();
-  const stats = await getWalletStats();
-  const transactions = await getWalletTransactions(20);
+  // Ensure wallet exists first (creates if needed)
+  await getOrCreateWallet();
+
+  // Then fetch stats and transactions in parallel (both independent read-only queries)
+  const [stats, transactions] = await Promise.all([
+    getWalletStats(),
+    getWalletTransactions(20),
+  ]);
 
   return <WalletContent stats={stats as any} transactions={transactions} />;
 };

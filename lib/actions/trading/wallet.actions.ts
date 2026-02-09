@@ -19,7 +19,7 @@ export const getOrCreateWallet = async () => {
     await connectToDatabase();
 
     // Try to find existing wallet
-    let wallet = await CreditWallet.findOne({ userId: session.user.id });
+    let wallet = await CreditWallet.findOne({ userId: session.user.id }).lean();
 
     // Create wallet if doesn't exist
     if (!wallet) {
@@ -57,7 +57,7 @@ export const getWalletBalance = async () => {
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
+    const wallet = await CreditWallet.findOne({ userId: session.user.id }).lean() as any;
 
     if (!wallet) {
       return { balance: 0, isActive: false };
@@ -95,45 +95,51 @@ export const getWalletTransactions = async (limit: number = 50) => {
       .lean();
 
     // For withdrawals, get actual status from WithdrawalRequest (source of truth)
+    // Batch-fetch all withdrawal requests at once instead of per-transaction (N+1 fix)
     const WithdrawalRequest = (
       await import("@/database/models/withdrawal-request.model")
     ).default;
 
-    const enrichedTransactions = await Promise.all(
-      transactions.map(async (t) => {
-        if (
-          t.transactionType === "withdrawal" &&
-          t.metadata?.withdrawalRequestId
-        ) {
-          const withdrawalReq = await WithdrawalRequest.findById(
-            t.metadata.withdrawalRequestId,
-          ).lean();
-          if (withdrawalReq) {
-            // Map withdrawal request status to wallet transaction status
-            let actualStatus = t.status;
-            if (withdrawalReq.status === "completed")
-              actualStatus = "completed";
-            else if (
-              withdrawalReq.status === "rejected" ||
-              withdrawalReq.status === "failed"
-            )
-              actualStatus = "failed";
-            else if (withdrawalReq.status === "cancelled")
-              actualStatus = "cancelled";
-            else actualStatus = "pending"; // pending, approved, processing all show as pending
+    const withdrawalIds = transactions
+      .filter((t: any) => t.transactionType === "withdrawal" && t.metadata?.withdrawalRequestId)
+      .map((t: any) => t.metadata.withdrawalRequestId);
 
-            return {
-              ...t,
-              status: actualStatus,
-              // Include failure reason for rejected withdrawals
-              failureReason:
-                withdrawalReq.rejectionReason || withdrawalReq.failureReason,
-            };
-          }
-        }
-        return t;
-      }),
+    const withdrawalReqs = withdrawalIds.length > 0
+      ? await WithdrawalRequest.find({ _id: { $in: withdrawalIds } }).lean()
+      : [];
+    const withdrawalMap = new Map(
+      withdrawalReqs.map((w: any) => [w._id.toString(), w])
     );
+
+    const enrichedTransactions = transactions.map((t: any) => {
+      if (
+        t.transactionType === "withdrawal" &&
+        t.metadata?.withdrawalRequestId
+      ) {
+        const withdrawalReq = withdrawalMap.get(t.metadata.withdrawalRequestId.toString());
+        if (withdrawalReq) {
+          let actualStatus = t.status;
+          if (withdrawalReq.status === "completed")
+            actualStatus = "completed";
+          else if (
+            withdrawalReq.status === "rejected" ||
+            withdrawalReq.status === "failed"
+          )
+            actualStatus = "failed";
+          else if (withdrawalReq.status === "cancelled")
+            actualStatus = "cancelled";
+          else actualStatus = "pending";
+
+          return {
+            ...t,
+            status: actualStatus,
+            failureReason:
+              withdrawalReq.rejectionReason || withdrawalReq.failureReason,
+          };
+        }
+      }
+      return t;
+    });
 
     return JSON.parse(JSON.stringify(enrichedTransactions));
   } catch (error) {
@@ -543,7 +549,7 @@ export const completeDeposit = async (
         // Get wallet balance for notification
         const wallet = await CreditWallet.findOne({
           userId: transaction.userId,
-        });
+        }).lean() as any;
         const newBalance = wallet?.creditBalance || creditsToAdd;
 
         await notificationService.notifyDepositCompleted(
@@ -568,7 +574,7 @@ export const completeDeposit = async (
         const user = await getUserById(userId);
         const wallet = await CreditWallet.findOne({
           userId: transaction.userId,
-        });
+        }).lean() as any;
         const newBalance = wallet?.creditBalance || creditsToAdd;
 
         if (user?.email) {

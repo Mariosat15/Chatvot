@@ -12,23 +12,23 @@ async function getAuthPageSettings() {
   try {
     await connectToDatabase();
 
-    // Fetch testimonial settings from HeroSettings
-    const heroSettings = (await HeroSettings.findOne()
-      .select({
-        authPageTestimonialText: 1,
-        authPageTestimonialAuthor: 1,
-        authPageTestimonialRole: 1,
-        authPageTestimonialRating: 1,
-        authPageDashboardImage: 1,
-      })
-      .lean()) as any;
-
-    // Fetch branding from WhiteLabel (same source as admin branding settings)
-    const whiteLabel = (await WhiteLabel.findOne()
-      .select({
-        appLogo: 1,
-      })
-      .lean()) as any;
+    // Fetch testimonial settings and branding in parallel (independent queries)
+    const [heroSettings, whiteLabel] = (await Promise.all([
+      HeroSettings.findOne()
+        .select({
+          authPageTestimonialText: 1,
+          authPageTestimonialAuthor: 1,
+          authPageTestimonialRole: 1,
+          authPageTestimonialRating: 1,
+          authPageDashboardImage: 1,
+        })
+        .lean(),
+      WhiteLabel.findOne()
+        .select({
+          appLogo: 1,
+        })
+        .lean(),
+    ])) as any[];
 
     return {
       testimonialText:

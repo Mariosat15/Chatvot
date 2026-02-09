@@ -24,7 +24,7 @@ export async function initializeUserJourney(
   }
 
   // Get the map config for default start node
-  const mapConfig = await JourneyMapConfig.findOne({ mapId, isActive: true });
+  const mapConfig = await JourneyMapConfig.findOne({ mapId, isActive: true }).lean();
   const startNode = mapConfig?.defaultStartNode || "account_created";
 
   // Get the start milestone to auto-complete it
@@ -32,7 +32,7 @@ export async function initializeUserJourney(
     id: startNode, 
     mapId, 
     isActive: true 
-  });
+  }).lean();
 
   // Create new progress
   const progress = await UserJourneyProgress.create({
@@ -586,7 +586,7 @@ export async function checkMilestoneCompletion(
   }
 
   // Get milestone
-  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true });
+  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true }).lean();
   if (!milestone) {
     return { canComplete: false, isCompleted: false, isUnlocked: false, canUnlock: false };
   }
@@ -648,7 +648,7 @@ export async function completeMilestone(
   }
 
   // Get milestone details
-  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true });
+  const milestone = await JourneyMilestone.findOne({ id: milestoneId, mapId, isActive: true }).lean();
   if (!milestone) {
     return { success: false, message: "Milestone not found" };
   }
@@ -762,7 +762,7 @@ export async function completeMilestone(
         try {
           const { notificationService } = await import("@/lib/services/notification.service");
           const BadgeConfig = (await import("@/database/models/badge-config.model")).default;
-          const badge = await BadgeConfig.findOne({ id: milestone.rewards.badgeId });
+          const badge = await BadgeConfig.findOne({ id: milestone.rewards.badgeId }).lean();
           if (badge) {
             await notificationService.notifyBadgeEarned(
               userId,
@@ -829,7 +829,7 @@ export async function checkAndUnlockMilestones(
   }
 
   // Get all milestones for this map
-  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true });
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true }).lean();
   
   // Get already unlocked and completed milestone IDs
   const unlockedIds = new Set(progress.unlockedMilestones);
@@ -928,7 +928,7 @@ export async function checkAndCompleteMilestones(
   const { newlyUnlocked } = await checkAndUnlockMilestones(userId, mapId);
 
   // Refresh progress after unlocks
-  progress = await UserJourneyProgress.findOne({ userId, mapId });
+  progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   if (!progress) {
     return { completed: [], unlocked: newlyUnlocked, totalXPEarned: 0 };
   }
@@ -1000,7 +1000,7 @@ export async function selectBranchPath(
     id: branchMilestoneId,
     nodeType: "branch",
     isActive: true,
-  });
+  }).lean();
 
   if (!branchMilestone) {
     return { success: false, message: "Branch milestone not found" };

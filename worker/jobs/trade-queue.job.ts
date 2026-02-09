@@ -101,7 +101,7 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
     const pendingOrders = await TradingOrder.find({
       status: "pending",
       orderType: { $in: ["limit", "stop"] },
-    });
+    }).lean();
 
     result.pendingOrdersChecked = pendingOrders.length;
 
@@ -156,7 +156,7 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
         { takeProfit: { $exists: true, $ne: null } },
         { stopLoss: { $exists: true, $ne: null } },
       ],
-    });
+    }).lean();
 
     result.positionsChecked = openPositions.length;
 

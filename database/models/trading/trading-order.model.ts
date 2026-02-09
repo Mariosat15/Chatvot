@@ -184,6 +184,8 @@ TradingOrderSchema.index({ competitionId: 1, userId: 1, placedAt: -1 });
 TradingOrderSchema.index({ status: 1, placedAt: -1 });
 TradingOrderSchema.index({ symbol: 1, status: 1 });
 TradingOrderSchema.index({ userId: 1, status: 1, placedAt: -1 });
+// PERFORMANCE: Speeds up trade-queue job's pending order lookup
+TradingOrderSchema.index({ status: 1, orderType: 1, placedAt: -1 });
 
 // Virtual for is filled
 TradingOrderSchema.virtual("isFilled").get(function () {

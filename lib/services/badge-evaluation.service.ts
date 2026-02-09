@@ -211,8 +211,15 @@ export async function evaluateUserBadges(userId: string): Promise<{
  * Exported for use by journey progress service
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
+  // Fetch independent data in parallel (all queries depend only on userId)
+  const [participations, allPositions, closedTrades, wallet] = await Promise.all([
+    CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt").lean(),
+    TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(10000).lean(),
+    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol").sort({ closedAt: -1 }).limit(10000).lean(),
+    CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
+  ]);
+
   // Get competition stats
-  const participations = await CompetitionParticipant.find({ userId }).lean();
   const firstPlaceFinishes = participations.filter(
     (p) => p.currentRank === 1,
   ).length;
@@ -220,19 +227,15 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (p) => p.currentRank && p.currentRank <= 3,
   ).length;
 
-  // NEW: Count completed competitions (status = "completed")
+  // Count completed competitions (status = "completed")
   const completedCompetitions = participations.filter(
     (p) => p.status === "completed",
   ).length;
 
-  // NEW: Count completed competitions with 5+ trades (for realistic survival badges)
+  // Count completed competitions with 5+ trades (for realistic survival badges)
   const completedCompetitionsWithTrades = participations.filter(
     (p) => p.status === "completed" && (p.totalTrades || 0) >= 5,
   ).length;
-
-  // Get trading stats (cap at 10K most recent for performance)
-  const allPositions = await TradingPosition.find({ userId }).sort({ createdAt: -1 }).limit(10000).lean();
-  const closedTrades = await TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(10000).lean();
 
   const totalTrades = closedTrades.length;
   const winningTrades = closedTrades.filter(
@@ -319,11 +322,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   const alwaysUsesTP =
     allPositions.length > 0 && tradesWithTP === allPositions.length;
 
-  // Wallet stats
-  const wallet = (await CreditWallet.findOne({ userId }).lean()) as Record<
-    string,
-    unknown
-  > | null;
+  // Wallet stats (fetched in parallel above)
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
   const kycVerified = !!(wallet?.kycVerified || wallet?.kycStatus === "approved");
@@ -539,15 +538,6 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     );
   }
 
-  // Global rank from leaderboard (lower = better; 1 = first). Uses cached leaderboard when available.
-  let globalRank = 999999;
-  try {
-    const rankResult = await getUserGlobalRank(userId);
-    if (rankResult.rank > 0) globalRank = rankResult.rank;
-  } catch (err) {
-    console.warn("[gatherUserStats] getUserGlobalRank failed, using fallback rank:", err);
-  }
-
   // Calculate additional placement finishes from participations
   const secondPlaceFinishes = participations.filter(
     (p) => p.currentRank === 2,
@@ -565,35 +555,25 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (sum, p) => sum + (p.totalPnl || 0), 0
   );
 
-  // Fetch user level data for XP-based conditions
-  let currentLevel = 1;
-  let currentXP = 0;
-  let totalBadgesEarned = 0;
-  try {
-    const UserLevel = (await import("@/database/models/user-level.model")).default;
-    const userLevel = await UserLevel.findOne({ userId }).lean();
-    if (userLevel) {
-      currentLevel = (userLevel as any).currentLevel || 1;
-      currentXP = (userLevel as any).currentXP || 0;
-      totalBadgesEarned = (userLevel as any).totalBadgesEarned || 0;
-    }
-  } catch (error) {
-    // UserLevel may not exist yet
-  }
+  // Parallel fetch: global rank, user level, referral stats
+  const UserLevel = (await import("@/database/models/user-level.model")).default;
+  const UserReferral = (await import("@/database/models/user-referral.model")).default;
+  const [rankResult, userLevelDoc, referralsMadeCount, referralsActiveCount] = await Promise.all([
+    getUserGlobalRank(userId).catch((err: unknown) => {
+      console.warn("[gatherUserStats] getUserGlobalRank failed, using fallback rank:", err);
+      return { rank: 0 };
+    }),
+    UserLevel.findOne({ userId }).lean().catch(() => null),
+    UserReferral.countDocuments({ gameMasterId: userId }).catch(() => 0),
+    UserReferral.countDocuments({ gameMasterId: userId, isActive: true }).catch(() => 0),
+  ]);
 
-  // Fetch referral stats
-  let referralsMade = 0;
-  let referralsActive = 0;
-  try {
-    const UserReferral = (await import("@/database/models/user-referral.model")).default;
-    referralsMade = await UserReferral.countDocuments({ gameMasterId: userId });
-    referralsActive = await UserReferral.countDocuments({ 
-      gameMasterId: userId, 
-      isActive: true 
-    });
-  } catch (error) {
-    // Referral model may not exist
-  }
+  const globalRank = rankResult.rank > 0 ? rankResult.rank : 999999;
+  const currentLevel = (userLevelDoc as any)?.currentLevel || 1;
+  const currentXP = (userLevelDoc as any)?.currentXP || 0;
+  const totalBadgesEarned = (userLevelDoc as any)?.totalBadgesEarned || 0;
+  const referralsMade = referralsMadeCount;
+  const referralsActive = referralsActiveCount;
 
   // Max drawdown: largest peak-to-trough decline in cumulative PnL, as % of peak (for badge thresholds like <= 10%)
   let maxDrawdown = 0;

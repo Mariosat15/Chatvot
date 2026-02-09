@@ -8,7 +8,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import Competition from "@/database/models/trading/competition.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
-import { getRealPrice } from "@/lib/services/real-forex-prices.service";
+import { getRealPrice, fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
@@ -65,34 +65,32 @@ export const getUserDashboardDataForApi = async (userId: string) => {
             status: "open",
           }).lean();
 
-          // Calculate unrealized PnL for open positions
+          // Batch-fetch all prices at once instead of per-position (N+1 fix)
+          const uniqueSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
+          const pricesMap = uniqueSymbols.length > 0 ? await fetchRealForexPrices(uniqueSymbols) : new Map();
+
           let totalUnrealizedPnL = 0;
-          const positionsWithPnL = await Promise.all(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            openPositions.map(async (pos: any) => {
-              try {
-                const priceQuote = await getRealPrice(
+          const positionsWithPnL = openPositions.map((pos: any) => {
+            try {
+              const priceQuote = pricesMap.get(pos.symbol as ForexSymbol);
+              if (priceQuote) {
+                const currentPrice =
+                  pos.type === "long" ? priceQuote.bid : priceQuote.ask;
+                const unrealizedPnL = calculateUnrealizedPnL(
+                  pos.type,
+                  pos.entryPrice,
+                  currentPrice,
+                  pos.size,
                   pos.symbol as ForexSymbol,
                 );
-                if (priceQuote) {
-                  const currentPrice =
-                    pos.type === "long" ? priceQuote.bid : priceQuote.ask;
-                  const unrealizedPnL = calculateUnrealizedPnL(
-                    pos.type,
-                    pos.entryPrice,
-                    currentPrice,
-                    pos.size,
-                    pos.symbol as ForexSymbol,
-                  );
-                  totalUnrealizedPnL += unrealizedPnL;
-                  return { ...pos, currentPrice, unrealizedPnL };
-                }
-                return pos;
-              } catch {
-                return pos;
+                totalUnrealizedPnL += unrealizedPnL;
+                return { ...pos, currentPrice, unrealizedPnL };
               }
-            }),
-          );
+              return pos;
+            } catch {
+              return pos;
+            }
+          });
 
           const comp = competition as { startingCapital?: number };
           const currentCapital =
@@ -312,12 +310,14 @@ export const getUserDashboardData = async () => {
             status: "open",
           }).lean();
 
+          // Batch-fetch all prices at once (N+1 fix — single API call for all symbols)
+          const posSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
+          const posPricesMap = posSymbols.length > 0 ? await fetchRealForexPrices(posSymbols) : new Map();
+
           // Calculate total unrealized P&L from open positions
           let totalUnrealizedPnL = 0;
           for (const position of openPositions) {
-            const currentPrice = await getRealPrice(
-              position.symbol as ForexSymbol,
-            );
+            const currentPrice = posPricesMap.get(position.symbol as ForexSymbol);
             if (currentPrice) {
               const marketPrice =
                 position.side === "long" ? currentPrice.bid : currentPrice.ask;
@@ -341,10 +341,10 @@ export const getUserDashboardData = async () => {
             .limit(10)
             .lean();
 
-          // Get open positions with current prices
+          // Get open positions with current prices (reuse batch-fetched prices)
           const openPositionsWithPrices = [];
           for (const pos of openPositions) {
-            const livePrices = await getRealPrice(pos.symbol as ForexSymbol);
+            const livePrices = posPricesMap.get(pos.symbol as ForexSymbol);
             const currentPrice = livePrices
               ? pos.side === "long"
                 ? livePrices.bid
