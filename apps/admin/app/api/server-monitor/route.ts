@@ -210,11 +210,26 @@ async function getDatabaseStats(): Promise<{
     const totalSizeMB = Math.round(((dbStats.dataSize || 0) / (1024 * 1024)) * 100) / 100;
     const totalStorageMB = Math.round(((dbStats.storageSize || 0) / (1024 * 1024)) * 100) / 100;
     const totalIndexMB = Math.round(((dbStats.indexSize || 0) / (1024 * 1024)) * 100) / 100;
-    
-    // MongoDB Atlas M0 (free tier) = 512MB, M2 = 2GB, M5 = 5GB, M10 = 10GB
-    // You can configure this via environment variable
-    const storageLimitMB = parseInt(process.env.MONGODB_STORAGE_LIMIT_MB || "512", 10);
     const totalUsedMB = totalSizeMB + totalIndexMB;
+
+    // Detect actual storage limit intelligently:
+    // 1. Explicit env var override (highest priority)
+    // 2. MongoDB's fsTotalSize from dbStats (available on dedicated tiers M10+)
+    // 3. Auto-detect tier from actual usage (shared tiers: M0=512MB, M2=2GB, M5=5GB)
+    let storageLimitMB: number;
+    if (process.env.MONGODB_STORAGE_LIMIT_MB) {
+      storageLimitMB = parseInt(process.env.MONGODB_STORAGE_LIMIT_MB, 10);
+    } else if (dbStats.fsTotalSize && dbStats.fsTotalSize > 0) {
+      // Dedicated tier — fsTotalSize gives the actual disk allocated to the cluster
+      storageLimitMB = Math.round(dbStats.fsTotalSize / (1024 * 1024));
+    } else {
+      // Shared tier — auto-detect based on what's actually stored
+      // M0 = 512MB, M2 = 2GB, M5 = 5GB. If usage exceeds a tier, they're on a higher one.
+      if (totalUsedMB > 5120) storageLimitMB = 10240;       // M10 (10 GB)
+      else if (totalUsedMB > 2048) storageLimitMB = 5120;   // M5  (5 GB)
+      else if (totalUsedMB > 512) storageLimitMB = 2048;    // M2  (2 GB)
+      else storageLimitMB = 512;                             // M0  (512 MB)
+    }
     const storageUsagePercent = Math.min(100, (totalUsedMB / storageLimitMB) * 100);
 
     return {
