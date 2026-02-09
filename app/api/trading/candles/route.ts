@@ -93,8 +93,8 @@ async function getMarketDataSettings(): Promise<{
 
     // Debug: Log raw database values
       // // console.log(
-      `🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}, useLocalHistory=${settings?.useLocalHistory}`,
-    );
+      // `🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}, useLocalHistory=${settings?.useLocalHistory}`,
+    // );
 
     if (!settings) {
       // // console.log("📋 [Settings] No settings found, using defaults");
@@ -144,8 +144,8 @@ async function getMarketDataSettings(): Promise<{
     };
 
       // // console.log(
-      `📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? formatTime(result.chartHistoryLimitMinutesTotal) : "OFF"}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${formatTime(result.seedingMinutesTotal)}`,
-    );
+      // `📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? formatTime(result.chartHistoryLimitMinutesTotal) : "OFF"}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${formatTime(result.seedingMinutesTotal)}`,
+    // );
 
     return result;
   } catch (error) {
@@ -231,8 +231,8 @@ async function seedHistoricalCandles(
   // Prevent duplicate seeding for same symbol
   if (seedingInProgress.has(symbol)) {
       // // console.log(
-      `⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`,
-    );
+      // `⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`,
+    // );
     // Wait a bit for the other request to finish
     await new Promise((resolve) => setTimeout(resolve, 2000));
     return;
@@ -255,8 +255,8 @@ async function seedHistoricalCandles(
 
   try {
       // // console.log(
-      `🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol} (${barsToFetch} bars)...`,
-    );
+      // `🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol} (${barsToFetch} bars)...`,
+    // );
 
     // Fetch from Massive.com REST API - request exact number of bars based on seeding setting
     const candles = await getRecentCandles(
@@ -273,14 +273,14 @@ async function seedHistoricalCandles(
         candles[candles.length - 1].time * 1000,
       ).toISOString();
       // // console.log(
-        `🔍 [Seeding Debug] Massive.com returned ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
-      );
+        // `🔍 [Seeding Debug] Massive.com returned ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
+      // );
     }
 
     if (candles.length === 0) {
       // // console.log(
-        `⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`,
-      );
+        // `⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`,
+      // );
       return;
     }
 
@@ -290,8 +290,8 @@ async function seedHistoricalCandles(
       candles.length > barsToFetch ? candles.slice(-barsToFetch) : candles;
 
       // // console.log(
-      `📊 [Seeding] Limiting ${candles.length} candles to ${limitedCandles.length} (configured: ${barsToFetch})`,
-    );
+      // `📊 [Seeding] Limiting ${candles.length} candles to ${limitedCandles.length} (configured: ${barsToFetch})`,
+    // );
 
     // Convert to format expected by bulkUpsertCandles
     // NOTE: getRecentCandles returns time in SECONDS, but bulkUpsertCandles expects MILLISECONDS
@@ -310,8 +310,8 @@ async function seedHistoricalCandles(
     await Candle1m.bulkUpsertCandles(candlesToSave);
 
       // // console.log(
-      "✅ [Candles API] Seeded", limitedCandles.length, "candles", "(", formatTime(seedingMinutes), ") for", symbol, "to MongoDB"
-    );
+      // "✅ [Candles API] Seeded", limitedCandles.length, "candles", "(", formatTime(seedingMinutes), ") for", symbol, "to MongoDB"
+    // );
   } catch (error) {
     console.error(
       "❌ [Candles API] Failed to seed candles for", symbol, ":", error
@@ -400,8 +400,8 @@ async function autoFillGaps(
     (async () => {
       try {
       // // console.log(
-          `🔧 [Auto Gap Fill] Filling ${gaps.length} gaps for ${symbol}...`,
-        );
+          // `🔧 [Auto Gap Fill] Filling ${gaps.length} gaps for ${symbol}...`,
+        // );
         let filledCount = 0;
 
         for (const gap of gaps) {
@@ -447,8 +447,8 @@ async function autoFillGaps(
         }
 
       // // console.log(
-          `✅ [Auto Gap Fill] Completed for ${symbol} - filled ${filledCount} candles`,
-        );
+          // `✅ [Auto Gap Fill] Completed for ${symbol} - filled ${filledCount} candles`,
+        // );
         // Notify clients to refresh if we filled any gaps
         if (filledCount > 0) {
           broadcastDataUpdated(symbol, "1m", "gap_fill_complete");
@@ -484,8 +484,8 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     const MarketDataSettings = mongoose.models.MarketDataSettings;
     if (!MarketDataSettings) {
       // // console.log(
-        `⚠️ [Collection Gap] ${symbol}: MarketDataSettings model not found`,
-      );
+        // `⚠️ [Collection Gap] ${symbol}: MarketDataSettings model not found`,
+      // );
       return;
     }
 
@@ -494,14 +494,14 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     });
     if (!settings?.gapFill?.enabled) {
       // // console.log(
-        `⚠️ [Collection Gap] ${symbol}: Gap fill is DISABLED in admin settings`,
-      );
+        // `⚠️ [Collection Gap] ${symbol}: Gap fill is DISABLED in admin settings`,
+      // );
       return;
     }
     if (settings?.gapFill?.mode !== "auto") {
       // // console.log(
-        `⚠️ [Collection Gap] ${symbol}: Gap fill mode is "${settings?.gapFill?.mode}", not "auto"`,
-      );
+        // `⚠️ [Collection Gap] ${symbol}: Gap fill mode is "${settings?.gapFill?.mode}", not "auto"`,
+      // );
       return;
     }
 
@@ -524,8 +524,8 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     if (!oldest1m || !newestHistorical) {
       // Missing data in one of the collections, can't detect gap
       // // console.log(
-        `⚠️ [Collection Gap] ${symbol}: Missing data - oldest1m: ${!!oldest1m}, newestHistorical: ${!!newestHistorical}`,
-      );
+        // `⚠️ [Collection Gap] ${symbol}: Missing data - oldest1m: ${!!oldest1m}, newestHistorical: ${!!newestHistorical}`,
+      // );
       return;
     }
 
@@ -537,11 +537,11 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     // Log the timestamps for debugging
       // // console.log("🔍 [Collection Gap Check]", symbol);
       // // console.log(
-      `   candles_1m oldest: ${new Date(oldest1mTime * 1000).toISOString()}`,
-    );
+      // `   candles_1m oldest: ${new Date(oldest1mTime * 1000).toISOString()}`,
+    // );
       // // console.log(
-      `   candles_historical_1m newest: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
-    );
+      // `   candles_historical_1m newest: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
+    // );
 
     // Calculate gap in minutes
     const gapMinutes = Math.floor((oldest1mTime - newestHistoricalTime) / 60);
@@ -549,28 +549,28 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     // If gap is less than 10 minutes, no need to fill
     if (gapMinutes <= 10) {
       // // console.log(
-        `✅ [Collection Gap] ${symbol}: No significant gap (${gapMinutes} minutes)`,
-      );
+        // `✅ [Collection Gap] ${symbol}: No significant gap (${gapMinutes} minutes)`,
+      // );
       return;
     }
 
     // If gap is too large (> 7 days = 10080 minutes), don't auto-fill - user should download manually
     if (gapMinutes > 10080) {
       // // console.log(
-        `⚠️ [Collection Gap] ${symbol}: Gap of ${gapMinutes} minutes (${Math.round(gapMinutes / 1440)} days) is too large. Please download manually from Admin.`,
-      );
+        // `⚠️ [Collection Gap] ${symbol}: Gap of ${gapMinutes} minutes (${Math.round(gapMinutes / 1440)} days) is too large. Please download manually from Admin.`,
+      // );
       return;
     }
 
       // // console.log(
-      `🔍 [Collection Gap] ${symbol}: Detected ${gapMinutes} minute gap between live and historical data`,
-    );
+      // `🔍 [Collection Gap] ${symbol}: Detected ${gapMinutes} minute gap between live and historical data`,
+    // );
       // // console.log(
-      `   Historical ends: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
-    );
+      // `   Historical ends: ${new Date(newestHistoricalTime * 1000).toISOString()}`,
+    // );
       // // console.log(
-      `   Live starts: ${new Date(oldest1mTime * 1000).toISOString()}`,
-    );
+      // `   Live starts: ${new Date(oldest1mTime * 1000).toISOString()}`,
+    // );
 
     // Fill the gap in background
     collectionGapFillInProgress.add(symbol);
@@ -581,8 +581,8 @@ async function fillCollectionGap(symbol: string): Promise<void> {
         const gapEndMs = oldest1mTime * 1000 - 60000; // End 1 minute before oldest live
 
       // // console.log(
-          `🔧 [Collection Gap Fill] ${symbol}: Fetching ${gapMinutes} minutes from Massive.com...`,
-        );
+          // `🔧 [Collection Gap Fill] ${symbol}: Fetching ${gapMinutes} minutes from Massive.com...`,
+        // );
 
         const gapCandles = await fetchCandlesForRange(
           symbol as ForexSymbol,
@@ -593,14 +593,14 @@ async function fillCollectionGap(symbol: string): Promise<void> {
 
         if (gapCandles.length === 0) {
       // // console.log(
-            `⚠️ [Collection Gap Fill] ${symbol}: No candles available for gap period`,
-          );
+            // `⚠️ [Collection Gap Fill] ${symbol}: No candles available for gap period`,
+          // );
           return;
         }
 
       // // console.log(
-          `📥 [Collection Gap Fill] ${symbol}: Got ${gapCandles.length} candles, inserting to historical...`,
-        );
+          // `📥 [Collection Gap Fill] ${symbol}: Got ${gapCandles.length} candles, inserting to historical...`,
+        // );
 
         // Insert gap candles into candles_historical_1m
         let insertedCount = 0;
@@ -634,8 +634,8 @@ async function fillCollectionGap(symbol: string): Promise<void> {
         }
 
       // // console.log(
-          `✅ [Collection Gap Fill] ${symbol}: Inserted ${insertedCount} candles, gap filled!`,
-        );
+          // `✅ [Collection Gap Fill] ${symbol}: Inserted ${insertedCount} candles, gap filled!`,
+        // );
 
         // Notify clients to refresh if we filled any gaps
         if (insertedCount > 0) {
@@ -673,8 +673,8 @@ async function handleCandleRequest(
     (before ? settings.lazyLoadBatchSize : settings.initialCandleCount);
 
       // // console.log(
-    `📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || "none"}, limit=${limit}, before=${before || "none"}`,
-  );
+    // `📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || "none"}, limit=${limit}, before=${before || "none"}`,
+  // );
 
   // Apply history limit if enabled
   let historyLimitDate: Date | undefined;
@@ -692,8 +692,8 @@ async function handleCandleRequest(
     );
     const m = settings.chartHistoryLimitMinutesTotal % 60;
       // // console.log(
-      `📊 [Candles] History limit enabled: ${d}d ${h}h ${m}m (since ${historyLimitDate.toISOString()})`,
-    );
+      // `📊 [Candles] History limit enabled: ${d}d ${h}h ${m}m (since ${historyLimitDate.toISOString()})`,
+    // );
   }
 
   // For 1-minute timeframe: Get from MongoDB (server source of truth)
@@ -710,8 +710,8 @@ async function handleCandleRequest(
           candles[candles.length - 1].time * 1000,
         ).toISOString();
       // // console.log(
-          `📊 [1m Debug] Got ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
-        );
+          // `📊 [1m Debug] Got ${candles.length} candles, range: ${oldestTime} to ${newestTime}`,
+        // );
       }
 
       // Apply history limit
@@ -722,20 +722,20 @@ async function handleCandleRequest(
 
       // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
       // // console.log(
-        `📊 [1m Lazy] before=${before}, candles_1m.length=${candles.length}, limit=${limit}, useLocalHistory=${settings.useLocalHistory}`,
-      );
+        // `📊 [1m Lazy] before=${before}, candles_1m.length=${candles.length}, limit=${limit}, useLocalHistory=${settings.useLocalHistory}`,
+      // );
 
       if (before && candles.length < limit && settings.useLocalHistory) {
         const historicalModel = getHistoricalModel("1m");
       // // console.log(
-          `📊 [1m Lazy] Checking historical... historicalModel exists: ${!!historicalModel}`,
-        );
+          // `📊 [1m Lazy] Checking historical... historicalModel exists: ${!!historicalModel}`,
+        // );
 
         if (historicalModel) {
           const cutoffDate = new Date(before * 1000);
       // // console.log(
-            `📊 [1m Lazy] Querying candles_historical_1m before ${cutoffDate.toISOString()}...`,
-          );
+            // `📊 [1m Lazy] Querying candles_historical_1m before ${cutoffDate.toISOString()}...`,
+          // );
 
           const historicalCandles = await getHistoricalCandles("1m", symbol, {
             before: cutoffDate,
@@ -743,8 +743,8 @@ async function handleCandleRequest(
           });
 
       // // console.log(
-            `📊 [1m Lazy] Got ${historicalCandles.length} candles from candles_historical_1m`,
-          );
+            // `📊 [1m Lazy] Got ${historicalCandles.length} candles from candles_historical_1m`,
+          // );
 
           // Convert historical candles to the same format
           const historicalFormatted = historicalCandles.map((c) => ({
@@ -812,8 +812,8 @@ async function handleCandleRequest(
         const h = Math.floor((settings.seedingMinutesTotal % (24 * 60)) / 60);
         const m = settings.seedingMinutesTotal % 60;
       // // console.log(
-          `⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${d}d ${h}h ${m}m)...`,
-        );
+          // `⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${d}d ${h}h ${m}m)...`,
+        // );
 
         // Fire and forget - don't await!
         // Pass seedingMinutesTotal from admin settings (this IS the number of 1m candles to fetch)
@@ -824,8 +824,8 @@ async function handleCandleRequest(
         )
           .then(() => {
       // // console.log(
-              `✅ [Candles API] Background seeding completed for ${symbol}`,
-            );
+              // `✅ [Candles API] Background seeding completed for ${symbol}`,
+            // );
             // Notify all clients viewing this symbol to refresh their data
             broadcastDataUpdated(symbol, "1m", "seeding_complete");
           })
@@ -879,12 +879,12 @@ async function handleCandleRequest(
           if (olderExists) {
             hasMore = true;
       // // console.log(
-              `📊 [1m hasMore] Found historical data before ${checkBeforeDate.toISOString()}`,
-            );
+              // `📊 [1m hasMore] Found historical data before ${checkBeforeDate.toISOString()}`,
+            // );
           } else {
       // // console.log(
-              `📊 [1m hasMore] No historical data before ${checkBeforeDate.toISOString()}`,
-            );
+              // `📊 [1m hasMore] No historical data before ${checkBeforeDate.toISOString()}`,
+            // );
           }
         }
       }
@@ -1131,8 +1131,8 @@ async function handleCandleRequest(
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
       // // console.log(
-              `📥 [${normalizedTf} Lazy] ${symbol}: DB has ${historicalCandles.length}, fetching more from API...`,
-            );
+              // `📥 [${normalizedTf} Lazy] ${symbol}: DB has ${historicalCandles.length}, fetching more from API...`,
+            // );
             const apiCandles = await getRecentCandles(
               symbol as ForexSymbol,
               massiveTf,
@@ -1173,8 +1173,8 @@ async function handleCandleRequest(
               .slice(-limit);
 
       // // console.log(
-              `✅ [${normalizedTf} Lazy] ${symbol}: Merged to ${historicalCandles.length} candles`,
-            );
+              // `✅ [${normalizedTf} Lazy] ${symbol}: Merged to ${historicalCandles.length} candles`,
+            // );
           }
         }
       } else {
@@ -1201,17 +1201,17 @@ async function handleCandleRequest(
               const newestDbCandle = dbCandles[dbCandles.length - 1];
               const oldestDbCandle = dbCandles[0];
       // // console.log(
-                `🔍 [${normalizedTf} DEBUG] ${symbol}: DB returned ${dbCandles.length} candles`,
-              );
+                // `🔍 [${normalizedTf} DEBUG] ${symbol}: DB returned ${dbCandles.length} candles`,
+              // );
       // // console.log(
-                `   Query: before ${currentPeriodDate.toISOString()}, limit ${limit - 1}`,
-              );
+                // `   Query: before ${currentPeriodDate.toISOString()}, limit ${limit - 1}`,
+              // );
       // // console.log(
-                `   Oldest: ${new Date(oldestDbCandle.timestamp).toISOString()}`,
-              );
+                // `   Oldest: ${new Date(oldestDbCandle.timestamp).toISOString()}`,
+              // );
       // // console.log(
-                `   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`,
-              );
+                // `   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`,
+              // );
             }
 
             // ALWAYS align timestamps when reading to ensure consistency:
@@ -1232,8 +1232,8 @@ async function handleCandleRequest(
             historicalCandles = deduplicateCandles(rawCandles);
 
       // // console.log(
-              `⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`,
-            );
+              // `⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`,
+            // );
 
             // =====================================================
             // AUTO-FETCH: If historical is empty/insufficient, fetch from API
@@ -1241,8 +1241,8 @@ async function handleCandleRequest(
             // =====================================================
             if (historicalCandles.length < 50) {
       // // console.log(
-                `⚠️ [${normalizedTf}] ${symbol}: Historical has only ${historicalCandles.length} candles, fetching from API...`,
-              );
+                // `⚠️ [${normalizedTf}] ${symbol}: Historical has only ${historicalCandles.length} candles, fetching from API...`,
+              // );
 
               const massiveTimeframeMap: Record<string, Timeframe> = {
                 "5m": "5",
@@ -1264,8 +1264,8 @@ async function handleCandleRequest(
                     limit,
                   );
       // // console.log(
-                    `📥 [${normalizedTf}] ${symbol}: API returned ${apiCandles.length} candles`,
-                  );
+                    // `📥 [${normalizedTf}] ${symbol}: API returned ${apiCandles.length} candles`,
+                  // );
 
                   if (apiCandles.length > 0) {
                     // Convert and align API candles
@@ -1302,8 +1302,8 @@ async function handleCandleRequest(
                     );
 
       // // console.log(
-                      `✅ [${normalizedTf}] ${symbol}: Merged to ${historicalCandles.length} candles`,
-                    );
+                      // `✅ [${normalizedTf}] ${symbol}: Merged to ${historicalCandles.length} candles`,
+                    // );
 
                     // Save API candles to historical collection (background, fire and forget)
                     (async () => {
@@ -1337,8 +1337,8 @@ async function handleCandleRequest(
                         }
                       }
       // // console.log(
-                        `💾 [${normalizedTf}] ${symbol}: Saved ${savedCount} candles to historical collection`,
-                      );
+                        // `💾 [${normalizedTf}] ${symbol}: Saved ${savedCount} candles to historical collection`,
+                      // );
                     })();
                   }
                 } catch (apiError) {
@@ -1393,19 +1393,19 @@ async function handleCandleRequest(
             close: lastHistorical.close,
           };
       // // console.log(
-            `📌 [${normalizedTf}] ${symbol}: Created forming placeholder from last historical close`,
-          );
+            // `📌 [${normalizedTf}] ${symbol}: Created forming placeholder from last historical close`,
+          // );
         }
 
         // Log what we're returning (no augmentation, no gap filling from aggregator)
       // // console.log(
-          `🎯 [${normalizedTf} UNIFIED] ${symbol}: Using WebSocket as single source of truth`,
-        );
+          // `🎯 [${normalizedTf} UNIFIED] ${symbol}: Using WebSocket as single source of truth`,
+        // );
 
         // Final count log
       // // console.log(
-          `✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`,
-        );
+          // `✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`,
+        // );
       }
 
       // Apply history limit
@@ -1443,8 +1443,8 @@ async function handleCandleRequest(
             actualGapSeconds / (gapTfMinutes * 60),
           );
       // // console.log(
-            `⚠️ [${normalizedTf} Gap] ${symbol}: ${gapCandlesCount} candle gap detected (WebSocket will fill on next completion)`,
-          );
+            // `⚠️ [${normalizedTf} Gap] ${symbol}: ${gapCandlesCount} candle gap detected (WebSocket will fill on next completion)`,
+          // );
         }
       }
 

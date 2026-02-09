@@ -417,15 +417,15 @@ export async function initializeWebSocket(): Promise<void> {
   if (existingWs && existingWs.readyState <= 1) {
     // CONNECTING (0) or OPEN (1)
     // console.log(
-      `🔄 WebSocket already ${existingWs.readyState === 1 ? "connected" : "connecting"} (ID: ${state.connectionId})`,
-    );
+      // `🔄 WebSocket already ${existingWs.readyState === 1 ? "connected" : "connecting"} (ID: ${state.connectionId})`,
+    // );
     return;
   }
 
   if (state.isConnecting) {
     // console.log(
-      `🔄 WebSocket connection already in progress (ID: ${state.connectionId})`,
-    );
+      // `🔄 WebSocket connection already in progress (ID: ${state.connectionId})`,
+    // );
     return;
   }
 
@@ -455,8 +455,8 @@ async function connectWebSocket(): Promise<void> {
   // Generate new connection ID for debugging
   state.connectionId = Math.random().toString(36).substring(7);
   // console.log(
-    `🔌 Connecting to Massive.com WebSocket... (ID: ${state.connectionId})`,
-  );
+    // `🔌 Connecting to Massive.com WebSocket... (ID: ${state.connectionId})`,
+  // );
 
   try {
     // Dynamic import ws module (only on server)
@@ -495,8 +495,8 @@ async function connectWebSocket(): Promise<void> {
     newWs.on("close", (code: number, reason: Buffer) => {
       const reasonStr = reason.toString() || "No reason";
       // console.log(
-        `🔌 WebSocket closed: ${code} - ${reasonStr} (ID: ${state.connectionId})`,
-      );
+        // `🔌 WebSocket closed: ${code} - ${reasonStr} (ID: ${state.connectionId})`,
+      // );
 
       cleanup();
       scheduleReconnect();
@@ -1136,8 +1136,8 @@ async function saveCompletedCandleToMongoDB(
     // Log only EUR/USD as sample (not all 33 symbols)
     if (candle.symbol === "EUR/USD") {
       // console.log(
-        `💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`,
-      );
+        // `💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`,
+      // );
     }
   } catch (error) {
     console.error(
@@ -1228,8 +1228,8 @@ async function saveCompletedHigherTimeframeCandle(
 
         if (candle.symbol === "EUR/USD") {
           // console.log(
-            `🔄 [${timeframe}] Augmented with ${candles1m.length} 1m candles | O:${candle.open.toFixed(5)}→${finalOpen.toFixed(5)} H:${candle.high.toFixed(5)}→${finalHigh.toFixed(5)} L:${candle.low.toFixed(5)}→${finalLow.toFixed(5)}`,
-          );
+            // `🔄 [${timeframe}] Augmented with ${candles1m.length} 1m candles | O:${candle.open.toFixed(5)}→${finalOpen.toFixed(5)} H:${candle.high.toFixed(5)}→${finalHigh.toFixed(5)} L:${candle.low.toFixed(5)}→${finalLow.toFixed(5)}`,
+          // );
         }
       }
     } catch (err) {
@@ -1279,8 +1279,8 @@ async function saveCompletedHigherTimeframeCandle(
     // Log only EUR/USD as sample (to avoid log spam)
     if (candle.symbol === "EUR/USD") {
       // console.log(
-        `💾 [${timeframe}] Completed candle saved & queued for broadcast: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`,
-      );
+        // `💾 [${timeframe}] Completed candle saved & queued for broadcast: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`,
+      // );
     }
   } catch (error) {
     // Don't crash on save errors - just log and continue
@@ -1498,8 +1498,8 @@ async function saveCandleToMongoDB(
         if (Math.random() < 0.1) {
           // 10% of the time
           // console.log(
-            `🕯️ [Candle DB] Saved ${candlesToSave.length} candles to MongoDB`,
-          );
+            // `🕯️ [Candle DB] Saved ${candlesToSave.length} candles to MongoDB`,
+          // );
         }
       } catch (error) {
         // Log error but don't crash - candle storage failure shouldn't break price updates
@@ -1597,8 +1597,8 @@ function scheduleReconnect(): void {
     RECONNECT_BASE_DELAY_MS * Math.pow(1.5, state.reconnectAttempts - 1);
 
   // console.log(
-    `🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
-  );
+    // `🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+  // );
 
   // 🏥 Notify health monitor of reconnection attempt
   priceHealthMonitor.updateConnectionStatus(
@@ -1952,8 +1952,8 @@ export async function broadcastDataUpdated(
       }),
     });
     // console.log(
-      `🔄 [Broadcast] Data updated: ${symbol} ${timeframe} (${reason})`,
-    );
+      // `🔄 [Broadcast] Data updated: ${symbol} ${timeframe} (${reason})`,
+    // );
   } catch (error) {
     // Don't fail if WebSocket server is not running
     console.warn(
@@ -1990,9 +1990,9 @@ function isWorkerProcess(): boolean {
     args.includes("dist\\worker")
   ) {
     // console.log(
-      "✅ [WEBSOCKET] Worker detected from process.argv:",
-      args.substring(0, 100),
-    );
+      // "✅ [WEBSOCKET] Worker detected from process.argv:",
+      // args.substring(0, 100),
+    // );
     return true;
   }
 
@@ -2005,11 +2005,11 @@ function isWorkerProcess(): boolean {
   // Debug: Log what we found (only on first check)
   if (!hasLoggedInit) {
     // console.log(
-      "ℹ️ [WEBSOCKET] Worker detection: IS_WORKER=" +
-        process.env.IS_WORKER +
-        ", argv=" +
-        args.substring(0, 80),
-    );
+      // "ℹ️ [WEBSOCKET] Worker detection: IS_WORKER=" +
+        // process.env.IS_WORKER +
+        // ", argv=" +
+        // args.substring(0, 80),
+    // );
   }
 
   return false;
@@ -2112,8 +2112,8 @@ async function checkAndUpdateBroadcastInterval(): Promise<void> {
 
   if (newInterval !== currentBroadcastIntervalMs) {
     // console.log(
-      `📡 [Broadcast] Interval changed: ${currentBroadcastIntervalMs}ms → ${newInterval}ms`,
-    );
+      // `📡 [Broadcast] Interval changed: ${currentBroadcastIntervalMs}ms → ${newInterval}ms`,
+    // );
     currentBroadcastIntervalMs = newInterval;
 
     // Restart timer with new interval
@@ -2297,8 +2297,8 @@ async function broadcastFormingCandles(): Promise<void> {
     if (response.ok) {
       if (state.completedCandlesToBroadcast.length > 0) {
         // console.log(
-          `📤 [Broadcast] Sent ${state.completedCandlesToBroadcast.length} completed candles`,
-        );
+          // `📤 [Broadcast] Sent ${state.completedCandlesToBroadcast.length} completed candles`,
+        // );
       }
       state.completedCandlesToBroadcast = [];
     }
@@ -2330,8 +2330,8 @@ async function startBroadcastTimer(): Promise<void> {
     currentBroadcastIntervalMs,
   );
   // console.log(
-    `📡 [Broadcast] Started broadcasting forming candles every ${currentBroadcastIntervalMs}ms`,
-  );
+    // `📡 [Broadcast] Started broadcasting forming candles every ${currentBroadcastIntervalMs}ms`,
+  // );
 }
 
 function stopBroadcastTimer(): void {
@@ -2356,8 +2356,8 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
     const symbols = Object.keys(FOREX_PAIRS);
 
     // console.log(
-      `🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`,
-    );
+      // `🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`,
+    // );
 
     for (const symbol of symbols) {
       // Get last 15 completed 1m candles for each symbol (enough for 15m aggregation)
@@ -2381,8 +2381,8 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
     }
 
     // console.log(
-      `✅ [Buffer Seed] Seeded ${state.completedCandlesBuffer.size} symbols with completed candles`,
-    );
+      // `✅ [Buffer Seed] Seeded ${state.completedCandlesBuffer.size} symbols with completed candles`,
+    // );
   } catch (error) {
     console.warn(
       "⚠️ [Buffer Seed] Failed to seed buffer:",
@@ -2407,8 +2407,8 @@ async function seedHigherTimeframeCaches(): Promise<void> {
     const currentTime = Math.floor(now / 1000);
 
     // console.log(
-      `🌱 [HT Seed] Seeding higher timeframe caches for ${symbols.length} symbols...`,
-    );
+      // `🌱 [HT Seed] Seeding higher timeframe caches for ${symbols.length} symbols...`,
+    // );
 
     // Calculate period boundaries for each timeframe
     const nowDate = new Date(now);
@@ -2522,8 +2522,8 @@ async function seedHigherTimeframeCaches(): Promise<void> {
     }
 
     // console.log(
-      `✅ [HT Seed] Seeded: 5m=${state.formingCandles5m.size}, 15m=${state.formingCandles15m.size}, 30m=${state.formingCandles30m.size}, 1h=${state.formingCandles1h.size}, 4h=${state.formingCandles4h.size}, D=${state.formingCandlesD.size}, W=${state.formingCandlesW.size}, M=${state.formingCandlesM.size}`,
-    );
+      // `✅ [HT Seed] Seeded: 5m=${state.formingCandles5m.size}, 15m=${state.formingCandles15m.size}, 30m=${state.formingCandles30m.size}, 1h=${state.formingCandles1h.size}, 4h=${state.formingCandles4h.size}, D=${state.formingCandlesD.size}, W=${state.formingCandlesW.size}, M=${state.formingCandlesM.size}`,
+    // );
   } catch (error) {
     console.warn(
       "⚠️ [HT Seed] Failed to seed higher timeframe caches:",
@@ -2538,8 +2538,8 @@ async function autoInitialize(): Promise<void> {
   // Use global state to prevent re-initialization across HMR
   if (state.initialized) {
     // console.log(
-      `ℹ️ [AUTO-INIT] Already initialized (ID: ${state.connectionId})`,
-    );
+      // `ℹ️ [AUTO-INIT] Already initialized (ID: ${state.connectionId})`,
+    // );
     return;
   }
   state.initialized = true;
@@ -2553,8 +2553,8 @@ async function autoInitialize(): Promise<void> {
   if (isWorkerProcess()) {
     // console.log("ℹ️ [WEBSOCKET] Worker detected - skipping WebSocket init");
     // console.log(
-      "   Worker will read prices from MongoDB cache (written by WEB app)",
-    );
+      // "   Worker will read prices from MongoDB cache (written by WEB app)",
+    // );
     return;
   }
 
@@ -2565,8 +2565,8 @@ async function autoInitialize(): Promise<void> {
   }
 
   // console.log(
-    "🚀 [AUTO-INIT] Starting WebSocket and TP/SL cache initialization...",
-  );
+    // "🚀 [AUTO-INIT] Starting WebSocket and TP/SL cache initialization...",
+  // );
 
   try {
     await initializeWebSocket();
@@ -2594,8 +2594,8 @@ async function autoInitialize(): Promise<void> {
     }
 
     // console.log(
-      "✅ [AUTO-INIT] WebSocket, TP/SL cache, snapshots, and broadcast ready",
-    );
+      // "✅ [AUTO-INIT] WebSocket, TP/SL cache, snapshots, and broadcast ready",
+    // );
   } catch (error) {
     console.error("❌ [AUTO-INIT] Failed:", error);
   }
