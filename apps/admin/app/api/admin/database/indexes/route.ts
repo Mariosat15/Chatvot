@@ -224,12 +224,12 @@ const REQUIRED_INDEXES = {
   ],
   candles_1m: [
     {
-      keys: { symbol: 1, timestamp: -1 },
-      options: { name: "symbol_1_timestamp_-1" },
+      keys: { symbol: 1, t: -1 },
+      options: { name: "symbol_1_t_-1" },
     },
     {
-      keys: { symbol: 1, timestamp: 1 },
-      options: { name: "symbol_1_timestamp_1" },
+      keys: { symbol: 1, t: 1 },
+      options: { unique: true, name: "symbol_1_t_1" },
     },
   ],
   candles_historical_1m: [
