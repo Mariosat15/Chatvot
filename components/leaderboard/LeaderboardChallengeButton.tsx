@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useCallback } from "react";
 import { Swords, Circle, Loader2 } from "lucide-react";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import VsScreen, { VsOpponent } from "@/components/challenges/VsScreen";
@@ -26,29 +25,65 @@ interface OnlineUser {
   acceptingChallenges: boolean;
 }
 
-// Global cache for online users - shared across all instances
+// ============================================================
+// SINGLE GLOBAL POLLER — shared by all 50+ button instances
+// Instead of 50 separate setIntervals (each hitting the API),
+// ONE interval fetches every 15s and notifies all buttons via
+// a lightweight subscribe/notify pattern.
+// ============================================================
 let globalOnlineUsersCache: OnlineUser[] = [];
 let globalLastFetchTime = 0;
-const CACHE_DURATION = 1500; // 1.5 seconds cache for real-time updates
+let globalIntervalId: ReturnType<typeof setInterval> | null = null;
+let globalCurrentUserName = "";
+let globalCurrentUserImage: string | undefined;
+let globalCurrentUserFetched = false;
+const POLL_INTERVAL = 15_000; // 15 seconds (was 2s per button = 25 req/s)
 
-// Subscribe/unsubscribe pattern for real-time updates
 const subscribers = new Set<() => void>();
 
-async function fetchGlobalOnlineUsers() {
-  try {
-    const res = await fetch(`/api/user/presence?online=true`);
-    if (res.ok) {
-      const data = await res.json();
-      globalOnlineUsersCache = data.users || [];
-      globalLastFetchTime = Date.now();
-      // Notify all subscribers
-      subscribers.forEach((callback) => callback());
-      return globalOnlineUsersCache;
+function startGlobalPoller() {
+  if (globalIntervalId) return; // Already running
+
+  const doFetch = async () => {
+    try {
+      const res = await fetch(`/api/user/presence?online=true`);
+      if (res.ok) {
+        const data = await res.json();
+        globalOnlineUsersCache = data.users || [];
+        globalLastFetchTime = Date.now();
+        subscribers.forEach((cb) => cb());
+      }
+    } catch {
+      // Silently retry on next interval
     }
-  } catch (error) {
-    console.error("Failed to fetch online users:", error);
+  };
+
+  // Fetch immediately, then every POLL_INTERVAL
+  doFetch();
+  globalIntervalId = setInterval(doFetch, POLL_INTERVAL);
+}
+
+function stopGlobalPollerIfEmpty() {
+  if (subscribers.size === 0 && globalIntervalId) {
+    clearInterval(globalIntervalId);
+    globalIntervalId = null;
   }
-  return globalOnlineUsersCache;
+}
+
+// Fetch current user profile ONCE globally (not per button)
+async function fetchCurrentUserOnce() {
+  if (globalCurrentUserFetched) return;
+  globalCurrentUserFetched = true;
+  try {
+    const res = await fetch("/api/user/profile");
+    const data = await res.json();
+    const user = data.user || data;
+    if (user?.name) globalCurrentUserName = user.name;
+    if (user?.profileImage) globalCurrentUserImage = user.profileImage;
+    subscribers.forEach((cb) => cb()); // Notify so buttons pick up name/image
+  } catch {
+    globalCurrentUserFetched = false; // Retry next mount
+  }
 }
 
 export default function LeaderboardChallengeButton({
@@ -66,92 +101,41 @@ export default function LeaderboardChallengeButton({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showVsScreen, setShowVsScreen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [currentUserName, setCurrentUserName] = useState<string>("You");
+  const [currentUserName, setCurrentUserName] = useState<string>(
+    globalCurrentUserName || "You",
+  );
   const [currentUserImage, setCurrentUserImage] = useState<
     string | undefined
-  >();
+  >(globalCurrentUserImage);
   const [opponentStats, setOpponentStats] = useState<VsOpponent | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateStatusFromCache = useCallback(() => {
+  // Subscribe to the SINGLE global poller (no per-button interval)
+  const updateFromGlobal = useCallback(() => {
     const user = globalOnlineUsersCache.find(
       (u: OnlineUser) => u.userId === userId,
     );
     setOnlineStatus(user || null);
     setLoading(false);
+    // Also pick up current user info if available
+    if (globalCurrentUserName) setCurrentUserName(globalCurrentUserName);
+    if (globalCurrentUserImage) setCurrentUserImage(globalCurrentUserImage);
   }, [userId]);
 
-  const fetchOnlineStatus = useCallback(
-    async (forceRefresh = false) => {
-      const now = Date.now();
-
-      // Use cache if recent enough and not forcing refresh
-      if (
-        !forceRefresh &&
-        now - globalLastFetchTime < CACHE_DURATION &&
-        globalOnlineUsersCache.length >= 0
-      ) {
-        updateStatusFromCache();
-        return;
-      }
-
-      // Fetch fresh data
-      await fetchGlobalOnlineUsers();
-      updateStatusFromCache();
-    },
-    [updateStatusFromCache],
-  );
-
   useEffect(() => {
-    // Subscribe to cache updates
-    subscribers.add(updateStatusFromCache);
+    subscribers.add(updateFromGlobal);
+    startGlobalPoller(); // Starts only once; subsequent calls are no-ops
+    fetchCurrentUserOnce(); // Fetches only once globally
 
-    // Initial fetch
-    fetchOnlineStatus();
-
-    // Refresh every 2 seconds for real-time updates
-    intervalRef.current = setInterval(() => fetchOnlineStatus(true), 2000);
+    // Read from cache immediately if available
+    if (globalLastFetchTime > 0) {
+      updateFromGlobal();
+    }
 
     return () => {
-      subscribers.delete(updateStatusFromCache);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      subscribers.delete(updateFromGlobal);
+      stopGlobalPollerIfEmpty(); // Stops poller when last button unmounts
     };
-  }, [fetchOnlineStatus, updateStatusFromCache]);
-
-  // Also refresh when tab becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        fetchOnlineStatus(true);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [fetchOnlineStatus]);
-
-  // Fetch current user name and image on mount
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const res = await fetch("/api/user/profile");
-        const data = await res.json();
-        const user = data.user || data;
-        if (user?.name) {
-          setCurrentUserName(user.name);
-        }
-        if (user?.profileImage) {
-          setCurrentUserImage(user.profileImage);
-        }
-      } catch {
-        // Ignore - use default "You"
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  }, [updateFromGlobal]);
 
   // Handle challenge button click - show VS screen first
   const handleChallengeClick = () => {
