@@ -58,6 +58,24 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
+/**
+ * Invalidate the leaderboard cache on the main app.
+ * Called after competition/challenge ends so rankings update immediately.
+ * The main app's cache is in a different process — we call its HTTP endpoint.
+ */
+async function invalidateLeaderboardCache(): Promise<void> {
+  try {
+    const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+    });
+  } catch {
+    // Main app might not be reachable — cache will expire naturally in 5 min
+  }
+}
+
 // Create Agenda instance
 const agenda = new Agenda({
   db: {
@@ -112,6 +130,11 @@ agenda.define("competition-end", async () => {
         console.error(`🏆 [COMPETITION END] Failed: ${result.failedCompetitions.length}`);
         result.failedCompetitions.forEach((e) => console.error(`     - ${e}`));
       }
+
+      // Invalidate leaderboard cache so new rankings show immediately
+      if (result.endedCompetitions > 0) {
+        await invalidateLeaderboardCache();
+      }
     }
   } catch (error) {
     console.error(`🏆 [COMPETITION END] Failed:`, error);
@@ -142,6 +165,11 @@ agenda.define("challenge-finalize", async () => {
     if (result.failedChallenges.length > 0) {
       console.error(`⚔️ [CHALLENGE FINALIZE] Failed: ${result.failedChallenges.length}`);
       result.failedChallenges.forEach((e) => console.error(`     - ${e}`));
+    }
+
+    // Invalidate leaderboard cache so new rankings show immediately
+    if (result.finalizedChallenges > 0) {
+      await invalidateLeaderboardCache();
     }
   } catch (error) {
     console.error(`⚔️ [CHALLENGE FINALIZE] Failed:`, error);
@@ -213,6 +241,9 @@ agenda.define("evaluate-badges", async () => {
     // Only log when badges are actually awarded
     if (result.badgesAwarded > 0) {
       console.log(`🏅 [BADGE EVALUATION] Awarded ${result.badgesAwarded} badges to ${result.usersEvaluated} users`);
+
+      // Badges affect leaderboard scores — invalidate cache
+      await invalidateLeaderboardCache();
     }
 
     if (result.errors.length > 0) {
@@ -291,6 +322,9 @@ agenda.define("early-end-check", async () => {
       if (result.challengesEnded > 0) {
         console.log(`   Challenges ended early: ${result.challengesEnded}`);
       }
+
+      // Invalidate leaderboard cache so new rankings show immediately
+      await invalidateLeaderboardCache();
     }
 
     if (result.errors.length > 0) {

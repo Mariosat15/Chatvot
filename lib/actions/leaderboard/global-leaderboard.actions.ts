@@ -67,9 +67,10 @@ function isCacheValid(): boolean {
 
 /**
  * Clear the leaderboard cache.
- * Called after simulator cleanup or manual data deletion to force a fresh build.
+ * Called after simulator cleanup, competition end, or manual data deletion
+ * to force a fresh build on the next request.
  */
-export function clearLeaderboardCache(): void {
+export async function clearLeaderboardCache(): Promise<void> {
   leaderboardCache = null;
 }
 
