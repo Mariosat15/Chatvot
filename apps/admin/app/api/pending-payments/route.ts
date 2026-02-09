@@ -22,8 +22,14 @@ export async function GET() {
       .limit(50)
       .lean();
 
-    // Get Stripe client to verify payment intent statuses
-    const stripe = await getStripeClient();
+    // Lazy-load Stripe client only when needed (avoids crash if Stripe isn't configured)
+    let stripe: Awaited<ReturnType<typeof getStripeClient>> | null = null;
+    async function getStripe() {
+      if (!stripe) {
+        stripe = await getStripeClient();
+      }
+      return stripe;
+    }
 
     // Filter and verify pending payments against payment providers
     const verifiedPendingPayments = [];
@@ -97,8 +103,9 @@ export async function GET() {
 
       try {
         // Check actual status with Stripe
+        const stripeClient = await getStripe();
         const paymentIntent =
-          await stripe.paymentIntents.retrieve(paymentIntentId);
+          await stripeClient.paymentIntents.retrieve(paymentIntentId);
 
         console.log(
           `🔍 Checking PaymentIntent ${paymentIntentId}: status=${paymentIntent.status}`,
@@ -149,7 +156,7 @@ export async function GET() {
 
           // Cancel on Stripe side too
           try {
-            await stripe.paymentIntents.cancel(paymentIntentId);
+            await stripeClient.paymentIntents.cancel(paymentIntentId);
           } catch {
             // May already be canceled or in non-cancelable state
           }
