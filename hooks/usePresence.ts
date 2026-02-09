@@ -1,82 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 
-const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-
-export function usePresence(currentPage?: string) {
-  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
-  const [isActive, setIsActive] = useState(false);
+/**
+ * DEPRECATED: Page-specific presence tracking is now handled by
+ * GlobalPresenceTracker (in root layout) which sends the current pathname
+ * with every heartbeat.
+ *
+ * This hook is kept only for backward-compatibility — it no longer creates
+ * its own heartbeat interval or marks the user offline on unmount. Those
+ * behaviours were causing duplicate heartbeats and conflicting offline
+ * signals when the user navigated between pages.
+ *
+ * If you need to know the user's online state, read it from the presence API
+ * or from GlobalPresenceTracker's heartbeat instead.
+ */
+export function usePresence(_currentPage?: string) {
+  const [isActive] = useState(true); // always true — global tracker handles it
 
   const sendHeartbeat = useCallback(async () => {
-    try {
-      const res = await fetch("/api/user/presence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPage }),
-      });
-      if (res.ok) {
-        setIsActive(true);
-      }
-    } catch (error) {
-      console.error("Failed to send heartbeat:", error);
-    }
-  }, [currentPage]);
-
-  const goOffline = useCallback(async () => {
-    try {
-      await fetch("/api/user/presence", {
-        method: "DELETE",
-      });
-      setIsActive(false);
-    } catch (error) {
-      console.error("Failed to go offline:", error);
-    }
+    // No-op: GlobalPresenceTracker already sends heartbeats
   }, []);
 
-  useEffect(() => {
-    // Send initial heartbeat
-    sendHeartbeat();
-
-    // Set up interval
-    heartbeatRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
-
-    // Go offline on unmount
-    return () => {
-      if (heartbeatRef.current) {
-        clearInterval(heartbeatRef.current);
-      }
-      goOffline();
-    };
-  }, [sendHeartbeat, goOffline]);
-
-  // Handle visibility change
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        sendHeartbeat();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [sendHeartbeat]);
-
-  // Handle page unload
-  useEffect(() => {
-    const handleUnload = () => {
-      // Use sendBeacon for reliability on page close
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon("/api/user/presence?action=offline");
-      }
-    };
-
-    window.addEventListener("beforeunload", handleUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-    };
+  const goOffline = useCallback(async () => {
+    // No-op: Only GlobalPresenceTracker should control online/offline status
   }, []);
 
   return { sendHeartbeat, goOffline, isActive };

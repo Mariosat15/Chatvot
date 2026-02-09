@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 /**
  * Global presence tracker component that should be added to the root layout.
  * This tracks user online/offline status across all pages.
  *
- * IMPORTANT: Users stay ONLINE as long as they are logged in, even if the
+ * IMPORTANT: This is the ONLY presence tracker in the app. Page-specific
+ * trackers (LeaderboardPresenceTracker, challenges usePresence) have been
+ * removed to avoid duplicate heartbeats and conflicting offline signals.
+ *
+ * Users stay ONLINE as long as they are logged in, even if the
  * browser tab is in the background. They only go offline when:
  * - They close the browser/tab completely
  * - They log out
@@ -15,17 +20,25 @@ import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
  */
 export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const pathname = usePathname();
+  // Keep pathname in a ref so the interval always sends the latest page
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   useEffect(() => {
     if (!userId) return;
 
     const sendHeartbeat = async () => {
       // Always send heartbeat - user is online as long as they're logged in
+      // Include currentPage so the server knows which page the user is viewing
       try {
         await fetch("/api/user/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "online" }),
+          body: JSON.stringify({
+            status: "online",
+            currentPage: pathnameRef.current,
+          }),
         });
       } catch {
         // Silently fail - presence is non-critical

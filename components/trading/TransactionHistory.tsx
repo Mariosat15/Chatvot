@@ -98,6 +98,30 @@ export default function TransactionHistory({
   const { settings } = useAppSettings();
   const [filter, setFilter] = useState<FilterType>("all");
 
+  // ── Batch invoice lookup ─────────────────────────────────────────────
+  // Instead of each TransactionItem fetching /api/user/invoices/by-transaction/X
+  // independently (N+1 pattern: 20 deposits = 20 calls), we do ONE batch call.
+  const [invoiceMap, setInvoiceMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const depositIds = transactions
+      .filter(
+        (t) =>
+          t.transactionType === "deposit" && t.status === "completed",
+      )
+      .map((t) => t._id);
+
+    if (depositIds.length === 0) return;
+
+    fetch("/api/user/invoices/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactionIds: depositIds }),
+    })
+      .then((res) => (res.ok ? res.json() : { invoiceMap: {} }))
+      .then((data) => setInvoiceMap(data.invoiceMap || {}))
+      .catch(() => {});
+  }, [transactions]);
+
   // Date filter state
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -408,7 +432,11 @@ export default function TransactionHistory({
       ) : (
         <div className="space-y-3">
           {filteredTransactions.map((transaction) => (
-            <TransactionItem key={transaction._id} transaction={transaction} />
+            <TransactionItem
+              key={transaction._id}
+              transaction={transaction}
+              preloadedInvoiceId={invoiceMap[transaction._id] || null}
+            />
           ))}
         </div>
       )}
@@ -416,37 +444,19 @@ export default function TransactionHistory({
   );
 }
 
-function TransactionItem({ transaction }: { transaction: Transaction }) {
+function TransactionItem({
+  transaction,
+  preloadedInvoiceId,
+}: {
+  transaction: Transaction;
+  preloadedInvoiceId: string | null;
+}) {
   const { settings, creditsToEUR } = useAppSettings();
-  const [invoiceId, setInvoiceId] = useState<string | null>(null);
-  const [loadingInvoice, setLoadingInvoice] = useState(false);
-  const [checkedInvoice, setCheckedInvoice] = useState(false);
 
-  // Check if invoice exists for this transaction (only for deposits)
-  useEffect(() => {
-    if (
-      transaction.transactionType === "deposit" &&
-      transaction.status === "completed" &&
-      !checkedInvoice
-    ) {
-      setCheckedInvoice(true);
-      setLoadingInvoice(true);
-      fetch(`/api/user/invoices/by-transaction/${transaction._id}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.invoice?._id) {
-            setInvoiceId(data.invoice._id);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingInvoice(false));
-    }
-  }, [
-    transaction._id,
-    transaction.transactionType,
-    transaction.status,
-    checkedInvoice,
-  ]);
+  // Invoice ID is now provided by the parent via a single batch API call
+  // instead of each row making its own request (was N+1 pattern).
+  const invoiceId = preloadedInvoiceId;
+  const loadingInvoice = false;
 
   const handleViewInvoice = () => {
     if (invoiceId) {

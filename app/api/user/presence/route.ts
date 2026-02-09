@@ -4,6 +4,13 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import UserPresence from "@/database/models/user-presence.model";
 
+// ── Stale-cleanup throttle ─────────────────────────────────────────────
+// Before this fix, every heartbeat (POST) ran updateMany to mark stale
+// users offline. With N users heartbeating every 30s, that was N redundant
+// updateMany operations per 30s. Now we only run cleanup once per 60s.
+let lastStaleCleanupTime = 0;
+const STALE_CLEANUP_INTERVAL_MS = 60_000; // 60 seconds
+
 // GET - Get current user's presence or list of online users
 export async function GET(request: NextRequest) {
   try {
@@ -113,15 +120,19 @@ export async function POST(request: NextRequest) {
       { upsert: true, new: true },
     );
 
-    // Mark stale users as offline (run periodically)
-    // Users are offline if no heartbeat in last 45 seconds
-    await UserPresence.updateMany(
-      {
-        status: { $ne: "offline" },
-        lastHeartbeat: { $lt: new Date(Date.now() - 45 * 1000) },
-      },
-      { $set: { status: "offline" } },
-    );
+    // Mark stale users as offline — throttled to run at most once per 60s
+    // to avoid redundant updateMany on every heartbeat from every user.
+    const nowMs = Date.now();
+    if (nowMs - lastStaleCleanupTime > STALE_CLEANUP_INTERVAL_MS) {
+      lastStaleCleanupTime = nowMs;
+      await UserPresence.updateMany(
+        {
+          status: { $ne: "offline" },
+          lastHeartbeat: { $lt: new Date(nowMs - 45 * 1000) },
+        },
+        { $set: { status: "offline" } },
+      );
+    }
 
     return NextResponse.json({
       success: true,

@@ -35,8 +35,9 @@ import {
   getAllDifficultyLevels,
 } from "@/lib/utils/competition-difficulty";
 
-// Auto-refresh interval (10 seconds for real-time updates)
-const AUTO_REFRESH_INTERVAL = 10000;
+// Auto-refresh interval — 30s is sufficient for list views where data changes
+// infrequently. Visibility/focus handlers provide instant refresh on tab switch.
+const AUTO_REFRESH_INTERVAL = 30000;
 
 interface Competition {
   _id: string;
@@ -1213,6 +1214,7 @@ export default function CompetitionsPageContent({
                 isCompleted={false}
                 isUserIn={userInCompetitions.has(competition._id)}
                 viewMode={viewMode}
+                platformLeverage={platformLeverage}
               />
             ))}
           </div>
@@ -1258,6 +1260,7 @@ export default function CompetitionsPageContent({
                 isCompleted={competition.status === "completed"}
                 isUserIn={userInCompetitions.has(competition._id)}
                 viewMode={viewMode}
+                platformLeverage={platformLeverage}
               />
             ))}
           </div>

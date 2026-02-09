@@ -19,7 +19,6 @@ import {
   DollarSign,
   ArrowDownUp,
 } from "lucide-react";
-import usePresence from "@/hooks/usePresence";
 import ChallengeCard from "@/components/trading/ChallengeCard";
 
 interface Challenge {
@@ -61,9 +60,6 @@ export default function ChallengesPageContent({
     "newest" | "starting" | "prize" | "entry"
   >("newest");
 
-  // Track presence
-  usePresence("/challenges");
-
   const fetchChallenges = useCallback(async (showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true);
     try {
@@ -84,8 +80,12 @@ export default function ChallengesPageContent({
 
   useEffect(() => {
     fetchChallenges();
-    // Refresh every 10 seconds
-    const interval = setInterval(() => fetchChallenges(false), 10000);
+    // Refresh every 30s — skip when tab is hidden to avoid wasted requests
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchChallenges(false);
+      }
+    }, 30000);
     return () => clearInterval(interval);
   }, [fetchChallenges]);
 

@@ -76,8 +76,8 @@ export default function LiveRankingPanel({
   useEffect(() => {
     fetchRankings();
 
-    // Poll every 5 seconds for live updates
-    const interval = setInterval(fetchRankings, 5000);
+    // Poll every 15 seconds for live updates (reduced from 5s to lower server load)
+    const interval = setInterval(fetchRankings, 15000);
 
     return () => clearInterval(interval);
   }, [fetchRankings]);

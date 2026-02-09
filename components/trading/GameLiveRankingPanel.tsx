@@ -70,7 +70,8 @@ export default function GameLiveRankingPanel({
 
   useEffect(() => {
     fetchRankings();
-    const interval = setInterval(fetchRankings, 5000);
+    // Poll every 15 seconds (reduced from 5s to lower server load)
+    const interval = setInterval(fetchRankings, 15000);
     return () => clearInterval(interval);
   }, [fetchRankings]);
 

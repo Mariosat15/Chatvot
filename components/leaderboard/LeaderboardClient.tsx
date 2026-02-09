@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import LeaderboardContent from "@/components/leaderboard/LeaderboardContent";
-import LeaderboardPresenceTracker from "@/components/leaderboard/LeaderboardPresenceTracker";
 import type { GlobalLeaderboardEntry } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
 const PAGE_SIZE = 50;
@@ -106,7 +105,6 @@ export default function LeaderboardClient({
 
   return (
     <>
-      <LeaderboardPresenceTracker />
       <LeaderboardContent
         leaderboard={entries}
         myPosition={myPosition}

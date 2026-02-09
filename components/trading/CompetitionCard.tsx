@@ -39,6 +39,8 @@ interface CompetitionCardProps {
   isCompleted?: boolean;
   isUserIn?: boolean;
   viewMode?: "card" | "list";
+  /** Platform leverage fetched once by the parent — avoids N+1 API calls */
+  platformLeverage?: number;
 }
 
 // Competition type images and colors
@@ -114,6 +116,7 @@ export default function CompetitionCard({
   isCompleted = false,
   isUserIn = false,
   viewMode = "card",
+  platformLeverage = 100,
 }: CompetitionCardProps) {
   const [entering, setEntering] = useState(false);
   const [liveCountdown, setLiveCountdown] = useState("");
@@ -132,27 +135,8 @@ export default function CompetitionCard({
   const rankingInfo =
     RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
-  // Fetch platform risk settings for actual leverage
-  const [platformLeverage, setPlatformLeverage] = useState<number>(100);
-
-  useEffect(() => {
-    const fetchRiskSettings = async () => {
-      try {
-        const res = await fetch("/api/trading/risk-settings");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.settings?.maxLeverage) {
-            setPlatformLeverage(data.settings.maxLeverage);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch risk settings:", err);
-      }
-    };
-    fetchRiskSettings();
-  }, []);
-
-  // Use platform leverage (actual trading leverage) instead of stored competition value
+  // Platform leverage is now passed as a prop from the parent (fetched ONCE)
+  // instead of each card making its own API call (was N+1 pattern: 20 cards = 20 calls)
   const maxLeverage = platformLeverage;
 
   const difficulty = useMemo(() => {

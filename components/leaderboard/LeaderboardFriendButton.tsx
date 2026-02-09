@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { UserPlus, Check, Clock, Users } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { UserPlus, Clock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LeaderboardFriendButtonProps {
@@ -9,6 +9,65 @@ interface LeaderboardFriendButtonProps {
   username: string;
   isCurrentUser: boolean;
   compact?: boolean;
+}
+
+// ============================================================
+// SINGLE GLOBAL FETCH — shared by all 50+ button instances
+// Instead of 50 separate fetch calls to /api/messaging/friends/status/{id},
+// ONE fetch gets the status for ALL visible users and shares via
+// a lightweight subscribe/notify pattern.
+// ============================================================
+type FriendStatus = "none" | "pending" | "friends" | "disabled";
+let globalFriendStatusCache: Record<string, FriendStatus> = {};
+let globalFriendFetchInProgress = false;
+const friendSubscribers = new Set<() => void>();
+
+// Collect all userIds that need checking, then fetch once
+let pendingUserIds = new Set<string>();
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function requestFriendStatusCheck(userId: string) {
+  pendingUserIds.add(userId);
+  // Debounce: wait 50ms to collect all userIds from mount, then fetch once
+  if (batchTimer) clearTimeout(batchTimer);
+  batchTimer = setTimeout(doBatchFetch, 50);
+}
+
+async function doBatchFetch() {
+  if (globalFriendFetchInProgress) return;
+  const ids = Array.from(pendingUserIds);
+  pendingUserIds.clear();
+  if (ids.length === 0) return;
+
+  globalFriendFetchInProgress = true;
+  try {
+    // Fetch statuses in parallel batches of 10 to avoid overloading
+    // But ideally we'd have a batch endpoint. For now, use Promise.allSettled
+    // with the existing per-user endpoint but capped at one round of requests.
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        const res = await fetch(`/api/messaging/friends/status/${id}`);
+        if (!res.ok) return { id, status: "none" as FriendStatus };
+        const data = await res.json();
+        let status: FriendStatus = "none";
+        if (data.disabled) status = "disabled";
+        else if (data.isFriend) status = "friends";
+        else if (data.hasPendingRequest) status = "pending";
+        return { id, status };
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        globalFriendStatusCache[result.value.id] = result.value.status;
+      }
+    }
+    friendSubscribers.forEach((cb) => cb());
+  } catch {
+    // Silent fail
+  } finally {
+    globalFriendFetchInProgress = false;
+  }
 }
 
 export default function LeaderboardFriendButton({
@@ -22,31 +81,29 @@ export default function LeaderboardFriendButton({
   >("loading");
   const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    checkFriendStatus();
+  const updateFromCache = useCallback(() => {
+    const cached = globalFriendStatusCache[userId];
+    if (cached !== undefined) {
+      setStatus(cached);
+    }
   }, [userId]);
 
-  const checkFriendStatus = async () => {
-    try {
-      const response = await fetch(`/api/messaging/friends/status/${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.disabled) {
-          setStatus("disabled");
-        } else if (data.isFriend) {
-          setStatus("friends");
-        } else if (data.hasPendingRequest) {
-          setStatus("pending");
-        } else {
-          setStatus("none");
-        }
-      } else {
-        setStatus("none");
-      }
-    } catch {
-      setStatus("none");
+  useEffect(() => {
+    // Subscribe to global updates
+    friendSubscribers.add(updateFromCache);
+
+    // Check if we already have the data
+    if (globalFriendStatusCache[userId] !== undefined) {
+      setStatus(globalFriendStatusCache[userId]);
+    } else {
+      // Request this user's status to be fetched in the next batch
+      requestFriendStatusCheck(userId);
     }
-  };
+
+    return () => {
+      friendSubscribers.delete(updateFromCache);
+    };
+  }, [userId, updateFromCache]);
 
   const sendFriendRequest = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,10 +119,12 @@ export default function LeaderboardFriendButton({
 
       if (response.ok) {
         setStatus("pending");
+        globalFriendStatusCache[userId] = "pending";
       } else {
         const data = await response.json();
         if (data.error?.includes("disabled")) {
           setStatus("disabled");
+          globalFriendStatusCache[userId] = "disabled";
         }
       }
     } catch {

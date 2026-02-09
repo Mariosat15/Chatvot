@@ -4,10 +4,19 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
 
+// ── In-memory cache (per competition) ──────────────────────────────────
+// Rankings rarely change within 5 seconds. When multiple users view the
+// same competition, this avoids redundant DB queries per viewer.
+const rankingCache = new Map<
+  string,
+  { data: Record<string, unknown>; ts: number }
+>();
+const RANKING_CACHE_TTL = 5000; // 5 seconds
+
 /**
  * GET /api/competitions/[id]/live-ranking
  * Returns live participant rankings with prize info for the trading interface
- * Optimized for frequent polling (every 5-10 seconds)
+ * Optimized for frequent polling (every 15 seconds on client)
  */
 export async function GET(
   request: NextRequest,
@@ -20,6 +29,24 @@ export async function GET(
     }
 
     const { id: competitionId } = await params;
+
+    // Check cache first — avoids DB queries when multiple users poll simultaneously
+    const cached = rankingCache.get(competitionId);
+    if (cached && Date.now() - cached.ts < RANKING_CACHE_TTL) {
+      // Return cached data but personalise userRank for THIS user
+      const userRanking = (
+        cached.data.allRankings as Array<{ userId: string; rank: number; liveEquity: number }>
+      )?.find((r) => r.userId === session.user.id);
+      return NextResponse.json({
+        ...cached.data,
+        rankings: buildDisplayRankings(
+          cached.data.allRankings as Array<Record<string, unknown>>,
+          session.user.id,
+        ),
+        userRank: userRanking?.rank || null,
+        userEquity: userRanking?.liveEquity || null,
+      });
+    }
 
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(competitionId)) {
@@ -220,26 +247,23 @@ export async function GET(
       };
     });
 
+    // Store full rankings in cache for all users to share
+    const cachePayload = {
+      allRankings: rankingsWithPrizes,
+      totalParticipants: rankings.length,
+      prizePool: netPool,
+      firstPlaceValue,
+      rankingMethod,
+    };
+    rankingCache.set(competitionId, { data: cachePayload, ts: Date.now() });
+
     // Find current user's rank
     const userRanking = rankingsWithPrizes.find(
       (r) => r.userId === session.user.id,
     );
 
-    // Return top 10 + user's position if not in top 10
-    let displayRankings = rankingsWithPrizes.slice(0, 10);
-
-    if (userRanking && userRanking.rank > 10) {
-      // Add separator and user's position
-      displayRankings = [
-        ...displayRankings,
-        { ...userRanking, isSeparator: true } as typeof userRanking & {
-          isSeparator: boolean;
-        },
-      ];
-    }
-
     return NextResponse.json({
-      rankings: displayRankings,
+      rankings: buildDisplayRankings(rankingsWithPrizes, session.user.id),
       userRank: userRanking?.rank || null,
       userEquity: userRanking?.liveEquity || null,
       totalParticipants: rankings.length,
@@ -257,4 +281,19 @@ export async function GET(
       { status: 500 },
     );
   }
+}
+
+/** Return top 10 + the user's own position if not in top 10 */
+function buildDisplayRankings(
+  allRankings: Array<Record<string, unknown>>,
+  userId: string,
+) {
+  const top10 = allRankings.slice(0, 10);
+  const userRanking = allRankings.find(
+    (r) => r.userId === userId,
+  );
+  if (userRanking && (userRanking.rank as number) > 10) {
+    return [...top10, { ...userRanking, isSeparator: true }];
+  }
+  return top10;
 }
