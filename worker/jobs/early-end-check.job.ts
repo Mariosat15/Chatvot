@@ -63,7 +63,8 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
       .toArray();
 
     // BATCH: Load ALL participants for ALL active competitions in ONE query
-    const allCompIds = activeCompetitions.map((c) => c._id);
+    // NOTE: competitionId is stored as String in schema, so we must convert ObjectIds to strings
+    const allCompIds = activeCompetitions.map((c) => c._id.toString());
     const allCompParticipants = allCompIds.length > 0
       ? await participantsCollection
           .find({ competitionId: { $in: allCompIds } })
@@ -219,7 +220,8 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
       .toArray();
 
     // BATCH: Load ALL participants for ALL active challenges in ONE query
-    const allChallengeIds = activeChallenges.map((c) => c._id);
+    // NOTE: challengeId is stored as String in schema, so we must convert ObjectIds to strings
+    const allChallengeIds = activeChallenges.map((c) => c._id.toString());
     const allChallengeParticipants = allChallengeIds.length > 0
       ? await challengeParticipantsCollection
           .find({ challengeId: { $in: allChallengeIds } })
