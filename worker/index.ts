@@ -8,7 +8,7 @@
  * REPLACES INNGEST - all scheduled jobs handled here!
  *
  * Jobs:
- * - margin-check: Backup margin monitoring (every 5 minutes)
+ * - margin-check: Backup margin monitoring (every 1 minute, covers competitions + challenges)
  * - competition-end: Check for expired competitions (every 1 minute)
  * - challenge-finalize: Check for expired challenges (every 1 minute)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
@@ -372,7 +372,7 @@ async function startWorker(): Promise<void> {
     await agenda.start();
 
     // Schedule recurring jobs
-    await agenda.every("5 minutes", "margin-check");
+    await agenda.every("1 minute", "margin-check");
     await agenda.every("1 minute", "competition-end");
     await agenda.every("1 minute", "challenge-finalize");
     await agenda.every("1 minute", "early-end-check");

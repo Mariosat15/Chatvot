@@ -4,6 +4,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import { getMarginThresholds } from "@/lib/actions/trading/risk-settings.actions";
@@ -27,12 +28,20 @@ export const checkUserMargin = async (competitionId: string) => {
 
     await connectToDatabase();
 
-    // Get user's participant record
-    const participant = await CompetitionParticipant.findOne({
+    // Get user's participant record (try competition first, then challenge)
+    let participant = await CompetitionParticipant.findOne({
       competitionId,
       userId: session.user.id,
       status: "active",
     });
+
+    if (!participant) {
+      participant = await ChallengeParticipant.findOne({
+        challengeId: competitionId,
+        userId: session.user.id,
+        status: "active",
+      });
+    }
 
     if (!participant || participant.currentOpenPositions === 0) {
       return { liquidated: false, marginLevel: Infinity };

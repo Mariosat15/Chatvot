@@ -1,8 +1,10 @@
 /**
  * Margin Check Job
  *
- * Runs periodically to check all users' margins and liquidate if needed.
+ * Runs every 1 minute to check all users' margins and liquidate if needed.
  * This is a BACKUP to the client-side real-time checks.
+ *
+ * Handles BOTH competitions AND challenges.
  *
  * Benefits:
  * - Catches users who disconnect before liquidation
@@ -14,8 +16,10 @@ import { connectToDatabase } from "../config/database";
 
 // Import models directly
 import CompetitionParticipant from "../../database/models/trading/competition-participant.model";
+import ChallengeParticipant from "../../database/models/trading/challenge-participant.model";
 import TradingPosition from "../../database/models/trading/trading-position.model";
 import Competition from "../../database/models/trading/competition.model";
+import Challenge from "../../database/models/trading/challenge.model";
 
 // Import services directly
 import { fetchRealForexPrices } from "../../lib/services/real-forex-prices.service";
@@ -45,6 +49,170 @@ export interface MarginCheckResult {
   errors: string[];
 }
 
+/**
+ * Helper: check a batch of participants (competition OR challenge) for margin calls.
+ * Reusable for both competition and challenge participants.
+ */
+async function checkParticipantBatch(
+  participants: any[],
+  pricesMap: Map<ForexSymbol, any>,
+  thresholds: { liquidation: number; marginCall: number; warning: number },
+  contestMap: Map<string, any>,
+  ParticipantModel: typeof CompetitionParticipant | typeof ChallengeParticipant,
+  contestIdField: "competitionId" | "challengeId",
+  result: MarginCheckResult,
+): Promise<void> {
+  if (participants.length === 0) return;
+
+  // Load ALL open positions in a single query
+  const allParticipantIds = participants.map((p) => p._id);
+  const allPositions = await TradingPosition.find({
+    participantId: { $in: allParticipantIds },
+    status: "open",
+  })
+    .select("_id participantId symbol side entryPrice quantity")
+    .lean();
+
+  // Group positions by participant and collect unique symbols
+  const participantPositions = new Map<string, any[]>();
+  const newSymbols = new Set<ForexSymbol>();
+
+  for (const position of allPositions) {
+    const participantId = position.participantId.toString();
+    if (!participantPositions.has(participantId)) {
+      participantPositions.set(participantId, []);
+    }
+    participantPositions.get(participantId)!.push(position);
+
+    const sym = position.symbol as ForexSymbol;
+    if (!pricesMap.has(sym)) {
+      newSymbols.add(sym);
+    }
+  }
+
+  // Fetch any new prices not already in the map
+  if (newSymbols.size > 0) {
+    const fetched = await fetchRealForexPrices(Array.from(newSymbols));
+    for (const [k, v] of fetched) {
+      pricesMap.set(k, v);
+    }
+  }
+
+  // Check each participant
+  for (const participant of participants) {
+    result.checkedParticipants++;
+
+    const positions = participantPositions.get(participant._id.toString());
+    if (!positions || positions.length === 0) continue;
+
+    try {
+      // Calculate total unrealized P&L
+      let totalUnrealizedPnl = 0;
+
+      for (const position of positions) {
+        const currentPrice = pricesMap.get(position.symbol);
+        if (!currentPrice) continue;
+
+        const marketPrice =
+          position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const unrealizedPnl = calculateUnrealizedPnL(
+          position.side,
+          position.entryPrice,
+          marketPrice,
+          position.quantity,
+          position.symbol,
+        );
+
+        totalUnrealizedPnl += unrealizedPnl;
+      }
+
+      // Check margin status
+      const marginStatus = getMarginStatus(
+        participant.currentCapital,
+        totalUnrealizedPnl,
+        participant.usedMargin,
+        thresholds,
+      );
+
+      // Liquidate if needed
+      if (marginStatus.status === "liquidation") {
+        result.liquidatedUsers++;
+
+        // Close all positions for this user
+        for (const position of positions) {
+          try {
+            const currentPrice = pricesMap.get(position.symbol);
+            if (!currentPrice) continue;
+
+            const marketPrice =
+              position.side === "long" ? currentPrice.bid : currentPrice.ask;
+            await closePositionAutomatic(
+              position._id.toString(),
+              marketPrice,
+              "margin_call",
+            );
+            result.liquidatedPositions++;
+          } catch (posError) {
+            result.errors.push(
+              `Failed to close position ${position._id}: ${posError}`,
+            );
+          }
+        }
+
+        // Mark participant as liquidated using correct model
+        await ParticipantModel.findByIdAndUpdate(participant._id, {
+          $set: {
+            status: "liquidated",
+            liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
+            currentOpenPositions: 0,
+          },
+        });
+
+        // Send liquidation notification
+        try {
+          const { sendNotification } =
+            await import("../../lib/services/notification.service");
+          await sendNotification({
+            userId: participant.userId,
+            type: "liquidation",
+            metadata: { symbol: "All positions" },
+          });
+        } catch {
+          // Notification failure is not critical
+        }
+
+        // Send disqualification notification if contest has disqualifyOnLiquidation
+        try {
+          const contestId = participant[contestIdField]?.toString();
+          const contest = contestMap.get(contestId);
+          if ((contest as any)?.rules?.disqualifyOnLiquidation) {
+            const { sendNotification } =
+              await import("../../lib/services/notification.service");
+            await sendNotification({
+              userId: participant.userId,
+              type: "competition_disqualified",
+              metadata: {
+                competitionId: contestId,
+                competitionName: (contest as any).name,
+                reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
+              },
+            });
+          }
+        } catch (notifError) {
+          console.error(
+            `   ❌ Failed to send disqualification notification:`,
+            notifError,
+          );
+        }
+      }
+    } catch (participantError) {
+      result.errors.push(
+        `Error processing participant ${participant._id}: ${participantError}`,
+      );
+    }
+  }
+}
+
 export async function runMarginCheck(): Promise<MarginCheckResult> {
   const result: MarginCheckResult = {
     checkedParticipants: 0,
@@ -72,182 +240,81 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
       // Use defaults
     }
 
-    // Get all active competitions — only need _id, name, and rules for margin check
+    const thresholds = {
+      liquidation: liquidationThreshold,
+      marginCall: marginCallThreshold,
+      warning: warningThreshold,
+    };
+
+    // Shared price map across competitions and challenges (avoids duplicate fetches)
+    const pricesMap = new Map<ForexSymbol, any>();
+
+    // ============================================
+    // 1. CHECK COMPETITIONS FOR MARGIN
+    // ============================================
     const activeCompetitions = await Competition.find({ status: "active" })
-      .select("_id name rules prizePool prizeDistribution")
-      .lean();
-    const activeCompetitionIds = activeCompetitions.map((c) => c._id);
-
-    if (activeCompetitionIds.length === 0) {
-      return result;
-    }
-
-    // Get all participants with open positions in active competitions
-    // Only select fields needed for margin calculation
-    const participantsWithPositions = await CompetitionParticipant.find({
-      competitionId: { $in: activeCompetitionIds },
-      status: "active",
-      currentOpenPositions: { $gt: 0 },
-    })
-      .select("_id userId competitionId currentCapital usedMargin currentOpenPositions")
+      .select("_id name rules")
       .lean();
 
-    if (participantsWithPositions.length === 0) {
-      return result;
-    }
+    if (activeCompetitions.length > 0) {
+      const activeCompetitionIds = activeCompetitions.map((c) => c._id);
 
-    // Load ALL open positions in a single query (much faster than N queries)
-    // Only select fields needed for PnL calculation
-    const allParticipantIds = participantsWithPositions.map((p) => p._id);
-    const allPositions = await TradingPosition.find({
-      participantId: { $in: allParticipantIds },
-      status: "open",
-    })
-      .select("_id participantId symbol side entryPrice quantity takeProfit stopLoss")
-      .lean();
+      const compParticipants = await CompetitionParticipant.find({
+        competitionId: { $in: activeCompetitionIds },
+        status: "active",
+        currentOpenPositions: { $gt: 0 },
+      })
+        .select("_id userId competitionId currentCapital usedMargin currentOpenPositions")
+        .lean();
 
-    // Group positions by participant and collect unique symbols
-    const allSymbols = new Set<ForexSymbol>();
-    const participantPositions = new Map<string, any[]>();
-
-    for (const position of allPositions) {
-      const participantId = position.participantId.toString();
-      if (!participantPositions.has(participantId)) {
-        participantPositions.set(participantId, []);
+      const competitionMap = new Map<string, any>();
+      for (const comp of activeCompetitions) {
+        competitionMap.set((comp._id as any).toString(), comp);
       }
-      participantPositions.get(participantId)!.push(position);
-      allSymbols.add(position.symbol as ForexSymbol);
+
+      await checkParticipantBatch(
+        compParticipants,
+        pricesMap,
+        thresholds,
+        competitionMap,
+        CompetitionParticipant as any,
+        "competitionId",
+        result,
+      );
     }
 
-    // Fetch current prices for all symbols at once (efficient)
-    const pricesMap = await fetchRealForexPrices(Array.from(allSymbols));
+    // ============================================
+    // 2. CHECK CHALLENGES FOR MARGIN
+    // ============================================
+    const activeChallenges = await Challenge.find({ status: "active" })
+      .select("_id name rules")
+      .lean();
 
-    // PERF: Pre-fetch all active competitions once to avoid N+1 Competition.findById in the loop
-    // Already lean() from above
-    const competitionMap = new Map<string, any>();
-    for (const comp of activeCompetitions) {
-      competitionMap.set((comp._id as any).toString(), comp);
-    }
+    if (activeChallenges.length > 0) {
+      const activeChallengeIds = activeChallenges.map((c) => c._id);
 
-    // Check each participant
-    for (const participant of participantsWithPositions) {
-      result.checkedParticipants++;
+      const challengeParticipants = await ChallengeParticipant.find({
+        challengeId: { $in: activeChallengeIds },
+        status: "active",
+        currentOpenPositions: { $gt: 0 },
+      })
+        .select("_id userId challengeId currentCapital usedMargin currentOpenPositions")
+        .lean();
 
-      const positions = participantPositions.get(participant._id.toString());
-      if (!positions || positions.length === 0) continue;
-
-      try {
-        // Calculate total unrealized P&L
-        let totalUnrealizedPnl = 0;
-
-        for (const position of positions) {
-          const currentPrice = pricesMap.get(position.symbol);
-          if (!currentPrice) continue;
-
-          const marketPrice =
-            position.side === "long" ? currentPrice.bid : currentPrice.ask;
-          const unrealizedPnl = calculateUnrealizedPnL(
-            position.side,
-            position.entryPrice,
-            marketPrice,
-            position.quantity,
-            position.symbol,
-          );
-
-          totalUnrealizedPnl += unrealizedPnl;
-        }
-
-        // Check margin status
-        const marginStatus = getMarginStatus(
-          participant.currentCapital,
-          totalUnrealizedPnl,
-          participant.usedMargin,
-          {
-            liquidation: liquidationThreshold,
-            marginCall: marginCallThreshold,
-            warning: warningThreshold,
-          },
-        );
-
-        // Liquidate if needed
-        if (marginStatus.status === "liquidation") {
-          result.liquidatedUsers++;
-
-          // Close all positions for this user
-          for (const position of positions) {
-            try {
-              const currentPrice = pricesMap.get(position.symbol);
-              if (!currentPrice) continue;
-
-              const marketPrice =
-                position.side === "long" ? currentPrice.bid : currentPrice.ask;
-              await closePositionAutomatic(
-                position._id.toString(),
-                marketPrice,
-                "margin_call",
-              );
-              result.liquidatedPositions++;
-            } catch (posError) {
-              result.errors.push(
-                `Failed to close position ${position._id}: ${posError}`,
-              );
-            }
-          }
-
-          // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
-          // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
-          await CompetitionParticipant.findByIdAndUpdate(participant._id, {
-            $set: {
-              status: "liquidated",
-              liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
-              currentOpenPositions: 0,
-            },
-          });
-          // Participant marked as liquidated
-
-          // Send liquidation notification
-          try {
-            const { sendNotification } =
-              await import("../../lib/services/notification.service");
-            await sendNotification({
-              userId: participant.userId,
-              type: "liquidation",
-              metadata: { symbol: "All positions" },
-            });
-          } catch {
-            // Notification failure is not critical
-          }
-
-          // Send disqualification notification if competition has disqualifyOnLiquidation enabled
-          try {
-            // PERF: Use pre-fetched map instead of N+1 Competition.findById
-            const competition = competitionMap.get(participant.competitionId?.toString());
-            if ((competition as any)?.rules?.disqualifyOnLiquidation) {
-              const { sendNotification } =
-                await import("../../lib/services/notification.service");
-              await sendNotification({
-                userId: participant.userId,
-                type: "competition_disqualified",
-                metadata: {
-                  competitionId: participant.competitionId,
-                  competitionName: (competition as any).name,
-                  reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
-                },
-              });
-              // Disqualification notification sent
-            }
-          } catch (notifError) {
-            console.error(
-              `   ❌ Failed to send disqualification notification:`,
-              notifError,
-            );
-          }
-        }
-      } catch (participantError) {
-        result.errors.push(
-          `Error processing participant ${participant._id}: ${participantError}`,
-        );
+      const challengeMap = new Map<string, any>();
+      for (const ch of activeChallenges) {
+        challengeMap.set((ch._id as any).toString(), ch);
       }
+
+      await checkParticipantBatch(
+        challengeParticipants,
+        pricesMap,
+        thresholds,
+        challengeMap,
+        ChallengeParticipant as any,
+        "challengeId",
+        result,
+      );
     }
 
     return result;

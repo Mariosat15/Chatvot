@@ -4,6 +4,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import { getMarginThresholds } from "@/lib/actions/trading/risk-settings.actions";
@@ -52,12 +53,22 @@ export const executeLiquidation = async (
 
     await connectToDatabase();
 
-    // Get user's participant record
-    const participant = await CompetitionParticipant.findOne({
+    // Get user's participant record (try competition first, then challenge)
+    let participant = await CompetitionParticipant.findOne({
       competitionId,
       userId: session.user.id,
       status: "active",
     });
+
+    let isChallenge = false;
+    if (!participant) {
+      participant = await ChallengeParticipant.findOne({
+        challengeId: competitionId,
+        userId: session.user.id,
+        status: "active",
+      });
+      isChallenge = true;
+    }
 
     if (!participant) {
       return {
@@ -175,9 +186,10 @@ export const executeLiquidation = async (
     }
 
     // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
-    // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
+    // This is needed for disqualifyOnLiquidation rule to work correctly at competition/challenge end
     if (closedCount > 0) {
-      await CompetitionParticipant.findByIdAndUpdate(participant._id, {
+      const ParticipantModel = isChallenge ? ChallengeParticipant : CompetitionParticipant;
+      await ParticipantModel.findByIdAndUpdate(participant._id, {
         $set: {
           status: "liquidated",
           liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
@@ -188,16 +200,18 @@ export const executeLiquidation = async (
         `📝 Participant ${session.user.id} marked as 'liquidated' for disqualification tracking`,
       );
 
-      // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+      // Send disqualification notification if competition/challenge has disqualifyOnLiquidation enabled
       try {
-        const Competition = (
-          await import("@/database/models/trading/competition.model")
-        ).default;
-        const competition = (await Competition.findById(
-          competitionId,
-        ).lean()) as any;
+        let contestDoc: any = null;
+        if (isChallenge) {
+          const Challenge = (await import("@/database/models/trading/challenge.model")).default;
+          contestDoc = await Challenge.findById(competitionId).lean();
+        } else {
+          const Competition = (await import("@/database/models/trading/competition.model")).default;
+          contestDoc = await Competition.findById(competitionId).lean();
+        }
 
-        if (competition?.rules?.disqualifyOnLiquidation) {
+        if (contestDoc?.rules?.disqualifyOnLiquidation) {
           const { sendNotification } =
             await import("@/lib/services/notification.service");
 
@@ -207,7 +221,7 @@ export const executeLiquidation = async (
             type: "competition_disqualified",
             metadata: {
               competitionId: competitionId,
-              competitionName: competition.name,
+              competitionName: contestDoc.name,
               reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
             },
           });
@@ -259,11 +273,20 @@ export const backupMarginCheck = async (
 
     await connectToDatabase();
 
-    const participant = await CompetitionParticipant.findOne({
+    // Try competition first, then challenge
+    let participant = await CompetitionParticipant.findOne({
       competitionId,
       userId: session.user.id,
       status: "active",
     });
+
+    if (!participant) {
+      participant = await ChallengeParticipant.findOne({
+        challengeId: competitionId,
+        userId: session.user.id,
+        status: "active",
+      });
+    }
 
     if (!participant || participant.currentOpenPositions === 0) {
       return { needsLiquidation: false, marginLevel: Infinity };
