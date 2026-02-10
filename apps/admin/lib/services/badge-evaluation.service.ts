@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { Badge } from "@/lib/constants/badges";
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
@@ -48,6 +49,7 @@ export interface UserStats {
   // Wallet
   totalDeposited: number;
   totalWithdrawn: number;
+  withdrawalCount: number; // Number of completed withdrawals
   kycVerified: boolean;
 
   // Time
@@ -359,10 +361,10 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     allPositions.length > 0 && tradesWithTP === allPositions.length;
 
   // Wallet stats
-  const wallet = (await CreditWallet.findOne({ userId }).lean()) as Record<
-    string,
-    unknown
-  > | null;
+  const [wallet, withdrawalCount] = await Promise.all([
+    CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
+    WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
+  ]);
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
   const kycVerified = !!(wallet?.kycVerified || wallet?.kycStatus === "approved");
@@ -680,6 +682,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
     totalWithdrawn,
+    withdrawalCount,
     kycVerified,
     accountAge,
     consecutiveTradingDays: consecutiveDays,
@@ -825,6 +828,8 @@ export async function checkBadgeCondition(
       return compareValue(stats.totalDeposited, value, comparison);
     case "withdrawal_made":
       return stats.totalWithdrawn > 0;
+    case "total_withdrawals":
+      return compareValue(stats.withdrawalCount, value, comparison);
     case "large_withdrawal":
       return stats.totalWithdrawn >= 500;
     case "net_profit_lifetime":
