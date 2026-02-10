@@ -33,6 +33,7 @@ async function loadWorkerPoolSettings(
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 3000,
       connectTimeoutMS: 3000,
+      serverMonitoringMode: "poll",
     });
     await client.connect();
     const doc = await client
@@ -72,6 +73,7 @@ export async function connectToDatabase(): Promise<void> {
       maxPoolSize: pool.maxPoolSize,
       minPoolSize: pool.minPoolSize,
       bufferCommands: false,
+      serverMonitoringMode: "poll",
     });
 
     isConnected = true;

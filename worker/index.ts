@@ -87,7 +87,8 @@ const agenda = new Agenda({
     options: {
       maxPoolSize: 5,
       minPoolSize: 1,
-    },
+      serverMonitoringMode: "poll",
+    } as any,
   },
   processEvery: "30 seconds",
   maxConcurrency: 3,

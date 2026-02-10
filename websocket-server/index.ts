@@ -86,6 +86,7 @@ async function loadWsPoolSettings(
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 3000,
       connectTimeoutMS: 3000,
+      serverMonitoringMode: "poll",
     });
     await client.connect();
     const doc = await client
@@ -121,6 +122,7 @@ async function connectToMongoDB() {
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 30000,
+      serverMonitoringMode: "poll",
     });
     console.log(
       `✅ Connected to MongoDB (pool: ${pool.maxPoolSize}/${pool.minPoolSize})`,

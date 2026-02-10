@@ -55,12 +55,16 @@ async function loadClusterSettings(
     // specific read-heavy queries (leaderboard, stats) that don't use transactions.
     retryWrites: true,
     retryReads: true,
+    // Use poll mode to reduce monitoring connections from 6 to 3 per instance
+    // (no separate RTT pinger connection per replica set member)
+    serverMonitoringMode: "poll",
   };
 
   try {
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 3000,
       connectTimeoutMS: 3000,
+      serverMonitoringMode: "poll",
     });
     await client.connect();
     const doc = await client

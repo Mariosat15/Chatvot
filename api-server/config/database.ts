@@ -29,12 +29,14 @@ async function loadApiPoolSettings(
     socketTimeoutMS: 45000,
     bufferCommands: false,
     autoIndex: true,
+    serverMonitoringMode: "poll",
   };
 
   try {
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 3000,
       connectTimeoutMS: 3000,
+      serverMonitoringMode: "poll",
     });
     await client.connect();
     const doc = await client
