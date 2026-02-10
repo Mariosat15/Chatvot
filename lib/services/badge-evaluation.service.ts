@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { Badge } from "@/lib/constants/badges";
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
@@ -49,6 +50,7 @@ export interface UserStats {
   // Wallet
   totalDeposited: number;
   totalWithdrawn: number;
+  withdrawalCount: number; // Number of completed withdrawals
   kycVerified: boolean;
 
   // Time
@@ -212,11 +214,12 @@ export async function evaluateUserBadges(userId: string): Promise<{
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Fetch independent data in parallel (all queries depend only on userId)
-  const [participations, allPositions, closedTrades, wallet] = await Promise.all([
+  const [participations, allPositions, closedTrades, wallet, withdrawalCount] = await Promise.all([
     CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
     TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(10000).lean(),
     TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume").sort({ closedAt: -1 }).limit(10000).lean(),
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
+    WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
   ]);
 
   // Get competition stats
@@ -621,6 +624,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
     totalWithdrawn,
+    withdrawalCount,
     kycVerified,
     accountAge,
     consecutiveTradingDays: consecutiveDays,
@@ -767,6 +771,8 @@ export async function checkBadgeCondition(
       return compareValue(stats.totalDeposited, value, comparison);
     case "withdrawal_made":
       return stats.totalWithdrawn > 0;
+    case "total_withdrawals":
+      return compareValue(stats.withdrawalCount, value, comparison);
     case "large_withdrawal":
       return stats.totalWithdrawn >= 500;
     case "net_profit_lifetime":

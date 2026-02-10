@@ -50,6 +50,7 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
     kycVerified: true,
     totalDeposited: 1000,
     totalWithdrawn: 500,
+    withdrawalCount: 5, // 5 completed withdrawals (for total_withdrawals badge)
     accountAge: 365,
     winningTrades: 60,
     losingTrades: 40,
@@ -195,6 +196,9 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       break;
     case "withdrawal_made":
       baseStats.totalWithdrawn = 100;
+      break;
+    case "total_withdrawals":
+      baseStats.withdrawalCount = numericValue + 2;
       break;
     case "large_withdrawal":
       baseStats.totalWithdrawn = 600;

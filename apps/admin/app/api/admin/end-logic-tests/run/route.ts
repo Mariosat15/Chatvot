@@ -3667,10 +3667,11 @@ async function runRealChallengeTest(
           }
 
           // Verify GameMasterEarning record was created
-          // Challenge finalization creates records with 'challengeId' field, not 'sourceId'
+          // Challenge finalization writes sourceType:"challenge" + sourceId (the challenge _id)
           const gmEarning = await gmEarningsCollection.findOne({
             gameMasterId: actualGmUserId.toString(),
-            challengeId: challengeId.toString(),
+            sourceId: challengeId.toString(),
+            sourceType: "challenge",
           });
 
           if (!gmEarning && expectedGmFee.amount > 0) {
@@ -3693,9 +3694,10 @@ async function runRealChallengeTest(
           scenario.expected.expectedRetainedFees > 0
         ) {
           // Verify no GM earnings were created for this challenge
-          // Challenge finalization creates records with 'challengeId' field
+          // Challenge finalization writes sourceType:"challenge" + sourceId
           const anyGmEarnings = await gmEarningsCollection.findOne({
-            challengeId: challengeId.toString(),
+            sourceId: challengeId.toString(),
+            sourceType: "challenge",
           });
           if (anyGmEarnings) {
             passed = false;

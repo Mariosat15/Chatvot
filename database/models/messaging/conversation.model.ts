@@ -215,17 +215,23 @@ ConversationSchema.index({ assignedEmployeeId: 1, status: 1 });
 ConversationSchema.index({ type: 1, status: 1, lastActivityAt: -1 });
 ConversationSchema.index({ isAIHandled: 1, type: 1 });
 
-// Auto-cleanup: drop the old illegal compound index on two array fields if it still exists in the DB.
-// This runs once on model load and silently ignores if the index was already removed.
-ConversationSchema.on("index", function () {
-  const Convo = mongoose.models.Conversation;
-  if (Convo?.collection) {
-    Convo.collection
+// Auto-cleanup: drop the old illegal compound index on two array fields.
+// Uses mongoose connection event so it runs reliably after DB is connected.
+function dropBrokenConversationIndex() {
+  const conn = mongoose.connection;
+  const doDrop = () => {
+    conn.db?.collection("conversations")
       .dropIndex("participants.id_1_deletedByUsers_1")
       .then(() => console.error("[conversations] Dropped broken compound index participants.id_1_deletedByUsers_1"))
       .catch(() => { /* index doesn't exist — nothing to do */ });
+  };
+  if (conn.readyState === 1) {
+    doDrop();
+  } else {
+    conn.once("open", doDrop);
   }
-});
+}
+dropBrokenConversationIndex();
 
 // Static methods
 ConversationSchema.statics.findByParticipant = function (
