@@ -89,7 +89,9 @@ const agenda = new Agenda({
     options: {
       maxPoolSize: 5,
       minPoolSize: 1,
-      serverMonitoringMode: "poll",
+      // NOTE: serverMonitoringMode is NOT supported by Agenda's bundled MongoDB driver (v4.x).
+      // It's only available in MongoDB driver v6+. The worker's own Mongoose connection
+      // already uses serverMonitoringMode:"poll" — this only affects Agenda's internal client.
     } as any,
   },
   processEvery: "30 seconds",
