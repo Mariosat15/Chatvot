@@ -187,7 +187,9 @@ const pendingPriceUpdates = new Map<
   { bid: number; ask: number; timestamp: number }
 >();
 let mongoPriceWriteTimer: NodeJS.Timeout | null = null;
-const MONGO_PRICE_WRITE_INTERVAL_MS = 1000; // Write to MongoDB every 1 second (batched)
+const MONGO_PRICE_WRITE_INTERVAL_MS = 2500; // Write to MongoDB every 2.5 seconds (batched)
+// Reduced from 1s → 2.5s to cut PriceCache writes by 60%.
+// Prices still update faster than client 2s poll. Worker reads from this cache.
 
 /**
  * Check TP/SL when price updates - throttled to prevent resource overload

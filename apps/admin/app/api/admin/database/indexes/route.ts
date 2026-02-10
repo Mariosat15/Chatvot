@@ -114,11 +114,16 @@ const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
       keys: { status: 1, endTime: 1 },
       options: { name: "status_1_endTime_1" },
     },
+    {
+      keys: { status: 1, acceptDeadline: 1 },
+      options: { name: "status_1_acceptDeadline_1" },
+    }, // challenge-finalize job queries pending + acceptDeadline every minute
     { keys: { challengerId: 1 }, options: { name: "challengerId_1" } },
     { keys: { challengedId: 1 }, options: { name: "challengedId_1" } },
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
   ],
   challengeparticipants: [
+    { keys: { challengeId: 1 }, options: { name: "challengeId_1" } }, // early-end-check queries by challengeId every minute
     {
       keys: { challengeId: 1, role: 1 },
       options: { name: "challengeId_1_role_1" },
@@ -165,6 +170,21 @@ const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
   ],
 
   // ============================================
+  // TRADE HISTORY INDEXES (defined in model but must also be tracked here)
+  // ============================================
+  tradehistories: [
+    { keys: { competitionId: 1, closedAt: -1 }, options: { name: "competitionId_1_closedAt_-1" } },
+    { keys: { userId: 1, closedAt: -1 }, options: { name: "userId_1_closedAt_-1" } },
+    { keys: { participantId: 1, closedAt: -1 }, options: { name: "participantId_1_closedAt_-1" } },
+    { keys: { symbol: 1, closedAt: -1 }, options: { name: "symbol_1_closedAt_-1" } },
+    { keys: { competitionId: 1, isWinner: 1 }, options: { name: "competitionId_1_isWinner_1" } },
+    { keys: { userId: 1, isWinner: 1 }, options: { name: "userId_1_isWinner_1" } },
+    { keys: { userId: 1, competitionId: 1, closedAt: -1 }, options: { name: "userId_1_competitionId_1_closedAt_-1" } },
+    { keys: { competitionId: 1, realizedPnl: -1 }, options: { name: "competitionId_1_realizedPnl_-1" } },
+    { keys: { closeReason: 1, closedAt: -1 }, options: { name: "closeReason_1_closedAt_-1" } },
+  ],
+
+  // ============================================
   // WITHDRAWAL REQUESTS (wallet/withdraw hot path)
   // ============================================
   withdrawalrequests: [
@@ -195,6 +215,10 @@ const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
     },
     { keys: { walletId: 1, type: 1 }, options: { name: "walletId_1_type_1" } },
     { keys: { status: 1 }, options: { name: "status_1" } },
+    {
+      keys: { transactionType: 1, status: 1, createdAt: -1 },
+      options: { name: "transactionType_1_status_1_createdAt_-1" },
+    }, // Dashboard stats queries by type+status
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
     { keys: { competitionId: 1 }, options: { name: "competitionId_1" } },
     { keys: { challengeId: 1 }, options: { name: "challengeId_1" } },
@@ -224,6 +248,13 @@ const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
     },
     { keys: { userId: 1, createdAt: -1 }, options: { name: "userId_1_createdAt_-1" } },
     { keys: { createdAt: -1 }, options: { name: "createdAt_-1" } },
+  ],
+
+  // ============================================
+  // PRICE CACHE (worker reads by symbol, WEB writes by symbol)
+  // ============================================
+  pricecaches: [
+    { keys: { symbol: 1 }, options: { unique: true, name: "symbol_1" } },
   ],
 
   // ============================================

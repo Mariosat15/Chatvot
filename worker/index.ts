@@ -11,9 +11,9 @@
  * - margin-check: Backup margin monitoring (every 5 minutes)
  * - competition-end: Check for expired competitions (every 1 minute)
  * - challenge-finalize: Check for expired challenges (every 1 minute)
- * - trade-queue: Process limit orders & TP/SL (every 1 minute)
- * - price-cache: Update price cache (every 1 minute)
+ * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
+ * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
  *
  * Usage:
  *   npm run worker
@@ -40,7 +40,9 @@ import { runMarginCheck } from "./jobs/margin-check.job";
 import { runCompetitionEndCheck } from "./jobs/competition-end.job";
 import { runChallengeFinalizeCheck } from "./jobs/challenge-finalize.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
-import { runPriceCacheUpdate } from "./jobs/price-cache.job";
+// NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
+// The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
+// the WEB app's WebSocket-driven PriceCache writes). Worker reads from PriceCache instead.
 import { runBadgeEvaluation } from "./jobs/evaluate-badges.job";
 import {
   defineWithdrawalProcessJob,
@@ -199,13 +201,10 @@ agenda.define("trade-queue", async () => {
     const duration = Date.now() - startTime;
 
     // Only log if there was activity
-    if (result.ordersExecuted > 0 || result.tpSlTriggered > 0) {
+    if (result.ordersExecuted > 0) {
       console.log(`\n📋 [TRADE QUEUE] Completed in ${duration}ms`);
       console.log(
         `   Orders checked: ${result.pendingOrdersChecked}, executed: ${result.ordersExecuted}`,
-      );
-      console.log(
-        `   Positions checked: ${result.positionsChecked}, TP/SL backup triggered: ${result.tpSlTriggered}`,
       );
     }
 
@@ -218,24 +217,9 @@ agenda.define("trade-queue", async () => {
   }
 });
 
-/**
- * Price Cache Update Job
- * Updates forex price cache every minute
- * (Replaces Inngest: update-price-cache)
- */
-agenda.define("price-cache", async () => {
-  try {
-    const result = await runPriceCacheUpdate();
-
-    // Silent unless errors
-    if (result.errors.length > 0) {
-      console.error(`💱 [PRICE CACHE] Errors:`);
-      result.errors.forEach((e) => console.error(`     - ${e}`));
-    }
-  } catch (error) {
-    console.error(`💱 [PRICE CACHE] Failed:`, error);
-  }
-});
+// price-cache job REMOVED — WEB app's WebSocket streamer writes prices to PriceCache
+// every 1-2 seconds via bulkWrite. The worker's 1-minute REST API fetch was redundant
+// and added ~33 extra upserts/minute + an external API call. Worker reads from cache instead.
 
 /**
  * Badge Evaluation Job
@@ -391,7 +375,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "challenge-finalize");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
-    await agenda.every("1 minute", "price-cache");
+    // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes
     await agenda.every("1 hour", "evaluate-badges");
     await agenda.every("1 day", "kyc-expiry-check");
     await agenda.every("5 minutes", "market-data-maintenance");
@@ -408,7 +392,6 @@ async function startWorker(): Promise<void> {
     await agenda.now("challenge-finalize", {});
     await agenda.now("early-end-check", {});
     await agenda.now("trade-queue", {});
-    await agenda.now("price-cache", {});
   } catch (error) {
     console.error("❌ Failed to start worker:", error);
     process.exit(1);

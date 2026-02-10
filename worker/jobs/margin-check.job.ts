@@ -72,27 +72,39 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
       // Use defaults
     }
 
-    // Get all active competitions
-    const activeCompetitions = await Competition.find({ status: "active" });
+    // Get all active competitions — only need _id, name, and rules for margin check
+    const activeCompetitions = await Competition.find({ status: "active" })
+      .select("_id name rules prizePool prizeDistribution")
+      .lean();
     const activeCompetitionIds = activeCompetitions.map((c) => c._id);
 
+    if (activeCompetitionIds.length === 0) {
+      return result;
+    }
+
     // Get all participants with open positions in active competitions
+    // Only select fields needed for margin calculation
     const participantsWithPositions = await CompetitionParticipant.find({
       competitionId: { $in: activeCompetitionIds },
       status: "active",
       currentOpenPositions: { $gt: 0 },
-    });
+    })
+      .select("_id userId competitionId currentCapital usedMargin currentOpenPositions")
+      .lean();
 
     if (participantsWithPositions.length === 0) {
       return result;
     }
 
     // Load ALL open positions in a single query (much faster than N queries)
+    // Only select fields needed for PnL calculation
     const allParticipantIds = participantsWithPositions.map((p) => p._id);
     const allPositions = await TradingPosition.find({
       participantId: { $in: allParticipantIds },
       status: "open",
-    });
+    })
+      .select("_id participantId symbol side entryPrice quantity takeProfit stopLoss")
+      .lean();
 
     // Group positions by participant and collect unique symbols
     const allSymbols = new Set<ForexSymbol>();
@@ -111,9 +123,10 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
     const pricesMap = await fetchRealForexPrices(Array.from(allSymbols));
 
     // PERF: Pre-fetch all active competitions once to avoid N+1 Competition.findById in the loop
+    // Already lean() from above
     const competitionMap = new Map<string, any>();
     for (const comp of activeCompetitions) {
-      competitionMap.set(comp._id.toString(), comp);
+      competitionMap.set((comp._id as any).toString(), comp);
     }
 
     // Check each participant

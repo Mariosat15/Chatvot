@@ -1,7 +1,8 @@
 /**
  * Trade Queue Processor Job
  *
- * Processes pending limit orders and checks for TP/SL triggers.
+ * Processes pending limit orders only.
+ * TP/SL is handled in real-time by tpsl-realtime.service.ts (on every price tick).
  * Runs every minute (same as Inngest: process-trade-queue)
  *
  * 📦 IMPORTANT: Worker reads prices from MongoDB cache (written by WEB app)
@@ -12,7 +13,6 @@ import { connectToDatabase } from "../config/database";
 
 // Import models
 import TradingOrder from "../../database/models/trading/trading-order.model";
-import TradingPosition from "../../database/models/trading/trading-position.model";
 import PriceCache from "../../database/models/price-cache.model";
 import { fetchRealForexPrices } from "../../lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "../../lib/services/pnl-calculator.service";
@@ -20,22 +20,31 @@ import type { ForexSymbol } from "../../lib/services/pnl-calculator.service";
 /**
  * Fetch prices - tries MongoDB cache first, falls back to REST API
  * MongoDB cache is populated by WEB app's WebSocket connection
+ *
+ * OPTIMIZED: Uses targeted $in query for requested symbols instead of
+ * PriceCache.getAllPrices() which does find({}).lean() (full collection scan).
  */
 async function fetchPricesFromCacheOrAPI(
   symbols: ForexSymbol[],
 ): Promise<Map<ForexSymbol, { bid: number; ask: number }>> {
   const priceMap = new Map<ForexSymbol, { bid: number; ask: number }>();
 
-  try {
-    // Try MongoDB cache first (populated by WEB WebSocket)
-    const cachedPrices = await PriceCache.getAllPrices();
+  if (symbols.length === 0) return priceMap;
 
-    // Check which symbols we got from cache
+  try {
+    // Targeted query — fetch ONLY the symbols we need (not the entire collection)
+    const cachedDocs = await PriceCache.find({ symbol: { $in: symbols } }).lean();
+
     const missingSymbols: ForexSymbol[] = [];
+    const now = Date.now();
+    const cachedBySymbol = new Map<string, any>();
+    for (const doc of cachedDocs) {
+      cachedBySymbol.set(doc.symbol, doc);
+    }
+
     for (const symbol of symbols) {
-      const cached = cachedPrices.get(symbol);
-      if (cached && Date.now() - cached.timestamp < 60000) {
-        // Use if less than 1 min old
+      const cached = cachedBySymbol.get(symbol);
+      if (cached && now - cached.updatedAt?.getTime?.() < 60000) {
         priceMap.set(symbol, { bid: cached.bid, ask: cached.ask });
       } else {
         missingSymbols.push(symbol);
@@ -65,8 +74,6 @@ async function fetchPricesFromCacheOrAPI(
 export interface TradeQueueResult {
   pendingOrdersChecked: number;
   ordersExecuted: number;
-  positionsChecked: number;
-  tpSlTriggered: number;
   errors: string[];
 }
 
@@ -74,30 +81,27 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
   const result: TradeQueueResult = {
     pendingOrdersChecked: 0,
     ordersExecuted: 0,
-    positionsChecked: 0,
-    tpSlTriggered: 0,
     errors: [],
   };
 
   try {
     await connectToDatabase();
 
-    // Early exit: skip all work if no pending orders and no open positions with TP/SL
-    const [pendingCount, tpSlCount] = await Promise.all([
-      TradingOrder.countDocuments({ status: "pending", orderType: { $in: ["limit", "stop"] } }),
-      TradingPosition.countDocuments({
-        status: "open",
-        $or: [
-          { takeProfit: { $exists: true, $ne: null } },
-          { stopLoss: { $exists: true, $ne: null } },
-        ],
-      }),
-    ]);
-    if (pendingCount === 0 && tpSlCount === 0) {
+    // Early exit: skip all work if no pending limit/stop orders
+    const pendingCount = await TradingOrder.countDocuments({
+      status: "pending",
+      orderType: { $in: ["limit", "stop"] },
+    });
+    if (pendingCount === 0) {
       return result;
     }
 
-    // ========== PART 1: Process Pending Limit Orders ==========
+    // ========== Process Pending Limit/Stop Orders ==========
+    // NOTE: TP/SL checking is handled in real-time by tpsl-realtime.service.ts
+    // (fires on every WebSocket price tick). Removed from here to avoid:
+    // - Redundant TradingPosition.find() + PriceCache.find({}) full scan every minute
+    // - Double-triggering of position closes
+
     const pendingOrders = await TradingOrder.find({
       status: "pending",
       orderType: { $in: ["limit", "stop"] },
@@ -106,7 +110,7 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
     result.pendingOrdersChecked = pendingOrders.length;
 
     if (pendingOrders.length > 0) {
-      // Get unique symbols
+      // Get unique symbols needed, then fetch only those prices
       const symbols = [
         ...new Set(pendingOrders.map((o) => o.symbol)),
       ] as ForexSymbol[];
@@ -145,81 +149,6 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
           }
         } catch (orderError) {
           result.errors.push(`Order ${order._id} error: ${orderError}`);
-        }
-      }
-    }
-
-    // ========== PART 2: Check TP/SL on Open Positions ==========
-    const openPositions = await TradingPosition.find({
-      status: "open",
-      $or: [
-        { takeProfit: { $exists: true, $ne: null } },
-        { stopLoss: { $exists: true, $ne: null } },
-      ],
-    }).lean();
-
-    result.positionsChecked = openPositions.length;
-
-    if (openPositions.length > 0) {
-      // Get unique symbols
-      const symbols = [
-        ...new Set(openPositions.map((p) => p.symbol)),
-      ] as ForexSymbol[];
-      const pricesMap = await fetchPricesFromCacheOrAPI(symbols);
-
-      for (const position of openPositions) {
-        try {
-          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
-          if (!currentPrice) continue;
-
-          const marketPrice =
-            position.side === "long" ? currentPrice.bid : currentPrice.ask;
-          let shouldClose = false;
-          let closeReason = "";
-
-          // Check Take Profit
-          if (position.takeProfit) {
-            if (
-              position.side === "long" &&
-              marketPrice >= position.takeProfit
-            ) {
-              shouldClose = true;
-              closeReason = "take_profit";
-            } else if (
-              position.side === "short" &&
-              marketPrice <= position.takeProfit
-            ) {
-              shouldClose = true;
-              closeReason = "take_profit";
-            }
-          }
-
-          // Check Stop Loss
-          if (!shouldClose && position.stopLoss) {
-            if (position.side === "long" && marketPrice <= position.stopLoss) {
-              shouldClose = true;
-              closeReason = "stop_loss";
-            } else if (
-              position.side === "short" &&
-              marketPrice >= position.stopLoss
-            ) {
-              shouldClose = true;
-              closeReason = "stop_loss";
-            }
-          }
-
-          if (shouldClose) {
-            const { closePositionAutomatic } =
-              await import("../../lib/actions/trading/position.actions");
-            await closePositionAutomatic(
-              position._id.toString(),
-              marketPrice,
-              closeReason as any,
-            );
-            result.tpSlTriggered++;
-          }
-        } catch (posError) {
-          result.errors.push(`Position ${position._id} error: ${posError}`);
         }
       }
     }

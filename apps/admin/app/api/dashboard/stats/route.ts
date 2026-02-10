@@ -272,7 +272,8 @@ export async function GET() {
       services,
     ] = await Promise.all([
       // User queries (using collection directly)
-      usersCollection.countDocuments(),
+      // estimatedDocumentCount() is O(1) metadata read vs countDocuments() full scan
+      usersCollection.estimatedDocumentCount(),
       usersCollection.countDocuments({ createdAt: { $gte: startOfToday } }),
       usersCollection.countDocuments({ createdAt: { $gte: startOfWeek } }),
       usersCollection.countDocuments({ createdAt: { $gte: startOfMonth } }),
