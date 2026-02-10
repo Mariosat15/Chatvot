@@ -58,6 +58,12 @@ export async function finalizeChallenge(challengeId: string) {
       return null;
     }
 
+    // Sanitize floating-point artifacts from DB (e.g. usedMargin: -5.68e-14 instead of 0)
+    for (const p of [challenger, challenged]) {
+      if (p.usedMargin < 0 && p.usedMargin > -1e-6) p.usedMargin = 0;
+      if (p.unrealizedPnl !== 0 && Math.abs(p.unrealizedPnl) < 1e-6) p.unrealizedPnl = 0;
+    }
+
     // Import required models
     const TradeHistory = (
       await import("@/database/models/trading/trade-history.model")
@@ -298,19 +304,35 @@ export async function finalizeChallenge(challengeId: string) {
         { session },
       );
 
-      // Refresh participant data
+      // Refresh participant data (must sync ALL fields set by findByIdAndUpdate above
+      // to prevent stale in-memory values from overwriting DB on subsequent .save() calls,
+      // and to prevent validation errors from floating-point artifacts like usedMargin: -5.68e-14)
       if (userId === challenger.userId) {
         challenger.currentCapital = stats.currentCapital;
+        challenger.availableCapital = stats.currentCapital;
+        challenger.usedMargin = 0;
         challenger.pnl = stats.totalPnL;
         challenger.pnlPercentage = pnlPercentage;
+        challenger.realizedPnl = stats.totalPnL;
+        challenger.unrealizedPnl = 0;
         challenger.totalTrades = stats.totalTrades;
+        challenger.winningTrades = stats.winningTrades;
+        challenger.losingTrades = stats.losingTrades;
         challenger.winRate = winRate;
+        challenger.currentOpenPositions = 0;
       } else {
         challenged.currentCapital = stats.currentCapital;
+        challenged.availableCapital = stats.currentCapital;
+        challenged.usedMargin = 0;
         challenged.pnl = stats.totalPnL;
         challenged.pnlPercentage = pnlPercentage;
+        challenged.realizedPnl = stats.totalPnL;
+        challenged.unrealizedPnl = 0;
         challenged.totalTrades = stats.totalTrades;
+        challenged.winningTrades = stats.winningTrades;
+        challenged.losingTrades = stats.losingTrades;
         challenged.winRate = winRate;
+        challenged.currentOpenPositions = 0;
       }
     }
 
