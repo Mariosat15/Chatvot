@@ -39,113 +39,111 @@ interface ClusterSettings {
   workerMinPoolSize: number;
   adminMaxPoolSize: number;
   adminMinPoolSize: number;
+  apiMaxPoolSize: number;
+  apiMinPoolSize: number;
+  wsMaxPoolSize: number;
+  wsMinPoolSize: number;
   serverSelectionTimeoutMS: number;
   socketTimeoutMS: number;
   connectTimeoutMS: number;
   maxIdleTimeMS: number;
 }
 
-const TIER_PRESETS: Record<
-  string,
-  {
-    label: string;
-    mainMax: number;
-    mainMin: number;
-    workerMax: number;
-    workerMin: number;
-    adminMax: number;
-    adminMin: number;
-    desc: string;
-  }
-> = {
+interface TierPreset {
+  label: string;
+  mainMax: number;
+  mainMin: number;
+  workerMax: number;
+  workerMin: number;
+  adminMax: number;
+  adminMin: number;
+  apiMax: number;
+  apiMin: number;
+  wsMax: number;
+  wsMin: number;
+  desc: string;
+}
+
+const TIER_PRESETS: Record<string, TierPreset> = {
   M0: {
     label: "M0 (Free)",
-    mainMax: 5,
-    mainMin: 1,
-    workerMax: 3,
-    workerMin: 1,
-    adminMax: 5,
-    adminMin: 1,
+    mainMax: 5, mainMin: 1,
+    workerMax: 3, workerMin: 1,
+    adminMax: 5, adminMin: 1,
+    apiMax: 5, apiMin: 1,
+    wsMax: 3, wsMin: 1,
     desc: "500 connections max, shared resources",
   },
   M2: {
     label: "M2 ($9/mo)",
-    mainMax: 10,
-    mainMin: 2,
-    workerMax: 5,
-    workerMin: 1,
-    adminMax: 10,
-    adminMin: 2,
+    mainMax: 10, mainMin: 2,
+    workerMax: 5, workerMin: 1,
+    adminMax: 10, adminMin: 2,
+    apiMax: 10, apiMin: 2,
+    wsMax: 5, wsMin: 1,
     desc: "500 connections max, shared resources",
   },
   M5: {
     label: "M5 ($25/mo)",
-    mainMax: 10,
-    mainMin: 2,
-    workerMax: 5,
-    workerMin: 1,
-    adminMax: 10,
-    adminMin: 2,
+    mainMax: 10, mainMin: 2,
+    workerMax: 5, workerMin: 1,
+    adminMax: 10, adminMin: 2,
+    apiMax: 10, apiMin: 2,
+    wsMax: 5, wsMin: 1,
     desc: "500 connections max, shared resources",
   },
   M10: {
     label: "M10 ($57/mo)",
-    mainMax: 10,
-    mainMin: 2,
-    workerMax: 5,
-    workerMin: 1,
-    adminMax: 10,
-    adminMin: 2,
+    mainMax: 10, mainMin: 2,
+    workerMax: 5, workerMin: 1,
+    adminMax: 10, adminMin: 2,
+    apiMax: 10, apiMin: 2,
+    wsMax: 5, wsMin: 1,
     desc: "1,500 connections, 2 GB RAM dedicated",
   },
   M20: {
     label: "M20 ($140/mo)",
-    mainMax: 20,
-    mainMin: 3,
-    workerMax: 10,
-    workerMin: 2,
-    adminMax: 15,
-    adminMin: 2,
+    mainMax: 20, mainMin: 3,
+    workerMax: 10, workerMin: 2,
+    adminMax: 15, adminMin: 2,
+    apiMax: 15, apiMin: 2,
+    wsMax: 5, wsMin: 1,
     desc: "1,500 connections, 4 GB RAM",
   },
   M30: {
     label: "M30 ($340/mo)",
-    mainMax: 30,
-    mainMin: 5,
-    workerMax: 15,
-    workerMin: 3,
-    adminMax: 20,
-    adminMin: 3,
+    mainMax: 30, mainMin: 5,
+    workerMax: 15, workerMin: 3,
+    adminMax: 20, adminMin: 3,
+    apiMax: 20, apiMin: 3,
+    wsMax: 10, wsMin: 2,
     desc: "3,000 connections, 8 GB RAM",
   },
   M40: {
     label: "M40 ($560/mo)",
-    mainMax: 50,
-    mainMin: 5,
-    workerMax: 20,
-    workerMin: 3,
-    adminMax: 25,
-    adminMin: 3,
+    mainMax: 50, mainMin: 5,
+    workerMax: 20, workerMin: 3,
+    adminMax: 25, adminMin: 3,
+    apiMax: 25, apiMin: 3,
+    wsMax: 10, wsMin: 2,
     desc: "6,000 connections, 16 GB RAM",
   },
   M50: {
     label: "M50 ($1,000/mo)",
-    mainMax: 75,
-    mainMin: 10,
-    workerMax: 30,
-    workerMin: 5,
-    adminMax: 30,
-    adminMin: 5,
+    mainMax: 75, mainMin: 10,
+    workerMax: 30, workerMin: 5,
+    adminMax: 30, adminMin: 5,
+    apiMax: 30, apiMin: 5,
+    wsMax: 15, wsMin: 3,
     desc: "16,000 connections, 32 GB RAM",
   },
   Custom: {
     label: "Custom",
-    mainMax: 10,
-    mainMin: 2,
-    workerMax: 5,
-    workerMin: 1,
-    adminMax: 10,
-    adminMin: 2,
+    mainMax: 10, mainMin: 2,
+    workerMax: 5, workerMin: 1,
+    adminMax: 10, adminMin: 2,
+    apiMax: 10, apiMin: 2,
+    wsMax: 5, wsMin: 1,
     desc: "Manually configured pool sizes",
   },
 };
@@ -160,6 +158,10 @@ export default function MdbClusterSection() {
     workerMinPoolSize: 1,
     adminMaxPoolSize: 10,
     adminMinPoolSize: 2,
+    apiMaxPoolSize: 10,
+    apiMinPoolSize: 2,
+    wsMaxPoolSize: 5,
+    wsMinPoolSize: 1,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 30000,
     connectTimeoutMS: 10000,
@@ -192,6 +194,10 @@ export default function MdbClusterSection() {
           workerMinPoolSize: s.workerMinPoolSize ?? 1,
           adminMaxPoolSize: s.adminMaxPoolSize ?? 10,
           adminMinPoolSize: s.adminMinPoolSize ?? 2,
+          apiMaxPoolSize: s.apiMaxPoolSize ?? 10,
+          apiMinPoolSize: s.apiMinPoolSize ?? 2,
+          wsMaxPoolSize: s.wsMaxPoolSize ?? 5,
+          wsMinPoolSize: s.wsMinPoolSize ?? 1,
           serverSelectionTimeoutMS: s.serverSelectionTimeoutMS ?? 5000,
           socketTimeoutMS: s.socketTimeoutMS ?? 30000,
           connectTimeoutMS: s.connectTimeoutMS ?? 10000,
@@ -235,6 +241,10 @@ export default function MdbClusterSection() {
         workerMinPoolSize: preset.workerMin,
         adminMaxPoolSize: preset.adminMax,
         adminMinPoolSize: preset.adminMin,
+        apiMaxPoolSize: preset.apiMax,
+        apiMinPoolSize: preset.apiMin,
+        wsMaxPoolSize: preset.wsMax,
+        wsMinPoolSize: preset.wsMin,
       };
       setHasChanges(JSON.stringify(next) !== JSON.stringify(savedSettings));
       return next;
@@ -290,7 +300,9 @@ export default function MdbClusterSection() {
   const totalEstimatedConnections =
     settings.mainMaxPoolSize +
     settings.workerMaxPoolSize +
-    settings.adminMaxPoolSize;
+    settings.adminMaxPoolSize +
+    settings.apiMaxPoolSize +
+    settings.wsMaxPoolSize;
 
   const tierPreset = TIER_PRESETS[settings.clusterTier];
 
@@ -418,7 +430,9 @@ export default function MdbClusterSection() {
               <span className="text-muted-foreground ml-2">
                 (Main {settings.mainMaxPoolSize} + Worker{" "}
                 {settings.workerMaxPoolSize} + Admin{" "}
-                {settings.adminMaxPoolSize})
+                {settings.adminMaxPoolSize} + API{" "}
+                {settings.apiMaxPoolSize} + WS{" "}
+                {settings.wsMaxPoolSize})
               </span>
             </div>
           </div>
@@ -426,7 +440,7 @@ export default function MdbClusterSection() {
       </Card>
 
       {/* Pool Sizes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Main App */}
         <Card>
           <CardHeader className="pb-3">
@@ -435,12 +449,12 @@ export default function MdbClusterSection() {
               Main App
             </CardTitle>
             <CardDescription className="text-xs">
-              User-facing Next.js process
+              User-facing Next.js
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Max Pool Size</Label>
+              <Label className="text-xs">Max Pool</Label>
               <Input
                 type="number"
                 min={1}
@@ -452,7 +466,7 @@ export default function MdbClusterSection() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Min Pool Size</Label>
+              <Label className="text-xs">Min Pool</Label>
               <Input
                 type="number"
                 min={0}
@@ -474,12 +488,12 @@ export default function MdbClusterSection() {
               Worker
             </CardTitle>
             <CardDescription className="text-xs">
-              Background jobs (Agenda.js)
+              Background jobs (Agenda)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Max Pool Size</Label>
+              <Label className="text-xs">Max Pool</Label>
               <Input
                 type="number"
                 min={1}
@@ -491,7 +505,7 @@ export default function MdbClusterSection() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Min Pool Size</Label>
+              <Label className="text-xs">Min Pool</Label>
               <Input
                 type="number"
                 min={0}
@@ -513,12 +527,12 @@ export default function MdbClusterSection() {
               Admin
             </CardTitle>
             <CardDescription className="text-xs">
-              Admin panel Next.js process
+              Admin panel Next.js
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Max Pool Size</Label>
+              <Label className="text-xs">Max Pool</Label>
               <Input
                 type="number"
                 min={1}
@@ -530,7 +544,7 @@ export default function MdbClusterSection() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Min Pool Size</Label>
+              <Label className="text-xs">Min Pool</Label>
               <Input
                 type="number"
                 min={0}
@@ -538,6 +552,84 @@ export default function MdbClusterSection() {
                 value={settings.adminMinPoolSize}
                 onChange={(e) =>
                   updateSetting("adminMinPoolSize", Number(e.target.value))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* API Server */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              API Server
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Auth / bcrypt worker
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Max Pool</Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={settings.apiMaxPoolSize}
+                onChange={(e) =>
+                  updateSetting("apiMaxPoolSize", Number(e.target.value))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Min Pool</Label>
+              <Input
+                type="number"
+                min={0}
+                max={20}
+                value={settings.apiMinPoolSize}
+                onChange={(e) =>
+                  updateSetting("apiMinPoolSize", Number(e.target.value))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* WebSocket Server */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-orange-500" />
+              WebSocket
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Real-time chat server
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Max Pool</Label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={settings.wsMaxPoolSize}
+                onChange={(e) =>
+                  updateSetting("wsMaxPoolSize", Number(e.target.value))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Min Pool</Label>
+              <Input
+                type="number"
+                min={0}
+                max={10}
+                value={settings.wsMinPoolSize}
+                onChange={(e) =>
+                  updateSetting("wsMinPoolSize", Number(e.target.value))
                 }
               />
             </div>

@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 /**
  * MongoDB Cluster Settings Model (Singleton)
  * Controls connection pool sizes and cluster-level configuration.
- * Read by all processes (main app, worker, admin) on startup.
+ * Read by all 5 PM2 processes (main app, worker, admin, API server, WebSocket) on startup.
  *
  * Scaling guide:
  *   M10  → maxPoolSize 10, minPoolSize 2
@@ -29,6 +29,14 @@ export interface IMdbClusterSettings extends Document {
   // Connection pool — admin process
   adminMaxPoolSize: number;
   adminMinPoolSize: number;
+
+  // Connection pool — API server process (bcrypt/auth)
+  apiMaxPoolSize: number;
+  apiMinPoolSize: number;
+
+  // Connection pool — WebSocket server process (chat)
+  wsMaxPoolSize: number;
+  wsMinPoolSize: number;
 
   // Timeouts (ms)
   serverSelectionTimeoutMS: number;
@@ -106,6 +114,34 @@ const MdbClusterSettingsSchema = new Schema<IMdbClusterSettings>(
       default: 2,
       min: 0,
       max: 20,
+    },
+
+    // API server pool (bcrypt/auth — lightweight)
+    apiMaxPoolSize: {
+      type: Number,
+      default: 10,
+      min: 1,
+      max: 100,
+    },
+    apiMinPoolSize: {
+      type: Number,
+      default: 2,
+      min: 0,
+      max: 20,
+    },
+
+    // WebSocket server pool (chat — lightweight)
+    wsMaxPoolSize: {
+      type: Number,
+      default: 5,
+      min: 1,
+      max: 50,
+    },
+    wsMinPoolSize: {
+      type: Number,
+      default: 1,
+      min: 0,
+      max: 10,
     },
 
     // Timeouts

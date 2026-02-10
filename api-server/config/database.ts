@@ -1,27 +1,66 @@
 /**
  * Database Configuration for API Server
  *
- * Reuses the same MongoDB connection as the main app.
- * Uses the existing mongoose configuration.
+ * Pool sizes are read from MDB Cluster settings (Admin → MDB Cluster).
+ * Falls back to sensible defaults if settings are not configured.
  */
 
 import mongoose from "mongoose";
+import { MongoClient } from "mongodb";
 
 // Track if event listeners are already registered to prevent duplicates
 let listenersRegistered = false;
 
-// Connection options optimized for performance
-const connectionOptions: mongoose.ConnectOptions = {
-  maxPoolSize: 50,
-  minPoolSize: 10,
-  maxIdleTimeMS: 60000,
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-  // CRITICAL: Disable buffering to get immediate errors instead of timeouts
-  bufferCommands: false,
-  // Auto-reconnect
-  autoIndex: true,
-};
+// Cached connection options (populated once from DB)
+let connectionOptions: mongoose.ConnectOptions | null = null;
+
+/**
+ * Load API server pool settings from MDB Cluster settings in DB.
+ * Falls back to defaults (10/2) on any error.
+ */
+async function loadApiPoolSettings(
+  uri: string,
+): Promise<mongoose.ConnectOptions> {
+  const defaults: mongoose.ConnectOptions = {
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    maxIdleTimeMS: 60000,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    bufferCommands: false,
+    autoIndex: true,
+  };
+
+  try {
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 3000,
+      connectTimeoutMS: 3000,
+    });
+    await client.connect();
+    const doc = await client
+      .db()
+      .collection("mdbclustersettings")
+      .findOne({ _id: "global-mdb-cluster-settings" as any });
+    await client.close();
+
+    if (doc) {
+      defaults.maxPoolSize = doc.apiMaxPoolSize ?? 10;
+      defaults.minPoolSize = doc.apiMinPoolSize ?? 2;
+      defaults.serverSelectionTimeoutMS =
+        doc.serverSelectionTimeoutMS ?? 10000;
+      defaults.socketTimeoutMS = doc.socketTimeoutMS ?? 45000;
+      defaults.maxIdleTimeMS = doc.maxIdleTimeMS ?? 60000;
+
+      console.log(
+        `📊 MDB Cluster settings loaded: API pool ${defaults.maxPoolSize}/${defaults.minPoolSize}`,
+      );
+    }
+  } catch {
+    // Settings not available — use defaults
+  }
+
+  return defaults;
+}
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
   // Check actual mongoose connection state
@@ -90,6 +129,11 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   }
 
   try {
+    // Load cluster settings from DB (pool sizes, timeouts) before connecting
+    if (!connectionOptions) {
+      connectionOptions = await loadApiPoolSettings(MONGODB_URI);
+    }
+
     console.log("📊 Connecting to database...");
     const db = await mongoose.connect(MONGODB_URI, connectionOptions);
     console.log("✅ Database connected");

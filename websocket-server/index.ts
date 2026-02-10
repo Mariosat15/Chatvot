@@ -11,6 +11,7 @@ import { createServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
+import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -74,6 +75,37 @@ const participantConnections = new Map<string, Set<string>>(); // participantId 
 // MongoDB Connection
 // ==========================================
 
+/**
+ * Load WebSocket pool settings from MDB Cluster settings in DB.
+ * Falls back to defaults (5/1) on any error.
+ */
+async function loadWsPoolSettings(
+  uri: string,
+): Promise<{ maxPoolSize: number; minPoolSize: number }> {
+  try {
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 3000,
+      connectTimeoutMS: 3000,
+    });
+    await client.connect();
+    const doc = await client
+      .db()
+      .collection("mdbclustersettings")
+      .findOne({ _id: "global-mdb-cluster-settings" as any });
+    await client.close();
+
+    if (doc) {
+      return {
+        maxPoolSize: doc.wsMaxPoolSize ?? 5,
+        minPoolSize: doc.wsMinPoolSize ?? 1,
+      };
+    }
+  } catch {
+    // Settings not available — use defaults
+  }
+  return { maxPoolSize: 5, minPoolSize: 1 };
+}
+
 async function connectToMongoDB() {
   try {
     if (!MONGODB_URI) {
@@ -81,8 +113,18 @@ async function connectToMongoDB() {
       return false;
     }
 
-    await mongoose.connect(MONGODB_URI);
-    console.log("✅ Connected to MongoDB");
+    const pool = await loadWsPoolSettings(MONGODB_URI);
+
+    await mongoose.connect(MONGODB_URI, {
+      maxPoolSize: pool.maxPoolSize,
+      minPoolSize: pool.minPoolSize,
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 30000,
+    });
+    console.log(
+      `✅ Connected to MongoDB (pool: ${pool.maxPoolSize}/${pool.minPoolSize})`,
+    );
     return true;
   } catch (error) {
     console.error("❌ MongoDB connection error:", error);
