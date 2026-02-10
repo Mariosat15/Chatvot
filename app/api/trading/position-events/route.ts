@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
-import PositionEvent from "@/database/models/position-event.model";
+import { positionEventBroadcaster } from "@/lib/services/position-event-broadcaster";
 
 /**
  * SSE Endpoint for Real-Time Position Events
@@ -10,14 +10,13 @@ import PositionEvent from "@/database/models/position-event.model";
  * Clients subscribe to this endpoint to receive instant notifications
  * when positions are closed (TP/SL), opened, or modified.
  *
- * This replaces polling and provides < 2s latency updates.
+ * Architecture (Shared Fan-Out):
+ * - All SSE connections share a SINGLE global poller (PositionEventBroadcaster)
+ * - The broadcaster runs 1 MongoDB query every 3s regardless of client count
+ * - Results are grouped by userId+competitionId and fanned out in-memory
+ * - With 5,000 clients: 1 query/3s instead of 5,000 queries/3s
  *
- * Architecture:
- * - Each SSE connection tracks a cursor (lastCheckedAt timestamp)
- * - Polls MongoDB with { userId, competitionId, createdAt: { $gt: lastCheckedAt } }
- * - This query is FULLY COVERED by the compound index {userId, competitionId, createdAt}
- * - No write operations needed (old approach used $addToSet on every poll)
- * - Events auto-delete after 60s (TTL), so the collection stays tiny
+ * The positionevents collection has 60s TTL → stays tiny, so one full scan is cheap.
  *
  * Usage:
  * const eventSource = new EventSource('/api/trading/position-events?competitionId=xxx');
@@ -39,14 +38,13 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
+    // Unique ID for this SSE connection
+    const subscriberId = `${session.user.id}:${competitionId}:${Date.now()}`;
+
     // Create SSE stream
     const stream = new ReadableStream({
-      async start(controller) {
+      start(controller) {
         const encoder = new TextEncoder();
-
-        // Cursor: track the last event time we've seen
-        // Start from 60s ago to catch any recent events (TTL is 60s so nothing older exists)
-        let lastCheckedAt = new Date(Date.now() - 60_000);
 
         // Send initial connection message
         controller.enqueue(
@@ -65,30 +63,15 @@ export async function GET(request: NextRequest) {
           }
         }, 15000);
 
-        // Poll for new events using cursor-based approach
-        // Query uses compound index {userId, competitionId, createdAt} — no collection scan
-        // No write operations (old $addToSet approach wrote on every poll)
-        const pollInterval = setInterval(async () => {
-          try {
-            const events = await PositionEvent.find({
-              userId: session.user.id,
-              competitionId,
-              createdAt: { $gt: lastCheckedAt },
-            })
-              .sort({ createdAt: -1 })
-              .limit(10)
-              .lean();
-
-            if (events.length > 0) {
-              // Advance cursor to the newest event's timestamp
-              const newestEvent = events[0] as any;
-              if (newestEvent.createdAt > lastCheckedAt) {
-                lastCheckedAt = newestEvent.createdAt;
-              }
-
-              // Send each event (oldest first for chronological order)
-              for (let i = events.length - 1; i >= 0; i--) {
-                const event = events[i] as any;
+        // Subscribe to the shared broadcaster — no individual polling!
+        // The broadcaster runs 1 global query and fans out matching events
+        positionEventBroadcaster.subscribe(
+          subscriberId,
+          session.user.id,
+          competitionId,
+          (events: any[]) => {
+            try {
+              for (const event of events) {
                 const eventData = {
                   type: "position_event",
                   event: {
@@ -108,16 +91,18 @@ export async function GET(request: NextRequest) {
                   encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`),
                 );
               }
+            } catch {
+              // Stream closed, unsubscribe
+              positionEventBroadcaster.unsubscribe(subscriberId);
+              clearInterval(keepAliveInterval);
             }
-          } catch (error) {
-            console.error("[SSE] Error polling events:", error);
-          }
-        }, 1500); // Poll every 1.5s (was 500ms — 3x fewer queries, still fast enough for trade events)
+          },
+        );
 
         // Cleanup on close
         request.signal.addEventListener("abort", () => {
+          positionEventBroadcaster.unsubscribe(subscriberId);
           clearInterval(keepAliveInterval);
-          clearInterval(pollInterval);
           controller.close();
         });
       },

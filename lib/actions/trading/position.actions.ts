@@ -1303,7 +1303,7 @@ export const checkMarginCalls = async (competitionId: string) => {
       competitionId,
     }).select(
       "username status currentOpenPositions currentCapital unrealizedPnl usedMargin",
-    );
+    ).lean() as any[];
 
     let isChallenge = false;
     if (allParticipants.length === 0) {
@@ -1311,7 +1311,7 @@ export const checkMarginCalls = async (competitionId: string) => {
         challengeId: competitionId,
       }).select(
         "username status currentOpenPositions currentCapital unrealizedPnl usedMargin",
-      );
+      ).lean() as any[];
       isChallenge = true;
     }
 
@@ -1333,7 +1333,9 @@ export const checkMarginCalls = async (competitionId: string) => {
       ...idField,
       status: "active",
       currentOpenPositions: { $gt: 0 },
-    });
+    })
+      .select("_id userId username currentCapital usedMargin currentOpenPositions status marginCallWarnings")
+      .lean() as any[];
 
     console.log(
       `\n✅ Active participants with open positions: ${participants.length}`,
@@ -1341,9 +1343,11 @@ export const checkMarginCalls = async (competitionId: string) => {
 
     // OPTIMIZATION: Get ALL open positions for ALL participants at once
     const allOpenPositions = await TradingPosition.find({
-      participantId: { $in: participants.map((p) => p._id) },
+      participantId: { $in: participants.map((p: any) => p._id) },
       status: "open",
-    });
+    })
+      .select("_id participantId symbol side entryPrice quantity leverage takeProfit stopLoss")
+      .lean() as any[];
 
     // Batch fetch ALL prices at once (single request for all symbols!)
     const allSymbols = [

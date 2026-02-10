@@ -5,27 +5,20 @@ import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import {
   sendSignUpEmail,
-  updateCompetitionStatuses,
-  monitorMarginLevels,
-  evaluateUserBadges,
   sendInvoiceEmailJob,
-  updatePriceCache,
-  processTradeQueue,
 } from "@/lib/inngest/functions";
 
 // Disable body parsing for Inngest to handle signature verification
 export const runtime = "nodejs";
 export const preferredRegion = "auto";
 
-// All Inngest functions
+// Only event-driven functions (emails/invoices) remain.
+// All cron-based jobs (competition-end, margin-check, badge-eval, trade-queue,
+// price-cache) are handled by the Agenda worker process — running them here too
+// was doubling MongoDB queries and causing CPU spikes.
 const functions = [
   sendSignUpEmail,
-  updateCompetitionStatuses,
-  monitorMarginLevels,
-  evaluateUserBadges,
   sendInvoiceEmailJob,
-  updatePriceCache,
-  processTradeQueue,
 ];
 
 // Cache for credentials (refresh every 5 minutes)

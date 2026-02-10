@@ -261,10 +261,10 @@ export const PERFORMANCE_INTERVALS = {
   PRICE_POLLING: 2000, // 2 seconds (was 1000)
   PRICE_UI_UPDATE: 500, // 500ms for UI smoothness
 
-  // Status checks
-  COMPETITION_STATUS: 10000, // 10 seconds (was 5 seconds)
-  CHALLENGE_STATUS: 10000, // 10 seconds (was 5 seconds)
-  CHALLENGE_LIVE_DATA: 5000, // 5 seconds (was 3 seconds)
+  // Status checks — competitions/challenges change status rarely (only at end time)
+  COMPETITION_STATUS: 30000, // 30 seconds (was 10s — 3x fewer polls, status changes are predictable)
+  CHALLENGE_STATUS: 30000, // 30 seconds (was 10s)
+  CHALLENGE_LIVE_DATA: 10000, // 10 seconds (was 5s)
 
   // Admin/Background
   NOTIFICATION_POLL: 60000, // 60 seconds (was 30 seconds)

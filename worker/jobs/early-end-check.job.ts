@@ -62,14 +62,27 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
       })
       .toArray();
 
+    // BATCH: Load ALL participants for ALL active competitions in ONE query
+    const allCompIds = activeCompetitions.map((c) => c._id);
+    const allCompParticipants = allCompIds.length > 0
+      ? await participantsCollection
+          .find({ competitionId: { $in: allCompIds } })
+          .project({ competitionId: 1, status: 1, pnl: 1, currentRank: 1, username: 1, userId: 1 })
+          .toArray()
+      : [];
+
+    // Group by competition ID
+    const compParticipantsMap = new Map<string, typeof allCompParticipants>();
+    for (const p of allCompParticipants) {
+      const key = p.competitionId.toString();
+      if (!compParticipantsMap.has(key)) compParticipantsMap.set(key, []);
+      compParticipantsMap.get(key)!.push(p);
+    }
+
     for (const competition of activeCompetitions) {
       try {
-        // Get all participants for this competition
-        const participants = await participantsCollection
-          .find({
-            competitionId: competition._id,
-          })
-          .toArray();
+        // Get all participants for this competition (from pre-loaded batch)
+        const participants = compParticipantsMap.get(competition._id.toString()) || [];
 
         if (participants.length === 0) continue;
 
@@ -205,14 +218,27 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
       })
       .toArray();
 
+    // BATCH: Load ALL participants for ALL active challenges in ONE query
+    const allChallengeIds = activeChallenges.map((c) => c._id);
+    const allChallengeParticipants = allChallengeIds.length > 0
+      ? await challengeParticipantsCollection
+          .find({ challengeId: { $in: allChallengeIds } })
+          .project({ challengeId: 1, role: 1, status: 1, pnl: 1, username: 1, userId: 1 })
+          .toArray()
+      : [];
+
+    // Group by challenge ID
+    const challengeParticipantsMap = new Map<string, typeof allChallengeParticipants>();
+    for (const p of allChallengeParticipants) {
+      const key = p.challengeId.toString();
+      if (!challengeParticipantsMap.has(key)) challengeParticipantsMap.set(key, []);
+      challengeParticipantsMap.get(key)!.push(p);
+    }
+
     for (const challenge of activeChallenges) {
       try {
-        // Get both participants
-        const participants = await challengeParticipantsCollection
-          .find({
-            challengeId: challenge._id,
-          })
-          .toArray();
+        // Get both participants (from pre-loaded batch)
+        const participants = challengeParticipantsMap.get(challenge._id.toString()) || [];
 
         if (participants.length !== 2) continue;
 
