@@ -108,6 +108,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
       : challenge.challengerName;
     const isWinner = challenge.winnerId === session.user.id;
     const isLoser = challenge.loserId === session.user.id;
+    const isNoWinner = challenge.noWinner === true;
     const myStats = isChallenger
       ? challenge.challengerFinalStats
       : challenge.challengedFinalStats;
@@ -164,13 +165,17 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             {/* Status Badge */}
             {isCompleted && (
               <div className="mb-4">
-                {isWinner ? (
-                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 text-white text-lg font-bold">
-                    🏆 YOU WON!
+                {isNoWinner ? (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-600 text-white text-lg font-bold">
+                    ⚠️ NO WINNER — All Players Disqualified
                   </span>
                 ) : challenge.isTie ? (
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-600 text-white text-lg font-bold">
                     🤝 TIE
+                  </span>
+                ) : isWinner ? (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 text-white text-lg font-bold">
+                    🏆 YOU WON!
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 text-white text-lg font-bold">
@@ -293,12 +298,22 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                       <span className="text-sm font-semibold text-gray-300">
                         You
                       </span>
-                      {isWinner && (
+                      {isNoWinner && (
+                        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-bold rounded">
+                          DISQUALIFIED
+                        </span>
+                      )}
+                      {!isNoWinner && challenge.isTie && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
+                          TIE
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && isWinner && (
                         <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
                           WINNER
                         </span>
                       )}
-                      {isLoser && (
+                      {!isNoWinner && !challenge.isTie && isLoser && (
                         <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold rounded">
                           LOST
                         </span>
@@ -357,15 +372,30 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
 
                   {/* Opponent Stats */}
                   <div
-                    className={`p-4 rounded-xl border ${!isWinner && !challenge.isTie ? "bg-green-500/10 border-green-500/30" : "bg-gray-800/50 border-gray-700"}`}
+                    className={`p-4 rounded-xl border ${!isNoWinner && !challenge.isTie && !isWinner ? "bg-green-500/10 border-green-500/30" : "bg-gray-800/50 border-gray-700"}`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-semibold text-gray-300">
                         {opponentName}
                       </span>
-                      {!isWinner && !challenge.isTie && (
+                      {isNoWinner && (
+                        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-bold rounded">
+                          DISQUALIFIED
+                        </span>
+                      )}
+                      {!isNoWinner && challenge.isTie && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
+                          TIE
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && !isWinner && (
                         <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
                           WINNER
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && isWinner && (
+                        <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold rounded">
+                          LOST
                         </span>
                       )}
                     </div>

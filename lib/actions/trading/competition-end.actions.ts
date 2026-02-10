@@ -1238,6 +1238,10 @@ export async function finalizeCompetition(competitionId: string) {
     competition.winnerId = leaderboard[0]?.userId;
     competition.winnerPnL = leaderboard[0]?.pnl;
     competition.finalLeaderboard = leaderboard;
+    // Mark as no-winners when all participants are disqualified
+    if (actualWinners === 0) {
+      competition.noWinners = true;
+    }
     await competition.save({ session });
 
     // CRITICAL: Update ALL participant statuses to 'completed' so they don't block withdrawals!

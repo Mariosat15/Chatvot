@@ -419,6 +419,8 @@ export interface UserChallengeStats {
     winRate: number;
     status: string;
     isWinner: boolean;
+    isTie: boolean;
+    noWinner: boolean;
     prizeAmount: number;
     startTime: Date;
     endTime: Date;
@@ -532,6 +534,8 @@ export async function getUserChallengeStats(
         winRate: myStats?.winRate || 0,
         status: c.status,
         isWinner,
+        isTie: c.isTie || false,
+        noWinner: c.noWinner || false,
         prizeAmount: isWinner ? c.winnerPrize : 0,
         startTime: c.startTime || c.createdAt,
         endTime: c.endTime || c.updatedAt,

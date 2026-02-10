@@ -600,6 +600,8 @@ export async function finalizeChallenge(challengeId: string) {
     challenge.loserName = loserName || undefined;
     challenge.loserPnL = loserPnL;
     challenge.isTie = isTie;
+    // Mark as no-winner when both are disqualified (neither winner nor tie)
+    challenge.noWinner = !winnerId && !isTie ? true : undefined;
 
     // Store final stats
     challenge.challengerFinalStats = {

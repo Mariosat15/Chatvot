@@ -99,6 +99,8 @@ export interface IChallenge extends Document {
   loserName?: string;
   loserPnL?: number;
   isTie?: boolean;
+  noWinner?: boolean;
+  earlyEndReason?: string;
 
   // Final Stats
   challengerFinalStats?: {
@@ -330,6 +332,8 @@ const ChallengeSchema = new Schema<IChallenge>(
     loserName: String,
     loserPnL: Number,
     isTie: Boolean,
+    noWinner: Boolean,
+    earlyEndReason: String,
     challengerFinalStats: {
       finalCapital: Number,
       pnl: Number,

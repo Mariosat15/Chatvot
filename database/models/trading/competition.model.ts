@@ -147,6 +147,8 @@ export interface ICompetition extends Document {
   // Results
   winnerId?: string;
   winnerPnL?: number;
+  noWinners?: boolean;
+  earlyEndReason?: string;
   finalLeaderboard?: {
     rank: number;
     userId: string;
@@ -485,6 +487,12 @@ const CompetitionSchema = new Schema<ICompetition>(
     },
     winnerPnL: {
       type: Number,
+    },
+    noWinners: {
+      type: Boolean,
+    },
+    earlyEndReason: {
+      type: String,
     },
     finalLeaderboard: [
       {

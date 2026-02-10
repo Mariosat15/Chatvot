@@ -440,6 +440,11 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
             { $inc: { creditBalance: prizePool } },
           );
 
+          // Determine loser
+          const loserId = winnerId === challenger.userId.toString()
+            ? opponent.userId.toString()
+            : challenger.userId.toString();
+
           // Update challenge
           await challengesCollection.updateOne(
             { _id: challenge._id },
@@ -449,6 +454,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
                 completedAt: now,
                 winnerId: new mongoose.Types.ObjectId(winnerId),
                 winnerRole: winnerRole,
+                loserId,
                 earlyEndReason: endReason,
               },
             },
@@ -456,7 +462,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
           // Update participants
           await challengeParticipantsCollection.updateOne(
-            { challengeId: challenge._id, role: winnerRole },
+            { challengeId: challenge._id.toString(), role: winnerRole },
             { $set: { isWinner: true } },
           );
 
@@ -779,6 +785,11 @@ export async function runEarlyEndCheckForTest(
             { $inc: { creditBalance: prizePool } },
           );
 
+          // Determine loser
+          const testLoserId = winnerId === challenger.userId.toString()
+            ? opponent.userId.toString()
+            : challenger.userId.toString();
+
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
@@ -787,12 +798,13 @@ export async function runEarlyEndCheckForTest(
                 completedAt: now,
                 winnerId: new mongoose.Types.ObjectId(winnerId),
                 winnerRole,
+                loserId: testLoserId,
               },
             },
           );
 
           await challengeParticipantsCollection.updateOne(
-            { challengeId: challenge._id, role: winnerRole },
+            { challengeId: challenge._id.toString(), role: winnerRole },
             { $set: { isWinner: true } },
           );
         }

@@ -104,6 +104,7 @@ export default function ChallengeCard({
   const canRespond = !isChallenger && challenge.status === "pending";
   const isWinner = challenge.winnerId === userId;
   const isLoser = challenge.loserId === userId;
+  const isNoWinner = challenge.noWinner === true; // Both disqualified - no winner
   const isActive = challenge.status === "active";
   const isPending = challenge.status === "pending";
   const isCompleted = challenge.status === "completed";
@@ -158,6 +159,18 @@ export default function ChallengeCard({
   // Get status style
   const getStatusStyle = () => {
     if (isCompleted) {
+      if (isNoWinner)
+        return {
+          text: "NO WINNER",
+          color: "text-gray-400/30",
+          shadow: "rgba(156, 163, 175, 0.4)",
+        };
+      if (challenge.isTie)
+        return {
+          text: "TIE",
+          color: "text-yellow-500/30",
+          shadow: "rgba(234, 179, 8, 0.4)",
+        };
       if (isWinner)
         return {
           text: "WON",
@@ -170,12 +183,12 @@ export default function ChallengeCard({
           color: "text-red-500/30",
           shadow: "rgba(239, 68, 68, 0.4)",
         };
-      if (challenge.isTie)
-        return {
-          text: "TIE",
-          color: "text-yellow-500/30",
-          shadow: "rgba(234, 179, 8, 0.4)",
-        };
+      // Fallback for completed but no outcome detected (shouldn't happen, but safe)
+      return {
+        text: "LOST",
+        color: "text-red-500/30",
+        shadow: "rgba(239, 68, 68, 0.4)",
+      };
     }
     if (isCancelled)
       return {
@@ -238,12 +251,22 @@ export default function ChallengeCard({
                     LIVE
                   </span>
                 )}
-                {isCompleted && isWinner && (
+                {isCompleted && isNoWinner && (
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-gray-600 text-white text-[10px] font-bold">
+                    NO WINNER
+                  </span>
+                )}
+                {isCompleted && !isNoWinner && challenge.isTie && (
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-yellow-600 text-white text-[10px] font-bold">
+                    TIE
+                  </span>
+                )}
+                {isCompleted && !isNoWinner && !challenge.isTie && isWinner && (
                   <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[10px] font-bold">
                     WON
                   </span>
                 )}
-                {isCompleted && isLoser && (
+                {isCompleted && !isNoWinner && !challenge.isTie && isLoser && (
                   <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
                     LOST
                   </span>
@@ -302,12 +325,22 @@ export default function ChallengeCard({
               )}
               {isCompleted && (
                 <div
-                  className={`px-3 py-1.5 rounded-lg ${isWinner ? "bg-green-500/20 border border-green-500/30" : "bg-red-500/20 border border-red-500/30"}`}
+                  className={`px-3 py-1.5 rounded-lg ${
+                    isNoWinner ? "bg-gray-500/20 border border-gray-500/30"
+                    : challenge.isTie ? "bg-yellow-500/20 border border-yellow-500/30"
+                    : isWinner ? "bg-green-500/20 border border-green-500/30"
+                    : "bg-red-500/20 border border-red-500/30"
+                  }`}
                 >
                   <p
-                    className={`text-xs font-bold ${isWinner ? "text-green-400" : "text-red-400"}`}
+                    className={`text-xs font-bold ${
+                      isNoWinner ? "text-gray-400"
+                      : challenge.isTie ? "text-yellow-400"
+                      : isWinner ? "text-green-400"
+                      : "text-red-400"
+                    }`}
                   >
-                    {isWinner ? "WON" : challenge.isTie ? "TIE" : "LOST"}
+                    {isNoWinner ? "NO WINNER" : challenge.isTie ? "TIE" : isWinner ? "WON" : "LOST"}
                   </p>
                 </div>
               )}
@@ -325,15 +358,26 @@ export default function ChallengeCard({
   const bgPattern =
     isCancelled || isDeclined || isExpired
       ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-800/40 via-gray-900 to-gray-900"
-      : isCompleted && isLoser
-        ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900"
-        : isCompleted && isWinner
-          ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-green-900/40 via-gray-900 to-gray-900"
-          : theme.bgPattern;
+      : isCompleted && isNoWinner
+        ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-800/40 via-gray-900 to-gray-900"
+        : isCompleted && challenge.isTie
+          ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-yellow-900/40 via-gray-900 to-gray-900"
+          : isCompleted && isLoser
+            ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900"
+            : isCompleted && isWinner
+              ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-green-900/40 via-gray-900 to-gray-900"
+              : theme.bgPattern;
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl ${bgPattern} border ${isCancelled || isDeclined || isExpired ? "border-gray-700/50" : isCompleted && isLoser ? "border-red-700/50 hover:border-red-500/50" : isCompleted && isWinner ? "border-green-700/50 hover:border-green-500/50" : "border-gray-700/50 hover:border-orange-500/50"} transition-all duration-500 hover:shadow-2xl hover:${theme.glow} hover:-translate-y-2`}
+      className={`group relative overflow-hidden rounded-2xl ${bgPattern} border ${
+        isCancelled || isDeclined || isExpired ? "border-gray-700/50"
+        : isCompleted && isNoWinner ? "border-gray-600/50 hover:border-gray-500/50"
+        : isCompleted && challenge.isTie ? "border-yellow-700/50 hover:border-yellow-500/50"
+        : isCompleted && isLoser ? "border-red-700/50 hover:border-red-500/50"
+        : isCompleted && isWinner ? "border-green-700/50 hover:border-green-500/50"
+        : "border-gray-700/50 hover:border-orange-500/50"
+      } transition-all duration-500 hover:shadow-2xl hover:${theme.glow} hover:-translate-y-2`}
     >
       {/* Animated Background Effects */}
       <div className="absolute inset-0 opacity-30">
