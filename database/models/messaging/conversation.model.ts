@@ -209,7 +209,8 @@ const ConversationSchema = new Schema<IConversation>(
 
 // Indexes for efficient queries
 ConversationSchema.index({ "participants.id": 1, status: 1 });
-ConversationSchema.index({ "participants.id": 1, deletedByUsers: 1 });
+// NOTE: Cannot compound-index two array fields (participants + deletedByUsers).
+// deletedByUsers already has a field-level index; participants.id is indexed above.
 ConversationSchema.index({ assignedEmployeeId: 1, status: 1 });
 ConversationSchema.index({ type: 1, status: 1, lastActivityAt: -1 });
 ConversationSchema.index({ isAIHandled: 1, type: 1 });
