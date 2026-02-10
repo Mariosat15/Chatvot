@@ -1334,7 +1334,7 @@ export const checkMarginCalls = async (competitionId: string) => {
       status: "active",
       currentOpenPositions: { $gt: 0 },
     })
-      .select("_id userId username currentCapital usedMargin currentOpenPositions status marginCallWarnings")
+      .select("_id userId username currentCapital usedMargin currentOpenPositions status marginCallWarnings unrealizedPnl competitionId challengeId")
       .lean() as any[];
 
     console.log(
@@ -1516,7 +1516,8 @@ export const checkMarginCalls = async (competitionId: string) => {
 
         // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
         // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
-        await CompetitionParticipant.findByIdAndUpdate(participant._id, {
+        // Use the correct model (CompetitionParticipant or ChallengeParticipant)
+        await ParticipantModel.findByIdAndUpdate(participant._id, {
           $set: {
             status: "liquidated",
             liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
@@ -1531,19 +1532,20 @@ export const checkMarginCalls = async (competitionId: string) => {
           `   📝 Participant status set to 'liquidated' for disqualification tracking`,
         );
 
-        // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+        // Send disqualification notification if competition/challenge has disqualifyOnLiquidation enabled
         try {
-          const Competition = (
-            await import("@/database/models/trading/competition.model")
-          ).default;
-          const competition = (await Competition.findById(
-            participant.competitionId,
-          ).lean()) as {
-            name?: string;
-            rules?: { disqualifyOnLiquidation?: boolean };
-          } | null;
+          const contestId = isChallenge ? participant.challengeId : participant.competitionId;
+          let contestDoc: { name?: string; rules?: { disqualifyOnLiquidation?: boolean } } | null = null;
 
-          if (competition?.rules?.disqualifyOnLiquidation) {
+          if (isChallenge) {
+            const Challenge = (await import("@/database/models/trading/challenge.model")).default;
+            contestDoc = await Challenge.findById(contestId).select("name rules").lean() as any;
+          } else {
+            const Competition = (await import("@/database/models/trading/competition.model")).default;
+            contestDoc = await Competition.findById(contestId).select("name rules").lean() as any;
+          }
+
+          if (contestDoc?.rules?.disqualifyOnLiquidation) {
             const { sendNotification } =
               await import("@/lib/services/notification.service");
 
@@ -1552,8 +1554,8 @@ export const checkMarginCalls = async (competitionId: string) => {
               userId: participant.userId,
               type: "competition_disqualified",
               metadata: {
-                competitionId: participant.competitionId,
-                competitionName: competition.name,
+                competitionId: contestId,
+                competitionName: contestDoc.name,
                 reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
               },
             });
