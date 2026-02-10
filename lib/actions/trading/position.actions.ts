@@ -605,7 +605,7 @@ export const closePosition = async (
             $set: {
               currentCapital: newCapital,
               availableCapital: newAvailableCapital,
-              usedMargin: participant.usedMargin - position.marginUsed,
+              usedMargin: Math.max(0, participant.usedMargin - position.marginUsed), // Clamp to 0 — IEEE 754 can produce tiny negatives
               realizedPnl: newRealizedPnl,
               pnl: newPnl,
               pnlPercentage: newPnlPercentage,
@@ -1151,7 +1151,7 @@ export async function closePositionAutomatic(
           $set: {
             currentCapital: newCapital,
             availableCapital: newAvailableCapital,
-            usedMargin: participant.usedMargin - position.marginUsed,
+            usedMargin: Math.max(0, participant.usedMargin - position.marginUsed), // Clamp to 0 — IEEE 754 can produce tiny negatives
             realizedPnl: newRealizedPnl,
             pnl: newPnl,
             pnlPercentage: newPnlPercentage,

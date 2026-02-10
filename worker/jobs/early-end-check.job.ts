@@ -223,7 +223,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
     const allChallengeParticipants = allChallengeIds.length > 0
       ? await challengeParticipantsCollection
           .find({ challengeId: { $in: allChallengeIds } })
-          .project({ challengeId: 1, role: 1, status: 1, pnl: 1, username: 1, userId: 1 })
+          .project({ challengeId: 1, role: 1, status: 1, pnl: 1, username: 1, userId: 1, currentCapital: 1, unrealizedPnl: 1 })
           .toArray()
       : [];
 
