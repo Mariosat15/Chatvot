@@ -77,10 +77,17 @@ async function invalidateLeaderboardCache(): Promise<void> {
 }
 
 // Create Agenda instance
+// IMPORTANT: Agenda creates its OWN MongoClient internally.
+// Without db.options, it defaults to maxPoolSize: 100 — way too many.
+// Cap it to 5 since jobs run sequentially (maxConcurrency: 3).
 const agenda = new Agenda({
   db: {
     address: MONGODB_URI,
     collection: "worker_jobs",
+    options: {
+      maxPoolSize: 5,
+      minPoolSize: 1,
+    },
   },
   processEvery: "30 seconds",
   maxConcurrency: 3,
