@@ -70,12 +70,11 @@ async function loadClusterSettings(
     await client.close();
 
     if (doc) {
-      // Determine which pool fields to use based on the process name
-      // PM2 sets process_title or we can check env
-      const isWorker = process.env.PM2_PROCESS_NAME?.includes("worker") ||
-        process.argv.some((a) => a.includes("worker"));
-      const isAdmin = process.env.PM2_PROCESS_NAME?.includes("admin") ||
-        process.argv.some((a) => a.includes("admin"));
+      // Determine which pool fields to use based on PM2 env vars.
+      // IMPORTANT: Don't use process.argv — Next.js build workers have
+      // "worker" in their argv which causes false matches.
+      const isWorker = process.env.IS_WORKER === "true";
+      const isAdmin = process.env.IS_ADMIN === "true";
 
       if (isWorker) {
         base.maxPoolSize = doc.workerMaxPoolSize ?? DEFAULT_OPTIONS.maxPoolSize;
