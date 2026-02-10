@@ -60,7 +60,9 @@ export async function GET(request: NextRequest) {
         status: conv.status,
         participants: conv.participants.filter((p) => p.isActive),
         lastMessage: conv.lastMessage,
-        unreadCount: conv.unreadCounts.get(session.user.id) || 0,
+        unreadCount: typeof conv.unreadCounts?.get === "function"
+          ? conv.unreadCounts.get(session.user.id) || 0
+          : (conv.unreadCounts as any)?.[session.user.id] || 0,
         isAIHandled: conv.isAIHandled,
         assignedEmployeeName: conv.assignedEmployeeName,
         createdAt: conv.createdAt,
@@ -175,7 +177,9 @@ export async function POST(request: NextRequest) {
         status: conversation.status,
         participants: conversation.participants,
         lastMessage: conversation.lastMessage,
-        unreadCount: conversation.unreadCounts.get(session.user.id) || 0,
+        unreadCount: typeof conversation.unreadCounts?.get === "function"
+          ? conversation.unreadCounts.get(session.user.id) || 0
+          : (conversation.unreadCounts as any)?.[session.user.id] || 0,
         createdAt: conversation.createdAt,
       },
     });
