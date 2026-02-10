@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { MongoClient } from "mongodb";
 
 // NOTE: Don't capture MONGODB_URI at module load time!
 // It must be read at runtime because the worker loads .env after imports are resolved.
@@ -18,25 +19,94 @@ if (!cached) {
   cached = global.mongooseCache = { conn: null, promise: null };
 }
 
-// Optimized connection options for M10+ (3-node replica set)
-const connectionOptions: mongoose.ConnectOptions = {
-  bufferCommands: false,
-  // Connection pool settings
-  maxPoolSize: 10, // Reduced from 50 — M2 shared tier doesn't need large pools
-  minPoolSize: 2, // Reduced from 10 — keep 2 warm connections per process
-  // Timeouts
-  serverSelectionTimeoutMS: 5000, // Fail fast if can't connect
-  socketTimeoutMS: 30000, // 30s — allows leaderboard build to complete without killing socket
-  connectTimeoutMS: 10000, // Connection timeout
-  // Performance options
-  maxIdleTimeMS: 60000, // Keep connections alive 60s under load
-  // NOTE: readPreference is NOT set globally because MongoDB transactions
-  // require primary reads. Instead, use .read("secondaryPreferred") on
-  // specific read-heavy queries (leaderboard, stats) that don't use transactions.
-  // Retry options for resilience
-  retryWrites: true,
-  retryReads: true,
+// =============================================================================
+// DEFAULT CONNECTION OPTIONS (overridden by MDB Cluster settings from DB)
+// These are fallbacks if the DB settings haven't been configured yet.
+// To change pool sizes: Admin Panel → MDB Cluster → Save → pm2 restart all
+// =============================================================================
+const DEFAULT_OPTIONS = {
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 30000,
+  connectTimeoutMS: 10000,
+  maxIdleTimeMS: 60000,
 };
+
+/**
+ * Fetch MDB Cluster settings from the database BEFORE establishing the
+ * Mongoose connection, so pool sizes take effect on first connect.
+ * Uses a quick MongoClient query — adds ~50ms to first connection.
+ * Falls back to DEFAULT_OPTIONS on any error.
+ */
+async function loadClusterSettings(
+  uri: string,
+): Promise<mongoose.ConnectOptions> {
+  const base: mongoose.ConnectOptions = {
+    bufferCommands: false,
+    maxPoolSize: DEFAULT_OPTIONS.maxPoolSize,
+    minPoolSize: DEFAULT_OPTIONS.minPoolSize,
+    serverSelectionTimeoutMS: DEFAULT_OPTIONS.serverSelectionTimeoutMS,
+    socketTimeoutMS: DEFAULT_OPTIONS.socketTimeoutMS,
+    connectTimeoutMS: DEFAULT_OPTIONS.connectTimeoutMS,
+    maxIdleTimeMS: DEFAULT_OPTIONS.maxIdleTimeMS,
+    // NOTE: readPreference is NOT set globally because MongoDB transactions
+    // require primary reads. Instead, use .read("secondaryPreferred") on
+    // specific read-heavy queries (leaderboard, stats) that don't use transactions.
+    retryWrites: true,
+    retryReads: true,
+  };
+
+  try {
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 3000,
+      connectTimeoutMS: 3000,
+    });
+    await client.connect();
+    const doc = await client
+      .db()
+      .collection("mdbclustersettings")
+      .findOne({ _id: "global-mdb-cluster-settings" as any });
+    await client.close();
+
+    if (doc) {
+      // Determine which pool fields to use based on the process name
+      // PM2 sets process_title or we can check env
+      const isWorker = process.env.PM2_PROCESS_NAME?.includes("worker") ||
+        process.argv.some((a) => a.includes("worker"));
+      const isAdmin = process.env.PM2_PROCESS_NAME?.includes("admin") ||
+        process.argv.some((a) => a.includes("admin"));
+
+      if (isWorker) {
+        base.maxPoolSize = doc.workerMaxPoolSize ?? DEFAULT_OPTIONS.maxPoolSize;
+        base.minPoolSize = doc.workerMinPoolSize ?? DEFAULT_OPTIONS.minPoolSize;
+      } else if (isAdmin) {
+        base.maxPoolSize = doc.adminMaxPoolSize ?? DEFAULT_OPTIONS.maxPoolSize;
+        base.minPoolSize = doc.adminMinPoolSize ?? DEFAULT_OPTIONS.minPoolSize;
+      } else {
+        base.maxPoolSize = doc.mainMaxPoolSize ?? DEFAULT_OPTIONS.maxPoolSize;
+        base.minPoolSize = doc.mainMinPoolSize ?? DEFAULT_OPTIONS.minPoolSize;
+      }
+
+      base.serverSelectionTimeoutMS =
+        doc.serverSelectionTimeoutMS ?? DEFAULT_OPTIONS.serverSelectionTimeoutMS;
+      base.socketTimeoutMS =
+        doc.socketTimeoutMS ?? DEFAULT_OPTIONS.socketTimeoutMS;
+      base.connectTimeoutMS =
+        doc.connectTimeoutMS ?? DEFAULT_OPTIONS.connectTimeoutMS;
+      base.maxIdleTimeMS =
+        doc.maxIdleTimeMS ?? DEFAULT_OPTIONS.maxIdleTimeMS;
+
+      console.log(
+        `📊 MDB Cluster settings loaded: pool ${base.maxPoolSize}/${base.minPoolSize} (tier: ${doc.clusterTier || "unknown"})`,
+      );
+    }
+  } catch {
+    // Settings not available yet — use defaults silently
+  }
+
+  return base;
+}
 
 // =============================================================================
 // SLOW QUERY PROFILING
@@ -86,17 +156,18 @@ const RETRY_DELAY_MS = 1000;
 
 async function connectWithRetry(
   uri: string,
+  options: mongoose.ConnectOptions,
   retries = MAX_RETRIES,
 ): Promise<typeof mongoose> {
   try {
-    return await mongoose.connect(uri, connectionOptions);
+    return await mongoose.connect(uri, options);
   } catch (err) {
     if (retries > 0) {
       console.warn(
         `⚠️ MongoDB connection failed, retrying in ${RETRY_DELAY_MS}ms... (${retries} retries left)`,
       );
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-      return connectWithRetry(uri, retries - 1);
+      return connectWithRetry(uri, options, retries - 1);
     }
     throw err;
   }
@@ -115,7 +186,10 @@ export const connectToDatabase = async () => {
     // Enable slow query profiling (always on — logs queries >500ms)
     enableQueryProfiling();
 
-    cached.promise = connectWithRetry(mongoUri);
+    // Load cluster settings from DB (pool sizes, timeouts) before connecting
+    cached.promise = loadClusterSettings(mongoUri).then((opts) =>
+      connectWithRetry(mongoUri, opts),
+    );
   }
 
   try {
@@ -123,13 +197,6 @@ export const connectToDatabase = async () => {
   } catch (err) {
     cached.promise = null;
     throw err;
-  }
-
-  // Only log on first connection, not reconnects
-  if (process.env.NODE_ENV === "development") {
-    console.log(
-      `✅ Connected to database - pool: ${connectionOptions.maxPoolSize} connections`,
-    );
   }
 
   return cached.conn;

@@ -95,6 +95,7 @@ import NotificationSystemSection from "@/components/admin/NotificationSystemSect
 import MarketplaceSection from "@/components/admin/MarketplaceSection";
 import LandingPageBuilder from "@/components/admin/LandingPageBuilder";
 import RedisSettingsSection from "@/components/admin/RedisSettingsSection";
+import MdbClusterSection from "@/components/admin/MdbClusterSection";
 import ServerMonitorSection from "@/components/admin/ServerMonitorSection";
 import ServerOptionsSection from "@/components/admin/ServerOptionsSection";
 import DevSettingsSection from "@/components/admin/DevSettingsSection";
@@ -546,6 +547,11 @@ const menuGroups: MenuGroup[] = [
             id: "database",
             label: "Database",
             icon: <Database className="h-4 w-4" />,
+          },
+          {
+            id: "mdb-cluster",
+            label: "MDB Cluster",
+            icon: <Server className="h-4 w-4" />,
           },
           {
             id: "audit-logs",
@@ -1007,6 +1013,8 @@ export default function AdminDashboard({
         return <RedisSettingsSection key={currentRefreshKey} />;
       case "database":
         return <DatabaseSection key={currentRefreshKey} />;
+      case "mdb-cluster":
+        return <MdbClusterSection key={currentRefreshKey} />;
       case "audit-logs":
         return <AuditLogSection key={currentRefreshKey} />;
       case "dev-settings":
