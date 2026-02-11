@@ -379,6 +379,7 @@ export const enterCompetition = async (competitionId: string) => {
     // Start MongoDB transaction
     const mongoSession = await mongoose.startSession();
     mongoSession.startTransaction();
+    let committed = false;
 
     try {
       // Get competition
@@ -394,7 +395,13 @@ export const enterCompetition = async (competitionId: string) => {
         competition.status !== "upcoming" &&
         competition.status !== "active"
       ) {
-        throw new Error("Competition is not open for entries");
+        throw new Error(
+          competition.status === "cancelled"
+            ? "This competition has been cancelled"
+            : competition.status === "completed"
+              ? "This competition has already ended"
+              : "Competition is not open for entries"
+        );
       }
 
       // Check if competition is full
@@ -535,6 +542,7 @@ export const enterCompetition = async (competitionId: string) => {
 
       // Commit transaction
       await mongoSession.commitTransaction();
+      committed = true;
 
       console.log(
         `✅ User ${session.user.id} entered competition ${competition.name}`,
@@ -643,8 +651,9 @@ export const enterCompetition = async (competitionId: string) => {
         participant: JSON.parse(JSON.stringify(participant[0])),
       };
     } catch (error) {
-      // Rollback on error
-      await mongoSession.abortTransaction();
+      if (!committed) {
+        await mongoSession.abortTransaction();
+      }
       throw error;
     } finally {
       mongoSession.endSession();

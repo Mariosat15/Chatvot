@@ -18,6 +18,7 @@ export async function cancelCompetitionAndRefund(
 ): Promise<{ success: boolean; refundedCount: number; totalRefunded: number }> {
   const session = await mongoose.startSession();
   session.startTransaction();
+  let committed = false;
 
   try {
     await connectToDatabase();
@@ -148,6 +149,7 @@ export async function cancelCompetitionAndRefund(
     );
 
     await session.commitTransaction();
+    committed = true;
 
     console.log(`✅ Competition "${competition.name}" cancelled successfully`);
     console.log(`   Refunded: ${refundedCount} participants`);
@@ -165,7 +167,9 @@ export async function cancelCompetitionAndRefund(
       totalRefunded,
     };
   } catch (error) {
-    await session.abortTransaction();
+    if (!committed) {
+      await session.abortTransaction();
+    }
     console.error("❌ Error cancelling competition:", error);
     throw error;
   } finally {
