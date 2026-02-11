@@ -40,7 +40,7 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Dashboard",
     icon: <GameIcon name="headset" size={22} />,
     color: "text-blue-400",

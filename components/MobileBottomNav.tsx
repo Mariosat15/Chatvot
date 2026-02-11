@@ -16,7 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Home",
     iconName: "headset",
     color: "text-blue-400",
@@ -56,7 +56,7 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
 
   const isActive = (path: string) => {
-    if (path === "/") return pathname === "/" || pathname === "/dashboard";
+    if (path === "/") return pathname === "/";
     return pathname.startsWith(path);
   };
 
