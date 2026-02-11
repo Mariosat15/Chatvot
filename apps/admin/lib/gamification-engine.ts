@@ -1,9 +1,9 @@
 /**
- * Local Gamification Evaluation & Auto-Fix Engine
+ * Local Gamification Evaluation & Auto-Fix Engine v2
  *
  * 100% local, instant, deterministic — NO AI calls, NO timeouts.
- * Scores 10 criteria based on concrete rules and generates
- * specific, targeted fixes for each issue found.
+ * SMART: Detects flat distributions, clustered levels, missing progression.
+ * CREATIVE: Distributes values across smooth curves, not just minimums.
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
@@ -87,25 +87,28 @@ export interface FixResult {
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 
-const RARITY_MINLEVEL_RANGES: Record<string, [number, number]> = {
-  common: [0, 1],
-  rare: [2, 5],
-  epic: [5, 12],
-  legendary: [8, 18],
+// Full ranges for distributing levels (not just minimums!)
+const RARITY_LEVEL_RANGES: Record<string, [number, number]> = {
+  common: [0, 2],
+  rare: [2, 6],
+  epic: [6, 13],
+  legendary: [10, 18],
 };
 
-const RARITY_MINTRADES_RANGES: Record<string, [number, number]> = {
-  common: [3, 25],
-  rare: [15, 100],
-  epic: [50, 500],
-  legendary: [200, 2000],
+// Full ranges for distributing minTrades
+const RARITY_TRADES_RANGES: Record<string, [number, number]> = {
+  common: [3, 20],
+  rare: [15, 80],
+  epic: [50, 300],
+  legendary: [200, 1500],
 };
 
-const RARITY_MINCOMPS_RANGES: Record<string, [number, number]> = {
+// Full ranges for distributing minCompletedCompetitions
+const RARITY_COMPS_RANGES: Record<string, [number, number]> = {
   common: [1, 5],
-  rare: [3, 15],
-  epic: [10, 30],
-  legendary: [20, 100],
+  rare: [3, 12],
+  epic: [8, 25],
+  legendary: [15, 75],
 };
 
 const VALID_CATEGORIES = [
@@ -113,10 +116,43 @@ const VALID_CATEGORIES = [
   "Speed", "Consistency", "Strategy", "Social", "Legendary",
 ];
 
-// Categories that should require minTrades
 const TRADE_CATEGORIES = ["Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy"];
-// Categories that should require minCompletedCompetitions
 const COMP_CATEGORIES = ["Competition"];
+
+// ─── Smart Distribution Helper ──────────────────────────────────────────────────
+
+/**
+ * Distributes N items across a range [min, max] with a smooth curve.
+ * Returns an array of N values, sorted ascending.
+ * Uses linear interpolation for even spread.
+ */
+function distributeValues(count: number, min: number, max: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [Math.round((min + max) / 2)];
+  const values: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const t = i / (count - 1); // 0 to 1
+    const val = Math.round(min + t * (max - min));
+    values.push(val);
+  }
+  return values;
+}
+
+/**
+ * Checks if an array of numbers is "flat" — all same or nearly same value.
+ * Returns the dominant value if flat, or null if varied.
+ */
+function detectFlatDistribution(values: number[]): { isFlat: boolean; dominant: number; uniqueCount: number } {
+  if (values.length === 0) return { isFlat: true, dominant: 0, uniqueCount: 0 };
+  const counts: Record<number, number> = {};
+  for (const v of values) counts[v] = (counts[v] || 0) + 1;
+  const unique = Object.keys(counts).length;
+  const maxCount = Math.max(...Object.values(counts));
+  const dominant = Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]);
+  // Flat if > 80% of values are the same, or only 1-2 unique values with 5+ badges
+  const isFlat = (maxCount / values.length > 0.8) || (unique <= 2 && values.length >= 5);
+  return { isFlat, dominant, uniqueCount: unique };
+}
 
 // ─── Evaluation Engine ──────────────────────────────────────────────────────────
 
@@ -128,34 +164,15 @@ export function evaluateSystem(
   const issues: EvalIssue[] = [];
   const strengths: string[] = [];
 
-  // ── 1. Progression Flow ──
   const progressionScore = scoreProgressionFlow(badges, issues, strengths);
-
-  // ── 2. Difficulty Curve ──
   const difficultyScore = scoreDifficultyCurve(badges, issues, strengths);
-
-  // ── 3. Zero-Baseline Protection ──
   const zeroBaselineScore = scoreZeroBaseline(badges, issues, strengths);
-
-  // ── 4. Level Gating ──
   const levelGatingScore = scoreLevelGating(badges, issues, strengths);
-
-  // ── 5. Category Balance ──
   const categoryScore = scoreCategoryBalance(badges, issues, strengths);
-
-  // ── 6. XP Economy ──
   const xpScore = scoreXPEconomy(badges, milestones, issues, strengths);
-
-  // ── 7. Milestone-Badge Connection ──
   const connectionScore = scoreMilestoneBadgeConnection(badges, milestones, issues, strengths);
-
-  // ── 8. Engagement Hooks ──
   const engagementScore = scoreEngagementHooks(badges, milestones, issues, strengths);
-
-  // ── 9. Urgency ──
   const urgencyScore = scoreUrgency(badges, milestones, issues, strengths);
-
-  // ── 10. Fun Factor ──
   const funScore = scoreFunFactor(badges, milestones, maps, issues, strengths);
 
   const scores: Record<string, number> = {
@@ -175,16 +192,14 @@ export function evaluateSystem(
     (Object.values(scores).reduce((a, b) => a + b, 0) / 10) * 10
   ) / 10;
 
-  // Sort issues by severity
-  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-  issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  issues.sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3));
 
   const summary = buildSummary(overallScore, badges.length, milestones.length, maps.length, issues);
-
   return { overallScore, scores, issues, strengths, summary };
 }
 
-// ─── Auto-Fix Engine ────────────────────────────────────────────────────────────
+// ─── Smart Auto-Fix Engine ──────────────────────────────────────────────────────
 
 export function generateFixes(
   badges: BadgeData[],
@@ -194,60 +209,138 @@ export function generateFixes(
   const milestoneFixes: FixResult["milestoneFixes"] = [];
   const badgeIds = new Set(badges.map(b => b.id));
 
-  for (const badge of badges) {
-    const rarity = badge.rarity || "common";
-    const cat = badge.category || "";
+  // ══════════════════════════════════════════════════════════════════════════
+  // SMART minLevel DISTRIBUTION
+  // Instead of just setting minimums, distribute levels across the FULL
+  // range for each rarity, creating a smooth progression curve.
+  // ══════════════════════════════════════════════════════════════════════════
 
-    // Fix: Zero-baseline for trade categories
-    if (TRADE_CATEGORIES.includes(cat) && rarity !== "common") {
-      const mt = badge.condition?.minTrades || 0;
-      const range = RARITY_MINTRADES_RANGES[rarity] || [5, 25];
-      if (mt < range[0]) {
-        badgeFixes.push({
-          id: badge.id,
-          field: "condition.minTrades",
-          oldValue: mt,
-          newValue: range[0],
-        });
+  // Group badges by rarity
+  const byRarity: Record<string, BadgeData[]> = {};
+  for (const b of badges) {
+    const r = b.rarity || "common";
+    if (!byRarity[r]) byRarity[r] = [];
+    byRarity[r].push(b);
+  }
+
+  for (const rarity of RARITY_ORDER) {
+    const pool = byRarity[rarity] || [];
+    if (pool.length === 0) continue;
+
+    const range = RARITY_LEVEL_RANGES[rarity];
+    if (!range) continue;
+
+    const currentLevels = pool.map(b => b.minLevel || 0);
+    const dist = detectFlatDistribution(currentLevels);
+
+    // Fix if: flat distribution, or most badges below the range minimum
+    const belowMin = pool.filter(b => (b.minLevel || 0) < range[0]).length;
+    const needsFix = dist.isFlat || (belowMin > pool.length * 0.5);
+
+    if (needsFix && pool.length > 0) {
+      // Sort badges by name for deterministic ordering, then distribute
+      const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
+      const targetLevels = distributeValues(sorted.length, range[0], range[1]);
+
+      for (let i = 0; i < sorted.length; i++) {
+        const badge = sorted[i];
+        const current = badge.minLevel || 0;
+        const target = targetLevels[i];
+        if (current !== target) {
+          badgeFixes.push({
+            id: badge.id,
+            field: "minLevel",
+            oldValue: current,
+            newValue: target,
+          });
+        }
       }
-    }
-
-    // Fix: Zero-baseline for competition categories
-    if (COMP_CATEGORIES.includes(cat) && rarity !== "common") {
-      const mc = badge.condition?.minCompletedCompetitions || 0;
-      const range = RARITY_MINCOMPS_RANGES[rarity] || [1, 5];
-      if (mc < range[0]) {
-        badgeFixes.push({
-          id: badge.id,
-          field: "condition.minCompletedCompetitions",
-          oldValue: mc,
-          newValue: range[0],
-        });
-      }
-    }
-
-    // Fix: Level gating
-    const mlRange = RARITY_MINLEVEL_RANGES[rarity] || [0, 1];
-    const ml = badge.minLevel || 0;
-    if (rarity !== "common" && ml < mlRange[0]) {
-      badgeFixes.push({
-        id: badge.id,
-        field: "minLevel",
-        oldValue: ml,
-        newValue: mlRange[0],
-      });
-    }
-    if (ml > mlRange[1]) {
-      badgeFixes.push({
-        id: badge.id,
-        field: "minLevel",
-        oldValue: ml,
-        newValue: mlRange[1],
-      });
     }
   }
 
-  // Fix milestones: invalid badge references
+  // ══════════════════════════════════════════════════════════════════════════
+  // SMART minTrades DISTRIBUTION
+  // For trade-related categories, distribute minTrades across the full
+  // range — not just the minimum. Creates: "easy rare = 15 trades,
+  // hard rare = 80 trades" instead of "all rare = 15 trades".
+  // ══════════════════════════════════════════════════════════════════════════
+
+  for (const rarity of RARITY_ORDER) {
+    const pool = (byRarity[rarity] || []).filter(b =>
+      TRADE_CATEGORIES.includes(b.category || "")
+    );
+    if (pool.length === 0) continue;
+
+    const range = RARITY_TRADES_RANGES[rarity];
+    if (!range) continue;
+
+    const currentTrades = pool.map(b => b.condition?.minTrades || 0);
+    const dist = detectFlatDistribution(currentTrades);
+    const zeroCount = currentTrades.filter(v => v === 0).length;
+
+    // Fix if: flat, mostly zero, or clustered
+    if (dist.isFlat || zeroCount > pool.length * 0.5) {
+      const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
+      const targetTrades = distributeValues(sorted.length, range[0], range[1]);
+
+      for (let i = 0; i < sorted.length; i++) {
+        const badge = sorted[i];
+        const current = badge.condition?.minTrades || 0;
+        const target = targetTrades[i];
+        if (current !== target) {
+          badgeFixes.push({
+            id: badge.id,
+            field: "condition.minTrades",
+            oldValue: current,
+            newValue: target,
+          });
+        }
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SMART minCompletedCompetitions DISTRIBUTION
+  // Same approach for competition badges.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  for (const rarity of RARITY_ORDER) {
+    const pool = (byRarity[rarity] || []).filter(b =>
+      COMP_CATEGORIES.includes(b.category || "")
+    );
+    if (pool.length === 0) continue;
+
+    const range = RARITY_COMPS_RANGES[rarity];
+    if (!range) continue;
+
+    const currentComps = pool.map(b => b.condition?.minCompletedCompetitions || 0);
+    const dist = detectFlatDistribution(currentComps);
+    const zeroCount = currentComps.filter(v => v === 0).length;
+
+    if (dist.isFlat || zeroCount > pool.length * 0.5) {
+      const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
+      const targetComps = distributeValues(sorted.length, range[0], range[1]);
+
+      for (let i = 0; i < sorted.length; i++) {
+        const badge = sorted[i];
+        const current = badge.condition?.minCompletedCompetitions || 0;
+        const target = targetComps[i];
+        if (current !== target) {
+          badgeFixes.push({
+            id: badge.id,
+            field: "condition.minCompletedCompetitions",
+            oldValue: current,
+            newValue: target,
+          });
+        }
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIX: Invalid milestone badge references
+  // ══════════════════════════════════════════════════════════════════════════
+
   for (const ms of milestones) {
     if (ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0) {
       const invalid = ms.requiredBadgeIds.filter(bid => !badgeIds.has(bid));
@@ -264,16 +357,20 @@ export function generateFixes(
     }
   }
 
-  // Fix milestones: add badge gates to strategic checkpoints
-  // Strategy: every ~4 milestones in a map, add a badge gate using a
-  // progressively harder badge (common → rare → epic → legendary)
+  // ══════════════════════════════════════════════════════════════════════════
+  // SMART: Add badge gates to milestone checkpoints
+  // Strategy: every ~4 milestones per map, add a gate using a badge that
+  // gets progressively harder (common → rare → epic → legendary).
+  // Uses different badges per gate for variety.
+  // ══════════════════════════════════════════════════════════════════════════
+
   const gatedCount = milestones.filter(ms =>
     ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0
   ).length;
   const gateRatio = milestones.length > 0 ? gatedCount / milestones.length : 1;
 
   if (gateRatio < 0.15 && badges.length > 0) {
-    // Build badge pools by rarity (sorted by minLevel ascending)
+    // Build badge pools by rarity, shuffle for variety
     const badgesByRarity: Record<string, BadgeData[]> = {
       common: [], rare: [], epic: [], legendary: [],
     };
@@ -281,42 +378,42 @@ export function generateFixes(
       const r = b.rarity || "common";
       if (badgesByRarity[r]) badgesByRarity[r].push(b);
     }
-    // Sort each pool by minLevel
+    // Sort each pool by minLevel for progression
     for (const pool of Object.values(badgesByRarity)) {
       pool.sort((a, b) => (a.minLevel || 0) - (b.minLevel || 0));
     }
 
-    // Group milestones by map and sort by order
+    // Group milestones by map
     const byMap: Record<string, MilestoneData[]> = {};
     for (const ms of milestones) {
       if (!byMap[ms.mapId]) byMap[ms.mapId] = [];
       byMap[ms.mapId].push(ms);
     }
 
-    const GATE_INTERVAL = 4; // add a gate every 4 milestones
+    const GATE_INTERVAL = 4;
     const rarityProgression = ["common", "common", "rare", "rare", "epic", "epic", "legendary"];
 
-    for (const [mapId, mapMilestones] of Object.entries(byMap)) {
+    for (const [_mapId, mapMilestones] of Object.entries(byMap)) {
       const sorted = [...mapMilestones].sort((a, b) => a.order - b.order);
-      let badgePoolIdx = 0;
+      let poolIdx = 0;
 
       for (let i = GATE_INTERVAL - 1; i < sorted.length; i += GATE_INTERVAL) {
         const ms = sorted[i];
-        // Skip if already has a badge gate
         if (ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0) continue;
 
-        // Pick a badge from the appropriate rarity tier
         const tierIdx = Math.min(
           Math.floor(i / GATE_INTERVAL),
           rarityProgression.length - 1,
         );
         const rarity = rarityProgression[tierIdx];
-        const pool = badgesByRarity[rarity] || badgesByRarity.common;
+        const pool = badgesByRarity[rarity]?.length > 0
+          ? badgesByRarity[rarity]
+          : badgesByRarity.common;
 
         if (pool.length === 0) continue;
 
-        const badge = pool[badgePoolIdx % pool.length];
-        badgePoolIdx++;
+        const badge = pool[poolIdx % pool.length];
+        poolIdx++;
 
         milestoneFixes.push({
           id: ms.id,
@@ -363,11 +460,26 @@ function scoreProgressionFlow(badges: BadgeData[], issues: EvalIssue[], strength
         severity: "high",
         area: "progression",
         description: `${curr.rarity} badges (avg level ${curr.avg.toFixed(1)}) don't require higher level than ${prev.rarity} (avg ${prev.avg.toFixed(1)})`,
-        recommendation: `Increase minLevel on ${curr.rarity} badges to create clear progression`,
+        recommendation: `Auto-fix distributes minLevel across the full range for each rarity tier`,
         targetAgent: "badge_agent",
         autoFixable: true,
       });
     }
+  }
+
+  // NEW: Check for flat distribution across ALL badges
+  const allLevels = badges.map(b => b.minLevel || 0);
+  const allDist = detectFlatDistribution(allLevels);
+  if (allDist.isFlat && badges.length > 10) {
+    score -= 3;
+    issues.push({
+      severity: "critical",
+      area: "progression",
+      description: `${allDist.uniqueCount === 1 ? "ALL" : "Almost all"} badges have minLevel=${allDist.dominant} — no progression curve exists`,
+      recommendation: "Auto-fix will distribute minLevel across 0-18 based on rarity (common:0-2, rare:2-6, epic:6-13, legendary:10-18)",
+      targetAgent: "badge_agent",
+      autoFixable: true,
+    });
   }
 
   if (score >= 8) strengths.push("Good progression flow: minLevel increases with rarity tiers");
@@ -384,7 +496,6 @@ function scoreDifficultyCurve(badges: BadgeData[], issues: EvalIssue[], strength
     if (byRarity[r]) byRarity[r].push(val);
   }
 
-  // Check: condition values should increase with rarity
   const avgValues = RARITY_ORDER.map(r => ({
     rarity: r,
     avg: byRarity[r].length > 0 ? byRarity[r].reduce((a, b) => a + b, 0) / byRarity[r].length : 0,
@@ -410,119 +521,125 @@ function scoreDifficultyCurve(badges: BadgeData[], issues: EvalIssue[], strength
 
 function scoreZeroBaseline(badges: BadgeData[], issues: EvalIssue[], strengths: string[]): number {
   let score = 10;
-  let zeroCount = 0;
+  let tradeZeros = 0;
+  let compZeros = 0;
 
   for (const b of badges) {
     if (b.rarity === "common") continue;
-    const mt = b.condition?.minTrades || 0;
-    const mc = b.condition?.minCompletedCompetitions || 0;
     const cat = b.category || "";
 
-    if (TRADE_CATEGORIES.includes(cat) && mt === 0) {
-      zeroCount++;
-      issues.push({
-        severity: "critical",
-        area: "zero-baseline",
-        description: `${b.rarity} badge "${b.name}" (${b.id}) in ${cat} has minTrades=0 — earnable without trading`,
-        recommendation: `Set minTrades >= ${RARITY_MINTRADES_RANGES[b.rarity]?.[0] || 5}`,
-        targetAgent: "badge_agent",
-        autoFixable: true,
-        fix: {
-          type: "update_badge",
-          id: b.id,
-          field: "condition.minTrades",
-          oldValue: 0,
-          newValue: RARITY_MINTRADES_RANGES[b.rarity]?.[0] || 5,
-        },
-      });
+    if (TRADE_CATEGORIES.includes(cat) && (b.condition?.minTrades || 0) === 0) {
+      tradeZeros++;
     }
-
-    if (COMP_CATEGORIES.includes(cat) && mc === 0) {
-      zeroCount++;
-      issues.push({
-        severity: "critical",
-        area: "zero-baseline",
-        description: `${b.rarity} badge "${b.name}" (${b.id}) in ${cat} has minCompletedCompetitions=0 — earnable without competing`,
-        recommendation: `Set minCompletedCompetitions >= ${RARITY_MINCOMPS_RANGES[b.rarity]?.[0] || 1}`,
-        targetAgent: "badge_agent",
-        autoFixable: true,
-        fix: {
-          type: "update_badge",
-          id: b.id,
-          field: "condition.minCompletedCompetitions",
-          oldValue: 0,
-          newValue: RARITY_MINCOMPS_RANGES[b.rarity]?.[0] || 1,
-        },
-      });
+    if (COMP_CATEGORIES.includes(cat) && (b.condition?.minCompletedCompetitions || 0) === 0) {
+      compZeros++;
     }
   }
 
-  const nonCommon = badges.filter(b => b.rarity !== "common").length;
-  const ratio = nonCommon > 0 ? zeroCount / nonCommon : 0;
-  score = Math.round(10 * (1 - ratio));
+  const totalZeros = tradeZeros + compZeros;
 
-  if (zeroCount === 0) strengths.push("Excellent zero-baseline protection: all non-common badges require activity");
-  return Math.max(1, Math.min(10, score));
-}
-
-function scoreLevelGating(badges: BadgeData[], issues: EvalIssue[], strengths: string[]): number {
-  let score = 10;
-  let ungatedNonCommon = 0;
-  let overGated = 0;
-
-  for (const b of badges) {
-    const r = b.rarity || "common";
-    if (r === "common") continue;
-    const ml = b.minLevel || 0;
-    const range = RARITY_MINLEVEL_RANGES[r];
-    if (!range) continue;
-
-    if (ml < range[0]) {
-      ungatedNonCommon++;
-      if (ungatedNonCommon <= 5) { // Only report first 5
-        issues.push({
-          severity: r === "legendary" ? "high" : "medium",
-          area: "level-gating",
-          description: `${r} badge "${b.name}" (${b.id}) has minLevel=${ml}, should be ${range[0]}-${range[1]}`,
-          recommendation: `Set minLevel to at least ${range[0]}`,
-          targetAgent: "badge_agent",
-          autoFixable: true,
-          fix: { type: "update_badge", id: b.id, field: "minLevel", oldValue: ml, newValue: range[0] },
-        });
-      }
-    }
-    if (ml > range[1]) {
-      overGated++;
-      issues.push({
-        severity: "medium",
-        area: "level-gating",
-        description: `${r} badge "${b.name}" (${b.id}) has minLevel=${ml}, max for ${r} is ${range[1]}`,
-        recommendation: `Reduce minLevel to ${range[1]}`,
-        targetAgent: "badge_agent",
-        autoFixable: true,
-        fix: { type: "update_badge", id: b.id, field: "minLevel", oldValue: ml, newValue: range[1] },
-      });
-    }
-  }
-
-  if (ungatedNonCommon > 5) {
+  // Report as bulk issue instead of per-badge spam
+  if (tradeZeros > 0) {
     issues.push({
-      severity: "high",
-      area: "level-gating",
-      description: `${ungatedNonCommon} total non-common badges have insufficient minLevel`,
-      recommendation: "Run Badge Agent auto-fix to set appropriate minLevels",
+      severity: "critical",
+      area: "zero-baseline",
+      description: `${tradeZeros} non-common trade/profit/risk/etc. badges have minTrades=0 — earnable without trading`,
+      recommendation: `Auto-fix distributes minTrades across each rarity tier (common:3-20, rare:15-80, epic:50-300, legendary:200-1500)`,
+      targetAgent: "badge_agent",
+      autoFixable: true,
+    });
+  }
+  if (compZeros > 0) {
+    issues.push({
+      severity: "critical",
+      area: "zero-baseline",
+      description: `${compZeros} non-common competition badges have minCompletedCompetitions=0 — earnable without competing`,
+      recommendation: `Auto-fix distributes minCompletedCompetitions across each rarity tier (common:1-5, rare:3-12, epic:8-25, legendary:15-75)`,
       targetAgent: "badge_agent",
       autoFixable: true,
     });
   }
 
   const nonCommon = badges.filter(b => b.rarity !== "common").length;
-  const ungatedRatio = nonCommon > 0 ? ungatedNonCommon / nonCommon : 0;
-  score -= Math.round(ungatedRatio * 6);
-  score -= Math.min(2, overGated);
+  const ratio = nonCommon > 0 ? totalZeros / nonCommon : 0;
+  score = Math.round(10 * (1 - ratio));
 
-  if (ungatedNonCommon === 0 && overGated === 0) {
-    strengths.push("Perfect level gating: all non-common badges have appropriate minLevel requirements");
+  if (totalZeros === 0) strengths.push("Excellent zero-baseline protection: all non-common badges require activity");
+  return Math.max(1, Math.min(10, score));
+}
+
+function scoreLevelGating(badges: BadgeData[], issues: EvalIssue[], strengths: string[]): number {
+  let score = 10;
+
+  // Group by rarity and check distribution quality
+  const byRarity: Record<string, { below: number; above: number; inRange: number; flat: boolean; total: number }> = {};
+
+  for (const rarity of RARITY_ORDER) {
+    const pool = badges.filter(b => (b.rarity || "common") === rarity);
+    if (pool.length === 0) continue;
+
+    const range = RARITY_LEVEL_RANGES[rarity];
+    if (!range) continue;
+
+    const levels = pool.map(b => b.minLevel || 0);
+    const dist = detectFlatDistribution(levels);
+
+    let below = 0, above = 0, inRange = 0;
+    for (const ml of levels) {
+      if (ml < range[0]) below++;
+      else if (ml > range[1]) above++;
+      else inRange++;
+    }
+
+    byRarity[rarity] = { below, above, inRange, flat: dist.isFlat, total: pool.length };
+  }
+
+  // Score based on issues found
+  for (const [rarity, stats] of Object.entries(byRarity)) {
+    if (rarity === "common") continue; // common is fine at 0
+
+    if (stats.flat && stats.total >= 3) {
+      score -= 2;
+      issues.push({
+        severity: "high",
+        area: "level-gating",
+        description: `All ${stats.total} ${rarity} badges have the same/similar minLevel — no variety within the tier`,
+        recommendation: `Auto-fix distributes across ${RARITY_LEVEL_RANGES[rarity]?.[0]}-${RARITY_LEVEL_RANGES[rarity]?.[1]}`,
+        targetAgent: "badge_agent",
+        autoFixable: true,
+      });
+    }
+
+    if (stats.below > stats.total * 0.5) {
+      score -= 1.5;
+      issues.push({
+        severity: "high",
+        area: "level-gating",
+        description: `${stats.below}/${stats.total} ${rarity} badges have minLevel below the expected range (${RARITY_LEVEL_RANGES[rarity]?.[0]}-${RARITY_LEVEL_RANGES[rarity]?.[1]})`,
+        recommendation: `Auto-fix will distribute minLevel for ${rarity} badges across the full range`,
+        targetAgent: "badge_agent",
+        autoFixable: true,
+      });
+    }
+  }
+
+  // Check if ALL non-common badges have minLevel=0
+  const nonCommonLevels = badges.filter(b => b.rarity !== "common").map(b => b.minLevel || 0);
+  const allZero = nonCommonLevels.length > 0 && nonCommonLevels.every(l => l === 0);
+  if (allZero) {
+    score = 1; // Catastrophic
+    issues.push({
+      severity: "critical",
+      area: "level-gating",
+      description: `ALL ${nonCommonLevels.length} non-common badges have minLevel=0 — level gating does not exist`,
+      recommendation: "Auto-fix creates full progression: rare(2-6), epic(6-13), legendary(10-18)",
+      targetAgent: "badge_agent",
+      autoFixable: true,
+    });
+  }
+
+  if (score >= 8) {
+    strengths.push("Well-distributed level gating across all rarity tiers");
   }
   return Math.max(1, Math.min(10, score));
 }
@@ -544,7 +661,6 @@ function scoreCategoryBalance(badges: BadgeData[], issues: EvalIssue[], strength
     ...rarities,
   }));
 
-  // Check for empty categories
   const emptyCats = VALID_CATEGORIES.filter(c => !byCat[c] || Object.values(byCat[c]).reduce((a, b) => a + b, 0) === 0);
   if (emptyCats.length > 0) {
     score -= emptyCats.length;
@@ -558,7 +674,6 @@ function scoreCategoryBalance(badges: BadgeData[], issues: EvalIssue[], strength
     });
   }
 
-  // Check for categories with no legendary
   const noLegendary = catCounts.filter(c => (c.legendary || 0) === 0 && c.total > 3);
   if (noLegendary.length > 3) {
     score -= 1;
@@ -572,7 +687,6 @@ function scoreCategoryBalance(badges: BadgeData[], issues: EvalIssue[], strength
     });
   }
 
-  // Check for heavily skewed categories
   if (catCounts.length > 0) {
     const avg = badges.length / catCounts.length;
     const overLoaded = catCounts.filter(c => c.total > avg * 2);
@@ -589,9 +703,8 @@ function scoreCategoryBalance(badges: BadgeData[], issues: EvalIssue[], strength
 }
 
 function scoreXPEconomy(badges: BadgeData[], milestones: MilestoneData[], issues: EvalIssue[], strengths: string[]): number {
-  let score = 8; // Start at 8 — XP is mostly config-based
+  let score = 8;
 
-  // Check: milestone XP rewards should be reasonable
   const xpValues = milestones.map(m => m.rewards?.xp || 0).filter(x => x > 0);
   if (xpValues.length > 0) {
     const avgXP = xpValues.reduce((a, b) => a + b, 0) / xpValues.length;
@@ -619,20 +732,6 @@ function scoreXPEconomy(badges: BadgeData[], milestones: MilestoneData[], issues
     }
   }
 
-  // Check badge count vs level count (rough check)
-  const commonCount = badges.filter(b => b.rarity === "common").length;
-  if (commonCount > 40) {
-    score -= 1;
-    issues.push({
-      severity: "low",
-      area: "xp-economy",
-      description: `${commonCount} common badges — each gives 10 XP, total ${commonCount * 10} XP from common alone`,
-      recommendation: "Monitor if players level up too quickly from common badges",
-      targetAgent: "manual",
-      autoFixable: false,
-    });
-  }
-
   if (score >= 7) strengths.push("XP economy appears balanced for the level curve");
   return Math.max(1, Math.min(10, score));
 }
@@ -654,30 +753,41 @@ function scoreMilestoneBadgeConnection(
       for (const bid of ms.requiredBadgeIds) {
         if (!badgeIds.has(bid)) {
           invalidRefs++;
-          issues.push({
-            severity: "high",
-            area: "connections",
-            description: `Milestone "${ms.name}" (${ms.id}) requires non-existent badge "${bid}"`,
-            recommendation: "Remove invalid badge reference or create the missing badge",
-            targetAgent: "milestone_agent",
-            autoFixable: true,
-            fix: { type: "update_milestone", id: ms.id, field: "requiredBadgeIds", oldValue: bid, newValue: null },
-          });
+          if (invalidRefs <= 3) {
+            issues.push({
+              severity: "high",
+              area: "connections",
+              description: `Milestone "${ms.name}" requires non-existent badge "${bid}"`,
+              recommendation: "Auto-fix removes invalid badge references",
+              targetAgent: "milestone_agent",
+              autoFixable: true,
+            });
+          }
         }
       }
     }
   }
 
+  if (invalidRefs > 3) {
+    issues.push({
+      severity: "high",
+      area: "connections",
+      description: `${invalidRefs} total invalid badge references in milestones`,
+      recommendation: "Auto-fix removes all invalid badge references",
+      targetAgent: "milestone_agent",
+      autoFixable: true,
+    });
+  }
+
   if (invalidRefs > 0) score -= Math.min(4, invalidRefs);
 
-  // Check: enough milestones should have badge gates
   if (milestones.length > 10 && gatedCount < milestones.length * 0.15) {
     score -= 2;
     issues.push({
       severity: "medium",
       area: "connections",
       description: `Only ${gatedCount}/${milestones.length} milestones have badge gates (${(gatedCount / milestones.length * 100).toFixed(0)}%)`,
-      recommendation: "Auto-fix will add badge gates every ~4 milestones per map, using progressively harder badges",
+      recommendation: "Auto-fix adds badge gates every ~4 milestones per map with progressive difficulty",
       targetAgent: "milestone_agent",
       autoFixable: true,
     });
@@ -692,7 +802,6 @@ function scoreMilestoneBadgeConnection(
 function scoreEngagementHooks(badges: BadgeData[], milestones: MilestoneData[], issues: EvalIssue[], strengths: string[]): number {
   let score = 7;
 
-  // Check: variety of condition types
   const condTypes = new Set(badges.map(b => b.condition?.type).filter(Boolean));
   if (condTypes.size >= 8) {
     score += 2;
@@ -709,20 +818,16 @@ function scoreEngagementHooks(badges: BadgeData[], milestones: MilestoneData[], 
     });
   }
 
-  // Check: mix of short-term and long-term goals
   const easyBadges = badges.filter(b => b.rarity === "common").length;
   const hardBadges = badges.filter(b => b.rarity === "legendary").length;
-  if (easyBadges > 0 && hardBadges > 0) {
-    score += 1;
-  }
+  if (easyBadges > 0 && hardBadges > 0) score += 1;
 
   return Math.max(1, Math.min(10, score));
 }
 
 function scoreUrgency(badges: BadgeData[], milestones: MilestoneData[], issues: EvalIssue[], strengths: string[]): number {
-  let score = 5; // Start neutral — urgency depends on implementation
+  let score = 5;
 
-  // Check for competition-related badges (inherently time-limited)
   const compBadges = badges.filter(b => b.category === "Competition");
   if (compBadges.length > 0) {
     score += Math.min(3, Math.floor(compBadges.length / 5));
@@ -752,7 +857,6 @@ function scoreFunFactor(
 ): number {
   let score = 6;
 
-  // Legendary badges are exciting goals
   const legendaryCount = badges.filter(b => b.rarity === "legendary").length;
   if (legendaryCount >= 5) {
     score += 2;
@@ -769,13 +873,11 @@ function scoreFunFactor(
     });
   }
 
-  // Multiple maps = variety
   if (maps.length >= 5) {
     score += 1;
     strengths.push(`${maps.length} journey maps provide varied progression paths`);
   }
 
-  // Total badges — more = more to collect
   if (badges.length >= 80) score += 1;
   if (badges.length >= 120) strengths.push(`${badges.length} badges create a rich collection to pursue`);
 
