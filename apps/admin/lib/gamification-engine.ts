@@ -264,6 +264,71 @@ export function generateFixes(
     }
   }
 
+  // Fix milestones: add badge gates to strategic checkpoints
+  // Strategy: every ~4 milestones in a map, add a badge gate using a
+  // progressively harder badge (common → rare → epic → legendary)
+  const gatedCount = milestones.filter(ms =>
+    ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0
+  ).length;
+  const gateRatio = milestones.length > 0 ? gatedCount / milestones.length : 1;
+
+  if (gateRatio < 0.15 && badges.length > 0) {
+    // Build badge pools by rarity (sorted by minLevel ascending)
+    const badgesByRarity: Record<string, BadgeData[]> = {
+      common: [], rare: [], epic: [], legendary: [],
+    };
+    for (const b of badges) {
+      const r = b.rarity || "common";
+      if (badgesByRarity[r]) badgesByRarity[r].push(b);
+    }
+    // Sort each pool by minLevel
+    for (const pool of Object.values(badgesByRarity)) {
+      pool.sort((a, b) => (a.minLevel || 0) - (b.minLevel || 0));
+    }
+
+    // Group milestones by map and sort by order
+    const byMap: Record<string, MilestoneData[]> = {};
+    for (const ms of milestones) {
+      if (!byMap[ms.mapId]) byMap[ms.mapId] = [];
+      byMap[ms.mapId].push(ms);
+    }
+
+    const GATE_INTERVAL = 4; // add a gate every 4 milestones
+    const rarityProgression = ["common", "common", "rare", "rare", "epic", "epic", "legendary"];
+
+    for (const [mapId, mapMilestones] of Object.entries(byMap)) {
+      const sorted = [...mapMilestones].sort((a, b) => a.order - b.order);
+      let badgePoolIdx = 0;
+
+      for (let i = GATE_INTERVAL - 1; i < sorted.length; i += GATE_INTERVAL) {
+        const ms = sorted[i];
+        // Skip if already has a badge gate
+        if (ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0) continue;
+
+        // Pick a badge from the appropriate rarity tier
+        const tierIdx = Math.min(
+          Math.floor(i / GATE_INTERVAL),
+          rarityProgression.length - 1,
+        );
+        const rarity = rarityProgression[tierIdx];
+        const pool = badgesByRarity[rarity] || badgesByRarity.common;
+
+        if (pool.length === 0) continue;
+
+        const badge = pool[badgePoolIdx % pool.length];
+        badgePoolIdx++;
+
+        milestoneFixes.push({
+          id: ms.id,
+          mapId: ms.mapId,
+          field: "requiredBadgeIds",
+          oldValue: ms.requiredBadgeIds || [],
+          newValue: [badge.id],
+        });
+      }
+    }
+  }
+
   return {
     badgeFixes,
     milestoneFixes,
@@ -606,15 +671,15 @@ function scoreMilestoneBadgeConnection(
   if (invalidRefs > 0) score -= Math.min(4, invalidRefs);
 
   // Check: enough milestones should have badge gates
-  if (milestones.length > 10 && gatedCount < milestones.length * 0.1) {
+  if (milestones.length > 10 && gatedCount < milestones.length * 0.15) {
     score -= 2;
     issues.push({
       severity: "medium",
       area: "connections",
       description: `Only ${gatedCount}/${milestones.length} milestones have badge gates (${(gatedCount / milestones.length * 100).toFixed(0)}%)`,
-      recommendation: "Add requiredBadgeIds to strategic checkpoint milestones (every 3-5 milestones)",
+      recommendation: "Auto-fix will add badge gates every ~4 milestones per map, using progressively harder badges",
       targetAgent: "milestone_agent",
-      autoFixable: false,
+      autoFixable: true,
     });
   }
 

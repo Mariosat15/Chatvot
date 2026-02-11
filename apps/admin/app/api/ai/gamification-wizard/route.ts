@@ -64,14 +64,9 @@ const dbTools = {
       try {
         const { _changes, _isNew, _id, __v, createdAt, updatedAt, ...clean } = badge;
 
-        // ── Validation: skip badges with invalid or missing required fields ──
+        // ── Validation ──
         if (!clean.id || typeof clean.id !== "string") {
           console.warn(`[Wizard] Skipping badge with missing/invalid id`);
-          results.skipped++;
-          continue;
-        }
-        if (!clean.condition?.type) {
-          console.warn(`[Wizard] Skipping badge ${clean.id}: missing condition.type`);
           results.skipped++;
           continue;
         }
@@ -85,7 +80,6 @@ const dbTools = {
           results.skipped++;
           continue;
         }
-
         // ── Sanitize numeric fields ──
         const minLevel = Math.max(0, Math.min(20, Number(clean.minLevel) || 0));
         if (clean.condition) {
@@ -101,6 +95,14 @@ const dbTools = {
         }
 
         const existing = await BadgeConfig.findOne({ id: clean.id });
+
+        // condition.type is only required for NEW badges — existing badges
+        // may store conditions differently and we preserve them via merge
+        if (!existing && !clean.condition?.type) {
+          console.warn(`[Wizard] Skipping NEW badge ${clean.id}: missing condition.type`);
+          results.skipped++;
+          continue;
+        }
 
         // #region agent log
         console.log(`[DEBUG-WIZARD] writeBadge id=${clean.id} minLevel=${minLevel} condMinTrades=${clean.condition?.minTrades} existing=${!!existing} existingMinLevel=${existing?.minLevel} existingCondMinTrades=${(existing as any)?.condition?.minTrades}`);
