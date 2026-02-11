@@ -99,32 +99,87 @@ npm run worker:build
 # Update nginx config (smart - preserves SSL)
 echo "🌐 Checking nginx configuration..."
 
+NGINX_CONF="/etc/nginx/sites-available/chartvolt"
+NGINX_CHANGED=false
+
 # Check if current config has SSL (certbot added it)
-if grep -q "listen 443" /etc/nginx/sites-available/chartvolt 2>/dev/null; then
+if grep -q "listen 443" "$NGINX_CONF" 2>/dev/null; then
   echo "🔒 SSL detected in nginx config - preserving certbot settings"
-  echo "   Only updating client_max_body_size if needed..."
+  echo "   Checking for missing directives..."
   
   # Check if admin block has client_max_body_size
-  if ! grep -A20 "server_name admin.chartvolt.com" /etc/nginx/sites-available/chartvolt | grep -q "client_max_body_size"; then
+  if ! grep -A20 "server_name admin" "$NGINX_CONF" | grep -q "client_max_body_size"; then
     echo "📝 Adding client_max_body_size to admin server block..."
-    # Use sed to add client_max_body_size after admin server_name line
-    sudo sed -i '/server_name admin.chartvolt.com/a\    client_max_body_size 10M;' /etc/nginx/sites-available/chartvolt
-    
+    sudo sed -i '/server_name admin/a\    client_max_body_size 10M;' "$NGINX_CONF"
+    NGINX_CHANGED=true
+  else
+    echo "  ✅ client_max_body_size already configured"
+  fi
+  
+  # Check if AI timeout block exists (needed for OpenAI calls >60s)
+  if ! grep -q "location /api/ai/" "$NGINX_CONF" 2>/dev/null; then
+    echo "📝 Adding AI route timeout blocks (proxy_read_timeout 180s)..."
+    # Insert AI timeout block before the admin root "location / {" block
+    # Find the admin server block's "location / {" (after the admin server_name)
+    sudo sed -i '/# Root - proxy to admin app/i\
+    # AI routes need longer timeout (OpenAI calls can take 30-120s)\
+    location /api/ai/ {\
+        proxy_pass http://admin_app;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 180;\
+        proxy_send_timeout 180;\
+        proxy_connect_timeout 30;\
+    }\
+\
+    # Badge evaluation trigger also needs longer timeout\
+    location /api/trigger-badge-evaluation {\
+        proxy_pass http://admin_app;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 180;\
+        proxy_send_timeout 180;\
+    }\
+' "$NGINX_CONF"
+    NGINX_CHANGED=true
+  else
+    echo "  ✅ AI timeout blocks already configured"
+  fi
+  
+  # Check if admin root location has proxy_read_timeout
+  if ! grep -A10 "# Root - proxy to admin app" "$NGINX_CONF" | grep -q "proxy_read_timeout"; then
+    echo "📝 Adding proxy_read_timeout to admin root location..."
+    sudo sed -i '/# Root - proxy to admin app/,/}/ s/proxy_cache_bypass \$http_upgrade;/proxy_cache_bypass $http_upgrade;\n        proxy_read_timeout 120;/' "$NGINX_CONF"
+    NGINX_CHANGED=true
+  else
+    echo "  ✅ Admin root proxy_read_timeout already configured"
+  fi
+  
+  # Reload nginx if changes were made
+  if [ "$NGINX_CHANGED" = true ]; then
     echo "🔍 Testing nginx config..."
     if sudo nginx -t; then
       echo "✅ Nginx config valid, reloading..."
       sudo systemctl reload nginx
     else
       echo "❌ Nginx config invalid after modification!"
-      echo "   Please check /etc/nginx/sites-available/chartvolt manually."
+      echo "   Please check $NGINX_CONF manually."
+      echo "   Reverting changes..."
+      cd /var/www/chartvolt && git checkout deploy/nginx.conf
     fi
   else
-    echo "✅ client_max_body_size already configured"
+    echo "  ✅ All nginx directives already up to date"
   fi
 else
-  # No SSL - safe to copy our base config
+  # No SSL - safe to copy our base config (includes AI timeouts)
   echo "📝 No SSL detected, copying base nginx config..."
-  sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+  sudo cp deploy/nginx.conf "$NGINX_CONF"
   
   echo "🔍 Testing nginx config..."
   if sudo nginx -t; then

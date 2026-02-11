@@ -119,15 +119,59 @@ deploy_to_server() {
     # Update nginx config (smart - preserves SSL)
     echo "🌐 Checking nginx configuration..."
     
+    NGINX_CONF="/etc/nginx/sites-available/chartvolt"
+    NGINX_CHANGED=false
+    
     # Check if current config has SSL (certbot added it)
-    if grep -q "listen 443" /etc/nginx/sites-available/chartvolt 2>/dev/null; then
+    if grep -q "listen 443" "$NGINX_CONF" 2>/dev/null; then
       echo "🔒 SSL detected - preserving certbot settings"
       
       # Check if admin block has client_max_body_size
-      if ! grep -A20 "server_name admin.chartvolt.com" /etc/nginx/sites-available/chartvolt | grep -q "client_max_body_size"; then
+      if ! grep -A20 "server_name admin" "$NGINX_CONF" | grep -q "client_max_body_size"; then
         echo "📝 Adding client_max_body_size to admin server block..."
-        sed -i '/server_name admin.chartvolt.com/a\    client_max_body_size 10M;' /etc/nginx/sites-available/chartvolt
-        
+        sed -i '/server_name admin/a\    client_max_body_size 10M;' "$NGINX_CONF"
+        NGINX_CHANGED=true
+      fi
+      
+      # Check if AI timeout block exists
+      if ! grep -q "location /api/ai/" "$NGINX_CONF" 2>/dev/null; then
+        echo "📝 Adding AI route timeout blocks..."
+        sed -i '/# Root - proxy to admin app/i\
+    # AI routes need longer timeout (OpenAI calls can take 30-120s)\
+    location /api/ai/ {\
+        proxy_pass http://admin_app;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 180;\
+        proxy_send_timeout 180;\
+        proxy_connect_timeout 30;\
+    }\
+\
+    # Badge evaluation trigger also needs longer timeout\
+    location /api/trigger-badge-evaluation {\
+        proxy_pass http://admin_app;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 180;\
+        proxy_send_timeout 180;\
+    }\
+' "$NGINX_CONF"
+        NGINX_CHANGED=true
+      fi
+      
+      # Check if admin root location has proxy_read_timeout
+      if ! grep -A10 "# Root - proxy to admin app" "$NGINX_CONF" | grep -q "proxy_read_timeout"; then
+        sed -i '/# Root - proxy to admin app/,/}/ s/proxy_cache_bypass \$http_upgrade;/proxy_cache_bypass $http_upgrade;\n        proxy_read_timeout 120;/' "$NGINX_CONF"
+        NGINX_CHANGED=true
+      fi
+      
+      if [ "$NGINX_CHANGED" = true ]; then
         if nginx -t; then
           echo "✅ Nginx config valid, reloading..."
           systemctl reload nginx
@@ -135,12 +179,12 @@ deploy_to_server() {
           echo "❌ Nginx config invalid after modification!"
         fi
       else
-        echo "✅ client_max_body_size already configured"
+        echo "✅ All nginx directives already up to date"
       fi
     else
-      # No SSL - safe to copy our base config
+      # No SSL - safe to copy our base config (includes AI timeouts)
       echo "📝 No SSL detected, copying base nginx config..."
-      cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+      cp deploy/nginx.conf "$NGINX_CONF"
       
       if nginx -t; then
         echo "✅ Nginx config valid, reloading..."
