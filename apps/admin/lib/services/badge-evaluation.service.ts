@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { Badge } from "@/lib/constants/badges";
@@ -48,6 +49,7 @@ export interface UserStats {
 
   // Wallet
   totalDeposited: number;
+  depositCount: number; // Number of completed deposits
   totalWithdrawn: number;
   withdrawalCount: number; // Number of completed withdrawals
   kycVerified: boolean;
@@ -391,9 +393,10 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     allPositions.length > 0 && tradesWithTP === allPositions.length;
 
   // Wallet stats
-  const [wallet, withdrawalCount] = await Promise.all([
+  const [wallet, withdrawalCount, depositCount] = await Promise.all([
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
     WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
+    WalletTransaction.countDocuments({ userId, transactionType: "deposit", status: "completed" }),
   ]);
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
@@ -711,6 +714,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     alwaysUsesTP,
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
+    depositCount,
     totalWithdrawn,
     withdrawalCount,
     kycVerified,
@@ -1132,7 +1136,7 @@ export async function checkBadgeCondition(
     case "profile_complete":
       return stats.totalDeposited > 0; // Has activity = profile complete
     case "total_deposits":
-      return compareValue(stats.totalDeposited, value, comparison);
+      return compareValue(stats.depositCount, value, comparison);
     case "first_trade":
       return stats.totalTrades >= 1;
     case "losing_trades":

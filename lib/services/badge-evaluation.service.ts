@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { Badge } from "@/lib/constants/badges";
@@ -49,6 +50,7 @@ export interface UserStats {
 
   // Wallet
   totalDeposited: number;
+  depositCount: number; // Number of completed deposits
   totalWithdrawn: number;
   withdrawalCount: number; // Number of completed withdrawals
   kycVerified: boolean;
@@ -283,7 +285,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   }
 
   // PERF: Fetch independent data in parallel, with reduced limits and countDocuments for totals
-  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
+  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount, depositCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
     CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
     TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(2000).lean(),
     TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume closeReason").sort({ closedAt: -1 }).limit(2000).lean(),
@@ -291,6 +293,8 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     TradeHistory.countDocuments({ userId }),
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
     WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
+    // Count completed deposits
+    WalletTransaction.countDocuments({ userId, transactionType: "deposit", status: "completed" }),
     // SL/TP trigger counts for badge evaluation
     TradeHistory.countDocuments({ userId, closeReason: "stop_loss" }),
     TradeHistory.countDocuments({ userId, closeReason: "take_profit" }),
@@ -700,6 +704,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     alwaysUsesTP,
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
+    depositCount,
     totalWithdrawn,
     withdrawalCount,
     kycVerified,
@@ -1135,7 +1140,7 @@ export async function checkBadgeCondition(
     case "profile_complete":
       return stats.totalDeposited > 0; // Has activity = profile complete
     case "total_deposits":
-      return compareValue(stats.totalDeposited, value, comparison);
+      return compareValue(stats.depositCount, value, comparison);
     case "first_trade":
       return stats.totalTrades >= 1;
     case "losing_trades":
