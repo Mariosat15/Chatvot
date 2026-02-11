@@ -548,48 +548,90 @@ export default function JourneyMapEditorSection() {
       const extraNeeded = targetCount - fullBlueprint.length;
       console.log(`[Blueprint Gen] Generating ${extraNeeded} extra milestones beyond blueprint`);
       
-      // Extra milestone templates based on common progression patterns
-      const extraConditionTypes = [
-        { type: "total_trades", baseValue: 10 + mapIndex * 15 },
-        { type: "winning_trades", baseValue: 5 + mapIndex * 8 },
-        { type: "win_streak", baseValue: 2 + mapIndex },
-        { type: "unique_pairs_traded", baseValue: 1 + Math.floor(mapIndex / 2) },
-        { type: "daily_trading_streak", baseValue: 1 + mapIndex },
+      // Find the max values already used in this blueprint to avoid duplicates
+      const usedMaxValues: Record<string, number> = {};
+      fullBlueprint.forEach((bp) => {
+        const t = bp.condition.type;
+        const v = typeof bp.condition.value === "number" ? bp.condition.value : 0;
+        if (!usedMaxValues[t] || v > usedMaxValues[t]) usedMaxValues[t] = v;
+      });
+
+      // Smart extra condition templates that continue from blueprint max values
+      const extraTemplates = [
+        { type: "total_trades", step: Math.max(5, mapIndex * 3), icon: "sword", descVerb: "Execute" },
+        { type: "winning_trades", step: Math.max(3, mapIndex * 2), icon: "trophy", descVerb: "Achieve" },
+        { type: "win_streak", step: 1, icon: "fireSpell", descVerb: "Reach a" },
+        { type: "unique_pairs_traded", step: 1, icon: "compass", descVerb: "Trade" },
+        { type: "daily_trading_streak", step: Math.max(1, Math.floor(mapIndex / 2)), icon: "flag", descVerb: "Maintain a" },
+        { type: "competitions_entered", step: 1, icon: "arena", descVerb: "Enter" },
+        { type: "competitions_completed", step: 1, icon: "banner", descVerb: "Complete" },
       ];
-      
-      const themeNames: Record<string, string[]> = {
-        pirate: ["Treasure Hunter", "Sea Wolf", "Corsair", "Buccaneer", "Marauder"],
-        space: ["Astronaut", "Cosmonaut", "Stargazer", "Navigator", "Explorer"],
-        medieval: ["Knight", "Squire", "Baron", "Duke", "Lord"],
-        cyber: ["Hacker", "Coder", "Programmer", "Developer", "Architect"],
-        ancient: ["Pharaoh", "Priest", "Oracle", "Sage", "Elder"],
-        volcanic: ["Phoenix", "Firewalker", "Lava Lord", "Flame Master", "Inferno"],
-        arctic: ["Frostbite", "Glacier", "Blizzard", "Avalanche", "Permafrost"],
-        dragon: ["Dragon Rider", "Flame Keeper", "Scale Master", "Fire Breather", "Wyrm"],
-        celestial: ["Archangel", "Seraph", "Divine", "Ethereal", "Astral"],
-        legendary: ["Legend", "Myth", "Immortal", "Titan", "God"],
+
+      // Only use condition types appropriate for this map's stage
+      const allowedTypes = mapIndex <= 2
+        ? ["total_trades", "winning_trades", "win_streak", "unique_pairs_traded", "daily_trading_streak"]
+        : mapIndex <= 4
+        ? ["total_trades", "winning_trades", "win_streak", "unique_pairs_traded", "competitions_entered", "competitions_completed", "daily_trading_streak"]
+        : ["total_trades", "winning_trades", "win_streak", "unique_pairs_traded", "competitions_entered", "competitions_completed", "daily_trading_streak"];
+
+      const filteredTemplates = extraTemplates.filter((t) => allowedTypes.includes(t.type));
+
+      // Themed descriptions using adjective + noun pattern
+      const themeAdjectives: Record<string, string[]> = {
+        pirate: ["Swashbuckling", "Daring", "Fearless", "Cunning", "Bold"],
+        space: ["Stellar", "Cosmic", "Orbital", "Galactic", "Quantum"],
+        medieval: ["Valiant", "Noble", "Royal", "Heroic", "Legendary"],
+        cyber: ["Digital", "Neural", "Quantum", "Binary", "Encrypted"],
+        ancient: ["Sacred", "Divine", "Mystic", "Eternal", "Ancient"],
+        volcanic: ["Blazing", "Scorching", "Molten", "Fierce", "Volcanic"],
+        arctic: ["Frozen", "Glacial", "Icy", "Frigid", "Crystal"],
+        dragon: ["Draconic", "Fiery", "Mighty", "Fearsome", "Ancient"],
+        celestial: ["Celestial", "Ethereal", "Divine", "Radiant", "Astral"],
+        legendary: ["Legendary", "Mythical", "Immortal", "Supreme", "Godlike"],
       };
-      
-      const names = themeNames[metadata.theme] || themeNames.pirate;
-      
+
+      const themeNouns: Record<string, string[]> = {
+        pirate: ["Voyage", "Plunder", "Conquest", "Raid", "Treasure"],
+        space: ["Mission", "Discovery", "Expedition", "Launch", "Orbit"],
+        medieval: ["Quest", "Campaign", "Siege", "Crusade", "Battle"],
+        cyber: ["Protocol", "Upload", "Breach", "Download", "Hack"],
+        ancient: ["Ritual", "Prophecy", "Legacy", "Awakening", "Passage"],
+        volcanic: ["Eruption", "Inferno", "Tempest", "Forge", "Blaze"],
+        arctic: ["Expedition", "Traverse", "Endurance", "Survival", "Passage"],
+        dragon: ["Trial", "Ascension", "Challenge", "Legacy", "Awakening"],
+        celestial: ["Ascension", "Revelation", "Prophecy", "Alignment", "Eclipse"],
+        legendary: ["Odyssey", "Saga", "Epic", "Destiny", "Triumph"],
+      };
+
+      const adjectives = themeAdjectives[metadata.theme] || themeAdjectives.pirate;
+      const nouns = themeNouns[metadata.theme] || themeNouns.pirate;
+
       for (let i = 0; i < extraNeeded; i++) {
-        const condTemplate = extraConditionTypes[i % extraConditionTypes.length];
-        const extraValue = condTemplate.baseValue + (i * 5);
-        const extraId = `extra_${i + 1}`;
-        const extraXP = 15 + (mapIndex * 3) + (i * 5);
+        const template = filteredTemplates[i % filteredTemplates.length];
+        const baseValue = usedMaxValues[template.type] || 0;
+        const newValue = baseValue + template.step * (Math.floor(i / filteredTemplates.length) + 1);
+        const extraId = `bonus_${metadata.theme}_${i + 1}`;
+        const extraXP = Math.round((metadata.xpBudget / targetCount) * (0.8 + Math.random() * 0.4));
+        
+        const adj = adjectives[i % adjectives.length];
+        const noun = nouns[(i + 2) % nouns.length];
+        const friendlyType = template.type.replace(/_/g, " ");
         
         blueprint.push({
           id: extraId,
-          name: `${names[i % names.length]} ${i + 1}`,
-          description: `Achieve ${condTemplate.type.replace(/_/g, " ")} of ${extraValue}`,
-          condition: { type: condTemplate.type, value: extraValue, comparison: "gte" },
+          name: `${adj} ${noun}`,
+          description: `${template.descVerb} ${newValue} ${friendlyType}`,
+          condition: { type: template.type, value: newValue, comparison: "gte" },
           xp: extraXP,
           nodeType: i === extraNeeded - 1 ? "checkpoint" : "milestone",
-          icon: "trophy",
+          icon: template.icon,
         });
+
+        // Track used values to avoid duplicates within extras
+        usedMaxValues[template.type] = Math.max(usedMaxValues[template.type] || 0, newValue);
       }
     } else if (targetCount < fullBlueprint.length) {
-      // Trim to target count
+      // Trim to target count, keeping start and legendary milestones
       blueprint.length = targetCount;
     }
 

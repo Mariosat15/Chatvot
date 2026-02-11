@@ -246,7 +246,26 @@ Generate EXACTLY ${count} milestones in strictly increasing difficulty order.`;
         });
 
         const response = completion.choices[0]?.message?.content || "";
-        const parsed = JSON.parse(response);
+        let parsed;
+        try {
+          parsed = JSON.parse(response);
+        } catch {
+          // Try to repair truncated JSON
+          try {
+            const lastBracket = response.lastIndexOf('}');
+            if (lastBracket > 0) {
+              parsed = JSON.parse(response.substring(0, lastBracket + 1) + ']}');
+            } else {
+              return NextResponse.json({ error: "AI returned invalid JSON", raw: response.substring(0, 500) }, { status: 500 });
+            }
+          } catch {
+            return NextResponse.json({ error: "AI returned invalid JSON", raw: response.substring(0, 500) }, { status: 500 });
+          }
+        }
+
+        if (!parsed.milestones || parsed.milestones.length === 0) {
+          return NextResponse.json({ error: "AI returned no milestones" }, { status: 500 });
+        }
 
         // Enhance milestones with calculated difficulty and proper structure
         const enhancedMilestones = parsed.milestones.map(
@@ -442,7 +461,9 @@ Analyze and return JSON with:
 
         // SMART: Fetch milestones from ALL previous maps in ONE batch query
         const previousMapsProgress: { type: string; maxValue: number }[] = [];
-        let cumulativeMaxValues: Record<string, number> = {};
+        const cumulativeMaxValues: Record<string, number> = {};
+        // Also collect all existing milestone condition keys to avoid duplication
+        const usedConditionKeys: string[] = [];
         
         if (mapOrder > 1) {
           const prevMapIds = MAP_SEQUENCE
@@ -453,7 +474,7 @@ Analyze and return JSON with:
           const allPrevMilestones = await JourneyMilestone.find(
             { mapId: { $in: prevMapIds }, isActive: true }
           )
-            .select("completeCondition")
+            .select("completeCondition mapId")
             .lean();
           
           allPrevMilestones.forEach((m: any) => {
@@ -464,6 +485,7 @@ Analyze and return JSON with:
               if (!cumulativeMaxValues[condType] || condValue > cumulativeMaxValues[condType]) {
                 cumulativeMaxValues[condType] = condValue;
               }
+              usedConditionKeys.push(`${condType}:${condValue}`);
             }
           });
         }
@@ -480,18 +502,44 @@ Analyze and return JSON with:
         
         console.log(`[AI Gen] Generating ${targetMilestoneCount} milestones for Map ${mapOrder}: ${mapConfig.name}`);
         
-        // Simplified, shorter prompt for faster AI response
-        const singleMapPrompt = `Generate ${targetMilestoneCount} milestones for "${mapConfig.name}" (${mapConfig.theme} theme, Map ${mapOrder}/10).
+        // Build a detailed prompt with full previous-map awareness
+        const prevProgressText = previousMapsProgress.length > 0
+          ? `PREVIOUS MAPS HIGHEST VALUES (you MUST use HIGHER values than these):\n${previousMapsProgress.map(p => `  - ${p.type}: ${p.maxValue}`).join('\n')}\n\nALREADY USED (DO NOT reuse these exact type:value pairs):\n  ${usedConditionKeys.slice(-30).join(', ')}`
+          : 'This is Map 1 (first map). Start with beginner values: account_created, kyc_verified, first_deposit, first_trade, then 5-15 for trades/wins.';
 
-${previousMapsProgress.length > 0 ? `Previous max values: ${previousMapsProgress.slice(0, 5).map(p => `${p.type}=${p.maxValue}`).join(', ')}. Use HIGHER values.` : 'This is Map 1, start with low values (1-15).'}
+        // Map stage guidance for each map
+        const MAP_STAGE_GUIDE: Record<number, string> = {
+          1: "ONBOARDING: account_created, kyc_verified, first_deposit, first_trade, winning_trades 1-3, total_trades 5-10, win_streak 2",
+          2: "FOUNDATIONS: total_trades 15-30, winning_trades 5-12, unique_pairs_traded 2-3, win_streak 3",
+          3: "FIRST COMPETITIONS: total_trades 40-50, competitions_entered 1, competitions_completed 1, winning_trades 15-25, win_streak 4",
+          4: "COMPETITION GROWTH: total_trades 70-100, competitions_entered 3, competitions_completed 2-3, winning_trades 30-40, win_streak 5, unique_pairs_traded 5",
+          5: "FIRST PODIUMS: total_trades 150, competitions_completed 4, podium_finishes 1-2, winning_trades 50-60, win_streak 7, daily_trading_streak 7",
+          6: "FIRST WINS: total_trades 200, podium_finishes 3, first_place_finishes 1-2, winning_trades 70-80, win_streak 10, competitions_completed 6",
+          7: "MULTIPLE WINS: total_trades 300, podium_finishes 5, first_place_finishes 4-6, winning_trades 100-120, win_streak 12, competitions_completed 10, daily_trading_streak 14",
+          8: "CHAMPION STATUS: total_trades 400, podium_finishes 8, first_place_finishes 10-15, winning_trades 150-200, win_streak 15, competitions_completed 15, comeback_victory 1",
+          9: "NEAR LEGENDARY: total_trades 500, podium_finishes 12, first_place_finishes 20-25, winning_trades 250-300, win_streak 20, competitions_completed 20, daily_trading_streak 30",
+          10: "GOD STATUS: total_trades 750-1000, podium_finishes 20, first_place_finishes 35-50, winning_trades 400-500, win_streak 30, competitions_completed 30",
+        };
 
-Rules:
-- ${mapConfig.theme}-themed names
-- Progressive difficulty (each harder than previous)
-- XP budget: ${budget}
-- Value range: ${mapOrder * 10}-${mapOrder * 30} for trades, proportional for others
+        const stageGuide = MAP_STAGE_GUIDE[mapOrder] || MAP_STAGE_GUIDE[10];
 
-Generate exactly ${targetMilestoneCount} milestones.`;
+        const singleMapPrompt = `Generate EXACTLY ${targetMilestoneCount} milestones for Map ${mapOrder}/10: "${mapConfig.name}" (${mapConfig.theme} theme).
+
+STAGE FOR THIS MAP: ${stageGuide}
+
+${prevProgressText}
+
+RULES:
+1. Use ${mapConfig.theme}-themed names (e.g., ${mapOrder === 1 ? 'Pirate: Set Sail, Treasure Hunt' : mapOrder === 10 ? 'Legendary: Trading God, Immortal Trader' : `${mapConfig.theme}: creative themed names`})
+2. STRICTLY progressive difficulty (each milestone MUST be harder than previous)
+3. XP budget: ${budget} total
+4. First milestone: ${mapOrder === 1 ? 'account_created (start node)' : `map_completed with value "${MAP_SEQUENCE[mapOrder - 2]?.mapId}" (start node)`}
+5. Last milestone: legendary node type with the hardest condition
+6. NEVER duplicate a condition type+value pair from previous maps
+7. Mix condition types: use at least 3-4 different types per map
+8. Value range guide: ${stageGuide}
+
+Generate EXACTLY ${targetMilestoneCount} milestones. Return compact JSON.`;
 
         const completion = await openai.chat.completions.create({
           model: config.model,
@@ -500,12 +548,41 @@ Generate exactly ${targetMilestoneCount} milestones.`;
             { role: "user", content: singleMapPrompt },
           ],
           temperature: 0.5,
-          max_tokens: 2500, // Reduced for faster response
+          max_tokens: 4500, // Increased to prevent truncation for larger maps
           response_format: { type: "json_object" },
         });
 
         const response = completion.choices[0]?.message?.content || "";
-        const parsed = JSON.parse(response);
+        let parsed;
+        try {
+          parsed = JSON.parse(response);
+        } catch (parseErr) {
+          // Try to repair truncated JSON by finding the last complete milestone
+          console.warn(`[AI Gen] Map ${mapOrder} JSON parse failed, attempting repair...`);
+          try {
+            // Find last complete object in milestones array
+            const lastGoodBracket = response.lastIndexOf('}');
+            if (lastGoodBracket > 0) {
+              const repaired = response.substring(0, lastGoodBracket + 1) + ']}';
+              parsed = JSON.parse(repaired);
+              console.log(`[AI Gen] Repaired JSON: ${parsed.milestones?.length || 0} milestones recovered`);
+            } else {
+              throw parseErr;
+            }
+          } catch {
+            return NextResponse.json(
+              { error: `Map ${mapOrder} AI returned invalid JSON. Try reducing milestone count or regenerating.`, raw: response.substring(0, 500) },
+              { status: 500 }
+            );
+          }
+        }
+
+        if (!parsed.milestones || !Array.isArray(parsed.milestones) || parsed.milestones.length === 0) {
+          return NextResponse.json(
+            { error: `Map ${mapOrder} AI returned no milestones. Try regenerating.` },
+            { status: 500 }
+          );
+        }
 
         // Enhance milestones with proper structure (including badge-gating + seasonal from AI)
         const enhancedMilestones = parsed.milestones.map(
@@ -633,33 +710,54 @@ Generate exactly ${targetMilestoneCount} milestones.`;
         const { startFromMap = 1, endAtMap = 10 } = body;
         
         const allMaps: any[] = [];
-        let usedConditions = new Set<string>();
+        const usedConditions = new Set<string>();
         let cumulativeTradesRequired = 0;
         let cumulativeWinsRequired = 0;
+        let cumulativePodiums = 0;
+        let cumulativeFirstPlace = 0;
+        let cumulativeCompsCompleted = 0;
+        
+        // Map stage guidance (same as single map)
+        const SEQUENCE_STAGE_GUIDE: Record<number, string> = {
+          1: "ONBOARDING: account_created, kyc, deposit, first trades, 5-10 trades, win_streak 2",
+          2: "FOUNDATIONS: 15-30 trades, 5-12 wins, 2-3 assets, win_streak 3",
+          3: "FIRST COMPETITIONS: 40-50 trades, enter 1 comp, complete 1 comp, 15-25 wins, streak 4",
+          4: "COMPETITION GROWTH: 70-100 trades, 3 entered, 2-3 completed, 30-40 wins, streak 5",
+          5: "FIRST PODIUMS: 150 trades, 4 completed, 1-2 podiums, 50-60 wins, streak 7",
+          6: "FIRST WINS: 200 trades, 3 podiums, 1-2 first place, 70-80 wins, streak 10",
+          7: "MULTIPLE WINS: 300 trades, 5 podiums, 4-6 wins, 100-120 wins, streak 12",
+          8: "CHAMPION: 400 trades, 8 podiums, 10-15 first place, 150-200 wins, streak 15",
+          9: "NEAR LEGENDARY: 500 trades, 12 podiums, 20-25 first place, 250-300 wins, streak 20",
+          10: "GOD STATUS: 750-1000 trades, 20 podiums, 35-50 first place, 400-500 wins, streak 30",
+        };
         
         for (let mapIndex = startFromMap; mapIndex <= endAtMap; mapIndex++) {
           const mapConfig = MAP_SEQUENCE[mapIndex - 1];
           if (!mapConfig) continue;
 
-          // Generate this map's milestones
-          const sequencePrompt = `Generate milestones for Map ${mapIndex}: "${mapConfig.name}"
+          const stageGuide = SEQUENCE_STAGE_GUIDE[mapIndex] || "";
+          const usedCondArr = Array.from(usedConditions);
 
-THEME: ${mapConfig.theme}
-DIFFICULTY: ${mapConfig.difficulty}/10
-XP BUDGET: ${mapConfig.xpBudget} XP
-MILESTONES: ${mapConfig.milestoneCount}
+          // Generate this map's milestones with full context
+          const sequencePrompt = `Generate EXACTLY ${mapConfig.milestoneCount} milestones for Map ${mapIndex}/10: "${mapConfig.name}" (${mapConfig.theme} theme).
 
-CUMULATIVE PROGRESS SO FAR:
-- Total trades required by end of previous map: ${cumulativeTradesRequired}
-- Total wins required by end of previous map: ${cumulativeWinsRequired}
-- Conditions already used: ${Array.from(usedConditions).slice(-10).join(', ')}
+STAGE: ${stageGuide}
 
-${mapIndex > 1 ? `PREREQUISITE: First milestone must require { type: "map_completed", milestoneId: "${MAP_SEQUENCE[mapIndex - 2]?.mapId}" }` : 'FIRST MAP: Start with account_created'}
+CUMULATIVE PROGRESS FROM PREVIOUS MAPS:
+- Max total_trades: ${cumulativeTradesRequired}
+- Max winning_trades: ${cumulativeWinsRequired}
+- Max podium_finishes: ${cumulativePodiums}
+- Max first_place_finishes: ${cumulativeFirstPlace}
+- Max competitions_completed: ${cumulativeCompsCompleted}
+ALL values in this map MUST be HIGHER than these.
 
-Create ${mapConfig.milestoneCount} ${mapConfig.theme}-themed milestones.
-- Avoid duplicate conditions: ${Array.from(usedConditions).slice(-20).join(', ')}
-- Continue progression from ${cumulativeTradesRequired} trades, ${cumulativeWinsRequired} wins
-- Stay within ${mapConfig.xpBudget} XP budget`;
+ALREADY USED CONDITIONS (DO NOT duplicate): ${usedCondArr.slice(-30).join(', ')}
+
+${mapIndex > 1 ? `First milestone MUST be: { type: "map_completed", value: "${MAP_SEQUENCE[mapIndex - 2]?.mapId}" } (start node)` : 'First milestone: account_created (start node)'}
+Last milestone: legendary node type.
+
+XP budget: ${mapConfig.xpBudget}. Use ${mapConfig.theme}-themed names. Mix 3-4+ condition types.
+Return compact JSON.`;
 
           const completion = await openai.chat.completions.create({
             model: config.model,
@@ -667,23 +765,44 @@ Create ${mapConfig.milestoneCount} ${mapConfig.theme}-themed milestones.
               { role: "system", content: JOURNEY_AGENT_SYSTEM_PROMPT },
               { role: "user", content: sequencePrompt },
             ],
-            temperature: 0.7,
-            max_tokens: 6000,
+            temperature: 0.5,
+            max_tokens: 4500,
             response_format: { type: "json_object" },
           });
 
-          const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+          let parsed;
+          try {
+            parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+          } catch {
+            // Try to repair truncated JSON
+            const raw = completion.choices[0]?.message?.content || "";
+            try {
+              const lastBracket = raw.lastIndexOf('}');
+              if (lastBracket > 0) {
+                parsed = JSON.parse(raw.substring(0, lastBracket + 1) + ']}');
+              } else {
+                console.error(`[AI Gen] Map ${mapIndex} JSON parse failed, skipping`);
+                continue;
+              }
+            } catch {
+              console.error(`[AI Gen] Map ${mapIndex} JSON repair failed, skipping`);
+              continue;
+            }
+          }
 
           // Track conditions and cumulative progress
           parsed.milestones?.forEach((m: any) => {
             const condKey = `${m.completeCondition?.type}:${m.completeCondition?.value || 0}`;
             usedConditions.add(condKey);
             
-            if (m.completeCondition?.type === "total_trades" && m.completeCondition?.value) {
-              cumulativeTradesRequired = Math.max(cumulativeTradesRequired, m.completeCondition.value);
-            }
-            if (m.completeCondition?.type === "winning_trades" && m.completeCondition?.value) {
-              cumulativeWinsRequired = Math.max(cumulativeWinsRequired, m.completeCondition.value);
+            const condType = m.completeCondition?.type;
+            const condValue = m.completeCondition?.value;
+            if (condType && typeof condValue === 'number') {
+              if (condType === "total_trades") cumulativeTradesRequired = Math.max(cumulativeTradesRequired, condValue);
+              if (condType === "winning_trades") cumulativeWinsRequired = Math.max(cumulativeWinsRequired, condValue);
+              if (condType === "podium_finishes") cumulativePodiums = Math.max(cumulativePodiums, condValue);
+              if (condType === "first_place_finishes") cumulativeFirstPlace = Math.max(cumulativeFirstPlace, condValue);
+              if (condType === "competitions_completed") cumulativeCompsCompleted = Math.max(cumulativeCompsCompleted, condValue);
             }
           });
 
