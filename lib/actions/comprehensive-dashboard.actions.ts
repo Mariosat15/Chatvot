@@ -232,6 +232,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   await connectToDatabase();
 
   // Fetch user-scoped data first (no load-all)
+  // PERF: .select() on every query to fetch only fields used by dashboard
+  const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt";
+  const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
+  const challengeSelect = "_id challengerId challengedId name status startTime endTime stakeAmount challengerUsername challengedUsername";
+
   const [
     competitionParticipations,
     challengeParticipations,
@@ -240,14 +245,15 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     wallet,
     walletTransactions,
   ] = await Promise.all([
-    CompetitionParticipant.find({ userId }).sort({ createdAt: -1 }).limit(200).lean(),
-    ChallengeParticipant.find({ userId }).sort({ createdAt: -1 }).limit(200).lean(),
+    CompetitionParticipant.find({ userId }).select(participantSelect).sort({ createdAt: -1 }).limit(200).lean(),
+    ChallengeParticipant.find({ userId }).select(participantSelect).sort({ createdAt: -1 }).limit(200).lean(),
     Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
-    }).sort({ createdAt: -1 }).limit(100).lean(),
-    TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
-    CreditWallet.findOne({ userId }).lean(),
+    }).select(challengeSelect).sort({ createdAt: -1 }).limit(100).lean(),
+    TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(100).lean(),
+    CreditWallet.findOne({ userId }).select("creditBalance totalWonFromCompetitions totalWonFromChallenges").lean(),
     WalletTransaction.find({ userId, status: "completed" })
+      .select("createdAt balanceAfter amount")
       .sort({ createdAt: 1 })
       .limit(1000)
       .lean(),
@@ -260,9 +266,10 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         .filter(Boolean),
     ),
   ];
+  const competitionSelect = "_id name status startTime endTime prizePool prizePoolCredits entryFee entryFeeCredits currentParticipants startingCapital rules prizeDistribution";
   const allCompetitions =
     userCompIds.length > 0
-      ? await Competition.find({ _id: { $in: userCompIds } }).lean()
+      ? await Competition.find({ _id: { $in: userCompIds } }).select(competitionSelect).lean()
       : [];
 
   // Process competitions
@@ -636,7 +643,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const openPositions = await TradingPosition.find({
     userId,
     status: "open",
-  }).lean();
+  }).select("_id symbol side entryPrice quantity marginUsed openedAt competitionId challengeId").lean();
   const uniqueSymbols = [
     ...new Set((openPositions as any[]).map((p: any) => p.symbol).filter(Boolean)),
   ] as ForexSymbol[];
@@ -808,8 +815,9 @@ async function buildChartData(
     }
   }
 
-  // Daily P&L for last 30 days
-  const dailyPnL: { date: string; pnl: number; trades: number }[] = [];
+  // PERF: Single-pass trade analysis replaces 7+ separate iterations
+  // Pre-build date keys for 30-day lookup
+  const dayPnLMap = new Map<string, { pnl: number; trades: number }>();
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
@@ -817,22 +825,73 @@ async function buildChartData(
       month: "short",
       day: "numeric",
     });
+    dayPnLMap.set(dateStr, { pnl: 0, trades: 0 });
+  }
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+  // Accumulators for all chart data
+  let wins = 0;
+  let losses = 0;
+  let breakeven = 0;
+  const symbolMap = new Map<string, { count: number; pnl: number }>();
+  const hourMap = new Map<number, { count: number; pnl: number }>();
+  for (let i = 0; i < 24; i++) hourMap.set(i, { count: 0, pnl: 0 });
+  const monthMap = new Map<string, { pnl: number; trades: number; wins: number }>();
 
-    const dayTrades = allTrades.filter((t: any) => {
-      const tradeDate = new Date(t.closedAt);
-      return tradeDate >= startOfDay && tradeDate <= endOfDay;
+  // Single pass over all trades
+  for (const trade of allTrades) {
+    const pnl = trade.realizedPnl || 0;
+    const closedAt = new Date(trade.closedAt);
+
+    // Win/Loss distribution
+    if (pnl > 0) wins++;
+    else if (pnl < 0) losses++;
+    else breakeven++;
+
+    // Daily P&L (30-day window)
+    const dayKey = closedAt.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
     });
+    const dayEntry = dayPnLMap.get(dayKey);
+    if (dayEntry) {
+      dayEntry.pnl += pnl;
+      dayEntry.trades++;
+    }
 
-    const dayPnL = dayTrades.reduce(
-      (sum: number, t: any) => sum + (t.realizedPnl || 0),
-      0,
-    );
-    dailyPnL.push({ date: dateStr, pnl: dayPnL, trades: dayTrades.length });
+    // Trades by symbol
+    const symEntry = symbolMap.get(trade.symbol);
+    if (symEntry) {
+      symEntry.count++;
+      symEntry.pnl += pnl;
+    } else {
+      symbolMap.set(trade.symbol, { count: 1, pnl });
+    }
+
+    // Trades by hour
+    const hour = closedAt.getHours();
+    const hourEntry = hourMap.get(hour)!;
+    hourEntry.count++;
+    hourEntry.pnl += pnl;
+
+    // Monthly performance
+    const monthKey = closedAt.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+    });
+    const monthEntry = monthMap.get(monthKey);
+    if (monthEntry) {
+      monthEntry.pnl += pnl;
+      monthEntry.trades++;
+      if (pnl > 0) monthEntry.wins++;
+    } else {
+      monthMap.set(monthKey, { pnl, trades: 1, wins: pnl > 0 ? 1 : 0 });
+    }
+  }
+
+  // Build daily P&L array from pre-built map (preserves 30-day order)
+  const dailyPnL: { date: string; pnl: number; trades: number }[] = [];
+  for (const [date, data] of dayPnLMap) {
+    dailyPnL.push({ date, ...data });
   }
 
   // Equity curve (cumulative) - based on trading performance
@@ -847,56 +906,17 @@ async function buildChartData(
     });
   }
 
-  // Win/Loss distribution
-  const wins = allTrades.filter((t: any) => (t.realizedPnl || 0) > 0).length;
-  const losses = allTrades.filter((t: any) => (t.realizedPnl || 0) < 0).length;
-  const breakeven = allTrades.filter(
-    (t: any) => (t.realizedPnl || 0) === 0,
-  ).length;
-
-  // Trades by symbol
-  const symbolMap = new Map<string, { count: number; pnl: number }>();
-  for (const trade of allTrades) {
-    const existing = symbolMap.get(trade.symbol) || { count: 0, pnl: 0 };
-    existing.count++;
-    existing.pnl += trade.realizedPnl || 0;
-    symbolMap.set(trade.symbol, existing);
-  }
+  // Sort and limit derived arrays
   const tradesBySymbol = Array.from(symbolMap.entries())
     .map(([symbol, data]) => ({ symbol, ...data }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // Trades by hour
-  const hourMap = new Map<number, { count: number; pnl: number }>();
-  for (let i = 0; i < 24; i++) hourMap.set(i, { count: 0, pnl: 0 });
-  for (const trade of allTrades) {
-    const hour = new Date(trade.closedAt).getHours();
-    const existing = hourMap.get(hour)!;
-    existing.count++;
-    existing.pnl += trade.realizedPnl || 0;
-  }
   const tradesByHour = Array.from(hourMap.entries()).map(([hour, data]) => ({
     hour,
     ...data,
   }));
 
-  // Monthly performance
-  const monthMap = new Map<
-    string,
-    { pnl: number; trades: number; wins: number }
-  >();
-  for (const trade of allTrades) {
-    const month = new Date(trade.closedAt).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-    });
-    const existing = monthMap.get(month) || { pnl: 0, trades: 0, wins: 0 };
-    existing.pnl += trade.realizedPnl || 0;
-    existing.trades++;
-    if ((trade.realizedPnl || 0) > 0) existing.wins++;
-    monthMap.set(month, existing);
-  }
   const monthlyPerformance = Array.from(monthMap.entries())
     .map(([month, data]) => ({
       month,
