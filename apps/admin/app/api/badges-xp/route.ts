@@ -3,6 +3,37 @@ import { connectToDatabase } from "@/database/mongoose";
 import UserLevel from "@/database/models/user-level.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { BADGES } from "@/lib/constants/badges";
+import { ObjectId } from "mongodb";
+
+/**
+ * Build a query that matches user by various ID formats.
+ * Better Auth uses 'id' field, but MongoDB also has '_id'.
+ * UserLevel.userId may store either format.
+ */
+function buildUserQuery(uid: string) {
+  const queries: any[] = [{ id: uid }];
+  if (ObjectId.isValid(uid)) {
+    queries.push({ _id: new ObjectId(uid) });
+  }
+  queries.push({ _id: uid });
+  return { $or: queries };
+}
+
+/**
+ * Build a batch query that matches multiple user IDs by id / _id.
+ */
+function buildBatchUserQuery(uids: string[]) {
+  const objectIds = uids
+    .filter((uid) => ObjectId.isValid(uid))
+    .map((uid) => new ObjectId(uid));
+  return {
+    $or: [
+      { id: { $in: uids } },
+      ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
+      { _id: { $in: uids } },
+    ],
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,12 +50,12 @@ export async function GET(request: NextRequest) {
       throw new Error("Database connection not found");
     }
 
-    // ── Single-user detail view (unchanged) ──────────────────────────────
+    // ── Single-user detail view ────────────────────────────────────────
     if (userId) {
       const [userLevel, userBadges, userDoc] = await Promise.all([
         UserLevel.findOne({ userId }).lean(),
         UserBadge.find({ userId }).lean(),
-        db.collection("user").findOne({ id: userId }),
+        db.collection("user").findOne(buildUserQuery(userId)),
       ]);
 
       const user = userDoc
@@ -115,9 +146,17 @@ export async function GET(request: NextRequest) {
         .limit(500) // Reasonable cap — search should narrow results
         .toArray();
 
-      matchingUserIds = matchedUsers.map(
-        (u: any) => u.id || u._id?.toString(),
+      // Collect BOTH id and _id formats so we match regardless of what UserLevel stores
+      matchingUserIds = matchedUsers.flatMap(
+        (u: any) => {
+          const ids: string[] = [];
+          if (u.id) ids.push(u.id);
+          if (u._id) ids.push(u._id.toString());
+          return ids;
+        },
       );
+      // Deduplicate
+      matchingUserIds = [...new Set(matchingUserIds)];
 
       // No matches → return empty page immediately
       if (matchingUserIds.length === 0) {
@@ -152,25 +191,26 @@ export async function GET(request: NextRequest) {
     fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:userLookup',message:'UserLevel userIds to look up',data:{userIdsInPage},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
     // #endregion
 
-    const userDocs = await db
-      .collection("user")
-      .find({ id: { $in: userIdsInPage } }, { projection: { id: 1, name: 1, email: 1, image: 1, _id: 1 } })
-      .toArray();
+    // Use $or query to match by id, _id (ObjectId), or _id (string)
+    const userDocs = userIdsInPage.length > 0
+      ? await db
+          .collection("user")
+          .find(buildBatchUserQuery(userIdsInPage), { projection: { id: 1, name: 1, email: 1, image: 1, _id: 1 } })
+          .toArray()
+      : [];
 
     // #region agent log
-    // Also try lookup by _id to see if that works
-    const { ObjectId } = await import("mongodb");
-    const objectIdQueries = userIdsInPage.filter((uid: string) => ObjectId.isValid(uid)).map((uid: string) => new ObjectId(uid));
-    const userDocsByOid = objectIdQueries.length > 0 ? await db.collection("user").find({ _id: { $in: objectIdQueries } }, { projection: { id: 1, name: 1, email: 1, _id: 1 } }).toArray() : [];
-    // Also fetch all users to compare
-    const allUsersInDB = await db.collection("user").find({}, { projection: { id: 1, name: 1, email: 1, _id: 1 } }).limit(20).toArray();
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:userLookupResult',message:'User lookup results',data:{foundById:userDocs.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email})),foundByOid:userDocsByOid.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email})),allUsersInDB:allUsersInDB.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email}))},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:userLookupResult',message:'User lookup results after fix',data:{requestedIds:userIdsInPage,foundCount:userDocs.length,foundUsers:userDocs.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email}))},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
     // #endregion
 
+    // Map users by BOTH id and _id.toString() so lookup works regardless of format
     const userMap = new Map<string, any>();
     for (const u of userDocs) {
-      const uid = u.id || u._id?.toString();
-      userMap.set(uid, { id: uid, name: u.name, email: u.email, image: u.image || null });
+      const userData = { id: u.id || u._id?.toString(), name: u.name, email: u.email, image: u.image || null };
+      // Map by 'id' field
+      if (u.id) userMap.set(u.id, userData);
+      // Map by '_id' as string (handles case where UserLevel.userId = _id.toString())
+      if (u._id) userMap.set(u._id.toString(), userData);
     }
 
     // 5. Assemble response
