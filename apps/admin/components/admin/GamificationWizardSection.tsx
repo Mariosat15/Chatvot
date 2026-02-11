@@ -52,8 +52,7 @@ interface EvaluationResult {
     area: string;
     description: string;
     recommendation: string;
-    autoFixable: boolean;
-    fix?: any;
+    targetAgent?: string; // "badge_agent" | "milestone_agent"
   }>;
   strengths: string[];
   summary: string;
@@ -66,7 +65,7 @@ const WIZARD_STEPS = [
   { id: "levels", label: "XP & Levels", icon: Star, description: "Configure level progression and XP values" },
   { id: "badges", label: "Badge Agent", icon: Trophy, description: "AI audits, fixes, and generates badges" },
   { id: "milestones", label: "Milestone Agent", icon: Map, description: "AI audits milestone progression and badge-gating" },
-  { id: "evaluate", label: "Evaluate & Fix", icon: Shield, description: "AI evaluates full system coherence and auto-fixes" },
+  { id: "evaluate", label: "Evaluation", icon: Shield, description: "AI scores the full system and recommends improvements" },
 ] as const;
 
 type StepId = typeof WIZARD_STEPS[number]["id"];
@@ -194,21 +193,15 @@ export default function GamificationWizardSection() {
     setStepLoading(null);
   };
 
-  const runEvaluationAgent = async (autoApply: boolean) => {
+  const runEvaluationAgent = async () => {
     setStepLoading("evaluate");
     try {
       const data = await callWizardAPI({
         action: "agent_evaluate",
-        autoApply,
       });
       if (data.success && data.evaluation) {
         setEvaluation(data.evaluation);
-        if (autoApply && data.fixResults) {
-          toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10 — ${data.fixResults.totalFixable} fixes applied`);
-          loadStatus();
-        } else {
-          toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10`);
-        }
+        toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10 — ${data.evaluation.issues?.length || 0} recommendations`);
       } else {
         toast.error(data.error || "Evaluation agent failed");
       }
@@ -266,14 +259,13 @@ export default function GamificationWizardSection() {
         toast.error(`Step 2/3: Milestone Agent failed — ${msData.error || "unknown error"}`);
       }
 
-      // Step 3: Evaluation Agent
-      setFullSetupProgress({ step: 3, label: "Running Evaluation Agent...", steps });
+      // Step 3: Evaluation Agent (report-only — does NOT modify the database)
+      setFullSetupProgress({ step: 3, label: "Running Evaluation (report-only)...", steps });
       const evalData = await callWizardAPI({
         action: "agent_evaluate",
-        autoApply: true,
       });
       const evalStep = {
-        name: "Evaluation Agent",
+        name: "Evaluation (Report)",
         success: evalData.success,
         overallScore: evalData.evaluation?.overallScore,
         issueCount: evalData.evaluation?.issues?.length || 0,
@@ -281,9 +273,9 @@ export default function GamificationWizardSection() {
       steps.push(evalStep);
       if (evalData.success && evalData.evaluation) {
         setEvaluation(evalData.evaluation);
-        toast.success(`Step 3/3: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} issues found`);
+        toast.success(`Step 3/3: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} recommendations`);
       } else {
-        toast.error(`Step 3/3: Evaluation Agent failed — ${evalData.error || "unknown error"}`);
+        toast.error(`Step 3/3: Evaluation failed — ${evalData.error || "unknown error"}`);
       }
 
       setFullSetupProgress({ step: 4, label: "Complete!", steps });
@@ -506,7 +498,7 @@ export default function GamificationWizardSection() {
                   <Wand2 className="h-5 w-5 text-purple-400" /> One-Click Full Setup
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Runs 3 agents one by one: Fix badges → Fix milestones → Evaluate system. Everything auto-applied.
+                  Runs 3 agents: Fix badges → Fix milestones → Evaluate system (report-only). Badges and milestones are auto-fixed; evaluation only scores and recommends.
                 </p>
               </div>
               <Button
@@ -1005,31 +997,20 @@ export default function GamificationWizardSection() {
             <Shield className="h-5 w-5 text-green-400" /> Evaluation Agent
           </CardTitle>
           <CardDescription className="text-gray-400">
-            The Evaluation Agent loads badges, milestones, and XP config, then scores the entire system for coherence, balance, and fun. It can auto-fix issues it finds.
+            The Evaluation Agent scores the entire gamification system for coherence, balance, and fun.
+            It is <strong className="text-white">report-only</strong> — it identifies issues and recommends which specialist agent (Badge Agent or Milestone Agent) should fix them. Use those agents to apply fixes safely.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex gap-4">
           <Button
-            onClick={() => runEvaluationAgent(false)}
-            disabled={isStepLoading("evaluate")}
-            variant="outline"
-            className="border-green-600 text-green-400 hover:bg-green-600/20"
-          >
-            {isStepLoading("evaluate") ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Evaluating...</>
-            ) : (
-              <><Eye className="h-4 w-4 mr-2" /> Evaluate Only</>
-            )}
-          </Button>
-          <Button
-            onClick={() => runEvaluationAgent(true)}
+            onClick={() => runEvaluationAgent()}
             disabled={isStepLoading("evaluate")}
             className="bg-green-600 hover:bg-green-500 text-white"
           >
             {isStepLoading("evaluate") ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Evaluating...</>
             ) : (
-              <><Wrench className="h-4 w-4 mr-2" /> Evaluate & Auto-Fix</>
+              <><BarChart3 className="h-4 w-4 mr-2" /> Run Evaluation</>
             )}
           </Button>
         </CardContent>
@@ -1097,26 +1078,16 @@ export default function GamificationWizardSection() {
             </Card>
           )}
 
-          {/* Issues */}
+          {/* Issues (Recommendations) */}
           {evaluation.issues?.length > 0 && (
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-white text-sm flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-400" /> Issues ({evaluation.issues.length})
-                  </CardTitle>
-                  {evaluation.issues.some((i) => i.autoFixable) && (
-                    <Button
-                      size="sm"
-                      onClick={() => runEvaluationAgent(true)}
-                      disabled={isStepLoading("evaluate")}
-                      className="bg-orange-600 hover:bg-orange-500 text-white"
-                    >
-                      <Wrench className="h-3 w-3 mr-1" />
-                      Auto-Fix {evaluation.issues.filter((i) => i.autoFixable).length} Issues
-                    </Button>
-                  )}
-                </div>
+                <CardTitle className="text-white text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" /> Recommendations ({evaluation.issues.length})
+                </CardTitle>
+                <CardDescription className="text-gray-500 text-xs">
+                  These are recommendations only. Use the Badge Agent (Step 3) or Milestone Agent (Step 4) to apply fixes.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1130,16 +1101,16 @@ export default function GamificationWizardSection() {
                           <Badge variant="outline" className="border-gray-600 text-gray-400 text-[10px]">
                             {issue.area}
                           </Badge>
-                          {issue.autoFixable && (
-                            <Badge variant="outline" className="border-green-600 text-green-400 text-[10px]">
-                              auto-fixable
+                          {(issue as any).targetAgent && (
+                            <Badge variant="outline" className="border-cyan-600 text-cyan-400 text-[10px]">
+                              {(issue as any).targetAgent === "badge_agent" ? "Badge Agent" : "Milestone Agent"}
                             </Badge>
                           )}
                         </div>
                       </div>
                       <p className="text-sm text-gray-300 mt-1">{issue.description}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        <span className="text-gray-400">Fix:</span> {issue.recommendation}
+                        <span className="text-gray-400">Recommendation:</span> {issue.recommendation}
                       </p>
                     </div>
                   ))}

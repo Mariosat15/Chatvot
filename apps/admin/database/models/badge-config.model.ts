@@ -13,7 +13,10 @@ export interface IBadgeConfig extends Document {
     minValue?: number;
     maxValue?: number;
     comparison?: string;
+    minTrades?: number;
+    minCompletedCompetitions?: number;
   };
+  minLevel: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -70,6 +73,14 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       minValue: Number,
       maxValue: Number,
       comparison: String,
+      minTrades: Number,
+      minCompletedCompetitions: Number,
+    },
+    minLevel: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 20,
     },
     isActive: {
       type: Boolean,

@@ -55,19 +55,100 @@ const dbTools = {
     return JourneyMapConfig.find({}).sort({ sequenceOrder: 1 }).lean();
   },
   async writeBadgesBatch(badges: any[]) {
-    const results = { created: 0, updated: 0, errors: 0 };
+    const results = { created: 0, updated: 0, errors: 0, skipped: 0 };
+    const validRarities = ["common", "rare", "epic", "legendary"];
+    const validCategories = ["Competition", "Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy", "Social", "Legendary"];
+
     for (const badge of badges) {
       try {
         const { _changes, _isNew, _id, __v, createdAt, updatedAt, ...clean } = badge;
+
+        // ── Validation: skip badges with invalid or missing required fields ──
+        if (!clean.id || typeof clean.id !== "string") {
+          console.warn(`[Wizard] Skipping badge with missing/invalid id`);
+          results.skipped++;
+          continue;
+        }
+        if (!clean.condition?.type) {
+          console.warn(`[Wizard] Skipping badge ${clean.id}: missing condition.type`);
+          results.skipped++;
+          continue;
+        }
+        if (clean.rarity && !validRarities.includes(clean.rarity)) {
+          console.warn(`[Wizard] Skipping badge ${clean.id}: invalid rarity "${clean.rarity}"`);
+          results.skipped++;
+          continue;
+        }
+        if (clean.category && !validCategories.includes(clean.category)) {
+          console.warn(`[Wizard] Skipping badge ${clean.id}: invalid category "${clean.category}"`);
+          results.skipped++;
+          continue;
+        }
+
+        // ── Sanitize numeric fields ──
+        const minLevel = Math.max(0, Math.min(20, Number(clean.minLevel) || 0));
+        if (clean.condition) {
+          if (clean.condition.minTrades !== undefined) {
+            clean.condition.minTrades = Math.max(0, Number(clean.condition.minTrades) || 0);
+          }
+          if (clean.condition.minCompletedCompetitions !== undefined) {
+            clean.condition.minCompletedCompetitions = Math.max(0, Number(clean.condition.minCompletedCompetitions) || 0);
+          }
+          if (clean.condition.value !== undefined) {
+            clean.condition.value = Number(clean.condition.value) || 0;
+          }
+        }
+
         const existing = await BadgeConfig.findOne({ id: clean.id });
+
+        // #region agent log
+        console.log(`[DEBUG-WIZARD] writeBadge id=${clean.id} minLevel=${minLevel} condMinTrades=${clean.condition?.minTrades} existing=${!!existing} existingMinLevel=${existing?.minLevel} existingCondMinTrades=${(existing as any)?.condition?.minTrades}`);
+        // #endregion
+
         if (existing) {
+          // ── Surgical update: use $set to only update provided fields ──
+          // Preserve fields the AI didn't provide by merging with existing
+          const updateDoc: any = {
+            minLevel,
+          };
+          // Only update fields that are explicitly provided in clean
+          if (clean.name) updateDoc.name = clean.name;
+          if (clean.description) updateDoc.description = clean.description;
+          if (clean.category) updateDoc.category = clean.category;
+          if (clean.icon) updateDoc.icon = clean.icon;
+          if (clean.rarity) updateDoc.rarity = clean.rarity;
+          if (clean.condition) {
+            // Merge with existing condition to preserve fields AI didn't mention
+            updateDoc.condition = {
+              ...((existing as any).condition?.toObject?.() || (existing as any).condition || {}),
+              ...clean.condition,
+            };
+          }
+
           await BadgeConfig.findOneAndUpdate(
             { id: clean.id },
-            { ...clean, minLevel: clean.minLevel ?? 0 },
+            { $set: updateDoc },
           );
+
+          // #region agent log
+          const afterWrite = await BadgeConfig.findOne({ id: clean.id }).lean();
+          console.log(`[DEBUG-WIZARD] afterWrite id=${clean.id} minLevel=${(afterWrite as any)?.minLevel} condMinTrades=${(afterWrite as any)?.condition?.minTrades} condMinComps=${(afterWrite as any)?.condition?.minCompletedCompetitions} preserved=${(afterWrite as any)?.minLevel===minLevel}`);
+          // #endregion
+
           results.updated++;
         } else {
-          await BadgeConfig.create({ ...clean, minLevel: clean.minLevel ?? 0, isActive: true });
+          // New badge — require all critical fields
+          if (!clean.name || !clean.description || !clean.category || !clean.rarity) {
+            console.warn(`[Wizard] Skipping new badge ${clean.id}: missing name/description/category/rarity`);
+            results.skipped++;
+            continue;
+          }
+          await BadgeConfig.create({
+            ...clean,
+            minLevel,
+            isActive: true,
+            icon: clean.icon || "🏆",
+          });
           results.created++;
         }
       } catch (err) {
@@ -175,8 +256,10 @@ Return ONLY valid JSON. No markdown.`;
 const EVALUATOR_PROMPT = `You are a GAMIFICATION EVALUATOR for a forex trading platform.
 Score 10 criteria (1-10): progressionFlow, difficultyCurve, zeroBaselineProtection, levelGating, categoryBalance, xpEconomy, milestoneBadgeConnection, engagementHooks, urgency, funFactor.
 
-Return JSON: { "overallScore": N, "scores": {...}, "issues": [{severity,area,description,recommendation,autoFixable,fix}], "strengths": [...], "summary": "..." }
-Fix types: { "type": "update_badge", "badgeId": "x", "changes": {minLevel,condition,rarity} }
+You are a REPORT-ONLY agent. You DO NOT fix anything. You score, identify issues, and recommend what the Badge Agent or Milestone Agent should fix.
+
+Return JSON: { "overallScore": N, "scores": {...}, "issues": [{severity,area,description,recommendation,targetAgent}], "strengths": [...], "summary": "..." }
+targetAgent is "badge_agent" or "milestone_agent" — indicates which agent should fix this issue.
 Return ONLY valid JSON. No markdown.`;
 
 // ─── JSON PARSER (with repair) ──────────────────────────────────────────────────
@@ -452,11 +535,10 @@ Return JSON:
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // agent_evaluate — OPTIMIZED: compact data, reduced max_tokens
+    // agent_evaluate — REPORT-ONLY: scores the system, recommends fixes,
+    // but NEVER writes to the database. Use Badge/Milestone agents to fix.
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "agent_evaluate") {
-      const { autoApply = false } = body;
-
       const [badges, milestones, maps] = await Promise.all([
         dbTools.readAllBadges(),
         dbTools.readAllMilestones(),
@@ -468,7 +550,7 @@ Return JSON:
       for (const b of badges as any[]) {
         const cat = b.category || "?";
         if (!catDist[cat]) catDist[cat] = "";
-        catDist[cat] += (b.rarity || "c")[0]; // c/r/e/l first letter
+        catDist[cat] += (b.rarity || "c")[0];
       }
       const catSummary = Object.entries(catDist).map(([cat, rarities]) => {
         const c = (rarities.match(/c/g) || []).length;
@@ -484,10 +566,8 @@ Return JSON:
         lvlDist[lvl] = (lvlDist[lvl] || 0) + 1;
       }
 
-      // Compact badges (one line per badge)
       const compactBadges = badgesToCompact(badges);
 
-      // Milestone summary per map (not full details)
       const msByMap: Record<string, { count: number; gated: number; totalXP: number }> = {};
       for (const m of milestones as any[]) {
         const mid = m.mapId || "?";
@@ -500,7 +580,8 @@ Return JSON:
         `${mapId}: ${s.count} milestones, ${s.gated} badge-gated, ${s.totalXP} XP total`
       ).join("\n");
 
-      const prompt = `EVALUATE the gamification system.
+      const prompt = `EVALUATE the gamification system. Score all 10 criteria. List top 5-10 issues with recommendations.
+Do NOT return fix payloads. Only describe what needs fixing and which agent should handle it.
 
 BADGES (${badges.length}):
 Categories: ${catSummary}
@@ -511,9 +592,11 @@ MILESTONES (${milestones.length} across ${maps.length} maps):
 ${msSummary}
 
 XP: common=10, rare=25, epic=50, legendary=100. Activity: 2/trade(cap100/day), 25/comp, 50/35/20 podium.
-LEVELS: L1:0 L2:50 L3:125 L4:250 L5:375 L6:500 L7:750 L8:1100 L9:1450 L10:1800 L11:2000 L12:2500 L13:3000 L14:3500 L15:4000 L16:5000 L17:6000 L18:7500 L19:10000 L20:15000
+LEVELS: L1:0 L2:50 L3:125 L4:250 L5:375 L6:500 L7:750 L8:1100 L9:1450 L10:1800 L11:2000 L12:2500 L13:3000 L14:3500 L15:4000 L16:5000 L17:6000 L18:7500 L19:10000 L20:15000`;
 
-Score all 10 criteria. List top 5-10 specific issues with fix payloads.`;
+      // #region agent log
+      console.log(`[DEBUG-WIZARD] evaluate start badges=${badges.length} milestones=${milestones.length} maps=${maps.length} promptLen=${prompt.length}`);
+      // #endregion
 
       const completion = await openai.chat.completions.create({
         model: config.model,
@@ -521,8 +604,8 @@ Score all 10 criteria. List top 5-10 specific issues with fix payloads.`;
           { role: "system", content: EVALUATOR_PROMPT },
           { role: "user", content: prompt },
         ],
-        temperature: 0.3,
-        max_tokens: 4000,
+        temperature: 0.2,
+        max_tokens: 3000,
       });
 
       const evaluation = parseAIJSON(completion.choices[0]?.message?.content || "{}");
@@ -530,43 +613,16 @@ Score all 10 criteria. List top 5-10 specific issues with fix payloads.`;
         return NextResponse.json({ success: false, error: "Evaluation agent returned invalid response" }, { status: 500 });
       }
 
-      // Auto-apply fixable issues
-      let fixResults = null;
-      if (autoApply && evaluation.issues) {
-        const fixable = evaluation.issues.filter((i: any) => i.autoFixable && i.fix);
-        const badgeFixes: any[] = [];
-        const milestoneFixes: any[] = [];
-
-        for (const issue of fixable) {
-          if (issue.fix?.type === "update_badge" && issue.fix.badgeId) {
-            const badge = (badges as any[]).find((b) => b.id === issue.fix.badgeId);
-            if (badge) {
-              badgeFixes.push({
-                ...badge,
-                ...(issue.fix.changes || {}),
-                condition: issue.fix.changes?.condition
-                  ? { ...badge.condition, ...issue.fix.changes.condition }
-                  : badge.condition,
-              });
-            }
-          }
-          if (issue.fix?.type === "update_milestone" && issue.fix.milestoneId) {
-            const ms = (milestones as any[]).find((m: any) => m.id === issue.fix.milestoneId);
-            if (ms) milestoneFixes.push({ ...ms, ...(issue.fix.changes || {}) });
-          }
-        }
-
-        const bResults = badgeFixes.length > 0 ? await dbTools.writeBadgesBatch(badgeFixes) : null;
-        const mResults = milestoneFixes.length > 0 ? await dbTools.writeMilestonesBatch(milestoneFixes) : null;
-        fixResults = { totalFixable: fixable.length, badgeFixes: bResults, milestoneFixes: mResults };
-      }
+      // #region agent log
+      console.log(`[DEBUG-WIZARD] evaluate done score=${evaluation.overallScore} issues=${evaluation.issues?.length||0} strengths=${evaluation.strengths?.length||0}`);
+      // #endregion
 
       return NextResponse.json({
         success: true,
         action: "agent_evaluate",
         evaluation,
-        applied: autoApply,
-        fixResults,
+        applied: false, // Always false — evaluation is report-only
+        fixResults: null,
       });
     }
 
