@@ -35,19 +35,21 @@ export const getUserDashboardDataForApi = async (userId: string) => {
 
     log("📊 Active participations found:", activeParticipations.length);
 
-    // Filter to only include competitions that are currently active (live now)
-    const liveCompetitionIds = await Competition.find({
+    // PERF: Batch-fetch all live competitions in ONE query instead of N findById calls
+    const liveCompetitions = await Competition.find({
       status: "active",
       startTime: { $lte: new Date() },
       endTime: { $gte: new Date() },
-    }).distinct("_id");
+    }).lean();
+
+    const liveCompetitionMap = new Map(
+      liveCompetitions.map((c: any) => [c._id.toString(), c]),
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const liveParticipations = activeParticipations.filter(
       (participation: any) =>
-        liveCompetitionIds.some(
-          (id) => id.toString() === participation.competitionId.toString(),
-        ),
+        liveCompetitionMap.has(participation.competitionId.toString()),
     );
 
     // Same logic as getUserDashboardData but with userId parameter
@@ -55,9 +57,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
-          const competition = await Competition.findById(
-            participation.competitionId,
-          ).lean();
+          const competition = liveCompetitionMap.get(participation.competitionId.toString());
           if (!competition) return null;
 
           const openPositions = await TradingPosition.find({
@@ -211,23 +211,25 @@ export const getUserDashboardData = async () => {
 
     log("📊 Active participations found:", activeParticipations.length);
 
-    // Filter to only include competitions that are currently active (live now)
-    const liveCompetitionIds = await Competition.find({
+    // PERF: Batch-fetch all live competitions in ONE query instead of N findById calls
+    const liveCompetitions = await Competition.find({
       status: "active", // Only competitions that are currently live
       startTime: { $lte: new Date() }, // Started
       endTime: { $gte: new Date() }, // Not ended yet
-    }).distinct("_id");
+    }).lean();
+
+    const liveCompetitionMap = new Map(
+      liveCompetitions.map((c: any) => [c._id.toString(), c]),
+    );
 
     // Filter participations to only include live competitions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const liveParticipations = activeParticipations.filter(
       (participation: any) =>
-        liveCompetitionIds.some(
-          (id) => id.toString() === participation.competitionId.toString(),
-        ),
+        liveCompetitionMap.has(participation.competitionId.toString()),
     );
 
-    log("📊 Live competitions:", liveCompetitionIds.length);
+    log("📊 Live competitions:", liveCompetitionMap.size);
     log("📊 Live participations:", liveParticipations.length);
 
     // Get competition details for each participation (only live ones)
@@ -239,9 +241,7 @@ export const getUserDashboardData = async () => {
             `📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`,
           );
 
-          const competition = await Competition.findById(
-            participation.competitionId,
-          ).lean();
+          const competition = liveCompetitionMap.get(participation.competitionId.toString());
 
           if (!competition) {
             log(`⚠️ Competition not found: ${participation.competitionId}`);
@@ -278,11 +278,15 @@ export const getUserDashboardData = async () => {
             stats.total += stat.count;
           });
 
+          // PERF: .select() to only fetch display fields (participant docs have 30+ fields)
+          const participantSelect = "userId username currentCapital startingCapital pnl pnlPercentage currentRank status totalTrades winningTrades losingTrades winRate updatedAt";
+
           // Get detailed participant lists
           const activeParticipants = await CompetitionParticipant.find({
             competitionId: participation.competitionId,
             status: "active",
           })
+            .select(participantSelect)
             .sort({ currentRank: 1 })
             .limit(20)
             .lean();
@@ -291,6 +295,7 @@ export const getUserDashboardData = async () => {
             competitionId: participation.competitionId,
             status: "liquidated",
           })
+            .select(participantSelect)
             .sort({ updatedAt: -1 })
             .limit(20)
             .lean();
@@ -299,6 +304,7 @@ export const getUserDashboardData = async () => {
             competitionId: participation.competitionId,
             status: "disqualified",
           })
+            .select(participantSelect)
             .sort({ updatedAt: -1 })
             .limit(20)
             .lean();

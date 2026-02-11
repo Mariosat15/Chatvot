@@ -572,6 +572,19 @@ export async function finalizeCompetition(competitionId: string) {
     let totalDistributed = 0;
     const winnerTransactions = [];
 
+    // PERF: Batch-fetch all winner wallets in ONE query instead of N findOne calls
+    const allWinnerUserIds = prizeDistributions
+      .map((d) => leaderboard.find((l) => l.userId === d.userId)?.userId)
+      .filter(Boolean) as string[];
+
+    const existingWallets = await CreditWallet.find({
+      userId: { $in: allWinnerUserIds },
+    }).session(session);
+
+    const walletMap = new Map(
+      existingWallets.map((w: any) => [w.userId.toString(), w]),
+    );
+
     // Distribute to each winner
     for (const dist of prizeDistributions) {
       const winner = leaderboard.find((l) => l.userId === dist.userId);
@@ -585,12 +598,10 @@ export async function finalizeCompetition(competitionId: string) {
           `  🏆 Rank ${dist.rank}${dist.isTied ? " (TIED)" : ""}: ${winner.username} wins ${prizeAmount} credits`,
         );
 
-        // Get winner's wallet (or create if doesn't exist)
-        let winnerWallet = await CreditWallet.findOne({
-          userId: winner.userId,
-        }).session(session);
+        // Get winner's wallet from pre-fetched map (or create if doesn't exist)
+        let winnerWallet = walletMap.get(winner.userId.toString());
         if (!winnerWallet) {
-          winnerWallet = await CreditWallet.create(
+          const created = await CreditWallet.create(
             [
               {
                 userId: winner.userId,
@@ -606,7 +617,8 @@ export async function finalizeCompetition(competitionId: string) {
             ],
             { session },
           );
-          winnerWallet = winnerWallet[0];
+          winnerWallet = created[0];
+          walletMap.set(winner.userId.toString(), winnerWallet);
         }
 
         const balanceBefore = winnerWallet.creditBalance || 0;
@@ -1140,12 +1152,16 @@ export async function finalizeCompetition(competitionId: string) {
             },
           );
 
-          // Credit to game master's wallet
-          let gmWallet = await CreditWallet.findOne({ userId: gmId }).session(
-            session,
-          );
+          // Credit to game master's wallet (reuse walletMap from prize distribution)
+          let gmWallet = walletMap.get(gmId.toString());
           if (!gmWallet) {
-            gmWallet = await CreditWallet.create(
+            // Not in pre-fetched map, fetch individually (GM wasn't a winner)
+            gmWallet = await CreditWallet.findOne({ userId: gmId }).session(
+              session,
+            );
+          }
+          if (!gmWallet) {
+            const created = await CreditWallet.create(
               [
                 {
                   userId: gmId,
@@ -1161,7 +1177,8 @@ export async function finalizeCompetition(competitionId: string) {
               ],
               { session },
             );
-            gmWallet = gmWallet[0];
+            gmWallet = created[0];
+            walletMap.set(gmId.toString(), gmWallet);
           }
 
           const balanceBefore = gmWallet.creditBalance || 0;

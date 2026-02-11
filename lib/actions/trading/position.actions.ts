@@ -874,6 +874,7 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
   try {
     await connectToDatabase();
 
+    // PERF: .lean() - positions are read-only here (only checking SL/TP values)
     const positions = await TradingPosition.find({
       competitionId,
       status: "open",
@@ -881,7 +882,7 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
         { stopLoss: { $exists: true, $ne: null } },
         { takeProfit: { $exists: true, $ne: null } },
       ],
-    });
+    }).lean() as any[];
 
     if (positions.length === 0) return;
 

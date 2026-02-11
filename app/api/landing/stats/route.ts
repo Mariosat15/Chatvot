@@ -34,7 +34,8 @@ export async function GET() {
       tradesToday,
       platformFinancials,
     ] = await Promise.all([
-      db.collection("user").countDocuments({}),
+      // PERF: estimatedDocumentCount() uses collection metadata (O(1)) instead of full scan
+      db.collection("user").estimatedDocumentCount(),
       db.collection("competitions").countDocuments({ status: "active" }),
       db
         .collection("competitions")
@@ -53,7 +54,8 @@ export async function GET() {
         status: { $in: ["pending", "accepted", "active"] },
       }),
       db.collection("challenges").countDocuments({ status: "completed" }),
-      db.collection("positions").countDocuments({}),
+      // PERF: estimatedDocumentCount() uses collection metadata (O(1)) instead of full scan
+      db.collection("positions").estimatedDocumentCount(),
       db.collection("positions").countDocuments({
         createdAt: { $gte: today },
       }),
