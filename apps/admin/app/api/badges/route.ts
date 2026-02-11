@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       icon: badge.icon || "🏆",
       rarity: badge.rarity,
       condition: badge.condition || { type: "manual" },
+      minLevel: badge.minLevel ?? 0,
       isActive: true,
     });
 
@@ -112,6 +113,7 @@ export async function PUT(request: NextRequest) {
         icon: badge.icon || "🏆",
         rarity: badge.rarity,
         condition: badge.condition || { type: "manual" },
+        minLevel: badge.minLevel ?? 0,
       },
       { new: true },
     );

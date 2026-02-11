@@ -57,6 +57,12 @@ import {
   X,
   Shield,
   ChevronLeft,
+  Sparkles,
+  BarChart3,
+  CheckCircle,
+  AlertTriangle,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -247,6 +253,7 @@ export default function BadgeXPManagementSection() {
     category: "",
     rarity: "",
     icon: "",
+    minLevel: 0 as number,
     condition: {
       type: "",
       value: undefined as number | undefined,
@@ -256,6 +263,15 @@ export default function BadgeXPManagementSection() {
     },
   });
   const [isClosing, setIsClosing] = useState(false);
+
+  // AI Badge Generation & Evaluation state
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiEvaluating, setAiEvaluating] = useState(false);
+  const [aiGeneratedBadges, setAiGeneratedBadges] = useState<any[]>([]);
+  const [aiEvaluation, setAiEvaluation] = useState<any>(null);
+  const [showAiResults, setShowAiResults] = useState(false);
+  const [showAiEvaluation, setShowAiEvaluation] = useState(false);
+  const [aiApplying, setAiApplying] = useState(false);
 
   // Fetch a specific page of users (server-side pagination + search)
   const fetchData = useCallback(
@@ -971,9 +987,84 @@ export default function BadgeXPManagementSection() {
                   <Plus className="h-4 w-4 mr-2" />
                   Add New Badge
                 </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setAiGenerating(true);
+                      const res = await fetch("/api/ai/generate-badges", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "generate",
+                          category: selectedCategory,
+                          count: 5,
+                          existingBadges: badgesFromDB,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setAiGeneratedBadges(data.badges);
+                        setShowAiResults(true);
+                        toast.success(`AI generated ${data.count} badges`);
+                      } else {
+                        toast.error(data.error || "AI generation failed");
+                      }
+                    } catch {
+                      toast.error("Failed to connect to AI");
+                    } finally {
+                      setAiGenerating(false);
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  disabled={aiGenerating}
+                  className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                >
+                  {aiGenerating ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  AI Generate
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setAiEvaluating(true);
+                      const res = await fetch("/api/ai/evaluate-balance", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "evaluate" }),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setAiEvaluation(data);
+                        setShowAiEvaluation(true);
+                        toast.success(`Balance evaluation complete: ${data.evaluation.overallScore}/10`);
+                      } else {
+                        toast.error(data.error || "Evaluation failed");
+                      }
+                    } catch {
+                      toast.error("Failed to connect to AI");
+                    } finally {
+                      setAiEvaluating(false);
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  disabled={aiEvaluating}
+                  className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  {aiEvaluating ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                  )}
+                  AI Evaluate Balance
+                </Button>
                 <Badge variant="secondary" className="text-base px-4 py-2">
                   <Trophy className="h-4 w-4 mr-2" />
-                  120 Badges
+                  {badgesFromDB.length || 120} Badges
                 </Badge>
               </div>
             </div>
@@ -1040,6 +1131,7 @@ export default function BadgeXPManagementSection() {
                       category: badge.category,
                       rarity: badge.rarity,
                       icon: badge.icon,
+                      minLevel: badge.minLevel ?? 0,
                       condition: badge.condition || {
                         type: "",
                         value: undefined,
@@ -1073,6 +1165,7 @@ export default function BadgeXPManagementSection() {
                             category: badge.category,
                             rarity: badge.rarity,
                             icon: badge.icon,
+                            minLevel: badge.minLevel ?? 0,
                             condition: badge.condition || {
                               type: "",
                               value: undefined,
@@ -1100,10 +1193,16 @@ export default function BadgeXPManagementSection() {
                       {BADGE_XP_VALUES[badge.rarity]} XP
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <code className="bg-muted px-2 py-1 rounded">
                       {badge.id}
                     </code>
+                    {(badge.minLevel > 0 || badge.rarity === "epic" || badge.rarity === "legendary") && (
+                      <Badge variant="outline" className="text-xs font-semibold text-amber-400 border-amber-500/50">
+                        <Shield className="h-3 w-3 mr-1" />
+                        Lv.{badge.minLevel > 0 ? badge.minLevel : badge.rarity === "legendary" ? 8 : badge.rarity === "epic" ? 5 : 0}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1337,6 +1436,7 @@ export default function BadgeXPManagementSection() {
                 category: "",
                 rarity: "",
                 icon: "",
+                minLevel: 0,
                 condition: {
                   type: "",
                   value: undefined,
@@ -1390,6 +1490,7 @@ export default function BadgeXPManagementSection() {
                         category: "",
                         rarity: "",
                         icon: "",
+                        minLevel: 0,
                         condition: {
                           type: "",
                           value: undefined,
@@ -1531,6 +1632,31 @@ export default function BadgeXPManagementSection() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Min Level Required */}
+                <div className="space-y-3">
+                  <Label className="text-xl font-semibold flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-amber-400" />
+                    Min Level Required
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={badgeForm.minLevel || 0}
+                    onChange={(e) =>
+                      setBadgeForm({ ...badgeForm, minLevel: parseInt(e.target.value) || 0 })
+                    }
+                    placeholder="0 (uses rarity default)"
+                    className="text-lg h-12"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    0 = uses rarity default (epic: Lv.5, legendary: Lv.8). Set 1-20 to override.
+                  </p>
+                </div>
+
+                {/* Spacer for grid alignment */}
+                <div />
 
                 {/* Icon Picker */}
                 <div className="space-y-3 col-span-2">
@@ -1803,6 +1929,8 @@ export default function BadgeXPManagementSection() {
                       category: badgeForm.category || "Competition",
                       rarity: badgeForm.rarity || "common",
                       icon: badgeForm.icon || "🏆",
+                      minLevel: badgeForm.minLevel || 0,
+                      condition: badgeForm.condition || { type: "manual" },
                     };
 
                     const method = editingBadge ? "PUT" : "POST";
@@ -1837,6 +1965,7 @@ export default function BadgeXPManagementSection() {
                           category: "",
                           rarity: "",
                           icon: "",
+                          minLevel: 0,
                           condition: {
                             type: "",
                             value: undefined,
@@ -2087,6 +2216,279 @@ export default function BadgeXPManagementSection() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Generated Badges Dialog */}
+      <Dialog open={showAiResults} onOpenChange={setShowAiResults}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <Sparkles className="h-6 w-6 text-purple-400" />
+              AI Generated Badges ({aiGeneratedBadges.length})
+            </DialogTitle>
+            <DialogDescription>
+              Review and apply AI-generated badges to your system
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {aiGeneratedBadges.map((badge: any, i: number) => (
+              <div
+                key={badge.id || i}
+                className={`border-2 rounded-xl p-4 ${getRarityColor(badge.rarity)}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <GameIcon name={badge.icon as GameIconName} size={40} />
+                    <div>
+                      <p className="font-bold text-lg">{badge.name}</p>
+                      <p className="text-sm text-muted-foreground">{badge.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="capitalize">{badge.rarity}</Badge>
+                    <Badge variant="secondary">{badge.category}</Badge>
+                    {badge.minLevel > 0 && (
+                      <Badge variant="outline" className="text-amber-400 border-amber-500/50">
+                        <Shield className="h-3 w-3 mr-1" />Lv.{badge.minLevel}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <code className="bg-muted px-2 py-1 rounded">{badge.id}</code>
+                  {" | "}
+                  Condition: {badge.condition?.type} {badge.condition?.comparison} {badge.condition?.value}
+                  {badge.condition?.minTrades ? ` | Min trades: ${badge.condition.minTrades}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="mt-6 gap-2">
+            <Button variant="outline" onClick={() => setShowAiResults(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={aiApplying || aiGeneratedBadges.length === 0}
+              onClick={async () => {
+                try {
+                  setAiApplying(true);
+                  const res = await fetch("/api/ai/generate-badges", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "apply",
+                      badges: aiGeneratedBadges,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    toast.success(data.message);
+                    // Refresh badges
+                    const refreshRes = await fetch("/api/badges");
+                    const refreshData = await refreshRes.json();
+                    if (refreshData.success) setBadgesFromDB(refreshData.badges);
+                    setShowAiResults(false);
+                    setAiGeneratedBadges([]);
+                  } else {
+                    toast.error(data.error || "Failed to apply badges");
+                  }
+                } catch {
+                  toast.error("Failed to apply badges");
+                } finally {
+                  setAiApplying(false);
+                }
+              }}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {aiApplying ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Apply All to Database
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Balance Evaluation Dialog */}
+      <Dialog open={showAiEvaluation} onOpenChange={setShowAiEvaluation}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <BarChart3 className="h-6 w-6 text-emerald-400" />
+              Gamification Balance Report
+            </DialogTitle>
+            <DialogDescription>
+              AI analysis of your badges, XP, levels, and milestones
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiEvaluation?.evaluation && (
+            <div className="space-y-6 mt-4">
+              {/* Overall Score */}
+              <div className="flex items-center gap-6 p-6 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl">
+                <div className="text-center">
+                  <p className="text-6xl font-bold text-emerald-400">
+                    {aiEvaluation.evaluation.overallScore}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">/ 10</p>
+                </div>
+                <div className="flex-1">
+                  <p className="text-lg font-semibold mb-2">Overall Balance Score</p>
+                  <p className="text-sm text-muted-foreground">
+                    {aiEvaluation.evaluation.summary}
+                  </p>
+                </div>
+              </div>
+
+              {/* Score Breakdown */}
+              {aiEvaluation.evaluation.scores && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {Object.entries(aiEvaluation.evaluation.scores).map(([key, value]: [string, any]) => (
+                    <div key={key} className="bg-card border rounded-lg p-3 text-center">
+                      <p className={`text-2xl font-bold ${value >= 7 ? "text-emerald-400" : value >= 5 ? "text-yellow-400" : "text-red-400"}`}>
+                        {value}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">
+                        {key.replace(/([A-Z])/g, " $1").trim()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Strengths */}
+              {aiEvaluation.evaluation.strengths?.length > 0 && (
+                <div className="border border-emerald-500/20 rounded-xl p-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2 mb-3 text-emerald-400">
+                    <CheckCircle className="h-5 w-5" /> Strengths
+                  </h3>
+                  <ul className="space-y-1">
+                    {aiEvaluation.evaluation.strengths.map((s: string, i: number) => (
+                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-emerald-400 mt-0.5">+</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Issues */}
+              {aiEvaluation.evaluation.issues?.length > 0 && (
+                <div className="border border-yellow-500/20 rounded-xl p-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2 mb-3 text-yellow-400">
+                    <AlertTriangle className="h-5 w-5" /> Issues ({aiEvaluation.evaluation.issues.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {aiEvaluation.evaluation.issues.map((issue: any, i: number) => (
+                      <div key={i} className="bg-card border rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          {issue.severity === "critical" && <AlertCircle className="h-4 w-4 text-red-400" />}
+                          {issue.severity === "high" && <AlertTriangle className="h-4 w-4 text-orange-400" />}
+                          {issue.severity === "medium" && <Info className="h-4 w-4 text-yellow-400" />}
+                          {issue.severity === "low" && <Info className="h-4 w-4 text-blue-400" />}
+                          <Badge variant="outline" className="capitalize text-xs">
+                            {issue.severity}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">{issue.area}</Badge>
+                          {issue.autoFixable && (
+                            <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/50">
+                              Auto-fixable
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium">{issue.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{issue.recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* System Stats */}
+              {aiEvaluation.systemStats && (
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="bg-card border rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-400">{aiEvaluation.systemStats.totalBadges}</p>
+                    <p className="text-xs text-muted-foreground">Badges</p>
+                  </div>
+                  <div className="bg-card border rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-purple-400">{aiEvaluation.systemStats.totalMilestones}</p>
+                    <p className="text-xs text-muted-foreground">Milestones</p>
+                  </div>
+                  <div className="bg-card border rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-400">{aiEvaluation.systemStats.totalMaps}</p>
+                    <p className="text-xs text-muted-foreground">Maps</p>
+                  </div>
+                  <div className="bg-card border rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-emerald-400">20</p>
+                    <p className="text-xs text-muted-foreground">Levels</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Fix Button */}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowAiEvaluation(false)}>
+                  Close
+                </Button>
+                {aiEvaluation.evaluation.issues?.some((i: any) => i.autoFixable) && (
+                  <Button
+                    disabled={aiApplying}
+                    onClick={async () => {
+                      try {
+                        setAiApplying(true);
+                        const fixableIssues = aiEvaluation.evaluation.issues
+                          .filter((i: any) => i.autoFixable && i.fix)
+                          .map((i: any) => i.fix);
+
+                        if (fixableIssues.length === 0) {
+                          toast.error("No auto-fixable issues with fix data");
+                          return;
+                        }
+
+                        const res = await fetch("/api/ai/evaluate-balance", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "fix",
+                            fixes: fixableIssues,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          toast.success(data.message);
+                          // Refresh badges
+                          const refreshRes = await fetch("/api/badges");
+                          const refreshData = await refreshRes.json();
+                          if (refreshData.success) setBadgesFromDB(refreshData.badges);
+                          setShowAiEvaluation(false);
+                        } else {
+                          toast.error(data.error || "Failed to apply fixes");
+                        }
+                      } catch {
+                        toast.error("Failed to apply fixes");
+                      } finally {
+                        setAiApplying(false);
+                      }
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {aiApplying ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Auto-Fix {aiEvaluation.evaluation.issues.filter((i: any) => i.autoFixable).length} Issues
+                  </Button>
+                )}
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
