@@ -1018,8 +1018,57 @@ export const BADGES: Badge[] = [
   },
 
   // ============================================
+  // SOCIAL & ONBOARDING BADGES - Entry-level (no trade requirements)
+  // These give new users their first badges and XP immediately
+  // ============================================
+  {
+    id: "social_first_deposit",
+    name: "First Deposit",
+    description: "Funded your account",
+    category: "Social",
+    icon: "chest",
+    rarity: "common",
+    condition: { type: "first_deposit" },
+  },
+  {
+    id: "social_funded_trader",
+    name: "Funded Trader",
+    description: "Deposited 50+ credits",
+    category: "Social",
+    icon: "coins",
+    rarity: "common",
+    condition: { type: "total_deposited", value: 50, comparison: "gte" },
+  },
+  {
+    id: "social_first_comp",
+    name: "Arena Newcomer",
+    description: "Entered first competition",
+    category: "Social",
+    icon: "giftAward",
+    rarity: "common",
+    condition: { type: "competitions_entered", value: 1, comparison: "gte" },
+  },
+  {
+    id: "social_identity_verified",
+    name: "Verified Trader",
+    description: "Completed KYC",
+    category: "Social",
+    icon: "shieldAward",
+    rarity: "common",
+    condition: { type: "kyc_verified" },
+  },
+  {
+    id: "social_first_trade",
+    name: "Market Debut",
+    description: "Placed first trade",
+    category: "Social",
+    icon: "scrollAward",
+    rarity: "common",
+    condition: { type: "first_trade" },
+  },
+
+  // ============================================
   // SOCIAL & ACHIEVEMENT BADGES - MASTERY (requires sustained activity)
-  // "First Deposit" is a Journey Milestone only
   // ============================================
   {
     id: "social_early_adopter",

@@ -785,14 +785,16 @@ export async function checkBadgeCondition(
   // Condition types that do NOT require minimum trading activity
   // These are social, onboarding, account-based, and referral badges
   const TRADE_EXEMPT_TYPES = new Set([
-    "first_deposit", "has_deposit", "total_deposited",
+    "first_deposit", "has_deposit", "total_deposited", "total_deposits",
     "withdrawal_made", "total_withdrawals", "large_withdrawal",
     "net_profit_lifetime",
     "platform_age", "early_adopter", "account_age", "account_age_days",
+    "account_created",
     "kyc_verified", "profile_complete",
     "referrals_made", "referrals_active",
     "friends_added", "login_streak",
     "competitions_entered", // Entry alone shouldn't require trades
+    "first_trade", // Onboarding badge for first trade
   ]);
 
   const isTradeExempt = TRADE_EXEMPT_TYPES.has(type);
