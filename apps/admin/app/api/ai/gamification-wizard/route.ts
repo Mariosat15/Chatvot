@@ -633,19 +633,37 @@ Return JSON:
       if (fixes.milestoneFixes.length > 0) {
         let applied = 0;
         let errors = 0;
+        let notFound = 0;
         for (const fix of fixes.milestoneFixes) {
           try {
-            await JourneyMilestone.findOneAndUpdate(
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix attempt',data:{id:fix.id,mapId:fix.mapId,field:fix.field,newValue:fix.newValue},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion
+            const result = await JourneyMilestone.findOneAndUpdate(
               { id: fix.id, mapId: fix.mapId },
               { $set: { [fix.field]: fix.newValue } },
+              { new: true },
             );
-            applied++;
-          } catch (err) {
+            if (result) {
+              applied++;
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix OK',data:{id:fix.id,field:fix.field,resultBadgeIds:(result as any).requiredBadgeIds},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+              // #endregion
+            } else {
+              notFound++;
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone NOT FOUND',data:{id:fix.id,mapId:fix.mapId},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+              // #endregion
+            }
+          } catch (err: any) {
             console.error(`[WIZARD] auto_fix milestone error for ${fix.id}:`, err);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix ERROR',data:{id:fix.id,error:err?.message},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+            // #endregion
             errors++;
           }
         }
-        milestoneWriteResults = { applied, errors, total: fixes.milestoneFixes.length };
+        milestoneWriteResults = { applied, errors, notFound, total: fixes.milestoneFixes.length };
       }
 
       return NextResponse.json({

@@ -63,6 +63,13 @@ export interface IJourneyMilestone extends Document {
   tooltipText?: string;
   celebrationText?: string;
   isActive: boolean;
+  // Seasonal/event milestone fields
+  isSeasonal: boolean;
+  seasonStart?: Date;
+  seasonEnd?: Date;
+  seasonTag?: string;
+  // Badge-gated: milestone requires specific badges before it can be unlocked
+  requiredBadgeIds: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -187,6 +194,25 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    // Seasonal/event milestone support
+    isSeasonal: {
+      type: Boolean,
+      default: false,
+    },
+    seasonStart: {
+      type: Date,
+    },
+    seasonEnd: {
+      type: Date,
+    },
+    seasonTag: {
+      type: String,
+    },
+    // Badge-gated: all listed badges must be earned before this milestone unlocks
+    requiredBadgeIds: {
+      type: [String],
+      default: [],
     },
   },
   {
