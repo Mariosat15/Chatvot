@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import UserLevel from "@/database/models/user-level.model";
 import { evaluateUserBadges } from "@/lib/services/badge-evaluation.service";
 import { recalculateUserLevel } from "@/lib/services/xp-level.service";
 
@@ -53,12 +54,31 @@ export async function POST(request: NextRequest) {
         },
       });
     } else {
-      // Evaluate badges for ALL users who have participated in competitions
+      // Evaluate badges for ALL users (competition participants + users with UserLevel records)
       console.log(`🏅 Manually evaluating badges for ALL users...`);
 
-      const uniqueUsers = await CompetitionParticipant.distinct("userId");
+      // Gather users from multiple sources to cover everyone
+      const [competitionUserIds, userLevelUserIds, allUserDocs] = await Promise.all([
+        CompetitionParticipant.distinct("userId"),
+        UserLevel.distinct("userId"),
+        // Also get all users from the auth collection directly
+        (async () => {
+          const mongoose = await import("mongoose");
+          const db = mongoose.default.connection.db;
+          if (!db) return [];
+          const users = await db.collection("user").find({}, { projection: { id: 1, _id: 1 } }).toArray();
+          return users.map((u: any) => u.id || u._id?.toString()).filter(Boolean);
+        })(),
+      ]);
 
-      console.log(`📊 Found ${uniqueUsers.length} users to evaluate`);
+      // Merge and deduplicate all user IDs
+      const uniqueUsers = [...new Set([
+        ...competitionUserIds.map(String),
+        ...userLevelUserIds,
+        ...allUserDocs,
+      ])];
+
+      console.log(`📊 Found ${uniqueUsers.length} users to evaluate (competitions: ${competitionUserIds.length}, userLevels: ${userLevelUserIds.length}, authUsers: ${allUserDocs.length})`);
 
       let totalNewBadges = 0;
       let usersWithNewBadges = 0;

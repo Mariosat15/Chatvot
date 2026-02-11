@@ -777,7 +777,7 @@ export async function checkBadgeCondition(
 
   // TIER SYSTEM: Rarity-based minimum activity requirements
   // Ensures badges can't be earned without demonstrated trading activity
-  // Onboarding badges (handled by journey milestones) are excluded
+  // Social/onboarding badges are EXEMPT - they have their own conditions
   const RARITY_MIN_REQUIREMENTS: Record<string, { trades: number; competitions: number }> = {
     common: { trades: 5, competitions: 0 },
     rare: { trades: 25, competitions: 1 },
@@ -785,14 +785,35 @@ export async function checkBadgeCondition(
     legendary: { trades: 100, competitions: 5 },
   };
 
+  // Condition types that do NOT require minimum trading activity
+  // These are social, onboarding, account-based, and referral badges
+  const TRADE_EXEMPT_TYPES = new Set([
+    "first_deposit", "has_deposit", "total_deposited",
+    "withdrawal_made", "total_withdrawals", "large_withdrawal",
+    "net_profit_lifetime",
+    "platform_age", "early_adopter", "account_age", "account_age_days",
+    "kyc_verified", "profile_complete",
+    "referrals_made", "referrals_active",
+    "friends_added", "login_streak",
+    "competitions_entered", // Entry alone shouldn't require trades
+  ]);
+
+  const isTradeExempt = TRADE_EXEMPT_TYPES.has(type);
+
   const tierReqs = RARITY_MIN_REQUIREMENTS[badge.rarity] || { trades: 0, competitions: 0 };
   
   // Apply the STRICTER of: badge-specific minTrades OR rarity tier minimum
-  const effectiveMinTrades = Math.max(minTrades || 0, tierReqs.trades);
-  const effectiveMinComps = Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
+  // BUT skip rarity tier for trade-exempt badges (only use badge-specific if set)
+  const effectiveMinTrades = isTradeExempt
+    ? (minTrades || 0) // Trade-exempt: only use badge-specific minTrades if explicitly set
+    : Math.max(minTrades || 0, tierReqs.trades);
+  const effectiveMinComps = isTradeExempt
+    ? (minCompletedCompetitions || 0)
+    : Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
 
   // CRITICAL: First check minimum requirements before evaluating the condition
   // This prevents "zero-baseline" badges from being awarded to new users
+  // Trade-exempt badges skip this check (they validate their own conditions)
   
   // Check minimum trades requirement (uses stricter of badge-specific or tier)
   if (effectiveMinTrades > 0 && stats.totalTrades < effectiveMinTrades) {
