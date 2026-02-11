@@ -40,6 +40,8 @@ interface LiveCompetitionsProps {
   description?: string;
   ctaText?: string;
   ctaLink?: string;
+  /** Pre-fetched competitions from combined endpoint */
+  externalData?: { active: Competition[]; upcoming: Competition[] };
 }
 
 export default function LiveCompetitions({
@@ -51,6 +53,7 @@ export default function LiveCompetitions({
   description = "Real-time trading competitions with live leaderboards and massive prize pools.",
   ctaText = "View All Competitions",
   ctaLink = "/competitions",
+  externalData,
 }: LiveCompetitionsProps) {
   const effectiveColors = {
     primary: propColors?.primary || "#00f0ff",
@@ -60,15 +63,25 @@ export default function LiveCompetitions({
   };
   const effectiveHeadingFont = propFont || "inherit";
   const [competitions, setCompetitions] = useState<Competition[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!externalData);
 
+  // Use external data if provided
   useEffect(() => {
+    if (externalData) {
+      setCompetitions([...externalData.active, ...externalData.upcoming].slice(0, 3));
+      setLoading(false);
+    }
+  }, [externalData]);
+
+  // Only poll individually if no external data
+  useEffect(() => {
+    if (externalData) return;
+
     const fetchCompetitions = async () => {
       try {
         const response = await fetch("/api/landing/competitions");
         if (response.ok) {
           const data = await response.json();
-          // Combine active and upcoming, prioritizing active
           setCompetitions([...data.active, ...data.upcoming].slice(0, 3));
         }
       } catch (error) {
@@ -79,10 +92,9 @@ export default function LiveCompetitions({
     };
 
     fetchCompetitions();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchCompetitions, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [externalData]);
 
   const getStatusColor = (status: string, statusColor: string) => {
     switch (statusColor) {

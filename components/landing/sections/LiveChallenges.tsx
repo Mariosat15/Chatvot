@@ -49,6 +49,8 @@ interface LiveChallengesProps {
   description?: string;
   ctaText?: string;
   ctaLink?: string;
+  /** Pre-fetched challenges from combined endpoint */
+  externalData?: { active: ActiveChallenge[]; completed: CompletedChallenge[]; stats: ChallengeStats };
 }
 
 export default function LiveChallenges({
@@ -60,6 +62,7 @@ export default function LiveChallenges({
   description = "Challenge any trader to a head-to-head battle.",
   ctaText = "Start a Challenge",
   ctaLink = "/challenges",
+  externalData,
 }: LiveChallengesProps) {
   const effectiveColors = {
     primary: propColors?.primary || "#00f0ff",
@@ -75,9 +78,22 @@ export default function LiveChallenges({
     CompletedChallenge[]
   >([]);
   const [stats, setStats] = useState<ChallengeStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!externalData);
 
+  // Use external data if provided
   useEffect(() => {
+    if (externalData) {
+      setActiveChallenges(externalData.active || []);
+      setCompletedChallenges(externalData.completed || []);
+      setStats(externalData.stats);
+      setLoading(false);
+    }
+  }, [externalData]);
+
+  // Only poll individually if no external data
+  useEffect(() => {
+    if (externalData) return;
+
     const fetchChallenges = async () => {
       try {
         const response = await fetch("/api/landing/challenges");
@@ -97,7 +113,7 @@ export default function LiveChallenges({
     fetchChallenges();
     const interval = setInterval(fetchChallenges, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [externalData]);
 
   return (
     <SectionWrapper id="challenges">

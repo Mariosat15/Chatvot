@@ -13,9 +13,10 @@ export async function GET(_request: NextRequest) {
 
     console.log("🔍 API: Fetching all user restrictions...");
 
-    // Fetch all restrictions, sorted by most recent first
+    // PERF: Limit to 200 most recent restrictions instead of unbounded full-collection scan
     const restrictions = await UserRestriction.find({})
       .sort({ restrictedAt: -1 })
+      .limit(200)
       .lean();
 
     console.log(`✅ API: Found ${restrictions.length} restriction(s)`);

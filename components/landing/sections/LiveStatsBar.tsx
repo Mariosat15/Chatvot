@@ -46,6 +46,8 @@ interface LiveStatsBarProps {
     enabled: boolean;
   }>;
   animated?: boolean;
+  /** Pre-fetched stats from combined endpoint -- skips individual fetch if provided */
+  externalData?: StatsData;
 }
 
 // Animated counter component
@@ -105,6 +107,7 @@ export default function LiveStatsBar({
   effectiveColors: propColors,
   customStats,
   animated = true,
+  externalData,
 }: LiveStatsBarProps) {
   // Ensure effectiveColors has defaults
   const effectiveColors = {
@@ -113,10 +116,21 @@ export default function LiveStatsBar({
     accent: propColors.accent || "#ffd700",
     text: propColors.text || "#ffffff",
   };
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<StatsData | null>(externalData || null);
+  const [loading, setLoading] = useState(!externalData);
 
+  // Use external data if provided (from combined endpoint)
   useEffect(() => {
+    if (externalData) {
+      setStats(externalData);
+      setLoading(false);
+    }
+  }, [externalData]);
+
+  // Only poll individually if no external data is provided (backward compatible)
+  useEffect(() => {
+    if (externalData) return; // Skip individual fetch when parent provides data
+
     const fetchStats = async () => {
       try {
         const response = await fetch("/api/landing/stats");
@@ -132,10 +146,9 @@ export default function LiveStatsBar({
     };
 
     fetchStats();
-    // Refresh stats every 60 seconds
     const interval = setInterval(fetchStats, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [externalData]);
 
   // Default stats to show
   const defaultStats = [

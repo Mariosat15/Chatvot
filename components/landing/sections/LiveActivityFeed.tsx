@@ -29,6 +29,8 @@ interface LiveActivityFeedProps {
   };
   maxItems?: number;
   refreshInterval?: number;
+  /** Pre-fetched activity from combined endpoint */
+  externalData?: { activities: Activity[]; count: number };
 }
 
 export default function LiveActivityFeed({
@@ -36,6 +38,7 @@ export default function LiveActivityFeed({
   effectiveColors: propColors,
   maxItems = 5,
   refreshInterval = 30000,
+  externalData,
 }: LiveActivityFeedProps) {
   const effectiveColors = {
     primary: propColors?.primary || "#00f0ff",
@@ -50,7 +53,18 @@ export default function LiveActivityFeed({
   );
   const currentIndex = useRef(0);
 
+  // Use external data if provided
   useEffect(() => {
+    if (externalData) {
+      setActivities(externalData.activities || []);
+      setLoading(false);
+    }
+  }, [externalData]);
+
+  // Only poll individually if no external data
+  useEffect(() => {
+    if (externalData) return;
+
     const fetchActivities = async () => {
       try {
         const response = await fetch("/api/landing/live-activity");
@@ -68,7 +82,7 @@ export default function LiveActivityFeed({
     fetchActivities();
     const interval = setInterval(fetchActivities, refreshInterval);
     return () => clearInterval(interval);
-  }, [refreshInterval]);
+  }, [refreshInterval, externalData]);
 
   // Cycle through activities one at a time
   useEffect(() => {

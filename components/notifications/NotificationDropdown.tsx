@@ -79,7 +79,7 @@ export default function NotificationDropdown() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Poll for new notifications - optimized with visibility awareness
+  // Poll for new notifications - optimized with visibility + dropdown awareness
   useEffect(() => {
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -93,8 +93,8 @@ export default function NotificationDropdown() {
           const data = await response.json();
           if (data.count !== unreadCount) {
             setUnreadCount(data.count);
-            // If new notifications, refresh the list
-            if (data.count > unreadCount) {
+            // If new notifications and dropdown is open, refresh the list
+            if (data.count > unreadCount && open) {
               fetchNotifications();
             }
           }
@@ -104,10 +104,9 @@ export default function NotificationDropdown() {
       }
     };
 
-    pollInterval = setInterval(
-      pollNotifications,
-      PERFORMANCE_INTERVALS.NOTIFICATION_POLL,
-    );
+    // Poll faster when dropdown is open (15s), slower when closed (60s)
+    const interval = open ? 15000 : PERFORMANCE_INTERVALS.NOTIFICATION_POLL;
+    pollInterval = setInterval(pollNotifications, interval);
 
     // Refresh when tab becomes visible
     const handleVisibilityChange = () => {
@@ -121,7 +120,7 @@ export default function NotificationDropdown() {
       if (pollInterval) clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [unreadCount, fetchNotifications]);
+  }, [unreadCount, fetchNotifications, open]);
 
   // Refresh when opening
   useEffect(() => {

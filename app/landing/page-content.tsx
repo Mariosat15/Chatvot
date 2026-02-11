@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
@@ -394,6 +394,7 @@ export default function LandingPageContent() {
     ["rgba(3, 7, 18, 0)", "rgba(3, 7, 18, 0.95)"],
   );
 
+
   // Determine active theme (with holiday override support)
   const getEffectiveThemeId = (): string => {
     if (!settings) return "gaming-neon";
@@ -409,6 +410,26 @@ export default function LandingPageContent() {
 
   const effectiveThemeId = getEffectiveThemeId();
   const theme: LandingTheme | undefined = getThemeById(effectiveThemeId);
+
+  // === Combined landing data (replaces 4 individual polls with 1) ===
+  const [combinedData, setCombinedData] = useState<{
+    stats: any;
+    activity: any;
+    competitions: any;
+    challenges: any;
+  } | null>(null);
+
+  const fetchCombinedData = useCallback(async () => {
+    try {
+      const response = await fetch("/api/landing/combined");
+      if (response.ok) {
+        const data = await response.json();
+        setCombinedData(data);
+      }
+    } catch {
+      // Silent fail -- components will fall back to individual fetching
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -426,6 +447,14 @@ export default function LandingPageContent() {
     }
     fetchSettings();
   }, []);
+
+  // Start combined polling once settings are loaded
+  useEffect(() => {
+    if (loading) return;
+    fetchCombinedData(); // Initial fetch
+    const interval = setInterval(fetchCombinedData, 30000); // Single 30s poll for all data
+    return () => clearInterval(interval);
+  }, [loading, fetchCombinedData]);
 
   if (loading) {
     return (
@@ -1006,6 +1035,7 @@ export default function LandingPageContent() {
             effectiveColors={effectiveColors}
             customStats={settings.stats}
             animated={settings.statsAnimated}
+            externalData={combinedData?.stats}
           />
         )}
 
@@ -1273,6 +1303,7 @@ export default function LandingPageContent() {
           description={settings.competitionsDescription}
           ctaText={settings.competitionsCTAText}
           ctaLink={settings.competitionsCTALink}
+          externalData={combinedData?.competitions}
         />
       )}
 
@@ -1436,6 +1467,7 @@ export default function LandingPageContent() {
           description={settings.challengesDescription}
           ctaText={settings.challengesCTAText}
           ctaLink={settings.challengesCTALink}
+          externalData={combinedData?.challenges}
         />
       )}
 
@@ -1450,6 +1482,7 @@ export default function LandingPageContent() {
                 refreshInterval={
                   settings.liveDataSettings?.activityFeedRefreshRate || 30000
                 }
+                externalData={combinedData?.activity}
               />
             </div>
           </section>

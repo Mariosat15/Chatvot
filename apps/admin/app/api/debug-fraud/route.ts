@@ -17,13 +17,14 @@ export async function GET() {
     // Get fraud settings
     const settings = await FraudSettings.findOne();
 
-    // Get all device fingerprints
+    // Get recent device fingerprints (admin debug view)
     const fingerprints = await DeviceFingerprint.find({})
       .sort({ createdAt: -1 })
-      .limit(20);
+      .limit(20)
+      .lean();
 
-    // Get all fraud alerts
-    const alerts = await FraudAlert.find({}).sort({ createdAt: -1 }).limit(20);
+    // Get recent fraud alerts (admin debug view)
+    const alerts = await FraudAlert.find({}).sort({ createdAt: -1 }).limit(20).lean();
 
     // Count statistics
     const totalFingerprints = await DeviceFingerprint.countDocuments();

@@ -358,8 +358,9 @@ export async function POST(request: NextRequest) {
 
       case "debug-status": {
         // Debug: Get current status of behavioral data (capped to avoid full scan)
-        const profiles = await TradingBehaviorProfile.find({}).limit(500).lean();
-        const similarities = await BehavioralSimilarity.find({}).limit(500).lean();
+        // PERF: Reduced from 500 to 50 -- debug view doesn't need hundreds of records
+        const profiles = await TradingBehaviorProfile.find({}).sort({ lastUpdated: -1 }).limit(50).lean();
+        const similarities = await BehavioralSimilarity.find({}).sort({ analyzedAt: -1 }).limit(50).lean();
 
         const profileSummary = profiles.map((p) => ({
           userId: p.userId.toString(),
