@@ -2522,31 +2522,28 @@ export default function BadgeXPManagementSection() {
                     onClick={async () => {
                       try {
                         setAiApplying(true);
-                        const fixableIssues = aiEvaluation.evaluation.issues
-                          .filter((i: any) => i.autoFixable && i.fix)
-                          .map((i: any) => i.fix);
-
-                        if (fixableIssues.length === 0) {
-                          toast.error("No auto-fixable issues with fix data");
-                          return;
-                        }
-
+                        // Call fix action directly — the backend generates its own
+                        // fixes using the local engine (no individual fix objects needed)
                         const res = await fetch("/api/ai/evaluate-balance", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "fix",
-                            fixes: fixableIssues,
-                          }),
+                          body: JSON.stringify({ action: "fix" }),
                         });
                         const data = await res.json();
                         if (data.success) {
-                          toast.success(data.message);
+                          toast.success(data.message || `Applied ${data.results?.applied || 0} fixes`);
                           // Refresh badges
                           const refreshRes = await fetch("/api/badges");
                           const refreshData = await refreshRes.json();
                           if (refreshData.success) setBadgesFromDB(refreshData.badges);
-                          setShowAiEvaluation(false);
+                          // Re-run evaluation to show updated scores
+                          const reEvalRes = await fetch("/api/ai/evaluate-balance", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "evaluate" }),
+                          });
+                          const reEvalData = await reEvalRes.json();
+                          if (reEvalData.success) setAiEvaluation(reEvalData);
                         } else {
                           toast.error(data.error || "Failed to apply fixes");
                         }

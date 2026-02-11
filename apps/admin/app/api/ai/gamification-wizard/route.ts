@@ -587,6 +587,13 @@ Return JSON:
 
       // Apply badge fixes
       let badgeWriteResults = null;
+      // #region agent log
+      console.log(`[AUTO-FIX] Badge fixes generated: ${fixes.badgeFixes.length}, Milestone fixes: ${fixes.milestoneFixes.length}`);
+      if (fixes.badgeFixes.length > 0) {
+        console.log(`[AUTO-FIX] Sample badge fixes:`, JSON.stringify(fixes.badgeFixes.slice(0, 5).map(f => ({ id: f.id, field: f.field, old: f.oldValue, new: f.newValue }))));
+      }
+      // #endregion
+
       if (fixes.badgeFixes.length > 0) {
         // Group fixes by badge ID
         const fixesByBadge: Record<string, Record<string, any>> = {};
@@ -602,9 +609,14 @@ Return JSON:
           }
         }
 
+        // #region agent log
+        console.log(`[AUTO-FIX] Grouped into ${Object.keys(fixesByBadge).length} badge updates`);
+        // #endregion
+
         // Apply with $set for surgical updates
         let applied = 0;
         let errors = 0;
+        let notFound = 0;
         for (const [badgeId, updates] of Object.entries(fixesByBadge)) {
           try {
             // For condition sub-fields, merge with existing
@@ -618,14 +630,37 @@ Return JSON:
                 setDoc[key] = val;
               }
             }
-            await BadgeConfig.findOneAndUpdate({ id: badgeId }, { $set: setDoc });
-            applied++;
-          } catch (err) {
-            console.error(`[WIZARD] auto_fix badge error for ${badgeId}:`, err);
+            const result = await BadgeConfig.findOneAndUpdate(
+              { id: badgeId },
+              { $set: setDoc },
+              { new: true },
+            );
+            if (result) {
+              applied++;
+              // Log first 3 and last 1 for verification
+              if (applied <= 3 || badgeId === Object.keys(fixesByBadge).at(-1)) {
+                console.log(`[AUTO-FIX] Badge ${badgeId}: SET ${JSON.stringify(setDoc)} => minLevel=${result.minLevel} minTrades=${(result as any).condition?.minTrades}`);
+              }
+            } else {
+              notFound++;
+              console.warn(`[AUTO-FIX] Badge ${badgeId} NOT FOUND in DB`);
+            }
+          } catch (err: any) {
+            console.error(`[AUTO-FIX] Badge ${badgeId} ERROR: ${err?.message}`);
             errors++;
           }
         }
-        badgeWriteResults = { applied, errors, total: Object.keys(fixesByBadge).length };
+        badgeWriteResults = { applied, errors, notFound, total: Object.keys(fixesByBadge).length };
+
+        // #region agent log
+        console.log(`[AUTO-FIX] Badge results: ${applied} applied, ${notFound} not found, ${errors} errors out of ${Object.keys(fixesByBadge).length}`);
+        // Verification: read a sample badge to confirm persistence
+        const sampleId = Object.keys(fixesByBadge)[0];
+        if (sampleId) {
+          const verify = await BadgeConfig.findOne({ id: sampleId }).lean();
+          console.log(`[AUTO-FIX] VERIFY badge ${sampleId}: minLevel=${(verify as any)?.minLevel} minTrades=${(verify as any)?.condition?.minTrades} minComps=${(verify as any)?.condition?.minCompletedCompetitions}`);
+        }
+        // #endregion
       }
 
       // Apply milestone fixes

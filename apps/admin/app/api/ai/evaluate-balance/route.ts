@@ -127,8 +127,10 @@ export async function POST(request: NextRequest) {
 
       const fixes = generateFixes(badgeData, milestoneData);
 
+      console.log(`[EVAL-FIX] Generated ${fixes.badgeFixes.length} badge fixes, ${fixes.milestoneFixes.length} milestone fixes`);
+
       // Apply badge fixes using surgical $set
-      const results = { applied: 0, skipped: 0, errors: 0 };
+      const results = { applied: 0, skipped: 0, errors: 0, notFound: 0 };
 
       // Group badge fixes by badge ID
       const fixesByBadge: Record<string, Record<string, any>> = {};
@@ -144,24 +146,46 @@ export async function POST(request: NextRequest) {
 
       for (const [badgeId, updates] of Object.entries(fixesByBadge)) {
         try {
-          await BadgeConfig.findOneAndUpdate({ id: badgeId }, { $set: updates });
-          results.applied++;
+          const result = await BadgeConfig.findOneAndUpdate(
+            { id: badgeId },
+            { $set: updates },
+            { new: true },
+          );
+          if (result) {
+            results.applied++;
+          } else {
+            results.notFound++;
+            console.warn(`[EVAL-FIX] Badge ${badgeId} not found in DB`);
+          }
         } catch (err) {
-          console.error(`Error applying fix to badge ${badgeId}:`, err);
+          console.error(`[EVAL-FIX] Error fixing badge ${badgeId}:`, err);
           results.errors++;
         }
       }
 
+      // Verify first badge
+      if (Object.keys(fixesByBadge).length > 0) {
+        const sampleId = Object.keys(fixesByBadge)[0];
+        const verify = await BadgeConfig.findOne({ id: sampleId }).lean();
+        console.log(`[EVAL-FIX] VERIFY ${sampleId}: minLevel=${(verify as any)?.minLevel} minTrades=${(verify as any)?.condition?.minTrades}`);
+      }
+      console.log(`[EVAL-FIX] Badge results: ${results.applied} applied, ${results.notFound} not found, ${results.errors} errors`);
+
       // Apply milestone fixes
       for (const fix of fixes.milestoneFixes) {
         try {
-          await JourneyMilestone.findOneAndUpdate(
+          const result = await JourneyMilestone.findOneAndUpdate(
             { id: fix.id, mapId: fix.mapId },
             { $set: { [fix.field]: fix.newValue } },
+            { new: true },
           );
-          results.applied++;
+          if (result) {
+            results.applied++;
+          } else {
+            results.notFound++;
+          }
         } catch (err) {
-          console.error(`Error applying fix to milestone ${fix.id}:`, err);
+          console.error(`[EVAL-FIX] Error fixing milestone ${fix.id}:`, err);
           results.errors++;
         }
       }
