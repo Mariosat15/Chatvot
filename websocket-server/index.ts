@@ -523,6 +523,28 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case "employee-notification":
+            // Forward notification to a specific employee (new chat, assignment, etc.)
+            if (data.employeeId) {
+              broadcastToParticipant(data.employeeId, {
+                type: "notification",
+                data: {
+                  id: `emp-${data.type}-${Date.now()}`,
+                  type: data.type || "employee_notification",
+                  title: data.type === "new_chat" ? "New Chat Assigned"
+                    : data.type === "customer_assignment" ? "Customer Assignment"
+                    : "Notification",
+                  message: data.type === "new_chat"
+                    ? `New chat from ${data.data?.customerName || "customer"}`
+                    : data.type === "customer_assignment"
+                    ? `Customer ${data.data?.customerName || ""} ${data.data?.assignmentType || "updated"}`
+                    : "You have a new notification",
+                  data: data.data || {},
+                },
+              });
+            }
+            break;
+
           case "data_updated":
             // Broadcast data update notification to all price viewers
             // Called when: seeding completes, gap fill completes, historical download completes
