@@ -1297,21 +1297,33 @@ export async function finalizeCompetition(competitionId: string) {
       `   Platform Net Earned: ${(prizePool - totalDistributed - actualGmEarnings).toFixed(2)} credits`,
     );
 
-    // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
+    // Award activity XP + evaluate badges for ALL participants (fire and forget)
     try {
       const { evaluateUserBadges } =
         await import("@/lib/services/badge-evaluation.service");
+      const { awardActivityXP } =
+        await import("@/lib/services/xp-level.service");
       const uniqueUserIds = [
         ...new Set(participants.map((p) => p.userId.toString())),
       ];
 
       console.log(
-        `🏅 Evaluating badges for ${uniqueUserIds.length} participants...`,
+        `🏅 Evaluating badges + awarding XP for ${uniqueUserIds.length} participants...`,
       );
 
-      // Evaluate badges for each participant (don't wait for all to complete)
+      // Award competition XP and evaluate badges for each participant
       uniqueUserIds.forEach((userId) => {
-        evaluateUserBadges(userId)
+        // Award competition completion XP
+        awardActivityXP(userId, "competition_completed").catch(() => {});
+
+        // Award podium XP if applicable
+        const userEntry = leaderboard.find((l) => l.userId === userId);
+        if (userEntry?.rank === 1) awardActivityXP(userId, "competition_podium_1").catch(() => {});
+        else if (userEntry?.rank === 2) awardActivityXP(userId, "competition_podium_2").catch(() => {});
+        else if (userEntry?.rank === 3) awardActivityXP(userId, "competition_podium_3").catch(() => {});
+
+        // Evaluate competition-related badges only (incremental)
+        evaluateUserBadges(userId, ["Competition"])
           .then((result) => {
             if (result.newBadges.length > 0) {
               console.log(
@@ -1324,7 +1336,7 @@ export async function finalizeCompetition(competitionId: string) {
           );
       });
     } catch (error) {
-      console.error("Error importing badge service:", error);
+      console.error("Error importing badge/XP service:", error);
     }
 
     // Send notifications to all participants about competition end (fire and forget - non-blocking)

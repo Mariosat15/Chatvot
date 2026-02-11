@@ -262,6 +262,7 @@ export async function GET(
       (r) => r.userId === session.user.id,
     );
 
+    // PERF: Add Cache-Control to reduce redundant requests from polling clients
     return NextResponse.json({
       rankings: buildDisplayRankings(rankingsWithPrizes, session.user.id),
       userRank: userRanking?.rank || null,
@@ -270,6 +271,10 @@ export async function GET(
       prizePool: netPool,
       firstPlaceValue,
       rankingMethod,
+    }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=5, stale-while-revalidate=10",
+      },
     });
   } catch (error) {
     console.error("Error fetching live ranking:", error);

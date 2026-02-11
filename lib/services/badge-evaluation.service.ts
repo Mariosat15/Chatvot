@@ -110,9 +110,15 @@ export interface UserStats {
 }
 
 /**
- * Evaluate all badges for a user and award new ones
+ * Evaluate badges for a user and award new ones
+ * @param userId - User to evaluate
+ * @param categories - Optional category filter (only evaluate badges in these categories)
+ *   If not provided, evaluates ALL badges (used for hourly cron)
+ *   Use for incremental evaluation: trade close → ["Trading","Profit","Risk","Speed","Consistency"]
+ *                                    competition end → ["Competition"]
+ *                                    deposit → ["Social"]
  */
-export async function evaluateUserBadges(userId: string): Promise<{
+export async function evaluateUserBadges(userId: string, categories?: string[]): Promise<{
   newBadges: Badge[];
   totalBadges: number;
 }> {
@@ -120,7 +126,12 @@ export async function evaluateUserBadges(userId: string): Promise<{
 
   try {
     // 0. Fetch badges from database
-    const badges = await getBadgesFromDB();
+    const allBadges = await getBadgesFromDB();
+
+    // PERF: Filter by category if specified (incremental evaluation)
+    const badges = categories
+      ? allBadges.filter((b) => categories.includes(b.category))
+      : allBadges;
 
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
@@ -129,7 +140,7 @@ export async function evaluateUserBadges(userId: string): Promise<{
     const existingBadges = await UserBadge.find({ userId }).lean();
     const existingBadgeIds = new Set(existingBadges.map((b) => b.badgeId));
 
-    // 3. Evaluate each badge
+    // 3. Evaluate each badge (filtered by category if specified)
     const newlyEarnedBadges: Badge[] = [];
 
     for (const badge of badges) {
@@ -213,11 +224,13 @@ export async function evaluateUserBadges(userId: string): Promise<{
  * Exported for use by journey progress service
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
-  // Fetch independent data in parallel (all queries depend only on userId)
-  const [participations, allPositions, closedTrades, wallet, withdrawalCount] = await Promise.all([
+  // PERF: Fetch independent data in parallel, with reduced limits and countDocuments for totals
+  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount] = await Promise.all([
     CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
-    TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(10000).lean(),
-    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume").sort({ closedAt: -1 }).limit(10000).lean(),
+    TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(2000).lean(),
+    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume").sort({ closedAt: -1 }).limit(2000).lean(),
+    TradingPosition.countDocuments({ userId }),
+    TradeHistory.countDocuments({ userId }),
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
     WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
   ]);
@@ -240,14 +253,17 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (p) => p.status === "completed" && (p.totalTrades || 0) >= 5,
   ).length;
 
-  const totalTrades = closedTrades.length;
+  // PERF: Use accurate counts from countDocuments (not capped by limit)
+  const totalTrades = totalTradeCount;
   const winningTrades = closedTrades.filter(
     (t) => (t.realizedPnl || 0) > 0,
   ).length;
   const losingTrades = closedTrades.filter(
     (t) => (t.realizedPnl || 0) < 0,
   ).length;
-  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+  // Win rate based on sampled trades (accurate for most users, only very active users are sampled)
+  const sampleTotal = closedTrades.length;
+  const winRate = sampleTotal > 0 ? (winningTrades / sampleTotal) * 100 : 0;
 
   const totalPnl = closedTrades.reduce(
     (sum, t) => sum + (t.realizedPnl || 0),
@@ -683,16 +699,32 @@ export async function checkBadgeCondition(
   const { condition } = badge;
   const { type, value, comparison, minTrades, minCompletedCompetitions } = condition;
 
+  // TIER SYSTEM: Rarity-based minimum activity requirements
+  // Ensures badges can't be earned without demonstrated trading activity
+  // Onboarding badges (handled by journey milestones) are excluded
+  const RARITY_MIN_REQUIREMENTS: Record<string, { trades: number; competitions: number }> = {
+    common: { trades: 5, competitions: 0 },
+    rare: { trades: 25, competitions: 1 },
+    epic: { trades: 50, competitions: 3 },
+    legendary: { trades: 100, competitions: 5 },
+  };
+
+  const tierReqs = RARITY_MIN_REQUIREMENTS[badge.rarity] || { trades: 0, competitions: 0 };
+  
+  // Apply the STRICTER of: badge-specific minTrades OR rarity tier minimum
+  const effectiveMinTrades = Math.max(minTrades || 0, tierReqs.trades);
+  const effectiveMinComps = Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
+
   // CRITICAL: First check minimum requirements before evaluating the condition
   // This prevents "zero-baseline" badges from being awarded to new users
   
-  // Check minimum trades requirement
-  if (minTrades !== undefined && stats.totalTrades < minTrades) {
+  // Check minimum trades requirement (uses stricter of badge-specific or tier)
+  if (effectiveMinTrades > 0 && stats.totalTrades < effectiveMinTrades) {
     return false;
   }
 
-  // Check minimum completed competitions requirement
-  if (minCompletedCompetitions !== undefined && stats.completedCompetitionsWithTrades < minCompletedCompetitions) {
+  // Check minimum completed competitions requirement (uses stricter of badge-specific or tier)
+  if (effectiveMinComps > 0 && stats.completedCompetitionsWithTrades < effectiveMinComps) {
     return false;
   }
 

@@ -375,10 +375,11 @@ export async function GET(req: NextRequest) {
     let equityCurve: { time: string; equity: number }[] = [];
 
     if (competitionId) {
+      // PERF: .select() to fetch only needed fields
       const participation = (await CompetitionParticipant.findOne({
         competitionId,
         userId,
-      }).lean()) as {
+      }).select("startingCapital currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate realizedPnl role isWinner username currentRank").lean()) as {
         _id: { toString(): string };
         startingCapital?: number;
         currentCapital?: number;
@@ -611,10 +612,11 @@ export async function GET(req: NextRequest) {
     let challengeEquityCurve: { time: string; equity: number }[] = [];
 
     if (challengeId) {
+      // PERF: .select() to fetch only needed fields
       const participation = (await ChallengeParticipant.findOne({
         challengeId,
         userId,
-      }).lean()) as {
+      }).select("startingCapital currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate realizedPnl").lean()) as {
         _id: { toString(): string };
         startingCapital?: number;
         currentCapital?: number;

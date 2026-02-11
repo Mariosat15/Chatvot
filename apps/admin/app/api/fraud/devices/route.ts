@@ -37,7 +37,8 @@ export async function GET(request: Request) {
 
     // Get statistics
     const stats = {
-      totalDevices: await DeviceFingerprint.countDocuments({}),
+      // PERF: estimatedDocumentCount() is O(1) vs full scan
+      totalDevices: await DeviceFingerprint.estimatedDocumentCount(),
       suspiciousDevices: await DeviceFingerprint.countDocuments({
         linkedUserIds: { $exists: true, $ne: [] },
       }),

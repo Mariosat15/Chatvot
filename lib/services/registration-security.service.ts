@@ -1380,7 +1380,8 @@ export async function getDatabaseLockoutStats(): Promise<{
     const [active, expired, total] = await Promise.all([
       AccountLockout.countDocuments({ isActive: true }),
       AccountLockout.countDocuments({ isActive: false }),
-      AccountLockout.countDocuments({}),
+      // PERF: estimatedDocumentCount() is O(1) vs full scan
+      AccountLockout.estimatedDocumentCount(),
     ]);
 
     return {

@@ -629,11 +629,24 @@ export const closePosition = async (
         `✅ Position closed: ${position.symbol}, P&L: $${realizedPnl.toFixed(2)}`,
       );
 
-      // Evaluate badges for the user (fire and forget - don't wait)
+      // Award activity XP for trade completion (fire and forget)
+      try {
+        const { awardActivityXP } = await import("@/lib/services/xp-level.service");
+        const isWin = realizedPnl > 0;
+        // Award base trade XP + bonus for winning trade
+        awardActivityXP(session.user.id, "trade_completed").catch(() => {});
+        if (isWin) {
+          awardActivityXP(session.user.id, "winning_trade").catch(() => {});
+        }
+      } catch (error) {
+        console.error("Error awarding activity XP:", error);
+      }
+
+      // Evaluate badges for the user (fire and forget - only trading-related categories)
       try {
         const { evaluateUserBadges } =
           await import("@/lib/services/badge-evaluation.service");
-        evaluateUserBadges(session.user.id)
+        evaluateUserBadges(session.user.id, ["Trading", "Profit", "Risk", "Speed", "Consistency"])
           .then((result) => {
             if (result.newBadges.length > 0) {
               console.log(

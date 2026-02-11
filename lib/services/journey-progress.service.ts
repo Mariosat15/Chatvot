@@ -423,7 +423,8 @@ export async function checkConditionMet(
       // Check if user has earned a specific badge
       if (condition.badgeId) {
         const UserBadge = (await import("@/database/models/user-badge.model")).default;
-        const badge = await UserBadge.findOne({ userId, badgeId: condition.badgeId });
+        // PERF: .lean() for read-only check
+        const badge = await UserBadge.findOne({ userId, badgeId: condition.badgeId }).lean();
         return { met: !!badge, currentValue: badge ? 1 : 0 };
       }
       return { met: false };

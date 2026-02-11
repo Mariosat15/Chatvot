@@ -451,15 +451,21 @@ async function escalateToHuman(
 
   let assignedEmployee = null;
 
+  // PERF: Batch-fetch all active admins in ONE query instead of up to 4 sequential findOne calls
+  const allActiveAdmins = await db.collection("admins").find({
+    status: "active",
+  }).toArray();
+
+  const adminById = new Map(allActiveAdmins.map((a) => [a._id.toString(), a]));
+
   // Priority 1: Use the employee already assigned to this conversation
   if (conversation?.assignedEmployeeId) {
-    assignedEmployee = await db.collection("admins").findOne({
-      _id: conversation.assignedEmployeeId,
-      status: "active",
-    });
-    console.log(
-      `🤖→👤 [Escalate] Using pre-assigned employee from conversation: ${assignedEmployee?.name || assignedEmployee?.email}`,
-    );
+    assignedEmployee = adminById.get(conversation.assignedEmployeeId.toString()) || null;
+    if (assignedEmployee) {
+      console.log(
+        `🤖→👤 [Escalate] Using pre-assigned employee from conversation: ${assignedEmployee?.name || assignedEmployee?.email}`,
+      );
+    }
   }
 
   // Priority 2: Check customer_assignments if no employee on conversation
@@ -470,13 +476,12 @@ async function escalateToHuman(
     });
 
     if (assignment?.employeeId) {
-      assignedEmployee = await db.collection("admins").findOne({
-        _id: new mongoose.default.Types.ObjectId(assignment.employeeId),
-        status: "active",
-      });
-      console.log(
-        `🤖→👤 [Escalate] Using customer assignment: ${assignedEmployee?.name || assignedEmployee?.email}`,
-      );
+      assignedEmployee = adminById.get(assignment.employeeId.toString()) || null;
+      if (assignedEmployee) {
+        console.log(
+          `🤖→👤 [Escalate] Using customer assignment: ${assignedEmployee?.name || assignedEmployee?.email}`,
+        );
+      }
     }
   }
 
@@ -487,13 +492,12 @@ async function escalateToHuman(
     );
     const originalEmployee = assignedEmployee;
 
-    assignedEmployee = await db.collection("admins").findOne({
-      _id: { $ne: originalEmployee._id }, // Different from original
-      status: "active",
-      role: { $in: ["Backoffice", "Support Agent", "Full Admin"] },
-      isLockedOut: { $ne: true },
-      isAvailableForChat: { $ne: false },
-    });
+    assignedEmployee = allActiveAdmins.find((a) =>
+      a._id.toString() !== originalEmployee._id.toString() &&
+      ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
+      a.isLockedOut !== true &&
+      a.isAvailableForChat !== false
+    ) || null;
 
     if (assignedEmployee) {
       console.log(
@@ -504,12 +508,11 @@ async function escalateToHuman(
 
   // Priority 4: If still no employee, find any available support staff
   if (!assignedEmployee) {
-    assignedEmployee = await db.collection("admins").findOne({
-      status: "active",
-      role: { $in: ["Backoffice", "Support Agent", "Full Admin"] },
-      isLockedOut: { $ne: true },
-      isAvailableForChat: { $ne: false },
-    });
+    assignedEmployee = allActiveAdmins.find((a) =>
+      ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
+      a.isLockedOut !== true &&
+      a.isAvailableForChat !== false
+    ) || null;
     console.log(
       `🤖→👤 [Escalate] Fallback to any available: ${assignedEmployee?.name || assignedEmployee?.email || "none"}`,
     );

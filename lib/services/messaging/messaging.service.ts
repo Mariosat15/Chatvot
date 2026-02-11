@@ -1012,14 +1012,14 @@ export class MessagingService {
 
     const db = mongoose.connection.db;
     if (db && userId) {
+      // PERF: Batch-fetch all active admins in ONE query instead of up to 3 sequential findOne calls
+      const allActiveAdmins = await db.collection("admins").find({ status: "active" }).toArray();
+      const adminById = new Map(allActiveAdmins.map((a) => [a._id.toString(), a]));
+
       // Priority 1: Use existing assigned employee on conversation
       if (conversation.assignedEmployeeId) {
-        const emp = await db.collection("admins").findOne({
-          _id: conversation.assignedEmployeeId,
-          status: "active",
-          isAvailableForChat: { $ne: false },
-        });
-        if (emp) {
+        const emp = adminById.get(conversation.assignedEmployeeId.toString());
+        if (emp && emp.isAvailableForChat !== false) {
           assignedEmployee = {
             id: emp._id.toString(),
             name: emp.name || emp.email?.split("@")[0],
@@ -1039,12 +1039,8 @@ export class MessagingService {
         });
 
         if (assignment?.employeeId) {
-          const emp = await db.collection("admins").findOne({
-            _id: new Types.ObjectId(assignment.employeeId),
-            status: "active",
-            isAvailableForChat: { $ne: false },
-          });
-          if (emp) {
+          const emp = adminById.get(assignment.employeeId.toString());
+          if (emp && emp.isAvailableForChat !== false) {
             assignedEmployee = {
               id: emp._id.toString(),
               name: emp.name || emp.email?.split("@")[0],
@@ -1057,14 +1053,13 @@ export class MessagingService {
         }
       }
 
-      // Priority 3: Find any available support staff
+      // Priority 3: Find any available support staff (from pre-fetched array)
       if (!assignedEmployee) {
-        const emp = await db.collection("admins").findOne({
-          status: "active",
-          role: { $in: ["Backoffice", "Support Agent", "Full Admin"] },
-          isLockedOut: { $ne: true },
-          isAvailableForChat: { $ne: false },
-        });
+        const emp = allActiveAdmins.find((a) =>
+          ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
+          a.isLockedOut !== true &&
+          a.isAvailableForChat !== false
+        );
         if (emp) {
           assignedEmployee = {
             id: emp._id.toString(),

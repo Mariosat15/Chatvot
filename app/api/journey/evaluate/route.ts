@@ -224,12 +224,18 @@ async function getUserStats(userId: string): Promise<Record<string, number | boo
       stats.deposit_amount = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
     }
 
-    // Get trades from trade history (cap at 10K most recent for performance)
-    const trades = await TradeHistory.find({ userId })
-      .sort({ closedAt: -1 })
-      .limit(10000)
-      .lean() as any[];
-    stats.total_trades = trades.length;
+    // PERF: Journey milestones only need aggregate stats, not full trade docs
+    // Use countDocuments for totals and limit to 500 for streak/detail calculations
+    const [totalTradeCount, trades] = await Promise.all([
+      TradeHistory.countDocuments({ userId }),
+      TradeHistory.find({ userId })
+        .sort({ closedAt: -1 })
+        .limit(500)
+        .select("pnl result isWin closedAt createdAt")
+        .lean() as Promise<any[]>,
+    ]);
+    // Use actual count from countDocuments (accurate, not capped by limit)
+    stats.total_trades = totalTradeCount;
     stats.first_trade = trades.length > 0;
     
     // Winning and losing trades

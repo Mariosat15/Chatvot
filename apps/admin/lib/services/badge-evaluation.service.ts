@@ -740,16 +740,31 @@ export async function checkBadgeCondition(
   const { condition } = badge;
   const { type, value, comparison, minTrades, minCompletedCompetitions } = condition;
 
+  // TIER SYSTEM: Rarity-based minimum activity requirements
+  // Ensures badges can't be earned without demonstrated trading activity
+  const RARITY_MIN_REQUIREMENTS: Record<string, { trades: number; competitions: number }> = {
+    common: { trades: 5, competitions: 0 },
+    rare: { trades: 25, competitions: 1 },
+    epic: { trades: 50, competitions: 3 },
+    legendary: { trades: 100, competitions: 5 },
+  };
+
+  const tierReqs = RARITY_MIN_REQUIREMENTS[badge.rarity] || { trades: 0, competitions: 0 };
+  
+  // Apply the STRICTER of: badge-specific minTrades OR rarity tier minimum
+  const effectiveMinTrades = Math.max(minTrades || 0, tierReqs.trades);
+  const effectiveMinComps = Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
+
   // CRITICAL: First check minimum requirements before evaluating the condition
   // This prevents "zero-baseline" badges from being awarded to new users
   
-  // Check minimum trades requirement
-  if (minTrades !== undefined && stats.totalTrades < minTrades) {
+  // Check minimum trades requirement (uses stricter of badge-specific or tier)
+  if (effectiveMinTrades > 0 && stats.totalTrades < effectiveMinTrades) {
     return false;
   }
 
-  // Check minimum completed competitions requirement
-  if (minCompletedCompetitions !== undefined && stats.completedCompetitionsWithTrades < minCompletedCompetitions) {
+  // Check minimum completed competitions requirement (uses stricter of badge-specific or tier)
+  if (effectiveMinComps > 0 && stats.completedCompetitionsWithTrades < effectiveMinComps) {
     return false;
   }
 

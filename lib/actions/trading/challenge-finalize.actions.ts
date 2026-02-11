@@ -925,12 +925,19 @@ export async function finalizeChallenge(challengeId: string) {
     if (gmPayments.length > 0) {
       const db = mongoose.connection.db;
       if (db) {
+        // PERF: Batch-fetch all GM subscriptions and wallets in 2 queries instead of 2N
+        const allGmIds = gmPayments.map((p) => p.gmId);
+        const [allGmSubs, allGmWallets] = await Promise.all([
+          db.collection("gamemastersubscriptions").find({ userId: { $in: allGmIds } }).toArray(),
+          db.collection("creditwallets").find({ userId: { $in: allGmIds } }).toArray(),
+        ]);
+        const gmSubMap = new Map(allGmSubs.map((s) => [s.userId, s]));
+        const gmWalletMap = new Map(allGmWallets.map((w) => [w.userId, w]));
+
         for (const payment of gmPayments) {
           try {
-            // Get GM subscription for email
-            const gmSubscription = await db
-              .collection("gamemastersubscriptions")
-              .findOne({ userId: payment.gmId });
+            // Get GM subscription from pre-fetched map
+            const gmSubscription = gmSubMap.get(payment.gmId) || null;
 
             // Update GM subscription earnings (add to total, but NOT to pending since we pay immediately)
             await db.collection("gamemastersubscriptions").updateOne(
@@ -944,10 +951,8 @@ export async function finalizeChallenge(challengeId: string) {
               },
             );
 
-            // Add to GM's wallet
-            const gmWallet = await db
-              .collection("creditwallets")
-              .findOne({ userId: payment.gmId });
+            // Add to GM's wallet (from pre-fetched map)
+            const gmWallet = gmWalletMap.get(payment.gmId) || null;
             if (gmWallet) {
               const balanceBefore = gmWallet.creditBalance || 0;
               await db
@@ -1287,6 +1292,25 @@ export async function finalizeChallenge(challengeId: string) {
       }
     } catch (notifError) {
       console.error("Error sending challenge notifications:", notifError);
+    }
+
+    // Award activity XP + evaluate badges for both participants (fire and forget)
+    try {
+      const { awardActivityXP } = await import("@/lib/services/xp-level.service");
+      const { evaluateUserBadges } = await import("@/lib/services/badge-evaluation.service");
+
+      for (const p of [challenger, challenged]) {
+        // Challenge completion XP
+        awardActivityXP(p.userId, "challenge_completed").catch(() => {});
+        // Winner bonus XP
+        if (p.userId === winnerId) {
+          awardActivityXP(p.userId, "challenge_won").catch(() => {});
+        }
+        // Evaluate competition-related badges
+        evaluateUserBadges(p.userId, ["Competition"]).catch(() => {});
+      }
+    } catch (xpError) {
+      console.error("Error awarding challenge XP:", xpError);
     }
 
     console.log(

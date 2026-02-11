@@ -32,7 +32,8 @@ export async function GET(request: Request) {
 
     // Get statistics
     const stats = {
-      total: await FraudAlert.countDocuments({}),
+      // PERF: estimatedDocumentCount() is O(1) vs full scan
+      total: await FraudAlert.estimatedDocumentCount(),
       pending: await FraudAlert.countDocuments({ status: "pending" }),
       investigating: await FraudAlert.countDocuments({
         status: "investigating",
