@@ -14,6 +14,7 @@ import { WhiteLabel } from "@/database/models/whitelabel.model";
 import BadgeConfig from "@/database/models/badge-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
@@ -253,14 +254,8 @@ RULES:
 
 Return ONLY valid JSON. No markdown.`;
 
-const EVALUATOR_PROMPT = `You are a GAMIFICATION EVALUATOR for a forex trading platform.
-Score 10 criteria (1-10): progressionFlow, difficultyCurve, zeroBaselineProtection, levelGating, categoryBalance, xpEconomy, milestoneBadgeConnection, engagementHooks, urgency, funFactor.
-
-You are a REPORT-ONLY agent. You DO NOT fix anything. You score, identify issues, and recommend what the Badge Agent or Milestone Agent should fix.
-
-Return JSON: { "overallScore": N, "scores": {...}, "issues": [{severity,area,description,recommendation,targetAgent}], "strengths": [...], "summary": "..." }
-targetAgent is "badge_agent" or "milestone_agent" — indicates which agent should fix this issue.
-Return ONLY valid JSON. No markdown.`;
+// EVALUATOR_PROMPT removed — evaluation is now handled by the local engine
+// (gamification-engine.ts) — instant, deterministic, no AI, no timeouts.
 
 // ─── JSON PARSER (with repair) ──────────────────────────────────────────────────
 function parseAIJSON(content: string): any {
@@ -535,8 +530,8 @@ Return JSON:
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // agent_evaluate — REPORT-ONLY: scores the system, recommends fixes,
-    // but NEVER writes to the database. Use Badge/Milestone agents to fix.
+    // agent_evaluate — LOCAL ENGINE: instant, deterministic, NO AI calls.
+    // Scores 10 criteria via rules, generates specific fix recommendations.
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "agent_evaluate") {
       const [badges, milestones, maps] = await Promise.all([
@@ -545,84 +540,118 @@ Return JSON:
         dbTools.readAllMaps(),
       ]);
 
-      // Category + level distribution (compact)
-      const catDist: Record<string, string> = {};
-      for (const b of badges as any[]) {
-        const cat = b.category || "?";
-        if (!catDist[cat]) catDist[cat] = "";
-        catDist[cat] += (b.rarity || "c")[0];
-      }
-      const catSummary = Object.entries(catDist).map(([cat, rarities]) => {
-        const c = (rarities.match(/c/g) || []).length;
-        const r = (rarities.match(/r/g) || []).length;
-        const e = (rarities.match(/e/g) || []).length;
-        const l = (rarities.match(/l/g) || []).length;
-        return `${cat}: ${c}c/${r}r/${e}e/${l}l`;
-      }).join(", ");
-
-      const lvlDist: Record<number, number> = {};
-      for (const b of badges as any[]) {
-        const lvl = b.minLevel || 0;
-        lvlDist[lvl] = (lvlDist[lvl] || 0) + 1;
-      }
-
-      const compactBadges = badgesToCompact(badges);
-
-      const msByMap: Record<string, { count: number; gated: number; totalXP: number }> = {};
-      for (const m of milestones as any[]) {
-        const mid = m.mapId || "?";
-        if (!msByMap[mid]) msByMap[mid] = { count: 0, gated: 0, totalXP: 0 };
-        msByMap[mid].count++;
-        if (m.requiredBadgeIds?.length > 0) msByMap[mid].gated++;
-        msByMap[mid].totalXP += m.rewards?.xp || 0;
-      }
-      const msSummary = Object.entries(msByMap).map(([mapId, s]) =>
-        `${mapId}: ${s.count} milestones, ${s.gated} badge-gated, ${s.totalXP} XP total`
-      ).join("\n");
-
-      const prompt = `EVALUATE the gamification system. Score all 10 criteria. List top 5-10 issues with recommendations.
-Do NOT return fix payloads. Only describe what needs fixing and which agent should handle it.
-
-BADGES (${badges.length}):
-Categories: ${catSummary}
-Level gating: ${JSON.stringify(lvlDist)}
-${compactBadges}
-
-MILESTONES (${milestones.length} across ${maps.length} maps):
-${msSummary}
-
-XP: common=10, rare=25, epic=50, legendary=100. Activity: 2/trade(cap100/day), 25/comp, 50/35/20 podium.
-LEVELS: L1:0 L2:50 L3:125 L4:250 L5:375 L6:500 L7:750 L8:1100 L9:1450 L10:1800 L11:2000 L12:2500 L13:3000 L14:3500 L15:4000 L16:5000 L17:6000 L18:7500 L19:10000 L20:15000`;
-
       // #region agent log
-      console.log(`[DEBUG-WIZARD] evaluate start badges=${badges.length} milestones=${milestones.length} maps=${maps.length} promptLen=${prompt.length}`);
+      const evalStart = Date.now();
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:eval',message:'agent_evaluate start',data:{badges:badges.length,milestones:milestones.length,maps:maps.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
       // #endregion
 
-      const completion = await openai.chat.completions.create({
-        model: config.model,
-        messages: [
-          { role: "system", content: EVALUATOR_PROMPT },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.2,
-        max_tokens: 3000,
-      });
-
-      const evaluation = parseAIJSON(completion.choices[0]?.message?.content || "{}");
-      if (!evaluation) {
-        return NextResponse.json({ success: false, error: "Evaluation agent returned invalid response" }, { status: 500 });
-      }
+      const evaluation = evaluateSystem(
+        badges as unknown as BadgeData[],
+        milestones as unknown as MilestoneData[],
+        maps as unknown as MapData[],
+      );
 
       // #region agent log
-      console.log(`[DEBUG-WIZARD] evaluate done score=${evaluation.overallScore} issues=${evaluation.issues?.length||0} strengths=${evaluation.strengths?.length||0}`);
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:eval',message:'agent_evaluate done',data:{durationMs:Date.now()-evalStart,overallScore:evaluation.overallScore,issues:evaluation.issues.length,strengths:evaluation.strengths.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
       // #endregion
 
       return NextResponse.json({
         success: true,
         action: "agent_evaluate",
         evaluation,
-        applied: false, // Always false — evaluation is report-only
+        applied: false,
         fixResults: null,
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // auto_fix — LOCAL ENGINE: applies deterministic fixes based on rules.
+    // Fixes zero-baseline, level gating, invalid badge refs. NO AI.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "auto_fix") {
+      const [badges, milestones] = await Promise.all([
+        dbTools.readAllBadges(),
+        dbTools.readAllMilestones(),
+      ]);
+
+      const fixes = generateFixes(
+        badges as unknown as BadgeData[],
+        milestones as unknown as MilestoneData[],
+      );
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:autofix',message:'auto_fix start',data:{badgeFixes:fixes.badgeFixes.length,milestoneFixes:fixes.milestoneFixes.length,totalFixes:fixes.totalFixes},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+
+      // Apply badge fixes
+      let badgeWriteResults = null;
+      if (fixes.badgeFixes.length > 0) {
+        // Group fixes by badge ID
+        const fixesByBadge: Record<string, Record<string, any>> = {};
+        for (const fix of fixes.badgeFixes) {
+          if (!fixesByBadge[fix.id]) fixesByBadge[fix.id] = {};
+          // Handle nested fields like "condition.minTrades"
+          const parts = fix.field.split(".");
+          if (parts.length === 2) {
+            if (!fixesByBadge[fix.id][parts[0]]) fixesByBadge[fix.id][parts[0]] = {};
+            fixesByBadge[fix.id][parts[0]][parts[1]] = fix.newValue;
+          } else {
+            fixesByBadge[fix.id][fix.field] = fix.newValue;
+          }
+        }
+
+        // Apply with $set for surgical updates
+        let applied = 0;
+        let errors = 0;
+        for (const [badgeId, updates] of Object.entries(fixesByBadge)) {
+          try {
+            // For condition sub-fields, merge with existing
+            const setDoc: any = {};
+            for (const [key, val] of Object.entries(updates)) {
+              if (key === "condition" && typeof val === "object") {
+                for (const [subKey, subVal] of Object.entries(val as Record<string, any>)) {
+                  setDoc[`condition.${subKey}`] = subVal;
+                }
+              } else {
+                setDoc[key] = val;
+              }
+            }
+            await BadgeConfig.findOneAndUpdate({ id: badgeId }, { $set: setDoc });
+            applied++;
+          } catch (err) {
+            console.error(`[WIZARD] auto_fix badge error for ${badgeId}:`, err);
+            errors++;
+          }
+        }
+        badgeWriteResults = { applied, errors, total: Object.keys(fixesByBadge).length };
+      }
+
+      // Apply milestone fixes
+      let milestoneWriteResults = null;
+      if (fixes.milestoneFixes.length > 0) {
+        let applied = 0;
+        let errors = 0;
+        for (const fix of fixes.milestoneFixes) {
+          try {
+            await JourneyMilestone.findOneAndUpdate(
+              { id: fix.id, mapId: fix.mapId },
+              { $set: { [fix.field]: fix.newValue } },
+            );
+            applied++;
+          } catch (err) {
+            console.error(`[WIZARD] auto_fix milestone error for ${fix.id}:`, err);
+            errors++;
+          }
+        }
+        milestoneWriteResults = { applied, errors, total: fixes.milestoneFixes.length };
+      }
+
+      return NextResponse.json({
+        success: true,
+        action: "auto_fix",
+        fixes,
+        badgeWriteResults,
+        milestoneWriteResults,
       });
     }
 
@@ -642,7 +671,7 @@ LEVELS: L1:0 L2:50 L3:125 L4:250 L5:375 L6:500 L7:750 L8:1100 L9:1450 L10:1800 L
     }
 
     return NextResponse.json(
-      { success: false, error: "Invalid action. Use: get_status, setup_levels, agent_badges, agent_milestones, agent_evaluate, apply_changes" },
+      { success: false, error: "Invalid action. Use: get_status, setup_levels, agent_badges, agent_milestones, agent_evaluate, auto_fix, apply_changes" },
       { status: 400 },
     );
   } catch (error) {

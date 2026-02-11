@@ -52,7 +52,8 @@ interface EvaluationResult {
     area: string;
     description: string;
     recommendation: string;
-    targetAgent?: string; // "badge_agent" | "milestone_agent"
+    targetAgent?: string; // "badge_agent" | "milestone_agent" | "manual"
+    autoFixable?: boolean;
   }>;
   strengths: string[];
   summary: string;
@@ -65,7 +66,7 @@ const WIZARD_STEPS = [
   { id: "levels", label: "XP & Levels", icon: Star, description: "Configure level progression and XP values" },
   { id: "badges", label: "Badge Agent", icon: Trophy, description: "AI audits, fixes, and generates badges" },
   { id: "milestones", label: "Milestone Agent", icon: Map, description: "AI audits milestone progression and badge-gating" },
-  { id: "evaluate", label: "Evaluation", icon: Shield, description: "AI scores the full system and recommends improvements" },
+  { id: "evaluate", label: "Evaluate & Fix", icon: Shield, description: "Instant rule-based scoring with one-click auto-fix" },
 ] as const;
 
 type StepId = typeof WIZARD_STEPS[number]["id"];
@@ -196,17 +197,63 @@ export default function GamificationWizardSection() {
   const runEvaluationAgent = async () => {
     setStepLoading("evaluate");
     try {
+      // #region agent log
+      const t0 = Date.now();
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation start (local engine)',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       const data = await callWizardAPI({
         action: "agent_evaluate",
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation response',data:{durationMs:Date.now()-t0,success:data.success,score:data.evaluation?.overallScore,issues:data.evaluation?.issues?.length,error:data.error},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       if (data.success && data.evaluation) {
         setEvaluation(data.evaluation);
-        toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10 — ${data.evaluation.issues?.length || 0} recommendations`);
+        toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10 — ${data.evaluation.issues?.length || 0} issues found`);
       } else {
-        toast.error(data.error || "Evaluation agent failed");
+        toast.error(data.error || "Evaluation failed");
       }
-    } catch (err) {
-      toast.error("Evaluation agent error");
+    } catch (err: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation EXCEPTION',data:{error:err?.message||String(err)},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      toast.error("Evaluation error");
+    }
+    setStepLoading(null);
+  };
+
+  const runAutoFix = async () => {
+    setStepLoading("autofix");
+    try {
+      // #region agent log
+      const t0 = Date.now();
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix start (local engine)',data:{},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      const data = await callWizardAPI({ action: "auto_fix" });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix response',data:{durationMs:Date.now()-t0,success:data.success,totalFixes:data.fixes?.totalFixes,badgeApplied:data.badgeWriteResults?.applied,milestoneApplied:data.milestoneWriteResults?.applied,error:data.error},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      if (data.success) {
+        const bp = data.badgeWriteResults;
+        const mp = data.milestoneWriteResults;
+        const parts: string[] = [];
+        if (bp) parts.push(`${bp.applied} badges fixed`);
+        if (mp) parts.push(`${mp.applied} milestones fixed`);
+        toast.success(`Auto-fix: ${parts.join(", ") || "no fixes needed"}`);
+        // Re-run evaluation to show updated scores
+        loadStatus();
+        const evalData = await callWizardAPI({ action: "agent_evaluate" });
+        if (evalData.success && evalData.evaluation) {
+          setEvaluation(evalData.evaluation);
+        }
+      } else {
+        toast.error(data.error || "Auto-fix failed");
+      }
+    } catch (err: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix EXCEPTION',data:{error:err?.message||String(err)},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      toast.error("Auto-fix error");
     }
     setStepLoading(null);
   };
@@ -214,17 +261,17 @@ export default function GamificationWizardSection() {
   const runFullSetup = async () => {
     setStepLoading("full");
     const steps: any[] = [];
-    setFullSetupProgress({ step: 1, label: "Running Badge Agent...", steps: [] });
+    setFullSetupProgress({ step: 1, label: "Running Badge Agent (AI)...", steps: [] });
 
     try {
-      // Step 1: Badge Agent
+      // Step 1: Badge Agent (AI)
       const badgesData = await callWizardAPI({
         action: "agent_badges",
         generateCount: badgeGenCount,
         autoApply: true,
       });
       const badgeStep = {
-        name: "Badge Agent",
+        name: "Badge Agent (AI)",
         success: badgesData.success,
         summary: badgesData.summary || "",
         fixedCount: badgesData.fixedCount || 0,
@@ -233,19 +280,19 @@ export default function GamificationWizardSection() {
       steps.push(badgeStep);
       if (badgesData.success) {
         setBadgeResult(badgesData);
-        toast.success(`Step 1/3: Badges — ${badgesData.fixedCount} fixed, ${badgesData.newCount} new`);
+        toast.success(`Step 1/4: Badges — ${badgesData.fixedCount} fixed, ${badgesData.newCount} new`);
       } else {
-        toast.error(`Step 1/3: Badge Agent failed — ${badgesData.error || "unknown error"}`);
+        toast.error(`Step 1/4: Badge Agent failed — ${badgesData.error || "unknown error"}`);
       }
 
-      // Step 2: Milestone Agent
-      setFullSetupProgress({ step: 2, label: "Running Milestone Agent...", steps });
+      // Step 2: Milestone Agent (AI)
+      setFullSetupProgress({ step: 2, label: "Running Milestone Agent (AI)...", steps });
       const msData = await callWizardAPI({
         action: "agent_milestones",
         autoApply: true,
       });
       const msStep = {
-        name: "Milestone Agent",
+        name: "Milestone Agent (AI)",
         success: msData.success,
         summary: msData.summary || "",
         fixedCount: msData.fixedCount || 0,
@@ -254,18 +301,16 @@ export default function GamificationWizardSection() {
       steps.push(msStep);
       if (msData.success) {
         setMilestoneResult(msData);
-        toast.success(`Step 2/3: Milestones — ${msData.fixedCount} fixed, ${msData.badgeGatesAdded} badge-gates`);
+        toast.success(`Step 2/4: Milestones — ${msData.fixedCount} fixed, ${msData.badgeGatesAdded} badge-gates`);
       } else {
-        toast.error(`Step 2/3: Milestone Agent failed — ${msData.error || "unknown error"}`);
+        toast.error(`Step 2/4: Milestone Agent failed — ${msData.error || "unknown error"}`);
       }
 
-      // Step 3: Evaluation Agent (report-only — does NOT modify the database)
-      setFullSetupProgress({ step: 3, label: "Running Evaluation (report-only)...", steps });
-      const evalData = await callWizardAPI({
-        action: "agent_evaluate",
-      });
+      // Step 3: Local Evaluation (instant, no AI)
+      setFullSetupProgress({ step: 3, label: "Evaluating system (instant)...", steps });
+      const evalData = await callWizardAPI({ action: "agent_evaluate" });
       const evalStep = {
-        name: "Evaluation (Report)",
+        name: "Evaluation Engine",
         success: evalData.success,
         overallScore: evalData.evaluation?.overallScore,
         issueCount: evalData.evaluation?.issues?.length || 0,
@@ -273,15 +318,34 @@ export default function GamificationWizardSection() {
       steps.push(evalStep);
       if (evalData.success && evalData.evaluation) {
         setEvaluation(evalData.evaluation);
-        toast.success(`Step 3/3: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} recommendations`);
+        toast.success(`Step 3/4: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} issues`);
       } else {
-        toast.error(`Step 3/3: Evaluation failed — ${evalData.error || "unknown error"}`);
+        toast.error(`Step 3/4: Evaluation failed — ${evalData.error || "unknown error"}`);
       }
 
-      setFullSetupProgress({ step: 4, label: "Complete!", steps });
+      // Step 4: Auto-fix (local engine, no AI)
+      setFullSetupProgress({ step: 4, label: "Auto-fixing issues...", steps });
+      const fixData = await callWizardAPI({ action: "auto_fix" });
+      const fixStep = {
+        name: "Auto-Fix Engine",
+        success: fixData.success,
+        summary: `${fixData.fixes?.totalFixes || 0} fixes applied`,
+      };
+      steps.push(fixStep);
+      if (fixData.success) {
+        toast.success(`Step 4/4: ${fixData.fixes?.totalFixes || 0} fixes applied`);
+      }
+
+      // Final re-evaluation to show updated scores
+      const finalEval = await callWizardAPI({ action: "agent_evaluate" });
+      if (finalEval.success && finalEval.evaluation) {
+        setEvaluation(finalEval.evaluation);
+      }
+
+      setFullSetupProgress({ step: 5, label: "Complete!", steps });
       loadStatus();
       setCurrentStep("evaluate");
-      toast.success("Full setup complete! All 3 agents finished.");
+      toast.success("Full setup complete! All 4 steps finished.");
     } catch (err) {
       toast.error("Full setup error — check your connection");
     }
@@ -346,7 +410,7 @@ export default function GamificationWizardSection() {
     }
   };
 
-  const isStepLoading = (step: string) => stepLoading === step || stepLoading === "full" || stepLoading === "apply";
+  const isStepLoading = (step: string) => stepLoading === step || stepLoading === "full" || stepLoading === "apply" || stepLoading === "autofix";
 
   // ─── Render: Overview Step ──────────────────────────────────────────────────
 
@@ -498,7 +562,7 @@ export default function GamificationWizardSection() {
                   <Wand2 className="h-5 w-5 text-purple-400" /> One-Click Full Setup
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Runs 3 agents: Fix badges → Fix milestones → Evaluate system (report-only). Badges and milestones are auto-fixed; evaluation only scores and recommends.
+                  Runs 4 steps: AI Badge Agent → AI Milestone Agent → Evaluate (instant) → Auto-Fix (instant). AI generates/audits, then the local engine evaluates and applies targeted fixes — no timeouts.
                 </p>
               </div>
               <Button
@@ -519,15 +583,15 @@ export default function GamificationWizardSection() {
               <div className="space-y-3 pt-2 border-t border-purple-700/30">
                 {/* Progress bar */}
                 <div className="flex items-center gap-3">
-                  <Progress value={(fullSetupProgress.step / 4) * 100} className="h-2 bg-gray-700 flex-1" />
+                  <Progress value={(fullSetupProgress.step / 5) * 100} className="h-2 bg-gray-700 flex-1" />
                   <span className="text-xs text-purple-300 whitespace-nowrap">
-                    {fullSetupProgress.step <= 3 ? `${fullSetupProgress.step}/3` : "Done"}
+                    {fullSetupProgress.step <= 4 ? `${fullSetupProgress.step}/4` : "Done"}
                   </span>
                 </div>
 
                 {/* Current step label */}
                 <div className="flex items-center gap-2 text-sm">
-                  {fullSetupProgress.step <= 3 ? (
+                  {fullSetupProgress.step <= 4 ? (
                     <Loader2 className="h-4 w-4 text-purple-400 animate-spin" />
                   ) : (
                     <CheckCircle className="h-4 w-4 text-green-400" />
@@ -829,7 +893,10 @@ export default function GamificationWizardSection() {
 
   // ─── Render: Milestones Step ────────────────────────────────────────────────
 
-  const renderMilestones = () => (
+  const renderMilestones = () => {
+    if (!status) return <div className="text-gray-400 text-center py-8">Loading system status...</div>;
+
+    return (
     <div className="space-y-6">
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
@@ -850,7 +917,7 @@ export default function GamificationWizardSection() {
                 </SelectTrigger>
                 <SelectContent className="bg-gray-900 border-gray-700">
                   <SelectItem value="all">All Maps</SelectItem>
-                  {status?.maps.list.map((m) => (
+                  {status?.maps?.list?.map((m) => (
                     <SelectItem key={m.mapId} value={m.mapId}>
                       {m.name} (#{m.sequenceOrder})
                     </SelectItem>
@@ -986,6 +1053,7 @@ export default function GamificationWizardSection() {
       </Dialog>
     </div>
   );
+  };
 
   // ─── Render: Evaluate Step ──────────────────────────────────────────────────
 
@@ -994,11 +1062,12 @@ export default function GamificationWizardSection() {
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Shield className="h-5 w-5 text-green-400" /> Evaluation Agent
+            <Shield className="h-5 w-5 text-green-400" /> Evaluation Engine
+            <Badge variant="outline" className="border-green-600 text-green-400 text-[10px] ml-2">INSTANT</Badge>
           </CardTitle>
           <CardDescription className="text-gray-400">
-            The Evaluation Agent scores the entire gamification system for coherence, balance, and fun.
-            It is <strong className="text-white">report-only</strong> — it identifies issues and recommends which specialist agent (Badge Agent or Milestone Agent) should fix them. Use those agents to apply fixes safely.
+            Local rule-based engine — <strong className="text-white">no AI, no timeouts</strong>. Scores 10 criteria (progression, difficulty, zero-baseline, level gating, etc.) using deterministic rules.
+            Auto-Fix applies targeted corrections: sets minLevel, minTrades, minCompletedCompetitions, and removes invalid badge references.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex gap-4">
@@ -1011,6 +1080,17 @@ export default function GamificationWizardSection() {
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Evaluating...</>
             ) : (
               <><BarChart3 className="h-4 w-4 mr-2" /> Run Evaluation</>
+            )}
+          </Button>
+          <Button
+            onClick={() => runAutoFix()}
+            disabled={isStepLoading("autofix") || isStepLoading("evaluate")}
+            className="bg-orange-600 hover:bg-orange-500 text-white"
+          >
+            {isStepLoading("autofix") ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Fixing...</>
+            ) : (
+              <><Wrench className="h-4 w-4 mr-2" /> Auto-Fix All Issues</>
             )}
           </Button>
         </CardContent>
@@ -1082,12 +1162,31 @@ export default function GamificationWizardSection() {
           {evaluation.issues?.length > 0 && (
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-white text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-400" /> Recommendations ({evaluation.issues.length})
-                </CardTitle>
-                <CardDescription className="text-gray-500 text-xs">
-                  These are recommendations only. Use the Badge Agent (Step 3) or Milestone Agent (Step 4) to apply fixes.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-400" /> Issues ({evaluation.issues.length})
+                      {evaluation.issues.filter((i: any) => i.autoFixable).length > 0 && (
+                        <Badge variant="outline" className="border-orange-500 text-orange-400 text-[10px] ml-1">
+                          {evaluation.issues.filter((i: any) => i.autoFixable).length} auto-fixable
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="text-gray-500 text-xs mt-1">
+                      Auto-fixable issues are resolved by the &quot;Auto-Fix All Issues&quot; button above.
+                    </CardDescription>
+                  </div>
+                  {evaluation.issues.filter((i: any) => i.autoFixable).length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={() => runAutoFix()}
+                      disabled={isStepLoading("autofix")}
+                      className="bg-orange-600 hover:bg-orange-500 text-white"
+                    >
+                      {isStepLoading("autofix") ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Wrench className="h-3 w-3 mr-1" /> Fix {evaluation.issues.filter((i: any) => i.autoFixable).length} Issues</>}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1103,14 +1202,21 @@ export default function GamificationWizardSection() {
                           </Badge>
                           {(issue as any).targetAgent && (
                             <Badge variant="outline" className="border-cyan-600 text-cyan-400 text-[10px]">
-                              {(issue as any).targetAgent === "badge_agent" ? "Badge Agent" : "Milestone Agent"}
+                              {(issue as any).targetAgent === "badge_agent" ? "Badge Agent"
+                                : (issue as any).targetAgent === "milestone_agent" ? "Milestone Agent"
+                                : "Manual"}
+                            </Badge>
+                          )}
+                          {(issue as any).autoFixable && (
+                            <Badge variant="outline" className="border-orange-500 text-orange-400 text-[10px]">
+                              auto-fixable
                             </Badge>
                           )}
                         </div>
                       </div>
                       <p className="text-sm text-gray-300 mt-1">{issue.description}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        <span className="text-gray-400">Recommendation:</span> {issue.recommendation}
+                        <span className="text-gray-400">Fix:</span> {issue.recommendation}
                       </p>
                     </div>
                   ))}
@@ -1177,11 +1283,28 @@ export default function GamificationWizardSection() {
 
       {/* Step Content */}
       <div className="min-h-[400px]">
-        {currentStep === "overview" && renderOverview()}
-        {currentStep === "levels" && renderLevels()}
-        {currentStep === "badges" && renderBadges()}
-        {currentStep === "milestones" && renderMilestones()}
-        {currentStep === "evaluate" && renderEvaluate()}
+        {(() => {
+          try {
+            if (currentStep === "overview") return renderOverview();
+            if (currentStep === "levels") return renderLevels();
+            if (currentStep === "badges") return renderBadges();
+            if (currentStep === "milestones") return renderMilestones();
+            if (currentStep === "evaluate") return renderEvaluate();
+            return null;
+          } catch (err) {
+            console.error("[GamificationWizard] Render error on step:", currentStep, err);
+            return (
+              <div className="text-center py-12 space-y-4">
+                <AlertCircle className="h-10 w-10 text-red-400 mx-auto" />
+                <p className="text-red-400 font-medium">Something went wrong rendering this step</p>
+                <p className="text-gray-500 text-sm">{err instanceof Error ? err.message : "Unknown error"}</p>
+                <Button variant="outline" onClick={() => { setCurrentStep("overview"); loadStatus(); }} className="border-gray-600 text-gray-400">
+                  <RefreshCw className="h-4 w-4 mr-2" /> Reset to Overview
+                </Button>
+              </div>
+            );
+          }
+        })()}
       </div>
 
       {/* Step Navigation Footer */}
