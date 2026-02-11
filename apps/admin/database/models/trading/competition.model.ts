@@ -23,6 +23,7 @@ export interface ICompetition extends Document {
     | "draft"
     | "upcoming"
     | "active"
+    | "finalizing"
     | "completed"
     | "cancelled"
     | "emergency_ended";
@@ -235,6 +236,7 @@ const CompetitionSchema = new Schema<ICompetition>(
         "draft",
         "upcoming",
         "active",
+        "finalizing",
         "completed",
         "cancelled",
         "emergency_ended",

@@ -43,27 +43,37 @@ export async function finalizeCompetition(competitionId: string) {
 }
 
 async function _finalizeCompetitionAttempt(competitionId: string) {
+  await connectToDatabase();
+
+  // OPTIMISTIC LOCK: Atomically claim this competition for finalization.
+  // Only one caller can change "active" → "finalizing". All others get null and exit.
+  const lockResult = await Competition.findOneAndUpdate(
+    { _id: competitionId, status: "active" },
+    { $set: { status: "finalizing" } },
+    { new: true },
+  );
+
+  if (!lockResult) {
+    const existing = await Competition.findById(competitionId).select("status").lean() as { status?: string } | null;
+    console.log(
+      `⚠️ Competition ${competitionId} is not active (status: ${existing?.status ?? "not found"}), skipping`,
+    );
+    return { success: false, message: "Competition is not active" };
+  }
+
+  console.log(`🏁 Starting competition finalization for: ${competitionId}`);
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    await connectToDatabase();
-
-    console.log(`🏁 Starting competition finalization for: ${competitionId}`);
-
-    // Get competition
+    // Get competition within transaction
     const competition =
       await Competition.findById(competitionId).session(session);
     if (!competition) {
-      throw new Error("Competition not found");
-    }
-
-    if (competition.status !== "active") {
-      console.log(
-        `⚠️ Competition ${competitionId} is not active (status: ${competition.status}), skipping`,
-      );
       await session.abortTransaction();
-      return { success: false, message: "Competition is not active" };
+      await Competition.updateOne({ _id: competitionId, status: "finalizing" }, { $set: { status: "active" } });
+      throw new Error("Competition not found");
     }
 
     // STEP 1: Close all open positions AND calculate P&L in memory
@@ -1498,6 +1508,15 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // Only abort if session is still in transaction
     if (session.inTransaction()) {
       await session.abortTransaction();
+    }
+    // Release the optimistic lock so another attempt can try
+    try {
+      await Competition.updateOne(
+        { _id: competitionId, status: "finalizing" },
+        { $set: { status: "active" } },
+      );
+    } catch {
+      // Best effort
     }
     console.error("❌ Error finalizing competition:", error);
     throw error;

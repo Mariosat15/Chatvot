@@ -45,6 +45,17 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
     const challengesCollection = db.collection("challenges");
     const walletsCollection = db.collection("creditwallets");
 
+    // Recovery: Reset challenges stuck in "finalizing" for more than 5 minutes
+    // This handles cases where a process crashed mid-finalization
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const stuckReset = await challengesCollection.updateMany(
+      { status: "finalizing", updatedAt: { $lt: fiveMinutesAgo } },
+      { $set: { status: "active" } },
+    );
+    if (stuckReset.modifiedCount > 0) {
+      console.log(`🔧 [RECOVERY] Reset ${stuckReset.modifiedCount} stuck "finalizing" challenge(s) back to "active"`);
+    }
+
     // Early exit: skip all work if no pending or active challenges exist
     const relevantCount = await challengesCollection.countDocuments({
       status: { $in: ["pending", "active"] },

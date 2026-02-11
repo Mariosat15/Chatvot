@@ -35,6 +35,7 @@ export interface IChallenge extends Document {
     | "declined"
     | "expired"
     | "active"
+    | "finalizing"
     | "completed"
     | "cancelled";
   acceptedAt?: Date;
@@ -216,6 +217,7 @@ const ChallengeSchema = new Schema<IChallenge>(
         "declined",
         "expired",
         "active",
+        "finalizing",
         "completed",
         "cancelled",
       ],

@@ -38,6 +38,16 @@ export async function runCompetitionEndCheck(): Promise<CompetitionEndResult> {
 
     const competitionsCollection = db.collection("competitions");
 
+    // Recovery: Reset competitions stuck in "finalizing" for more than 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const stuckReset = await competitionsCollection.updateMany(
+      { status: "finalizing", updatedAt: { $lt: fiveMinutesAgo } },
+      { $set: { status: "active" } },
+    );
+    if (stuckReset.modifiedCount > 0) {
+      console.log(`🔧 [RECOVERY] Reset ${stuckReset.modifiedCount} stuck "finalizing" competition(s) back to "active"`);
+    }
+
     // Early exit: skip all work if no active competitions exist
     const activeCount = await competitionsCollection.countDocuments({ status: "active" });
     if (activeCount === 0) {

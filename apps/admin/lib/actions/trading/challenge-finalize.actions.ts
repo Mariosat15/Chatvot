@@ -47,23 +47,46 @@ export async function finalizeChallenge(challengeId: string) {
 }
 
 async function _finalizeChallengeAttempt(challengeId: string) {
+  await connectToDatabase();
+
+  // OPTIMISTIC LOCK: Atomically claim this challenge for finalization.
+  // Only one caller can change "active" → "finalizing". All others get null and exit.
+  const lockResult = await Challenge.findOneAndUpdate(
+    {
+      _id: challengeId,
+      status: "active",
+      $or: [
+        { endTime: { $exists: false } },
+        { endTime: null },
+        { endTime: { $lte: new Date() } },
+      ],
+    },
+    { $set: { status: "finalizing" } },
+    { new: true },
+  );
+
+  if (!lockResult) {
+    console.log(`Challenge ${challengeId} not active (already claimed or completed), skipping`);
+    return null;
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    await connectToDatabase();
-
     const challenge = await Challenge.findById(challengeId).session(session);
-    if (!challenge || challenge.status !== "active") {
-      console.log(`Challenge ${challengeId} not active, skipping`);
+    if (!challenge) {
+      console.log(`Challenge ${challengeId} not found, skipping`);
       await session.abortTransaction();
+      await Challenge.updateOne({ _id: challengeId, status: "finalizing" }, { $set: { status: "active" } });
       return null;
     }
 
-    // Check if challenge has ended
+    // Check if challenge has ended (safety net)
     if (challenge.endTime && new Date() < challenge.endTime) {
       console.log(`Challenge ${challengeId} hasn't ended yet`);
       await session.abortTransaction();
+      await Challenge.updateOne({ _id: challengeId, status: "finalizing" }, { $set: { status: "active" } });
       return null;
     }
 
@@ -904,6 +927,15 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     // Only abort if session is still in transaction
     if (session.inTransaction()) {
       await session.abortTransaction();
+    }
+    // Release the optimistic lock so another attempt can try
+    try {
+      await Challenge.updateOne(
+        { _id: challengeId, status: "finalizing" },
+        { $set: { status: "active" } },
+      );
+    } catch {
+      // Best effort
     }
     console.error("Error finalizing challenge", challengeId, ":", error);
     throw error;
