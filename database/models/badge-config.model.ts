@@ -13,7 +13,10 @@ export interface IBadgeConfig extends Document {
     minValue?: number;
     maxValue?: number;
     comparison?: string;
+    minTrades?: number;
+    minCompletedCompetitions?: number;
   };
+  minLevel: number; // Badge visible but locked until user reaches this level (0 = no requirement)
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -70,6 +73,16 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       minValue: Number,
       maxValue: Number,
       comparison: String,
+      // These were previously missing -- badge-specific minimums were lost on seed
+      minTrades: Number,
+      minCompletedCompetitions: Number,
+    },
+    // Level-gated badge visibility: badge is visible but locked until user reaches this level
+    minLevel: {
+      type: Number,
+      default: 0, // 0 = no level requirement
+      min: 0,
+      max: 20,
     },
     isActive: {
       type: Boolean,

@@ -43,9 +43,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       milestoneQuery.whitelabelId = whitelabelId;
     }
 
-    const milestones = await JourneyMilestone.find(milestoneQuery)
+    const allMilestones = await JourneyMilestone.find(milestoneQuery)
       .sort({ orderInMap: 1 })
       .lean();
+
+    // Filter out expired seasonal milestones, but keep future/active ones
+    const now = new Date();
+    const milestones = allMilestones.filter((m: any) => {
+      if (!m.isSeasonal) return true; // Non-seasonal always shown
+      // Show if season hasn't ended yet (or no end date)
+      if (m.seasonEnd && now > new Date(m.seasonEnd)) return false;
+      return true;
+    });
 
     return NextResponse.json({
       success: true,

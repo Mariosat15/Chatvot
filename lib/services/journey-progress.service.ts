@@ -848,11 +848,30 @@ export async function checkAndUnlockMilestones(
     preloadedStats = await gatherUserStats(userId);
   }
 
+  // Pre-fetch user's earned badge IDs for badge-gated milestone checks
+  let userBadgeIds: Set<string> | null = null;
+  const hasBadgeGatedMilestones = allMilestones.some(
+    (m: any) => m.requiredBadgeIds && m.requiredBadgeIds.length > 0
+  );
+  if (hasBadgeGatedMilestones) {
+    const UserBadge = (await import("@/database/models/user-badge.model")).default;
+    const earnedBadges = await UserBadge.find({ userId }).select("badgeId").lean();
+    userBadgeIds = new Set(earnedBadges.map((b: any) => b.badgeId));
+  }
+
   // Check each milestone that is NOT yet unlocked
   for (const milestone of allMilestones) {
     // Skip if already unlocked or completed
     if (unlockedIds.has(milestone.id) || completedIds.has(milestone.id)) {
       continue;
+    }
+
+    // Skip seasonal milestones outside their active window
+    const ms = milestone as any;
+    if (ms.isSeasonal) {
+      const now = new Date();
+      if (ms.seasonStart && now < new Date(ms.seasonStart)) continue;
+      if (ms.seasonEnd && now > new Date(ms.seasonEnd)) continue;
     }
 
     // Check if this milestone can be unlocked
@@ -880,6 +899,14 @@ export async function checkAndUnlockMilestones(
     if (!canUnlock && milestone.nodeType === "start" && 
         (!milestone.connectedFrom || milestone.connectedFrom.length === 0)) {
       canUnlock = true;
+    }
+
+    // Badge-gated check: user must have earned ALL required badges
+    if (canUnlock && ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0 && userBadgeIds) {
+      const hasAllBadges = ms.requiredBadgeIds.every((bid: string) => userBadgeIds!.has(bid));
+      if (!hasAllBadges) {
+        canUnlock = false; // Missing required badges -- stay locked
+      }
     }
 
     // Unlock the milestone if conditions are met
@@ -1074,4 +1101,54 @@ export async function getJourneyStats(userId: string): Promise<{
     currentZone: progress.currentZone || "starting_dock",
     journeyDays,
   };
+}
+
+/**
+ * Calculate progress for all non-completed milestones
+ * Returns { milestoneId, currentValue, targetValue } for each milestone
+ * Used to show progress bars (e.g. "23/50 trades") in the UI
+ */
+export async function calculateMilestoneProgress(
+  userId: string,
+  mapId: string = "traders_journey"
+): Promise<Array<{ milestoneId: string; currentValue: number; targetValue: number }>> {
+  await connectToDatabase();
+
+  const progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
+  if (!progress) return [];
+
+  const completedIds = new Set(
+    (progress.completedMilestones || []).map((m: any) => m.milestoneId)
+  );
+
+  // Get milestones that are NOT completed
+  const allMilestones = await JourneyMilestone.find({ mapId, isActive: true })
+    .select("id completeCondition")
+    .lean();
+
+  const notCompleted = allMilestones.filter((m) => !completedIds.has(m.id));
+  if (notCompleted.length === 0) return [];
+
+  // Gather stats once
+  const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
+  const stats = await gatherUserStats(userId);
+
+  const results: Array<{ milestoneId: string; currentValue: number; targetValue: number }> = [];
+
+  for (const milestone of notCompleted) {
+    if (!milestone.completeCondition) continue;
+
+    const { currentValue } = await checkConditionMet(userId, milestone.completeCondition, stats);
+    const targetValue = (typeof milestone.completeCondition.value === "number" 
+      ? milestone.completeCondition.value 
+      : 1);
+
+    results.push({
+      milestoneId: milestone.id,
+      currentValue: currentValue ?? 0,
+      targetValue,
+    });
+  }
+
+  return results;
 }

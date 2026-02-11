@@ -117,6 +117,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return item;
     });
 
+    // Calculate per-milestone progress for progress bars in the UI
+    let milestoneProgressData: Array<{ milestoneId: string; currentValue: number; targetValue: number }> = [];
+    try {
+      const { calculateMilestoneProgress } = await import("@/lib/services/journey-progress.service");
+      milestoneProgressData = await calculateMilestoneProgress(userId, userProgress.mapId || "traders_journey");
+    } catch (err) {
+      // Non-critical -- fall back to empty progress
+      console.warn("Failed to calculate milestone progress:", err);
+    }
+
     return NextResponse.json({
       success: true,
       currentMapIndex: userProgress.currentMapIndex || currentMapIndex,
@@ -128,6 +138,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       currentMilestone: userProgress.currentMilestone || "",
       journeyStartedAt: userProgress.journeyStartedAt,
       lastProgressAt: userProgress.lastProgressAt,
+      milestoneProgress: milestoneProgressData,
     });
   } catch (error) {
     console.error("Error fetching user journey progress:", error);

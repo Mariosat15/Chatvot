@@ -27,6 +27,7 @@ interface BadgesDisplayProps {
     };
     categoryCount: Record<BadgeCategory, number>;
   };
+  userLevel?: number; // Current user level for showing level-gated info
 }
 
 const CATEGORIES: BadgeCategory[] = [
@@ -42,7 +43,15 @@ const CATEGORIES: BadgeCategory[] = [
   "Legendary",
 ];
 
-export default function BadgesDisplay({ badges, stats }: BadgesDisplayProps) {
+// Default minLevel per rarity (same as in badge-evaluation.service.ts)
+const RARITY_DEFAULT_MIN_LEVEL: Record<string, number> = {
+  common: 0,
+  rare: 0,
+  epic: 5,
+  legendary: 8,
+};
+
+export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDisplayProps) {
   const [selectedCategory, setSelectedCategory] = useState<
     BadgeCategory | "All"
   >("All");
@@ -252,11 +261,20 @@ export default function BadgesDisplay({ badges, stats }: BadgesDisplayProps) {
             }`}
           >
             {/* Locked Overlay */}
-            {!badge.earned && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/70 rounded-xl">
-                <Lock className="h-8 w-8 text-gray-500" />
-              </div>
-            )}
+            {!badge.earned && (() => {
+              const requiredLevel = badge.minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
+              const isLevelLocked = requiredLevel > 0 && userLevel < requiredLevel;
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70 rounded-xl gap-1">
+                  <Lock className={`h-8 w-8 ${isLevelLocked ? "text-purple-400" : "text-gray-500"}`} />
+                  {isLevelLocked && (
+                    <span className="text-[10px] font-bold text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-full">
+                      Lv.{requiredLevel} Required
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Badge Content */}
             <div className="flex flex-col items-center text-center space-y-2">

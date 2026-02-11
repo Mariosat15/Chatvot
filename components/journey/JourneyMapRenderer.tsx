@@ -41,6 +41,13 @@ export interface Milestone {
   isRequired: boolean;
   tooltipText?: string;
   celebrationText?: string;
+  // Seasonal milestone fields
+  isSeasonal?: boolean;
+  seasonStart?: string;
+  seasonEnd?: string;
+  seasonTag?: string;
+  // Badge-gated: required badges to unlock
+  requiredBadgeIds?: string[];
 }
 
 export interface Zone {
@@ -805,6 +812,46 @@ export default function JourneyMapRenderer({
                   whileTap={{ scale: 0.95 }}
                   className="relative"
                 >
+                  {/* Progress ring for non-completed milestones */}
+                  {status !== "completed" && (() => {
+                    const mp = milestoneProgress.find(p => p.milestoneId === milestone.id);
+                    if (!mp || mp.targetValue <= 0) return null;
+                    const pct = Math.min(100, Math.round((mp.currentValue / mp.targetValue) * 100));
+                    if (pct <= 0) return null;
+                    const r = (nodeSize / 2) + 3; // ring radius outside the node
+                    const circ = 2 * Math.PI * r;
+                    const dash = (pct / 100) * circ;
+                    return (
+                      <svg
+                        className="absolute pointer-events-none"
+                        width={r * 2 + 4}
+                        height={r * 2 + 4}
+                        style={{ top: -(r - nodeSize / 2 + 2), left: -(r - nodeSize / 2 + 2) }}
+                      >
+                        <circle
+                          cx={r + 2}
+                          cy={r + 2}
+                          r={r}
+                          fill="none"
+                          stroke="rgba(59,130,246,0.3)"
+                          strokeWidth={3}
+                        />
+                        <circle
+                          cx={r + 2}
+                          cy={r + 2}
+                          r={r}
+                          fill="none"
+                          stroke="#3B82F6"
+                          strokeWidth={3}
+                          strokeDasharray={`${dash} ${circ - dash}`}
+                          strokeDashoffset={circ * 0.25} // start from top
+                          strokeLinecap="round"
+                          style={{ transition: "stroke-dasharray 0.5s ease" }}
+                        />
+                      </svg>
+                    );
+                  })()}
+
                   {/* Content based on status */}
                   {status === "completed" ? (
                     // Completed: Show the actual icon image
@@ -864,6 +911,20 @@ export default function JourneyMapRenderer({
                   {milestone.rewards.badgeId && (status === "current" || status === "unlocked") && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center shadow-lg border border-purple-300">
                       <span className="text-[8px]">🏆</span>
+                    </div>
+                  )}
+
+                  {/* Seasonal indicator */}
+                  {milestone.isSeasonal && (
+                    <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-lg border border-amber-300" title={milestone.seasonTag || "Limited Time"}>
+                      <span className="text-[8px]">⏳</span>
+                    </div>
+                  )}
+
+                  {/* Badge-gated indicator */}
+                  {milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0 && status !== "completed" && (
+                    <div className="absolute -top-1 -left-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center shadow-lg border border-purple-400" title="Requires specific badges">
+                      <span className="text-[8px]">🏅</span>
                     </div>
                   )}
                 </motion.div>

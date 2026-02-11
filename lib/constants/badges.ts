@@ -22,10 +22,12 @@ export interface Badge {
     type: string;
     value?: number;
     comparison?: "gte" | "lte" | "eq";
-    // NEW: Minimum requirements to prevent zero-baseline badges
+    // Minimum requirements to prevent zero-baseline badges
     minTrades?: number;
     minCompletedCompetitions?: number;
   };
+  // Level-gated: badge visible but locked until user reaches this level (0 = no requirement)
+  minLevel?: number;
 }
 
 export const BADGES: Badge[] = [

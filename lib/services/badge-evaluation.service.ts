@@ -88,6 +88,10 @@ export interface UserStats {
   uniqueStrategiesUsed: number;
   consecutiveProfitableDays: number;
 
+  // SL/TP trigger counts (for "always_uses_sl"/"always_uses_tp" badge validation)
+  slTriggeredCount: number;
+  tpTriggeredCount: number;
+
   // Global rank
   globalRank: number;
   
@@ -140,12 +144,34 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
     const existingBadges = await UserBadge.find({ userId }).lean();
     const existingBadgeIds = new Set(existingBadges.map((b) => b.badgeId));
 
+    // 2b. Fetch user level for level-gated badge checks
+    let userCurrentLevel = 1;
+    try {
+      const UserLevel = (await import("@/database/models/user-level.model")).default;
+      const userLevelDoc = await UserLevel.findOne({ userId }).select("currentLevel").lean();
+      userCurrentLevel = (userLevelDoc as any)?.currentLevel || 1;
+    } catch { /* default to 1 */ }
+
+    // Default minLevel per rarity for badges that don't specify one
+    const RARITY_DEFAULT_MIN_LEVEL: Record<string, number> = {
+      common: 0,   // Always accessible
+      rare: 0,     // Always accessible, but harder conditions
+      epic: 5,     // Visible but locked until level 5
+      legendary: 8, // Visible but locked until level 8
+    };
+
     // 3. Evaluate each badge (filtered by category if specified)
     const newlyEarnedBadges: Badge[] = [];
 
     for (const badge of badges) {
       // Skip if already earned
       if (existingBadgeIds.has(badge.id)) continue;
+
+      // Level-gated check: badge requires minimum level to earn
+      const badgeMinLevel = (badge as any).minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
+      if (badgeMinLevel > 0 && userCurrentLevel < badgeMinLevel) {
+        continue; // User hasn't reached the required level yet
+      }
 
       // Check if badge condition is met
       const earned = await checkBadgeCondition(badge as Badge, stats);
@@ -220,19 +246,36 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
 }
 
 /**
+ * In-memory cache for gatherUserStats to avoid redundant DB queries within a 5-minute window.
+ * Key: userId, Value: { stats, expiresAt }
+ */
+const _statsCache = new Map<string, { stats: UserStats; expiresAt: number }>();
+const STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Gather comprehensive user statistics for badge evaluation
  * Exported for use by journey progress service
+ * PERF: Results cached for 5 minutes per user
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
+  // Check cache first
+  const cached = _statsCache.get(userId);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.stats;
+  }
+
   // PERF: Fetch independent data in parallel, with reduced limits and countDocuments for totals
-  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount] = await Promise.all([
+  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
     CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
     TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(2000).lean(),
-    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume").sort({ closedAt: -1 }).limit(2000).lean(),
+    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume closeReason").sort({ closedAt: -1 }).limit(2000).lean(),
     TradingPosition.countDocuments({ userId }),
     TradeHistory.countDocuments({ userId }),
     CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
     WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
+    // SL/TP trigger counts for badge evaluation
+    TradeHistory.countDocuments({ userId, closeReason: "stop_loss" }),
+    TradeHistory.countDocuments({ userId, closeReason: "take_profit" }),
   ]);
 
   // Get competition stats
@@ -614,7 +657,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     }
   }
 
-  return {
+  const stats: UserStats = {
     userId,
     competitionsEntered: participations.length,
     completedCompetitions,
@@ -667,6 +710,8 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     averagePositionSize,
     uniqueStrategiesUsed,
     consecutiveProfitableDays,
+    slTriggeredCount,
+    tpTriggeredCount,
     globalRank,
     // Additional milestone condition fields
     secondPlaceFinishes,
@@ -685,6 +730,19 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     messagesSent: 0, // Not implemented yet
     loginStreak: consecutiveDays, // Use consecutive trading days as proxy
   };
+
+  // Cache result for 5 minutes
+  _statsCache.set(userId, { stats, expiresAt: Date.now() + STATS_CACHE_TTL_MS });
+
+  // Evict old entries if cache grows too large (prevent memory leak)
+  if (_statsCache.size > 500) {
+    const now = Date.now();
+    for (const [key, val] of _statsCache) {
+      if (now >= val.expiresAt) _statsCache.delete(key);
+    }
+  }
+
+  return stats;
 }
 
 /**
@@ -792,9 +850,11 @@ export async function checkBadgeCondition(
         stats.liquidationCount === 0
       );
     case "always_uses_sl":
-      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50);
+      // Must always use SL + have sufficient trades + at least 3 SL actually triggered (proves they work)
+      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50) && stats.slTriggeredCount >= 3;
     case "always_uses_tp":
-      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50);
+      // Must always use TP + have sufficient trades + at least 3 TP actually triggered
+      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50) && stats.tpTriggeredCount >= 3;
 
     // Social badges
     case "first_deposit":

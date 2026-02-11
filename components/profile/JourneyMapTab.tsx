@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { JourneyMapRenderer, type Milestone, type MapConfig, type Zone, type MapSequenceInfo } from "@/components/journey";
+import { JourneyMapRenderer, type Milestone, type MapConfig, type Zone, type MapSequenceInfo, type MilestoneProgress } from "@/components/journey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -73,6 +73,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [progress, setProgress] = useState<JourneyProgress | null>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
+  const [milestoneProgressData, setMilestoneProgressData] = useState<MilestoneProgress[]>([]);
   const [showingOverview, setShowingOverview] = useState(true); // Track if showing overview
 
   // Fetch all maps in sequence
@@ -147,6 +148,10 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
           currentMapIndex: data.currentMapIndex || 1,
           mapsCompleted: data.mapsCompleted || 0,
         });
+        // Store milestone progress data for progress bars
+        if (data.milestoneProgress && Array.isArray(data.milestoneProgress)) {
+          setMilestoneProgressData(data.milestoneProgress);
+        }
         return data;
       }
       return null;
@@ -898,6 +903,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
               unlockedIds={unlockedIds}
               currentMilestone={progress?.currentMilestone}
               userLevel={userLevel}
+              milestoneProgress={milestoneProgressData}
               onMilestoneClick={handleMilestoneClick}
               sequenceInfo={sequenceInfo}
               onNavigateMap={handleNavigateMap}

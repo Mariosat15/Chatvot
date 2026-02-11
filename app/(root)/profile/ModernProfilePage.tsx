@@ -103,7 +103,7 @@ export default function ModernProfilePage({
             overviewContent={overviewContent}
             journeyContent={<JourneyMapTab userId={session.user.id} />}
             badgesContent={
-              <BadgesDisplay badges={badges} stats={badgeStats as any} />
+              <BadgesDisplay badges={badges} stats={badgeStats as any} userLevel={levelData?.currentLevel || 1} />
             }
             notificationsContent={<NotificationCenter />}
             arsenalContent={<TradingArsenalSection />}

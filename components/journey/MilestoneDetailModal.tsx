@@ -371,6 +371,36 @@ export default function MilestoneDetailModal({
                   </div>
                 </div>
 
+                {/* Badge requirements (for badge-gated milestones) */}
+                {milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0 && (
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 text-purple-400 mb-2">
+                      <Trophy className="h-4 w-4" />
+                      <span className="text-sm font-medium">Required Badges</span>
+                    </div>
+                    <p className="text-sm text-purple-200">
+                      Earn these badges to unlock: {milestone.requiredBadgeIds.join(", ")}
+                    </p>
+                  </div>
+                )}
+
+                {/* Seasonal info */}
+                {milestone.isSeasonal && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 text-amber-400 mb-2">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {milestone.seasonTag ? `Season: ${milestone.seasonTag.replace(/_/g, " ")}` : "Limited Time Event"}
+                      </span>
+                    </div>
+                    {milestone.seasonEnd && (
+                      <p className="text-sm text-amber-200">
+                        Available until {new Date(milestone.seasonEnd).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Locked info - show what's needed to unlock */}
                 {(status === "locked" || status === "level_locked") && (
                   <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 mb-4">
@@ -381,6 +411,8 @@ export default function MilestoneDetailModal({
                     <p className="text-sm text-slate-300">
                       {status === "level_locked" && milestone.unlockCondition?.value
                         ? `Reach Level ${milestone.unlockCondition.value} to unlock this milestone.`
+                        : milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0
+                        ? "Earn the required badges listed above to unlock this milestone."
                         : "Complete the previous milestones in your journey to unlock this one."
                       }
                     </p>

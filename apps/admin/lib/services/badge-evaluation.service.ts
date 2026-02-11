@@ -87,6 +87,10 @@ export interface UserStats {
   uniqueStrategiesUsed: number;
   consecutiveProfitableDays: number;
 
+  // SL/TP trigger counts
+  slTriggeredCount: number;
+  tpTriggeredCount: number;
+
   // Global rank
   globalRank: number;
   
@@ -148,12 +152,34 @@ export async function evaluateUserBadges(userId: string): Promise<{
       `🏅 [BADGE EVAL] User already has ${existingBadges.length} badges`,
     );
 
+    // 2b. Fetch user level for level-gated badge checks
+    let userCurrentLevel = 1;
+    try {
+      const UserLevel = (await import("@/database/models/user-level.model")).default;
+      const userLevelDoc = await UserLevel.findOne({ userId }).select("currentLevel").lean();
+      userCurrentLevel = (userLevelDoc as any)?.currentLevel || 1;
+    } catch { /* default to 1 */ }
+
+    // Default minLevel per rarity for badges that don't specify one
+    const RARITY_DEFAULT_MIN_LEVEL: Record<string, number> = {
+      common: 0,
+      rare: 0,
+      epic: 5,
+      legendary: 8,
+    };
+
     // 3. Evaluate each badge
     const newlyEarnedBadges: Badge[] = [];
 
     for (const badge of badges) {
       // Skip if already earned
       if (existingBadgeIds.has(badge.id)) continue;
+
+      // Level-gated check
+      const badgeMinLevel = (badge as any).minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
+      if (badgeMinLevel > 0 && userCurrentLevel < badgeMinLevel) {
+        continue;
+      }
 
       // Check if badge condition is met
       const earned = await checkBadgeCondition(badge as Badge, stats);
@@ -274,6 +300,10 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Get trading stats
   const allPositions = await TradingPosition.find({ userId }).lean();
   const closedTrades = await TradeHistory.find({ userId }).lean();
+
+  // SL/TP trigger counts
+  const slTriggeredCount = closedTrades.filter((t: any) => t.closeReason === "stop_loss").length;
+  const tpTriggeredCount = closedTrades.filter((t: any) => t.closeReason === "take_profit").length;
 
   const totalTrades = closedTrades.length;
   const winningTrades = closedTrades.filter(
@@ -709,6 +739,8 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     averagePositionSize,
     uniqueStrategiesUsed,
     consecutiveProfitableDays,
+    slTriggeredCount,
+    tpTriggeredCount,
     globalRank,
     // Additional milestone condition fields
     secondPlaceFinishes,
@@ -832,9 +864,11 @@ export async function checkBadgeCondition(
         stats.liquidationCount === 0
       );
     case "always_uses_sl":
-      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50);
+      // Must always use SL + have sufficient trades + at least 3 SL actually triggered (proves they work)
+      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50) && (stats.slTriggeredCount || 0) >= 3;
     case "always_uses_tp":
-      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50);
+      // Must always use TP + have sufficient trades + at least 3 TP actually triggered
+      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50) && (stats.tpTriggeredCount || 0) >= 3;
 
     // Social badges
     case "first_deposit":

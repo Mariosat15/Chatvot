@@ -26,7 +26,8 @@ export async function seedBadgeConfigs() {
           category: badge.category,
           icon: badge.icon,
           rarity: badge.rarity,
-          condition: badge.condition,
+          condition: badge.condition, // Now includes minTrades + minCompletedCompetitions
+          minLevel: badge.minLevel || 0,
           isActive: true,
         })),
       );
@@ -130,7 +131,7 @@ export async function getBadgesFromDB() {
     }
 
     // Convert to plain objects, removing MongoDB-specific fields
-    return badges.map((badge) => ({
+    return badges.map((badge: any) => ({
       id: badge.id,
       name: badge.name,
       description: badge.description,
@@ -138,6 +139,7 @@ export async function getBadgesFromDB() {
       icon: badge.icon,
       rarity: badge.rarity,
       condition: badge.condition,
+      minLevel: badge.minLevel || 0,
       isActive: badge.isActive,
     }));
   } catch (error) {

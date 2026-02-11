@@ -32,7 +32,7 @@ const UserLevelSchema = new Schema<IUserLevel>(
       type: Number,
       default: 1,
       min: 1,
-      max: 10,
+      max: 20, // Supports all 20 levels in TITLE_LEVELS
     },
     currentTitle: {
       type: String,
