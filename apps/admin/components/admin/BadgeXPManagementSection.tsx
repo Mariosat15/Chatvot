@@ -1204,10 +1204,10 @@ export default function BadgeXPManagementSection() {
                     <code className="bg-muted px-2 py-1 rounded">
                       {badge.id}
                     </code>
-                    {(badge.minLevel > 0 || badge.rarity === "epic" || badge.rarity === "legendary") && (
+                    {badge.minLevel > 0 && (
                       <Badge variant="outline" className="text-xs font-semibold text-amber-400 border-amber-500/50">
                         <Shield className="h-3 w-3 mr-1" />
-                        Lv.{badge.minLevel > 0 ? badge.minLevel : badge.rarity === "legendary" ? 8 : badge.rarity === "epic" ? 5 : 0}
+                        Lv.{badge.minLevel}
                       </Badge>
                     )}
                   </div>
@@ -1658,7 +1658,7 @@ export default function BadgeXPManagementSection() {
                     className="text-lg h-12"
                   />
                   <p className="text-sm text-muted-foreground">
-                    0 = uses rarity default (epic: Lv.5, legendary: Lv.8). Set 1-20 to override.
+                    Minimum player level required to earn this badge (0-20). Auto-fix distributes levels by rarity.
                   </p>
                 </div>
 

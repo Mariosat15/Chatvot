@@ -138,6 +138,7 @@ export async function getBadgesFromDB() {
       icon: badge.icon,
       rarity: badge.rarity,
       condition: badge.condition,
+      minLevel: badge.minLevel ?? 0,
       isActive: badge.isActive,
     }));
   } catch (error) {
