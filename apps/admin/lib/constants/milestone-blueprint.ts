@@ -36,6 +36,14 @@ export interface MilestoneBlueprint {
   xp: number;
   nodeType: "start" | "milestone" | "checkpoint" | "legendary";
   icon: string;
+  /** Badge IDs from lib/constants/badges.ts that must be earned before this milestone unlocks */
+  requiredBadgeIds?: string[];
+  /** Badge ID to award when this milestone is completed */
+  rewardBadgeId?: string;
+  /** If true, this milestone is seasonal/time-limited */
+  isSeasonal?: boolean;
+  /** Seasonal tag for grouping (e.g., "winter_2026", "spring_event") */
+  seasonTag?: string;
 }
 
 export const MAP_METADATA: Record<number, { mapId: string; name: string; theme: string; xpBudget: number }> = {
@@ -304,6 +312,7 @@ export const MAP_3_BLUEPRINT: MilestoneBlueprint[] = [
     icon: "shield",
   },
   // === FIRST COMPETITION ENTRY (must come BEFORE completion!) ===
+  // Badge-gated: must have proven trading commitment first
   {
     id: "first_tournament",
     name: "Tournament Entry",
@@ -312,6 +321,7 @@ export const MAP_3_BLUEPRINT: MilestoneBlueprint[] = [
     xp: 35,
     nodeType: "checkpoint",
     icon: "arena",
+    requiredBadgeIds: ["trade_25"], // Must have 25 trades badge before entering competitions
   },
   {
     id: "streak_four",
@@ -511,6 +521,7 @@ export const MAP_5_BLUEPRINT: MilestoneBlueprint[] = [
     icon: "pyramid",
   },
   // === FIRST PODIUM (after multiple completions) ===
+  // Badge-gated: must have competition experience + risk management skills
   {
     id: "first_podium",
     name: "First Podium",
@@ -519,6 +530,7 @@ export const MAP_5_BLUEPRINT: MilestoneBlueprint[] = [
     xp: 75,
     nodeType: "checkpoint",
     icon: "trophy",
+    requiredBadgeIds: ["comp_5_entries", "risk_survivor"], // Must have entered 5 comps + survived without liquidation
   },
   {
     id: "streak_seven",
@@ -698,6 +710,7 @@ export const MAP_7_BLUEPRINT: MilestoneBlueprint[] = [
     nodeType: "checkpoint",
     icon: "frost",
   },
+  // Badge-gated: must have proven podium ability + trading volume
   {
     id: "five_podiums",
     name: "Podium Master",
@@ -706,6 +719,7 @@ export const MAP_7_BLUEPRINT: MilestoneBlueprint[] = [
     xp: 85,
     nodeType: "milestone",
     icon: "medal",
+    requiredBadgeIds: ["comp_5_podiums", "trade_100"], // Must have 5 podiums badge + 100 trades badge
   },
   {
     id: "four_wins",
@@ -865,6 +879,7 @@ export const MAP_8_BLUEPRINT: MilestoneBlueprint[] = [
  * Focus: Elite status, massive stats, exceptional achievements
  */
 export const MAP_9_BLUEPRINT: MilestoneBlueprint[] = [
+  // Badge-gated: must have proven championship caliber
   {
     id: "celestial_entry",
     name: "Celestial Ascension",
@@ -873,6 +888,7 @@ export const MAP_9_BLUEPRINT: MilestoneBlueprint[] = [
     xp: 75,
     nodeType: "start",
     icon: "angel",
+    requiredBadgeIds: ["comp_10_wins", "trade_500"], // Must have 10 comp wins + 500 trades
   },
   {
     id: "five_hundred_trades",

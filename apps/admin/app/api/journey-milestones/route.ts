@@ -49,15 +49,125 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** Build a milestone document from raw data */
+function buildMilestoneDoc(data: any) {
+  return {
+    id: data.id,
+    mapId: data.mapId || "traders_journey",
+    name: data.name,
+    description: data.description || "",
+    shortDescription: data.shortDescription || "",
+    zoneId: data.zoneId,
+    position: data.position || { x: 0, y: 0 },
+    nodeType: data.nodeType || "milestone",
+    icon: data.icon || "target",
+    color: data.color || "#3B82F6",
+    size: data.size || "medium",
+    unlockCondition: data.unlockCondition,
+    completeCondition: data.completeCondition,
+    rewards: data.rewards || { xp: 10 },
+    connectedTo: data.connectedTo || [],
+    connectedFrom: data.connectedFrom || [],
+    isRequired: data.isRequired ?? true,
+    isAutoComplete: data.isAutoComplete ?? false,
+    order: data.order || 0,
+    tooltipText: data.tooltipText,
+    celebrationText: data.celebrationText,
+    isActive: data.isActive ?? true,
+    // Badge-gated milestone support
+    requiredBadgeIds: data.requiredBadgeIds || [],
+    // Seasonal milestone support
+    isSeasonal: data.isSeasonal || false,
+    seasonStart: data.seasonStart || undefined,
+    seasonEnd: data.seasonEnd || undefined,
+    seasonTag: data.seasonTag || undefined,
+  };
+}
+
 /**
  * POST /api/journey-milestones
- * Create a new milestone
+ * Create a new milestone or batch-create multiple milestones
+ * 
+ * Single: { id, name, zoneId, completeCondition, ... }
+ * Batch:  { batch: true, milestones: [...], mapId?: string }
  */
 export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
     const data = await request.json();
 
+    // === BATCH MODE: Save many milestones in one request ===
+    if (data.batch && Array.isArray(data.milestones)) {
+      const milestones = data.milestones;
+      const results: { saved: number; skipped: number; errors: string[] } = {
+        saved: 0,
+        skipped: 0,
+        errors: [],
+      };
+
+      // Get existing IDs in one query to avoid N+1
+      const incomingIds = milestones.map((m: any) => m.id).filter(Boolean);
+      const existingDocs = await JourneyMilestone.find(
+        { id: { $in: incomingIds } },
+        { id: 1 }
+      ).lean();
+      const existingIds = new Set(existingDocs.map((d: any) => d.id));
+
+      // Split into new and updates
+      const toInsert: any[] = [];
+      const toUpdate: any[] = [];
+
+      for (const m of milestones) {
+        if (!m.id || !m.name) {
+          results.errors.push(`Skipped milestone: missing id or name`);
+          results.skipped++;
+          continue;
+        }
+        const doc = buildMilestoneDoc(m);
+        if (existingIds.has(m.id)) {
+          toUpdate.push(doc);
+        } else {
+          toInsert.push(doc);
+        }
+      }
+
+      // Bulk insert new milestones
+      if (toInsert.length > 0) {
+        try {
+          await JourneyMilestone.insertMany(toInsert, { ordered: false });
+          results.saved += toInsert.length;
+        } catch (insertError: any) {
+          // Some may have succeeded in unordered insert
+          results.saved += insertError.insertedDocs?.length || 0;
+          results.errors.push(`Bulk insert error: ${insertError.message}`);
+        }
+      }
+
+      // Bulk update existing milestones
+      if (toUpdate.length > 0) {
+        const bulkOps = toUpdate.map((doc) => ({
+          updateOne: {
+            filter: { id: doc.id },
+            update: { $set: doc },
+          },
+        }));
+        try {
+          const bulkResult = await JourneyMilestone.bulkWrite(bulkOps);
+          results.saved += bulkResult.modifiedCount;
+        } catch (updateError: any) {
+          results.errors.push(`Bulk update error: ${updateError.message}`);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Batch complete: ${results.saved} saved, ${results.skipped} skipped`,
+        ...results,
+        total: milestones.length,
+      });
+    }
+
+    // === SINGLE MODE: Original behavior ===
     // Validate required fields
     if (!data.id || !data.name || !data.zoneId || !data.completeCondition) {
       return NextResponse.json(
@@ -75,30 +185,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const milestone = await JourneyMilestone.create({
-      id: data.id,
-      mapId: data.mapId || "traders_journey",
-      name: data.name,
-      description: data.description || "",
-      shortDescription: data.shortDescription || "",
-      zoneId: data.zoneId,
-      position: data.position || { x: 0, y: 0 },
-      nodeType: data.nodeType || "milestone",
-      icon: data.icon || "target",
-      color: data.color || "#3B82F6",
-      size: data.size || "medium",
-      unlockCondition: data.unlockCondition,
-      completeCondition: data.completeCondition,
-      rewards: data.rewards || { xp: 10 },
-      connectedTo: data.connectedTo || [],
-      connectedFrom: data.connectedFrom || [],
-      isRequired: data.isRequired ?? true,
-      isAutoComplete: data.isAutoComplete ?? false,
-      order: data.order || 0,
-      tooltipText: data.tooltipText,
-      celebrationText: data.celebrationText,
-      isActive: data.isActive ?? true,
-    });
+    const milestone = await JourneyMilestone.create(buildMilestoneDoc(data));
 
     return NextResponse.json({
       success: true,
@@ -137,7 +224,11 @@ export async function PUT(request: NextRequest) {
       "name", "description", "shortDescription", "zoneId", "position",
       "nodeType", "icon", "color", "size", "unlockCondition", "completeCondition",
       "rewards", "connectedTo", "connectedFrom", "isRequired", "isAutoComplete",
-      "order", "tooltipText", "celebrationText", "isActive"
+      "order", "tooltipText", "celebrationText", "isActive",
+      // Badge-gated milestone fields
+      "requiredBadgeIds",
+      // Seasonal milestone fields
+      "isSeasonal", "seasonStart", "seasonEnd", "seasonTag",
     ];
 
     for (const field of allowedFields) {

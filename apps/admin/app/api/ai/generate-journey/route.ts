@@ -134,6 +134,21 @@ THEME-SPECIFIC NAMING:
 - Celestial: Divine Ascension, Star Collector, Trading Titan
 - Legendary: Legend Entry, Immortal Streak, Trading God
 
+BADGE-GATED MILESTONES:
+Some milestones should require specific badges before unlocking, creating a web of dependencies.
+Use "requiredBadgeIds" (an array of badge IDs) to gate important milestones.
+Available badge IDs for gating (use sparingly -- 1-3 per map max):
+- Competition: comp_5_entries, comp_10_entries, comp_3_wins, comp_5_wins, comp_10_wins, comp_5_podiums, comp_10_podiums
+- Trading: trade_25, trade_50, trade_100, trade_500, trade_1000
+- Risk: risk_survivor, risk_stop_master, risk_tp_master, risk_disciplined
+- Profit: profit_5_wins, profit_25_wins, profit_50_wins
+
+BADGE REWARDS:
+Milestones can award badges on completion. Use "rewardBadgeId" (a single badge ID string) for key checkpoints.
+
+SEASONAL MILESTONES (optional):
+Set "isSeasonal": true and "seasonTag": "event_name" for time-limited milestones. Use 0-1 per map maximum.
+
 RESPONSE FORMAT: Return ONLY valid JSON with this structure:
 {
   "milestones": [
@@ -150,7 +165,10 @@ RESPONSE FORMAT: Return ONLY valid JSON with this structure:
       },
       "rewards": { "xp": number },
       "order": sequential_number,
-      "difficulty_score": calculated_difficulty
+      "difficulty_score": calculated_difficulty,
+      "requiredBadgeIds": ["badge_id"] (optional, for badge-gated milestones),
+      "isSeasonal": false (optional, true for time-limited milestones),
+      "seasonTag": "event_name" (optional, if isSeasonal is true)
     }
   ],
   "validation": {
@@ -422,28 +440,32 @@ Analyze and return JSON with:
           );
         }
 
-        // SMART: Fetch milestones from ALL previous maps to ensure progression
+        // SMART: Fetch milestones from ALL previous maps in ONE batch query
         const previousMapsProgress: { type: string; maxValue: number }[] = [];
         let cumulativeMaxValues: Record<string, number> = {};
         
-        for (let i = 1; i < mapOrder; i++) {
-          const prevMapId = MAP_SEQUENCE[i - 1]?.mapId;
-          if (prevMapId) {
-            const prevMilestones = await JourneyMilestone.find({ mapId: prevMapId, isActive: true })
-              .sort({ order: 1 })
-              .lean();
+        if (mapOrder > 1) {
+          const prevMapIds = MAP_SEQUENCE
+            .slice(0, mapOrder - 1)
+            .map((m) => m.mapId);
+          
+          // Single batch query instead of N sequential queries
+          const allPrevMilestones = await JourneyMilestone.find(
+            { mapId: { $in: prevMapIds }, isActive: true }
+          )
+            .select("completeCondition")
+            .lean();
+          
+          allPrevMilestones.forEach((m: any) => {
+            const condType = m.completeCondition?.type;
+            const condValue = m.completeCondition?.value;
             
-            prevMilestones.forEach((m: any) => {
-              const condType = m.completeCondition?.type;
-              const condValue = m.completeCondition?.value;
-              
-              if (condType && typeof condValue === 'number') {
-                if (!cumulativeMaxValues[condType] || condValue > cumulativeMaxValues[condType]) {
-                  cumulativeMaxValues[condType] = condValue;
-                }
+            if (condType && typeof condValue === 'number') {
+              if (!cumulativeMaxValues[condType] || condValue > cumulativeMaxValues[condType]) {
+                cumulativeMaxValues[condType] = condValue;
               }
-            });
-          }
+            }
+          });
         }
         
         // Convert to array for the prompt
@@ -485,7 +507,7 @@ Generate exactly ${targetMilestoneCount} milestones.`;
         const response = completion.choices[0]?.message?.content || "";
         const parsed = JSON.parse(response);
 
-        // Enhance milestones with proper structure
+        // Enhance milestones with proper structure (including badge-gating + seasonal from AI)
         const enhancedMilestones = parsed.milestones.map(
           (m: any, index: number) => ({
             ...m,
@@ -504,27 +526,51 @@ Generate exactly ${targetMilestoneCount} milestones.`;
             difficulty_score: m.completeCondition
               ? calculateDifficultyScore(m.completeCondition)
               : 0,
+            // Preserve AI-generated badge-gating and seasonal fields
+            requiredBadgeIds: Array.isArray(m.requiredBadgeIds) ? m.requiredBadgeIds : [],
+            isSeasonal: m.isSeasonal || false,
+            seasonTag: m.seasonTag || undefined,
           })
         );
 
-        // Optionally save to database
+        // Optionally save to database using batch operations
         let savedCount = 0;
         if (saveToDB) {
+          // Get existing milestone IDs in one query
+          const incomingIds = enhancedMilestones.map((m: any) => m.id);
+          const existingDocs = await JourneyMilestone.find(
+            { id: { $in: incomingIds } },
+            { id: 1 }
+          ).lean();
+          const existingIds = new Set(existingDocs.map((d: any) => d.id));
+
+          const toInsert: any[] = [];
+          const bulkOps: any[] = [];
+
           for (const milestone of enhancedMilestones) {
-            try {
-              // Check if milestone exists
-              const existing = await JourneyMilestone.findOne({ id: milestone.id });
-              if (existing) {
-                // Update existing
-                await JourneyMilestone.updateOne({ id: milestone.id }, { $set: milestone });
-              } else {
-                // Create new
-                await JourneyMilestone.create(milestone);
-              }
-              savedCount++;
-            } catch (saveError) {
-              console.error(`Failed to save milestone ${milestone.id}:`, saveError);
+            if (existingIds.has(milestone.id)) {
+              bulkOps.push({
+                updateOne: {
+                  filter: { id: milestone.id },
+                  update: { $set: milestone },
+                },
+              });
+            } else {
+              toInsert.push(milestone);
             }
+          }
+
+          try {
+            if (toInsert.length > 0) {
+              await JourneyMilestone.insertMany(toInsert, { ordered: false });
+              savedCount += toInsert.length;
+            }
+            if (bulkOps.length > 0) {
+              const result = await JourneyMilestone.bulkWrite(bulkOps);
+              savedCount += result.modifiedCount;
+            }
+          } catch (saveError) {
+            console.error(`Failed to batch save milestones:`, saveError);
           }
           
           // Update or create map config
@@ -641,7 +687,7 @@ Create ${mapConfig.milestoneCount} ${mapConfig.theme}-themed milestones.
             }
           });
 
-          // Enhance milestones
+          // Enhance milestones (including badge-gating + seasonal from AI)
           const enhancedMilestones = parsed.milestones?.map(
             (m: any, index: number) => ({
               ...m,
@@ -657,6 +703,10 @@ Create ${mapConfig.milestoneCount} ${mapConfig.theme}-themed milestones.
               isAutoComplete: m.completeCondition?.type === "account_created",
               isActive: true,
               zoneId: getZoneForOrderInMap(index + 1, mapConfig.zones),
+              // Preserve AI-generated badge-gating and seasonal fields
+              requiredBadgeIds: Array.isArray(m.requiredBadgeIds) ? m.requiredBadgeIds : [],
+              isSeasonal: m.isSeasonal || false,
+              seasonTag: m.seasonTag || undefined,
             })
           ) || [];
 

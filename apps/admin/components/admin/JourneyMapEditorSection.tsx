@@ -601,7 +601,7 @@ export default function JourneyMapEditorSection() {
 
     console.log(`[Blueprint Gen] Generating Map ${mapIndex}: ${metadata.name} with ${blueprint.length} milestones (requested: ${targetCount})`);
 
-    // Convert blueprint to milestones
+    // Convert blueprint to milestones (with badge-gating and seasonal support)
     const milestones = blueprint.map((bp, index) => {
       const progress = index / blueprint.length;
       const row = Math.floor(index / 4);
@@ -627,7 +627,9 @@ export default function JourneyMapEditorSection() {
           ? { type: "milestone_complete", milestoneId: `${metadata.mapId}_${blueprint[index - 1].id}` }
           : undefined,
         completeCondition: bp.condition,
-        rewards: { xp: bp.xp },
+        rewards: bp.rewardBadgeId 
+          ? { xp: bp.xp, badgeId: bp.rewardBadgeId } 
+          : { xp: bp.xp },
         connectedTo: index < blueprint.length - 1 ? [`${metadata.mapId}_${blueprint[index + 1].id}`] : [],
         connectedFrom: index > 0 ? [`${metadata.mapId}_${blueprint[index - 1].id}`] : [],
         isRequired: true,
@@ -635,6 +637,11 @@ export default function JourneyMapEditorSection() {
         order: index + 1,
         orderInMap: index + 1,
         isActive: true,
+        // Badge-gated milestone support (from blueprint)
+        requiredBadgeIds: bp.requiredBadgeIds || [],
+        // Seasonal milestone support (from blueprint)
+        isSeasonal: bp.isSeasonal || false,
+        seasonTag: bp.seasonTag || undefined,
       };
     });
     
@@ -646,19 +653,22 @@ export default function JourneyMapEditorSection() {
       console.log(`  ${i + 1}. ${m.name}: ${m.completeCondition.type} ${m.completeCondition.value || ''} (+${m.rewards.xp} XP)`);
     });
 
-    // Save to database if requested
+    // Save to database if requested (using batch endpoint instead of N+1 POSTs)
     if (saveToDB) {
       try {
         // Delete existing milestones for this map
         await fetch(`/api/journey-milestones?all=true&mapId=${metadata.mapId}`, { method: "DELETE" });
 
-        // Save new milestones
-        for (const milestone of milestones) {
-          await fetch("/api/journey-milestones", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(milestone),
-          });
+        // Batch save all milestones in ONE request
+        const batchResponse = await fetch("/api/journey-milestones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch: true, milestones }),
+        });
+
+        if (!batchResponse.ok) {
+          const errorData = await batchResponse.json().catch(() => ({}));
+          console.error("Batch save failed:", errorData);
         }
 
         // Create/update map config
