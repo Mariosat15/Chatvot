@@ -96,17 +96,24 @@ const dbTools = {
 
         const existing = await BadgeConfig.findOne({ id: clean.id });
 
-        // condition.type is only required for NEW badges — existing badges
-        // may store conditions differently and we preserve them via merge
+        // For NEW badges: if condition.type is missing, infer from category
         if (!existing && !clean.condition?.type) {
-          console.warn(`[Wizard] Skipping NEW badge ${clean.id}: missing condition.type`);
-          results.skipped++;
-          continue;
+          const CATEGORY_DEFAULT_TYPE: Record<string, string> = {
+            Competition: "competitions_entered",
+            Trading: "total_trades",
+            Profit: "total_pnl",
+            Risk: "no_liquidations",
+            Speed: "quick_scalps",
+            Consistency: "consecutive_trading_days",
+            Strategy: "unique_pairs_traded",
+            Social: "referrals_made",
+            Legendary: "level_reached",
+          };
+          const inferredType = CATEGORY_DEFAULT_TYPE[clean.category || ""] || "total_trades";
+          if (!clean.condition) clean.condition = {};
+          clean.condition.type = inferredType;
+          console.log(`[Wizard] Inferred condition.type='${inferredType}' for NEW badge ${clean.id} (category=${clean.category})`);
         }
-
-        // #region agent log
-        console.log(`[DEBUG-WIZARD] writeBadge id=${clean.id} minLevel=${minLevel} condMinTrades=${clean.condition?.minTrades} existing=${!!existing} existingMinLevel=${existing?.minLevel} existingCondMinTrades=${(existing as any)?.condition?.minTrades}`);
-        // #endregion
 
         if (existing) {
           // ── Surgical update: use $set to only update provided fields ──
@@ -132,11 +139,6 @@ const dbTools = {
             { id: clean.id },
             { $set: updateDoc },
           );
-
-          // #region agent log
-          const afterWrite = await BadgeConfig.findOne({ id: clean.id }).lean();
-          console.log(`[DEBUG-WIZARD] afterWrite id=${clean.id} minLevel=${(afterWrite as any)?.minLevel} condMinTrades=${(afterWrite as any)?.condition?.minTrades} condMinComps=${(afterWrite as any)?.condition?.minCompletedCompetitions} preserved=${(afterWrite as any)?.minLevel===minLevel}`);
-          // #endregion
 
           results.updated++;
         } else {
@@ -241,6 +243,21 @@ RULES:
 2. minLevel gates: common=0-1, rare=2-4, epic=5-10, legendary=8-15.
 3. Rarity matches difficulty: common=easy(week), rare=moderate(month), epic=hard(2-3mo), legendary=extreme(6mo+).
 4. Common:5-25trades, Rare:25-100trades, Epic:100-500trades, Legendary:500+trades.
+
+REQUIRED SCHEMA for each badge (especially NEW badges):
+{
+  "id": "snake_case_id", "name": "Display Name", "description": "...",
+  "category": "Trading", "rarity": "common|rare|epic|legendary", "icon": "emoji",
+  "minLevel": 0-18,
+  "condition": {
+    "type": "<MUST be one of: total_trades, winning_trades, win_rate, win_streak, max_win_streak, total_pnl, profit_factor, competitions_entered, competitions_completed, first_place_finishes, podium_finishes, top_10_finishes, consecutive_trading_days, unique_pairs_traded, no_liquidations, always_uses_sl, referrals_made, level_reached, xp_threshold, total_badges, platform_age, active_days, quick_scalps, net_profit_lifetime>",
+    "value": <threshold number>,
+    "minTrades": <required for Trading/Profit/Risk/Speed/Consistency/Strategy badges>,
+    "minCompletedCompetitions": <required for Competition badges>
+  }
+}
+
+CRITICAL: Every badge MUST have condition.type set to a valid value from the list above.
 
 Return ONLY valid JSON. No markdown, no explanation.`;
 
@@ -542,20 +559,11 @@ Return JSON:
         dbTools.readAllMaps(),
       ]);
 
-      // #region agent log
-      const evalStart = Date.now();
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:eval',message:'agent_evaluate start',data:{badges:badges.length,milestones:milestones.length,maps:maps.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
-
       const evaluation = evaluateSystem(
         badges as unknown as BadgeData[],
         milestones as unknown as MilestoneData[],
         maps as unknown as MapData[],
       );
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:eval',message:'agent_evaluate done',data:{durationMs:Date.now()-evalStart,overallScore:evaluation.overallScore,issues:evaluation.issues.length,strengths:evaluation.strengths.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
 
       return NextResponse.json({
         success: true,
@@ -581,18 +589,8 @@ Return JSON:
         milestones as unknown as MilestoneData[],
       );
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gamification-wizard/route.ts:autofix',message:'auto_fix start',data:{badgeFixes:fixes.badgeFixes.length,milestoneFixes:fixes.milestoneFixes.length,totalFixes:fixes.totalFixes},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-
       // Apply badge fixes
       let badgeWriteResults = null;
-      // #region agent log
-      console.log(`[AUTO-FIX] Badge fixes generated: ${fixes.badgeFixes.length}, Milestone fixes: ${fixes.milestoneFixes.length}`);
-      if (fixes.badgeFixes.length > 0) {
-        console.log(`[AUTO-FIX] Sample badge fixes:`, JSON.stringify(fixes.badgeFixes.slice(0, 5).map(f => ({ id: f.id, field: f.field, old: f.oldValue, new: f.newValue }))));
-      }
-      // #endregion
 
       if (fixes.badgeFixes.length > 0) {
         // Group fixes by badge ID
@@ -608,10 +606,6 @@ Return JSON:
             fixesByBadge[fix.id][fix.field] = fix.newValue;
           }
         }
-
-        // #region agent log
-        console.log(`[AUTO-FIX] Grouped into ${Object.keys(fixesByBadge).length} badge updates`);
-        // #endregion
 
         // Apply with $set for surgical updates
         let applied = 0;
@@ -637,30 +631,15 @@ Return JSON:
             );
             if (result) {
               applied++;
-              // Log first 3 and last 1 for verification
-              if (applied <= 3 || badgeId === Object.keys(fixesByBadge).at(-1)) {
-                console.log(`[AUTO-FIX] Badge ${badgeId}: SET ${JSON.stringify(setDoc)} => minLevel=${result.minLevel} minTrades=${(result as any).condition?.minTrades}`);
-              }
             } else {
               notFound++;
-              console.warn(`[AUTO-FIX] Badge ${badgeId} NOT FOUND in DB`);
             }
           } catch (err: any) {
-            console.error(`[AUTO-FIX] Badge ${badgeId} ERROR: ${err?.message}`);
+            console.error(`[Wizard] auto_fix badge error for ${badgeId}:`, err);
             errors++;
           }
         }
         badgeWriteResults = { applied, errors, notFound, total: Object.keys(fixesByBadge).length };
-
-        // #region agent log
-        console.log(`[AUTO-FIX] Badge results: ${applied} applied, ${notFound} not found, ${errors} errors out of ${Object.keys(fixesByBadge).length}`);
-        // Verification: read a sample badge to confirm persistence
-        const sampleId = Object.keys(fixesByBadge)[0];
-        if (sampleId) {
-          const verify = await BadgeConfig.findOne({ id: sampleId }).lean();
-          console.log(`[AUTO-FIX] VERIFY badge ${sampleId}: minLevel=${(verify as any)?.minLevel} minTrades=${(verify as any)?.condition?.minTrades} minComps=${(verify as any)?.condition?.minCompletedCompetitions}`);
-        }
-        // #endregion
       }
 
       // Apply milestone fixes
@@ -671,9 +650,6 @@ Return JSON:
         let notFound = 0;
         for (const fix of fixes.milestoneFixes) {
           try {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix attempt',data:{id:fix.id,mapId:fix.mapId,field:fix.field,newValue:fix.newValue},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-            // #endregion
             const result = await JourneyMilestone.findOneAndUpdate(
               { id: fix.id, mapId: fix.mapId },
               { $set: { [fix.field]: fix.newValue } },
@@ -681,20 +657,11 @@ Return JSON:
             );
             if (result) {
               applied++;
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix OK',data:{id:fix.id,field:fix.field,resultBadgeIds:(result as any).requiredBadgeIds},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-              // #endregion
             } else {
               notFound++;
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone NOT FOUND',data:{id:fix.id,mapId:fix.mapId},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-              // #endregion
             }
           } catch (err: any) {
-            console.error(`[WIZARD] auto_fix milestone error for ${fix.id}:`, err);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:autofix-ms',message:'milestone fix ERROR',data:{id:fix.id,error:err?.message},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-            // #endregion
+            console.error(`[Wizard] auto_fix milestone error for ${fix.id}:`, err);
             errors++;
           }
         }
