@@ -832,72 +832,6 @@ For autoFixable issues, provide the exact fix payload.`;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ACTION: agent_full_setup — Run all agents in sequence
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_full_setup") {
-      const { generateBadgeCount = 5, autoApply = true } = body;
-
-      const steps: any[] = [];
-
-      // Step 1: Badge Agent
-      const badgesReq = new Request(request.url, {
-        method: "POST",
-        body: JSON.stringify({ action: "agent_badges", generateCount: generateBadgeCount, autoApply }),
-        headers: { "Content-Type": "application/json" },
-      });
-      const badgesRes = await POST(new NextRequest(badgesReq));
-      const badgesData = await badgesRes.json();
-      steps.push({
-        step: "badges",
-        success: badgesData.success,
-        summary: badgesData.summary,
-        fixedCount: badgesData.fixedCount,
-        newCount: badgesData.newCount,
-        applied: badgesData.applied,
-      });
-
-      // Step 2: Milestone Agent (audit all)
-      const msReq = new Request(request.url, {
-        method: "POST",
-        body: JSON.stringify({ action: "agent_milestones", autoApply }),
-        headers: { "Content-Type": "application/json" },
-      });
-      const msRes = await POST(new NextRequest(msReq));
-      const msData = await msRes.json();
-      steps.push({
-        step: "milestones",
-        success: msData.success,
-        summary: msData.summary,
-        fixedCount: msData.fixedCount,
-        badgeGatesAdded: msData.badgeGatesAdded,
-        applied: msData.applied,
-      });
-
-      // Step 3: Evaluate
-      const evalReq = new Request(request.url, {
-        method: "POST",
-        body: JSON.stringify({ action: "agent_evaluate", autoApply }),
-        headers: { "Content-Type": "application/json" },
-      });
-      const evalRes = await POST(new NextRequest(evalReq));
-      const evalData = await evalRes.json();
-      steps.push({
-        step: "evaluate",
-        success: evalData.success,
-        overallScore: evalData.evaluation?.overallScore,
-        issueCount: evalData.evaluation?.issues?.length || 0,
-        applied: evalData.applied,
-      });
-
-      return NextResponse.json({
-        success: true,
-        action: "agent_full_setup",
-        steps,
-        evaluation: evalData.evaluation,
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // ACTION: apply_changes — Apply a specific set of badge/milestone changes
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "apply_changes") {
@@ -920,7 +854,7 @@ For autoFixable issues, provide the exact fix payload.`;
     }
 
     return NextResponse.json(
-      { success: false, error: "Invalid action. Use: get_status, setup_levels, agent_badges, agent_milestones, agent_evaluate, agent_full_setup, apply_changes" },
+      { success: false, error: "Invalid action. Use: get_status, setup_levels, agent_badges, agent_milestones, agent_evaluate, apply_changes" },
       { status: 400 },
     );
   } catch (error) {

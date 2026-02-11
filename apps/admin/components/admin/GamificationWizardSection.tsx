@@ -90,6 +90,9 @@ export default function GamificationWizardSection() {
   // Evaluation state
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
 
+  // Full setup progress
+  const [fullSetupProgress, setFullSetupProgress] = useState<{ step: number; label: string; steps: any[] } | null>(null);
+
   // Dialogs
   const [showBadgeDetails, setShowBadgeDetails] = useState(false);
   const [showMilestoneDetails, setShowMilestoneDetails] = useState(false);
@@ -217,22 +220,78 @@ export default function GamificationWizardSection() {
 
   const runFullSetup = async () => {
     setStepLoading("full");
+    const steps: any[] = [];
+    setFullSetupProgress({ step: 1, label: "Running Badge Agent...", steps: [] });
+
     try {
-      const data = await callWizardAPI({
-        action: "agent_full_setup",
-        generateBadgeCount: badgeGenCount,
+      // Step 1: Badge Agent
+      const badgesData = await callWizardAPI({
+        action: "agent_badges",
+        generateCount: badgeGenCount,
         autoApply: true,
       });
-      if (data.success) {
-        if (data.evaluation) setEvaluation(data.evaluation);
-        toast.success("Full setup complete! All agents ran and applied fixes.");
-        loadStatus();
-        setCurrentStep("evaluate");
+      const badgeStep = {
+        name: "Badge Agent",
+        success: badgesData.success,
+        summary: badgesData.summary || "",
+        fixedCount: badgesData.fixedCount || 0,
+        newCount: badgesData.newCount || 0,
+      };
+      steps.push(badgeStep);
+      if (badgesData.success) {
+        setBadgeResult(badgesData);
+        toast.success(`Step 1/3: Badges — ${badgesData.fixedCount} fixed, ${badgesData.newCount} new`);
       } else {
-        toast.error(data.error || "Full setup failed");
+        toast.error(`Step 1/3: Badge Agent failed — ${badgesData.error || "unknown error"}`);
       }
+
+      // Step 2: Milestone Agent
+      setFullSetupProgress({ step: 2, label: "Running Milestone Agent...", steps });
+      const msData = await callWizardAPI({
+        action: "agent_milestones",
+        autoApply: true,
+      });
+      const msStep = {
+        name: "Milestone Agent",
+        success: msData.success,
+        summary: msData.summary || "",
+        fixedCount: msData.fixedCount || 0,
+        badgeGatesAdded: msData.badgeGatesAdded || 0,
+      };
+      steps.push(msStep);
+      if (msData.success) {
+        setMilestoneResult(msData);
+        toast.success(`Step 2/3: Milestones — ${msData.fixedCount} fixed, ${msData.badgeGatesAdded} badge-gates`);
+      } else {
+        toast.error(`Step 2/3: Milestone Agent failed — ${msData.error || "unknown error"}`);
+      }
+
+      // Step 3: Evaluation Agent
+      setFullSetupProgress({ step: 3, label: "Running Evaluation Agent...", steps });
+      const evalData = await callWizardAPI({
+        action: "agent_evaluate",
+        autoApply: true,
+      });
+      const evalStep = {
+        name: "Evaluation Agent",
+        success: evalData.success,
+        overallScore: evalData.evaluation?.overallScore,
+        issueCount: evalData.evaluation?.issues?.length || 0,
+      };
+      steps.push(evalStep);
+      if (evalData.success && evalData.evaluation) {
+        setEvaluation(evalData.evaluation);
+        toast.success(`Step 3/3: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} issues found`);
+      } else {
+        toast.error(`Step 3/3: Evaluation Agent failed — ${evalData.error || "unknown error"}`);
+      }
+
+      setFullSetupProgress({ step: 4, label: "Complete!", steps });
+      loadStatus();
+      setCurrentStep("evaluate");
+      toast.success("Full setup complete! All 3 agents finished.");
     } catch (err) {
-      toast.error("Full setup error");
+      toast.error("Full setup error — check your connection");
     }
     setStepLoading(null);
   };
@@ -440,14 +499,14 @@ export default function GamificationWizardSection() {
 
         {/* One-Click Full Setup */}
         <Card className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-purple-700/50">
-          <CardContent className="p-6">
+          <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Wand2 className="h-5 w-5 text-purple-400" /> One-Click Full Setup
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Run all 3 agents in sequence: Fix badges → Fix milestones → Evaluate system. Everything auto-applied.
+                  Runs 3 agents one by one: Fix badges → Fix milestones → Evaluate system. Everything auto-applied.
                 </p>
               </div>
               <Button
@@ -456,12 +515,49 @@ export default function GamificationWizardSection() {
                 className="bg-purple-600 hover:bg-purple-500 text-white px-6"
               >
                 {isStepLoading("full") ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running all agents...</>
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running...</>
                 ) : (
                   <><Play className="h-4 w-4 mr-2" /> Run All Agents</>
                 )}
               </Button>
             </div>
+
+            {/* Live Progress */}
+            {fullSetupProgress && (
+              <div className="space-y-3 pt-2 border-t border-purple-700/30">
+                {/* Progress bar */}
+                <div className="flex items-center gap-3">
+                  <Progress value={(fullSetupProgress.step / 4) * 100} className="h-2 bg-gray-700 flex-1" />
+                  <span className="text-xs text-purple-300 whitespace-nowrap">
+                    {fullSetupProgress.step <= 3 ? `${fullSetupProgress.step}/3` : "Done"}
+                  </span>
+                </div>
+
+                {/* Current step label */}
+                <div className="flex items-center gap-2 text-sm">
+                  {fullSetupProgress.step <= 3 ? (
+                    <Loader2 className="h-4 w-4 text-purple-400 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                  )}
+                  <span className="text-gray-300">{fullSetupProgress.label}</span>
+                </div>
+
+                {/* Completed steps */}
+                {fullSetupProgress.steps.map((s: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    {s.success ? (
+                      <CheckCircle className="h-3 w-3 text-green-400" />
+                    ) : (
+                      <AlertCircle className="h-3 w-3 text-red-400" />
+                    )}
+                    <span className={s.success ? "text-green-400" : "text-red-400"}>
+                      {s.name}: {s.summary || (s.overallScore ? `Score ${s.overallScore}/10` : s.success ? "Done" : "Failed")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
