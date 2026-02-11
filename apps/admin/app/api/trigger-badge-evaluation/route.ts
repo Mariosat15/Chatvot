@@ -4,6 +4,9 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import { evaluateUserBadges } from "@/lib/services/badge-evaluation.service";
 import { recalculateUserLevel } from "@/lib/services/xp-level.service";
 
+// Allow up to 2 minutes for bulk badge evaluation
+export const maxDuration = 120;
+
 /**
  * POST /api/admin/trigger-badge-evaluation
  * Manually trigger badge evaluation for all users or a specific user

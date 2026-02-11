@@ -18,6 +18,9 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 
+// Allow up to 2 minutes for AI operations
+export const maxDuration = 120;
+
 interface AIConfig {
   apiKey: string | null;
   model: string;

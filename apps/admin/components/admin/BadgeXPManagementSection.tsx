@@ -490,7 +490,7 @@ export default function BadgeXPManagementSection() {
                 Total XP Awarded
               </p>
               <p className="text-4xl font-bold text-yellow-400">
-                {stats?.totalXPAwarded.toLocaleString() || 0}
+                {(stats?.totalXPAwarded ?? 0).toLocaleString()}
               </p>
             </div>
             <Star className="h-12 w-12 text-yellow-500" />
@@ -518,7 +518,7 @@ export default function BadgeXPManagementSection() {
                 Average Level
               </p>
               <p className="text-4xl font-bold text-green-400">
-                {stats?.averageLevel.toFixed(1) || "0.0"}
+                {(stats?.averageLevel ?? 0).toFixed(1)}
               </p>
             </div>
             <TrendingUp className="h-12 w-12 text-green-500" />
@@ -1894,11 +1894,20 @@ export default function BadgeXPManagementSection() {
                 <Button
                   variant="destructive"
                   size="lg"
-                  onClick={() => {
-                    toast.success(
-                      "Badge deleted. Changes will apply after server restart.",
-                    );
-                    setEditingBadge(null);
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/badges?badgeId=${editingBadge.id}`, { method: "DELETE" });
+                      const data = await res.json();
+                      if (data.success) {
+                        toast.success("Badge deleted successfully");
+                        setEditingBadge(null);
+                        fetchData(currentPage, searchTerm);
+                      } else {
+                        toast.error(data.error || "Failed to delete badge");
+                      }
+                    } catch {
+                      toast.error("Failed to delete badge");
+                    }
                   }}
                 >
                   <Trash2 className="h-5 w-5 mr-2" />

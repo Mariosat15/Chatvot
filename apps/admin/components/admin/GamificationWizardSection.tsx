@@ -756,21 +756,21 @@ export default function GamificationWizardSection() {
             <div className="grid grid-cols-4 gap-3">
               <div className="text-center p-3 rounded bg-gray-900/50">
                 <div className="text-xl font-bold text-white">{badgeResult.totalBadges}</div>
-                <div className="text-xs text-gray-400">Total</div>
+                <div className="text-xs text-gray-400">Total in DB</div>
               </div>
               <div className="text-center p-3 rounded bg-orange-900/20">
                 <div className="text-xl font-bold text-orange-400">{badgeResult.fixedCount}</div>
-                <div className="text-xs text-gray-400">Fixed</div>
+                <div className="text-xs text-gray-400">Need Fixes</div>
               </div>
               <div className="text-center p-3 rounded bg-green-900/20">
                 <div className="text-xl font-bold text-green-400">{badgeResult.newCount}</div>
-                <div className="text-xs text-gray-400">New</div>
+                <div className="text-xs text-gray-400">New Generated</div>
               </div>
               <div className="text-center p-3 rounded bg-blue-900/20">
                 <div className="text-xl font-bold text-blue-400">
-                  {badgeResult.applied ? "Yes" : "No"}
+                  {badgeResult.applied ? "Applied" : "Preview"}
                 </div>
-                <div className="text-xs text-gray-400">Applied</div>
+                <div className="text-xs text-gray-400">Status</div>
               </div>
             </div>
             {badgeResult.summary && (
@@ -845,7 +845,7 @@ export default function GamificationWizardSection() {
             <Map className="h-5 w-5 text-blue-400" /> Milestone Agent
           </CardTitle>
           <CardDescription className="text-gray-400">
-            The Milestone Agent reads all milestones and badges, checks progression consistency, adds badge-gating at strategic points, and fixes reward values. It understands the full badge system.
+            The Milestone Agent processes one map at a time for speed. It checks progression consistency, adds badge-gating at strategic checkpoints, and fixes reward values. Select a map or let it auto-pick.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -15,6 +15,9 @@ import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import BadgeConfig from "@/database/models/badge-config.model";
 
+// Allow up to 2 minutes for AI operations
+export const maxDuration = 120;
+
 interface AIConfig {
   apiKey: string | null;
   model: string;
