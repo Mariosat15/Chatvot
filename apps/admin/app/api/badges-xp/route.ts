@@ -72,6 +72,13 @@ export async function GET(request: NextRequest) {
     const search = (searchParams.get("search") || "").trim();
     const skip = (page - 1) * limit;
 
+    // #region agent log
+    // Log all UserLevel entries to understand what's in the collection
+    const allUserLevels = await UserLevel.find({}).select('userId currentXP currentLevel totalBadgesEarned').lean();
+    const userLevelSummary = allUserLevels.map((ul: any) => ({ id: ul.userId, xp: ul.currentXP, lvl: ul.currentLevel, badges: ul.totalBadgesEarned }));
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:allUserLevels',message:'All UserLevel entries',data:{count:allUserLevels.length,entries:userLevelSummary},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
+    // #endregion
+
     // 1. Compute stats with aggregation (fast — no full scan to JS)
     const [statsResult] = await UserLevel.aggregate([
       {
@@ -140,10 +147,25 @@ export async function GET(request: NextRequest) {
 
     // 4. Batch-fetch only the users we need (tiny set: ≤ limit)
     const userIdsInPage = pagedLevels.map((ul) => ul.userId);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:userLookup',message:'UserLevel userIds to look up',data:{userIdsInPage},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+    // #endregion
+
     const userDocs = await db
       .collection("user")
-      .find({ id: { $in: userIdsInPage } }, { projection: { id: 1, name: 1, email: 1, image: 1 } })
+      .find({ id: { $in: userIdsInPage } }, { projection: { id: 1, name: 1, email: 1, image: 1, _id: 1 } })
       .toArray();
+
+    // #region agent log
+    // Also try lookup by _id to see if that works
+    const { ObjectId } = await import("mongodb");
+    const objectIdQueries = userIdsInPage.filter((uid: string) => ObjectId.isValid(uid)).map((uid: string) => new ObjectId(uid));
+    const userDocsByOid = objectIdQueries.length > 0 ? await db.collection("user").find({ _id: { $in: objectIdQueries } }, { projection: { id: 1, name: 1, email: 1, _id: 1 } }).toArray() : [];
+    // Also fetch all users to compare
+    const allUsersInDB = await db.collection("user").find({}, { projection: { id: 1, name: 1, email: 1, _id: 1 } }).limit(20).toArray();
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badges-xp/route.ts:userLookupResult',message:'User lookup results',data:{foundById:userDocs.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email})),foundByOid:userDocsByOid.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email})),allUsersInDB:allUsersInDB.map((u:any)=>({id:u.id,_id:u._id?.toString(),name:u.name,email:u.email}))},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+    // #endregion
 
     const userMap = new Map<string, any>();
     for (const u of userDocs) {

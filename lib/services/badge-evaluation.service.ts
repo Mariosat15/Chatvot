@@ -137,8 +137,16 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
       ? allBadges.filter((b) => categories.includes(b.category))
       : allBadges;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:start',message:'Badge eval started',data:{userId,categories,totalBadgesFromDB:allBadges.length,filteredBadges:badges.length,sampleBadges:badges.slice(0,3).map((b:any)=>({id:b.id,rarity:b.rarity,condType:b.condition?.type,isActive:b.isActive}))},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+    // #endregion
+
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:stats',message:'User stats gathered',data:{userId,totalTrades:stats.totalTrades,completedCompetitions:stats.completedCompetitions,hasDeposit:stats.hasDeposit,totalDeposits:stats.totalDeposits,kycVerified:stats.kycVerified,winRate:stats.winRate,competitionsEntered:stats.competitionsEntered},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+    // #endregion
 
     // 2. Get currently earned badges
     const existingBadges = await UserBadge.find({ userId }).lean();
@@ -215,13 +223,23 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
       }
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:evalResult',message:'Badge eval loop complete',data:{userId,newBadgesCount:newlyEarnedBadges.length,newBadgeIds:newlyEarnedBadges.map(b=>b.id),existingBadgesCount:existingBadges.length,totalEvaluated:badges.length},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+    // #endregion
+
     // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
     // Even if no badges earned, we create the record for tracking
     try {
       const { ensureUserLevel } =
         await import("@/lib/services/xp-level.service");
       await ensureUserLevel(userId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:ensureUserLevel',message:'ensureUserLevel completed',data:{userId,newBadgesCount:newlyEarnedBadges.length},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
+      // #endregion
     } catch (levelError) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:ensureUserLevel:ERROR',message:'ensureUserLevel FAILED',data:{userId,error:String(levelError)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
+      // #endregion
       console.error("❌ [BADGE EVAL] Error ensuring user level:", levelError);
     }
 
