@@ -13,6 +13,8 @@ import {
   BarChart3,
   Loader2,
 } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -220,9 +222,14 @@ export default function ProfileCard({
               <div className="flex items-center justify-center gap-2 mt-2">
                 {stats?.userTitle && (
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${stats.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
+                    className={`px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center gap-1.5 ${stats.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
                   >
-                    {stats.userTitleIcon} {stats.userTitle}
+                    {stats.userTitleIcon && stats.userTitleIcon in GAME_ICONS ? (
+                      <GameIcon name={stats.userTitleIcon as GameIconName} size={16} />
+                    ) : stats.userTitleIcon ? (
+                      <span>{stats.userTitleIcon}</span>
+                    ) : null}
+                    {stats.userTitle}
                   </span>
                 )}
                 <span

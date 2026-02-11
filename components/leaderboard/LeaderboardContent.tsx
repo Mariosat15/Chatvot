@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import LeaderboardChallengeButton from "@/components/leaderboard/LeaderboardChallengeButton";
 import LeaderboardFriendButton from "@/components/leaderboard/LeaderboardFriendButton";
 import MatchmakingCards from "@/components/leaderboard/MatchmakingCards";
@@ -714,11 +715,16 @@ export default function LeaderboardContent({
                             {entry.userTitle && (
                               <span
                                 className={cn(
-                                  "px-2 py-0.5 rounded-md text-[10px] font-bold flex-shrink-0 bg-gray-800 border border-gray-700",
+                                  "px-2 py-0.5 rounded-md text-[10px] font-bold flex-shrink-0 bg-gray-800 border border-gray-700 inline-flex items-center gap-1",
                                   entry.userTitleColor || "text-purple-400",
                                 )}
                               >
-                                {entry.userTitleIcon} {entry.userTitle}
+                                {entry.userTitleIcon && entry.userTitleIcon in GAME_ICONS ? (
+                                  <GameIcon name={entry.userTitleIcon as GameIconName} size={12} />
+                                ) : entry.userTitleIcon ? (
+                                  <span>{entry.userTitleIcon}</span>
+                                ) : null}
+                                {entry.userTitle}
                               </span>
                             )}
                           </div>
@@ -934,11 +940,16 @@ export default function LeaderboardContent({
                       {entry.userTitle && (
                         <span
                           className={cn(
-                            "text-xs",
+                            "text-xs inline-flex items-center gap-1",
                             entry.userTitleColor || "text-purple-400",
                           )}
                         >
-                          {entry.userTitleIcon} {entry.userTitle}
+                          {entry.userTitleIcon && entry.userTitleIcon in GAME_ICONS ? (
+                            <GameIcon name={entry.userTitleIcon as GameIconName} size={12} />
+                          ) : entry.userTitleIcon ? (
+                            <span>{entry.userTitleIcon}</span>
+                          ) : null}
+                          {entry.userTitle}
                         </span>
                       )}
                     </div>

@@ -437,7 +437,7 @@ export const enterCompetition = async (competitionId: string) => {
           const requiredTitle =
             TITLE_LEVELS[competition.levelRequirement.minLevel - 1];
           throw new Error(
-            `This competition requires ${requiredTitle.icon} ${requiredTitle.title} or higher. You are currently ${userTitleLevel.icon} ${userTitleLevel.title}.`,
+            `This competition requires ${requiredTitle.title} (Level ${requiredTitle.level}) or higher. You are currently ${userTitleLevel.title} (Level ${userTitleLevel.level}).`,
           );
         }
 
@@ -449,7 +449,7 @@ export const enterCompetition = async (competitionId: string) => {
           const maxTitle =
             TITLE_LEVELS[competition.levelRequirement.maxLevel - 1];
           throw new Error(
-            `This competition is only for traders up to ${maxTitle.icon} ${maxTitle.title}. You are ${userTitleLevel.icon} ${userTitleLevel.title}.`,
+            `This competition is only for traders up to ${maxTitle.title} (Level ${maxTitle.level}). You are ${userTitleLevel.title} (Level ${userTitleLevel.level}).`,
           );
         }
       }

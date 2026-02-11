@@ -18,6 +18,8 @@ import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 
 // Level names for display
 const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
@@ -89,7 +91,9 @@ export default function CompetitionEntryButton({
       return {
         type: "too_low",
         message: `Requires ${minLevelInfo.icon} ${minLevelInfo.title} or higher`,
-        detail: `Your level: ${userLevel.icon} ${userLevel.title}`,
+        detailText: `Your level: `,
+        detailIcon: userLevel.icon,
+        detailTitle: userLevel.title,
       };
     }
 
@@ -97,7 +101,9 @@ export default function CompetitionEntryButton({
       return {
         type: "too_high",
         message: `Only for traders up to ${maxLevelInfo.icon} ${maxLevelInfo.title}`,
-        detail: `Your level: ${userLevel.icon} ${userLevel.title}`,
+        detailText: `Your level: `,
+        detailIcon: userLevel.icon,
+        detailTitle: userLevel.title,
       };
     }
 
@@ -324,8 +330,14 @@ export default function CompetitionEntryButton({
                 >
                   {levelReqMessage.message}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {levelReqMessage.detail}
+                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                  {levelReqMessage.detailText}
+                  {levelReqMessage.detailIcon && levelReqMessage.detailIcon in GAME_ICONS ? (
+                    <GameIcon name={levelReqMessage.detailIcon as GameIconName} size={12} />
+                  ) : levelReqMessage.detailIcon ? (
+                    <span>{levelReqMessage.detailIcon}</span>
+                  ) : null}
+                  {levelReqMessage.detailTitle}
                 </p>
                 {levelReqMessage.type === "too_low" && (
                   <Link href="/profile">

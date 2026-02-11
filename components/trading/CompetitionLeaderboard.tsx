@@ -1,6 +1,8 @@
 "use client";
 
 import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 
 interface LeaderboardEntry {
   _id: string;
@@ -220,9 +222,14 @@ export default function CompetitionLeaderboard({
                   </p>
                   {entry.userTitle && !isDisqualified && (
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 inline-flex items-center gap-1 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
                     >
-                      {entry.userTitleIcon} {entry.userTitle}
+                      {entry.userTitleIcon && entry.userTitleIcon in GAME_ICONS ? (
+                        <GameIcon name={entry.userTitleIcon as GameIconName} size={12} />
+                      ) : entry.userTitleIcon ? (
+                        <span>{entry.userTitleIcon}</span>
+                      ) : null}
+                      {entry.userTitle}
                     </span>
                   )}
                   {isCurrentUser && (
