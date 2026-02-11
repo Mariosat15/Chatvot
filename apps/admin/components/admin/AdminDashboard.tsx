@@ -124,6 +124,7 @@ import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
 import IncidentsSection from "@/components/admin/IncidentsSection";
 import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection";
+import GamificationWizardSection from "@/components/admin/GamificationWizardSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -277,6 +278,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Map className="h-5 w-5" />,
         color: "text-amber-400",
         bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
+      },
+      {
+        id: "gamification-wizard",
+        label: "Gamification Wizard",
+        icon: <Sparkles className="h-5 w-5" />,
+        color: "text-purple-400",
+        bgColor: "bg-purple-500/10 hover:bg-purple-500/20",
       },
       {
         id: "customer-assignment",
@@ -972,6 +980,8 @@ export default function AdminDashboard({
         return <BadgeXPManagementSection key={currentRefreshKey} />;
       case "journey-map":
         return <JourneyMapEditorSection key={currentRefreshKey} />;
+      case "gamification-wizard":
+        return <GamificationWizardSection key={currentRefreshKey} />;
       case "wiki":
         return <AdminWikiSection key={currentRefreshKey} />;
       case "credentials":
