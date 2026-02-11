@@ -124,61 +124,134 @@ export async function POST(request: NextRequest) {
     const openai = new OpenAI({ apiKey: config.apiKey });
 
     if (action === "generate") {
-      // Generate new badges for a category or fill gaps
+      // STEP 1: Audit & Fix ALL existing badges (minLevel, conditions, balance)
+      // STEP 2: Generate new badges if requested
+
       const badgeSummary = currentBadges.map((b: any) => ({
         id: b.id,
         name: b.name,
+        description: b.description,
         category: b.category,
         rarity: b.rarity,
         minLevel: b.minLevel || 0,
         condition: b.condition,
       }));
 
-      const categoryFilter = category && category !== "all"
-        ? `Generate ${count} NEW badges specifically for the "${category}" category.`
-        : `Generate ${count} NEW badges spread across categories that fill gaps in the current system.`;
+      // --- STEP 1: Audit & fix existing badges ---
+      const auditPrompt = `AUDIT AND FIX ALL EXISTING BADGES.
 
-      const userPrompt = `CURRENT BADGES IN SYSTEM (${currentBadges.length} total):
+CURRENT BADGES (${currentBadges.length} total):
 ${JSON.stringify(badgeSummary, null, 2)}
 
-TASK: ${categoryFilter}
+YOUR TASK: Return the COMPLETE array of ALL existing badges with fixes applied.
 
-Requirements:
-- Do NOT duplicate any existing badge IDs or condition type+value combinations
-- Ensure each new badge fits into the progression ladder for its category
-- Include a mix of rarities if generating for "all" categories
-- Make sure minLevel values create meaningful gates
-- All IDs must be unique snake_case strings
+FOR EACH BADGE, check and fix:
 
-Return ONLY a JSON array of the new badge objects.`;
+1. minLevel — MUST be set properly based on difficulty, NOT left at 0:
+   - Common badges: minLevel 0-1 (accessible early)
+   - Rare badges: minLevel 2-4 (need some progression)
+   - Epic badges: minLevel 5-10 (mid-game players)
+   - Legendary badges: minLevel 8-15 (advanced players only)
+   - Harder badges within same rarity should have higher minLevel
 
-      const completion = await openai.chat.completions.create({
+2. condition.minTrades — MUST prevent zero-baseline awards:
+   - Common: at least 5-10
+   - Rare: at least 25-50
+   - Epic: at least 50-100
+   - Legendary: at least 100-500
+   - Competition badges need minCompletedCompetitions > 0 too
+
+3. condition.value — Should match rarity difficulty:
+   - If a legendary badge only requires 3 wins, increase it
+   - If a common badge requires 500 trades, that's too hard for common
+
+4. rarity — If the difficulty doesn't match the rarity, adjust the rarity
+
+RULES:
+- DO NOT change: id, name, description, category, icon, condition.type
+- You CAN change: minLevel, condition.value, condition.minTrades, condition.minCompletedCompetitions, condition.comparison, rarity
+- Add "_changes" field (string) on each badge you modified, explaining what changed
+- Badges with no changes needed: include them as-is WITHOUT "_changes" field
+
+Return the COMPLETE JSON array with ALL ${currentBadges.length} badges.`;
+
+      const auditCompletion = await openai.chat.completions.create({
         model: config.model,
         messages: [
           { role: "system", content: BADGE_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
+          { role: "user", content: auditPrompt },
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: 0.2,
+        max_tokens: 16000,
       });
 
-      const content = completion.choices[0]?.message?.content || "[]";
-      let badges;
+      const auditContent = auditCompletion.choices[0]?.message?.content || "[]";
+      let fixedBadges: any[] = [];
       try {
-        // Strip markdown code fences if present
-        const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        badges = JSON.parse(cleaned);
+        const cleaned = auditContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        fixedBadges = JSON.parse(cleaned);
+        if (!Array.isArray(fixedBadges)) fixedBadges = [];
       } catch {
-        return NextResponse.json(
-          { success: false, error: "AI returned invalid JSON", raw: content },
-          { status: 500 },
-        );
+        // If audit fails, continue with generation only
+        console.error("Badge audit JSON parse failed, skipping audit step");
+      }
+
+      const auditedCount = fixedBadges.filter((b: any) => b._changes).length;
+
+      // --- STEP 2: Generate new badges (if requested) ---
+      let newBadges: any[] = [];
+      if (count > 0) {
+        const categoryFilter = category && category !== "all"
+          ? `Generate ${count} NEW badges specifically for the "${category}" category.`
+          : `Generate ${count} NEW badges spread across categories that fill gaps in the current system.`;
+
+        // Use the fixed badges as context so new badges don't conflict
+        const contextBadges = fixedBadges.length > 0 ? fixedBadges : badgeSummary;
+        const existingIds = contextBadges.map((b: any) => b.id);
+        const existingConditions = contextBadges.map((b: any) => `${b.condition?.type}:${b.condition?.value}`);
+
+        const genPrompt = `${categoryFilter}
+
+EXISTING BADGE IDS (do NOT reuse): ${existingIds.join(', ')}
+EXISTING CONDITIONS (do NOT duplicate): ${existingConditions.join(', ')}
+
+Requirements:
+- Each new badge must have proper minLevel (not 0 for rare/epic/legendary)
+- Each new badge must have minTrades and/or minCompletedCompetitions > 0
+- All IDs must be unique snake_case strings not in the existing list
+- Mix of rarities if generating for "all" categories
+
+Return ONLY a JSON array of the NEW badge objects (not existing ones).`;
+
+        const genCompletion = await openai.chat.completions.create({
+          model: config.model,
+          messages: [
+            { role: "system", content: BADGE_SYSTEM_PROMPT },
+            { role: "user", content: genPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 4000,
+        });
+
+        const genContent = genCompletion.choices[0]?.message?.content || "[]";
+        try {
+          const cleaned = genContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          newBadges = JSON.parse(cleaned);
+          if (!Array.isArray(newBadges)) newBadges = [];
+        } catch {
+          console.error("New badge generation JSON parse failed");
+        }
       }
 
       return NextResponse.json({
         success: true,
-        badges,
-        count: badges.length,
+        // Fixed existing badges (with _changes on modified ones)
+        fixedBadges,
+        fixedCount: auditedCount,
+        totalExisting: fixedBadges.length,
+        // New badges generated
+        newBadges,
+        newCount: newBadges.length,
         action: "generate",
       });
     }

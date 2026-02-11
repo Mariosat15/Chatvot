@@ -1003,9 +1003,16 @@ export default function BadgeXPManagementSection() {
                       });
                       const data = await res.json();
                       if (data.success) {
-                        setAiGeneratedBadges(data.badges);
+                        // Combine fixed existing badges + new badges for review
+                        const allBadges = [
+                          ...(data.fixedBadges || []),
+                          ...(data.newBadges || []).map((b: any) => ({ ...b, _isNew: true })),
+                        ];
+                        setAiGeneratedBadges(allBadges);
                         setShowAiResults(true);
-                        toast.success(`AI generated ${data.count} badges`);
+                        const fixMsg = data.fixedCount > 0 ? `Fixed ${data.fixedCount} existing badges. ` : "";
+                        const newMsg = data.newCount > 0 ? `Generated ${data.newCount} new badges.` : "No new badges needed.";
+                        toast.success(`${fixMsg}${newMsg}`);
                       } else {
                         toast.error(data.error || "AI generation failed");
                       }
@@ -1025,7 +1032,7 @@ export default function BadgeXPManagementSection() {
                   ) : (
                     <Sparkles className="h-4 w-4 mr-2" />
                   )}
-                  AI Generate
+                  AI Audit & Generate
                 </Button>
                 <Button
                   onClick={async () => {
@@ -2225,45 +2232,109 @@ export default function BadgeXPManagementSection() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
               <Sparkles className="h-6 w-6 text-purple-400" />
-              AI Generated Badges ({aiGeneratedBadges.length})
+              AI Badge Audit & Generation
             </DialogTitle>
             <DialogDescription>
-              Review and apply AI-generated badges to your system
+              {(() => {
+                const fixed = aiGeneratedBadges.filter((b: any) => b._changes);
+                const newOnes = aiGeneratedBadges.filter((b: any) => b._isNew);
+                const unchanged = aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew);
+                return `${fixed.length} badges fixed | ${newOnes.length} new badges | ${unchanged.length} unchanged`;
+              })()}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
-            {aiGeneratedBadges.map((badge: any, i: number) => (
-              <div
-                key={badge.id || i}
-                className={`border-2 rounded-xl p-4 ${getRarityColor(badge.rarity)}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <GameIcon name={badge.icon as GameIconName} size={40} />
-                    <div>
-                      <p className="font-bold text-lg">{badge.name}</p>
-                      <p className="text-sm text-muted-foreground">{badge.description}</p>
+            {/* Fixed badges section */}
+            {aiGeneratedBadges.filter((b: any) => b._changes).length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-amber-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Fixed Badges ({aiGeneratedBadges.filter((b: any) => b._changes).length})
+                </h3>
+                {aiGeneratedBadges.filter((b: any) => b._changes).map((badge: any, i: number) => (
+                  <div
+                    key={`fix-${badge.id || i}`}
+                    className={`border-2 rounded-xl p-4 mb-3 ${getRarityColor(badge.rarity)} border-amber-500/30`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <GameIcon name={badge.icon as GameIconName} size={36} />
+                        <div>
+                          <p className="font-bold">{badge.name}</p>
+                          <p className="text-xs text-muted-foreground">{badge.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize text-xs">{badge.rarity}</Badge>
+                        <Badge variant="outline" className="text-amber-400 border-amber-500/50 text-xs">
+                          <Shield className="h-3 w-3 mr-1" />Lv.{badge.minLevel || 0}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="mt-2 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                      <p className="text-xs text-amber-300 font-medium">Changes: {badge._changes}</p>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <code className="bg-muted px-1 rounded">{badge.id}</code>
+                      {" | "}
+                      {badge.condition?.type} {badge.condition?.comparison} {badge.condition?.value}
+                      {badge.condition?.minTrades ? ` | minTrades: ${badge.condition.minTrades}` : ""}
+                      {badge.condition?.minCompletedCompetitions ? ` | minComps: ${badge.condition.minCompletedCompetitions}` : ""}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="capitalize">{badge.rarity}</Badge>
-                    <Badge variant="secondary">{badge.category}</Badge>
-                    {badge.minLevel > 0 && (
-                      <Badge variant="outline" className="text-amber-400 border-amber-500/50">
-                        <Shield className="h-3 w-3 mr-1" />Lv.{badge.minLevel}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  <code className="bg-muted px-2 py-1 rounded">{badge.id}</code>
-                  {" | "}
-                  Condition: {badge.condition?.type} {badge.condition?.comparison} {badge.condition?.value}
-                  {badge.condition?.minTrades ? ` | Min trades: ${badge.condition.minTrades}` : ""}
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {/* New badges section */}
+            {aiGeneratedBadges.filter((b: any) => b._isNew).length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-emerald-400">
+                  <Plus className="h-5 w-5" />
+                  New Badges ({aiGeneratedBadges.filter((b: any) => b._isNew).length})
+                </h3>
+                {aiGeneratedBadges.filter((b: any) => b._isNew).map((badge: any, i: number) => (
+                  <div
+                    key={`new-${badge.id || i}`}
+                    className={`border-2 rounded-xl p-4 mb-3 ${getRarityColor(badge.rarity)} border-emerald-500/30`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <GameIcon name={badge.icon as GameIconName} size={36} />
+                        <div>
+                          <p className="font-bold">{badge.name}</p>
+                          <p className="text-xs text-muted-foreground">{badge.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize text-xs">{badge.rarity}</Badge>
+                        <Badge variant="secondary" className="text-xs">{badge.category}</Badge>
+                        {badge.minLevel > 0 && (
+                          <Badge variant="outline" className="text-amber-400 border-amber-500/50 text-xs">
+                            <Shield className="h-3 w-3 mr-1" />Lv.{badge.minLevel}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <code className="bg-muted px-1 rounded">{badge.id}</code>
+                      {" | "}
+                      {badge.condition?.type} {badge.condition?.comparison} {badge.condition?.value}
+                      {badge.condition?.minTrades ? ` | minTrades: ${badge.condition.minTrades}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Unchanged badges count */}
+            {aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew).length > 0 && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground text-center">
+                <CheckCircle className="h-4 w-4 inline mr-2 text-emerald-400" />
+                {aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew).length} badges are already properly balanced (no changes needed)
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-6 gap-2">
