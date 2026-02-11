@@ -14,8 +14,37 @@ import mongoose from "mongoose";
 
 /**
  * Finalize a single challenge - close positions, determine winner and distribute prizes
+ * Retries up to 3 times on transient transaction errors (WriteConflict)
  */
 export async function finalizeChallenge(challengeId: string) {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _finalizeChallengeAttempt(challengeId);
+    } catch (error: any) {
+      const isTransient =
+        error?.errorLabelSet?.has?.("TransientTransactionError") ||
+        error?.errorLabels?.includes?.("TransientTransactionError") ||
+        error?.code === 112 || // WriteConflict
+        error?.codeName === "WriteConflict";
+
+      if (isTransient && attempt < MAX_RETRIES) {
+        const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000); // 500ms, 1s, 2s
+        console.warn(
+          `⚠️ [CHALLENGE] TransientTransactionError on attempt ${attempt}/${MAX_RETRIES} for ${challengeId}, retrying in ${delay}ms...`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      // Non-transient error or max retries exhausted
+      throw error;
+    }
+  }
+}
+
+async function _finalizeChallengeAttempt(challengeId: string) {
   const session = await mongoose.startSession();
   session.startTransaction();
 

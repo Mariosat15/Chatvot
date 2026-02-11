@@ -13,8 +13,36 @@ import mongoose from "mongoose";
 /**
  * End a competition and distribute prizes
  * This is called automatically by Inngest when endTime is reached
+ * Retries up to 3 times on transient transaction errors (WriteConflict)
  */
 export async function finalizeCompetition(competitionId: string) {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _finalizeCompetitionAttempt(competitionId);
+    } catch (error: any) {
+      const isTransient =
+        error?.errorLabelSet?.has?.("TransientTransactionError") ||
+        error?.errorLabels?.includes?.("TransientTransactionError") ||
+        error?.code === 112 || // WriteConflict
+        error?.codeName === "WriteConflict";
+
+      if (isTransient && attempt < MAX_RETRIES) {
+        const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000);
+        console.warn(
+          `⚠️ [COMPETITION] TransientTransactionError on attempt ${attempt}/${MAX_RETRIES} for ${competitionId}, retrying in ${delay}ms...`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+}
+
+async function _finalizeCompetitionAttempt(competitionId: string) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
