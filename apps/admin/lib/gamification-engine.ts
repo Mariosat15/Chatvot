@@ -277,6 +277,25 @@ export function generateFixes(
       // #region agent log
       console.log(`[GEN-FIX] ${rarity} minLevel fixes: ${levelFixCount} (targets sample: [${targetLevels.slice(0,5).join(",")}...])`);
       // #endregion
+    } else if (!needsFix && rarity !== "common" && belowMin > 0) {
+      // SURGICAL MODE: Distribution is healthy but some badges are below range minimum
+      const belowBadges = pool.filter(b => (b.minLevel || 0) < range[0]);
+      const lowerEnd = range[0];
+      const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.3));
+      const targetValues = distributeValues(belowBadges.length, lowerEnd, upperEnd);
+
+      // #region agent log
+      console.log(`[GEN-FIX] ${rarity} minLevel SURGICAL: fixing ${belowBadges.length} below-range → [${lowerEnd},${upperEnd}]`);
+      // #endregion
+
+      for (let i = 0; i < belowBadges.length; i++) {
+        badgeFixes.push({
+          id: belowBadges[i].id,
+          field: "minLevel",
+          oldValue: belowBadges[i].minLevel || 0,
+          newValue: targetValues[i],
+        });
+      }
     }
   }
 
@@ -302,11 +321,11 @@ export function generateFixes(
     const zeroCount = currentTrades.filter(v => v === 0).length;
 
     // #region agent log
-    console.log(`[GEN-FIX] minTrades ${rarity}: tradePool=${pool.length} zeros=${zeroCount} isFlat=${dist.isFlat} needsFix=${dist.isFlat || zeroCount > pool.length * 0.5}`);
+    console.log(`[GEN-FIX] minTrades ${rarity}: tradePool=${pool.length} zeros=${zeroCount} isFlat=${dist.isFlat}`);
     // #endregion
 
-    // Fix if: flat, mostly zero, or clustered
     if (dist.isFlat || zeroCount > pool.length * 0.5) {
+      // BULK MODE: Distribution is broken → redistribute ALL badges in this pool
       const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
       const targetTrades = distributeValues(sorted.length, range[0], range[1]);
 
@@ -322,6 +341,27 @@ export function generateFixes(
             newValue: target,
           });
         }
+      }
+    } else if (zeroCount > 0 && rarity !== "common") {
+      // SURGICAL MODE: Distribution is healthy overall but individual badges
+      // have zero values — fix ONLY the zero-value badges, assigning them
+      // a spread within the lower portion of the rarity range
+      const zeroBadges = pool.filter(b => (b.condition?.minTrades || 0) === 0);
+      const lowerEnd = range[0];
+      const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.4));
+      const targetValues = distributeValues(zeroBadges.length, lowerEnd, upperEnd);
+
+      // #region agent log
+      console.log(`[GEN-FIX] minTrades ${rarity} SURGICAL: fixing ${zeroBadges.length} zeros → range [${lowerEnd},${upperEnd}]`);
+      // #endregion
+
+      for (let i = 0; i < zeroBadges.length; i++) {
+        badgeFixes.push({
+          id: zeroBadges[i].id,
+          field: "condition.minTrades",
+          oldValue: 0,
+          newValue: targetValues[i],
+        });
       }
     }
   }
@@ -345,6 +385,7 @@ export function generateFixes(
     const zeroCount = currentComps.filter(v => v === 0).length;
 
     if (dist.isFlat || zeroCount > pool.length * 0.5) {
+      // BULK MODE: redistribute all
       const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
       const targetComps = distributeValues(sorted.length, range[0], range[1]);
 
@@ -360,6 +401,25 @@ export function generateFixes(
             newValue: target,
           });
         }
+      }
+    } else if (zeroCount > 0 && rarity !== "common") {
+      // SURGICAL MODE: fix only zero-value badges
+      const zeroBadges = pool.filter(b => (b.condition?.minCompletedCompetitions || 0) === 0);
+      const lowerEnd = range[0];
+      const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.4));
+      const targetValues = distributeValues(zeroBadges.length, lowerEnd, upperEnd);
+
+      // #region agent log
+      console.log(`[GEN-FIX] minComps ${rarity} SURGICAL: fixing ${zeroBadges.length} zeros → range [${lowerEnd},${upperEnd}]`);
+      // #endregion
+
+      for (let i = 0; i < zeroBadges.length; i++) {
+        badgeFixes.push({
+          id: zeroBadges[i].id,
+          field: "condition.minCompletedCompetitions",
+          oldValue: 0,
+          newValue: targetValues[i],
+        });
       }
     }
   }
