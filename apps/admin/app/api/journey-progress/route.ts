@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
+
+/** Resolve active mapId dynamically instead of hardcoding */
+async function resolveMapId(): Promise<string> {
+  const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+  if (first?.mapId) return first.mapId;
+  const ids = await JourneyMilestone.distinct("mapId", { isActive: true });
+  const nonLegacy = ids.filter((id: string) => id !== "traders_journey");
+  return nonLegacy.length > 0 ? nonLegacy[0] : ids[0] || "pirate_cove";
+}
 
 /**
  * GET /api/journey-progress
@@ -13,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await resolveMapId();
 
     // If specific user ID provided
     if (userId) {
@@ -90,7 +100,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const mapId = data.mapId || "traders_journey";
+    const mapId = data.mapId || await resolveMapId();
 
     switch (action) {
       case "initialize": {

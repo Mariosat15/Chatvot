@@ -2,6 +2,14 @@ import type { MapTheme, IJourneyZone } from "@/database/models/journey-map-confi
 import type { IMilestoneCondition, MilestoneNodeType } from "@/database/models/journey-milestone.model";
 
 /**
+ * @deprecated — DO NOT USE THIS FILE FOR NEW CODE.
+ * 
+ * This is the LEGACY multi-map journey sequence template.
+ * The admin Gamification Wizard now generates milestones from
+ * `apps/admin/lib/constants/milestone-blueprint.ts` and stores them
+ * in the database. The backend reads FROM THE DATABASE only.
+ * 
+ * Original description:
  * 10-Map Journey Sequence
  * 
  * Complete configuration for the multi-map progression system.

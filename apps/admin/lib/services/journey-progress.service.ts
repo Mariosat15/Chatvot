@@ -7,12 +7,32 @@ import UserJourneyProgress, { IUserJourneyProgress } from "@/database/models/use
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
 
 /**
+ * Get the first active map's mapId from JourneyMapConfig.
+ * Single source of truth — reads from the database.
+ */
+export async function getFirstActiveMapId(): Promise<string> {
+  await connectToDatabase();
+  const firstMap = await JourneyMapConfig.findOne({ isActive: true })
+    .sort({ sequenceOrder: 1 })
+    .select("mapId")
+    .lean();
+  if (firstMap?.mapId) return firstMap.mapId;
+  const distinctMapIds = await JourneyMilestone.distinct("mapId", { isActive: true });
+  if (distinctMapIds.length > 0) {
+    const nonLegacy = distinctMapIds.filter((id: string) => id !== "traders_journey");
+    return nonLegacy.length > 0 ? nonLegacy[0] : distinctMapIds[0];
+  }
+  return "pirate_cove";
+}
+
+/**
  * Initialize journey progress for a new user
  */
 export async function initializeUserJourney(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<IUserJourneyProgress> {
+  if (!mapId) mapId = await getFirstActiveMapId();
   console.log(`🗺️ [JOURNEY] Initializing journey for user ${userId}`);
   await connectToDatabase();
 
@@ -64,8 +84,9 @@ export async function initializeUserJourney(
  */
 export async function quickSyncUnlocks(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<void> {
+  if (!mapId) mapId = await getFirstActiveMapId();
   await connectToDatabase();
 
   const progress = await UserJourneyProgress.findOne({ userId, mapId });
@@ -156,7 +177,7 @@ export async function quickSyncUnlocks(
  */
 export async function getUserJourneyProgress(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{
   progress: IUserJourneyProgress | null;
   mapConfig: any;
@@ -165,6 +186,7 @@ export async function getUserJourneyProgress(
   unlockedIds: string[];
 }> {
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   // Get or initialize progress
   let progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();

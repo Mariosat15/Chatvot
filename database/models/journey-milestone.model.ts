@@ -109,7 +109,6 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     mapId: {
       type: String,
       required: true,
-      default: "traders_journey",
       index: true,
     },
     name: {

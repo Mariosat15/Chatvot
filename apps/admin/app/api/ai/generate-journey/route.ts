@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
       action,
       theme = "pirate",
       existingMilestones = [],
-      mapId = "traders_journey",
+      mapId = "pirate_cove",
       count = 5,
       startOrder = 1,
     } = body;

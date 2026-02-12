@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import JourneyMilestone from "@/database/models/journey-milestone.model";
+
+/** Resolve active mapId dynamically instead of hardcoding */
+async function resolveMapId(): Promise<string> {
+  const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+  if (first?.mapId) return first.mapId;
+  const ids = await JourneyMilestone.distinct("mapId", { isActive: true });
+  const nonLegacy = ids.filter((id: string) => id !== "traders_journey");
+  return nonLegacy.length > 0 ? nonLegacy[0] : ids[0] || "pirate_cove";
+}
 
 /**
  * GET /api/journey-map
@@ -11,7 +21,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await resolveMapId();
 
     const mapConfig = await JourneyMapConfig.findOne({ mapId }).lean();
 
@@ -49,7 +59,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     const data = await request.json();
 
-    const mapId = data.mapId || "traders_journey";
+    const mapId = data.mapId || await resolveMapId();
 
     // Upsert: Create if not exists, update if exists
     const mapConfig = await JourneyMapConfig.findOneAndUpdate(

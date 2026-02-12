@@ -2,11 +2,12 @@ import type { IJourneyZone } from "@/database/models/journey-map-config.model";
 import type { IMilestoneCondition, IMilestoneReward, MilestoneNodeType } from "@/database/models/journey-milestone.model";
 
 /**
- * Trader's Journey Map Template
- * Treasure Map themed progression system
+ * @deprecated — DO NOT USE FOR NEW CODE.
  * 
- * Map dimensions: 1200 x 800
- * Islands positioned to match the pirate-cove.png background
+ * Legacy template. The admin Gamification Wizard now uses
+ * `milestone-blueprint.ts` as the SINGLE source of truth.
+ * Milestones are stored in the database and the backend reads
+ * from there using dynamic mapId resolution.
  */
 
 // ============================================

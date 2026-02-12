@@ -90,7 +90,6 @@ const JourneyMapConfigSchema = new Schema<IJourneyMapConfig>(
       required: true,
       unique: true,
       index: true,
-      default: "traders_journey",
     },
     name: {
       type: String,

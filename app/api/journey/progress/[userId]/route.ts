@@ -120,14 +120,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Retroactively check and complete milestones based on current user stats
     // This ensures past actions (e.g., winning trades before the fix) are recognized
     try {
+      const { checkAndCompleteMilestones, getFirstActiveMapId } = await import("@/lib/services/journey-progress.service");
+      const activeMapId = userProgress.mapId || await getFirstActiveMapId();
       // #region agent log
       const mapIdCounts: Record<string, number> = {};
       for (const m of milestones) { mapIdCounts[(m as any).mapId] = (mapIdCounts[(m as any).mapId] || 0) + 1; }
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress-api:120',message:'JOURNEY DATA MISMATCH DEBUG',data:{userId,userProgressMapId:userProgress.mapId,fallbackMapId:'traders_journey',mapConfigMapIds:maps.map((m:any)=>m.mapId),milestonesByMapId:mapIdCounts,completedMilestoneIds:completedMilestoneIds.slice(0,20),totalMaps:maps.length,totalMilestones:milestones.length},timestamp:Date.now(),hypothesisId:'HA-HB-HC',runId:'initial'})}).catch(()=>{});
-      console.log(`🔍 [JOURNEY-RETRO] Triggering retroactive milestone check for user ${userId} mapId=${userProgress.mapId || "traders_journey"}`);
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress-api:120',message:'JOURNEY DATA MISMATCH DEBUG',data:{userId,userProgressMapId:userProgress.mapId,resolvedMapId:activeMapId,mapConfigMapIds:maps.map((m:any)=>m.mapId),milestonesByMapId:mapIdCounts,completedMilestoneIds:completedMilestoneIds.slice(0,20),totalMaps:maps.length,totalMilestones:milestones.length},timestamp:Date.now(),hypothesisId:'HA-HB-HC',runId:'unified'})}).catch(()=>{});
+      console.log(`🔍 [JOURNEY-RETRO] Triggering retroactive milestone check for user ${userId} mapId=${activeMapId}`);
       // #endregion
-      const { checkAndCompleteMilestones } = await import("@/lib/services/journey-progress.service");
-      const retroResult = await checkAndCompleteMilestones(userId, userProgress.mapId || "traders_journey");
+      const retroResult = await checkAndCompleteMilestones(userId, activeMapId);
       // #region agent log
       console.log(`🔍 [JOURNEY-RETRO] Result: completed=${JSON.stringify(retroResult.completed)} unlocked=${JSON.stringify(retroResult.unlocked)} xp=${retroResult.totalXPEarned}`);
       // #endregion
@@ -144,7 +145,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let milestoneProgressData: Array<{ milestoneId: string; currentValue: number; targetValue: number }> = [];
     try {
       const { calculateMilestoneProgress } = await import("@/lib/services/journey-progress.service");
-      milestoneProgressData = await calculateMilestoneProgress(userId, activeProgress.mapId || "traders_journey");
+      const { getFirstActiveMapId: getMapId } = await import("@/lib/services/journey-progress.service");
+      milestoneProgressData = await calculateMilestoneProgress(userId, activeProgress.mapId || await getMapId());
     } catch (err) {
       // Non-critical -- fall back to empty progress
       console.warn("Failed to calculate milestone progress:", err);

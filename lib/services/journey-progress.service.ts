@@ -7,20 +7,74 @@ import UserJourneyProgress, { IUserJourneyProgress } from "@/database/models/use
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
 
 /**
+ * Get the first active map's mapId from JourneyMapConfig.
+ * This is the SINGLE SOURCE OF TRUTH — whatever map the admin wizard
+ * generated into the database is what the backend uses.
+ * Falls back to querying JourneyMilestone directly if no map config exists.
+ */
+export async function getFirstActiveMapId(): Promise<string> {
+  await connectToDatabase();
+  // Try JourneyMapConfig first (sorted by sequenceOrder)
+  const firstMap = await JourneyMapConfig.findOne({ isActive: true })
+    .sort({ sequenceOrder: 1 })
+    .select("mapId")
+    .lean();
+  if (firstMap?.mapId) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'Resolved active mapId from JourneyMapConfig',data:{resolvedMapId:firstMap.mapId},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
+    // #endregion
+    return firstMap.mapId;
+  }
+
+  // Fallback: check what mapIds actually exist in JourneyMilestone
+  const distinctMapIds = await JourneyMilestone.distinct("mapId", { isActive: true });
+  if (distinctMapIds.length > 0) {
+    // Prefer non-legacy mapIds
+    const nonLegacy = distinctMapIds.filter((id: string) => id !== "traders_journey");
+    const resolved = nonLegacy.length > 0 ? nonLegacy[0] : distinctMapIds[0];
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'Resolved mapId from JourneyMilestone distinct',data:{resolvedMapId:resolved,allMapIds:distinctMapIds},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
+    // #endregion
+    return resolved;
+  }
+
+  // Ultimate fallback (shouldn't happen if admin wizard was run)
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'FALLBACK to pirate_cove - no active maps found!',data:{},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
+  // #endregion
+  return "pirate_cove";
+}
+
+/**
  * Initialize journey progress for a new user
  */
 export async function initializeUserJourney(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<IUserJourneyProgress> {
-  console.log(`🗺️ [JOURNEY] Initializing journey for user ${userId}`);
+  // Dynamically resolve mapId if not provided
+  if (!mapId) mapId = await getFirstActiveMapId();
+  console.log(`🗺️ [JOURNEY] Initializing journey for user ${userId} on map ${mapId}`);
   await connectToDatabase();
 
-  // Check if progress already exists
+  // Check if progress already exists for the correct mapId
   const existing = await UserJourneyProgress.findOne({ userId, mapId });
   if (existing) {
-    console.log(`ℹ️ [JOURNEY] User ${userId} already has journey progress`);
+    console.log(`ℹ️ [JOURNEY] User ${userId} already has journey progress for ${mapId}`);
     return existing;
+  }
+
+  // MIGRATION: Check if user has progress on a legacy mapId (e.g. "traders_journey")
+  // If so, migrate their record to the new mapId to preserve completed milestones
+  const legacyProgress = await UserJourneyProgress.findOne({ userId });
+  if (legacyProgress && legacyProgress.mapId !== mapId) {
+    console.log(`🔄 [JOURNEY-MIGRATE] Migrating user ${userId} from mapId="${legacyProgress.mapId}" to "${mapId}"`);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:initializeUserJourney',message:'MIGRATING user from legacy mapId',data:{userId,fromMapId:legacyProgress.mapId,toMapId:mapId,completedCount:legacyProgress.completedMilestones?.length||0},timestamp:Date.now(),hypothesisId:'H-MIGRATE',runId:'unified'})}).catch(()=>{});
+    // #endregion
+    legacyProgress.mapId = mapId;
+    await legacyProgress.save();
+    return legacyProgress;
   }
 
   // Get the map config for default start node
@@ -64,8 +118,9 @@ export async function initializeUserJourney(
  */
 export async function quickSyncUnlocks(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<void> {
+  if (!mapId) mapId = await getFirstActiveMapId();
   await connectToDatabase();
 
   const progress = await UserJourneyProgress.findOne({ userId, mapId });
@@ -156,7 +211,7 @@ export async function quickSyncUnlocks(
  */
 export async function getUserJourneyProgress(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{
   progress: IUserJourneyProgress | null;
   mapConfig: any;
@@ -165,6 +220,7 @@ export async function getUserJourneyProgress(
   unlockedIds: string[];
 }> {
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   // Get or initialize progress
   let progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
@@ -565,7 +621,7 @@ export async function checkConditionMet(
 export async function checkMilestoneCompletion(
   userId: string,
   milestoneId: string,
-  mapId: string = "traders_journey",
+  mapId?: string,
   preloadedStats?: Record<string, any>
 ): Promise<{
   canComplete: boolean;
@@ -576,6 +632,7 @@ export async function checkMilestoneCompletion(
   targetValue?: number;
 }> {
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   // Get user's progress
   const progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
@@ -626,7 +683,7 @@ export async function checkMilestoneCompletion(
 export async function completeMilestone(
   userId: string,
   milestoneId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{
   success: boolean;
   message: string;
@@ -636,6 +693,7 @@ export async function completeMilestone(
 }> {
   console.log(`🎯 [JOURNEY] Attempting to complete milestone ${milestoneId} for user ${userId}`);
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   // Check if can complete
   const { canComplete, isCompleted } = await checkMilestoneCompletion(userId, milestoneId, mapId);
@@ -817,12 +875,13 @@ export async function completeMilestone(
  */
 export async function checkAndUnlockMilestones(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{
   newlyUnlocked: string[];
 }> {
   console.log(`🔓 [JOURNEY] Checking unlock conditions for user ${userId}`);
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   const newlyUnlocked: string[] = [];
 
@@ -937,7 +996,7 @@ export async function checkAndUnlockMilestones(
  */
 export async function checkAndCompleteMilestones(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{
   completed: string[];
   unlocked: string[];
@@ -945,6 +1004,7 @@ export async function checkAndCompleteMilestones(
 }> {
   console.log(`🔄 [JOURNEY] Checking milestones for user ${userId}`);
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   const completed: string[] = [];
   let totalXPEarned = 0;
@@ -987,111 +1047,10 @@ export async function checkAndCompleteMilestones(
   console.log(`🔍 [JOURNEY-DEBUG] userId=${userId} mapId=${mapId} completedCount=${completedIds.size} notCompletedCount=${notCompleted.length} allMilestonesCount=${allMilestones.length}`);
   // #endregion
 
-  // AUTO-SEED: If no milestones exist for this mapId, seed them from the template
-  if (allMilestones.length === 0 && mapId === "traders_journey") {
-    // #region agent log
-    console.log(`🚨 [JOURNEY-SEED] No milestones found for mapId="${mapId}" — auto-seeding from template...`);
-    // #endregion
-    try {
-      const { DEFAULT_MILESTONES, DEFAULT_MAP_CONFIG } = await import("@/lib/constants/journey-map-template");
-      const JourneyMapConfig = (await import("@/database/models/journey-map-config.model")).default;
-
-      // Seed map config if missing
-      const existingMap = await JourneyMapConfig.findOne({ mapId });
-      if (!existingMap) {
-        await JourneyMapConfig.create({
-          mapId: DEFAULT_MAP_CONFIG.mapId,
-          name: DEFAULT_MAP_CONFIG.name,
-          description: DEFAULT_MAP_CONFIG.description,
-          zones: DEFAULT_MAP_CONFIG.zones,
-          defaultStartNode: DEFAULT_MAP_CONFIG.defaultStartNode,
-          backgroundColor: DEFAULT_MAP_CONFIG.backgroundColor,
-          backgroundImage: DEFAULT_MAP_CONFIG.backgroundImage,
-          isActive: true,
-          version: 1,
-        });
-        console.log(`✅ [JOURNEY-SEED] Created map config for "${mapId}"`);
-      }
-
-      // Seed milestones
-      let seeded = 0;
-      for (const m of DEFAULT_MILESTONES) {
-        const exists = await JourneyMilestone.findOne({ id: m.id, mapId });
-        if (!exists) {
-          await JourneyMilestone.create({
-            id: m.id,
-            mapId,
-            name: m.name,
-            description: m.description,
-            shortDescription: m.shortDescription,
-            zoneId: m.zoneId,
-            position: m.position,
-            nodeType: m.nodeType,
-            icon: m.icon,
-            color: m.color,
-            size: m.size,
-            unlockCondition: m.unlockCondition,
-            completeCondition: m.completeCondition,
-            rewards: m.rewards,
-            connectedTo: m.connectedTo,
-            connectedFrom: m.connectedFrom,
-            isRequired: m.isRequired ?? true,
-            isAutoComplete: m.isAutoComplete ?? false,
-            order: m.order,
-            tooltipText: m.tooltipText,
-            celebrationText: m.celebrationText,
-            isActive: true,
-          });
-          seeded++;
-        }
-      }
-      // #region agent log
-      console.log(`✅ [JOURNEY-SEED] Auto-seeded ${seeded} milestones for "${mapId}"`);
-      // #endregion
-
-      // Re-query milestones after seeding
-      const freshMilestones = await JourneyMilestone.find({ mapId, isActive: true })
-        .sort({ order: 1 })
-        .lean();
-      
-      // Re-run the completion check with the newly seeded milestones
-      const freshNotCompleted = freshMilestones.filter(m => !completedIds.has(m.id));
-      
-      if (freshNotCompleted.length > 0) {
-        const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
-        preloadedStats = await gatherUserStats(userId);
-
-        for (const milestone of freshNotCompleted) {
-          if (!milestone.completeCondition) continue;
-          const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
-          // #region agent log
-          console.log(`🔍 [JOURNEY-DEBUG] Post-seed milestone "${milestone.name}" (${milestone.id}): condType=${milestone.completeCondition.type} condValue=${milestone.completeCondition.value} met=${met}`);
-          // #endregion
-          if (met) {
-            // Force-unlock
-            const fp = await UserJourneyProgress.findOne({ userId, mapId });
-            if (fp && !fp.unlockedMilestones.includes(milestone.id)) {
-              fp.unlockedMilestones.push(milestone.id);
-              await fp.save();
-            }
-            const result = await completeMilestone(userId, milestone.id, mapId);
-            if (result.success && result.rewards) {
-              completed.push(milestone.id);
-              totalXPEarned += result.rewards.xp;
-              console.log(`✅ [JOURNEY] Completed milestone (post-seed): ${milestone.name}`);
-              await checkAndUnlockMilestones(userId, mapId);
-            }
-          }
-        }
-      }
-
-      if (completed.length > 0) {
-        console.log(`✅ [JOURNEY] Completed ${completed.length} milestones for user ${userId} after auto-seed`);
-      }
-      return { completed, unlocked: newlyUnlocked, totalXPEarned };
-    } catch (seedError) {
-      console.error(`❌ [JOURNEY-SEED] Failed to auto-seed milestones:`, seedError);
-    }
+  // If no milestones found, log warning (admin must use the wizard to generate milestones)
+  if (allMilestones.length === 0) {
+    console.warn(`⚠️ [JOURNEY] No milestones found for mapId="${mapId}" — run the admin Gamification Wizard to generate milestones.`);
+    return { completed, unlocked: newlyUnlocked, totalXPEarned };
   }
 
   // #region agent log
@@ -1200,8 +1159,9 @@ export async function getJourneyStats(userId: string): Promise<{
   await connectToDatabase();
 
   const progress = await UserJourneyProgress.findOne({ userId }).lean();
+  const activeMapId = progress?.mapId || await getFirstActiveMapId();
   const totalMilestones = await JourneyMilestone.countDocuments({ 
-    mapId: progress?.mapId || "traders_journey",
+    mapId: activeMapId,
     isActive: true,
     isRequired: true,
   });
@@ -1242,9 +1202,10 @@ export async function getJourneyStats(userId: string): Promise<{
  */
 export async function calculateMilestoneProgress(
   userId: string,
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<Array<{ milestoneId: string; currentValue: number; targetValue: number }>> {
   await connectToDatabase();
+  if (!mapId) mapId = await getFirstActiveMapId();
 
   const progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   if (!progress) return [];

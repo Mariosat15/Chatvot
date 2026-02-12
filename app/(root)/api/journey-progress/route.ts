@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
-import { getUserJourneyProgress, checkAndCompleteMilestones } from "@/lib/services/journey-progress.service";
+import { getUserJourneyProgress, checkAndCompleteMilestones, getFirstActiveMapId } from "@/lib/services/journey-progress.service";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     let userId = searchParams.get("userId");
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await getFirstActiveMapId();
 
     // If no userId provided, try to get from session
     if (!userId) {
@@ -69,16 +69,17 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id;
     
-    // Get mapId from request body if provided
-    let mapId = "traders_journey";
+    // Get mapId from request body if provided, otherwise resolve dynamically
+    let mapId: string | undefined;
     try {
       const body = await request.json();
       if (body.mapId) {
         mapId = body.mapId;
       }
     } catch {
-      // No body or invalid JSON, use default mapId
+      // No body or invalid JSON — mapId will be resolved dynamically
     }
+    if (!mapId) mapId = await getFirstActiveMapId();
 
     // Check and complete any eligible milestones (also checks unlocks first)
     const result = await checkAndCompleteMilestones(userId, mapId);

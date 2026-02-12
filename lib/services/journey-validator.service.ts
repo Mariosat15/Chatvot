@@ -115,9 +115,13 @@ export function calculateDifficultyScore(condition: IMilestoneCondition): number
  * Validate that milestones form a proper linear progression
  */
 export async function validateJourneyProgression(
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<ValidationResult> {
   await connectToDatabase();
+  if (!mapId) {
+    const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+    mapId = first?.mapId || "pirate_cove";
+  }
   
   const milestones = await JourneyMilestone.find({ mapId, isActive: true })
     .sort({ order: 1 })
@@ -234,9 +238,13 @@ export async function validateJourneyProgression(
  * Auto-fix common progression issues
  */
 export async function autoFixProgression(
-  mapId: string = "traders_journey"
+  mapId?: string
 ): Promise<{ fixed: number; issues: string[] }> {
   await connectToDatabase();
+  if (!mapId) {
+    const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+    mapId = first?.mapId || "pirate_cove";
+  }
   
   const milestones = await JourneyMilestone.find({ mapId, isActive: true })
     .sort({ order: 1 });

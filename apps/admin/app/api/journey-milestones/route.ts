@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
+
+/** Resolve active mapId dynamically instead of hardcoding */
+async function resolveMapId(): Promise<string> {
+  const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+  if (first?.mapId) return first.mapId;
+  const ids = await JourneyMilestone.distinct("mapId", { isActive: true });
+  const nonLegacy = ids.filter((id: string) => id !== "traders_journey");
+  return nonLegacy.length > 0 ? nonLegacy[0] : ids[0] || "pirate_cove";
+}
 
 /**
  * GET /api/journey-milestones
@@ -11,7 +21,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await resolveMapId();
     const milestoneId = searchParams.get("id");
     const zoneId = searchParams.get("zoneId");
 
@@ -53,7 +63,7 @@ export async function GET(request: NextRequest) {
 function buildMilestoneDoc(data: any) {
   return {
     id: data.id,
-    mapId: data.mapId || "traders_journey",
+    mapId: data.mapId || "pirate_cove",
     name: data.name,
     description: data.description || "",
     shortDescription: data.shortDescription || "",
@@ -279,7 +289,7 @@ export async function DELETE(request: NextRequest) {
     const milestoneId = searchParams.get("id");
     const deleteAll = searchParams.get("all") === "true";
     const deleteAllMaps = searchParams.get("deleteAllMaps") === "true";
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await resolveMapId();
 
     // Delete ALL milestones from ALL maps
     if (deleteAll && deleteAllMaps) {

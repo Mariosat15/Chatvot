@@ -68,7 +68,6 @@ const UserJourneyProgressSchema = new Schema<IUserJourneyProgress>(
     mapId: {
       type: String,
       required: true,
-      default: "traders_journey",
       index: true,
     },
     currentZone: {

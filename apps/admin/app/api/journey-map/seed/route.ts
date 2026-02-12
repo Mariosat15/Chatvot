@@ -5,8 +5,9 @@ import JourneyMilestone from "@/database/models/journey-milestone.model";
 import { DEFAULT_MAP_CONFIG, DEFAULT_MILESTONES } from "@/lib/constants/journey-map-template";
 
 /**
- * Seed the default journey map and milestones
- * This will DELETE all existing milestones and create fresh ones from the template
+ * @deprecated — Use the Gamification Wizard to generate milestones instead.
+ * This seeds from the LEGACY traders_journey template.
+ * The wizard uses milestone-blueprint.ts as the single source of truth.
  */
 async function seedJourneyMap() {
   await connectToDatabase();

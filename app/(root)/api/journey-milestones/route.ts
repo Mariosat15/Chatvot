@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
+import { getFirstActiveMapId } from "@/lib/services/journey-progress.service";
 
 /**
  * GET /api/journey-milestones
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const mapId = searchParams.get("mapId") || "traders_journey";
+    const mapId = searchParams.get("mapId") || await getFirstActiveMapId();
     const zoneId = searchParams.get("zoneId");
 
     // Build query
