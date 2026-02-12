@@ -2723,7 +2723,7 @@ export default function JourneyMapEditorSection() {
             onClick={async () => {
               try {
                 setSavingDefaults(true);
-                toast.loading("Saving milestones as white-label default...", { id: "save-milestone-defaults" });
+                toast.loading("Saving milestones as defaults...", { id: "save-milestone-defaults" });
                 const res = await fetch("/api/admin/whitelabel-defaults", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -2733,7 +2733,7 @@ export default function JourneyMapEditorSection() {
                 if (data.success) {
                   const count = data.results?.milestones?.count || 0;
                   toast.success(
-                    `Saved ${count} milestones as white-label default!\nWill persist through DB resets and new deployments.`,
+                    `Saved ${count} milestones as defaults!\nWill persist through DB resets and new deployments.`,
                     { id: "save-milestone-defaults", duration: 5000 },
                   );
                 } else {

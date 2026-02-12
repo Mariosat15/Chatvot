@@ -527,16 +527,16 @@ export default function BadgeXPManagementSection() {
         </div>
       </div>
 
-      {/* Save as White-Label Default */}
+      {/* Save as Defaults */}
       <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-2 border-indigo-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Save className="h-5 w-5 text-indigo-400" />
-              White-Label Defaults
+              Save as Defaults
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Save the current badges and XP config as default for all new white-label deployments. These defaults are restored on database reset and seed.
+              Save the current badges and XP config as defaults. These are restored on database reset and seed, and used for new deployments.
             </p>
           </div>
           <Button
@@ -586,7 +586,7 @@ export default function BadgeXPManagementSection() {
             {savingDefaults ? (
               <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
             ) : (
-              <><Save className="h-4 w-4 mr-2" /> Save as White-Label Default</>
+              <><Save className="h-4 w-4 mr-2" /> Save as Defaults</>
             )}
           </Button>
         </div>
