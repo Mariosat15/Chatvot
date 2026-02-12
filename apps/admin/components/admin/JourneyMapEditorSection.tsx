@@ -32,7 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GameIconPicker } from "@/components/ui/GameIconPicker";
-import { type GameIconName } from "@/lib/constants/game-icons";
+import { type GameIconName, isValidGameIconName } from "@/lib/constants/game-icons";
 import {
   Map,
   Target,
@@ -563,7 +563,7 @@ export default function JourneyMapEditorSection() {
         { type: "win_streak", step: 1, icon: "fireSpell", descVerb: "Reach a" },
         { type: "unique_pairs_traded", step: 1, icon: "compass", descVerb: "Trade" },
         { type: "daily_trading_streak", step: Math.max(1, Math.floor(mapIndex / 2)), icon: "flag", descVerb: "Maintain a" },
-        { type: "competitions_entered", step: 1, icon: "arena", descVerb: "Enter" },
+        { type: "competitions_entered", step: 1, icon: "pirateSword", descVerb: "Enter" },
         { type: "competitions_completed", step: 1, icon: "banner", descVerb: "Complete" },
       ];
 
@@ -643,6 +643,29 @@ export default function JourneyMapEditorSection() {
 
     console.log(`[Blueprint Gen] Generating Map ${mapIndex}: ${metadata.name} with ${blueprint.length} milestones (requested: ${targetCount})`);
 
+    // ── Fetch real badges from DB to validate requiredBadgeIds & rewardBadgeId ──
+    let validBadgeIds = new Set<string>();
+    try {
+      const badgesRes = await fetch("/api/badges");
+      if (badgesRes.ok) {
+        const badgesData = await badgesRes.json();
+        const allBadges = badgesData.badges || badgesData || [];
+        validBadgeIds = new Set(allBadges.map((b: any) => b.id));
+        console.log(`[Blueprint Gen] Loaded ${validBadgeIds.size} badge IDs from DB for validation`);
+      }
+    } catch (err) {
+      console.warn("[Blueprint Gen] Could not fetch badges for validation, skipping badge-gate validation");
+    }
+
+    // Theme-based fallback icons for invalid icon names in blueprints
+    const THEME_FALLBACK_ICONS: Record<string, string> = {
+      pirate: "pirateShip", space: "star1", medieval: "sword1",
+      cyber: "tech1", ancient: "scrollAward", volcanic: "fireSpell",
+      arctic: "iceSpell", dragon: "fireSpell", celestial: "star2",
+      legendary: "crown",
+    };
+    const themeFallbackIcon = THEME_FALLBACK_ICONS[metadata.theme] || "starBadge";
+
     // Convert blueprint to milestones (with badge-gating and seasonal support)
     const milestones = blueprint.map((bp, index) => {
       const progress = index / blueprint.length;
@@ -653,6 +676,27 @@ export default function JourneyMapEditorSection() {
       const x = 120 + (col * 220) + (Math.random() * 40 - 20);
       const y = 100 + (row * 160) + (Math.random() * 30 - 15);
 
+      // Validate icon — use theme fallback if blueprint icon doesn't exist in registry
+      const validatedIcon = isValidGameIconName(bp.icon) ? bp.icon : themeFallbackIcon;
+
+      // Validate requiredBadgeIds — only keep IDs that exist in DB
+      const rawBadgeGates = bp.requiredBadgeIds || [];
+      const validatedBadgeGates = validBadgeIds.size > 0
+        ? rawBadgeGates.filter((bid: string) => {
+            if (validBadgeIds.has(bid)) return true;
+            console.warn(`[Blueprint Gen] Milestone "${bp.name}": removed non-existent badge gate "${bid}"`);
+            return false;
+          })
+        : rawBadgeGates;
+
+      // Validate rewardBadgeId — only use if it exists in DB
+      const validatedRewardBadge = bp.rewardBadgeId && validBadgeIds.size > 0
+        ? (validBadgeIds.has(bp.rewardBadgeId) ? bp.rewardBadgeId : undefined)
+        : bp.rewardBadgeId;
+      if (bp.rewardBadgeId && validBadgeIds.size > 0 && !validBadgeIds.has(bp.rewardBadgeId)) {
+        console.warn(`[Blueprint Gen] Milestone "${bp.name}": removed non-existent reward badge "${bp.rewardBadgeId}"`);
+      }
+
       return {
         id: `${metadata.mapId}_${bp.id}`,
         mapId: metadata.mapId,
@@ -662,15 +706,15 @@ export default function JourneyMapEditorSection() {
         zoneId: `zone_${Math.floor(progress * 4) + 1}`,
         position: { x: Math.round(x), y: Math.round(y) },
         nodeType: bp.nodeType,
-        icon: bp.icon,
+        icon: validatedIcon,
         color: bp.nodeType === "start" ? "#22C55E" : bp.nodeType === "legendary" ? "#F59E0B" : bp.nodeType === "checkpoint" ? "#8B5CF6" : "#3B82F6",
         size: bp.nodeType === "legendary" ? "large" : bp.nodeType === "checkpoint" ? "medium" : "medium",
         unlockCondition: index > 0 
           ? { type: "milestone_complete", milestoneId: `${metadata.mapId}_${blueprint[index - 1].id}` }
           : undefined,
         completeCondition: bp.condition,
-        rewards: bp.rewardBadgeId 
-          ? { xp: bp.xp, badgeId: bp.rewardBadgeId } 
+        rewards: validatedRewardBadge 
+          ? { xp: bp.xp, badgeId: validatedRewardBadge } 
           : { xp: bp.xp },
         connectedTo: index < blueprint.length - 1 ? [`${metadata.mapId}_${blueprint[index + 1].id}`] : [],
         connectedFrom: index > 0 ? [`${metadata.mapId}_${blueprint[index - 1].id}`] : [],
@@ -679,8 +723,8 @@ export default function JourneyMapEditorSection() {
         order: index + 1,
         orderInMap: index + 1,
         isActive: true,
-        // Badge-gated milestone support (from blueprint)
-        requiredBadgeIds: bp.requiredBadgeIds || [],
+        // Badge-gated milestone support (validated against real DB badges)
+        requiredBadgeIds: validatedBadgeGates,
         // Seasonal milestone support (from blueprint)
         isSeasonal: bp.isSeasonal || false,
         seasonTag: bp.seasonTag || undefined,
