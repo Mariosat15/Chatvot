@@ -8,6 +8,7 @@ import TradeHistory from "@/database/models/trading/trade-history.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { evaluateMilestoneCondition } from "@/lib/services/journey-milestone-evaluation.service";
+import UserBadge from "@/database/models/user-badge.model";
 
 /**
  * POST /api/journey/evaluate
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
     // Gather user's actual stats (this also validates the user exists via wallet/trades)
     const userStats = await getUserStats(userId);
     // console.log(`[Journey Evaluate] User ${userId} stats:`, userStats);
+
+    // Pre-fetch user's earned badge IDs for badge-gated milestone checks
+    const earnedBadges = await UserBadge.find({ userId }).select("badgeId").lean();
+    const userBadgeIds = new Set(earnedBadges.map((b: any) => b.badgeId));
 
     // Get all maps and milestones
     const maps = await JourneyMapConfig.find({ isActive: true })
@@ -95,6 +100,12 @@ export async function POST(request: NextRequest) {
         // Skip if already completed
         if (completedIds.includes(milestone.id)) continue;
 
+        // BADGE GATE: If milestone requires specific badges, skip if user doesn't have them
+        if (milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0) {
+          const hasAllBadges = milestone.requiredBadgeIds.every((bid: string) => userBadgeIds.has(bid));
+          if (!hasAllBadges) continue; // Skip - user hasn't earned required badges
+        }
+
         // Check if milestone condition is met
         let isMet = false;
         const condition = milestone.completeCondition;
@@ -132,13 +143,20 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Unlock milestone if it's the first or previous is completed
+        // Unlock milestone if it's the first or previous is completed (with badge gate)
         const isUnlocked = progress.unlockedMilestones?.includes(milestone.id);
         if (!isUnlocked) {
-          const shouldUnlock = 
+          // Badge gate check for unlocking too
+          let passesBadgeGate = true;
+          if (milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0) {
+            passesBadgeGate = milestone.requiredBadgeIds.every((bid: string) => userBadgeIds.has(bid));
+          }
+
+          const shouldUnlock = passesBadgeGate && (
             milestone.order === 1 || 
             !milestone.connectedFrom?.length ||
-            milestone.connectedFrom?.some((prevId: string) => completedIds.includes(prevId));
+            milestone.connectedFrom?.some((prevId: string) => completedIds.includes(prevId))
+          );
           
           if (shouldUnlock) {
             progress.unlockedMilestones.push(milestone.id);

@@ -102,6 +102,11 @@ function getUserFriendlyMessage(result: any): string {
     return `"${conditionType}" is a yes/no condition but uses "equals" comparison. A user with 500 trades won't match "equals 1". Change comparison to "greater or equal" (≥).`;
   }
 
+  // Counter type with eq comparison
+  if (!passed && COUNTER_TYPES_PREFER_GTE.has(conditionType) && condition?.comparison === "eq") {
+    return `"${conditionType}" uses "equals ${condition?.value}" — a user must have EXACTLY ${condition?.value}, not ${(condition?.value || 0) + 1}. This is usually an AI mistake. Click Fix to change to "≥" (greater or equal).`;
+  }
+
   return `This milestone failed testing. Check the condition type, value, and comparison below.`;
 }
 
@@ -128,6 +133,12 @@ function getIssueMessage(issue: string): string {
     return `Condition "${type}" is not recognized by the system. Click Fix to replace it with the closest supported type, or edit the milestone manually.`;
   }
 
+  if (issue.includes("Counter condition") && issue.includes("equals")) {
+    const typeMatch = issue.match(/"([^"]+)"/);
+    const type = typeMatch?.[1] || "this type";
+    return `"${type}" is a cumulative counter — using "equals" means the user must hit the exact number, not go above it. Click Fix to change to "≥" (greater or equal), which is almost always what you want.`;
+  }
+
   if (issue.includes("condition.value is string")) {
     return `The condition value is stored as text instead of a number. This can cause comparison bugs. Click Fix to convert it.`;
   }
@@ -151,64 +162,96 @@ function getIssueMessage(issue: string): string {
   return issue;
 }
 
+// ─── COUNTER TYPES THAT SHOULD USE GTE ────────────────────────────────────
+// Cumulative counter conditions where "eq" is almost always wrong.
+// A user's count will grow over time, so "eq 27" means they'd have to
+// have EXACTLY 27 — not 26, not 28. These should use "gte" (≥).
+const COUNTER_TYPES_PREFER_GTE = new Set([
+  "total_trades", "winning_trades", "losing_trades",
+  "trades_today", "trades_this_week", "trades_this_month",
+  "consecutive_trading_days", "daily_trading_streak",
+  "different_assets_traded", "unique_pairs_traded",
+  "win_streak", "consecutive_wins_in_map", "max_win_streak",
+  "total_pnl", "total_deposited", "total_deposits",
+  "competitions_entered", "competitions_completed",
+  "first_place_finishes", "second_place_finishes", "third_place_finishes",
+  "podium_finishes", "top_10_finishes", "top_50_percent_finishes",
+  "competition_pnl", "total_badges", "referrals_made", "referrals_active",
+  "friends_added", "messages_sent", "stop_loss_used", "take_profit_used",
+  "account_age_days", "account_age", "active_days", "active_trading_days",
+  "login_streak", "consecutive_profitable_days", "perfect_day",
+  "comeback_victory", "comeback_trade",
+  "comp_perfect_run", "legend_rank_1", "legend_hall_of_fame",
+  "level_reached", "xp_threshold", "xp_earned_today", "xp_earned_this_week",
+]);
+
 // ─── MOCK STATS (camelCase matching gatherUserStats) ─────────────────────
-function generateProductionMockStats(conditionType: string, conditionValue: number): Record<string, any> {
+function generateProductionMockStats(
+  conditionType: string,
+  conditionValue: number,
+  comparison: string = "gte"
+): Record<string, any> {
   const v = conditionValue;
+  // For "eq" comparisons, use the EXACT target value so the test passes.
+  // For "gte"/"gt", use a value comfortably above the target.
+  const exact = comparison === "eq";
+  const s = (min: number, offset: number) => exact ? v : Math.max(min, v + offset);
+
   return {
     userId: "mock-simulator-user",
-    totalTrades: Math.max(500, v + 10),
-    winningTrades: Math.max(300, v + 5),
-    losingTrades: Math.max(200, v + 5),
-    winRate: Math.max(60, v),
-    totalPnl: Math.max(10000, v + 100),
-    profitFactor: Math.max(2.5, v),
-    bestSingleTrade: Math.max(500, v + 50),
-    averageWin: Math.max(50, v + 5),
-    averageLoss: Math.max(25, v > 0 ? v : 25),
-    currentWinStreak: Math.max(20, v + 2),
-    maxWinStreak: Math.max(25, v + 5),
+    totalTrades: s(500, 10),
+    winningTrades: s(300, 5),
+    losingTrades: s(200, 5),
+    winRate: s(60, 0),
+    totalPnl: s(10000, 100),
+    profitFactor: s(2.5, 0),
+    bestSingleTrade: s(500, 50),
+    averageWin: s(50, 5),
+    averageLoss: exact ? v : Math.max(25, v > 0 ? v : 25),
+    currentWinStreak: s(20, 2),
+    maxWinStreak: s(25, 5),
     liquidationCount: 0,
-    maxDrawdown: 5,
+    maxDrawdown: exact ? v : 5,
     alwaysUsesSL: true,
     alwaysUsesTP: true,
-    tradesWithSL: Math.max(400, v + 10),
-    tradesWithTP: Math.max(400, v + 10),
-    totalDeposited: Math.max(5000, v + 100),
-    depositCount: Math.max(10, v + 1),
-    totalWithdrawn: 1000,
-    withdrawalCount: 2,
+    tradesWithSL: s(400, 10),
+    tradesWithTP: s(400, 10),
+    totalDeposited: s(5000, 100),
+    depositCount: s(10, 1),
+    totalWithdrawn: exact ? v : 1000,
+    withdrawalCount: exact ? v : 2,
     kycVerified: true,
-    accountAge: Math.max(365, v + 30),
-    consecutiveTradingDays: Math.max(30, v + 5),
-    consecutiveProfitableDays: Math.max(15, v + 3),
-    uniquePairsTraded: Math.max(15, v + 2),
-    differentAssetsTraded: Math.max(15, v + 2),
-    competitionsEntered: Math.max(30, v + 5),
-    completedCompetitions: Math.max(25, v + 3),
-    competitionsCompleted: Math.max(25, v + 3),
-    firstPlaceFinishes: Math.max(10, v + 2),
-    secondPlaceFinishes: Math.max(8, v + 1),
-    thirdPlaceFinishes: Math.max(5, v + 1),
-    podiumFinishes: Math.max(15, v + 2),
-    top10Finishes: Math.max(20, v + 3),
-    top50PercentFinishes: Math.max(22, v + 3),
-    competitionPnl: Math.max(5000, v + 500),
-    currentLevel: Math.max(10, v),
-    currentXP: Math.max(5000, v + 100),
-    xpEarnedToday: Math.max(50, v + 5),
-    xpEarnedThisWeek: Math.max(200, v + 20),
-    totalBadgesEarned: Math.max(20, v + 2),
-    referralsMade: Math.max(5, v + 1),
-    referralsActive: Math.max(3, v + 1),
-    friendsAdded: Math.max(10, v + 1),
-    messagesSent: Math.max(50, v + 5),
-    loginStreak: Math.max(30, v + 5),
-    maxPositionSize: 0.1,
-    maxTradesInOneDay: Math.max(20, v + 2),
-    maxTradesInOneWeek: Math.max(80, v + 10),
-    maxTradesInOneMonth: Math.max(300, v + 30),
-    comebackWins: Math.max(5, v + 1),
-    perfectCompetitionTrades: Math.max(3, v + 1),
+    accountAge: s(365, 30),
+    consecutiveTradingDays: s(30, 5),
+    consecutiveProfitableDays: s(15, 3),
+    uniquePairsTraded: s(15, 2),
+    differentAssetsTraded: s(15, 2),
+    competitionsEntered: s(30, 5),
+    completedCompetitions: s(25, 3),
+    competitionsCompleted: s(25, 3),
+    firstPlaceFinishes: s(10, 2),
+    secondPlaceFinishes: s(8, 1),
+    thirdPlaceFinishes: s(5, 1),
+    podiumFinishes: s(15, 2),
+    top10Finishes: s(20, 3),
+    top50PercentFinishes: s(22, 3),
+    competitionPnl: s(5000, 500),
+    currentLevel: s(10, 0),
+    currentXP: s(5000, 100),
+    xpEarnedToday: s(50, 5),
+    xpEarnedThisWeek: s(200, 20),
+    totalBadgesEarned: s(20, 2),
+    referralsMade: s(5, 1),
+    referralsActive: s(3, 1),
+    friendsAdded: s(10, 1),
+    messagesSent: s(50, 5),
+    loginStreak: s(30, 5),
+    maxPositionSize: exact ? v : 0.1,
+    maxTradesInOneDay: s(20, 2),
+    maxTradesInOneWeek: s(80, 10),
+    maxTradesInOneMonth: s(300, 30),
+    comebackWins: s(5, 1),
+    perfectCompetitionTrades: s(3, 1),
     profileComplete: true,
   };
 }
@@ -369,10 +412,10 @@ function evaluateWithProductionLogic(
       break;
     case "max_drawdown_under":
       currentValue = stats.maxDrawdown || 0;
-      return { met: value !== undefined && currentValue <= value, currentValue };
+      return { met: value !== undefined && currentValue! <= value, currentValue };
     case "position_size_under":
       currentValue = stats.maxPositionSize || 0;
-      return { met: value !== undefined && currentValue <= value, currentValue };
+      return { met: value !== undefined && currentValue! <= value, currentValue };
     case "account_age_days":
     case "account_age":
       currentValue = stats.accountAge || stats.accountAgeDays || 0;
@@ -460,6 +503,15 @@ function validateMilestoneInput(milestone: any): { issues: string[]; autoFixable
     if (cond.value !== undefined && cond.value !== 1) {
       suggestedFix["completeCondition.value"] = 1;
     }
+  }
+
+  // Counter/cumulative types should use gte, not eq
+  // Using eq means the user must have EXACTLY that count — not one more, not one less.
+  // This is almost always an AI wizard mistake.
+  if (cond.type && !BOOLEAN_TYPES.has(cond.type) && COUNTER_TYPES_PREFER_GTE.has(cond.type) && cond.comparison === "eq") {
+    issues.push(`Counter condition "${cond.type}" uses "equals" (eq) — user must have exactly ${cond.value}, not more. This is almost certainly wrong. Should use "≥" (gte).`);
+    autoFixable = true;
+    suggestedFix["completeCondition.comparison"] = "gte";
   }
 
   if (cond.type && !BOOLEAN_TYPES.has(cond.type) && !DB_DEPENDENT_TYPES.has(cond.type)) {
@@ -582,7 +634,7 @@ export async function POST(request: Request) {
         actual = false;
         reason = `Not recognized: "${condType}" is not handled in the codebase. This milestone will never complete for any user.`;
       } else {
-        const mockStats = generateProductionMockStats(condType, condValue);
+        const mockStats = generateProductionMockStats(condType, condValue, condition.comparison || "gte");
         const result = evaluateWithProductionLogic(condition, mockStats);
         actual = result.met;
         currentValue = result.currentValue;

@@ -88,6 +88,40 @@ export async function initializeUserJourney(
     isActive: true 
   }).lean();
 
+  // Filter connectedTo unlocks through badge gate
+  let initialUnlocks = [startNode];
+  if (startMilestone?.connectedTo && startMilestone.connectedTo.length > 0) {
+    // Check if any connected milestones have badge gates
+    const connectedMilestones = await JourneyMilestone.find({
+      id: { $in: startMilestone.connectedTo },
+      mapId,
+      isActive: true,
+    }).lean();
+
+    const hasBadgeGates = connectedMilestones.some(
+      (m: any) => m.requiredBadgeIds && m.requiredBadgeIds.length > 0
+    );
+
+    if (hasBadgeGates) {
+      const UserBadgeInit = (await import("@/database/models/user-badge.model")).default;
+      const earned = await UserBadgeInit.find({ userId }).select("badgeId").lean();
+      const badgeSet = new Set(earned.map((b: any) => b.badgeId));
+
+      for (const cm of connectedMilestones) {
+        const cmAny = cm as any;
+        if (cmAny.requiredBadgeIds && cmAny.requiredBadgeIds.length > 0) {
+          if (cmAny.requiredBadgeIds.every((bid: string) => badgeSet.has(bid))) {
+            initialUnlocks.push(cmAny.id);
+          }
+        } else {
+          initialUnlocks.push(cmAny.id);
+        }
+      }
+    } else {
+      initialUnlocks = [startNode, ...startMilestone.connectedTo];
+    }
+  }
+
   // Create new progress
   const progress = await UserJourneyProgress.create({
     userId,
@@ -99,7 +133,7 @@ export async function initializeUserJourney(
       completedAt: new Date(),
       rewards: { xp: startMilestone?.rewards?.xp || 0 },
     }] : [],
-    unlockedMilestones: [startNode, ...(startMilestone?.connectedTo || [])],
+    unlockedMilestones: initialUnlocks,
     totalXPFromJourney: startMilestone?.isAutoComplete ? (startMilestone?.rewards?.xp || 0) : 0,
     totalMilestonesCompleted: startMilestone?.isAutoComplete ? 1 : 0,
     journeyStartedAt: new Date(),
@@ -135,13 +169,32 @@ export async function quickSyncUnlocks(
   let hasChanges = false;
 
   // STRICTLY SEQUENTIAL: Only ONE milestone unlocked at a time
-  // Find the FIRST milestone (by order) that is NOT completed - that's the only one that should be unlocked
+  // Find the FIRST milestone (by order) that is NOT completed and passes badge gate
   let nextMilestoneToUnlock: typeof allMilestones[0] | null = null;
+
+  // Pre-fetch user badges for badge-gated check
+  let quickSyncBadgeIds: Set<string> | null = null;
+  const hasAnyBadgeGate = allMilestones.some(
+    (m: any) => m.requiredBadgeIds && m.requiredBadgeIds.length > 0
+  );
+  if (hasAnyBadgeGate) {
+    const UserBadgeQS = (await import("@/database/models/user-badge.model")).default;
+    const earned = await UserBadgeQS.find({ userId }).select("badgeId").lean();
+    quickSyncBadgeIds = new Set(earned.map((b: any) => b.badgeId));
+  }
   
   for (const milestone of allMilestones) {
     if (!completedIds.has(milestone.id)) {
+      // Check badge gate before unlocking
+      const mAny = milestone as any;
+      if (mAny.requiredBadgeIds && mAny.requiredBadgeIds.length > 0 && quickSyncBadgeIds) {
+        const hasAll = mAny.requiredBadgeIds.every((bid: string) => quickSyncBadgeIds!.has(bid));
+        if (!hasAll) {
+          continue; // Skip - user doesn't have required badges
+        }
+      }
       nextMilestoneToUnlock = milestone;
-      break; // Found the first uncompleted milestone by order
+      break;
     }
   }
 
@@ -183,9 +236,17 @@ export async function quickSyncUnlocks(
     progress.lastProgressAt = new Date();
     hasChanges = true;
 
-    // Find the NEXT milestone after this one
+    // Find the NEXT milestone after this one (respecting badge gates)
     const nextOrder = (nextMilestoneToUnlock.order || 0) + 1;
-    const nextAfterCompletion = allMilestones.find(m => (m.order || 0) >= nextOrder && !completedIds.has(m.id));
+    const nextAfterCompletion = allMilestones.find(m => {
+      if ((m.order || 0) < nextOrder || completedIds.has(m.id)) return false;
+      // Check badge gate
+      const mAny2 = m as any;
+      if (mAny2.requiredBadgeIds && mAny2.requiredBadgeIds.length > 0 && quickSyncBadgeIds) {
+        return mAny2.requiredBadgeIds.every((bid: string) => quickSyncBadgeIds!.has(bid));
+      }
+      return true;
+    });
     
     if (nextAfterCompletion) {
       progress.unlockedMilestones = [nextAfterCompletion.id];
@@ -701,6 +762,18 @@ export async function checkMilestoneCompletion(
     return { canComplete: false, isCompleted: false, isUnlocked: false, canUnlock };
   }
 
+  // BADGE GATE: Even if unlocked, check required badges before allowing completion
+  const msAny = milestone as any;
+  if (msAny.requiredBadgeIds && msAny.requiredBadgeIds.length > 0) {
+    const UserBadgeCheck = (await import("@/database/models/user-badge.model")).default;
+    const earnedBadges = await UserBadgeCheck.find({ userId }).select("badgeId").lean();
+    const userBadges = new Set(earnedBadges.map((b: any) => b.badgeId));
+    const hasAllBadges = msAny.requiredBadgeIds.every((bid: string) => userBadges.has(bid));
+    if (!hasAllBadges) {
+      return { canComplete: false, isCompleted: false, isUnlocked: true, canUnlock: true };
+    }
+  }
+
   // Check completion condition
   const { met, currentValue } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
 
@@ -774,15 +847,34 @@ export async function completeMilestone(
   const completedIds = new Set(progress.completedMilestones.map(m => m.milestoneId));
   completedIds.add(milestoneId); // Include the one we just completed
   
-  // Find the NEXT uncompleted milestone by order
+  // Pre-fetch user's badge IDs for badge-gated next-milestone check
+  let userBadgeIdsForNext: Set<string> | null = null;
+  const nextCandidates = allMilestones.filter(m => !completedIds.has(m.id));
+  const nextHasBadgeGate = nextCandidates.some(
+    (m: any) => m.requiredBadgeIds && m.requiredBadgeIds.length > 0
+  );
+  if (nextHasBadgeGate) {
+    const UserBadgeModel = (await import("@/database/models/user-badge.model")).default;
+    const earned = await UserBadgeModel.find({ userId }).select("badgeId").lean();
+    userBadgeIdsForNext = new Set(earned.map((b: any) => b.badgeId));
+  }
+
+  // Find the NEXT uncompleted milestone by order that passes badge gate
   const newUnlocks: string[] = [];
   let nextMilestone = null;
   
-  for (const m of allMilestones) {
-    if (!completedIds.has(m.id)) {
-      nextMilestone = m;
-      break;
+  for (const m of nextCandidates) {
+    // Check badge gate on the next milestone
+    const mAny = m as any;
+    if (mAny.requiredBadgeIds && mAny.requiredBadgeIds.length > 0 && userBadgeIdsForNext) {
+      const hasAll = mAny.requiredBadgeIds.every((bid: string) => userBadgeIdsForNext!.has(bid));
+      if (!hasAll) {
+        console.log(`🔒 [JOURNEY] Next milestone "${m.name}" blocked by badge gate - skipping to find next eligible`);
+        continue; // Skip badge-gated milestones the user can't unlock yet
+      }
     }
+    nextMilestone = m;
+    break;
   }
   
   // Clear unlocked list and set only the next milestone
@@ -1003,6 +1095,9 @@ export async function checkAndUnlockMilestones(
     // Badge-gated check: user must have earned ALL required badges
     if (canUnlock && ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0 && userBadgeIds) {
       const hasAllBadges = ms.requiredBadgeIds.every((bid: string) => userBadgeIds!.has(bid));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:checkAndUnlockMilestones',message:'Badge gate check',data:{milestoneId:milestone.id,milestoneName:milestone.name,requiredBadgeIds:ms.requiredBadgeIds,userBadges:[...userBadgeIds],hasAllBadges,canUnlockBefore:canUnlock},timestamp:Date.now(),hypothesisId:'H-BADGE-GATE',runId:'badge-debug'})}).catch(()=>{});
+      // #endregion
       if (!hasAllBadges) {
         canUnlock = false; // Missing required badges -- stay locked
       }
@@ -1080,32 +1175,46 @@ export async function checkAndCompleteMilestones(
     preloadedStats = await gatherUserStats(userId);
   }
 
-  // #region agent log
-  console.log(`🔍 [JOURNEY-DEBUG] userId=${userId} mapId=${mapId} completedCount=${completedIds.size} notCompletedCount=${notCompleted.length} allMilestonesCount=${allMilestones.length}`);
-  // #endregion
-
   // If no milestones found, log warning (admin must use the wizard to generate milestones)
   if (allMilestones.length === 0) {
     console.warn(`⚠️ [JOURNEY] No milestones found for mapId="${mapId}" — run the admin Gamification Wizard to generate milestones.`);
     return { completed, unlocked: newlyUnlocked, totalXPEarned };
   }
 
-  // #region agent log
-  if (preloadedStats) {
-    console.log(`🔍 [JOURNEY-DEBUG] Stats: totalTrades=${preloadedStats.totalTrades} winningTrades=${preloadedStats.winningTrades} depositCount=${preloadedStats.depositCount} kycVerified=${preloadedStats.kycVerified}`);
+  // Pre-fetch user's earned badge IDs for badge-gated milestone checks
+  let userBadgeIds: Set<string> | null = null;
+  const hasBadgeGated = notCompleted.some(
+    (m: any) => m.requiredBadgeIds && m.requiredBadgeIds.length > 0
+  );
+  if (hasBadgeGated) {
+    const UserBadge = (await import("@/database/models/user-badge.model")).default;
+    const earnedBadges = await UserBadge.find({ userId }).select("badgeId").lean();
+    userBadgeIds = new Set(earnedBadges.map((b: any) => b.badgeId));
   }
-  // #endregion
 
   // Check ALL non-completed milestones (allows out-of-order completion)
   for (const milestone of notCompleted) {
     // Check if this milestone's condition is met
     if (!milestone.completeCondition) continue;
+
+    // BADGE GATE: If milestone requires specific badges, check them first
+    const ms = milestone as any;
+    if (ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0) {
+      if (!userBadgeIds) {
+        console.log(`🔒 [JOURNEY] Milestone "${milestone.name}" requires badges but no badge data loaded - skipping`);
+        continue;
+      }
+      const hasAllBadges = ms.requiredBadgeIds.every((bid: string) => userBadgeIds!.has(bid));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:checkAndCompleteMilestones',message:'Badge gate in completion check',data:{milestoneId:milestone.id,milestoneName:milestone.name,requiredBadgeIds:ms.requiredBadgeIds,userBadges:[...userBadgeIds],hasAllBadges},timestamp:Date.now(),hypothesisId:'H-BADGE-GATE-COMPLETE',runId:'badge-debug'})}).catch(()=>{});
+      // #endregion
+      if (!hasAllBadges) {
+        console.log(`🔒 [JOURNEY] Milestone "${milestone.name}" blocked by badge gate: missing ${ms.requiredBadgeIds.filter((bid: string) => !userBadgeIds!.has(bid)).join(", ")}`);
+        continue; // Skip this milestone - required badges not earned
+      }
+    }
     
     const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
-    
-    // #region agent log
-    console.log(`🔍 [JOURNEY-DEBUG] Milestone "${milestone.name}" (${milestone.id}): condType=${milestone.completeCondition.type} condValue=${milestone.completeCondition.value} met=${met}`);
-    // #endregion
 
     if (met) {
       // Force-unlock this milestone if it's not already unlocked
