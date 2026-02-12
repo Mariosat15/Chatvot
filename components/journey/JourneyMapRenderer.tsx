@@ -970,13 +970,18 @@ export default function JourneyMapRenderer({
       <AnimatePresence>
         {modalOpen && selectedMilestone && (() => {
           const progress = milestoneProgress.find(p => p.milestoneId === selectedMilestone.id);
+          const milestoneStatus = getMilestoneStatus(selectedMilestone.id);
+          const isCompleted = milestoneStatus === "completed";
+          const targetVal = progress?.targetValue || selectedMilestone.completeCondition?.value || 1;
+          // If milestone is completed, show full progress (target/target) instead of defaulting to 0
+          const currentVal = isCompleted ? targetVal : (progress?.currentValue || 0);
           return (
             <MilestoneDetailModal
               milestone={selectedMilestone}
-              status={getMilestoneStatus(selectedMilestone.id)}
+              status={milestoneStatus}
               open={modalOpen}
-              currentValue={progress?.currentValue || 0}
-              targetValue={progress?.targetValue || selectedMilestone.completeCondition?.value || 1}
+              currentValue={currentVal}
+              targetValue={targetVal}
               onClose={() => {
                 setModalOpen(false);
                 setSelectedMilestone(null);

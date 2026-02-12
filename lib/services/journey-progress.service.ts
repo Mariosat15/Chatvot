@@ -1253,13 +1253,11 @@ export async function calculateMilestoneProgress(
     (progress.completedMilestones || []).map((m: any) => m.milestoneId)
   );
 
-  // Get milestones that are NOT completed
   const allMilestones = await JourneyMilestone.find({ mapId, isActive: true })
     .select("id completeCondition")
     .lean();
 
-  const notCompleted = allMilestones.filter((m) => !completedIds.has(m.id));
-  if (notCompleted.length === 0) return [];
+  if (allMilestones.length === 0) return [];
 
   // Gather stats once
   const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
@@ -1267,13 +1265,24 @@ export async function calculateMilestoneProgress(
 
   const results: Array<{ milestoneId: string; currentValue: number; targetValue: number }> = [];
 
-  for (const milestone of notCompleted) {
+  for (const milestone of allMilestones) {
     if (!milestone.completeCondition) continue;
 
-    const { currentValue } = await checkConditionMet(userId, milestone.completeCondition, stats);
     const targetValue = (typeof milestone.completeCondition.value === "number" 
       ? milestone.completeCondition.value 
       : 1);
+
+    // Completed milestones show full progress (target/target)
+    if (completedIds.has(milestone.id)) {
+      results.push({
+        milestoneId: milestone.id,
+        currentValue: targetValue,
+        targetValue,
+      });
+      continue;
+    }
+
+    const { currentValue } = await checkConditionMet(userId, milestone.completeCondition, stats);
 
     results.push({
       milestoneId: milestone.id,
