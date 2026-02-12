@@ -24,6 +24,7 @@ import { WhiteLabel } from "@/database/models/whitelabel.model";
 export const maxDuration = 120;
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import BadgeConfig from "@/database/models/badge-config.model";
 import {
   validateJourneyProgression,
   suggestNextMilestone,
@@ -68,6 +69,36 @@ async function getAIConfig(): Promise<AIConfig> {
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     enabled: process.env.OPENAI_ENABLED === "true",
   };
+}
+
+// ─── Dynamic badge context from database ────────────────────────────────────────
+async function buildBadgeContextForPrompt(): Promise<string> {
+  try {
+    const badges = await BadgeConfig.find({ isActive: true })
+      .select("id name category rarity condition")
+      .lean();
+    
+    if (!badges || badges.length === 0) {
+      return "AVAILABLE BADGES: None found in database. Do not use requiredBadgeIds or rewardBadgeId.";
+    }
+
+    // Group badges by category for readability
+    const grouped: Record<string, string[]> = {};
+    for (const b of badges as any[]) {
+      const cat = b.category || "Other";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(`${b.id}(${b.name}, ${b.rarity}, ${b.condition?.type || "manual"})`);
+    }
+
+    const lines = Object.entries(grouped).map(
+      ([cat, items]) => `- ${cat}: ${items.join(", ")}`
+    );
+
+    return `AVAILABLE BADGES (${badges.length} total, use ONLY these IDs for requiredBadgeIds and rewardBadgeId):\n${lines.join("\n")}`;
+  } catch (err) {
+    console.error("[AI Gen] Failed to build badge context:", err);
+    return "AVAILABLE BADGES: Error loading badges. Do not use requiredBadgeIds or rewardBadgeId.";
+  }
 }
 
 // The Journey AI Agent System Prompt - Specialized for trading journey creation
@@ -139,15 +170,12 @@ THEME-SPECIFIC NAMING:
 
 BADGE-GATED MILESTONES:
 Some milestones should require specific badges before unlocking, creating a web of dependencies.
-Use "requiredBadgeIds" (an array of badge IDs) to gate important milestones.
-Available badge IDs for gating (use sparingly -- 1-3 per map max):
-- Competition: comp_5_entries, comp_10_entries, comp_3_wins, comp_5_wins, comp_10_wins, comp_5_podiums, comp_10_podiums
-- Trading: trade_25, trade_50, trade_100, trade_500, trade_1000
-- Risk: risk_survivor, risk_stop_master, risk_tp_master, risk_disciplined
-- Profit: profit_5_wins, profit_25_wins, profit_50_wins
+Use "requiredBadgeIds" (an array of badge IDs) to gate important milestones (1-3 per map max).
+ONLY use badge IDs from the AVAILABLE BADGES list provided in the user prompt. NEVER invent badge IDs.
 
 BADGE REWARDS:
 Milestones can award badges on completion. Use "rewardBadgeId" (a single badge ID string) for key checkpoints.
+ONLY use badge IDs that actually exist in the AVAILABLE BADGES list.
 
 SEASONAL MILESTONES (optional):
 Set "isSeasonal": true and "seasonTag": "event_name" for time-limited milestones. Use 0-1 per map maximum.
@@ -223,10 +251,13 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case "generate_full_journey": {
         // Generate a complete journey from scratch
+        const fullJourneyBadgeContext = await buildBadgeContextForPrompt();
         const userPrompt = `Generate a COMPLETE trading journey with ${count} milestones.
 
 THEME: ${theme} (use ${theme}-themed names and descriptions)
 STARTING ORDER: ${startOrder}
+
+${fullJourneyBadgeContext}
 
 Requirements:
 1. Start with the easiest achievement (account_created if order=1)
@@ -234,6 +265,7 @@ Requirements:
 3. Each milestone MUST be progressively harder
 4. Include a good mix of trading, competition, and profit milestones
 5. Use creative ${theme}-themed names (e.g., "Set Sail", "First Treasure", "Pirate King")
+6. Use requiredBadgeIds sparingly at key checkpoints. ONLY use IDs from AVAILABLE BADGES above.
 
 Generate EXACTLY ${count} milestones in strictly increasing difficulty order.`;
 
@@ -505,6 +537,9 @@ Analyze and return JSON with:
         
         console.log(`[AI Gen] Generating ${targetMilestoneCount} milestones for Map ${mapOrder}: ${mapConfig.name}`);
         
+        // Fetch real badges from DB for badge-gating context
+        const badgeContext = await buildBadgeContextForPrompt();
+        
         // Build a detailed prompt with full previous-map awareness
         const prevProgressText = previousMapsProgress.length > 0
           ? `PREVIOUS MAPS HIGHEST VALUES (you MUST use HIGHER values than these):\n${previousMapsProgress.map(p => `  - ${p.type}: ${p.maxValue}`).join('\n')}\n\nALREADY USED (DO NOT reuse these exact type:value pairs):\n  ${usedConditionKeys.slice(-30).join(', ')}`
@@ -532,6 +567,8 @@ STAGE FOR THIS MAP: ${stageGuide}
 
 ${prevProgressText}
 
+${badgeContext}
+
 RULES:
 1. Use ${mapConfig.theme}-themed names (e.g., ${mapOrder === 1 ? 'Pirate: Set Sail, Treasure Hunt' : mapOrder === 10 ? 'Legendary: Trading God, Immortal Trader' : `${mapConfig.theme}: creative themed names`})
 2. STRICTLY progressive difficulty (each milestone MUST be harder than previous)
@@ -541,6 +578,7 @@ RULES:
 6. NEVER duplicate a condition type+value pair from previous maps
 7. Mix condition types: use at least 3-4 different types per map
 8. Value range guide: ${stageGuide}
+9. Use requiredBadgeIds sparingly (1-3 per map) at strategic checkpoints. ONLY use badge IDs from the AVAILABLE BADGES list above.
 
 Generate EXACTLY ${targetMilestoneCount} milestones. Return compact JSON.`;
 
@@ -712,6 +750,9 @@ Generate EXACTLY ${targetMilestoneCount} milestones. Return compact JSON.`;
         // Generate all 10 maps at once
         const { startFromMap = 1, endAtMap = 10 } = body;
         
+        // Fetch badges from DB once for the entire sequence
+        const seqBadgeContext = await buildBadgeContextForPrompt();
+        
         const allMaps: any[] = [];
         const usedConditions = new Set<string>();
         let cumulativeTradesRequired = 0;
@@ -756,10 +797,13 @@ ALL values in this map MUST be HIGHER than these.
 
 ALREADY USED CONDITIONS (DO NOT duplicate): ${usedCondArr.slice(-30).join(', ')}
 
+${seqBadgeContext}
+
 ${mapIndex > 1 ? `First milestone MUST be: { type: "map_completed", value: "${MAP_SEQUENCE[mapIndex - 2]?.mapId}" } (start node)` : 'First milestone: account_created (start node)'}
 Last milestone: legendary node type.
 
 XP budget: ${mapConfig.xpBudget}. Use ${mapConfig.theme}-themed names. Mix 3-4+ condition types.
+Use requiredBadgeIds sparingly (1-3 per map) at key checkpoints. ONLY use IDs from the AVAILABLE BADGES above.
 Return compact JSON.`;
 
           const completion = await openai.chat.completions.create({

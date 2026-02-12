@@ -15,6 +15,7 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
+import { isValidGameIconName } from "@/lib/constants/game-icons";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
@@ -80,6 +81,24 @@ const dbTools = {
           results.skipped++;
           continue;
         }
+        // ── Validate / fix icon ──
+        if (clean.icon && !isValidGameIconName(clean.icon)) {
+          const CATEGORY_ICON_FALLBACK: Record<string, string> = {
+            Competition: "trophy",
+            Trading: "trade",
+            Profit: "profit",
+            Risk: "shield1",
+            Speed: "lightningSpell",
+            Consistency: "target",
+            Strategy: "portfolio",
+            Social: "heart",
+            Legendary: "crown",
+          };
+          const fallback = CATEGORY_ICON_FALLBACK[clean.category || ""] || "starBadge";
+          console.log(`[Wizard] Badge ${clean.id}: invalid icon "${clean.icon}" → fallback "${fallback}"`);
+          clean.icon = fallback;
+        }
+
         // ── Sanitize numeric fields ──
         const minLevel = Math.max(0, Math.min(20, Number(clean.minLevel) || 0));
         if (clean.condition) {
@@ -148,11 +167,23 @@ const dbTools = {
             results.skipped++;
             continue;
           }
+          const CATEGORY_ICON_DEFAULT: Record<string, string> = {
+            Competition: "trophy",
+            Trading: "trade",
+            Profit: "profit",
+            Risk: "shield1",
+            Speed: "lightningSpell",
+            Consistency: "target",
+            Strategy: "portfolio",
+            Social: "heart",
+            Legendary: "crown",
+          };
+          const defaultIcon = CATEGORY_ICON_DEFAULT[clean.category || ""] || "starBadge";
           await BadgeConfig.create({
             ...clean,
             minLevel,
             isActive: true,
-            icon: clean.icon || "🏆",
+            icon: clean.icon || defaultIcon,
           });
           results.created++;
         }
@@ -212,11 +243,11 @@ const dbTools = {
 // Instead of pretty JSON, use compact CSV-like format to cut prompt size by ~70%
 
 function badgesToCompact(badges: any[]): string {
-  // One line per badge: id|name|category|rarity|minLevel|condType|condValue|condComp|minTrades|minComps
-  const header = "id|name|cat|rarity|minLvl|condType|condVal|comp|minTrades|minComps";
+  // One line per badge: id|name|category|rarity|minLevel|icon|condType|condValue|condComp|minTrades|minComps
+  const header = "id|name|cat|rarity|minLvl|icon|condType|condVal|comp|minTrades|minComps";
   const lines = (badges as any[]).map((b) => {
     const c = b.condition || {};
-    return `${b.id}|${b.name}|${b.category}|${b.rarity}|${b.minLevel || 0}|${c.type || "manual"}|${c.value ?? ""}|${c.comparison || "gte"}|${c.minTrades || 0}|${c.minCompletedCompetitions || 0}`;
+    return `${b.id}|${b.name}|${b.category}|${b.rarity}|${b.minLevel || 0}|${b.icon || ""}|${c.type || "manual"}|${c.value ?? ""}|${c.comparison || "gte"}|${c.minTrades || 0}|${c.minCompletedCompetitions || 0}`;
   });
   return [header, ...lines].join("\n");
 }
@@ -243,14 +274,35 @@ RULES:
 2. minLevel gates: common=0-1, rare=2-4, epic=5-10, legendary=8-15.
 3. Rarity matches difficulty: common=easy(week), rare=moderate(month), epic=hard(2-3mo), legendary=extreme(6mo+).
 4. Common:5-25trades, Rare:25-100trades, Epic:100-500trades, Legendary:500+trades.
+5. icon MUST be a valid GameIconName from the AVAILABLE ICONS list below. NEVER use emojis.
+
+AVAILABLE ICONS (pick the best match for each badge category and theme):
+Trophies: trophy, trophyStar, trophyGame, trophyFootball, trophyMusic, trophyMovie, trophy1, trophy2, trophy3, trophyCol1-trophyCol15
+Awards: starAward, starBadge, shieldAward, certificateAward, graduationAward, scrollAward, award, giftAward, studyAward, champion, victory, goldMedal
+Stars/Rankings: star1, star2, star3, rank1-rank7, crown, medal7
+Currency: coin, coins, gems, treasure, chest, chest1-chest4, pouch1, pouch2, money, moneyDeposit, capital, pirateCoin
+Finance: profit, profitAlt, loss, trade, investment, portfolio, buy, sell, equity, dividend, valuation, inflation, hedge, gain, fluctuation, dollarFinance1-10, euroFinance1-10, finance1-10, longTermInvestment, goldInvest, dollarPlant
+Risk/Status: warning, warning2-warning10, riskWarning, riskManagement, riskAnalysis, riskControl, riskMonitoring, target, timer, skull, crisisRecovery
+Weapons: sword, sword1-sword6, swordKnight3D, axe1-axe4, hammer1-hammer3, bow3D, bomb1-bomb4, piratePistol, cannon
+Defense: shield1-shield4, magicShield3D, helmet1-helmet4, armor1-armor2, key, banner, flag, crown, compass
+Potions/Spells: healthPotion, energyPotion, lightningPotion, ragePotion, fireSpell, blueFireSpell, iceSpell, lightningSpell, poisonSpell
+Characters: rookie, lord, archer, war, wolf1-wolf20, animal1-animal10, parrot
+Pirate: pirateShip, anchor, pirateFlag, pirateHat, pirateSword, pirateMap, eyePatch, barrel, compass
+Gaming: joystick1-joystick3, headset, keyboard, wasd
+Rewards: reward1-reward5, heart, dream, medKit1, medKit2
+Seasonal: christmas1-20, halloween1-10, blackFriday1-10, cyber1-10
+Technology: tech1-tech10
+Renders: render1-render20
+Prototypes: roundProto-roundProto4, shieldProto-shieldProto4
 
 REQUIRED SCHEMA for each badge (especially NEW badges):
 {
   "id": "snake_case_id", "name": "Display Name", "description": "...",
-  "category": "Trading", "rarity": "common|rare|epic|legendary", "icon": "emoji",
+  "category": "Trading", "rarity": "common|rare|epic|legendary",
+  "icon": "<GameIconName from AVAILABLE ICONS above - NEVER use emojis>",
   "minLevel": 0-18,
   "condition": {
-    "type": "<MUST be one of: total_trades, winning_trades, win_rate, win_streak, max_win_streak, total_pnl, profit_factor, competitions_entered, competitions_completed, first_place_finishes, podium_finishes, top_10_finishes, consecutive_trading_days, unique_pairs_traded, no_liquidations, always_uses_sl, referrals_made, level_reached, xp_threshold, total_badges, platform_age, active_days, quick_scalps, net_profit_lifetime>",
+    "type": "<MUST be one of: total_trades, winning_trades, win_rate, win_streak, max_win_streak, total_pnl, profit_factor, competitions_entered, competitions_completed, first_place_finishes, podium_finishes, top_10_finishes, consecutive_trading_days, unique_pairs_traded, no_liquidations, always_uses_sl, always_uses_tp, stop_loss_used, take_profit_used, referrals_made, level_reached, xp_threshold, total_badges, platform_age, active_days, quick_scalps, net_profit_lifetime>",
     "value": <threshold number>,
     "minTrades": <required for Trading/Profit/Risk/Speed/Consistency/Strategy badges>,
     "minCompletedCompetitions": <required for Competition badges>
@@ -258,6 +310,8 @@ REQUIRED SCHEMA for each badge (especially NEW badges):
 }
 
 CRITICAL: Every badge MUST have condition.type set to a valid value from the list above.
+CRITICAL: icon MUST be a valid GameIconName string (e.g. "trophy", "shield1", "sword"). NEVER use emoji characters.
+When fixing existing badges with emoji icons, replace them with the best matching GameIconName.
 
 Return ONLY valid JSON. No markdown, no explanation.`;
 
@@ -485,9 +539,9 @@ Return JSON:
         });
       }
 
-      // Compact badge list for context (just IDs and condition types)
+      // Compact badge list for context (IDs, names, and condition types for smarter gating)
       const badgeContext = (badges as any[]).map((b) =>
-        `${b.id}(${b.rarity},Lv${b.minLevel || 0},${b.condition?.type || "manual"})`
+        `${b.id}("${b.name}",${b.rarity},Lv${b.minLevel || 0},${b.condition?.type || "manual"})`
       ).join(", ");
 
       const compactMilestones = milestonesToCompact(milestones);
