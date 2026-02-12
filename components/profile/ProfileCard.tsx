@@ -204,8 +204,9 @@ export default function ProfileCard({
 
               {/* === AVATAR FRAME === */}
               <div className="mx-3 mb-2">
-                <div className={`relative rounded-lg border-2 ${config.border} overflow-hidden bg-gradient-to-br ${config.headerBg} flex items-center justify-center py-6`}>
-                  <div className="absolute inset-0 opacity-15">
+                <div className={`relative rounded-lg border-2 ${config.border} overflow-hidden bg-gradient-to-br ${config.headerBg}`}>
+                  {/* Decorative pattern overlay */}
+                  <div className="absolute inset-0 opacity-15 z-10 pointer-events-none">
                     <div className="absolute inset-0" style={{
                       backgroundImage: "radial-gradient(circle at 30% 30%, white 2px, transparent 2px), radial-gradient(circle at 70% 70%, white 1px, transparent 1px)",
                       backgroundSize: "24px 24px",
@@ -213,30 +214,32 @@ export default function ProfileCard({
                   </div>
 
                   <motion.div
-                    className="relative z-10"
-                    initial={{ scale: 0.5, opacity: 0 }}
+                    className="relative w-full"
+                    initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.15, type: "spring", damping: 15 }}
                   >
-                    <div className="w-24 h-24 rounded-full bg-white/30 backdrop-blur-sm border-4 border-white/50 flex items-center justify-center overflow-hidden shadow-2xl">
-                      {loading ? (
-                        <Loader2 className="h-8 w-8 text-white animate-spin" />
-                      ) : profileImage && !imageError ? (
-                        <Image
-                          src={profileImage}
-                          alt=""
-                          width={96}
-                          height={96}
-                          className="w-full h-full object-cover"
-                          onError={() => setImageError(true)}
-                          unoptimized
-                        />
-                      ) : (
-                        <span className="text-4xl font-bold text-white drop-shadow-lg">
+                    {loading ? (
+                      <div className="w-full aspect-[16/10] flex items-center justify-center">
+                        <Loader2 className="h-10 w-10 text-white animate-spin" />
+                      </div>
+                    ) : profileImage && !imageError ? (
+                      <Image
+                        src={profileImage}
+                        alt=""
+                        width={360}
+                        height={220}
+                        className="w-full aspect-[16/10] object-cover"
+                        onError={() => setImageError(true)}
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="w-full aspect-[16/10] flex items-center justify-center">
+                        <span className="text-6xl font-bold text-white drop-shadow-lg">
                           {username.charAt(0).toUpperCase()}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </motion.div>
                 </div>
               </div>

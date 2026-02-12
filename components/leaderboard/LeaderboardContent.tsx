@@ -920,6 +920,21 @@ export default function LeaderboardContent({
                         : `#${entry.rank}`}
                     </div>
 
+                    {/* Profile Image */}
+                    <div className="relative flex-shrink-0">
+                      <ProfileImage
+                        src={entry.profileImage}
+                        fallbackLetter={entry.username}
+                        size="md"
+                        className="rounded-xl"
+                      />
+                      {isCurrentUser && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
+                          <span className="text-[8px] text-white font-bold">YOU</span>
+                        </div>
+                      )}
+                    </div>
+
                     {/* User Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
