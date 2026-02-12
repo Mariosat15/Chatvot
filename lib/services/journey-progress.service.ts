@@ -982,6 +982,116 @@ export async function checkAndCompleteMilestones(
 
   // #region agent log
   console.log(`🔍 [JOURNEY-DEBUG] userId=${userId} mapId=${mapId} completedCount=${completedIds.size} notCompletedCount=${notCompleted.length} allMilestonesCount=${allMilestones.length}`);
+  // #endregion
+
+  // AUTO-SEED: If no milestones exist for this mapId, seed them from the template
+  if (allMilestones.length === 0 && mapId === "traders_journey") {
+    // #region agent log
+    console.log(`🚨 [JOURNEY-SEED] No milestones found for mapId="${mapId}" — auto-seeding from template...`);
+    // #endregion
+    try {
+      const { DEFAULT_MILESTONES, DEFAULT_MAP_CONFIG } = await import("@/lib/constants/journey-map-template");
+      const JourneyMapConfig = (await import("@/database/models/journey-map-config.model")).default;
+
+      // Seed map config if missing
+      const existingMap = await JourneyMapConfig.findOne({ mapId });
+      if (!existingMap) {
+        await JourneyMapConfig.create({
+          mapId: DEFAULT_MAP_CONFIG.mapId,
+          name: DEFAULT_MAP_CONFIG.name,
+          description: DEFAULT_MAP_CONFIG.description,
+          zones: DEFAULT_MAP_CONFIG.zones,
+          defaultStartNode: DEFAULT_MAP_CONFIG.defaultStartNode,
+          backgroundColor: DEFAULT_MAP_CONFIG.backgroundColor,
+          backgroundImage: DEFAULT_MAP_CONFIG.backgroundImage,
+          isActive: true,
+          version: 1,
+        });
+        console.log(`✅ [JOURNEY-SEED] Created map config for "${mapId}"`);
+      }
+
+      // Seed milestones
+      let seeded = 0;
+      for (const m of DEFAULT_MILESTONES) {
+        const exists = await JourneyMilestone.findOne({ id: m.id, mapId });
+        if (!exists) {
+          await JourneyMilestone.create({
+            id: m.id,
+            mapId,
+            name: m.name,
+            description: m.description,
+            shortDescription: m.shortDescription,
+            zoneId: m.zoneId,
+            position: m.position,
+            nodeType: m.nodeType,
+            icon: m.icon,
+            color: m.color,
+            size: m.size,
+            unlockCondition: m.unlockCondition,
+            completeCondition: m.completeCondition,
+            rewards: m.rewards,
+            connectedTo: m.connectedTo,
+            connectedFrom: m.connectedFrom,
+            isRequired: m.isRequired ?? true,
+            isAutoComplete: m.isAutoComplete ?? false,
+            order: m.order,
+            tooltipText: m.tooltipText,
+            celebrationText: m.celebrationText,
+            isActive: true,
+          });
+          seeded++;
+        }
+      }
+      // #region agent log
+      console.log(`✅ [JOURNEY-SEED] Auto-seeded ${seeded} milestones for "${mapId}"`);
+      // #endregion
+
+      // Re-query milestones after seeding
+      const freshMilestones = await JourneyMilestone.find({ mapId, isActive: true })
+        .sort({ order: 1 })
+        .lean();
+      
+      // Re-run the completion check with the newly seeded milestones
+      const freshNotCompleted = freshMilestones.filter(m => !completedIds.has(m.id));
+      
+      if (freshNotCompleted.length > 0) {
+        const { gatherUserStats } = await import("@/lib/services/badge-evaluation.service");
+        preloadedStats = await gatherUserStats(userId);
+
+        for (const milestone of freshNotCompleted) {
+          if (!milestone.completeCondition) continue;
+          const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
+          // #region agent log
+          console.log(`🔍 [JOURNEY-DEBUG] Post-seed milestone "${milestone.name}" (${milestone.id}): condType=${milestone.completeCondition.type} condValue=${milestone.completeCondition.value} met=${met}`);
+          // #endregion
+          if (met) {
+            // Force-unlock
+            const fp = await UserJourneyProgress.findOne({ userId, mapId });
+            if (fp && !fp.unlockedMilestones.includes(milestone.id)) {
+              fp.unlockedMilestones.push(milestone.id);
+              await fp.save();
+            }
+            const result = await completeMilestone(userId, milestone.id, mapId);
+            if (result.success && result.rewards) {
+              completed.push(milestone.id);
+              totalXPEarned += result.rewards.xp;
+              console.log(`✅ [JOURNEY] Completed milestone (post-seed): ${milestone.name}`);
+              await checkAndUnlockMilestones(userId, mapId);
+            }
+          }
+        }
+      }
+
+      if (completed.length > 0) {
+        console.log(`✅ [JOURNEY] Completed ${completed.length} milestones for user ${userId} after auto-seed`);
+      }
+      return { completed, unlocked: newlyUnlocked, totalXPEarned };
+    } catch (seedError) {
+      console.error(`❌ [JOURNEY-SEED] Failed to auto-seed milestones:`, seedError);
+    }
+  }
+
+  // #region agent log
   if (preloadedStats) {
     console.log(`🔍 [JOURNEY-DEBUG] Stats: totalTrades=${preloadedStats.totalTrades} winningTrades=${preloadedStats.winningTrades} depositCount=${preloadedStats.depositCount} kycVerified=${preloadedStats.kycVerified}`);
   }
