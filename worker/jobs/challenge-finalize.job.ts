@@ -45,15 +45,40 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
     const challengesCollection = db.collection("challenges");
     const walletsCollection = db.collection("creditwallets");
 
-    // Recovery: Reset challenges stuck in "finalizing" for more than 5 minutes
-    // This handles cases where a process crashed mid-finalization
+    // Recovery: Reset challenges stuck in "finalizing" for more than 5 minutes.
+    // This handles cases where a process crashed mid-finalization (before transaction commit).
+    // SAFETY: Only reset if NO wallet transactions exist for this challenge (proves it was never committed).
+    // If wallet transactions exist, the challenge was committed — mark it "completed" instead.
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const stuckReset = await challengesCollection.updateMany(
-      { status: "finalizing", updatedAt: { $lt: fiveMinutesAgo } },
-      { $set: { status: "active" } },
-    );
-    if (stuckReset.modifiedCount > 0) {
-      console.log(`🔧 [RECOVERY] Reset ${stuckReset.modifiedCount} stuck "finalizing" challenge(s) back to "active"`);
+    const stuckChallenges = await challengesCollection
+      .find({ status: "finalizing", updatedAt: { $lt: fiveMinutesAgo } })
+      .toArray();
+
+    if (stuckChallenges.length > 0) {
+      const walletTxCollection = db.collection("wallettransactions");
+      for (const stuck of stuckChallenges) {
+        // Check if any challenge_win transaction exists for this challenge
+        const existingWinTx = await walletTxCollection.findOne({
+          challengeId: stuck._id.toString(),
+          transactionType: "challenge_win",
+        });
+
+        if (existingWinTx) {
+          // Challenge was finalized (wallet credited) but got stuck — mark completed
+          await challengesCollection.updateOne(
+            { _id: stuck._id },
+            { $set: { status: "completed" } },
+          );
+          console.log(`🔧 [RECOVERY] Challenge ${stuck._id} was stuck in "finalizing" but has wallet transactions — marking "completed"`);
+        } else {
+          // Challenge was NOT finalized — safe to reset to "active" for retry
+          await challengesCollection.updateOne(
+            { _id: stuck._id },
+            { $set: { status: "active" } },
+          );
+          console.log(`🔧 [RECOVERY] Reset stuck "finalizing" challenge ${stuck._id} back to "active" (no wallet transactions found)`);
+        }
+      }
     }
 
     // Early exit: skip all work if no pending or active challenges exist

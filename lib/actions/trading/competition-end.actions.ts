@@ -659,11 +659,8 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           walletMap.set(winner.userId.toString(), winnerWallet);
         }
 
-        const balanceBefore = winnerWallet.creditBalance || 0;
-        const balanceAfter = balanceBefore + prizeAmount;
-
-        // Add credits to winner's wallet
-        await CreditWallet.findOneAndUpdate(
+        // Add credits to winner's wallet — use { new: true } for accurate balance tracking
+        const updatedWinnerWallet = await CreditWallet.findOneAndUpdate(
           { userId: winner.userId },
           {
             $inc: {
@@ -671,8 +668,15 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               totalWonFromCompetitions: prizeAmount,
             },
           },
-          { session },
+          { session, new: true },
         );
+        const balanceAfter = updatedWinnerWallet?.creditBalance || prizeAmount;
+        const balanceBefore = balanceAfter - prizeAmount;
+
+        // Update the walletMap with fresh data so GM fee code sees correct balance
+        if (updatedWinnerWallet) {
+          walletMap.set(winner.userId.toString(), updatedWinnerWallet);
+        }
 
         // Create transaction record
         const transaction = await WalletTransaction.create(
@@ -1232,14 +1236,15 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
             walletMap.set(gmId.toString(), gmWallet);
           }
 
-          const balanceBefore = gmWallet.creditBalance || 0;
-          const balanceAfter = balanceBefore + totalEarning;
-
-          await CreditWallet.findOneAndUpdate(
+          // Use findOneAndUpdate with { new: true } for accurate balance tracking.
+          // This ensures balanceBefore is correct even if the GM was also a prize winner.
+          const updatedGmWallet = await CreditWallet.findOneAndUpdate(
             { userId: gmId },
             { $inc: { creditBalance: totalEarning } },
-            { session },
+            { session, new: true },
           );
+          const balanceAfter = updatedGmWallet?.creditBalance || totalEarning;
+          const balanceBefore = balanceAfter - totalEarning;
 
           // Create wallet transaction
           await WalletTransaction.create(
@@ -1518,18 +1523,19 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       },
     };
   } catch (error) {
-    // Only abort if session is still in transaction
+    // Only abort and release lock if the transaction was NOT committed.
+    // If the transaction committed (prizes already distributed), we must NOT reset to "active".
     if (session.inTransaction()) {
       await session.abortTransaction();
-    }
-    // Release the optimistic lock so another attempt can try
-    try {
-      await Competition.updateOne(
-        { _id: competitionId, status: "finalizing" },
-        { $set: { status: "active" } },
-      );
-    } catch {
-      // Best effort
+      // Release the optimistic lock ONLY when the transaction was aborted (not committed)
+      try {
+        await Competition.updateOne(
+          { _id: competitionId, status: "finalizing" },
+          { $set: { status: "active" } },
+        );
+      } catch {
+        // Best effort
+      }
     }
     console.error("❌ Error finalizing competition:", error);
     throw error;

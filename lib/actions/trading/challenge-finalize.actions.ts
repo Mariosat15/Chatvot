@@ -948,17 +948,24 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     };
 
     // Distribute prize based on outcome
+    // IMPORTANT: All wallet updates use atomic $inc to prevent race conditions.
+    // balanceBefore/balanceAfter are calculated from the atomic update result for accuracy.
     if (winnerId && !isTie) {
-      // Winner takes all
-      const winnerWallet = await CreditWallet.findOne({
-        userId: winnerId,
-      }).session(session);
-      if (winnerWallet) {
-        const balanceBefore = winnerWallet.creditBalance;
-        winnerWallet.creditBalance += winnerPrize;
-        winnerWallet.totalWonFromChallenges =
-          (winnerWallet.totalWonFromChallenges || 0) + winnerPrize;
-        await winnerWallet.save({ session });
+      // Winner takes all — atomic $inc for safe concurrent access
+      const updatedWallet = await CreditWallet.findOneAndUpdate(
+        { userId: winnerId },
+        {
+          $inc: {
+            creditBalance: winnerPrize,
+            totalWonFromChallenges: winnerPrize,
+          },
+        },
+        { session, new: true },
+      );
+
+      if (updatedWallet) {
+        const balanceAfter = updatedWallet.creditBalance;
+        const balanceBefore = balanceAfter - winnerPrize;
 
         await WalletTransaction.create(
           [
@@ -967,7 +974,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               transactionType: "challenge_win",
               amount: winnerPrize,
               balanceBefore,
-              balanceAfter: winnerWallet.creditBalance,
+              balanceAfter,
               currency: "EUR",
               exchangeRate: 1,
               status: "completed",
@@ -999,19 +1006,30 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         settings?.tiePrizeDistribution || "split_equally";
 
       if (tiePrizeDistribution === "split_equally") {
-        const splitPrize = Math.floor(winnerPrize / 2);
+        // Split prize: first participant gets ceiling, second gets floor (no credits lost)
+        const halfPrize = winnerPrize / 2;
+        const prizes = [Math.ceil(halfPrize), Math.floor(halfPrize)];
 
-        // Give half to each
-        for (const participant of [challenger, challenged]) {
-          const wallet = await CreditWallet.findOne({
-            userId: participant.userId,
-          }).session(session);
-          if (wallet) {
-            const balanceBefore = wallet.creditBalance;
-            wallet.creditBalance += splitPrize;
-            wallet.totalWonFromChallenges =
-              (wallet.totalWonFromChallenges || 0) + splitPrize;
-            await wallet.save({ session });
+        // Give half to each — atomic $inc for safe concurrent access
+        const participants = [challenger, challenged];
+        for (let i = 0; i < participants.length; i++) {
+          const participant = participants[i];
+          const splitPrize = prizes[i];
+
+          const updatedWallet = await CreditWallet.findOneAndUpdate(
+            { userId: participant.userId },
+            {
+              $inc: {
+                creditBalance: splitPrize,
+                totalWonFromChallenges: splitPrize,
+              },
+            },
+            { session, new: true },
+          );
+
+          if (updatedWallet) {
+            const balanceAfter = updatedWallet.creditBalance;
+            const balanceBefore = balanceAfter - splitPrize;
 
             await WalletTransaction.create(
               [
@@ -1020,7 +1038,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                   transactionType: "challenge_win",
                   amount: splitPrize,
                   balanceBefore,
-                  balanceAfter: wallet.creditBalance,
+                  balanceAfter,
                   currency: "EUR",
                   exchangeRate: 1,
                   status: "completed",
@@ -1044,15 +1062,20 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         loserId = challenged.userId;
         loserName = challenged.username;
 
-        const chalWallet = await CreditWallet.findOne({
-          userId: challenger.userId,
-        }).session(session);
-        if (chalWallet) {
-          const balanceBefore = chalWallet.creditBalance;
-          chalWallet.creditBalance += winnerPrize;
-          chalWallet.totalWonFromChallenges =
-            (chalWallet.totalWonFromChallenges || 0) + winnerPrize;
-          await chalWallet.save({ session });
+        const updatedChalWallet = await CreditWallet.findOneAndUpdate(
+          { userId: challenger.userId },
+          {
+            $inc: {
+              creditBalance: winnerPrize,
+              totalWonFromChallenges: winnerPrize,
+            },
+          },
+          { session, new: true },
+        );
+
+        if (updatedChalWallet) {
+          const balanceAfter = updatedChalWallet.creditBalance;
+          const balanceBefore = balanceAfter - winnerPrize;
 
           await WalletTransaction.create(
             [
@@ -1061,7 +1084,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                 transactionType: "challenge_win",
                 amount: winnerPrize,
                 balanceBefore,
-                balanceAfter: chalWallet.creditBalance,
+                balanceAfter,
                 currency: "EUR",
                 exchangeRate: 1,
                 status: "completed",
@@ -1192,17 +1215,22 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                 });
 
                 if (!existingWalletTx) {
-                  const balanceBefore = gmWallet.creditBalance || 0;
-                  await db.collection("creditwallets").updateOne(
+                  // Use findOneAndUpdate for accurate balance tracking:
+                  // returnDocument:"after" gives us the NEW balance, so balanceBefore = newBalance - amount
+                  const updatedGmWallet = await db.collection("creditwallets").findOneAndUpdate(
                     { userId: payment.gmId },
                     { $inc: { creditBalance: payment.amount } },
+                    { returnDocument: "after" },
                   );
+                  const balanceAfterGm = updatedGmWallet?.creditBalance || payment.amount;
+                  const balanceBeforeGm = balanceAfterGm - payment.amount;
+
                   await db.collection("wallettransactions").insertOne({
                     userId: payment.gmId,
                     transactionType: "gamemaster_earning",
                     amount: payment.amount,
-                    balanceBefore,
-                    balanceAfter: balanceBefore + payment.amount,
+                    balanceBefore: balanceBeforeGm,
+                    balanceAfter: balanceAfterGm,
                     currency: "EUR",
                     exchangeRate: 1,
                     status: "completed",
@@ -1408,19 +1436,23 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     );
     return { success: true, winnerId, winnerName, isTie };
   } catch (error) {
-    // Only abort if session is still in transaction
+    // Only abort and release lock if the transaction was NOT committed.
+    // If the transaction committed (status is "completed" in DB), we must NOT reset to "active"
+    // because the prize has already been distributed.
     if (session.inTransaction()) {
       await session.abortTransaction();
+      // Release the optimistic lock ONLY when the transaction was aborted (not committed)
+      try {
+        await Challenge.updateOne(
+          { _id: challengeId, status: "finalizing" },
+          { $set: { status: "active" } },
+        );
+      } catch {
+        // Best effort - if this fails, worker recovery will handle stuck "finalizing" after 5 min
+      }
     }
-    // Release the optimistic lock so another attempt can try
-    try {
-      await Challenge.updateOne(
-        { _id: challengeId, status: "finalizing" },
-        { $set: { status: "active" } },
-      );
-    } catch {
-      // Best effort - if this fails, manual intervention may be needed
-    }
+    // If session is NOT in transaction, the transaction was either committed or already aborted.
+    // Don't reset to "active" — the challenge is already "completed" (committed) or will be retried.
     console.error("Error finalizing challenge", challengeId, ":", error);
     throw error;
   } finally {
