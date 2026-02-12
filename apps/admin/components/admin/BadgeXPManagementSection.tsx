@@ -225,6 +225,7 @@ export default function BadgeXPManagementSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+  const [savingDefaults, setSavingDefaults] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -523,6 +524,71 @@ export default function BadgeXPManagementSection() {
             </div>
             <TrendingUp className="h-12 w-12 text-green-500" />
           </div>
+        </div>
+      </div>
+
+      {/* Save as White-Label Default */}
+      <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-2 border-indigo-500/30 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Save className="h-5 w-5 text-indigo-400" />
+              White-Label Defaults
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Save the current badges and XP config as default for all new white-label deployments. These defaults are restored on database reset and seed.
+            </p>
+          </div>
+          <Button
+            onClick={async () => {
+              try {
+                setSavingDefaults(true);
+                toast.loading("Saving badges & XP as default...", { id: "save-defaults" });
+
+                // Save badges
+                const badgeRes = await fetch("/api/admin/whitelabel-defaults", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "save", type: "badges" }),
+                });
+                const badgeData = await badgeRes.json();
+
+                // Save XP config
+                const xpRes = await fetch("/api/admin/whitelabel-defaults", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "save", type: "xp_config" }),
+                });
+                const xpData = await xpRes.json();
+
+                if (badgeData.success && xpData.success) {
+                  const badgeCount = badgeData.results?.badges?.count || 0;
+                  toast.success(
+                    `Saved as default! ${badgeCount} badges + XP config.\nThese will persist through resets and new deployments.`,
+                    { id: "save-defaults", duration: 5000 },
+                  );
+                } else {
+                  toast.error(
+                    `Failed: ${badgeData.error || xpData.error}`,
+                    { id: "save-defaults" },
+                  );
+                }
+              } catch (error) {
+                toast.error(`Error: ${error}`, { id: "save-defaults" });
+              } finally {
+                setSavingDefaults(false);
+              }
+            }}
+            disabled={savingDefaults}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+            size="lg"
+          >
+            {savingDefaults ? (
+              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+            ) : (
+              <><Save className="h-4 w-4 mr-2" /> Save as White-Label Default</>
+            )}
+          </Button>
         </div>
       </div>
 

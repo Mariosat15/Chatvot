@@ -4,15 +4,24 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import XPConfig from "@/database/models/xp-config.model";
 import { BADGES } from "@/lib/constants/badges";
 import { BADGE_XP_VALUES, TITLE_LEVELS } from "@/lib/constants/levels";
+import { getDefaultBadges, getDefaultXPConfig } from "@/lib/services/whitelabel-defaults.service";
 
 /**
  * Shared function to reset and reseed badges/XP
+ * Prefers saved white-label defaults, falls back to hardcoded constants
  */
 async function reseedBadgesAndXP() {
   console.log("🌱 Starting badge and XP seeding (FORCE RESET MODE)...");
 
   await connectToDatabase();
   console.log("✅ Connected to database");
+
+  // Check for saved defaults
+  const savedBadges = getDefaultBadges();
+  const savedXP = getDefaultXPConfig();
+  const badgeSource = (savedBadges && savedBadges.length > 0) ? "saved defaults" : "constants";
+  const xpSource = savedXP?.badgeXP ? "saved defaults" : "constants";
+  console.log(`📦 Badge source: ${badgeSource}, XP source: ${xpSource}`);
 
   // Count existing before deletion
   const existingBadgesBefore = await BadgeConfig.countDocuments();
@@ -29,36 +38,46 @@ async function reseedBadgesAndXP() {
   const deletedXP = await XPConfig.deleteMany({});
   console.log(`🗑️ Deleted ${deletedXP.deletedCount} XP configs`);
 
-  // INSERT fresh badges from constants
-  console.log(`🌱 Inserting ${BADGES.length} badges from constants...`);
-  const badgesToInsert = BADGES.map((badge) => ({
-    id: badge.id,
-    name: badge.name,
-    description: badge.description,
-    category: badge.category,
-    icon: badge.icon,
-    rarity: badge.rarity,
-    condition: badge.condition,
-    isActive: true,
-  }));
-
-  const insertedBadges = await BadgeConfig.insertMany(badgesToInsert);
-  console.log(`✅ Inserted ${insertedBadges.length} badges`);
+  // INSERT badges from saved defaults or constants
+  let insertedBadgesCount: number;
+  if (savedBadges && savedBadges.length > 0) {
+    console.log(`🌱 Inserting ${savedBadges.length} badges from saved defaults...`);
+    const insertedBadges = await BadgeConfig.insertMany(savedBadges);
+    insertedBadgesCount = insertedBadges.length;
+  } else {
+    console.log(`🌱 Inserting ${BADGES.length} badges from constants...`);
+    const badgesToInsert = BADGES.map((badge) => ({
+      id: badge.id,
+      name: badge.name,
+      description: badge.description,
+      category: badge.category,
+      icon: badge.icon,
+      rarity: badge.rarity,
+      condition: badge.condition,
+      isActive: true,
+    }));
+    const insertedBadges = await BadgeConfig.insertMany(badgesToInsert);
+    insertedBadgesCount = insertedBadges.length;
+  }
+  console.log(`✅ Inserted ${insertedBadgesCount} badges from ${badgeSource}`);
 
   // INSERT Badge XP values
-  console.log("🌱 Creating Badge XP config...");
+  const badgeXPData = savedXP?.badgeXP || BADGE_XP_VALUES;
+  console.log(`🌱 Creating Badge XP config from ${xpSource}...`);
   const badgeXPDoc = await XPConfig.create({
     configType: "badge_xp",
-    data: BADGE_XP_VALUES,
+    data: badgeXPData,
     isActive: true,
   });
   console.log("✅ Badge XP config created:", badgeXPDoc._id);
 
-  // INSERT Level Progression (with 20 levels now!)
-  console.log(`🌱 Creating Level Progression config with ${TITLE_LEVELS.length} levels...`);
+  // INSERT Level Progression
+  const levelsData = savedXP?.levels || TITLE_LEVELS;
+  const levelsSource = savedXP?.levels ? "saved defaults" : "constants";
+  console.log(`🌱 Creating Level Progression config from ${levelsSource} with ${levelsData.length} levels...`);
   const levelsDoc = await XPConfig.create({
     configType: "level_progression",
-    data: { levels: TITLE_LEVELS },
+    data: { levels: levelsData },
     isActive: true,
   });
   console.log("✅ Level Progression config created:", levelsDoc._id);
@@ -68,16 +87,17 @@ async function reseedBadgesAndXP() {
   const finalXPCount = await XPConfig.countDocuments();
 
   console.log(
-    `✅ Seeding complete! Badges: ${finalBadgeCount}, XP Configs: ${finalXPCount}, Levels: ${TITLE_LEVELS.length}`,
+    `✅ Seeding complete! Badges: ${finalBadgeCount}, XP Configs: ${finalXPCount}, Levels: ${levelsData.length} (source: ${badgeSource})`,
   );
 
   return {
     badges: finalBadgeCount,
-    levels: TITLE_LEVELS.length,
+    levels: levelsData.length,
     xpConfigs: finalXPCount,
+    source: badgeSource,
     changes: {
       badgesDeleted: deletedBadges.deletedCount,
-      badgesInserted: insertedBadges.length,
+      badgesInserted: insertedBadgesCount,
       xpConfigsDeleted: deletedXP.deletedCount,
     },
   };
@@ -93,7 +113,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: `Badge and XP configurations reset and re-seeded! ${BADGES.length} badges with UNIQUE icons, ${TITLE_LEVELS.length} levels.`,
+      message: `Badge and XP configurations re-seeded from ${result.source}! ${result.badges} badges, ${result.levels} levels.`,
       counts: result,
     });
   } catch (error) {
@@ -120,7 +140,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Badge and XP configurations reset and re-seeded! ${BADGES.length} badges with UNIQUE icons, ${TITLE_LEVELS.length} levels.`,
+      message: `Badge and XP configurations re-seeded from ${result.source}! ${result.badges} badges, ${result.levels} levels.`,
       counts: result,
     });
   } catch (error) {

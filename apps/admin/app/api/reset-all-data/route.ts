@@ -45,6 +45,7 @@ import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import { resetBadgeAndXPConfigs } from "@/lib/services/badge-config-seed.service";
+import { seedMilestonesFromDefaults } from "@/lib/services/whitelabel-defaults.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getAdminSession } from "@/lib/admin/auth";
 
@@ -461,6 +462,14 @@ export async function POST(request: Request) {
     // Delete all user journey progress
     const userJourneyProgressDeleted = await UserJourneyProgress.deleteMany({});
     console.log(`✅ Deleted ${userJourneyProgressDeleted.deletedCount} user journey progress records`);
+
+    // Reseed milestones from saved white-label defaults (if available)
+    const milestonesReseeded = await seedMilestonesFromDefaults();
+    if (milestonesReseeded) {
+      console.log("✅ Journey milestones reseeded from saved white-label defaults");
+    } else {
+      console.log("ℹ️ No saved milestone defaults found — milestones will be empty until regenerated");
+    }
 
     // ============================================
     // DELETE GAME MASTER DATA

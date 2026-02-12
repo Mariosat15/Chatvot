@@ -3,6 +3,7 @@ import XPConfig from "@/database/models/xp-config.model";
 import { BADGES } from "@/lib/constants/badges";
 import { BADGE_XP_VALUES, TITLE_LEVELS } from "@/lib/constants/levels";
 import { connectToDatabase } from "@/database/mongoose";
+import { getDefaultBadges, getDefaultXPConfig } from "@/lib/services/whitelabel-defaults-reader";
 
 /**
  * Seed default badge configurations to database
@@ -15,24 +16,29 @@ export async function seedBadgeConfigs() {
     const existingCount = await BadgeConfig.countDocuments();
 
     if (existingCount === 0) {
-      console.log("🌱 Seeding default badge configurations...");
-
-      // Insert all default badges
-      await BadgeConfig.insertMany(
-        BADGES.map((badge) => ({
-          id: badge.id,
-          name: badge.name,
-          description: badge.description,
-          category: badge.category,
-          icon: badge.icon,
-          rarity: badge.rarity,
-          condition: badge.condition,
-          minLevel: badge.minLevel || 0,
-          isActive: true,
-        })),
-      );
-
-      console.log(`✅ Seeded ${BADGES.length} default badges`);
+      // Prefer saved white-label defaults over hardcoded constants
+      const savedDefaults = getDefaultBadges();
+      if (savedDefaults && savedDefaults.length > 0) {
+        console.log(`🌱 Seeding badge configs from saved white-label defaults (${savedDefaults.length} badges)...`);
+        await BadgeConfig.insertMany(savedDefaults);
+        console.log(`✅ Seeded ${savedDefaults.length} badges from saved defaults`);
+      } else {
+        console.log("🌱 Seeding default badge configurations from constants...");
+        await BadgeConfig.insertMany(
+          BADGES.map((badge) => ({
+            id: badge.id,
+            name: badge.name,
+            description: badge.description,
+            category: badge.category,
+            icon: badge.icon,
+            rarity: badge.rarity,
+            condition: badge.condition,
+            minLevel: badge.minLevel || 0,
+            isActive: true,
+          })),
+        );
+        console.log(`✅ Seeded ${BADGES.length} default badges from constants`);
+      }
     } else {
       // Sync: upsert any badges from constants that are missing or outdated in DB
       const existingBadges = await BadgeConfig.find({}).lean();
@@ -105,29 +111,35 @@ export async function seedXPConfigs() {
       configType: "level_progression",
     });
 
+    // Prefer saved white-label defaults over hardcoded constants
+    const savedXP = getDefaultXPConfig();
+
     if (!existingBadgeXP) {
-      console.log("🌱 Seeding default Badge XP values...");
+      const xpData = savedXP?.badgeXP || BADGE_XP_VALUES;
+      const source = savedXP?.badgeXP ? "saved defaults" : "constants";
+      console.log(`🌱 Seeding Badge XP values from ${source}...`);
       await XPConfig.create({
         configType: "badge_xp",
-        data: BADGE_XP_VALUES,
+        data: xpData,
         isActive: true,
       });
-      console.log("✅ Seeded Badge XP values");
+      console.log(`✅ Seeded Badge XP values from ${source}`);
     } else {
       console.log("ℹ️ Badge XP values already seeded");
     }
 
     if (!existingLevels) {
-      console.log("🌱 Seeding default Level Progression...");
-      console.log("Level data to seed:", TITLE_LEVELS);
+      const levelsData = savedXP?.levels || TITLE_LEVELS;
+      const source = savedXP?.levels ? "saved defaults" : "constants";
+      console.log(`🌱 Seeding Level Progression from ${source}...`);
       await XPConfig.create({
         configType: "level_progression",
-        data: { levels: TITLE_LEVELS },
+        data: { levels: levelsData },
         isActive: true,
       });
       console.log(
-        "✅ Seeded Level Progression with",
-        TITLE_LEVELS.length,
+        `✅ Seeded Level Progression from ${source} with`,
+        levelsData.length,
         "levels",
       );
     } else {

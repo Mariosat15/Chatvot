@@ -612,6 +612,50 @@ export default function DatabaseSection() {
               <Download className="h-5 w-5 mr-2" />
               Seed Badge & XP Defaults
             </Button>
+
+            <Button
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  toast.loading("Seeding journey milestones from defaults...", {
+                    id: "seed-milestones",
+                  });
+
+                  const response = await fetch("/api/admin/whitelabel-defaults", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "restore", type: "milestones" }),
+                  });
+
+                  const data = await response.json();
+
+                  if (data.success) {
+                    toast.success(
+                      data.results?.milestones
+                        ? `✅ Journey milestones restored from saved defaults!`
+                        : `⚠️ No saved milestone defaults found. Save defaults first from the Journey Map Editor.`,
+                      { id: "seed-milestones", duration: 5000 },
+                    );
+                  } else {
+                    toast.error(
+                      `Failed: ${data.error}`,
+                      { id: "seed-milestones" },
+                    );
+                  }
+                } catch (error) {
+                  toast.error(`Failed to seed milestones: ${error}`, {
+                    id: "seed-milestones",
+                  });
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white h-14 text-lg font-bold"
+              disabled={loading}
+            >
+              <Download className="h-5 w-5 mr-2" />
+              Seed Journey Milestone Defaults
+            </Button>
           </div>
         </div>
       </div>

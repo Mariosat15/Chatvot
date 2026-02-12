@@ -347,6 +347,7 @@ export default function JourneyMapEditorSection() {
   const [showSequenceDialog, setShowSequenceDialog] = useState(false);
   const [sequenceValidation, setSequenceValidation] = useState<any>(null);
   const [syncingAllUsers, setSyncingAllUsers] = useState(false);
+  const [savingDefaults, setSavingDefaults] = useState(false);
   
   // Milestone counts per map (admin can customize)
   const [mapMilestoneCounts, setMapMilestoneCounts] = useState<Record<number, number>>({
@@ -2716,6 +2717,39 @@ export default function JourneyMapEditorSection() {
           >
             {syncingAllUsers ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />}
             {syncingAllUsers ? "Syncing..." : "Sync All Users"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                setSavingDefaults(true);
+                toast.loading("Saving milestones as white-label default...", { id: "save-milestone-defaults" });
+                const res = await fetch("/api/admin/whitelabel-defaults", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "save", type: "milestones" }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  const count = data.results?.milestones?.count || 0;
+                  toast.success(
+                    `Saved ${count} milestones as white-label default!\nWill persist through DB resets and new deployments.`,
+                    { id: "save-milestone-defaults", duration: 5000 },
+                  );
+                } else {
+                  toast.error(`Failed: ${data.error}`, { id: "save-milestone-defaults" });
+                }
+              } catch (error) {
+                toast.error(`Error: ${error}`, { id: "save-milestone-defaults" });
+              } finally {
+                setSavingDefaults(false);
+              }
+            }}
+            disabled={savingDefaults}
+            className="border-indigo-600 text-indigo-600 hover:bg-indigo-600/10"
+          >
+            {savingDefaults ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            {savingDefaults ? "Saving..." : "Save as Default"}
           </Button>
           <Button variant="outline" onClick={() => fetchData()}>
             <RefreshCw className="h-4 w-4 mr-2" />
