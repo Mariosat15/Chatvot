@@ -47,6 +47,8 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
     liquidationCount: 0,
     alwaysUsesSL: true,
     alwaysUsesTP: true,
+    tradesWithSL: 50,
+    tradesWithTP: 50,
     kycVerified: true,
     totalDeposited: 1000,
     totalWithdrawn: 500,
@@ -490,11 +492,11 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
 
     // Risk management additional
     case "stop_loss_used":
-      baseStats.alwaysUsesSL = true;
+      baseStats.tradesWithSL = Math.max(baseStats.tradesWithSL || 0, value || 1);
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
       break;
     case "take_profit_used":
-      baseStats.alwaysUsesTP = true;
+      baseStats.tradesWithTP = Math.max(baseStats.tradesWithTP || 0, value || 1);
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
       break;
     case "max_drawdown_under":
@@ -653,6 +655,8 @@ function generateFailingMockStats(badge: Badge): Partial<UserStats> {
     liquidationCount: 5,
     alwaysUsesSL: false,
     alwaysUsesTP: false,
+    tradesWithSL: 0,
+    tradesWithTP: 0,
     kycVerified: false,
     totalDeposited: 0,
     totalWithdrawn: 0,

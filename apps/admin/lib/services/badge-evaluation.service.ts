@@ -43,6 +43,8 @@ export interface UserStats {
   maxDrawdown: number;
   alwaysUsesSL: boolean;
   alwaysUsesTP: boolean;
+  tradesWithSL: number;
+  tradesWithTP: number;
 
   // Speed
   averageTradesDuration: number;
@@ -712,6 +714,8 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     maxDrawdown,
     alwaysUsesSL,
     alwaysUsesTP,
+    tradesWithSL,
+    tradesWithTP,
     averageTradesDuration: averageTradeDuration,
     totalDeposited,
     depositCount,
@@ -1203,9 +1207,9 @@ export async function checkBadgeCondition(
     
     // Risk Management - Additional
     case "stop_loss_used":
-      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 10);
+      return compareValue(stats.tradesWithSL, value, comparison);
     case "take_profit_used":
-      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 10);
+      return compareValue(stats.tradesWithTP, value, comparison);
     case "max_drawdown_under":
       return stats.totalTrades >= (minTrades || 10) && stats.maxDrawdown <= (value || 50);
     case "position_size_under":

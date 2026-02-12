@@ -500,15 +500,18 @@ export async function checkConditionMet(
     // Risk Management
     // ============================================
     case "stop_loss_used":
+      // Count of trades where SL was set
+      currentValue = stats.tradesWithSL || 0;
+      break;
     case "always_uses_sl":
-      // alwaysUsesSL is boolean - convert to 1/0
-      currentValue = stats.alwaysUsesSL ? 1 : (stats.stopLossUsed || 0);
+      currentValue = stats.alwaysUsesSL ? 1 : 0;
       break;
 
     case "take_profit_used":
+      currentValue = stats.tradesWithTP || 0;
+      break;
     case "always_uses_tp":
-      // alwaysUsesTP is boolean - convert to 1/0
-      currentValue = stats.alwaysUsesTP ? 1 : (stats.takeProfitUsed || 0);
+      currentValue = stats.alwaysUsesTP ? 1 : 0;
       break;
 
     case "max_drawdown_under":
