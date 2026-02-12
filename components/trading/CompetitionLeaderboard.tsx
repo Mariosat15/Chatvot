@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import ProfileCard from "@/components/profile/ProfileCard";
 
 interface LeaderboardEntry {
   _id: string;
@@ -40,6 +42,9 @@ export default function CompetitionLeaderboard({
   minimumTrades = 0,
   competitionStatus,
 }: CompetitionLeaderboardProps) {
+  const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null);
+  const [showProfileCard, setShowProfileCard] = useState(false);
+
   const getPrizePercentage = (rank: number) => {
     const prize = prizeDistribution.find((p) => p.rank === rank);
     return prize ? prize.percentage : 0;
@@ -209,17 +214,21 @@ export default function CompetitionLeaderboard({
               {/* Trader */}
               <div className="flex flex-col justify-center min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                  <p
-                    className={`text-sm font-medium truncate ${
+                  <button
+                    onClick={() => {
+                      setSelectedUser(entry);
+                      setShowProfileCard(true);
+                    }}
+                    className={`text-sm font-medium truncate hover:underline cursor-pointer transition-colors ${
                       isDisqualified
                         ? "text-red-400/70 line-through"
                         : isCurrentUser
                           ? "text-blue-400"
-                          : "text-gray-100"
+                          : "text-gray-100 hover:text-blue-400"
                     }`}
                   >
                     {entry.username}
-                  </p>
+                  </button>
                   {entry.userTitle && !isDisqualified && (
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 inline-flex items-center gap-1 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
@@ -409,6 +418,27 @@ export default function CompetitionLeaderboard({
           );
         })}
       </div>
+
+      {/* Profile Card Popup */}
+      {selectedUser && (
+        <ProfileCard
+          show={showProfileCard}
+          userId={selectedUser._id}
+          username={selectedUser.username}
+          stats={{
+            rank: selectedUser.currentRank,
+            winRate: selectedUser.totalTrades > 0
+              ? (selectedUser.winningTrades / selectedUser.totalTrades) * 100
+              : 0,
+            totalTrades: selectedUser.totalTrades,
+            totalPnl: selectedUser.pnl,
+            userTitle: selectedUser.userTitle,
+            userTitleIcon: selectedUser.userTitleIcon,
+            userTitleColor: selectedUser.userTitleColor,
+          }}
+          onClose={() => setShowProfileCard(false)}
+        />
+      )}
     </div>
   );
 }

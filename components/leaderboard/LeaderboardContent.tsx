@@ -923,14 +923,18 @@ export default function LeaderboardContent({
                     {/* User Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span
+                        <button
+                          onClick={() => {
+                            setSelectedUser(entry);
+                            setShowProfileCard(true);
+                          }}
                           className={cn(
-                            "font-semibold truncate",
-                            isCurrentUser ? "text-primary-400" : "text-white",
+                            "font-semibold truncate hover:underline cursor-pointer transition-colors",
+                            isCurrentUser ? "text-primary-400" : "text-white hover:text-primary-400",
                           )}
                         >
                           {entry.username}
-                        </span>
+                        </button>
                         {isCurrentUser && (
                           <span className="px-1.5 py-0.5 text-[10px] bg-primary-500/20 text-primary-400 rounded font-bold">
                             YOU

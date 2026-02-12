@@ -117,27 +117,82 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return item;
     });
 
+    // Retroactively check and complete milestones based on current user stats
+    // This ensures past actions (e.g., winning trades before the fix) are recognized
+    try {
+      const { checkAndCompleteMilestones } = await import("@/lib/services/journey-progress.service");
+      await checkAndCompleteMilestones(userId, userProgress.mapId || "traders_journey");
+    } catch (err) {
+      // Non-critical -- don't block page load
+      console.warn("Failed to retroactively check milestones:", err);
+    }
+
+    // Re-fetch progress after retroactive check (it may have changed)
+    const refreshedProgress = await UserJourneyProgress.findOne({ userId }).lean();
+    const activeProgress = refreshedProgress || userProgress;
+
     // Calculate per-milestone progress for progress bars in the UI
     let milestoneProgressData: Array<{ milestoneId: string; currentValue: number; targetValue: number }> = [];
     try {
       const { calculateMilestoneProgress } = await import("@/lib/services/journey-progress.service");
-      milestoneProgressData = await calculateMilestoneProgress(userId, userProgress.mapId || "traders_journey");
+      milestoneProgressData = await calculateMilestoneProgress(userId, activeProgress.mapId || "traders_journey");
     } catch (err) {
       // Non-critical -- fall back to empty progress
       console.warn("Failed to calculate milestone progress:", err);
     }
 
+    // Re-extract completed milestones from refreshed data
+    const finalCompletedMilestones = (activeProgress.completedMilestones || []).map((item: any) => {
+      if (typeof item === "string") {
+        return { milestoneId: item, completedAt: new Date(), rewards: { xp: 0 } };
+      }
+      return item;
+    });
+
+    // Re-extract completed IDs for map progress
+    const finalCompletedIds: string[] = [];
+    if (Array.isArray(activeProgress.completedMilestones)) {
+      for (const item of activeProgress.completedMilestones) {
+        if (typeof item === "string") {
+          finalCompletedIds.push(item);
+        } else if (item && typeof item === "object" && item.milestoneId) {
+          finalCompletedIds.push(item.milestoneId);
+        }
+      }
+    }
+
+    // Rebuild map progress with refreshed data
+    const finalMapProgress = maps.map((map: any) => {
+      const mapMilestones = milestones.filter((m: any) => m.mapId === map.mapId);
+      const completedInMap = finalCompletedIds.filter((completedId) =>
+        mapMilestones.some((m: any) =>
+          m.id === completedId ||
+          m._id?.toString() === completedId ||
+          completedId.includes(m.id)
+        )
+      );
+      return {
+        mapId: map.mapId,
+        sequenceOrder: map.sequenceOrder,
+        totalMilestones: mapMilestones.length || map.totalMilestones || 0,
+        completedMilestones: completedInMap,
+        isComplete:
+          activeProgress.completedMaps?.includes(map.mapId) ||
+          (completedInMap.length > 0 && completedInMap.length >= mapMilestones.length),
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      currentMapIndex: userProgress.currentMapIndex || currentMapIndex,
-      mapProgress,
-      totalXP: userProgress.totalXPFromJourney || userProgress.allMapsXP || userProgress.totalXP || 0,
-      mapsCompleted: userProgress.totalMapsCompleted || mapProgress.filter((p: any) => p.isComplete).length,
-      completedMilestones: formattedCompletedMilestones,
-      unlockedMilestones: userProgress.unlockedMilestones || [],
-      currentMilestone: userProgress.currentMilestone || "",
-      journeyStartedAt: userProgress.journeyStartedAt,
-      lastProgressAt: userProgress.lastProgressAt,
+      currentMapIndex: activeProgress.currentMapIndex || currentMapIndex,
+      mapProgress: finalMapProgress,
+      totalXP: activeProgress.totalXPFromJourney || activeProgress.allMapsXP || activeProgress.totalXP || 0,
+      mapsCompleted: activeProgress.totalMapsCompleted || finalMapProgress.filter((p: any) => p.isComplete).length,
+      completedMilestones: finalCompletedMilestones,
+      unlockedMilestones: activeProgress.unlockedMilestones || [],
+      currentMilestone: activeProgress.currentMilestone || "",
+      journeyStartedAt: activeProgress.journeyStartedAt,
+      lastProgressAt: activeProgress.lastProgressAt,
       milestoneProgress: milestoneProgressData,
     });
   } catch (error) {
