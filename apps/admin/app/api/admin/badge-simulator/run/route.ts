@@ -68,6 +68,7 @@ const SUPPORTED_CONDITION_TYPES = new Set([
   "survived_full_competition", "first_trade_in_comp", "beat_top_trader",
   "underdog_win", "comeback_victory", "wire_to_wire_win",
   "undefeated_in_comps", "all_legendary_badges", "hall_of_fame_status",
+  "perfect_competition_trades",
   // Risk
   "no_liquidations", "zero_liquidations_lifetime", "always_uses_sl",
   "always_uses_tp", "max_drawdown", "max_drawdown_under", "average_leverage_low",
@@ -81,11 +82,12 @@ const SUPPORTED_CONDITION_TYPES = new Set([
   "quick_scalps", "swing_trading_style", "position_trading_style",
   "trades_at_market_open", "trades_at_market_close", "trades_at_open",
   "trades_at_close", "late_night_trader", "ninja_trading", "trades_all_hours",
-  "ultra_fast_execution",
+  "ultra_fast_execution", "precise_entry_timing",
   // Strategy
   "trend_following", "counter_trend", "breakout_trading", "range_trading",
   "momentum_trading", "mean_reversion", "multiple_strategies",
   "unique_strategy", "patient_trading", "closes_all_daily",
+  "technical_analysis", "news_trading", "versatile",
   // Consistency
   "consecutive_trading_days", "daily_trading_streak", "active_days",
   "active_trading_days", "consecutive_profitable_days",
