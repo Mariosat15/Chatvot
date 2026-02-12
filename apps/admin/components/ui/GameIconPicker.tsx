@@ -20,65 +20,56 @@ interface GameIconPickerProps {
   maxHeight?: string;
 }
 
-// Group icons by category for easier navigation
-const ICON_CATEGORIES = {
-  "Trophies & Awards": [
-    "trophy", "trophyStar", "trophyGame", "trophyFootball",
-    "goldMedal", "champion", "victory", "award",
-    "starAward", "starBadge", "shieldAward", "certificateAward",
-    "graduationAward", "scrollAward", "giftAward", "studyAward"
-  ],
-  "Stars & Rankings": [
-    "star1", "star2", "star3", "rank1", "rank2", "rank3",
-    "rank4", "rank5", "rank6", "rank7", "crown"
-  ],
-  "Currency & Treasure": [
-    "coin", "coins", "gems", "gemsAlt", "treasure", "chest",
-    "chest1", "chest2", "chest3", "chest4", "pouch1", "pouch2",
-    "money", "moneyDeposit", "moneyBalance", "capital"
-  ],
-  "Finance": [
-    "profit", "loss", "trade", "investment", "portfolio",
-    "buy", "sell", "equity", "dividend", "valuation",
-    "inflation", "hedge", "gain", "fluctuation", "longTermInvestment",
-    "returnOfInvest", "investStock", "dollarPlant", "financialCalculation"
-  ],
-  "Weapons": [
-    "sword", "sword1", "sword2", "sword3", "sword4", "sword5", "sword6",
-    "swordKnight3D", "swordNumbered", "axe1", "axe2", "axe3", "axe4",
-    "axe3D", "axeNumbered", "hammer1", "hammer2", "hammer3", "hammer3D",
-    "bow3D", "bomb1", "bomb2", "bombNumbered"
-  ],
-  "Defense & Equipment": [
-    "shield1", "shield2", "shield3", "shield4", "magicShield3D",
-    "helmet1", "helmet2", "helmet3", "helmet4",
-    "armor1", "armor2", "key", "banner", "flag", "maps", "guideBook"
-  ],
-  "Potions & Spells": [
-    "healthPotion", "energyPotion", "lightningPotion", "ragePotion", "poisonPotion",
-    "fireSpell", "blueFireSpell", "iceSpell", "energySpell", "lightningSpell",
-    "healthSpell", "poisonSpell", "spellBrown", "spellGreen"
-  ],
-  "Characters": [
-    "rookie", "lord", "archer", "war",
-    "wolf1", "wolf2", "wolf3",
-    "animal1", "animal2", "animal3", "animal4", "animal5"
-  ],
-  "Status & Alerts": [
-    "warning", "warning2", "warning3",
-    "riskWarning", "riskManagement", "riskAnalysis", "riskControl", "riskMonitoring",
-    "target", "timer", "timerAlt", "skull", "crisisRecovery"
-  ],
-  "Gaming Hardware": [
-    "joystick1", "joystick2", "joystick3",
-    "headset", "keyboard", "wasd", "mic", "dashboard"
-  ],
-  "Rewards & Misc": [
-    "reward1", "reward2", "reward3", "reward4", "reward5",
-    "heart", "dream", "meat", "medKit1", "medKit2",
-    "notifications", "settings", "help", "profile", "marketplace"
-  ]
-} as const;
+/**
+ * Build categories dynamically from the GAME_ICONS registry.
+ * Icons are grouped by prefix pattern for intuitive browsing.
+ */
+function buildCategories(): Record<string, string[]> {
+  const all = Object.keys(GAME_ICONS) as GameIconName[];
+  const cats: Record<string, string[]> = {};
+  const assigned = new Set<string>();
+
+  const add = (label: string, filter: (k: string) => boolean) => {
+    const matches = all.filter(k => filter(k) && !assigned.has(k));
+    if (matches.length > 0) {
+      cats[label] = matches;
+      matches.forEach(k => assigned.add(k));
+    }
+  };
+
+  add("Trophies & Awards", k => /^(trophy|goldMedal|champion|victory|starAward|starBadge|shieldAward|certificateAward|graduationAward|scrollAward|award|giftAward|studyAward)/i.test(k));
+  add("Stars & Rankings", k => /^(star[0-9]|rank[0-9]|medal|crown)/i.test(k));
+  add("Currency & Treasure", k => /^(coin|gems|treasure|chest|pouch|money|capital|pirateCoin)/i.test(k));
+  add("Potions & Spells", k => /^(health|energy|lightning|rage|poison|spell|fire|blue|ice)/i.test(k) && !/finance/i.test(k));
+  add("Weapons", k => /^(sword|axe|hammer|bow|bomb|piratePistol|pirateCannon|cannon|sw[0-9])/i.test(k));
+  add("Defense & Equipment", k => /^(shield[0-9]|helmet|armor|key|banner|flag|crown|map|guide|compass|eyePatch|pirateH|piratesH|piratePeg|barrel|island)/i.test(k));
+  add("Characters", k => /^(rookie|lord|archer|war|wolf|animal|parrot)/i.test(k));
+  add("Pirate Theme", k => /^(pirate|anchor)/i.test(k));
+  add("Gaming Hardware", k => /^(joystick|headset|keyboard|wasd|mic|dashboard)/i.test(k));
+  add("Finance", k => /^(dollar|euro|finance|financial|equity|equities|dividend|valuation|inflation|hedge|gain|fluctuation|overPrice|redemption|riskRating|repository|investmentModel|fixIncome|longTerm|returnOf|investStock|investEd|goldInvest|attracting|dollarPlant|retirement|buy|sell|profit|loss|trade|investment|portfolio)/i.test(k));
+  add("Risk & Status", k => /^(warning|risk|market[RM]|operational|external|system|internal|qualitative|quantitative|impact|target|timer|skull|crisis)/i.test(k));
+  add("Rewards & Misc", k => /^(reward|heart|dream|meat|medKit|notification|settings|help|profile|marketplace|num[0-9])/i.test(k));
+  add("Renders & Art", k => /^(render|icon00)/i.test(k));
+  add("Game Collections", k => /^(game)/i.test(k));
+  add("Technology", k => /^(tech)/i.test(k));
+  add("Seasonal: Christmas", k => /^christmas/i.test(k));
+  add("Seasonal: Halloween", k => /^halloween/i.test(k));
+  add("Seasonal: Black Friday", k => /^blackFriday/i.test(k));
+  add("Seasonal: Cyber", k => /^cyber/i.test(k));
+  add("School & Education", k => /^school/i.test(k));
+  add("Marketing", k => /^marketing/i.test(k));
+  add("Badge Prototypes", k => /^(round|shield)Proto/i.test(k));
+
+  // Catch anything not yet categorized
+  const uncategorized = all.filter(k => !assigned.has(k));
+  if (uncategorized.length > 0) {
+    cats["Other"] = uncategorized;
+  }
+
+  return cats;
+}
+
+const ICON_CATEGORIES = buildCategories();
 
 // Get all icon names
 const ALL_ICON_NAMES = Object.keys(GAME_ICONS) as GameIconName[];
