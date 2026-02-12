@@ -24,22 +24,17 @@ export async function seedNotificationTemplates(): Promise<void> {
 }
 
 /**
- * Check if templates need seeding
+ * Check if templates need seeding.
+ * Always runs seedDefaults() which uses upsert ($setOnInsert) — safe to call
+ * repeatedly. This ensures newly added default templates are inserted even
+ * when existing templates already exist in the database.
  */
 export async function checkAndSeedTemplates(): Promise<void> {
+  if (hasSeeded) return;
   try {
     await connectToDatabase();
-
-    // Check if any templates exist
-    const count = await NotificationTemplate.countDocuments();
-
-    if (count === 0) {
-      console.log("📋 No notification templates found, seeding defaults...");
-      await NotificationTemplate.seedDefaults();
-      hasSeeded = true;
-    } else {
-      hasSeeded = true;
-    }
+    await NotificationTemplate.seedDefaults();
+    hasSeeded = true;
   } catch (error) {
     console.error("❌ Error checking notification templates:", error);
   }
