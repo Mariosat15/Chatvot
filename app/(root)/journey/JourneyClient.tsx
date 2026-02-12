@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import JourneyMapRenderer, { 
   type MapConfig, 
   type Milestone,
-  type MapSequenceInfo 
+  type MapSequenceInfo,
+  type MilestoneProgress,
 } from "@/components/journey/JourneyMapRenderer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
     currentMapIndex: 1,
     mapsCompleted: 0,
   });
+  const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgress[]>([]);
 
   // Fetch map sequence
   useEffect(() => {
@@ -120,14 +122,25 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
         const data = await res.json();
 
         if (data.success) {
+          // Extract milestone ID strings from objects (API returns { milestoneId, completedAt, rewards })
+          const completedIds = (data.completedMilestones || []).map((item: any) =>
+            typeof item === "string" ? item : item?.milestoneId
+          ).filter(Boolean);
+          const unlockedIds = (data.unlockedMilestones || []).map((item: any) =>
+            typeof item === "string" ? item : item?.milestoneId
+          ).filter(Boolean);
           setUserProgress({
-            completedMilestones: data.completedMilestones || [],
-            unlockedMilestones: data.unlockedMilestones || [],
+            completedMilestones: completedIds,
+            unlockedMilestones: unlockedIds,
             currentMilestone: data.currentMilestone || "",
             totalXP: data.totalXP || 0,
             currentMapIndex: data.currentMapIndex || 1,
             mapsCompleted: data.mapsCompleted || 0,
           });
+          // Store milestone progress data for progress bars
+          if (data.milestoneProgress) {
+            setMilestoneProgress(data.milestoneProgress);
+          }
           // Start at user's current map
           if (data.currentMapIndex) {
             setCurrentMapIndex(data.currentMapIndex);
@@ -264,6 +277,7 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
           unlockedIds={userProgress.unlockedMilestones}
           currentMilestone={userProgress.currentMilestone}
           userLevel={1}
+          milestoneProgress={milestoneProgress}
           onMilestoneClick={handleMilestoneClick}
           sequenceInfo={sequenceInfo}
           onNavigateMap={handleNavigateMap}
