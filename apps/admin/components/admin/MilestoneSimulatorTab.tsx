@@ -13,7 +13,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -40,15 +39,11 @@ import {
   Search,
   RotateCcw,
   Target,
-  Milestone,
+  Wrench,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface MilestoneCondition {
-  type: string;
-  value?: number | string;
-  comparison?: string;
-}
 
 interface MilestoneTestResult {
   milestoneId: string;
@@ -56,21 +51,28 @@ interface MilestoneTestResult {
   mapId: string;
   mapName: string;
   order: number;
-  condition: MilestoneCondition | null;
-  mockStats: Record<string, number | boolean>;
+  condition: any;
   expected: boolean;
   actual: boolean;
   passed: boolean;
   reason: string;
+  currentValue?: number;
+  targetValue?: number;
+  conditionType: string;
   duration: number;
+  issues: string[];
+  autoFixable: boolean;
+  suggestedFix?: any;
 }
 
 interface SimulatorSummary {
   total: number;
   passed: number;
   failed: number;
+  issues: number;
+  autoFixable: number;
   passRate: string;
-  byMap: Record<string, { passed: number; failed: number; total: number }>;
+  byMap: Record<string, { passed: number; failed: number; total: number; issues: number }>;
   byConditionType: Record<string, { passed: number; failed: number; total: number }>;
   mapsIncluded: number;
 }
@@ -84,21 +86,20 @@ interface MapInfo {
 
 export default function MilestoneSimulatorTab() {
   const [isRunning, setIsRunning] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<MilestoneTestResult[]>([]);
   const [summary, setSummary] = useState<SimulatorSummary | null>(null);
   const [maps, setMaps] = useState<MapInfo[]>([]);
   const [conditionTypes, setConditionTypes] = useState<string[]>([]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  
+
   // Filters
   const [selectedMap, setSelectedMap] = useState<string>("all");
   const [selectedConditionType, setSelectedConditionType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [includeFailTests, setIncludeFailTests] = useState(false);
 
-  // Load available milestones on mount
   useEffect(() => {
     loadMilestones();
   }, []);
@@ -107,7 +108,6 @@ export default function MilestoneSimulatorTab() {
     try {
       const response = await fetch("/api/admin/milestone-simulator/run");
       const data = await response.json();
-      
       if (data.success) {
         setMaps(data.maps || []);
         setConditionTypes(data.conditionTypes || []);
@@ -124,7 +124,6 @@ export default function MilestoneSimulatorTab() {
     setSummary(null);
 
     try {
-      // Simulate progress while waiting
       const progressInterval = setInterval(() => {
         setProgress((prev) => Math.min(prev + 2, 90));
       }, 100);
@@ -134,7 +133,6 @@ export default function MilestoneSimulatorTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mapId: selectedMap === "all" ? undefined : selectedMap,
-          includeFailTests,
         }),
       });
 
@@ -146,9 +144,12 @@ export default function MilestoneSimulatorTab() {
       if (data.success) {
         setResults(data.results);
         setSummary(data.summary);
-        
-        if (data.summary.failed > 0) {
-          toast.error(`${data.summary.failed} milestone tests failed`);
+
+        const issueCount = data.summary.issues || 0;
+        const failCount = data.summary.failed || 0;
+
+        if (failCount > 0 || issueCount > 0) {
+          toast.error(`${failCount} failed, ${issueCount} input issues found`);
         } else {
           toast.success(`All ${data.summary.passed} milestone tests passed!`);
         }
@@ -163,6 +164,73 @@ export default function MilestoneSimulatorTab() {
     }
   };
 
+  const fixAllIssues = async () => {
+    const fixable = results.filter(r => r.autoFixable);
+    if (fixable.length === 0) {
+      toast.info("No auto-fixable issues found");
+      return;
+    }
+
+    setIsFixing(true);
+    try {
+      toast.loading(`Fixing ${fixable.length} milestones...`, { id: "fix" });
+
+      const response = await fetch("/api/admin/milestone-simulator/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fix",
+          fixAll: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Fixed ${data.fixedCount} milestones. Re-run simulation to verify.`, {
+          id: "fix",
+          duration: 5000,
+        });
+        // Auto re-run
+        setTimeout(() => runSimulation(), 500);
+      } else {
+        toast.error(`Fix failed: ${data.error}`, { id: "fix" });
+      }
+    } catch (error) {
+      toast.error(`Fix error: ${error}`, { id: "fix" });
+    } finally {
+      setIsFixing(false);
+    }
+  };
+
+  const fixSingleMilestone = async (milestoneId: string) => {
+    try {
+      toast.loading(`Fixing ${milestoneId}...`, { id: `fix-${milestoneId}` });
+
+      const response = await fetch("/api/admin/milestone-simulator/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fix",
+          milestoneIds: [milestoneId],
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.fixedCount > 0) {
+        toast.success(`Fixed! ${data.fixes[0]?.fixes.join(", ")}`, {
+          id: `fix-${milestoneId}`,
+          duration: 4000,
+        });
+      } else {
+        toast.info("No fixes needed", { id: `fix-${milestoneId}` });
+      }
+    } catch (error) {
+      toast.error(`Fix error: ${error}`, { id: `fix-${milestoneId}` });
+    }
+  };
+
   const resetSimulation = () => {
     setResults([]);
     setSummary(null);
@@ -173,38 +241,29 @@ export default function MilestoneSimulatorTab() {
   const toggleRowExpansion = (milestoneId: string) => {
     setExpandedRows((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(milestoneId)) {
-        newSet.delete(milestoneId);
-      } else {
-        newSet.add(milestoneId);
-      }
+      if (newSet.has(milestoneId)) newSet.delete(milestoneId);
+      else newSet.add(milestoneId);
       return newSet;
     });
   };
 
   // Filter results
   const filteredResults = results.filter((result) => {
-    if (selectedMap !== "all" && result.mapId !== selectedMap) {
-      return false;
-    }
-    if (selectedConditionType !== "all" && result.condition?.type !== selectedConditionType) {
-      return false;
-    }
-    if (selectedStatus === "passed" && !result.passed) {
-      return false;
-    }
-    if (selectedStatus === "failed" && result.passed) {
-      return false;
-    }
-    if (searchQuery && !result.milestoneName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !result.milestoneId.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !(result.condition?.type || "").toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
+    if (selectedMap !== "all" && result.mapId !== selectedMap) return false;
+    if (selectedConditionType !== "all" && result.conditionType !== selectedConditionType) return false;
+    if (selectedStatus === "passed" && !result.passed) return false;
+    if (selectedStatus === "failed" && result.passed) return false;
+    if (selectedStatus === "issues" && result.issues.length === 0) return false;
+    if (searchQuery &&
+      !result.milestoneName.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !result.milestoneId.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !result.conditionType.toLowerCase().includes(searchQuery.toLowerCase())
+    ) return false;
     return true;
   });
 
   const totalMilestones = maps.reduce((sum, m) => sum + m.milestoneCount, 0);
+  const fixableCount = results.filter(r => r.autoFixable).length;
 
   return (
     <div className="space-y-6">
@@ -216,11 +275,26 @@ export default function MilestoneSimulatorTab() {
             Milestone Simulator
           </h2>
           <p className="text-zinc-400 mt-1">
-            Test milestone conditions against mock user stats using production evaluation code
+            Tests milestone conditions using production evaluation logic. Detects broken inputs and unsupported types.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          {fixableCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fixAllIssues}
+              disabled={isFixing}
+              className="border-amber-600 text-amber-400 hover:bg-amber-600/10"
+            >
+              {isFixing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Fixing...</>
+              ) : (
+                <><Wrench className="h-4 w-4 mr-2" /> Fix All Issues ({fixableCount})</>
+              )}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -237,15 +311,9 @@ export default function MilestoneSimulatorTab() {
             className="bg-green-600 hover:bg-green-700"
           >
             {isRunning ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Running...
-              </>
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running...</>
             ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Run Simulation
-              </>
+              <><Play className="h-4 w-4 mr-2" /> Run Simulation</>
             )}
           </Button>
         </div>
@@ -256,12 +324,11 @@ export default function MilestoneSimulatorTab() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Filter className="h-5 w-5 text-zinc-400" />
-            Configuration
+            Filters
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {/* Map Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Journey Map</Label>
               <Select value={selectedMap} onValueChange={setSelectedMap}>
@@ -282,7 +349,6 @@ export default function MilestoneSimulatorTab() {
               </Select>
             </div>
 
-            {/* Condition Type Filter */}
             <div className="space-y-2">
               <Label>Condition Type</Label>
               <Select value={selectedConditionType} onValueChange={setSelectedConditionType}>
@@ -300,56 +366,31 @@ export default function MilestoneSimulatorTab() {
               </Select>
             </div>
 
-            {/* Status Filter */}
             <div className="space-y-2">
-              <Label>Status Filter</Label>
+              <Label>Status</Label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="bg-zinc-800 border-zinc-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Results</SelectItem>
-                  <SelectItem value="passed">
-                    <span className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Passed Only
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="failed">
-                    <span className="flex items-center gap-2">
-                      <XCircle className="h-4 w-4 text-red-500" />
-                      Failed Only
-                    </span>
-                  </SelectItem>
+                  <SelectItem value="passed">Passed Only</SelectItem>
+                  <SelectItem value="failed">Failed Only</SelectItem>
+                  <SelectItem value="issues">With Issues</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Search */}
             <div className="space-y-2">
               <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                 <Input
-                  placeholder="Milestone name or condition..."
+                  placeholder="Name, ID, or condition..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-zinc-800 border-zinc-700"
                 />
-              </div>
-            </div>
-
-            {/* Include Fail Tests */}
-            <div className="space-y-2">
-              <Label>Include Negative Tests</Label>
-              <div className="flex items-center gap-2 h-10">
-                <Switch
-                  checked={includeFailTests}
-                  onCheckedChange={setIncludeFailTests}
-                />
-                <span className="text-sm text-zinc-400">
-                  Test invalid stats
-                </span>
               </div>
             </div>
           </div>
@@ -362,7 +403,7 @@ export default function MilestoneSimulatorTab() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Running milestone tests...</span>
+                <span className="text-zinc-400">Testing milestones with production logic...</span>
                 <span className="text-zinc-300">{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
@@ -373,51 +414,47 @@ export default function MilestoneSimulatorTab() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">{summary.total}</div>
-                <div className="text-zinc-400 text-sm">Total Tests</div>
-              </div>
+            <CardContent className="pt-6 text-center">
+              <div className="text-3xl font-bold text-white">{summary.total}</div>
+              <div className="text-zinc-400 text-sm">Total</div>
             </CardContent>
           </Card>
           <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-400">{summary.passed}</div>
-                <div className="text-zinc-400 text-sm">Passed</div>
-              </div>
+            <CardContent className="pt-6 text-center">
+              <div className="text-3xl font-bold text-green-400">{summary.passed}</div>
+              <div className="text-zinc-400 text-sm">Passed</div>
             </CardContent>
           </Card>
           <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-red-400">{summary.failed}</div>
-                <div className="text-zinc-400 text-sm">Failed</div>
-              </div>
+            <CardContent className="pt-6 text-center">
+              <div className="text-3xl font-bold text-red-400">{summary.failed}</div>
+              <div className="text-zinc-400 text-sm">Failed</div>
             </CardContent>
           </Card>
           <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className={cn(
-                  "text-3xl font-bold",
-                  parseFloat(summary.passRate) === 100 ? "text-green-400" :
-                  parseFloat(summary.passRate) >= 80 ? "text-yellow-400" : "text-red-400"
-                )}>
-                  {summary.passRate}
-                </div>
-                <div className="text-zinc-400 text-sm">Pass Rate</div>
-              </div>
+            <CardContent className="pt-6 text-center">
+              <div className="text-3xl font-bold text-amber-400">{summary.issues}</div>
+              <div className="text-zinc-400 text-sm">Input Issues</div>
             </CardContent>
           </Card>
           <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-400">{summary.mapsIncluded}</div>
-                <div className="text-zinc-400 text-sm">Maps Tested</div>
+            <CardContent className="pt-6 text-center">
+              <div className="text-3xl font-bold text-blue-400">{summary.autoFixable}</div>
+              <div className="text-zinc-400 text-sm">Auto-Fixable</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardContent className="pt-6 text-center">
+              <div className={cn(
+                "text-3xl font-bold",
+                parseFloat(summary.passRate) === 100 ? "text-green-400" :
+                parseFloat(summary.passRate) >= 80 ? "text-yellow-400" : "text-red-400"
+              )}>
+                {summary.passRate}
               </div>
+              <div className="text-zinc-400 text-sm">Pass Rate</div>
             </CardContent>
           </Card>
         </div>
@@ -438,7 +475,11 @@ export default function MilestoneSimulatorTab() {
                     key={mapId}
                     className={cn(
                       "p-3 rounded-lg bg-zinc-800/50 border",
-                      stats.failed === 0 ? "border-green-500/30" : "border-red-500/30"
+                      stats.failed === 0 && stats.issues === 0
+                        ? "border-green-500/30"
+                        : stats.failed > 0
+                          ? "border-red-500/30"
+                          : "border-amber-500/30"
                     )}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -448,8 +489,9 @@ export default function MilestoneSimulatorTab() {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-green-400">{stats.passed} passed</span>
-                      <span className="text-red-400">{stats.failed} failed</span>
+                      <span className="text-green-400">{stats.passed} ok</span>
+                      {stats.failed > 0 && <span className="text-red-400">{stats.failed} fail</span>}
+                      {stats.issues > 0 && <span className="text-amber-400">{stats.issues} issues</span>}
                     </div>
                   </div>
                 );
@@ -482,7 +524,7 @@ export default function MilestoneSimulatorTab() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-green-400">{stats.passed}</span>
-                      <span className="text-red-400">{stats.failed}</span>
+                      {stats.failed > 0 && <span className="text-red-400">{stats.failed}</span>}
                     </div>
                   </div>
                 ))}
@@ -517,7 +559,8 @@ export default function MilestoneSimulatorTab() {
                       <div
                         className={cn(
                           "flex items-center justify-between p-4 hover:bg-zinc-800/50 cursor-pointer",
-                          !result.passed && "bg-red-500/5"
+                          !result.passed && "bg-red-500/5",
+                          result.issues.length > 0 && result.passed && "bg-amber-500/5"
                         )}
                       >
                         <div className="flex items-center gap-4">
@@ -526,9 +569,13 @@ export default function MilestoneSimulatorTab() {
                           ) : (
                             <ChevronRight className="h-4 w-4 text-zinc-500" />
                           )}
-                          
+
                           {result.passed ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
+                            result.issues.length > 0 ? (
+                              <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            ) : (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            )
                           ) : (
                             <XCircle className="h-5 w-5 text-red-500" />
                           )}
@@ -541,89 +588,130 @@ export default function MilestoneSimulatorTab() {
                               <Badge variant="outline" className="text-[10px]">
                                 #{result.order}
                               </Badge>
+                              {result.issues.length > 0 && (
+                                <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">
+                                  {result.issues.length} issue{result.issues.length > 1 ? "s" : ""}
+                                </Badge>
+                              )}
                             </div>
                             <div className="text-xs text-zinc-500 mt-0.5">
-                              {result.condition?.type || "no condition"}
-                              {result.condition?.value !== undefined && (
-                                <span> = {result.condition.value}</span>
+                              {result.conditionType || "no condition"}
+                              {result.targetValue !== undefined && (
+                                <span> = {result.targetValue}</span>
                               )}
                               {result.condition?.comparison && (
                                 <span> ({result.condition.comparison})</span>
+                              )}
+                              {result.currentValue !== undefined && (
+                                <span className="text-zinc-400 ml-2">
+                                  mock: {result.currentValue}
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <Map className="h-4 w-4 text-blue-400" />
-                            <span className="text-sm text-zinc-400 max-w-[120px] truncate">
-                              {result.mapName}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-zinc-400 max-w-[100px] truncate hidden md:inline">
+                            {result.mapName}
+                          </span>
                           <Badge
                             variant="outline"
                             className={cn(
                               "text-xs",
                               result.passed
-                                ? "border-green-500/50 text-green-400"
+                                ? result.issues.length > 0
+                                  ? "border-amber-500/50 text-amber-400"
+                                  : "border-green-500/50 text-green-400"
                                 : "border-red-500/50 text-red-400"
                             )}
                           >
-                            {result.passed ? "PASSED" : "FAILED"}
+                            {result.passed ? (result.issues.length > 0 ? "WARN" : "PASS") : "FAIL"}
                           </Badge>
-                          <span className="text-xs text-zinc-500 w-16 text-right">
-                            {result.duration}ms
-                          </span>
+                          {result.autoFixable && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-600/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fixSingleMilestone(result.milestoneId);
+                              }}
+                            >
+                              <Wrench className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 pt-2 bg-zinc-800/30 border-t border-zinc-800">
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Reason */}
-                          <div>
-                            <Label className="text-xs text-zinc-500">Result</Label>
-                            <p className={cn(
-                              "text-sm mt-1",
-                              result.passed ? "text-green-400" : "text-red-400"
-                            )}>
-                              {result.reason}
-                            </p>
-                          </div>
+                      <div className="px-4 pb-4 pt-2 bg-zinc-800/30 border-t border-zinc-800 space-y-3">
+                        {/* Reason */}
+                        <div>
+                          <Label className="text-xs text-zinc-500">Result</Label>
+                          <p className={cn(
+                            "text-sm mt-1",
+                            result.passed ? "text-green-400" : "text-red-400"
+                          )}>
+                            {result.reason}
+                          </p>
+                        </div>
 
-                          {/* Condition Details */}
+                        {/* Issues */}
+                        {result.issues.length > 0 && (
+                          <div>
+                            <Label className="text-xs text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" /> Input Issues
+                            </Label>
+                            <ul className="text-sm mt-1 space-y-1">
+                              {result.issues.map((issue, i) => (
+                                <li key={i} className="text-amber-300 flex items-start gap-2">
+                                  <span className="text-amber-500 mt-0.5">•</span>
+                                  {issue}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Suggested Fix */}
+                        {result.suggestedFix && (
+                          <div>
+                            <Label className="text-xs text-blue-400 flex items-center gap-1">
+                              <Info className="h-3 w-3" /> Suggested Fix
+                            </Label>
+                            <pre className="text-xs mt-1 p-2 bg-zinc-900 rounded text-blue-300">
+                              {JSON.stringify(result.suggestedFix, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+
+                        {/* Condition Details */}
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label className="text-xs text-zinc-500">Condition</Label>
                             <pre className="text-xs mt-1 p-2 bg-zinc-900 rounded overflow-x-auto">
-                              {result.condition 
-                                ? JSON.stringify(result.condition, null, 2) 
+                              {result.condition
+                                ? JSON.stringify(result.condition, null, 2)
                                 : "No condition (auto-pass)"}
                             </pre>
                           </div>
-
-                          {/* Mock Stats */}
-                          <div className="col-span-2">
-                            <Label className="text-xs text-zinc-500">Mock Stats Used</Label>
-                            <pre className="text-xs mt-1 p-2 bg-zinc-900 rounded overflow-x-auto max-h-40">
-                              {JSON.stringify(result.mockStats, null, 2)}
-                            </pre>
-                          </div>
-
-                          {/* Expected vs Actual */}
-                          <div className="col-span-2 flex gap-4">
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs text-zinc-500">Expected:</Label>
-                              <Badge variant="outline" className={result.expected ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}>
-                                {result.expected ? "TRUE" : "FALSE"}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs text-zinc-500">Actual:</Label>
-                              <Badge variant="outline" className={result.actual ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}>
-                                {result.actual ? "TRUE" : "FALSE"}
-                              </Badge>
+                          <div>
+                            <Label className="text-xs text-zinc-500">Expected vs Actual</Label>
+                            <div className="mt-1 flex gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-500">Expected:</span>
+                                <Badge variant="outline" className={result.expected ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}>
+                                  {result.expected ? "TRUE" : "FALSE"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-500">Actual:</span>
+                                <Badge variant="outline" className={result.actual ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}>
+                                  {result.actual ? "TRUE" : "FALSE"}
+                                </Badge>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -646,12 +734,12 @@ export default function MilestoneSimulatorTab() {
               No Tests Run Yet
             </h3>
             <p className="text-zinc-400 mb-4">
-              Click &quot;Run Simulation&quot; to test all milestone conditions against mock user stats.
+              Click &quot;Run Simulation&quot; to test all milestone conditions using production evaluation logic.
               <br />
-              This uses the actual production evaluation code to identify issues.
+              Issues with missing fields, unsupported types, and bad inputs will be detected automatically.
             </p>
             <div className="text-sm text-zinc-500">
-              {totalMilestones} milestones available across {maps.length} journey maps
+              {totalMilestones} milestones across {maps.length} journey maps
             </div>
           </CardContent>
         </Card>
