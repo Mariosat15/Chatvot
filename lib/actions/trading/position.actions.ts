@@ -646,7 +646,7 @@ export const closePosition = async (
       try {
         const { evaluateUserBadges } =
           await import("@/lib/services/badge-evaluation.service");
-        evaluateUserBadges(session.user.id, ["Trading", "Profit", "Risk", "Speed", "Consistency"])
+        evaluateUserBadges(session.user.id, ["Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy"])
           .then((result) => {
             if (result.newBadges.length > 0) {
               console.log(

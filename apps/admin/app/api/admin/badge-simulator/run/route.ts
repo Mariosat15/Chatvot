@@ -102,6 +102,19 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
     xpEarnedToday: 100,
     xpEarnedThisWeek: 500,
     totalBadgesEarned: 20,
+    // SL/TP trigger counts (required for always_uses_sl/always_uses_tp badges)
+    slTriggeredCount: 10,
+    tpTriggeredCount: 10,
+    // Deposit count (required for total_deposits badge)
+    depositCount: 10,
+    // Social/community fields
+    referralsMade: 5,
+    referralsActive: 3,
+    friendsAdded: 10,
+    messagesSent: 50,
+    loginStreak: 30,
+    // Speed alias
+    averageTradesDuration: 30,
   };
 
   // Override specific stats based on condition type to ensure they pass
@@ -180,10 +193,12 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       break;
     case "always_uses_sl":
       baseStats.alwaysUsesSL = true;
+      baseStats.slTriggeredCount = 10; // At least 3 required
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 50);
       break;
     case "always_uses_tp":
       baseStats.alwaysUsesTP = true;
+      baseStats.tpTriggeredCount = 10; // At least 3 required
       baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 50);
       break;
 
@@ -193,6 +208,9 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       break;
     case "total_deposited":
       baseStats.totalDeposited = numericValue + 100;
+      break;
+    case "total_deposits":
+      baseStats.depositCount = numericValue + 5; // Number of completed deposits
       break;
     case "withdrawal_made":
       baseStats.totalWithdrawn = 100;
@@ -452,6 +470,164 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       baseStats.winRate = 60; // production: >= 55
       break;
 
+    // Social & Community conditions
+    case "referrals_made":
+      baseStats.referralsMade = numericValue + 2;
+      break;
+    case "referrals_active":
+      baseStats.referralsActive = numericValue + 2;
+      break;
+    case "friends_added":
+      baseStats.friendsAdded = numericValue + 3;
+      break;
+    case "messages_sent":
+      baseStats.messagesSent = numericValue + 10;
+      break;
+    case "login_streak":
+      baseStats.loginStreak = numericValue + 5;
+      baseStats.consecutiveTradingDays = numericValue + 5;
+      break;
+
+    // Risk management additional
+    case "stop_loss_used":
+      baseStats.alwaysUsesSL = true;
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
+      break;
+    case "take_profit_used":
+      baseStats.alwaysUsesTP = true;
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
+      break;
+    case "max_drawdown_under":
+      baseStats.maxDrawdown = Math.min(numericValue - 5, 10);
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
+      break;
+    case "position_size_under":
+      baseStats.averagePositionSize = Math.min(numericValue - 1, 1);
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
+      break;
+
+    // Competition placement conditions
+    case "second_place_finishes":
+      baseStats.secondPlaceFinishes = numericValue + 2;
+      break;
+    case "third_place_finishes":
+      baseStats.thirdPlaceFinishes = numericValue + 1;
+      break;
+    case "top_10_finishes":
+      baseStats.top10Finishes = numericValue + 5;
+      break;
+    case "top_50_percent_finishes":
+      baseStats.top50PercentFinishes = numericValue + 5;
+      break;
+    case "competitions_completed":
+      baseStats.completedCompetitions = numericValue + 3;
+      break;
+    case "competition_pnl":
+      baseStats.competitionPnl = numericValue + 500;
+      break;
+
+    // Progression & XP conditions
+    case "level_reached":
+      baseStats.currentLevel = numericValue + 2;
+      break;
+    case "xp_threshold":
+      baseStats.currentXP = numericValue + 500;
+      break;
+    case "xp_earned_today":
+      baseStats.xpEarnedToday = numericValue + 50;
+      break;
+    case "xp_earned_this_week":
+      baseStats.xpEarnedThisWeek = numericValue + 100;
+      break;
+    case "total_badges":
+      baseStats.totalBadgesEarned = numericValue + 5;
+      break;
+
+    // Account & milestone conditions
+    case "account_created":
+      break; // Always true
+    case "has_deposit":
+      baseStats.totalDeposited = 100;
+      break;
+    case "profile_complete":
+      baseStats.totalDeposited = 100;
+      break;
+    case "first_trade":
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, 1);
+      break;
+    case "losing_trades":
+      baseStats.losingTrades = numericValue + 5;
+      break;
+    case "risk_reward_ratio":
+      baseStats.averageWin = 80;
+      baseStats.averageLoss = 30; // Gives ~2.67 ratio
+      break;
+
+    // Additional time-based conditions
+    case "trades_today":
+      baseStats.maxTradesInOneDay = numericValue + 5;
+      break;
+    case "trades_this_week":
+      baseStats.maxTradesInOneWeek = numericValue + 10;
+      break;
+    case "trades_this_month":
+      baseStats.maxTradesInOneMonth = numericValue + 20;
+      break;
+    case "different_assets_traded":
+      baseStats.uniquePairsTraded = numericValue + 3;
+      break;
+
+    // Additional performance conditions
+    case "max_win_streak":
+      baseStats.maxWinStreak = numericValue + 3;
+      break;
+    case "best_trade_pnl":
+    case "best_single_trade":
+      baseStats.bestSingleTrade = numericValue + 100;
+      break;
+    case "average_trade_pnl":
+    case "average_win":
+      baseStats.averageWin = numericValue + 20;
+      break;
+
+    // Additional speed/execution conditions
+    case "ninja_trading":
+      baseStats.tradesUnder5Minutes = 25;
+      baseStats.winRate = 65;
+      break;
+    case "trades_all_hours":
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 100);
+      baseStats.uniquePairsTraded = 6;
+      break;
+    case "ultra_fast_execution":
+      baseStats.tradesUnder1Minute = 10;
+      break;
+
+    // Additional competition conditions
+    case "survived_full_competition":
+      baseStats.completedCompetitionsWithTrades = Math.max(1, minCompletedCompetitions || 1);
+      baseStats.totalTrades = Math.max(baseStats.totalTrades!, minTrades || 10);
+      baseStats.liquidationCount = 0;
+      break;
+    case "first_trade_in_comp":
+      baseStats.totalTrades = Math.max(1, baseStats.totalTrades!);
+      baseStats.competitionsEntered = Math.max(1, baseStats.competitionsEntered!);
+      break;
+    case "beat_top_trader":
+      baseStats.firstPlaceFinishes = Math.max(1, baseStats.firstPlaceFinishes!);
+      baseStats.competitionsEntered = Math.max(5, baseStats.competitionsEntered!);
+      break;
+    case "underdog_win":
+      baseStats.firstPlaceFinishes = Math.max(1, baseStats.firstPlaceFinishes!);
+      baseStats.averageRoi = 30; // production: < 50
+      break;
+    case "comeback_victory":
+      baseStats.comebackWins = Math.max(1, baseStats.comebackWins!);
+      break;
+    case "wire_to_wire_win":
+      baseStats.wireToWireWins = Math.max(1, baseStats.wireToWireWins!);
+      break;
+
     default:
       // For unhandled types, keep base stats
       break;
@@ -503,6 +679,10 @@ function generateFailingMockStats(badge: Badge): Partial<UserStats> {
     consecutiveProfitableDays: 0,
     consecutiveTradingDays: 0,
     globalRank: 10000,
+    slTriggeredCount: 0,
+    tpTriggeredCount: 0,
+    depositCount: 0,
+    withdrawalCount: 0,
   };
 
   // Specifically ensure minimum requirements fail

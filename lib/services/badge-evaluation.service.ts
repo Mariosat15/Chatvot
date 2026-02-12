@@ -130,6 +130,11 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
 }> {
   await connectToDatabase();
 
+  // CRITICAL: Invalidate stats cache for this user so we get fresh data.
+  // Badge evaluation is triggered after an action (trade, deposit, etc.),
+  // so we MUST re-fetch stats to include the new action.
+  _statsCache.delete(userId);
+
   try {
     // 0. Fetch badges from database
     const allBadges = await getBadgesFromDB();
@@ -140,14 +145,14 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
       : allBadges;
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:start',message:'Badge eval started',data:{userId,categories,totalBadgesFromDB:allBadges.length,filteredBadges:badges.length,sampleBadges:badges.slice(0,3).map((b:any)=>({id:b.id,rarity:b.rarity,condType:b.condition?.type,isActive:b.isActive}))},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+    console.log(`🔍 [BADGE-DEBUG] evaluateUserBadges userId=${userId} categories=${JSON.stringify(categories)} allBadgesCount=${allBadges.length} filteredBadgesCount=${badges.length} allCategories=${JSON.stringify([...new Set(allBadges.map((b:any)=>b.category))])}`);
     // #endregion
 
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:stats',message:'User stats gathered',data:{userId,totalTrades:stats.totalTrades,completedCompetitions:stats.completedCompetitions,hasDeposit:stats.hasDeposit,totalDeposits:stats.totalDeposits,kycVerified:stats.kycVerified,winRate:stats.winRate,competitionsEntered:stats.competitionsEntered},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+    console.log(`🔍 [BADGE-DEBUG] Stats for ${userId}: totalTrades=${stats.totalTrades} winningTrades=${stats.winningTrades} winRate=${stats.winRate?.toFixed(1)} totalPnl=${stats.totalPnl?.toFixed(2)} depositCount=${stats.depositCount} totalDeposited=${stats.totalDeposited} compsEntered=${stats.competitionsEntered} completedComps=${stats.completedCompetitions} completedCompsWithTrades=${stats.completedCompetitionsWithTrades} level=${stats.currentLevel} maxWinStreak=${stats.maxWinStreak} alwaysSL=${stats.alwaysUsesSL} alwaysTP=${stats.alwaysUsesTP}`);
     // #endregion
 
     // 2. Get currently earned badges
@@ -185,6 +190,14 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
 
       // Check if badge condition is met
       const earned = await checkBadgeCondition(badge as Badge, stats);
+
+      // #region agent log
+      const debugBadgeIds = ['profit_5_wins','profit_10_wins','social_first_deposit','social_funded_trader','social_first_comp','social_first_trade','social_depositor','trade_25','profit_positive','profit_win_streak_5','risk_survivor','comp_5_entries'];
+      if (debugBadgeIds.includes(badge.id)) {
+        const bCond = badge.condition as any;
+        console.log(`🔍 [BADGE-DEBUG] Badge ${badge.id}: earned=${earned} condType=${bCond?.type} condValue=${bCond?.value} minTrades=${bCond?.minTrades} rarity=${badge.rarity} userLevel=${userCurrentLevel}`);
+      }
+      // #endregion
 
       if (earned) {
         // Award the badge
@@ -225,23 +238,13 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
       }
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:evalResult',message:'Badge eval loop complete',data:{userId,newBadgesCount:newlyEarnedBadges.length,newBadgeIds:newlyEarnedBadges.map(b=>b.id),existingBadgesCount:existingBadges.length,totalEvaluated:badges.length},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
-    // #endregion
-
     // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
     // Even if no badges earned, we create the record for tracking
     try {
       const { ensureUserLevel } =
         await import("@/lib/services/xp-level.service");
       await ensureUserLevel(userId);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:ensureUserLevel',message:'ensureUserLevel completed',data:{userId,newBadgesCount:newlyEarnedBadges.length},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
-      // #endregion
     } catch (levelError) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'badge-evaluation.service.ts:ensureUserLevel:ERROR',message:'ensureUserLevel FAILED',data:{userId,error:String(levelError)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
-      // #endregion
       console.error("❌ [BADGE EVAL] Error ensuring user level:", levelError);
     }
 
@@ -281,6 +284,9 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Check cache first
   const cached = _statsCache.get(userId);
   if (cached && Date.now() < cached.expiresAt) {
+    // #region agent log
+    console.log(`🔍 [BADGE-DEBUG] CACHE HIT for ${userId} - age=${Math.round((Date.now()-(cached.expiresAt-5*60*1000))/1000)}s totalTrades=${cached.stats.totalTrades} winningTrades=${cached.stats.winningTrades}`);
+    // #endregion
     return cached.stats;
   }
 
@@ -897,10 +903,10 @@ export async function checkBadgeCondition(
       );
     case "always_uses_sl":
       // Must always use SL + have sufficient trades + at least 3 SL actually triggered (proves they work)
-      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50) && stats.slTriggeredCount >= 3;
+      return stats.alwaysUsesSL && stats.totalTrades >= (minTrades || 50) && (stats.slTriggeredCount || 0) >= 3;
     case "always_uses_tp":
       // Must always use TP + have sufficient trades + at least 3 TP actually triggered
-      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50) && stats.tpTriggeredCount >= 3;
+      return stats.alwaysUsesTP && stats.totalTrades >= (minTrades || 50) && (stats.tpTriggeredCount || 0) >= 3;
 
     // Social badges
     case "first_deposit":
@@ -1140,7 +1146,7 @@ export async function checkBadgeCondition(
     case "profile_complete":
       return stats.totalDeposited > 0; // Has activity = profile complete
     case "total_deposits":
-      return compareValue(stats.depositCount, value, comparison);
+      return compareValue(stats.depositCount || 0, value, comparison);
     case "first_trade":
       return stats.totalTrades >= 1;
     case "losing_trades":

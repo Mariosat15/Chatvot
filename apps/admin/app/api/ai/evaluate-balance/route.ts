@@ -61,16 +61,7 @@ export async function POST(request: NextRequest) {
         totalMilestones: milestoneData.filter(ms => ms.mapId === m.mapId).length,
       }));
 
-      // #region agent log
-      const evalStart = Date.now();
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'evaluate-balance/route.ts:eval',message:'evaluate start (LOCAL)',data:{badges:badgeData.length,milestones:milestoneData.length,maps:mapData.length},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
-
       const evaluation = evaluateSystem(badgeData, milestoneData, mapData);
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'evaluate-balance/route.ts:eval',message:'evaluate done (LOCAL)',data:{durationMs:Date.now()-evalStart,overallScore:evaluation.overallScore,issues:evaluation.issues.length},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
 
       // Build category distribution for stats
       const categoryDist: Record<string, Record<string, number>> = {};

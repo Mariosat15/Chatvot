@@ -197,16 +197,9 @@ export default function GamificationWizardSection() {
   const runEvaluationAgent = async () => {
     setStepLoading("evaluate");
     try {
-      // #region agent log
-      const t0 = Date.now();
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation start (local engine)',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       const data = await callWizardAPI({
         action: "agent_evaluate",
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation response',data:{durationMs:Date.now()-t0,success:data.success,score:data.evaluation?.overallScore,issues:data.evaluation?.issues?.length,error:data.error},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       if (data.success && data.evaluation) {
         setEvaluation(data.evaluation);
         toast.success(`Evaluation: Score ${data.evaluation.overallScore}/10 — ${data.evaluation.issues?.length || 0} issues found`);
@@ -214,9 +207,6 @@ export default function GamificationWizardSection() {
         toast.error(data.error || "Evaluation failed");
       }
     } catch (err: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runEval',message:'evaluation EXCEPTION',data:{error:err?.message||String(err)},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       toast.error("Evaluation error");
     }
     setStepLoading(null);
@@ -225,14 +215,7 @@ export default function GamificationWizardSection() {
   const runAutoFix = async () => {
     setStepLoading("autofix");
     try {
-      // #region agent log
-      const t0 = Date.now();
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix start (local engine)',data:{},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       const data = await callWizardAPI({ action: "auto_fix" });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix response',data:{durationMs:Date.now()-t0,success:data.success,totalFixes:data.fixes?.totalFixes,badgeApplied:data.badgeWriteResults?.applied,milestoneApplied:data.milestoneWriteResults?.applied,error:data.error},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       if (data.success) {
         const bp = data.badgeWriteResults;
         const mp = data.milestoneWriteResults;
@@ -250,9 +233,6 @@ export default function GamificationWizardSection() {
         toast.error(data.error || "Auto-fix failed");
       }
     } catch (err: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GamificationWizardSection.tsx:runAutoFix',message:'auto_fix EXCEPTION',data:{error:err?.message||String(err)},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       toast.error("Auto-fix error");
     }
     setStepLoading(null);

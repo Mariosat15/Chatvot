@@ -1362,8 +1362,8 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         if (p.userId === winnerId) {
           awardActivityXP(p.userId, "challenge_won").catch(() => {});
         }
-        // Evaluate competition-related badges
-        evaluateUserBadges(p.userId, ["Competition"]).catch(() => {});
+        // Evaluate ALL badge categories (challenges involve trading, profit, risk, etc.)
+        evaluateUserBadges(p.userId).catch(() => {});
       }
     } catch (xpError) {
       console.error("Error awarding challenge XP:", xpError);

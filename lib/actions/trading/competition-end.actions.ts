@@ -1360,8 +1360,8 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
         else if (userEntry?.rank === 2) awardActivityXP(userId, "competition_podium_2").catch(() => {});
         else if (userEntry?.rank === 3) awardActivityXP(userId, "competition_podium_3").catch(() => {});
 
-        // Evaluate competition-related badges only (incremental)
-        evaluateUserBadges(userId, ["Competition"])
+        // Evaluate ALL badge categories (competitions involve trading, profit, risk, etc.)
+        evaluateUserBadges(userId)
           .then((result) => {
             if (result.newBadges.length > 0) {
               console.log(

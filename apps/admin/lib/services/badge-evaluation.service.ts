@@ -1136,7 +1136,7 @@ export async function checkBadgeCondition(
     case "profile_complete":
       return stats.totalDeposited > 0; // Has activity = profile complete
     case "total_deposits":
-      return compareValue(stats.depositCount, value, comparison);
+      return compareValue(stats.depositCount || 0, value, comparison);
     case "first_trade":
       return stats.totalTrades >= 1;
     case "losing_trades":
