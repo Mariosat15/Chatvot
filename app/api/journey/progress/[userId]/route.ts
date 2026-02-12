@@ -120,8 +120,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Retroactively check and complete milestones based on current user stats
     // This ensures past actions (e.g., winning trades before the fix) are recognized
     try {
+      // #region agent log
+      console.log(`🔍 [JOURNEY-RETRO] Triggering retroactive milestone check for user ${userId} mapId=${userProgress.mapId || "traders_journey"}`);
+      // #endregion
       const { checkAndCompleteMilestones } = await import("@/lib/services/journey-progress.service");
-      await checkAndCompleteMilestones(userId, userProgress.mapId || "traders_journey");
+      const retroResult = await checkAndCompleteMilestones(userId, userProgress.mapId || "traders_journey");
+      // #region agent log
+      console.log(`🔍 [JOURNEY-RETRO] Result: completed=${JSON.stringify(retroResult.completed)} unlocked=${JSON.stringify(retroResult.unlocked)} xp=${retroResult.totalXPEarned}`);
+      // #endregion
     } catch (err) {
       // Non-critical -- don't block page load
       console.warn("Failed to retroactively check milestones:", err);

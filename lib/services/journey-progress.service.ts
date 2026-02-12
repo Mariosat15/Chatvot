@@ -980,6 +980,13 @@ export async function checkAndCompleteMilestones(
     preloadedStats = await gatherUserStats(userId);
   }
 
+  // #region agent log
+  console.log(`🔍 [JOURNEY-DEBUG] userId=${userId} mapId=${mapId} completedCount=${completedIds.size} notCompletedCount=${notCompleted.length} allMilestonesCount=${allMilestones.length}`);
+  if (preloadedStats) {
+    console.log(`🔍 [JOURNEY-DEBUG] Stats: totalTrades=${preloadedStats.totalTrades} winningTrades=${preloadedStats.winningTrades} depositCount=${preloadedStats.depositCount} kycVerified=${preloadedStats.kycVerified}`);
+  }
+  // #endregion
+
   // Check ALL non-completed milestones (allows out-of-order completion)
   for (const milestone of notCompleted) {
     // Check if this milestone's condition is met
@@ -987,6 +994,10 @@ export async function checkAndCompleteMilestones(
     
     const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
     
+    // #region agent log
+    console.log(`🔍 [JOURNEY-DEBUG] Milestone "${milestone.name}" (${milestone.id}): condType=${milestone.completeCondition.type} condValue=${milestone.completeCondition.value} met=${met}`);
+    // #endregion
+
     if (met) {
       // Force-unlock this milestone if it's not already unlocked
       // This ensures milestones can be completed even if earlier ones in the chain are skipped

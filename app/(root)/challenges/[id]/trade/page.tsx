@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChallengeInfoHeader } from "@/components/trading/ChallengeInfoHeader";
 import ChallengeStatusMonitor from "@/components/trading/ChallengeStatusMonitor";
 import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
+import TradingPageContent from "@/components/trading/TradingPageContent";
 import { ArrowLeft, Swords } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -174,6 +175,27 @@ const ChallengeTradingPage = async ({
                 />
               )}
 
+              <TradingPageContent
+                competition={{
+                  _id: challengeId,
+                  name: `${challenge.challengerName || "Player 1"} vs ${challenge.challengedName || "Player 2"}`,
+                  endTime: challenge.endTime || new Date(),
+                  currentParticipants: 2,
+                  prizePool: (challenge.entryFee || 0) * 2,
+                }}
+                participant={{
+                  currentCapital: participant.currentCapital,
+                  availableCapital: participant.availableCapital,
+                  unrealizedPnl: participant.unrealizedPnl,
+                  usedMargin: participant.usedMargin,
+                  currentOpenPositions: participant.currentOpenPositions,
+                }}
+                positions={positions}
+                competitionId={challengeId}
+                defaultLeverage={defaultLeverage}
+                startingCapital={challenge.startingCapital || 10000}
+                marginThresholds={marginThresholds}
+              >
               <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
                 {/* View-Only Banner for Completed Challenges */}
                 {isViewOnly && (
@@ -582,6 +604,7 @@ const ChallengeTradingPage = async ({
                   competitionId={challengeId}
                 />
               )}
+              </TradingPageContent>
             </TradingModeProvider>
           </PositionEventsProvider>
         </TradingArsenalProvider>
