@@ -44,10 +44,10 @@ export function GameIcon({
   animate = "none",
   style,
 }: GameIconProps) {
-  const iconPath = GAME_ICONS[name];
+  const iconPath = GAME_ICONS[name] || GAME_ICONS["starBadge"];
   
   if (!iconPath) {
-    console.warn(`GameIcon: Unknown icon name "${name}"`);
+    console.warn(`GameIcon: Unknown icon name "${name}" and no fallback found`);
     return null;
   }
 
@@ -88,7 +88,7 @@ export function GameIconInline({
   size?: number;
   className?: string;
 }) {
-  const iconPath = GAME_ICONS[name];
+  const iconPath = GAME_ICONS[name] || GAME_ICONS["starBadge"];
   
   if (!iconPath) return null;
 

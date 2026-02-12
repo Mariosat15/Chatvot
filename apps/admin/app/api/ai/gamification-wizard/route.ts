@@ -439,6 +439,27 @@ export async function POST(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "agent_badges") {
       const { generateCount = 0, autoApply = false } = body;
+
+      // ── Pre-pass: fix all badges with invalid icons (emojis, missing, etc.) ──
+      const CATEGORY_ICON_MAP: Record<string, string> = {
+        Competition: "trophy", Trading: "trade", Profit: "profit",
+        Risk: "shield1", Speed: "lightningSpell", Consistency: "target",
+        Strategy: "portfolio", Social: "heart", Legendary: "crown",
+      };
+      const allBadgesRaw = await BadgeConfig.find({ isActive: true }).lean();
+      let iconFixCount = 0;
+      for (const b of allBadgesRaw as any[]) {
+        const icon = b.icon;
+        if (!icon || !isValidGameIconName(icon)) {
+          const fallback = CATEGORY_ICON_MAP[b.category] || "starBadge";
+          await BadgeConfig.updateOne({ _id: b._id }, { $set: { icon: fallback } });
+          iconFixCount++;
+        }
+      }
+      if (iconFixCount > 0) {
+        console.log(`[Wizard] Pre-pass: fixed ${iconFixCount} badges with invalid/emoji icons`);
+      }
+
       const badges = await dbTools.readAllBadges();
 
       // Compact format: ~70% smaller than pretty JSON
