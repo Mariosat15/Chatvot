@@ -125,6 +125,7 @@ interface Milestone {
   tooltipText?: string;
   celebrationText?: string;
   isActive: boolean;
+  requiredBadgeIds?: string[];
 }
 
 interface MapConfig {
@@ -137,6 +138,14 @@ interface MapConfig {
   backgroundImage?: string;
   isActive: boolean;
   version: number;
+}
+
+interface BadgeOption {
+  id: string;
+  name: string;
+  icon: string;
+  rarity: string;
+  category: string;
 }
 
 // Map dimensions (matching treasure map)
@@ -348,6 +357,7 @@ export default function JourneyMapEditorSection() {
   const [sequenceValidation, setSequenceValidation] = useState<any>(null);
   const [syncingAllUsers, setSyncingAllUsers] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
+  const [allBadges, setAllBadges] = useState<BadgeOption[]>([]);
   
   // Milestone counts per map (admin can customize)
   const [mapMilestoneCounts, setMapMilestoneCounts] = useState<Record<number, number>>({
@@ -1194,6 +1204,29 @@ export default function JourneyMapEditorSection() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Fetch all badges for dropdowns (once on mount)
+  useEffect(() => {
+    const fetchBadges = async () => {
+      try {
+        const res = await fetch("/api/badges");
+        if (res.ok) {
+          const data = await res.json();
+          const badges = (data.badges || data || []).map((b: any) => ({
+            id: b.id,
+            name: b.name,
+            icon: b.icon || "🏆",
+            rarity: b.rarity || "common",
+            category: b.category || "Trading",
+          }));
+          setAllBadges(badges);
+        }
+      } catch (err) {
+        console.warn("Could not fetch badges for editor dropdowns");
+      }
+    };
+    fetchBadges();
+  }, []);
 
   // Update milestone position (local state)
   const updateMilestonePosition = (id: string, x: number, y: number) => {
@@ -2473,15 +2506,41 @@ export default function JourneyMapEditorSection() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Badge ID (optional)</Label>
-                    <Input
-                      value={selectedMilestone.rewards.badgeId || ""}
-                      onChange={e => setSelectedMilestone({
+                    <Label>Reward Badge (optional)</Label>
+                    <Select
+                      value={selectedMilestone.rewards.badgeId || "__none__"}
+                      onValueChange={value => setSelectedMilestone({
                         ...selectedMilestone,
-                        rewards: { ...selectedMilestone.rewards, badgeId: e.target.value || undefined }
+                        rewards: { ...selectedMilestone.rewards, badgeId: value === "__none__" ? undefined : value }
                       })}
-                      placeholder="e.g., trade_first"
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select badge..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">No badge reward</span>
+                        </SelectItem>
+                        {allBadges.map(badge => (
+                          <SelectItem key={badge.id} value={badge.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{badge.icon}</span>
+                              <span>{badge.name}</span>
+                              <span className={`text-xs ml-1 ${
+                                badge.rarity === "legendary" ? "text-yellow-400" :
+                                badge.rarity === "epic" ? "text-purple-400" :
+                                badge.rarity === "rare" ? "text-blue-400" : "text-zinc-400"
+                              }`}>({badge.rarity})</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedMilestone.rewards.badgeId && (
+                      <p className="text-xs text-muted-foreground">
+                        {allBadges.find(b => b.id === selectedMilestone.rewards.badgeId)?.name || selectedMilestone.rewards.badgeId}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Title (optional)</Label>
@@ -2497,6 +2556,87 @@ export default function JourneyMapEditorSection() {
                 </div>
               </div>
 
+              {/* Required Badges (gate) */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-orange-500" />
+                  Required Badges
+                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                    User must earn these badges before this milestone unlocks
+                  </span>
+                </h3>
+                {/* Selected badges */}
+                {(selectedMilestone.requiredBadgeIds?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(selectedMilestone.requiredBadgeIds || []).map(badgeId => {
+                      const badge = allBadges.find(b => b.id === badgeId);
+                      return (
+                        <Badge
+                          key={badgeId}
+                          variant="outline"
+                          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border-orange-500/30"
+                        >
+                          <span>{badge?.icon || "🏆"}</span>
+                          <span>{badge?.name || badgeId}</span>
+                          <button
+                            onClick={() => setSelectedMilestone({
+                              ...selectedMilestone,
+                              requiredBadgeIds: (selectedMilestone.requiredBadgeIds || []).filter(id => id !== badgeId)
+                            })}
+                            className="ml-1 text-red-400 hover:text-red-300"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Add badge dropdown */}
+                <Select
+                  value="__placeholder__"
+                  onValueChange={value => {
+                    if (value === "__placeholder__") return;
+                    const current = selectedMilestone.requiredBadgeIds || [];
+                    if (!current.includes(value)) {
+                      setSelectedMilestone({
+                        ...selectedMilestone,
+                        requiredBadgeIds: [...current, value]
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Add required badge..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__placeholder__" disabled>
+                      <span className="text-muted-foreground">Select a badge to add...</span>
+                    </SelectItem>
+                    {allBadges
+                      .filter(b => !(selectedMilestone.requiredBadgeIds || []).includes(b.id))
+                      .map(badge => (
+                        <SelectItem key={badge.id} value={badge.id}>
+                          <span className="flex items-center gap-2">
+                            <span>{badge.icon}</span>
+                            <span>{badge.name}</span>
+                            <span className={`text-xs ml-1 ${
+                              badge.rarity === "legendary" ? "text-yellow-400" :
+                              badge.rarity === "epic" ? "text-purple-400" :
+                              badge.rarity === "rare" ? "text-blue-400" : "text-zinc-400"
+                            }`}>({badge.rarity})</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {(selectedMilestone.requiredBadgeIds?.length ?? 0) === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    No required badges. Milestone unlocks based on connections only.
+                  </p>
+                )}
+              </div>
+
               {/* Connections */}
               <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -2504,27 +2644,115 @@ export default function JourneyMapEditorSection() {
                   Connections
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Connected From */}
                   <div className="space-y-2">
-                    <Label>Connected To (comma-separated IDs)</Label>
-                    <Input
-                      value={selectedMilestone.connectedTo.join(", ")}
-                      onChange={e => setSelectedMilestone({
-                        ...selectedMilestone,
-                        connectedTo: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
-                      })}
-                      placeholder="first_trade, first_deposit"
-                    />
+                    <Label>Connected From (prerequisites)</Label>
+                    {selectedMilestone.connectedFrom.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedMilestone.connectedFrom.map(id => {
+                          const ms = milestones.find(m => m.id === id);
+                          return (
+                            <Badge key={id} variant="outline" className="flex items-center gap-1 px-2 py-0.5 bg-slate-800">
+                              <span className="text-xs">{ms?.name || id}</span>
+                              <button
+                                onClick={() => setSelectedMilestone({
+                                  ...selectedMilestone,
+                                  connectedFrom: selectedMilestone.connectedFrom.filter(x => x !== id)
+                                })}
+                                className="ml-0.5 text-red-400 hover:text-red-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <Select
+                      value="__placeholder__"
+                      onValueChange={value => {
+                        if (value === "__placeholder__") return;
+                        if (!selectedMilestone.connectedFrom.includes(value)) {
+                          setSelectedMilestone({
+                            ...selectedMilestone,
+                            connectedFrom: [...selectedMilestone.connectedFrom, value]
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add prerequisite..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__placeholder__" disabled>Select milestone...</SelectItem>
+                        {milestones
+                          .filter(m => m.id !== selectedMilestone.id && !selectedMilestone.connectedFrom.includes(m.id))
+                          .sort((a, b) => a.order - b.order)
+                          .map(m => (
+                            <SelectItem key={m.id} value={m.id}>
+                              <span className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">#{m.order}</span>
+                                <span>{m.name}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                  {/* Connected To */}
                   <div className="space-y-2">
-                    <Label>Connected From (comma-separated IDs)</Label>
-                    <Input
-                      value={selectedMilestone.connectedFrom.join(", ")}
-                      onChange={e => setSelectedMilestone({
-                        ...selectedMilestone,
-                        connectedFrom: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
-                      })}
-                      placeholder="account_created"
-                    />
+                    <Label>Connected To (unlocks next)</Label>
+                    {selectedMilestone.connectedTo.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedMilestone.connectedTo.map(id => {
+                          const ms = milestones.find(m => m.id === id);
+                          return (
+                            <Badge key={id} variant="outline" className="flex items-center gap-1 px-2 py-0.5 bg-slate-800">
+                              <span className="text-xs">{ms?.name || id}</span>
+                              <button
+                                onClick={() => setSelectedMilestone({
+                                  ...selectedMilestone,
+                                  connectedTo: selectedMilestone.connectedTo.filter(x => x !== id)
+                                })}
+                                className="ml-0.5 text-red-400 hover:text-red-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <Select
+                      value="__placeholder__"
+                      onValueChange={value => {
+                        if (value === "__placeholder__") return;
+                        if (!selectedMilestone.connectedTo.includes(value)) {
+                          setSelectedMilestone({
+                            ...selectedMilestone,
+                            connectedTo: [...selectedMilestone.connectedTo, value]
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add next milestone..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__placeholder__" disabled>Select milestone...</SelectItem>
+                        {milestones
+                          .filter(m => m.id !== selectedMilestone.id && !selectedMilestone.connectedTo.includes(m.id))
+                          .sort((a, b) => a.order - b.order)
+                          .map(m => (
+                            <SelectItem key={m.id} value={m.id}>
+                              <span className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">#{m.order}</span>
+                                <span>{m.name}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -2592,21 +2820,21 @@ export default function JourneyMapEditorSection() {
           </div>
 
           {/* Right Column - Preview */}
-          <div className="w-80 bg-slate-900 border-l border-slate-700 p-4 overflow-y-auto">
+          <div className="w-96 bg-slate-900 border-l border-slate-700 p-4 overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Preview</h3>
             
             {/* Milestone Preview Card */}
             <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
               <div className="flex items-center gap-3 mb-3">
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
                   style={{ backgroundColor: selectedMilestone.color }}
                 >
                   <GameIcon name={selectedMilestone.icon as GameIconName} size={28} />
                 </div>
-                <div>
-                  <div className="font-semibold">{selectedMilestone.name || "Unnamed"}</div>
-                  <div className="text-sm text-muted-foreground">{selectedMilestone.nodeType}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{selectedMilestone.name || "Unnamed"}</div>
+                  <div className="text-xs text-muted-foreground">{selectedMilestone.nodeType} &middot; #{selectedMilestone.order}</div>
                 </div>
               </div>
               
@@ -2614,7 +2842,7 @@ export default function JourneyMapEditorSection() {
                 {selectedMilestone.description || "No description"}
               </p>
               
-              <div className="space-y-2 text-sm">
+              <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Zone:</span>
                   <span>{mapConfig?.zones.find(z => z.id === selectedMilestone.zoneId)?.name || selectedMilestone.zoneId}</span>
@@ -2624,32 +2852,86 @@ export default function JourneyMapEditorSection() {
                   <span>({selectedMilestone.position.x}, {selectedMilestone.position.y})</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order:</span>
-                  <span>#{selectedMilestone.order}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">XP Reward:</span>
                   <span className="text-yellow-500 font-semibold">+{selectedMilestone.rewards.xp} XP</span>
                 </div>
                 {selectedMilestone.rewards.badgeId && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Badge:</span>
-                    <span className="text-purple-400">{selectedMilestone.rewards.badgeId}</span>
+                    <span className="text-muted-foreground">Reward Badge:</span>
+                    <span className="text-purple-400">
+                      {allBadges.find(b => b.id === selectedMilestone.rewards.badgeId)?.icon || "🏆"}{" "}
+                      {allBadges.find(b => b.id === selectedMilestone.rewards.badgeId)?.name || selectedMilestone.rewards.badgeId}
+                    </span>
+                  </div>
+                )}
+                {selectedMilestone.rewards.title && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Title:</span>
+                    <span className="text-amber-400">{selectedMilestone.rewards.title}</span>
                   </div>
                 )}
               </div>
               
+              {/* Condition */}
               <div className="mt-3 pt-3 border-t border-slate-600">
-                <div className="text-sm text-muted-foreground mb-1">Condition:</div>
-                <div className="text-sm">
-                  {selectedMilestone.completeCondition.type} {selectedMilestone.completeCondition.comparison || "≥"} {selectedMilestone.completeCondition.value || 0}
+                <div className="text-xs text-muted-foreground mb-1">Completion Condition</div>
+                <div className="text-sm font-mono bg-slate-900/50 rounded px-2 py-1">
+                  {CONDITION_TYPES.find(ct => ct.value === selectedMilestone.completeCondition.type)?.label || selectedMilestone.completeCondition.type}
+                  {" "}
+                  {selectedMilestone.completeCondition.comparison === "gte" ? "≥" :
+                   selectedMilestone.completeCondition.comparison === "gt" ? ">" :
+                   selectedMilestone.completeCondition.comparison === "lte" ? "≤" :
+                   selectedMilestone.completeCondition.comparison === "lt" ? "<" :
+                   selectedMilestone.completeCondition.comparison === "eq" ? "=" : "≥"}
+                  {" "}
+                  {selectedMilestone.completeCondition.value || 0}
                 </div>
               </div>
+
+              {/* Required Badges */}
+              {(selectedMilestone.requiredBadgeIds?.length ?? 0) > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-600">
+                  <div className="text-xs text-muted-foreground mb-1.5">Required Badges</div>
+                  <div className="flex flex-wrap gap-1">
+                    {(selectedMilestone.requiredBadgeIds || []).map(badgeId => {
+                      const badge = allBadges.find(b => b.id === badgeId);
+                      return (
+                        <Badge key={badgeId} variant="outline" className="text-xs border-orange-500/30">
+                          {badge?.icon || "🏆"} {badge?.name || badgeId}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Connections */}
+              {(selectedMilestone.connectedFrom.length > 0 || selectedMilestone.connectedTo.length > 0) && (
+                <div className="mt-3 pt-3 border-t border-slate-600">
+                  <div className="text-xs text-muted-foreground mb-1.5">Connections</div>
+                  {selectedMilestone.connectedFrom.length > 0 && (
+                    <div className="mb-1">
+                      <span className="text-xs text-cyan-400">From: </span>
+                      <span className="text-xs">
+                        {selectedMilestone.connectedFrom.map(id => milestones.find(m => m.id === id)?.name || id).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {selectedMilestone.connectedTo.length > 0 && (
+                    <div>
+                      <span className="text-xs text-green-400">To: </span>
+                      <span className="text-xs">
+                        {selectedMilestone.connectedTo.map(id => milestones.find(m => m.id === id)?.name || id).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* Quick Stats */}
             <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge variant={selectedMilestone.isActive ? "default" : "secondary"}>
                   {selectedMilestone.isActive ? "Active" : "Inactive"}
                 </Badge>
@@ -2657,8 +2939,11 @@ export default function JourneyMapEditorSection() {
                   <Badge variant="outline">Required</Badge>
                 )}
                 {selectedMilestone.isAutoComplete && (
-                  <Badge variant="outline">Auto</Badge>
+                  <Badge variant="outline">Auto-complete</Badge>
                 )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                ID: <code className="bg-slate-800 px-1 rounded">{selectedMilestone.id}</code>
               </div>
             </div>
           </div>
@@ -3294,7 +3579,7 @@ export default function JourneyMapEditorSection() {
               onClick={() => {
                 setSelectedMilestone({
                   id: "",
-                  mapId: "traders_journey",
+                  mapId: mapConfig?.mapId || "traders_journey",
                   name: "",
                   description: "",
                   shortDescription: "",
@@ -3312,6 +3597,7 @@ export default function JourneyMapEditorSection() {
                   isAutoComplete: false,
                   order: milestones.length + 1,
                   isActive: true,
+                  requiredBadgeIds: [],
                 });
                 setEditMilestoneOpen(true);
               }}
