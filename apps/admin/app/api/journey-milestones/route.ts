@@ -186,11 +186,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if milestone ID already exists
-    const existing = await JourneyMilestone.findOne({ id: data.id });
+    // Check if milestone ID already exists on this map
+    const existing = await JourneyMilestone.findOne({ id: data.id, mapId: data.mapId });
     if (existing) {
       return NextResponse.json(
-        { success: false, error: "Milestone with this ID already exists" },
+        { success: false, error: "Milestone with this ID already exists on this map" },
         { status: 400 }
       );
     }

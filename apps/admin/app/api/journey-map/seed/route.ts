@@ -55,7 +55,24 @@ async function seedJourneyMap() {
     console.log("✨ [SEED] Created new map configuration");
   }
 
-  // Create all milestones fresh
+  // Drop the legacy global unique index on `id` if it exists.
+  // The new schema uses a compound unique index on { id, mapId } instead.
+  try {
+    const collection = JourneyMilestone.collection;
+    const indexes = await collection.indexes();
+    const legacyIndex = indexes.find(
+      (idx: any) => idx.key && idx.key.id === 1 && !idx.key.mapId && idx.unique
+    );
+    if (legacyIndex) {
+      await collection.dropIndex(legacyIndex.name!);
+      console.log(`🔧 [SEED] Dropped legacy unique index "${legacyIndex.name}" on id field`);
+    }
+  } catch (indexErr) {
+    // Index may not exist or already dropped — safe to ignore
+    console.log("ℹ️ [SEED] No legacy id index to drop (or already removed)");
+  }
+
+  // Create all milestones fresh (upsert to avoid duplicate key errors)
   let created = 0;
 
   for (const milestone of DEFAULT_MILESTONES) {
@@ -85,7 +102,11 @@ async function seedJourneyMap() {
         isActive: true,
       };
       
-      await JourneyMilestone.create(milestoneData);
+      await JourneyMilestone.findOneAndUpdate(
+        { id: milestone.id, mapId: DEFAULT_MAP_CONFIG.mapId },
+        { $set: milestoneData },
+        { upsert: true, new: true }
+      );
       created++;
     } catch (err) {
       console.error(`Error seeding milestone ${milestone.id}:`, err);

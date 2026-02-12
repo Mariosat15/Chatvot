@@ -103,8 +103,6 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     id: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
     },
     mapId: {
       type: String,
@@ -219,6 +217,8 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
   }
 );
 
+// Compound unique: milestone ID is unique PER MAP (not globally)
+JourneyMilestoneSchema.index({ id: 1, mapId: 1 }, { unique: true });
 // Index for efficient queries
 JourneyMilestoneSchema.index({ mapId: 1, zoneId: 1 });
 JourneyMilestoneSchema.index({ mapId: 1, order: 1 });
