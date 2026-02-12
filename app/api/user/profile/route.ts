@@ -207,6 +207,19 @@ export async function PUT(req: NextRequest) {
       phone: result.phone,
     });
 
+    // Invalidate caches when profile image or name changes (leaderboard, user lookup)
+    if (profileImage !== undefined || name !== undefined) {
+      try {
+        const { invalidateUserCaches } = await import("@/lib/utils/cache");
+        const { clearLeaderboardCache } = await import("@/lib/actions/leaderboard/global-leaderboard.actions");
+        invalidateUserCaches(session.user.id);
+        await clearLeaderboardCache();
+        console.log(`🔄 [CACHE] Invalidated user & leaderboard caches for ${session.user.id} after profile update`);
+      } catch (cacheError) {
+        console.error("Cache invalidation error:", cacheError);
+      }
+    }
+
     // Sync profile changes to messaging (friends, conversations, messages)
     // Only sync if name or profileImage changed
     if (name !== undefined || profileImage !== undefined) {

@@ -130,6 +130,17 @@ export async function POST(req: NextRequest) {
       profileImageUrl,
     );
 
+    // Invalidate caches so leaderboard shows new avatar immediately
+    try {
+      const { invalidateUserCaches } = await import("@/lib/utils/cache");
+      const { clearLeaderboardCache } = await import("@/lib/actions/leaderboard/global-leaderboard.actions");
+      invalidateUserCaches(session.user.id);
+      await clearLeaderboardCache();
+      console.log(`🔄 [CACHE] Invalidated caches after profile image upload for ${session.user.id}`);
+    } catch (cacheError) {
+      console.error("Cache invalidation error:", cacheError);
+    }
+
     // Sync profile image to messaging (friends, conversations, messages)
     try {
       await syncUserProfile({

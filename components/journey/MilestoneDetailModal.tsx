@@ -5,6 +5,10 @@ import { X, Star, CheckCircle, Lock, ArrowRight, Sparkles, Target, Shield } from
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { Milestone } from "./JourneyMapRenderer";
+import { BADGES } from "@/lib/constants/badges";
+
+// Build a lookup map from badge ID -> display name
+const BADGE_NAME_MAP = new Map(BADGES.map(b => [b.id, b.name]));
 
 interface MilestoneDetailModalProps {
   milestone: Milestone;
@@ -403,7 +407,7 @@ export default function MilestoneDetailModal({
                     <span className="text-[10px] font-bold text-purple-700">Required Badges</span>
                   </div>
                   <p className="text-[10px] text-purple-600 mt-0.5">
-                    {milestone.requiredBadgeIds.join(", ")}
+                    {milestone.requiredBadgeIds.map(id => BADGE_NAME_MAP.get(id) || id).join(", ")}
                   </p>
                 </div>
               )}
