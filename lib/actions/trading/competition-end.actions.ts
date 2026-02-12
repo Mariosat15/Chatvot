@@ -1153,19 +1153,20 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
             const effectivePercentage = (perUserEarning / entryFee) * 100;
 
             // IDEMPOTENCY: Check if earning already exists for this competition + GM + user
+            // Uses session so the check is snapshot-consistent with the transaction
             const existingEarning = await db.collection("gamemasterearnings").findOne({
               sourceType: "competition",
               sourceId: competition._id.toString(),
               gameMasterId: gmId,
               referredUserId: user.userId,
-            });
+            }, { session });
 
             if (existingEarning) {
               console.log(`   ⏩ GM earning already recorded for ${user.userName} in competition ${competition._id}, skipping duplicate`);
               continue;
             }
 
-            // Create GameMasterEarning record
+            // Create GameMasterEarning record (inside transaction so it's rolled back if commit fails)
             await db.collection("gamemasterearnings").insertOne({
               gameMasterId: gmId,
               gameMasterEmail: gmSubscription.userEmail,
@@ -1188,14 +1189,14 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               wasCapped: effectivePercentage < feePercentage, // Flag if earnings were reduced
               createdAt: new Date(),
               updatedAt: new Date(),
-            });
+            }, { session });
 
             console.log(
               `   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}${effectivePercentage < feePercentage ? " (capped)" : ""}`,
             );
           }
 
-          // Update game master subscription stats (totalEarning already calculated in payment object)
+          // Update game master subscription stats (inside transaction for consistency)
           await db.collection("gamemastersubscriptions").updateOne(
             { _id: gmSubscription._id },
             {
@@ -1205,6 +1206,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               },
               $set: { updatedAt: new Date() },
             },
+            { session },
           );
 
           // Credit to game master's wallet (reuse walletMap from prize distribution)
@@ -1269,7 +1271,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
             { session },
           );
 
-          // Update earnings status to paid
+          // Update earnings status to paid (inside transaction)
           await db.collection("gamemasterearnings").updateMany(
             {
               gameMasterId: gmId,
@@ -1282,14 +1284,16 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
                 paidAt: new Date(),
               },
             },
+            { session },
           );
 
-          // Update subscription pending earnings
+          // Update subscription pending earnings (inside transaction)
           await db.collection("gamemastersubscriptions").updateOne(
             { _id: gmSubscription._id },
             {
               $inc: { pendingEarnings: -totalEarning },
             },
+            { session },
           );
 
           console.log(

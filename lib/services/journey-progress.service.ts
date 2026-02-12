@@ -785,13 +785,16 @@ export async function completeMilestone(
   // Send notification
   try {
     const { notificationService } = await import("@/lib/services/notification.service");
-    await notificationService.sendNotification(
+    await notificationService.send({
       userId,
-      "milestone_completed",
-      `🎯 Milestone Complete: ${milestone.name}`,
-      milestone.celebrationText || `You've completed "${milestone.name}" and earned ${milestone.rewards.xp} XP!`,
-      { milestoneId, rewards: milestone.rewards }
-    );
+      templateId: "milestone_completed",
+      variables: {
+        milestoneName: milestone.name,
+        celebrationText: milestone.celebrationText || `You've completed "${milestone.name}" and earned ${milestone.rewards.xp} XP!`,
+        xpReward: milestone.rewards.xp,
+        milestoneId,
+      },
+    });
   } catch (error) {
     console.error(`⚠️ [JOURNEY] Error sending notification:`, error);
   }
