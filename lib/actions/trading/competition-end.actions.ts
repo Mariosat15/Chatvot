@@ -1138,7 +1138,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           // Calculate per-user earning from the (potentially scaled) totalEarning
           const perUserEarning = totalEarning / users.length;
 
-          // Create earning records for each referred user
+          // Create earning records for each referred user (with idempotency check)
           for (const user of users) {
             const entryFee = competition.entryFee;
             // Use the calculated per-user earning (which may have been scaled if capped)
@@ -1147,6 +1147,19 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
             const netEarning = grossEarning - platformFee;
             // Calculate effective percentage (may be lower than package rate if capped)
             const effectivePercentage = (perUserEarning / entryFee) * 100;
+
+            // IDEMPOTENCY: Check if earning already exists for this competition + GM + user
+            const existingEarning = await db.collection("gamemasterearnings").findOne({
+              sourceType: "competition",
+              sourceId: competition._id.toString(),
+              gameMasterId: gmId,
+              referredUserId: user.userId,
+            });
+
+            if (existingEarning) {
+              console.log(`   ⏩ GM earning already recorded for ${user.userName} in competition ${competition._id}, skipping duplicate`);
+              continue;
+            }
 
             // Create GameMasterEarning record
             await db.collection("gamemasterearnings").insertOne({

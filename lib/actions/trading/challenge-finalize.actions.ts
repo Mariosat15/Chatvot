@@ -1091,22 +1091,36 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
     // === DEFERRED: Record platform fees and GM payments AFTER transaction commit ===
     // These were previously inside the transaction but without a session, causing WriteConflict errors.
+    // IMPORTANT: All inserts below have idempotency guards to prevent duplicates from retries or concurrent calls.
     try {
       const { PlatformFinancialsService } =
         await import("@/lib/services/platform-financials.service");
 
-      // Record NET platform fee
+      // Record NET platform fee (with idempotency check)
       if (deferredFeeData.netPlatformFee > 0) {
-        await PlatformFinancialsService.recordPlatformFee({
-          amount: deferredFeeData.netPlatformFee,
+        const { PlatformTransaction } = await import("@/database/models/platform-financials.model");
+        const existingPlatformFee = await PlatformTransaction.findOne({
           sourceType: "challenge",
           sourceId: deferredFeeData.challengeId,
-          sourceName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
-          description:
-            deferredFeeData.actualGmEarnings > 0
-              ? `Platform fee (${deferredFeeData.platformFeePercentage}% - ${deferredFeeData.actualGmEarnings.toFixed(2)} GM fees) from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`
-              : `Platform fee (${deferredFeeData.platformFeePercentage}%) from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
+          transactionType: "challenge_platform_fee",
         });
+        if (!existingPlatformFee) {
+          await PlatformFinancialsService.recordPlatformFee({
+            amount: deferredFeeData.netPlatformFee,
+            sourceType: "challenge",
+            sourceId: deferredFeeData.challengeId,
+            sourceName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
+            description:
+              deferredFeeData.actualGmEarnings > 0
+                ? `Platform fee (${deferredFeeData.platformFeePercentage}% - ${deferredFeeData.actualGmEarnings.toFixed(2)} GM fees) from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`
+                : `Platform fee (${deferredFeeData.platformFeePercentage}%) from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
+          });
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'challenge-finalize.actions.ts:PLATFORM_FEE_SKIP',message:'Skipped duplicate platform fee',data:{challengeId:deferredFeeData.challengeId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          console.log(`   ⏩ Platform fee already recorded for challenge ${deferredFeeData.challengeId}, skipping duplicate`);
+        }
       }
 
       // Record retained GM fees for inactive/paused GMs
@@ -1131,7 +1145,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         }
       }
 
-      // Pay GM referral fees
+      // Pay GM referral fees (with idempotency guards)
       if (deferredFeeData.gmPayments.length > 0) {
         const db = mongoose.connection.db;
         if (db) {
@@ -1145,6 +1159,22 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
           for (const payment of deferredFeeData.gmPayments) {
             try {
+              // IDEMPOTENCY: Check if GM earnings already exist for this challenge + GM + referred user
+              const existingEarning = await db.collection("gamemasterearnings").findOne({
+                sourceType: "challenge",
+                sourceId: deferredFeeData.challengeId,
+                gameMasterId: payment.gmId,
+                referredUserId: payment.userId,
+              });
+
+              if (existingEarning) {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'challenge-finalize.actions.ts:GM_EARNING_SKIP',message:'Skipped duplicate GM earning',data:{challengeId:deferredFeeData.challengeId,gmId:payment.gmId,userId:payment.userId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
+                console.log(`   ⏩ GM earning already recorded for ${payment.userName} in challenge ${deferredFeeData.challengeId}, skipping duplicate`);
+                continue;
+              }
+
               const gmSubscription = gmSubMap.get(payment.gmId) || null;
               await db.collection("gamemastersubscriptions").updateOne(
                 { userId: payment.gmId },
@@ -1153,35 +1183,47 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
               const gmWallet = gmWalletMap.get(payment.gmId) || null;
               if (gmWallet) {
-                const balanceBefore = gmWallet.creditBalance || 0;
-                await db.collection("creditwallets").updateOne(
-                  { userId: payment.gmId },
-                  { $inc: { creditBalance: payment.amount } },
-                );
-                await db.collection("wallettransactions").insertOne({
+                // IDEMPOTENCY: Check if wallet transaction already exists for this challenge
+                const existingWalletTx = await db.collection("wallettransactions").findOne({
                   userId: payment.gmId,
                   transactionType: "gamemaster_earning",
-                  amount: payment.amount,
-                  balanceBefore,
-                  balanceAfter: balanceBefore + payment.amount,
-                  currency: "EUR",
-                  exchangeRate: 1,
-                  status: "completed",
-                  description: `🎮 Game Master referral earnings from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName} (1 referred user)`,
-                  metadata: {
-                    challengeId: deferredFeeData.challengeId,
-                    challengeName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
-                    referredUsersCount: 1,
-                    referredUserId: payment.userId,
-                    referredUserName: payment.userName,
-                    feePercentage: (payment.amount / deferredFeeData.entryFee) * 100,
-                    sourceType: "challenge",
-                  },
-                  processedAt: new Date(),
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  "metadata.challengeId": deferredFeeData.challengeId,
+                  "metadata.referredUserId": payment.userId,
                 });
-                console.log(`   ✅ Paid ${payment.amount.toFixed(2)} to GM ${payment.gmId} for ${payment.userName}'s referral`);
+
+                if (!existingWalletTx) {
+                  const balanceBefore = gmWallet.creditBalance || 0;
+                  await db.collection("creditwallets").updateOne(
+                    { userId: payment.gmId },
+                    { $inc: { creditBalance: payment.amount } },
+                  );
+                  await db.collection("wallettransactions").insertOne({
+                    userId: payment.gmId,
+                    transactionType: "gamemaster_earning",
+                    amount: payment.amount,
+                    balanceBefore,
+                    balanceAfter: balanceBefore + payment.amount,
+                    currency: "EUR",
+                    exchangeRate: 1,
+                    status: "completed",
+                    description: `🎮 Game Master referral earnings from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName} (1 referred user)`,
+                    metadata: {
+                      challengeId: deferredFeeData.challengeId,
+                      challengeName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
+                      referredUsersCount: 1,
+                      referredUserId: payment.userId,
+                      referredUserName: payment.userName,
+                      feePercentage: (payment.amount / deferredFeeData.entryFee) * 100,
+                      sourceType: "challenge",
+                    },
+                    processedAt: new Date(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  });
+                  console.log(`   ✅ Paid ${payment.amount.toFixed(2)} to GM ${payment.gmId} for ${payment.userName}'s referral`);
+                } else {
+                  console.log(`   ⏩ Wallet transaction already exists for GM ${payment.gmId} in challenge ${deferredFeeData.challengeId}, skipping`);
+                }
               }
 
               const feePercentage = (payment.amount / deferredFeeData.entryFee) * 100;
