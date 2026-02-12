@@ -100,7 +100,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_1_pirate",
-    mapId: "map_1_pirate",
+    mapId: "pirate_cove",
     name: "Pirate Cove",
     description: "Begin your trading voyage! Learn the basics as a young pirate.",
     theme: "pirate",
@@ -136,7 +136,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_2_space",
-    mapId: "map_2_space",
+    mapId: "space_station",
     name: "Space Station",
     description: "Launch into the cosmos! Trade among the stars.",
     theme: "space",
@@ -153,7 +153,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "cosmos", name: "Deep Space", description: "Galactic profits await", order: 3, position: { x: 700, y: 200 }, color: "#F59E0B", icon: "star", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "s2_launch", name: "Launch Sequence", description: "Begin space trading", shortDescription: "Enter space", zoneId: "launch", position: { x: 100, y: 600 }, nodeType: "start", icon: "rocket", color: "#8B5CF6", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_1_pirate" }, rewards: { xp: 10 }, connectedTo: ["s2_zero_g"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "3... 2... 1... Liftoff!" },
+      { id: "s2_launch", name: "Launch Sequence", description: "Begin space trading", shortDescription: "Enter space", zoneId: "launch", position: { x: 100, y: 600 }, nodeType: "start", icon: "rocket", color: "#8B5CF6", size: "large", completeCondition: { type: "map_completed", milestoneId: "pirate_cove" }, rewards: { xp: 10 }, connectedTo: ["s2_zero_g"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "3... 2... 1... Liftoff!" },
       { id: "s2_zero_g", name: "Zero Gravity", description: "Trade in weightlessness", shortDescription: "20 trades", zoneId: "launch", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "astronaut", color: "#8B5CF6", size: "medium", unlockCondition: { type: "total_trades", value: 15, comparison: "gte" }, completeCondition: { type: "total_trades", value: 20, comparison: "gte" }, rewards: { xp: 12 }, connectedTo: ["s2_satellite"], connectedFrom: ["s2_launch"], isRequired: true, order: 2 },
       { id: "s2_satellite", name: "Satellite Link", description: "5 winning trades", shortDescription: "5 wins", zoneId: "launch", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "satellite", color: "#06B6D4", size: "medium", unlockCondition: { type: "total_trades", value: 20, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 5, comparison: "gte" }, rewards: { xp: 15 }, connectedTo: ["s2_orbit_stable"], connectedFrom: ["s2_zero_g"], isRequired: true, order: 3 },
       { id: "s2_orbit_stable", name: "Stable Orbit", description: "25 total trades", shortDescription: "25 trades", zoneId: "orbit", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "planet", color: "#06B6D4", size: "medium", unlockCondition: { type: "winning_trades", value: 5, comparison: "gte" }, completeCondition: { type: "total_trades", value: 25, comparison: "gte" }, rewards: { xp: 15 }, connectedTo: ["s2_win_streak_3"], connectedFrom: ["s2_satellite"], isRequired: true, order: 4 },
@@ -172,7 +172,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_3_medieval",
-    mapId: "map_3_medieval",
+    mapId: "medieval_castle",
     name: "Medieval Castle",
     description: "Storm the castle! Battle your way to trading nobility.",
     theme: "medieval",
@@ -189,7 +189,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "throne", name: "Throne Room", description: "Claim your crown", order: 3, position: { x: 700, y: 200 }, color: "#F59E0B", icon: "crown", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "m3_knight", name: "Knight's Oath", description: "Pledge to the trading kingdom", shortDescription: "Enter castle", zoneId: "village", position: { x: 100, y: 600 }, nodeType: "start", icon: "sword", color: "#92400E", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_2_space" }, rewards: { xp: 15 }, connectedTo: ["m3_squire"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "For honor and profit!" },
+      { id: "m3_knight", name: "Knight's Oath", description: "Pledge to the trading kingdom", shortDescription: "Enter castle", zoneId: "village", position: { x: 100, y: 600 }, nodeType: "start", icon: "sword", color: "#92400E", size: "large", completeCondition: { type: "map_completed", milestoneId: "space_station" }, rewards: { xp: 15 }, connectedTo: ["m3_squire"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "For honor and profit!" },
       { id: "m3_squire", name: "Squire Training", description: "45 trades complete", shortDescription: "45 trades", zoneId: "village", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "helmet", color: "#92400E", size: "medium", unlockCondition: { type: "total_trades", value: 40, comparison: "gte" }, completeCondition: { type: "total_trades", value: 45, comparison: "gte" }, rewards: { xp: 15 }, connectedTo: ["m3_arena"], connectedFrom: ["m3_knight"], isRequired: true, order: 2 },
       { id: "m3_arena", name: "Arena Entry", description: "Enter your first competition", shortDescription: "1 competition", zoneId: "village", position: { x: 260, y: 480 }, nodeType: "checkpoint", icon: "arena", color: "#EF4444", size: "large", unlockCondition: { type: "total_trades", value: 45, comparison: "gte" }, completeCondition: { type: "competitions_entered", value: 1, comparison: "gte" }, rewards: { xp: 25 }, connectedTo: ["m3_swordsman"], connectedFrom: ["m3_squire"], isRequired: true, order: 3, celebrationText: "The tournament begins!" },
       { id: "m3_swordsman", name: "Swordsman", description: "50 trades wielded", shortDescription: "50 trades", zoneId: "training", position: { x: 350, y: 420 }, nodeType: "milestone", icon: "sword", color: "#EF4444", size: "medium", unlockCondition: { type: "competitions_entered", value: 1, comparison: "gte" }, completeCondition: { type: "total_trades", value: 50, comparison: "gte" }, rewards: { xp: 18 }, connectedTo: ["m3_shield"], connectedFrom: ["m3_arena"], isRequired: true, order: 4 },
@@ -208,7 +208,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_4_cyber",
-    mapId: "map_4_cyber",
+    mapId: "cyber_city",
     name: "Cyber City",
     description: "Jack into the matrix! Trade at the speed of light.",
     theme: "cyber",
@@ -225,7 +225,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "core", name: "System Core", description: "Full access", order: 3, position: { x: 700, y: 200 }, color: "#FFD700", icon: "cpu", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "c4_boot", name: "System Boot", description: "Initialize cyber trading", shortDescription: "Enter cyber", zoneId: "terminal", position: { x: 100, y: 600 }, nodeType: "start", icon: "power", color: "#00FFFF", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_3_medieval" }, rewards: { xp: 20 }, connectedTo: ["c4_upload"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "System online!" },
+      { id: "c4_boot", name: "System Boot", description: "Initialize cyber trading", shortDescription: "Enter cyber", zoneId: "terminal", position: { x: 100, y: 600 }, nodeType: "start", icon: "power", color: "#00FFFF", size: "large", completeCondition: { type: "map_completed", milestoneId: "medieval_castle" }, rewards: { xp: 20 }, connectedTo: ["c4_upload"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "System online!" },
       { id: "c4_upload", name: "Data Upload", description: "75 trades processed", shortDescription: "75 trades", zoneId: "terminal", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "upload", color: "#00FFFF", size: "medium", unlockCondition: { type: "total_trades", value: 70, comparison: "gte" }, completeCondition: { type: "total_trades", value: 75, comparison: "gte" }, rewards: { xp: 18 }, connectedTo: ["c4_hack"], connectedFrom: ["c4_boot"], isRequired: true, order: 2 },
       { id: "c4_hack", name: "First Hack", description: "30 winning trades", shortDescription: "30 wins", zoneId: "terminal", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "hack", color: "#00FFFF", size: "medium", unlockCondition: { type: "total_trades", value: 75, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 30, comparison: "gte" }, rewards: { xp: 22 }, connectedTo: ["c4_firewall"], connectedFrom: ["c4_upload"], isRequired: true, order: 3 },
       { id: "c4_firewall", name: "Firewall Breach", description: "80 trades complete", shortDescription: "80 trades", zoneId: "network", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "firewall", color: "#FF00FF", size: "large", unlockCondition: { type: "winning_trades", value: 30, comparison: "gte" }, completeCondition: { type: "total_trades", value: 80, comparison: "gte" }, rewards: { xp: 25 }, connectedTo: ["c4_virus"], connectedFrom: ["c4_hack"], isRequired: true, order: 4 },
@@ -244,7 +244,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_5_ancient",
-    mapId: "map_5_ancient",
+    mapId: "ancient_temple",
     name: "Ancient Temple",
     description: "Uncover ancient trading secrets! Navigate the temple of wealth.",
     theme: "ancient",
@@ -261,7 +261,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "sanctum", name: "Inner Sanctum", description: "Ultimate wisdom", order: 3, position: { x: 700, y: 200 }, color: "#F4A261", icon: "pyramid", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "a5_entry", name: "Temple Entry", description: "Enter the ancient realm", shortDescription: "Enter temple", zoneId: "entrance", position: { x: 100, y: 600 }, nodeType: "start", icon: "temple", color: "#D4A373", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_4_cyber" }, rewards: { xp: 25 }, connectedTo: ["a5_hieroglyph"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The temple welcomes you!" },
+      { id: "a5_entry", name: "Temple Entry", description: "Enter the ancient realm", shortDescription: "Enter temple", zoneId: "entrance", position: { x: 100, y: 600 }, nodeType: "start", icon: "temple", color: "#D4A373", size: "large", completeCondition: { type: "map_completed", milestoneId: "cyber_city" }, rewards: { xp: 25 }, connectedTo: ["a5_hieroglyph"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The temple welcomes you!" },
       { id: "a5_hieroglyph", name: "Hieroglyph Reader", description: "105 trades decoded", shortDescription: "105 trades", zoneId: "entrance", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "scroll", color: "#D4A373", size: "medium", unlockCondition: { type: "total_trades", value: 100, comparison: "gte" }, completeCondition: { type: "total_trades", value: 105, comparison: "gte" }, rewards: { xp: 22 }, connectedTo: ["a5_scarab"], connectedFrom: ["a5_entry"], isRequired: true, order: 2 },
       { id: "a5_scarab", name: "Scarab Hunter", description: "45 winning trades", shortDescription: "45 wins", zoneId: "entrance", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "scarab", color: "#D4A373", size: "medium", unlockCondition: { type: "total_trades", value: 105, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 45, comparison: "gte" }, rewards: { xp: 28 }, connectedTo: ["a5_pyramid"], connectedFrom: ["a5_hieroglyph"], isRequired: true, order: 3 },
       { id: "a5_pyramid", name: "Pyramid Climber", description: "115 trades complete", shortDescription: "115 trades", zoneId: "chambers", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "pyramid", color: "#E9C46A", size: "large", unlockCondition: { type: "winning_trades", value: 45, comparison: "gte" }, completeCondition: { type: "total_trades", value: 115, comparison: "gte" }, rewards: { xp: 32 }, connectedTo: ["a5_mummy"], connectedFrom: ["a5_scarab"], isRequired: true, order: 4 },
@@ -280,7 +280,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_6_volcanic",
-    mapId: "map_6_volcanic",
+    mapId: "volcanic_island",
     name: "Volcanic Island",
     description: "Trade in the fires of fortune! Survive the eruption.",
     theme: "volcanic",
@@ -297,7 +297,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "crater", name: "Volcano Crater", description: "Maximum heat", order: 3, position: { x: 700, y: 200 }, color: "#FBBF24", icon: "magma", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "v6_landing", name: "Inferno Landing", description: "Arrive at the volcano", shortDescription: "Enter volcano", zoneId: "shore", position: { x: 100, y: 600 }, nodeType: "start", icon: "fire", color: "#DC2626", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_5_ancient" }, rewards: { xp: 30 }, connectedTo: ["v6_heat"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "Feel the heat!" },
+      { id: "v6_landing", name: "Inferno Landing", description: "Arrive at the volcano", shortDescription: "Enter volcano", zoneId: "shore", position: { x: 100, y: 600 }, nodeType: "start", icon: "fire", color: "#DC2626", size: "large", completeCondition: { type: "map_completed", milestoneId: "ancient_temple" }, rewards: { xp: 30 }, connectedTo: ["v6_heat"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "Feel the heat!" },
       { id: "v6_heat", name: "Heat Resistance", description: "130 trades in the fire", shortDescription: "130 trades", zoneId: "shore", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "thermometer", color: "#DC2626", size: "medium", unlockCondition: { type: "total_trades", value: 125, comparison: "gte" }, completeCondition: { type: "total_trades", value: 130, comparison: "gte" }, rewards: { xp: 28 }, connectedTo: ["v6_flames"], connectedFrom: ["v6_landing"], isRequired: true, order: 2 },
       { id: "v6_flames", name: "Flame Walker", description: "65 winning trades", shortDescription: "65 wins", zoneId: "shore", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "flames", color: "#DC2626", size: "medium", unlockCondition: { type: "total_trades", value: 130, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 65, comparison: "gte" }, rewards: { xp: 32 }, connectedTo: ["v6_lava"], connectedFrom: ["v6_heat"], isRequired: true, order: 3 },
       { id: "v6_lava", name: "Lava Crosser", description: "140 trades complete", shortDescription: "140 trades", zoneId: "lava", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "lava", color: "#F97316", size: "large", unlockCondition: { type: "winning_trades", value: 65, comparison: "gte" }, completeCondition: { type: "total_trades", value: 140, comparison: "gte" }, rewards: { xp: 38 }, connectedTo: ["v6_streak"], connectedFrom: ["v6_flames"], isRequired: true, order: 4 },
@@ -316,7 +316,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_7_arctic",
-    mapId: "map_7_arctic",
+    mapId: "arctic_fortress",
     name: "Arctic Fortress",
     description: "Conquer the frozen markets! Only the strong survive.",
     theme: "arctic",
@@ -333,7 +333,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "fortress", name: "Ice Fortress", description: "Ultimate cold", order: 3, position: { x: 700, y: 200 }, color: "#E2E8F0", icon: "fortress", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "a7_arrival", name: "Arctic Arrival", description: "Brave the frozen north", shortDescription: "Enter arctic", zoneId: "tundra", position: { x: 100, y: 600 }, nodeType: "start", icon: "snowflake", color: "#38BDF8", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_6_volcanic" }, rewards: { xp: 40 }, connectedTo: ["a7_frost"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "Brace for the cold!" },
+      { id: "a7_arrival", name: "Arctic Arrival", description: "Brave the frozen north", shortDescription: "Enter arctic", zoneId: "tundra", position: { x: 100, y: 600 }, nodeType: "start", icon: "snowflake", color: "#38BDF8", size: "large", completeCondition: { type: "map_completed", milestoneId: "volcanic_island" }, rewards: { xp: 40 }, connectedTo: ["a7_frost"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "Brace for the cold!" },
       { id: "a7_frost", name: "Frost Trader", description: "160 trades in the cold", shortDescription: "160 trades", zoneId: "tundra", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "frost", color: "#38BDF8", size: "medium", unlockCondition: { type: "total_trades", value: 150, comparison: "gte" }, completeCondition: { type: "total_trades", value: 160, comparison: "gte" }, rewards: { xp: 38 }, connectedTo: ["a7_blizzard"], connectedFrom: ["a7_arrival"], isRequired: true, order: 2 },
       { id: "a7_blizzard", name: "Blizzard Survivor", description: "80 winning trades", shortDescription: "80 wins", zoneId: "tundra", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "blizzard", color: "#38BDF8", size: "medium", unlockCondition: { type: "total_trades", value: 160, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 80, comparison: "gte" }, rewards: { xp: 45 }, connectedTo: ["a7_iceberg"], connectedFrom: ["a7_frost"], isRequired: true, order: 3 },
       { id: "a7_iceberg", name: "Iceberg Navigator", description: "175 trades complete", shortDescription: "175 trades", zoneId: "glacier", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "iceberg", color: "#06B6D4", size: "large", unlockCondition: { type: "winning_trades", value: 80, comparison: "gte" }, completeCondition: { type: "total_trades", value: 175, comparison: "gte" }, rewards: { xp: 50 }, connectedTo: ["a7_comp5"], connectedFrom: ["a7_blizzard"], isRequired: true, order: 4 },
@@ -352,7 +352,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_8_dragon",
-    mapId: "map_8_dragon",
+    mapId: "dragon_realm",
     name: "Dragon Realm",
     description: "Face the dragons! Only legends survive this realm.",
     theme: "dragon",
@@ -369,7 +369,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "throne", name: "Dragon Throne", description: "Face the king", order: 3, position: { x: 700, y: 200 }, color: "#FFD700", icon: "dragonThrone", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "d8_enter", name: "Dragon's Gate", description: "Enter the realm of dragons", shortDescription: "Enter realm", zoneId: "lair_entry", position: { x: 100, y: 600 }, nodeType: "start", icon: "dragonEgg", color: "#A855F7", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_7_arctic" }, rewards: { xp: 60 }, connectedTo: ["d8_hatchling"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The dragons sense your presence!" },
+      { id: "d8_enter", name: "Dragon's Gate", description: "Enter the realm of dragons", shortDescription: "Enter realm", zoneId: "lair_entry", position: { x: 100, y: 600 }, nodeType: "start", icon: "dragonEgg", color: "#A855F7", size: "large", completeCondition: { type: "map_completed", milestoneId: "arctic_fortress" }, rewards: { xp: 60 }, connectedTo: ["d8_hatchling"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The dragons sense your presence!" },
       { id: "d8_hatchling", name: "Hatchling Hunter", description: "210 trades complete", shortDescription: "210 trades", zoneId: "lair_entry", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "dragon", color: "#A855F7", size: "medium", unlockCondition: { type: "total_trades", value: 200, comparison: "gte" }, completeCondition: { type: "total_trades", value: 210, comparison: "gte" }, rewards: { xp: 55 }, connectedTo: ["d8_fire"], connectedFrom: ["d8_enter"], isRequired: true, order: 2 },
       { id: "d8_fire", name: "Fire Breather", description: "110 winning trades", shortDescription: "110 wins", zoneId: "lair_entry", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "dragonFire", color: "#A855F7", size: "medium", unlockCondition: { type: "total_trades", value: 210, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 110, comparison: "gte" }, rewards: { xp: 65 }, connectedTo: ["d8_cave"], connectedFrom: ["d8_hatchling"], isRequired: true, order: 3 },
       { id: "d8_cave", name: "Cavern Explorer", description: "225 trades complete", shortDescription: "225 trades", zoneId: "caverns", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "cave", color: "#EF4444", size: "large", unlockCondition: { type: "winning_trades", value: 110, comparison: "gte" }, completeCondition: { type: "total_trades", value: 225, comparison: "gte" }, rewards: { xp: 70 }, connectedTo: ["d8_3wins"], connectedFrom: ["d8_fire"], isRequired: true, order: 4 },
@@ -388,7 +388,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_9_celestial",
-    mapId: "map_9_celestial",
+    mapId: "celestial_kingdom",
     name: "Celestial Kingdom",
     description: "Ascend to the heavens! Trade among the gods.",
     theme: "celestial",
@@ -405,7 +405,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "throne_divine", name: "Divine Throne", description: "Ultimate ascension", order: 3, position: { x: 700, y: 200 }, color: "#FFD700", icon: "divineThrone", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "c9_ascend", name: "Divine Ascension", description: "Rise to the celestial realm", shortDescription: "Enter heaven", zoneId: "gates", position: { x: 100, y: 600 }, nodeType: "start", icon: "angel", color: "#FFD700", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_8_dragon" }, rewards: { xp: 100 }, connectedTo: ["c9_halo"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "You've transcended mortality!" },
+      { id: "c9_ascend", name: "Divine Ascension", description: "Rise to the celestial realm", shortDescription: "Enter heaven", zoneId: "gates", position: { x: 100, y: 600 }, nodeType: "start", icon: "angel", color: "#FFD700", size: "large", completeCondition: { type: "map_completed", milestoneId: "dragon_realm" }, rewards: { xp: 100 }, connectedTo: ["c9_halo"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "You've transcended mortality!" },
       { id: "c9_halo", name: "Halo Bearer", description: "275 trades divine", shortDescription: "275 trades", zoneId: "gates", position: { x: 180, y: 540 }, nodeType: "milestone", icon: "halo", color: "#FFD700", size: "medium", unlockCondition: { type: "total_trades", value: 250, comparison: "gte" }, completeCondition: { type: "total_trades", value: 275, comparison: "gte" }, rewards: { xp: 90 }, connectedTo: ["c9_wings"], connectedFrom: ["c9_ascend"], isRequired: true, order: 2 },
       { id: "c9_wings", name: "Angel Wings", description: "150 winning trades", shortDescription: "150 wins", zoneId: "gates", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "angelWings", color: "#FFD700", size: "medium", unlockCondition: { type: "total_trades", value: 275, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 150, comparison: "gte" }, rewards: { xp: 110 }, connectedTo: ["c9_cloud"], connectedFrom: ["c9_halo"], isRequired: true, order: 3 },
       { id: "c9_cloud", name: "Cloud Walker", description: "300 trades milestone", shortDescription: "300 trades", zoneId: "clouds", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "cloud", color: "#F0F8FF", size: "large", unlockCondition: { type: "winning_trades", value: 150, comparison: "gte" }, completeCondition: { type: "total_trades", value: 300, comparison: "gte" }, rewards: { xp: 120 }, connectedTo: ["c9_star"], connectedFrom: ["c9_wings"], isRequired: true, order: 4, celebrationText: "300 trades achieved!" },
@@ -424,7 +424,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
   // ============================================
   {
     id: "map_10_legendary",
-    mapId: "map_10_legendary",
+    mapId: "hall_of_legends",
     name: "Hall of Legends",
     description: "The ultimate challenge! Etch your name in trading history.",
     theme: "legendary",
@@ -441,7 +441,7 @@ export const MAP_SEQUENCE: MapSequenceConfig[] = [
       { id: "god_throne", name: "Throne of Gods", description: "Ultimate glory", order: 3, position: { x: 700, y: 200 }, color: "#FFD700", icon: "godThrone", isUnlockable: true },
     ],
     milestoneTemplates: [
-      { id: "l10_enter", name: "Legend Entry", description: "Enter the Hall of Legends", shortDescription: "Enter hall", zoneId: "entrance_hall", position: { x: 100, y: 600 }, nodeType: "start", icon: "legend", color: "#FFD700", size: "large", completeCondition: { type: "map_completed", milestoneId: "map_9_celestial" }, rewards: { xp: 200 }, connectedTo: ["l10_400trades"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The legends welcome you!" },
+      { id: "l10_enter", name: "Legend Entry", description: "Enter the Hall of Legends", shortDescription: "Enter hall", zoneId: "entrance_hall", position: { x: 100, y: 600 }, nodeType: "start", icon: "legend", color: "#FFD700", size: "large", completeCondition: { type: "map_completed", milestoneId: "celestial_kingdom" }, rewards: { xp: 200 }, connectedTo: ["l10_400trades"], connectedFrom: [], isRequired: true, order: 1, celebrationText: "The legends welcome you!" },
       { id: "l10_400trades", name: "400 Club", description: "400 trades milestone", shortDescription: "400 trades", zoneId: "entrance_hall", position: { x: 180, y: 540 }, nodeType: "checkpoint", icon: "milestone400", color: "#FFD700", size: "large", unlockCondition: { type: "total_trades", value: 350, comparison: "gte" }, completeCondition: { type: "total_trades", value: 400, comparison: "gte" }, rewards: { xp: 200 }, connectedTo: ["l10_master"], connectedFrom: ["l10_enter"], isRequired: true, order: 2, celebrationText: "400 trades club member!" },
       { id: "l10_master", name: "Market Master", description: "225 winning trades", shortDescription: "225 wins", zoneId: "entrance_hall", position: { x: 260, y: 480 }, nodeType: "milestone", icon: "marketMaster", color: "#FFD700", size: "medium", unlockCondition: { type: "total_trades", value: 400, comparison: "gte" }, completeCondition: { type: "winning_trades", value: 225, comparison: "gte" }, rewards: { xp: 180 }, connectedTo: ["l10_10wins"], connectedFrom: ["l10_400trades"], isRequired: true, order: 3 },
       { id: "l10_10wins", name: "Decathlon Champion", description: "10 competition wins", shortDescription: "10 wins", zoneId: "hall", position: { x: 350, y: 420 }, nodeType: "checkpoint", icon: "decathlon", color: "#FF6B6B", size: "large", unlockCondition: { type: "winning_trades", value: 225, comparison: "gte" }, completeCondition: { type: "first_place_finishes", value: 10, comparison: "gte" }, rewards: { xp: 300 }, connectedTo: ["l10_streak20"], connectedFrom: ["l10_master"], isRequired: true, order: 4, celebrationText: "10-time champion!" },

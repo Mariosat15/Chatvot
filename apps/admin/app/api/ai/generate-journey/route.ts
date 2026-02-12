@@ -485,7 +485,10 @@ Analyze and return JSON with:
         // Generate milestones for a single map with specific theme and difficulty
         const { sequenceOrder = 1, mapIndex, xpBudget, saveToDB = true, milestoneCount: customMilestoneCount } = body;
         const mapOrder = mapIndex || sequenceOrder;
-        const mapConfig = getMapById(mapId) || MAP_SEQUENCE[mapOrder - 1];
+        // When mapIndex is provided, prioritize MAP_SEQUENCE lookup over the default mapId
+        const mapConfig = mapIndex
+          ? (MAP_SEQUENCE[mapOrder - 1] || getMapById(mapId))
+          : (getMapById(mapId) || MAP_SEQUENCE[mapOrder - 1]);
         
         if (!mapConfig) {
           return NextResponse.json(
