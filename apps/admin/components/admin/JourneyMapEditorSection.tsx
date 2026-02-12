@@ -229,6 +229,17 @@ const CONDITION_TYPES = [
   { value: "account_age_days", label: "Account Age (Days)", category: "time" },
   { value: "active_days", label: "Active Trading Days", category: "time" },
   { value: "login_streak", label: "Login Streak (Days)", category: "time" },
+  { value: "consecutive_profitable_days", label: "Consecutive Profitable Days", category: "time" },
+  
+  // Advanced / AI-generated (supported with aliases)
+  { value: "daily_trading_streak", label: "Daily Trading Streak", category: "trading" },
+  { value: "consecutive_wins_in_map", label: "Consecutive Wins in Map", category: "performance" },
+  { value: "comeback_victory", label: "Comeback Victory", category: "competitions" },
+  { value: "comeback_trade", label: "Comeback Trade", category: "competitions" },
+  { value: "comp_perfect_run", label: "Perfect Competition Run", category: "competitions" },
+  { value: "legend_rank_1", label: "Legend: 1st Place Finishes", category: "competitions" },
+  { value: "legend_hall_of_fame", label: "Legend: Hall of Fame (Podiums)", category: "competitions" },
+  { value: "perfect_day", label: "Perfect Day (All Profitable)", category: "performance" },
 ];
 
 // Milestone templates for varied generation

@@ -331,6 +331,10 @@ export async function checkConditionMet(
       break;
 
     case "first_trade":
+      // Boolean: has user made at least one trade?
+      currentValue = (stats.totalTrades || 0) > 0 ? 1 : 0;
+      break;
+
     case "total_trades":
       currentValue = stats.totalTrades || 0;
       break;
@@ -356,6 +360,7 @@ export async function checkConditionMet(
       break;
 
     case "consecutive_trading_days":
+    case "daily_trading_streak": // AI-generated alias
       currentValue = stats.consecutiveTradingDays || 0;
       break;
 
@@ -372,6 +377,7 @@ export async function checkConditionMet(
       break;
 
     case "win_streak":
+    case "consecutive_wins_in_map": // AI-generated alias (win streak within a map context)
       currentValue = stats.currentWinStreak || stats.maxWinStreak || 0;
       break;
 
@@ -585,7 +591,32 @@ export async function checkConditionMet(
       break;
 
     case "consecutive_profitable_days":
+    case "perfect_day": // AI-generated alias (consecutive profitable days)
       currentValue = stats.consecutiveProfitableDays || 0;
+      break;
+
+    // ============================================
+    // AI-Generated / Advanced Condition Types
+    // ============================================
+    case "comeback_victory":
+    case "comeback_trade":
+      // Comeback wins from competitions (came from behind to win)
+      currentValue = stats.comebackWins || 0;
+      break;
+
+    case "comp_perfect_run":
+      // Perfect competition runs (all trades profitable)
+      currentValue = stats.perfectCompetitionTrades || 0;
+      break;
+
+    case "legend_rank_1":
+      // Legendary achievement: first place finishes
+      currentValue = stats.firstPlaceFinishes || 0;
+      break;
+
+    case "legend_hall_of_fame":
+      // Hall of fame: total podium finishes (top 3)
+      currentValue = stats.podiumFinishes || 0;
       break;
 
     default:
