@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import BadgeDetailCard from "./BadgeDetailCard";
 
 interface BadgesDisplayProps {
   badges: (Badge & { earned: boolean; earnedAt?: Date })[];
@@ -37,7 +38,6 @@ const CATEGORIES: BadgeCategory[] = [
   "Risk",
   "Speed",
   "Consistency",
-  "Volume",
   "Strategy",
   "Social",
   "Legendary",
@@ -58,6 +58,7 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
   const [selectedRarity, setSelectedRarity] = useState<Badge["rarity"] | "All">(
     "All",
   );
+  const [selectedBadge, setSelectedBadge] = useState<(Badge & { earned: boolean; earnedAt?: Date }) | null>(null);
 
   // Filter badges
   const filteredBadges = badges.filter((badge) => {
@@ -111,8 +112,6 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
         return <GameIcon name="blueFireSpell" size={iconSize} />;
       case "Consistency":
         return <GameIcon name="target" size={iconSize} />;
-      case "Volume":
-        return <GameIcon name="capital" size={iconSize} />;
       case "Strategy":
         return <GameIcon name="guideBook" size={iconSize} />;
       case "Social":
@@ -254,10 +253,11 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
         {filteredBadges.map((badge) => (
           <div
             key={badge.id}
-            className={`relative group rounded-xl p-4 border-2 transition-all ${
+            onClick={() => setSelectedBadge(badge)}
+            className={`relative group rounded-xl p-4 border-2 transition-all cursor-pointer ${
               badge.earned
                 ? `${getRarityColor(badge.rarity)} hover:scale-105 hover:brightness-110`
-                : "bg-gray-800/60 border-gray-600 hover:bg-gray-700/60"
+                : "bg-gray-800/60 border-gray-600 hover:bg-gray-700/60 hover:border-gray-500"
             }`}
           >
             {/* Locked Overlay */}
@@ -349,6 +349,16 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
             Try selecting a different category or rarity
           </p>
         </div>
+      )}
+
+      {/* Badge Detail Popup */}
+      {selectedBadge && (
+        <BadgeDetailCard
+          badge={selectedBadge}
+          open={!!selectedBadge}
+          onClose={() => setSelectedBadge(null)}
+          userLevel={userLevel}
+        />
       )}
     </div>
   );

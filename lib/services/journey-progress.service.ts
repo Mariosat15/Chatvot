@@ -988,7 +988,15 @@ export async function checkAndCompleteMilestones(
     const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
     
     if (met) {
-      // Milestone condition is met - complete it even if not "unlocked"
+      // Force-unlock this milestone if it's not already unlocked
+      // This ensures milestones can be completed even if earlier ones in the chain are skipped
+      const freshProgress = await UserJourneyProgress.findOne({ userId, mapId });
+      if (freshProgress && !freshProgress.unlockedMilestones.includes(milestone.id)) {
+        freshProgress.unlockedMilestones.push(milestone.id);
+        await freshProgress.save();
+      }
+
+      // Milestone condition is met - complete it
       const result = await completeMilestone(userId, milestone.id, mapId);
       if (result.success && result.rewards) {
         completed.push(milestone.id);
