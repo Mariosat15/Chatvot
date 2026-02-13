@@ -2180,15 +2180,6 @@ export async function seedMarketplaceItems(
 
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
-  // Clean up: Remove all indicator marketplace items since they are all free in the chart
-  // All 66 indicators are available via the chart's built-in indicator panel at no cost
-  try {
-    const deleted = await MarketplaceItem.deleteMany({ category: "indicator" });
-    console.log(`🧹 [SEED] Removed ${deleted.deletedCount} indicator items from marketplace (all indicators are free in chart)`);
-  } catch (error) {
-    console.error("⚠️ [SEED] Error cleaning up indicator items:", error);
-  }
-
   for (const itemData of ALL_ITEMS) {
     try {
       // Check if item already exists
