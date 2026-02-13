@@ -17,6 +17,8 @@ import {
   MarketplaceItem,
   IMarketplaceItem,
 } from "@/database/models/marketplace/marketplace-item.model";
+import { readFile } from "fs/promises";
+import path from "path";
 
 // ============================================================================
 // INDICATOR TEMPLATES - Only indicators with chart implementations
@@ -881,6 +883,59 @@ const ALL_ITEMS = [
 // SEED FUNCTION
 // ============================================================================
 
+/**
+ * Load saved defaults from the JSON file (created by "Save as Defaults").
+ * Falls back to the hardcoded ALL_ITEMS template if no JSON file exists.
+ */
+async function loadDefaults(): Promise<Partial<IMarketplaceItem>[]> {
+  // Try multiple paths for the JSON defaults file
+  const possiblePaths = [
+    // Direct path from admin app
+    path.join(process.cwd(), "lib", "data", "marketplace-defaults.json"),
+    // Monorepo path from admin app
+    path.join(
+      process.cwd(),
+      "..",
+      "..",
+      "apps",
+      "admin",
+      "lib",
+      "data",
+      "marketplace-defaults.json",
+    ),
+    // Production path
+    path.join(
+      "/var/www/chartvolt",
+      "apps",
+      "admin",
+      "lib",
+      "data",
+      "marketplace-defaults.json",
+    ),
+  ];
+
+  for (const jsonPath of possiblePaths) {
+    try {
+      const content = await readFile(jsonPath, "utf-8");
+      const items = JSON.parse(content);
+      if (Array.isArray(items) && items.length > 0) {
+        console.log(
+          `📦 [SEED] Loaded ${items.length} items from saved defaults: ${jsonPath}`,
+        );
+        return items;
+      }
+    } catch {
+      // File doesn't exist at this path, try next
+    }
+  }
+
+  // Fall back to hardcoded templates
+  console.log(
+    `📦 [SEED] No saved defaults found, using ${ALL_ITEMS.length} hardcoded templates`,
+  );
+  return ALL_ITEMS;
+}
+
 export async function seedMarketplaceItems(
   adminId: string = "system",
 ): Promise<{
@@ -891,28 +946,79 @@ export async function seedMarketplaceItems(
 }> {
   await connectToDatabase();
 
-  const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+  const result = {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [] as string[],
+  };
 
-  for (const itemData of ALL_ITEMS) {
+  // Load defaults from JSON file (if available) or fall back to hardcoded templates
+  const defaultItems = await loadDefaults();
+
+  for (const itemData of defaultItems) {
     try {
+      if (!itemData.slug) {
+        result.errors.push(`Skipped item without slug: ${itemData.name}`);
+        continue;
+      }
+
       // Check if item already exists
       const existing = await MarketplaceItem.findOne({ slug: itemData.slug });
 
       if (existing) {
-        // #region agent log
-        console.log(`[DEBUG-SEED] Updating "${itemData.slug}" | existingImageUrl="${existing.imageUrl}" | templateImageUrl="${itemData.imageUrl}" | willClear=${!!existing.imageUrl && !itemData.imageUrl}`);
-        // #endregion
-        // Update existing item
+        // Update existing item but PRESERVE admin customizations
         existing.indicatorType = itemData.indicatorType;
         existing.strategyConfig = itemData.strategyConfig as any;
         existing.cosmeticType = itemData.cosmeticType as any;
-        existing.imageUrl = itemData.imageUrl;
+        existing.gameMasterConfig = itemData.gameMasterConfig as any;
+
+        // PRESERVE existing imageUrl if admin has uploaded a custom one
+        // Only set from template if the existing item has no image
+        if (!existing.imageUrl && itemData.imageUrl) {
+          existing.imageUrl = itemData.imageUrl;
+        }
+
+        // PRESERVE existing iconName if admin has selected one
+        if (!existing.iconName && itemData.iconName) {
+          existing.iconName = itemData.iconName;
+        }
+
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
         existing.defaultSettings =
           itemData.defaultSettings || existing.defaultSettings;
-        existing.fullDescription =
-          itemData.fullDescription || existing.fullDescription;
+
+        // PRESERVE existing descriptions if admin has customized them
+        if (!existing.fullDescription && itemData.fullDescription) {
+          existing.fullDescription = itemData.fullDescription;
+        }
+        if (!existing.shortDescription && itemData.shortDescription) {
+          existing.shortDescription = itemData.shortDescription;
+        }
+
         existing.version = itemData.version || existing.version;
+
+        // Ensure these are set correctly for items to appear
+        existing.isPublished = itemData.isPublished ?? true;
+        existing.status = itemData.status || "active";
+        existing.category = itemData.category || existing.category;
+
+        // PRESERVE existing price if admin has customized it
+        if (existing.price === 0 || existing.price === undefined) {
+          existing.price = itemData.price ?? existing.price;
+        }
+        existing.isFree = itemData.isFree ?? existing.isFree;
+
+        // Sync isFeatured from defaults
+        if (itemData.isFeatured !== undefined) {
+          existing.isFeatured = itemData.isFeatured;
+        }
+
+        // PRESERVE existing tags, merge if needed
+        if (!existing.tags || existing.tags.length === 0) {
+          existing.tags = itemData.tags || existing.tags;
+        }
+
         await existing.save();
         result.updated++;
         continue;
@@ -926,13 +1032,13 @@ export async function seedMarketplaceItems(
       result.created++;
     } catch (error) {
       result.errors.push(
-        `Failed to create ${itemData.slug}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to seed ${itemData.slug}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
 
   console.log(
-    `✅ Marketplace seeded: ${result.created} created, ${result.updated} updated`,
+    `✅ Marketplace seeded: ${result.created} created, ${result.updated} updated, from ${defaultItems.length} defaults`,
   );
 
   return result;

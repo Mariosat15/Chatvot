@@ -323,6 +323,46 @@ export default function MarketplaceSection() {
     }
   };
 
+  const [savingDefaults, setSavingDefaults] = useState(false);
+
+  const saveAsDefaults = async () => {
+    if (
+      !confirm(
+        "Save all current marketplace items as defaults?\n\n" +
+          "This will:\n" +
+          "- Copy all item images to the committed assets directory\n" +
+          "- Write a JSON defaults file with all item data\n" +
+          "- Update image URLs to use static asset paths\n\n" +
+          "After this, you should commit and push to include defaults in the repo.\n" +
+          "White-label instances will get all items and images automatically.",
+      )
+    ) {
+      return;
+    }
+
+    setSavingDefaults(true);
+    try {
+      const response = await fetch("/api/marketplace/save-defaults", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          `Saved ${data.totalItems} items as defaults! ${data.imagesCopied} images copied. Commit and push to finalize.`,
+          { duration: 8000 },
+        );
+        fetchItems(); // Refresh to show updated image URLs
+      } else {
+        toast.error(data.error || "Failed to save defaults");
+      }
+    } catch (error) {
+      toast.error("Failed to save marketplace defaults");
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
+
   // Handle image upload for any marketplace item
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -715,6 +755,20 @@ export default function MarketplaceSection() {
             <Button variant="outline" onClick={seedItems}>
               <Package className="h-4 w-4 mr-2" />
               Seed Defaults
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={saveAsDefaults}
+              disabled={savingDefaults}
+              className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+            >
+              {savingDefaults ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {savingDefaults ? "Saving..." : "Save as Defaults"}
             </Button>
 
             <Button

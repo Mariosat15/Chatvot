@@ -35,7 +35,11 @@ export async function GET(
 
     // Base directories to search
     const baseDirs = [
-      // Production: /var/www/chartvolt/public/uploads/marketplace (main upload location)
+      // Committed assets (defaults saved via "Save as Defaults") - check first
+      path.join("/var/www/chartvolt", "public", "assets", "marketplace"),
+      path.join(process.cwd(), "..", "..", "public", "assets", "marketplace"),
+      path.join(process.cwd(), "public", "assets", "marketplace"),
+      // Production: /var/www/chartvolt/public/uploads/marketplace (runtime uploads)
       path.join("/var/www/chartvolt", "public", "uploads", "marketplace"),
       // Production admin fallback
       path.join(
