@@ -213,7 +213,9 @@ export default function MarketplaceContent() {
           searchQuery !== undefined ? searchQuery : searchRef.current;
         if (currentSearch) params.set("search", currentSearch);
 
-        const response = await fetch(`/api/marketplace?${params.toString()}`);
+        const response = await fetch(`/api/marketplace?${params.toString()}`, {
+          cache: "no-store",
+        });
         const data = await response.json();
 
         if (data.success) {

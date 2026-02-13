@@ -6,7 +6,8 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { seedMarketplaceItems } from "@/lib/services/marketplace-seed.service";
 
-const MARKETPLACE_CACHE_TTL_MS = 60 * 1000;
+// Short TTL so admin price changes propagate quickly (5 seconds)
+const MARKETPLACE_CACHE_TTL_MS = 5 * 1000;
 const marketplaceListCache = new Map<
   string,
   { data: { success: true; items: unknown[] }; ts: number }
@@ -89,8 +90,7 @@ export async function GET(request: NextRequest) {
       if (cached && Date.now() - cached.ts < MARKETPLACE_CACHE_TTL_MS) {
         return NextResponse.json(cached.data, {
           headers: {
-            "Cache-Control":
-              "private, s-maxage=60, stale-while-revalidate=120",
+            "Cache-Control": "private, no-cache, must-revalidate",
           },
         });
       }
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(payload, {
       headers: {
-        "Cache-Control": "private, s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": "private, no-cache, must-revalidate",
       },
     });
   } catch {
