@@ -2141,41 +2141,8 @@ At 10% referral rate, your passive income potential is unmatched:
 // ============================================================================
 
 const ALL_ITEMS = [
-  // Indicators (Original 6)
-  SIMPLE_MA_INDICATOR, // Free SMA
-  EMA_INDICATOR, // EMA
-  BOLLINGER_BANDS_INDICATOR, // Bollinger Bands
-  SUPPORT_RESISTANCE_INDICATOR, // S/R Levels
-  RSI_INDICATOR, // RSI
-  MACD_INDICATOR, // MACD
-  // New Indicators (20 Advanced)
-  WMA_INDICATOR, // Weighted Moving Average
-  DEMA_INDICATOR, // Double Exponential MA
-  TEMA_INDICATOR, // Triple Exponential MA
-  HMA_INDICATOR, // Hull Moving Average
-  KELTNER_INDICATOR, // Keltner Channels
-  DONCHIAN_INDICATOR, // Donchian Channel
-  ICHIMOKU_INDICATOR, // Ichimoku Cloud
-  STOCHASTIC_INDICATOR, // Stochastic Oscillator
-  WILLIAMS_R_INDICATOR, // Williams %R
-  CCI_INDICATOR, // Commodity Channel Index
-  ADX_INDICATOR, // Average Directional Index
-  MFI_INDICATOR, // Money Flow Index
-  ATR_INDICATOR, // Average True Range
-  VWAP_INDICATOR, // VWAP
-  PARABOLIC_SAR_INDICATOR, // Parabolic SAR
-  PIVOT_POINTS_INDICATOR, // Pivot Points
-  OBV_INDICATOR, // On Balance Volume
-  ROC_INDICATOR, // Rate of Change
-  CMF_INDICATOR, // Chaikin Money Flow
-  MOMENTUM_INDICATOR, // Momentum Oscillator (Free)
-  // Batch 3: 40 Advanced Indicators
-  ALMA_IND, KAMA_IND, ZLEMA_IND, T3_IND, SMMA_IND, LSMA_IND, VIDYA_IND, MCGINLEY_IND, VWMA_IND,
-  SUPERTREND_IND, AROON_IND, VORTEX_IND, TRIX_IND, DPO_IND, KST_IND, COPPOCK_IND, ELDER_RAY_IND,
-  STDDEV_IND, HISTVOL_IND, CHKVOL_IND, MASSIDX_IND, ULCER_IND, RVI_IND,
-  ADLINE_IND, FORCEIDX_IND, EOM_IND, NVI_IND, PVI_IND,
-  ULTOSC_IND, AWEOSC_IND, STOCHRSI_IND, TSI_IND, PPO_IND, FISHER_IND, CRSI_IND, SMI_IND,
-  LINREG_IND, ENVELOPE_IND, PRICECH_IND, CHANDELIER_IND,
+  // NOTE: All 66 indicators are available for FREE in the chart's built-in indicator panel.
+  // They are NOT sold in the marketplace. Indicator definitions above are kept for reference only.
   // Strategies
   MA_CROSSOVER_STRATEGY, // MA + RSI strategy
   // Cosmetic Avatars
