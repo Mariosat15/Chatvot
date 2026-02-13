@@ -899,6 +899,9 @@ export async function seedMarketplaceItems(
       const existing = await MarketplaceItem.findOne({ slug: itemData.slug });
 
       if (existing) {
+        // #region agent log
+        console.log(`[DEBUG-SEED] Updating "${itemData.slug}" | existingImageUrl="${existing.imageUrl}" | templateImageUrl="${itemData.imageUrl}" | willClear=${!!existing.imageUrl && !itemData.imageUrl}`);
+        // #endregion
         // Update existing item
         existing.indicatorType = itemData.indicatorType;
         existing.strategyConfig = itemData.strategyConfig as any;
