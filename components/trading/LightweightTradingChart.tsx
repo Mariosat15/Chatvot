@@ -555,7 +555,10 @@ const LightweightTradingChart = ({
   const oscillatorRefreshFnsRef = useRef<Map<string, (mode: "light" | "full") => void>>(new Map());
   // Ref for the refresh dispatcher (called from live update paths)
   const refreshOscillatorsFnRef = useRef<((mode?: "light" | "full") => void) | null>(null);
-  // Per-instance throttle for oscillator refresh (replaces global window.__lastIndicatorRefresh)
+  // Overlay refresh functions (same two-tier pattern as oscillators, but on the main chart)
+  const overlayRefreshFnsRef = useRef<Map<string, (mode: "light" | "full") => void>>(new Map());
+  const refreshOverlaysFnRef = useRef<((mode?: "light" | "full") => void) | null>(null);
+  // Per-instance throttle for indicator refresh (replaces global window.__lastIndicatorRefresh)
   const lastOscRefreshRef = useRef<number>(0);
   // Track whether WebSocket is actively connected (to skip polling refresh when WS is live)
   const wsActiveRef = useRef<boolean>(false);
@@ -836,7 +839,7 @@ const LightweightTradingChart = ({
       indicators.filter((i) => i.enabled).map((i) => i.type),
     );
 
-    // Clear existing overlay indicator series from main chart
+    // Clear existing overlay indicator series and their refresh closures
     indicatorSeriesRef.current.forEach((series) => {
       try {
         chart.removeSeries(series);
@@ -845,6 +848,7 @@ const LightweightTradingChart = ({
       }
     });
     indicatorSeriesRef.current.clear();
+    overlayRefreshFnsRef.current.clear();
 
     const enabledIndicators = indicators.filter((ind) => ind.enabled);
 
@@ -1777,6 +1781,194 @@ const LightweightTradingChart = ({
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
+
+        // === OVERLAY REFRESH CLOSURE (two-tier: light/full) ===
+        // Captures indicator config at creation time. Looks up series from indicatorSeriesRef.
+        // "light" = tail-slice 100 candles + series.update() on last point (fast, preserves zoom)
+        // "full"  = all candles + series.setData() (accurate, for new candle periods / completed candles)
+        const _ovlType = indicator.type;
+        const _ovlParams = { ...indicator.parameters };
+        const _ovlPriceSource = indicator.priceSource || "close";
+        const _ovlOffset = indicator.offset || 0;
+        const _ovlId = indicator.id;
+        const _ovlVisibility = indicator.visibility ? { ...indicator.visibility } : {};
+
+        // Collect series refs that belong to this overlay (just stored in indicatorSeriesRef)
+        const _ovlSeriesMap = new Map<string, ISeriesApi<any>>();
+        indicatorSeriesRef.current.forEach((s, key) => {
+          if (key === _ovlId || key.startsWith(`${_ovlId}_`)) {
+            _ovlSeriesMap.set(key, s);
+          }
+        });
+
+        if (_ovlSeriesMap.size > 0) {
+          overlayRefreshFnsRef.current.set(_ovlId, (mode: "light" | "full") => {
+            if (!isMountedRef.current || candleDataRef.current.length < 20) return;
+            try {
+              const src = mode === "light"
+                ? candleDataRef.current.slice(-100)
+                : candleDataRef.current;
+              const tc = transformCandlesForPriceSource(src, _ovlPriceSource);
+              const p = _ovlParams;
+
+              // Helper: update a single-line series
+              const updateSingle = (seriesKey: string, data: { time: any; value: number }[]) => {
+                const s = _ovlSeriesMap.get(seriesKey);
+                if (!s || data.length === 0) return;
+                const od = applyOffset(data, _ovlOffset);
+                if (mode === "light") {
+                  const last = od[od.length - 1];
+                  s.update({ time: last.time as UTCTimestamp, value: last.value });
+                } else {
+                  s.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: d.value })));
+                }
+              };
+
+              // Helper: update a 3-band channel series (upper/middle/lower)
+              const updateChannel = (data: { time: any; upper: number; middle: number; lower: number }[]) => {
+                if (data.length === 0) return;
+                const od = applyOffset(data, _ovlOffset);
+                const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                const mS = _ovlSeriesMap.get(`${_ovlId}_middle`);
+                const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                if (mode === "light") {
+                  const last = od[od.length - 1];
+                  if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
+                  if (mS) mS.update({ time: last.time as UTCTimestamp, value: last.middle });
+                  if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                } else {
+                  if (uS) uS.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+                  if (mS) mS.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+                  if (lS) lS.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                }
+              };
+
+              // === Single-line overlays ===
+              const singleCalc: Record<string, () => { time: any; value: number }[]> = {
+                sma: () => calculateSMA(tc, p.period),
+                ema: () => calculateEMA(tc, p.period),
+                wma: () => calculateWMA(tc, p.period),
+                dema: () => calculateDEMA(tc, p.period || 20),
+                tema: () => calculateTEMA(tc, p.period || 20),
+                hma: () => calculateHMA(tc, p.period || 20),
+                sar: () => calculateParabolicSAR(tc, p.acceleration || 0.02, p.maximum || 0.2),
+                vwap: () => calculateVWAP(tc),
+                alma: () => calculateALMA(tc, p.period || 20, p.offset || 0.85, p.sigma || 6),
+                kama: () => calculateKAMA(tc, p.period || 10),
+                zlema: () => calculateZLEMA(tc, p.period || 20),
+                t3: () => calculateT3(tc, p.period || 5, p.vFactor || 0.7),
+                smma: () => calculateSMMA(tc, p.period || 20),
+                lsma: () => calculateLSMA(tc, p.period || 25),
+                vidya: () => calculateVIDYA(tc, p.period || 20),
+                mcginley: () => calculateMcGinley(tc, p.period || 14),
+                vwma: () => calculateVWMA(tc, p.period || 20),
+              };
+
+              // === 3-band channel overlays ===
+              const channelCalc: Record<string, () => { time: any; upper: number; middle: number; lower: number }[]> = {
+                bb: () => calculateBollingerBands(tc, p.period, p.stdDev),
+                keltner: () => calculateKeltnerChannels(tc, p.period || 20, p.multiplier || 2),
+                donchian: () => calculateDonchianChannel(tc, p.period || 20),
+                linreg_channel: () => calculateLinRegChannel(tc, p.period || 100, p.deviations || 2),
+                ma_envelope: () => calculateMAEnvelope(tc, p.period || 20, p.percentage || 2.5),
+                price_channel: () => calculatePriceChannel(tc, p.period || 20),
+                chandelier: () => calculateChandelierExit(tc, p.period || 22, p.multiplier || 3),
+                predictive_range: () => calculatePredictiveRange(tc, p.period || 14),
+                acceleration_bands: () => calculateAccelerationBands(tc, p.period || 20),
+                adaptive_channel: () => calculateAdaptiveChannel(tc, p.period || 20),
+                mean_reversion_band: () => calculateMeanReversionBand(tc, p.period || 20),
+                dynamic_pivots: () => calculateDynamicPivots(tc, p.lookback || 5),
+                anchored_vwap_bands: () => calculateAnchoredVWAPBands(tc, p.deviations || 2),
+              };
+
+              if (singleCalc[_ovlType]) {
+                updateSingle(_ovlId, singleCalc[_ovlType]());
+              } else if (channelCalc[_ovlType]) {
+                updateChannel(channelCalc[_ovlType]());
+              } else if (_ovlType === "ichimoku") {
+                const d = calculateIchimoku(tc, p.tenkanPeriod || 9, p.kijunPeriod || 26, p.senkouBPeriod || 52);
+                if (d.length > 0) {
+                  const tS = _ovlSeriesMap.get(`${_ovlId}_tenkan`);
+                  const kS = _ovlSeriesMap.get(`${_ovlId}_kijun`);
+                  const aS = _ovlSeriesMap.get(`${_ovlId}_senkouA`);
+                  const bS = _ovlSeriesMap.get(`${_ovlId}_senkouB`);
+                  if (mode === "light") {
+                    const last = d[d.length - 1];
+                    if (tS) tS.update({ time: last.time as UTCTimestamp, value: last.tenkan });
+                    if (kS) kS.update({ time: last.time as UTCTimestamp, value: last.kijun });
+                    if (aS) aS.update({ time: last.time as UTCTimestamp, value: last.senkouA });
+                    if (bS) bS.update({ time: last.time as UTCTimestamp, value: last.senkouB });
+                  } else {
+                    if (tS) tS.setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.tenkan })));
+                    if (kS) kS.setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.kijun })));
+                    if (aS) aS.setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.senkouA })));
+                    if (bS) bS.setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.senkouB })));
+                  }
+                }
+              } else if (_ovlType === "supertrend") {
+                const stData = calculateSupertrend(tc, p.period || 10, p.multiplier || 3);
+                const upS = _ovlSeriesMap.get(`${_ovlId}_up`);
+                const dnS = _ovlSeriesMap.get(`${_ovlId}_down`);
+                if (stData.length > 0) {
+                  if (mode === "light") {
+                    const last = stData[stData.length - 1];
+                    if (last.direction === 1 && upS) upS.update({ time: last.time as UTCTimestamp, value: last.value });
+                    else if (dnS) dnS.update({ time: last.time as UTCTimestamp, value: last.value });
+                  } else {
+                    const upD: any[] = []; const dnD: any[] = [];
+                    for (const d of stData) {
+                      if (d.direction === 1) upD.push({ time: d.time as UTCTimestamp, value: d.value });
+                      else dnD.push({ time: d.time as UTCTimestamp, value: d.value });
+                    }
+                    if (upS) upS.setData(upD);
+                    if (dnS) dnS.setData(dnD);
+                  }
+                }
+              } else if (_ovlType === "trend_ribbon") {
+                const ribbonData = calculateTrendRibbon(tc);
+                const emaKeys = ["ema1","ema2","ema3","ema4","ema5","ema6","ema7","ema8"] as const;
+                if (ribbonData.length > 0) {
+                  if (mode === "light") {
+                    const last = ribbonData[ribbonData.length - 1];
+                    emaKeys.forEach(key => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${key}`);
+                      if (s) s.update({ time: last.time as UTCTimestamp, value: last[key] });
+                    });
+                  } else {
+                    emaKeys.forEach(key => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${key}`);
+                      if (s) s.setData(ribbonData.map(d => ({ time: d.time as UTCTimestamp, value: d[key] })));
+                    });
+                  }
+                }
+              } else if (_ovlType === "pivot") {
+                const pivotData = calculatePivotPoints(tc);
+                if (pivotData.length > 0) {
+                  const od = applyOffset(pivotData, _ovlOffset);
+                  const pS = _ovlSeriesMap.get(`${_ovlId}_pivot`);
+                  if (mode === "light") {
+                    const last = od[od.length - 1];
+                    if (pS) pS.update({ time: last.time as UTCTimestamp, value: last.pivot });
+                    ["r1","r2","s1","s2"].forEach(level => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${level}`);
+                      if (s) s.update({ time: last.time as UTCTimestamp, value: (last as any)[level] });
+                    });
+                  } else {
+                    if (pS) pS.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: d.pivot })));
+                    ["r1","r2","s1","s2"].forEach(level => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${level}`);
+                      if (s) s.setData(od.map(d => ({ time: d.time as UTCTimestamp, value: (d as any)[level] })));
+                    });
+                  }
+                }
+              }
+              // Note: support_resistance is static (level detection) -- not updated in real-time
+            } catch (err) {
+              console.warn(`[OVL-REFRESH] Error refreshing ${_ovlType}:`, err);
+            }
+          });
+        }
+
       } else if (indicator.displayType === "oscillator") {
         // Transform candles based on price source
         const transformedCandles = transformCandlesForPriceSource(
@@ -2586,12 +2778,20 @@ const LightweightTradingChart = ({
   // Keep the ref always pointing to the latest updateIndicators (captures latest `indicators` state)
   updateIndicatorsFnRef.current = updateIndicators;
 
-  // Two-tier refresh dispatcher:
+  // Two-tier refresh dispatcher (oscillators):
   // "light" = tail-slice + series.update() (fast, for forming candle updates, preserves zoom naturally)
   // "full"  = all candles + setData() + range save/restore (accurate, for new candle periods / completed candles)
   refreshOscillatorsFnRef.current = (mode: "light" | "full" = "full") => {
     if (oscillatorRefreshFnsRef.current.size === 0) return;
     oscillatorRefreshFnsRef.current.forEach((fn) => {
+      try { fn(mode); } catch { /* non-fatal */ }
+    });
+  };
+
+  // Two-tier refresh dispatcher (overlays -- same pattern, on main chart):
+  refreshOverlaysFnRef.current = (mode: "light" | "full" = "full") => {
+    if (overlayRefreshFnsRef.current.size === 0) return;
+    overlayRefreshFnsRef.current.forEach((fn) => {
       try { fn(mode); } catch { /* non-fatal */ }
     });
   };
@@ -3231,12 +3431,14 @@ const LightweightTradingChart = ({
       volumeSeriesRef.current = null;
       positionLinesRef.current.clear();
       tpSlSeriesRef.current.clear();
-      // Clear oscillator refs to prevent refresh closures from accessing disposed charts
+      // Clear oscillator and overlay refs to prevent refresh closures from accessing disposed charts
       refreshOscillatorsFnRef.current = null;
       oscillatorRefreshFnsRef.current.clear();
       oscillatorSeriesRef.current.clear();
       oscillatorChartsRef.current.forEach((osc) => { try { osc.remove(); } catch {} });
       oscillatorChartsRef.current.clear();
+      refreshOverlaysFnRef.current = null;
+      overlayRefreshFnsRef.current.clear();
       wsActiveRef.current = false;
 
       // Remove chart last using local reference
@@ -3643,17 +3845,19 @@ const LightweightTradingChart = ({
         }
       }
 
-      // Two-tier oscillator refresh (per-instance throttle, 250ms)
+      // Two-tier indicator refresh (per-instance throttle, 250ms)
       // New candle period -> full refresh (accurate setData); forming update -> light refresh (fast series.update)
       const now = Date.now();
       if (isNewPeriod) {
         // Always do a full refresh immediately when a new candle period starts
         lastOscRefreshRef.current = now;
         try { refreshOscillatorsFnRef.current?.("full"); } catch {}
+        try { refreshOverlaysFnRef.current?.("full"); } catch {}
       } else if (now - lastOscRefreshRef.current > 250) {
         // Light refresh for forming candle updates (tail-slice + series.update, preserves zoom)
         lastOscRefreshRef.current = now;
         try { refreshOscillatorsFnRef.current?.("light"); } catch {}
+        try { refreshOverlaysFnRef.current?.("light"); } catch {}
       }
     };
 
@@ -3865,9 +4069,10 @@ const LightweightTradingChart = ({
                     );
                   }
 
-                  // Full oscillator refresh after completed candles are applied
-                  // This ensures indicators reflect the finalized candle data immediately
+                  // Full indicator refresh after completed candles are applied
+                  // This ensures all indicators reflect the finalized candle data immediately
                   try { refreshOscillatorsFnRef.current?.("full"); } catch {}
+                  try { refreshOverlaysFnRef.current?.("full"); } catch {}
                 }
 
                 const candleSource = isM
@@ -4223,6 +4428,7 @@ const LightweightTradingChart = ({
         // (WebSocket path already handles light/full refreshes; avoid double-refresh)
         if (!wsActiveRef.current) {
           try { refreshOscillatorsFnRef.current?.("full"); } catch {}
+          try { refreshOverlaysFnRef.current?.("full"); } catch {}
         }
       } catch {
         // Network error or chart disposed - ignore
