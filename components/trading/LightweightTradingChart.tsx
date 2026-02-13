@@ -548,6 +548,9 @@ const LightweightTradingChart = ({
   const oscillatorSeriesRef = useRef<Map<string, ISeriesApi<any>[]>>(new Map());
   const candleDataRef = useRef<OHLCCandle[]>([]);
 
+  // Ref to always hold the latest updateIndicators function (avoids stale closure in poll loop)
+  const updateIndicatorsFnRef = useRef<((candles: OHLCCandle[], chart: IChartApi, series: ISeriesApi<any>) => void) | null>(null);
+
   // Convert OHLC to Heikin Ashi
   const convertToHeikinAshi = (candles: OHLCCandle[]): OHLCCandle[] => {
     if (candles.length === 0) return [];
@@ -2446,6 +2449,9 @@ const LightweightTradingChart = ({
     log(`✅ Updated ${enabledIndicators.length} indicators`);
   };
 
+  // Keep the ref always pointing to the latest updateIndicators (captures latest `indicators` state)
+  updateIndicatorsFnRef.current = updateIndicators;
+
   // Subscribe to price updates
   useEffect(() => {
     subscribe(symbol);
@@ -3456,6 +3462,50 @@ const LightweightTradingChart = ({
       }
 
       currentCandleRef.current = candleData;
+
+      // Keep candleDataRef in sync with forming candle so indicators use the latest price
+      if (candleDataRef.current.length > 0) {
+        const lastIdx = candleDataRef.current.length - 1;
+        const lastRefTime = candleDataRef.current[lastIdx].time;
+        if (lastRefTime === candle.time) {
+          // Update existing candle in-place
+          candleDataRef.current[lastIdx] = {
+            ...candleDataRef.current[lastIdx],
+            open: candleData.open,
+            high: candleData.high,
+            low: candleData.low,
+            close: candleData.close,
+          };
+        } else if (candle.time > lastRefTime) {
+          // New candle period started
+          candleDataRef.current.push({
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: 0,
+          });
+          if (candleDataRef.current.length > 500) candleDataRef.current.shift();
+        }
+      }
+
+      // Throttled indicator refresh from forming candle updates (every 3 seconds)
+      const now = Date.now();
+      if (!((window as any).__lastIndicatorRefresh) || now - (window as any).__lastIndicatorRefresh > 3000) {
+        (window as any).__lastIndicatorRefresh = now;
+        if (chartRef.current && candlestickSeriesRef.current && candleDataRef.current.length > 0) {
+          try {
+            updateIndicatorsFnRef.current?.(
+              candleDataRef.current,
+              chartRef.current,
+              candlestickSeriesRef.current,
+            );
+          } catch {
+            // Non-fatal indicator update error
+          }
+        }
+      }
     };
 
     // ==== WEBSOCKET MODE ====
@@ -4014,7 +4064,18 @@ const LightweightTradingChart = ({
         }
 
         // Trigger indicator recalculation with updated candle data
-        setIndicatorDataVersion((v) => v + 1);
+        // Direct call via ref (bypasses React state cycle for reliable live updates)
+        if (chartRef.current && candlestickSeriesRef.current && candleDataRef.current.length > 0) {
+          try {
+            updateIndicatorsFnRef.current?.(
+              candleDataRef.current,
+              chartRef.current,
+              candlestickSeriesRef.current,
+            );
+          } catch {
+            // Indicator update error - non-fatal
+          }
+        }
       } catch {
         // Network error or chart disposed - ignore
       }
