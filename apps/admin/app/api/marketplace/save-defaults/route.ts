@@ -92,6 +92,41 @@ export async function POST(request: NextRequest) {
       path.join("/var/www/chartvolt", "public", "avatars"),
     ];
 
+    // ---- Helper: generate filename variants (original + webp fallback) ----
+    function getFilenameVariants(filename: string): string[] {
+      const variants = [filename];
+      // If the filename has a non-webp extension, also try .webp
+      // (upload route converts all images to .webp)
+      const webpVariant = filename.replace(
+        /\.(jpg|jpeg|png|gif|bmp|tiff)$/i,
+        ".webp",
+      );
+      if (webpVariant !== filename) {
+        variants.push(webpVariant);
+      }
+      return variants;
+    }
+
+    // ---- Helper: try to find file in directories with variants ----
+    async function tryFindInDirs(
+      filename: string,
+      dirs: string[],
+    ): Promise<string | null> {
+      const variants = getFilenameVariants(filename);
+      for (const variant of variants) {
+        for (const dir of dirs) {
+          const fullPath = path.join(dir, variant);
+          try {
+            await access(fullPath, constants.R_OK);
+            return fullPath;
+          } catch {
+            continue;
+          }
+        }
+      }
+      return null;
+    }
+
     // ---- Helper: find an image file on disk ----
     async function findImageFile(
       imageUrl: string,
@@ -101,44 +136,25 @@ export async function POST(request: NextRequest) {
       // Extract filename from URL (handle query params)
       const urlPath = imageUrl.split("?")[0];
 
-      // Case 1: /api/assets/marketplace/filename.webp
+      // Case 1: /api/assets/marketplace/filename.webp (or .png → .webp)
       if (urlPath.includes("/api/assets/marketplace/")) {
         const filename = urlPath.split("/api/assets/marketplace/")[1];
-        for (const dir of uploadDirs) {
-          const fullPath = path.join(dir, filename);
-          try {
-            await access(fullPath, constants.R_OK);
-            return fullPath;
-          } catch {
-            continue;
-          }
-        }
+        const found = await tryFindInDirs(filename, uploadDirs);
+        if (found) return found;
       }
 
-      // Case 2: /assets/avatars/name.png
+      // Case 2: /assets/avatars/name.png (or .webp)
       if (urlPath.includes("/assets/avatars/")) {
         const filename = urlPath.split("/assets/avatars/")[1];
-        for (const dir of avatarDirs) {
-          const fullPath = path.join(dir, filename);
-          try {
-            await access(fullPath, constants.R_OK);
-            return fullPath;
-          } catch {
-            continue;
-          }
-        }
+        const found = await tryFindInDirs(filename, avatarDirs);
+        if (found) return found;
       }
 
       // Case 3: /assets/marketplace/name.ext (already committed)
       if (urlPath.includes("/assets/marketplace/")) {
         const filename = urlPath.split("/assets/marketplace/")[1];
-        const fullPath = path.join(assetsDir, filename);
-        try {
-          await access(fullPath, constants.R_OK);
-          return fullPath;
-        } catch {
-          return null;
-        }
+        const found = await tryFindInDirs(filename, [assetsDir]);
+        if (found) return found;
       }
 
       return null;
