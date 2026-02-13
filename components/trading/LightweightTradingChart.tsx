@@ -80,6 +80,17 @@ import {
   calculateUltimateOscillator, calculateAwesomeOscillator, calculateStochRSI, calculateTSI,
   calculatePPO, calculateFisherTransform, calculateConnorsRSI, calculateSMIErgodic,
   calculateLinRegChannel, calculateMAEnvelope, calculatePriceChannel, calculateChandelierExit,
+  // Premium indicators
+  calculateTrendPulse, calculateMarketRegime, calculateTrendComposite, calculateCompositeBreadth,
+  calculateReversalSignal, calculatePredictiveRange, calculateBreakoutProb, calculateSentimentOsc,
+  calculateWhaleAccumulation, calculateSmartMoneyFlow, calculateVolumeClimax, calculateNetBuyingPressure,
+  calculateOrderFlowImbalance, calculateIntradayIntensity, calculateVolumeMomentum, calculateLiquidityHeatmap,
+  calculateVolatilitySqueeze, calculateSqueezeMomentum, calculateVolatilityRatio, calculateRangeExpansion,
+  calculateChoppyMarket, calculateFractalDimension, calculateAccelerationBands, calculateAdaptiveChannel,
+  calculateAlphaMomentum, calculateEfficiencyRatio, calculateTrendPersistence, calculateMTFMomentum,
+  calculateMomentumWave, calculateGapMomentum, calculateHeikinAshiTrend, calculateCycleDetector,
+  calculateAdaptiveRSI, calculateMeanReversionBand, calculateTrendRibbon, calculateRelativeVigor,
+  calculateDynamicPivots, calculatePriceActionScore, calculateErgodicVolume, calculateAnchoredVWAPBands,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -1694,6 +1705,46 @@ const LightweightTradingChart = ({
             lSeries.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.lower })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lSeries);
           }
+
+        // --- PREMIUM OVERLAY INDICATORS ---
+        // Channel overlays: predictive_range, acceleration_bands, adaptive_channel, mean_reversion_band, dynamic_pivots, anchored_vwap_bands
+        } else if (["predictive_range","acceleration_bands","adaptive_channel","mean_reversion_band","dynamic_pivots","anchored_vwap_bands"].includes(indicator.type)) {
+          const premChCalc: Record<string, () => { time: number; upper: number; middle: number; lower: number }[]> = {
+            predictive_range: () => calculatePredictiveRange(transformedCandles, indicator.parameters.period || 14),
+            acceleration_bands: () => calculateAccelerationBands(transformedCandles, indicator.parameters.period || 20),
+            adaptive_channel: () => calculateAdaptiveChannel(transformedCandles, indicator.parameters.period || 20),
+            mean_reversion_band: () => calculateMeanReversionBand(transformedCandles, indicator.parameters.period || 20),
+            dynamic_pivots: () => calculateDynamicPivots(transformedCandles, indicator.parameters.lookback || 5),
+            anchored_vwap_bands: () => calculateAnchoredVWAPBands(transformedCandles, indicator.parameters.deviations || 2),
+          };
+          const premChData = premChCalc[indicator.type]?.() || [];
+          if (indicator.visibility?.upper !== false) {
+            const uS = chart.addLineSeries({ color: hexToRgba(indicator.colors?.upper || indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: `${indicator.customLabel || indicator.name} Upper`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 } });
+            uS.setData(premChData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, uS);
+          }
+          if (indicator.visibility?.middle !== false) {
+            const mS = chart.addLineSeries({ color: hexToRgba(indicator.colors?.middle || indicator.color, indicator.opacity || 60), lineWidth: indicator.lineWidth as any, lineStyle: 2 as any, title: `${indicator.customLabel || indicator.name} Mid`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 } });
+            mS.setData(premChData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, mS);
+          }
+          if (indicator.visibility?.lower !== false) {
+            const lS = chart.addLineSeries({ color: hexToRgba(indicator.colors?.lower || indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: `${indicator.customLabel || indicator.name} Lower`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 } });
+            lS.setData(premChData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lS);
+          }
+
+        // Trend Ribbon: 8 EMA lines
+        } else if (indicator.type === "trend_ribbon") {
+          const ribbonData = calculateTrendRibbon(transformedCandles);
+          const colors = ["#00e676","#00c853","#2196f3","#1976d2","#f57c00","#e65100","#f44336","#c62828"];
+          const emaKeys = ["ema1","ema2","ema3","ema4","ema5","ema6","ema7","ema8"] as const;
+          emaKeys.forEach((key, idx) => {
+            const s = chart.addLineSeries({ color: hexToRgba(colors[idx], indicator.opacity || 70), lineWidth: 1 as any, title: idx === 0 ? (indicator.customLabel || "Trend Ribbon") : "", priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 } });
+            s.setData(ribbonData.map(d => ({ time: d.time as UTCTimestamp, value: d[key] })));
+            indicatorSeriesRef.current.set(`${indicator.id}_${key}`, s);
+          });
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2286,6 +2337,70 @@ const LightweightTradingChart = ({
           });
           sigSeries.setData(ppoData.map((d) => ({ time: d.time as UTCTimestamp, value: d.signal })));
           mainSeries2.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+
+        // --- PREMIUM OSCILLATOR INDICATORS ---
+        // Bounded 0-100 oscillators: trend_pulse, market_regime, trend_composite, composite_breadth, reversal_signal, breakout_prob, heikin_ashi_trend, adaptive_rsi, trend_persistence, choppy_market
+        } else if (["trend_pulse","market_regime","trend_composite","composite_breadth","reversal_signal","breakout_prob","heikin_ashi_trend","adaptive_rsi","trend_persistence","choppy_market"].includes(indicator.type)) {
+          const boundedCalc: Record<string, () => { time: number; value: number }[]> = {
+            trend_pulse: () => calculateTrendPulse(transformedCandles, indicator.parameters.adxPeriod || 14, indicator.parameters.rsiPeriod || 14),
+            market_regime: () => calculateMarketRegime(transformedCandles, indicator.parameters.period || 20),
+            trend_composite: () => calculateTrendComposite(transformedCandles, indicator.parameters.period || 14),
+            composite_breadth: () => calculateCompositeBreadth(transformedCandles),
+            reversal_signal: () => calculateReversalSignal(transformedCandles, indicator.parameters.rsiPeriod || 14),
+            breakout_prob: () => calculateBreakoutProb(transformedCandles, indicator.parameters.bbPeriod || 20, indicator.parameters.keltPeriod || 20),
+            heikin_ashi_trend: () => calculateHeikinAshiTrend(transformedCandles, indicator.parameters.period || 10),
+            adaptive_rsi: () => calculateAdaptiveRSI(transformedCandles, indicator.parameters.period || 14),
+            trend_persistence: () => calculateTrendPersistence(transformedCandles, indicator.parameters.period || 20),
+            choppy_market: () => calculateChoppyMarket(transformedCandles, indicator.parameters.period || 14),
+          };
+          const bData = boundedCalc[indicator.type]?.() || [];
+          const series = oscChart.addLineSeries({ color: hexToRgba(indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: indicator.customLabel || indicator.name });
+          series.setData(bData.map(d => ({ time: d.time as UTCTimestamp, value: d.value })));
+          series.createPriceLine({ price: 50, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+          if (["adaptive_rsi","trend_pulse","reversal_signal"].includes(indicator.type)) {
+            series.createPriceLine({ price: 70, color: hexToRgba("#f23645", 50), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "70" });
+            series.createPriceLine({ price: 30, color: hexToRgba("#00e676", 50), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "30" });
+          }
+
+        // Zero-line oscillators: sentiment_osc, volatility_squeeze, squeeze_momentum, range_expansion, alpha_momentum, efficiency_ratio, momentum_wave, gap_momentum, price_action_score, ergodic_volume, order_flow_imbalance, net_buying_pressure, volume_climax, relative_vigor, intraday_intensity, volume_momentum, liquidity_heatmap, mtf_momentum
+        } else if (["sentiment_osc","volatility_squeeze","squeeze_momentum","range_expansion","alpha_momentum","efficiency_ratio","momentum_wave","gap_momentum","price_action_score","ergodic_volume","order_flow_imbalance","net_buying_pressure","volume_climax","relative_vigor","intraday_intensity","volume_momentum","liquidity_heatmap","mtf_momentum"].includes(indicator.type)) {
+          const zeroCalc: Record<string, () => { time: number; value: number }[]> = {
+            sentiment_osc: () => calculateSentimentOsc(transformedCandles, indicator.parameters.smooth || 5),
+            volatility_squeeze: () => calculateVolatilitySqueeze(transformedCandles, indicator.parameters.period || 20),
+            squeeze_momentum: () => calculateSqueezeMomentum(transformedCandles, indicator.parameters.period || 20),
+            range_expansion: () => calculateRangeExpansion(transformedCandles, indicator.parameters.period || 14),
+            alpha_momentum: () => calculateAlphaMomentum(transformedCandles, indicator.parameters.period || 20),
+            efficiency_ratio: () => calculateEfficiencyRatio(transformedCandles, indicator.parameters.period || 10),
+            momentum_wave: () => calculateMomentumWave(transformedCandles, indicator.parameters.period || 20),
+            gap_momentum: () => calculateGapMomentum(transformedCandles, indicator.parameters.period || 14),
+            price_action_score: () => calculatePriceActionScore(transformedCandles, indicator.parameters.period || 10),
+            ergodic_volume: () => calculateErgodicVolume(transformedCandles, indicator.parameters.shortPeriod || 5, indicator.parameters.longPeriod || 20),
+            order_flow_imbalance: () => calculateOrderFlowImbalance(transformedCandles, indicator.parameters.period || 10),
+            net_buying_pressure: () => calculateNetBuyingPressure(transformedCandles, indicator.parameters.period || 14),
+            volume_climax: () => calculateVolumeClimax(transformedCandles, indicator.parameters.period || 20),
+            relative_vigor: () => calculateRelativeVigor(transformedCandles, indicator.parameters.period || 10),
+            intraday_intensity: () => calculateIntradayIntensity(transformedCandles, indicator.parameters.period || 21),
+            volume_momentum: () => calculateVolumeMomentum(transformedCandles, indicator.parameters.period || 14),
+            liquidity_heatmap: () => calculateLiquidityHeatmap(transformedCandles, indicator.parameters.period || 50),
+            mtf_momentum: () => calculateMTFMomentum(transformedCandles),
+          };
+          const zData = zeroCalc[indicator.type]?.() || [];
+          const series = oscChart.addLineSeries({ color: hexToRgba(indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: indicator.customLabel || indicator.name });
+          series.setData(zData.map(d => ({ time: d.time as UTCTimestamp, value: d.value })));
+          series.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+
+        // Non-bounded line oscillators: whale_accumulation, smart_money_flow, fractal_dimension, volatility_ratio, cycle_detector
+        } else if (["whale_accumulation","smart_money_flow","fractal_dimension","volatility_ratio","cycle_detector"].includes(indicator.type)) {
+          const lineCalc: Record<string, () => { time: number; value: number }[]> = {
+            whale_accumulation: () => calculateWhaleAccumulation(transformedCandles, indicator.parameters.threshold || 1.5),
+            smart_money_flow: () => calculateSmartMoneyFlow(transformedCandles, indicator.parameters.period || 14),
+            fractal_dimension: () => calculateFractalDimension(transformedCandles, indicator.parameters.period || 30),
+            volatility_ratio: () => calculateVolatilityRatio(transformedCandles, indicator.parameters.shortPeriod || 5, indicator.parameters.longPeriod || 20),
+            cycle_detector: () => calculateCycleDetector(transformedCandles, indicator.parameters.maxPeriod || 50),
+          };
+          const lData = lineCalc[indicator.type]?.() || [];
+          const series = oscChart.addLineSeries({ color: hexToRgba(indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: indicator.customLabel || indicator.name });
+          series.setData(lData.map(d => ({ time: d.time as UTCTimestamp, value: d.value })));
 
         } else {
           console.warn(

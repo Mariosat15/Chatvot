@@ -1424,6 +1424,250 @@ const CHANDELIER_IND = mkIndicator("Chandelier Exit", "chandelier-exit",
   ["channel", "chandelier", "exit", "trailing-stop", "atr"]);
 
 // ============================================================================
+// PREMIUM MARKETPLACE-ONLY INDICATORS (40 unique, creative - NOT in free chart)
+// ============================================================================
+
+const PREM_TREND_PULSE = mkIndicator("Trend Pulse", "trend-pulse",
+  "AI-style composite: blends ADX strength with RSI direction into a single health score.",
+  `# Trend Pulse\n\nCombines the directional strength from ADX with the momentum bias from RSI into one clean 0-100 score.\n\n- **Above 70**: Strong bullish trend\n- **Below 30**: Strong bearish trend\n- **40-60**: Choppy / no clear trend\n\nPerfect for quick trend assessment without multiple indicators.`,
+  "trend_pulse", "oscillator", 500, { adxPeriod: 14, rsiPeriod: 14, color: "#8b5cf6" },
+  ["premium", "composite", "ai", "trend", "smart"], { isFeatured: true });
+
+const PREM_MARKET_REGIME = mkIndicator("Market Regime Detector", "market-regime-detector",
+  "Automatically classifies market into trending, ranging, or volatile states.",
+  `# Market Regime Detector\n\nUses ADX + ATR expansion/contraction to determine market state:\n\n- **0-30**: Ranging market (avoid trend strategies)\n- **30-60**: Transitioning (prepare for breakout)\n- **60-100**: Strong trend (ride the wave)\n\nKnow your market before you trade.`,
+  "market_regime", "oscillator", 600, { period: 20, color: "#06b6d4" },
+  ["premium", "regime", "state", "classification", "smart"], { isFeatured: true });
+
+const PREM_TREND_COMPOSITE = mkIndicator("Trend Strength Composite", "trend-strength-composite",
+  "Multi-factor trend scoring: EMA slope × ADX power × momentum consensus.",
+  `# Trend Strength Composite\n\nThree-dimensional trend analysis:\n1. **EMA Slope** - Is the trend accelerating or decelerating?\n2. **ADX Power** - How strong is the directional movement?\n3. **Momentum** - Does momentum confirm the trend?\n\nAll three must agree for a strong signal.`,
+  "trend_composite", "oscillator", 450, { period: 14, color: "#22c55e" },
+  ["premium", "composite", "multi-factor", "trend"]);
+
+const PREM_BREADTH = mkIndicator("Composite Breadth Score", "composite-breadth-score",
+  "Consensus meter: counts how many indicators agree on market direction.",
+  `# Composite Breadth Score\n\nPolls 5 different indicators (RSI, MACD, Stochastic, CCI, EMA) and scores their consensus:\n\n- **80-100**: All bullish (strong buy zone)\n- **0-20**: All bearish (strong sell zone)\n- **40-60**: Mixed signals (stay cautious)\n\nThe more indicators agree, the stronger the signal.`,
+  "composite_breadth", "oscillator", 400, { color: "#3b82f6" },
+  ["premium", "breadth", "consensus", "multi-indicator"]);
+
+const PREM_REVERSAL = mkIndicator("Reversal Signal Detector", "reversal-signal-detector",
+  "Catches reversals by combining RSI extremes, volume spikes, and candlestick patterns.",
+  `# Reversal Signal Detector\n\nComposite reversal detection that scores:\n- RSI oversold/overbought extremes\n- Hammer/shooting star candle patterns\n- Volume spike confirmation\n- Bullish/bearish engulfing patterns\n\n**Above 70**: Bullish reversal likely\n**Below 30**: Bearish reversal likely`,
+  "reversal_signal", "oscillator", 550, { rsiPeriod: 14, color: "#f59e0b" },
+  ["premium", "reversal", "patterns", "signals"], { isFeatured: true });
+
+const PREM_PREDICT = mkIndicator("Predictive Range", "predictive-range",
+  "Projects next-bar expected price range using ATR and momentum analysis.",
+  `# Predictive Range\n\nForward-looking channel that projects where price is likely to go next:\n- Uses ATR for range estimation\n- Adjusts center based on current momentum\n- Upper/lower bands show expected price envelope\n\nGreat for setting profit targets and stop losses.`,
+  "predictive_range", "overlay", 600, { period: 14, color: "#a855f7" },
+  ["premium", "predictive", "forecast", "range", "targets"], { isFeatured: true });
+
+const PREM_BREAKOUT = mkIndicator("Breakout Probability", "breakout-probability",
+  "Measures energy build-up during BB/Keltner squeeze — signals imminent breakouts.",
+  `# Breakout Probability\n\nDetects when Bollinger Bands contract inside Keltner Channels (the \"squeeze\"). The longer the squeeze, the higher the breakout probability:\n\n- **0-30%**: No squeeze, normal market\n- **30-70%**: Building energy\n- **70-100%**: Imminent breakout!\n\nDoesn't predict direction, only probability.`,
+  "breakout_prob", "oscillator", 500, { bbPeriod: 20, keltPeriod: 20, color: "#ef4444" },
+  ["premium", "breakout", "squeeze", "probability"]);
+
+const PREM_SENTIMENT = mkIndicator("Sentiment Oscillator", "sentiment-oscillator",
+  "Scores candlestick patterns numerically — hammers, engulfings, dojis, and more.",
+  `# Sentiment Oscillator\n\nReads candle patterns like a pro trader:\n- Bullish engulfing: +3\n- Hammer/pin bar: +3\n- Strong body candles: ±2\n- Shooting star: -3\n- Bearish engulfing: -3\n\nSmoothed for clean signals. Positive = bullish sentiment, negative = bearish.`,
+  "sentiment_osc", "oscillator", 400, { smooth: 5, color: "#ec4899" },
+  ["premium", "sentiment", "candle-patterns", "price-action"]);
+
+const PREM_WHALE = mkIndicator("Whale Accumulation", "whale-accumulation",
+  "Tracks only large-volume blocks — reveals what institutional traders are doing.",
+  `# Whale Accumulation\n\nFilters out retail noise by only counting volume bars that exceed the average by a threshold. Rising line = institutions buying, falling = selling.\n\n## Settings\n- **Threshold**: Volume multiple (default: 1.5x average)\n\nSee what the big players are doing.`,
+  "whale_accumulation", "oscillator", 700, { threshold: 1.5, color: "#0ea5e9" },
+  ["premium", "whale", "institutional", "smart-money", "volume"], { isFeatured: true });
+
+const PREM_SMART_FLOW = mkIndicator("Smart Money Flow", "smart-money-flow",
+  "Volume-weighted money flow emphasizing institutional-sized bars for true accumulation.",
+  `# Smart Money Flow\n\nLike regular Money Flow but weights each bar by its relative volume. High-volume bars (institutional) dominate the calculation.\n\nRising = Smart money accumulating\nFalling = Smart money distributing`,
+  "smart_money_flow", "oscillator", 550, { period: 14, color: "#14b8a6" },
+  ["premium", "smart-money", "institutional", "accumulation"]);
+
+const PREM_VOL_CLIMAX = mkIndicator("Volume Climax", "volume-climax",
+  "Detects extreme volume spikes that often mark tops, bottoms, and capitulation events.",
+  `# Volume Climax\n\nSpikes when volume exceeds the average by a threshold (default 2x). Shows positive spikes for bullish climax and negative for bearish.\n\n- Large positive spike = potential buying climax (top)\n- Large negative spike = potential selling climax (bottom)`,
+  "volume_climax", "oscillator", 400, { period: 20, color: "#f97316" },
+  ["premium", "volume", "climax", "extremes", "reversals"]);
+
+const PREM_NET_BUYING = mkIndicator("Net Buying Pressure", "net-buying-pressure",
+  "Estimates buyer vs seller aggression from within-bar price action and volume.",
+  `# Net Buying Pressure\n\nFor each bar: how much of the range was \"won\" by buyers vs sellers, weighted by volume.\n\n- Positive = Buyers dominating\n- Negative = Sellers dominating\n- Divergence with price = Potential reversal`,
+  "net_buying_pressure", "oscillator", 450, { period: 14, color: "#22c55e" },
+  ["premium", "buying-pressure", "volume", "order-flow"]);
+
+const PREM_ORDER_FLOW = mkIndicator("Order Flow Imbalance", "order-flow-imbalance",
+  "Approximates buy vs sell volume from candlestick structure — no Level 2 needed.",
+  `# Order Flow Imbalance\n\nEstimates the buy/sell volume split from each candle's close position within its range:\n\n- **+50 to +100**: Strong buying imbalance\n- **-50 to -100**: Strong selling imbalance\n- **-20 to +20**: Balanced (ranging)`,
+  "order_flow_imbalance", "oscillator", 500, { period: 10, color: "#6366f1" },
+  ["premium", "order-flow", "buy-sell", "imbalance"]);
+
+const PREM_INTRADAY = mkIndicator("Intraday Intensity Index", "intraday-intensity-index",
+  "Measures accumulation/distribution within each bar — where did price close in its range?",
+  `# Intraday Intensity Index\n\nCalculates (2×Close - High - Low) / (High - Low) × Volume, then sums over a period.\n\n- Positive = Closing near highs (accumulation)\n- Negative = Closing near lows (distribution)`,
+  "intraday_intensity", "oscillator", 350, { period: 21, color: "#a855f7" },
+  ["premium", "intensity", "accumulation", "intraday"]);
+
+const PREM_VOL_MOM = mkIndicator("Volume Momentum", "volume-momentum",
+  "Rate of change of volume — shows whether trading activity is accelerating or decelerating.",
+  `# Volume Momentum\n\nVolume ROC: compares current volume to volume N bars ago.\n\n- Positive spikes = Activity surging (breakout potential)\n- Negative = Activity dying (consolidation)\n\nConfirm price breakouts with volume momentum.`,
+  "volume_momentum", "oscillator", 300, { period: 14, color: "#ef4444" },
+  ["premium", "volume", "momentum", "acceleration"]);
+
+const PREM_LIQUIDITY = mkIndicator("Liquidity Heatmap", "liquidity-heatmap",
+  "Volume-at-price proxy showing distance from where most trading occurred.",
+  `# Liquidity Heatmap\n\nCalculates the Volume Point of Control (VPOC) — the price level with the most trading activity — then shows price distance from it.\n\n- **Near zero**: Price at high-liquidity zone\n- **Far from zero**: Price extended from support\n\nMean reversion opportunities when price deviates far from VPOC.`,
+  "liquidity_heatmap", "oscillator", 500, { period: 50, color: "#0ea5e9" },
+  ["premium", "liquidity", "vpoc", "volume-profile"]);
+
+const PREM_VOL_SQUEEZE = mkIndicator("Volatility Squeeze", "volatility-squeeze",
+  "TTM-style squeeze: detects BB inside Keltner and shows momentum direction.",
+  `# Volatility Squeeze\n\nThe famous TTM Squeeze concept:\n1. When BB contracts inside Keltner = Squeeze is ON (energy building)\n2. Momentum shows which direction the breakout will go\n3. Squeeze release = Explosive move\n\nMomentum is dampened during squeeze, amplified on release.`,
+  "volatility_squeeze", "oscillator", 550, { period: 20, color: "#f59e0b" },
+  ["premium", "squeeze", "ttm", "volatility", "breakout"], { isFeatured: true });
+
+const PREM_SQZ_MOM = mkIndicator("Squeeze Momentum", "squeeze-momentum",
+  "Linear regression momentum measured relative to Keltner midline during squeeze events.",
+  `# Squeeze Momentum\n\nMeasures momentum as the linear regression slope of price deviation from Keltner midline.\n\n- Positive slope = Upward momentum building\n- Negative slope = Downward momentum building\n\nBest used alongside Volatility Squeeze.`,
+  "squeeze_momentum", "oscillator", 400, { period: 20, color: "#8b5cf6" },
+  ["premium", "squeeze", "momentum", "regression"]);
+
+const PREM_VOL_RATIO = mkIndicator("Volatility Ratio", "volatility-ratio",
+  "Current vs historical volatility — detects regime changes and expansion events.",
+  `# Volatility Ratio\n\nCompares short-term ATR to long-term ATR:\n\n- **Ratio > 1.5**: Volatility expanding (breakout)\n- **Ratio < 0.5**: Volatility contracting (squeeze)\n- **Around 1.0**: Normal conditions\n\nRegime change detector — know when the market shifts gears.`,
+  "volatility_ratio", "oscillator", 350, { shortPeriod: 5, longPeriod: 20, color: "#06b6d4" },
+  ["premium", "volatility", "ratio", "regime"]);
+
+const PREM_RANGE_EXP = mkIndicator("Range Expansion Index", "range-expansion-index",
+  "Measures today's range vs average — catches breakout bars and unusual activity.",
+  `# Range Expansion Index\n\nShows how much the current bar's range exceeds (or falls below) the recent average:\n\n- **+100%**: Range is 2x normal (breakout bar)\n- **0%**: Normal range\n- **-50%**: Range is half normal (tight consolidation)`,
+  "range_expansion", "oscillator", 300, { period: 14, color: "#22c55e" },
+  ["premium", "range", "expansion", "breakout"]);
+
+const PREM_CHOPPY = mkIndicator("Choppy Market Index", "choppy-market-index",
+  "Detects ranging/choppy conditions — avoid false signals in trendless markets.",
+  `# Choppy Market Index\n\nMathematically measures choppiness using the Choppiness Index formula:\n\n- **Above 60**: Very choppy (avoid trend trades)\n- **38-60**: Transitioning\n- **Below 38**: Strong trend (use trend strategies)\n\nSave money by not trading in choppy conditions.`,
+  "choppy_market", "oscillator", 400, { period: 14, color: "#f23645" },
+  ["premium", "choppy", "choppiness", "filter", "ranging"]);
+
+const PREM_FRACTAL = mkIndicator("Fractal Dimension", "fractal-dimension",
+  "Measures market complexity: 1.0 = perfectly trending, 2.0 = completely random.",
+  `# Fractal Dimension\n\nBased on fractal geometry. Approximates the Hurst exponent:\n\n- **1.0-1.3**: Strongly trending (predictable)\n- **1.3-1.5**: Mildly trending\n- **1.5**: Random walk (unpredictable)\n- **1.5-2.0**: Mean-reverting\n\nQuantify market predictability.`,
+  "fractal_dimension", "oscillator", 500, { period: 30, color: "#a855f7" },
+  ["premium", "fractal", "complexity", "hurst", "quantitative"]);
+
+const PREM_ACCEL_BANDS = mkIndicator("Acceleration Bands", "acceleration-bands",
+  "Bands that widen/narrow based on price acceleration — dynamic breakout levels.",
+  `# Acceleration Bands\n\nBands calculated from High × (1 + 2 × H-L/H) and Low × (1 - 2 × H-L/L).\n\nBand width responds to acceleration (rate of range change):\n- Wider during volatile moves\n- Tighter during consolidation\n\nBreakout above upper band = Strong bullish acceleration.`,
+  "acceleration_bands", "overlay", 400, { period: 20, color: "#14b8a6" },
+  ["premium", "bands", "acceleration", "dynamic"]);
+
+const PREM_ADAPT_CH = mkIndicator("Adaptive Channel", "adaptive-channel",
+  "ATR-based channel that automatically adjusts width to current volatility regime.",
+  `# Adaptive Channel\n\nEMA center line with ATR-scaled bands that auto-adjust:\n- In calm markets: Tight channel\n- In volatile markets: Wide channel\n\nPrice touching bands in calm markets is significant.\nPrice touching bands in volatile markets is normal.`,
+  "adaptive_channel", "overlay", 450, { period: 20, color: "#f97316" },
+  ["premium", "channel", "adaptive", "volatility"]);
+
+const PREM_ALPHA_MOM = mkIndicator("Alpha Momentum", "alpha-momentum",
+  "Risk-adjusted momentum: return divided by volatility. Sharpe-ratio style scoring.",
+  `# Alpha Momentum\n\nMomentum / Volatility = Risk-adjusted return score.\n\n- High positive = Strong risk-adjusted upside\n- High negative = Strong risk-adjusted downside\n- Near zero = No edge\n\nBetter than raw momentum because it accounts for risk.`,
+  "alpha_momentum", "oscillator", 500, { period: 20, color: "#6366f1" },
+  ["premium", "alpha", "risk-adjusted", "sharpe", "quantitative"]);
+
+const PREM_EFFICIENCY = mkIndicator("Efficiency Ratio Oscillator", "efficiency-ratio-oscillator",
+  "Direction vs noise ratio — shows how efficiently price is moving in a direction.",
+  `# Efficiency Ratio Oscillator\n\nMeasures directional efficiency:\n- +100%: Perfect uptrend (all bars contributing)\n- -100%: Perfect downtrend\n- 0%: Random noise (no directional movement)\n\nKaufman's ER as a signed oscillator.`,
+  "efficiency_ratio", "oscillator", 350, { period: 10, color: "#0ea5e9" },
+  ["premium", "efficiency", "noise", "directional"]);
+
+const PREM_PERSIST = mkIndicator("Trend Persistence", "trend-persistence",
+  "Measures what percentage of recent bars closed higher — trend duration meter.",
+  `# Trend Persistence\n\nCounts the percentage of bars that closed up in the last N periods:\n\n- **Above 70%**: Strong persistent uptrend\n- **Below 30%**: Strong persistent downtrend\n- **Around 50%**: No persistence (choppy)\n\nSimple but powerful trend filter.`,
+  "trend_persistence", "oscillator", 300, { period: 20, color: "#22c55e" },
+  ["premium", "persistence", "trend", "duration"]);
+
+const PREM_MTF = mkIndicator("Multi-TF Momentum", "multi-timeframe-momentum",
+  "Combines momentum from 5, 10, and 20-period views weighted by timeframe importance.",
+  `# Multi-Timeframe Momentum\n\nBlends ROC from three timeframes:\n- 5-period ROC × 50% (short-term)\n- 10-period ROC × 30% (medium-term)\n- 20-period ROC × 20% (long-term)\n\nWhen all three align, the signal is strongest.`,
+  "mtf_momentum", "oscillator", 450, { color: "#ec4899" },
+  ["premium", "multi-timeframe", "momentum", "weighted"]);
+
+const PREM_WAVE = mkIndicator("Momentum Wave", "momentum-wave",
+  "Sine-wave fitted cycle momentum — reveals the rhythm of market oscillations.",
+  `# Momentum Wave\n\nFits a sine wave to recent price changes using Fourier analysis.\n\nReveals the dominant cycle's:\n- **Amplitude**: How strong the cycle is\n- **Phase**: Where we are in the cycle\n\nPredicts the next cycle swing.`,
+  "momentum_wave", "oscillator", 550, { period: 20, color: "#8b5cf6" },
+  ["premium", "wave", "cycle", "fourier", "sine"], { isFeatured: true });
+
+const PREM_GAP = mkIndicator("Gap Momentum", "gap-momentum",
+  "Cumulative overnight gap impact — tracks the hidden momentum from gap opens.",
+  `# Gap Momentum\n\nSums the open-to-previous-close gaps over N periods.\n\n- Positive sum = Persistent gap-up pressure\n- Negative sum = Persistent gap-down pressure\n\nGaps often reveal overnight institutional activity that intraday traders miss.`,
+  "gap_momentum", "oscillator", 350, { period: 14, color: "#f59e0b" },
+  ["premium", "gap", "overnight", "institutional"]);
+
+const PREM_HA_TREND = mkIndicator("Heikin Ashi Trend", "heikin-ashi-trend",
+  "Trend direction from Heikin Ashi candle analysis — smoothed trend signal 0-100.",
+  `# Heikin Ashi Trend\n\nConverts to Heikin Ashi candles and counts bullish percentage:\n\n- **Above 70**: Strong HA uptrend (all candles green)\n- **Below 30**: Strong HA downtrend (all candles red)\n- **40-60**: Indecision\n\nHeikin Ashi removes noise that standard candles show.`,
+  "heikin_ashi_trend", "oscillator", 400, { period: 10, color: "#06b6d4" },
+  ["premium", "heikin-ashi", "trend", "smoothed"]);
+
+const PREM_CYCLE = mkIndicator("Cycle Detector", "cycle-detector",
+  "Finds the dominant market cycle period using autocorrelation analysis.",
+  `# Cycle Detector\n\nUses autocorrelation to detect the dominant cycle length (in bars):\n\n- Rising value = Cycle lengthening (market slowing)\n- Falling value = Cycle shortening (market accelerating)\n\nUse the detected period to optimize other indicator settings dynamically.`,
+  "cycle_detector", "oscillator", 600, { maxPeriod: 50, color: "#a855f7" },
+  ["premium", "cycle", "autocorrelation", "period-detection", "quantitative"]);
+
+const PREM_ADAPT_RSI = mkIndicator("Adaptive RSI", "adaptive-rsi",
+  "RSI that automatically adjusts its period based on current market volatility.",
+  `# Adaptive RSI\n\nDynamic RSI that adapts:\n- In volatile markets: Shorter RSI period (faster signals)\n- In calm markets: Longer RSI period (fewer false signals)\n\nThe period adjusts between 5-30 based on the volatility ratio. No more choosing between fast and slow RSI.`,
+  "adaptive_rsi", "oscillator", 500, { period: 14, color: "#ef4444" },
+  ["premium", "adaptive", "rsi", "dynamic", "volatility-adjusted"], { isFeatured: true });
+
+const PREM_MEAN_REV = mkIndicator("Mean Reversion Bands", "mean-reversion-bands",
+  "Z-score based bands showing statistically extreme price deviations from the mean.",
+  `# Mean Reversion Bands\n\nStatistical bands at ±2 standard deviations from the moving average:\n\n- Price at upper band = 2σ above mean (statistically expensive)\n- Price at lower band = 2σ below mean (statistically cheap)\n- Mean reversion probability increases at extremes\n\nQuantitative approach to overbought/oversold.`,
+  "mean_reversion_band", "overlay", 450, { period: 20, color: "#3b82f6" },
+  ["premium", "mean-reversion", "z-score", "statistical", "bands"]);
+
+const PREM_RIBBON = mkIndicator("Trend Ribbon", "trend-ribbon",
+  "8 Fibonacci-period EMAs creating a visual ribbon — green spread = bull, red = bear.",
+  `# Trend Ribbon\n\n8 EMAs at Fibonacci periods (5, 8, 13, 21, 34, 55, 89, 144):\n\n- **Ribbon expanding upward (green)**: Strong bullish trend\n- **Ribbon expanding downward (red)**: Strong bearish trend\n- **Ribbon twisted/crossed**: Trend change in progress\n\nAlso known as Guppy Multiple Moving Average (GMMA). Visual trend strength at a glance.`,
+  "trend_ribbon", "overlay", 500, { color: "#22c55e" },
+  ["premium", "ribbon", "guppy", "multiple-ema", "visual"], { isFeatured: true });
+
+const PREM_REL_VIGOR = mkIndicator("Relative Vigor Index", "relative-vigor-index",
+  "Measures conviction by comparing close-open distance to high-low range.",
+  `# Relative Vigor Index\n\nMeasures the \"vigor\" of price moves:\n- Strong closes near highs = High vigor (conviction)\n- Weak closes near opens = Low vigor (indecision)\n\nUses a 4-bar smoothing kernel for noise reduction. Positive = bullish conviction, negative = bearish.`,
+  "relative_vigor", "oscillator", 350, { period: 10, color: "#14b8a6" },
+  ["premium", "vigor", "conviction", "close-open"]);
+
+const PREM_DYN_PIVOTS = mkIndicator("Dynamic Pivot Zones", "dynamic-pivot-zones",
+  "Auto-calculated support/resistance from fractal swing highs and lows.",
+  `# Dynamic Pivot Zones\n\nFinds fractal swing points (local highs/lows) and projects them forward as dynamic S/R:\n\n- Upper line: Nearest confirmed resistance (swing high)\n- Lower line: Nearest confirmed support (swing low)\n- Middle: Fair value zone\n\nUpdates automatically as new pivots form.`,
+  "dynamic_pivots", "overlay", 500, { lookback: 5, color: "#f97316" },
+  ["premium", "pivots", "support-resistance", "fractal", "dynamic"]);
+
+const PREM_PA_SCORE = mkIndicator("Price Action Score", "price-action-score",
+  "Numeric scoring of bullish/bearish price action — higher highs, body size, direction.",
+  `# Price Action Score\n\nScores each bar on multiple price action criteria:\n- Higher highs / higher lows: ±2\n- Body-to-range ratio: up to ±2\n- Consecutive direction: ±1\n- Three-bar breakout: ±1.5\n\nSmoothed for clean signals. Positive = bullish structure, negative = bearish.`,
+  "price_action_score", "oscillator", 400, { period: 10, color: "#6366f1" },
+  ["premium", "price-action", "scoring", "structure"]);
+
+const PREM_ERGO_VOL = mkIndicator("Ergodic Volume Oscillator", "ergodic-volume-oscillator",
+  "TSI applied to volume-weighted candle bodies — reveals true buying/selling conviction.",
+  `# Ergodic Volume Oscillator\n\nApplies the True Strength Index calculation to (Close-Open)×Volume instead of price.\n\n- Positive = Volume-confirmed buying\n- Negative = Volume-confirmed selling\n- Near zero = No conviction\n\nUnlike regular oscillators, this weights by both direction AND volume.`,
+  "ergodic_volume", "oscillator", 500, { shortPeriod: 5, longPeriod: 20, color: "#ec4899" },
+  ["premium", "ergodic", "volume", "conviction", "tsi"]);
+
+const PREM_AVWAP = mkIndicator("Anchored VWAP Bands", "anchored-vwap-bands",
+  "VWAP with standard deviation bands — institutional price levels with volatility zones.",
+  `# Anchored VWAP Bands\n\nVWAP (Volume Weighted Average Price) with rolling standard deviation bands:\n\n- **VWAP line**: Fair value based on volume\n- **Upper band**: +2σ (statistically expensive)\n- **Lower band**: -2σ (statistically cheap)\n\nInstitutional traders use VWAP as their benchmark. Now you can too.`,
+  "anchored_vwap_bands", "overlay", 550, { deviations: 2, color: "#0ea5e9" },
+  ["premium", "vwap", "bands", "institutional", "statistical"]);
+
+// ============================================================================
 // STRATEGY TEMPLATES
 // ============================================================================
 
@@ -2176,6 +2420,17 @@ const ALL_ITEMS = [
   ADLINE_IND, FORCEIDX_IND, EOM_IND, NVI_IND, PVI_IND,
   ULTOSC_IND, AWEOSC_IND, STOCHRSI_IND, TSI_IND, PPO_IND, FISHER_IND, CRSI_IND, SMI_IND,
   LINREG_IND, ENVELOPE_IND, PRICECH_IND, CHANDELIER_IND,
+  // Premium Marketplace-Only Indicators (40) - NOT available in free chart panel
+  PREM_TREND_PULSE, PREM_MARKET_REGIME, PREM_TREND_COMPOSITE, PREM_BREADTH,
+  PREM_REVERSAL, PREM_PREDICT, PREM_BREAKOUT, PREM_SENTIMENT,
+  PREM_WHALE, PREM_SMART_FLOW, PREM_VOL_CLIMAX, PREM_NET_BUYING,
+  PREM_ORDER_FLOW, PREM_INTRADAY, PREM_VOL_MOM, PREM_LIQUIDITY,
+  PREM_VOL_SQUEEZE, PREM_SQZ_MOM, PREM_VOL_RATIO, PREM_RANGE_EXP,
+  PREM_CHOPPY, PREM_FRACTAL, PREM_ACCEL_BANDS, PREM_ADAPT_CH,
+  PREM_ALPHA_MOM, PREM_EFFICIENCY, PREM_PERSIST, PREM_MTF,
+  PREM_WAVE, PREM_GAP, PREM_HA_TREND, PREM_CYCLE,
+  PREM_ADAPT_RSI, PREM_MEAN_REV, PREM_RIBBON, PREM_REL_VIGOR,
+  PREM_DYN_PIVOTS, PREM_PA_SCORE, PREM_ERGO_VOL, PREM_AVWAP,
   // Strategies
   MA_CROSSOVER_STRATEGY, // MA + RSI strategy
   // Cosmetic Avatars

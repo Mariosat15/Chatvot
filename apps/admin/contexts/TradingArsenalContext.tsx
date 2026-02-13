@@ -22,7 +22,18 @@ export type IndicatorType =
   | "supertrend" | "aroon" | "vortex" | "trix" | "dpo" | "kst" | "coppock" | "elder_ray"
   | "std_dev" | "hist_volatility" | "chaikin_volatility" | "mass_index" | "ulcer_index" | "rvi"
   | "vwap" | "vwma" | "ad_line" | "force_index" | "eom" | "nvi" | "pvi"
-  | "sar" | "pivots" | "support_resistance";
+  | "sar" | "pivots" | "support_resistance"
+  // Premium Marketplace-Only
+  | "trend_pulse" | "market_regime" | "trend_composite" | "composite_breadth"
+  | "reversal_signal" | "predictive_range" | "breakout_prob" | "sentiment_osc"
+  | "whale_accumulation" | "smart_money_flow" | "volume_climax" | "net_buying_pressure"
+  | "order_flow_imbalance" | "intraday_intensity" | "volume_momentum" | "liquidity_heatmap"
+  | "volatility_squeeze" | "squeeze_momentum" | "volatility_ratio" | "range_expansion"
+  | "choppy_market" | "fractal_dimension" | "acceleration_bands" | "adaptive_channel"
+  | "alpha_momentum" | "efficiency_ratio" | "trend_persistence" | "mtf_momentum"
+  | "momentum_wave" | "gap_momentum" | "heikin_ashi_trend" | "cycle_detector"
+  | "adaptive_rsi" | "mean_reversion_band" | "trend_ribbon" | "relative_vigor"
+  | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -363,6 +374,88 @@ const INDICATOR_TYPE_MAP: Record<
   "connors rsi": { type: "connors_rsi", displayType: "oscillator" },
   smi_ergodic: { type: "smi_ergodic", displayType: "oscillator" },
   "smi ergodic": { type: "smi_ergodic", displayType: "oscillator" },
+
+  // Premium Marketplace-Only Indicators
+  trend_pulse: { type: "trend_pulse", displayType: "oscillator" },
+  "trend pulse": { type: "trend_pulse", displayType: "oscillator" },
+  market_regime: { type: "market_regime", displayType: "oscillator" },
+  "market regime": { type: "market_regime", displayType: "oscillator" },
+  trend_composite: { type: "trend_composite", displayType: "oscillator" },
+  "trend composite": { type: "trend_composite", displayType: "oscillator" },
+  composite_breadth: { type: "composite_breadth", displayType: "oscillator" },
+  "composite breadth": { type: "composite_breadth", displayType: "oscillator" },
+  reversal_signal: { type: "reversal_signal", displayType: "oscillator" },
+  "reversal signal": { type: "reversal_signal", displayType: "oscillator" },
+  predictive_range: { type: "predictive_range", displayType: "overlay" },
+  "predictive range": { type: "predictive_range", displayType: "overlay" },
+  breakout_prob: { type: "breakout_prob", displayType: "oscillator" },
+  "breakout probability": { type: "breakout_prob", displayType: "oscillator" },
+  sentiment_osc: { type: "sentiment_osc", displayType: "oscillator" },
+  "sentiment oscillator": { type: "sentiment_osc", displayType: "oscillator" },
+  whale_accumulation: { type: "whale_accumulation", displayType: "oscillator" },
+  "whale accumulation": { type: "whale_accumulation", displayType: "oscillator" },
+  smart_money_flow: { type: "smart_money_flow", displayType: "oscillator" },
+  "smart money flow": { type: "smart_money_flow", displayType: "oscillator" },
+  volume_climax: { type: "volume_climax", displayType: "oscillator" },
+  "volume climax": { type: "volume_climax", displayType: "oscillator" },
+  net_buying_pressure: { type: "net_buying_pressure", displayType: "oscillator" },
+  "net buying pressure": { type: "net_buying_pressure", displayType: "oscillator" },
+  order_flow_imbalance: { type: "order_flow_imbalance", displayType: "oscillator" },
+  "order flow imbalance": { type: "order_flow_imbalance", displayType: "oscillator" },
+  intraday_intensity: { type: "intraday_intensity", displayType: "oscillator" },
+  "intraday intensity": { type: "intraday_intensity", displayType: "oscillator" },
+  volume_momentum: { type: "volume_momentum", displayType: "oscillator" },
+  "volume momentum": { type: "volume_momentum", displayType: "oscillator" },
+  liquidity_heatmap: { type: "liquidity_heatmap", displayType: "oscillator" },
+  "liquidity heatmap": { type: "liquidity_heatmap", displayType: "oscillator" },
+  volatility_squeeze: { type: "volatility_squeeze", displayType: "oscillator" },
+  "volatility squeeze": { type: "volatility_squeeze", displayType: "oscillator" },
+  squeeze_momentum: { type: "squeeze_momentum", displayType: "oscillator" },
+  "squeeze momentum": { type: "squeeze_momentum", displayType: "oscillator" },
+  volatility_ratio: { type: "volatility_ratio", displayType: "oscillator" },
+  "volatility ratio": { type: "volatility_ratio", displayType: "oscillator" },
+  range_expansion: { type: "range_expansion", displayType: "oscillator" },
+  "range expansion": { type: "range_expansion", displayType: "oscillator" },
+  choppy_market: { type: "choppy_market", displayType: "oscillator" },
+  "choppy market": { type: "choppy_market", displayType: "oscillator" },
+  fractal_dimension: { type: "fractal_dimension", displayType: "oscillator" },
+  "fractal dimension": { type: "fractal_dimension", displayType: "oscillator" },
+  acceleration_bands: { type: "acceleration_bands", displayType: "overlay" },
+  "acceleration bands": { type: "acceleration_bands", displayType: "overlay" },
+  adaptive_channel: { type: "adaptive_channel", displayType: "overlay" },
+  "adaptive channel": { type: "adaptive_channel", displayType: "overlay" },
+  alpha_momentum: { type: "alpha_momentum", displayType: "oscillator" },
+  "alpha momentum": { type: "alpha_momentum", displayType: "oscillator" },
+  efficiency_ratio: { type: "efficiency_ratio", displayType: "oscillator" },
+  "efficiency ratio": { type: "efficiency_ratio", displayType: "oscillator" },
+  trend_persistence: { type: "trend_persistence", displayType: "oscillator" },
+  "trend persistence": { type: "trend_persistence", displayType: "oscillator" },
+  mtf_momentum: { type: "mtf_momentum", displayType: "oscillator" },
+  "multi-timeframe momentum": { type: "mtf_momentum", displayType: "oscillator" },
+  momentum_wave: { type: "momentum_wave", displayType: "oscillator" },
+  "momentum wave": { type: "momentum_wave", displayType: "oscillator" },
+  gap_momentum: { type: "gap_momentum", displayType: "oscillator" },
+  "gap momentum": { type: "gap_momentum", displayType: "oscillator" },
+  heikin_ashi_trend: { type: "heikin_ashi_trend", displayType: "oscillator" },
+  "heikin ashi trend": { type: "heikin_ashi_trend", displayType: "oscillator" },
+  cycle_detector: { type: "cycle_detector", displayType: "oscillator" },
+  "cycle detector": { type: "cycle_detector", displayType: "oscillator" },
+  adaptive_rsi: { type: "adaptive_rsi", displayType: "oscillator" },
+  "adaptive rsi": { type: "adaptive_rsi", displayType: "oscillator" },
+  mean_reversion_band: { type: "mean_reversion_band", displayType: "overlay" },
+  "mean reversion band": { type: "mean_reversion_band", displayType: "overlay" },
+  trend_ribbon: { type: "trend_ribbon", displayType: "overlay" },
+  "trend ribbon": { type: "trend_ribbon", displayType: "overlay" },
+  relative_vigor: { type: "relative_vigor", displayType: "oscillator" },
+  "relative vigor": { type: "relative_vigor", displayType: "oscillator" },
+  dynamic_pivots: { type: "dynamic_pivots", displayType: "overlay" },
+  "dynamic pivots": { type: "dynamic_pivots", displayType: "overlay" },
+  price_action_score: { type: "price_action_score", displayType: "oscillator" },
+  "price action score": { type: "price_action_score", displayType: "oscillator" },
+  ergodic_volume: { type: "ergodic_volume", displayType: "oscillator" },
+  "ergodic volume": { type: "ergodic_volume", displayType: "oscillator" },
+  anchored_vwap_bands: { type: "anchored_vwap_bands", displayType: "overlay" },
+  "anchored vwap bands": { type: "anchored_vwap_bands", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -538,6 +631,40 @@ export function marketplaceItemToIndicator(
     case "chaikin_volatility":
       params.emaPeriod = settings?.emaPeriod || 10;
       params.rocPeriod = settings?.rocPeriod || 10;
+      break;
+    // Premium indicators with special params
+    case "trend_pulse":
+      params.adxPeriod = settings?.adxPeriod || 14;
+      params.rsiPeriod = settings?.rsiPeriod || 14;
+      break;
+    case "breakout_prob":
+      params.bbPeriod = settings?.bbPeriod || 20;
+      params.keltPeriod = settings?.keltPeriod || 20;
+      break;
+    case "volatility_ratio":
+      params.shortPeriod = settings?.shortPeriod || 5;
+      params.longPeriod = settings?.longPeriod || 20;
+      break;
+    case "ergodic_volume":
+      params.shortPeriod = settings?.shortPeriod || 5;
+      params.longPeriod = settings?.longPeriod || 20;
+      break;
+    case "dynamic_pivots":
+      params.lookback = settings?.lookback || 5;
+      break;
+    case "anchored_vwap_bands":
+      params.deviations = settings?.deviations || 2;
+      break;
+    case "whale_accumulation":
+      params.threshold = settings?.threshold || 1.5;
+      break;
+    case "composite_breadth":
+    case "mtf_momentum":
+    case "awesome_osc":
+      // No params needed
+      break;
+    case "trend_ribbon":
+      // No params - uses fixed Fibonacci EMAs
       break;
     default:
       // Generic period-based indicators
