@@ -79,11 +79,17 @@ export async function POST(request: NextRequest) {
       path.join(repoRoot, "public", "assets", "marketplace"),
     ];
 
-    // Also check for avatar images
+    // Also check for avatar images (could be anywhere on the server)
     const avatarDirs = [
       path.join(repoRoot, "public", "assets", "avatars"),
-      path.join(repoRoot, "apps", "admin", "public", "assets", "avatars"),
       path.join(repoRoot, "public", "avatars"),
+      path.join(repoRoot, "apps", "admin", "public", "assets", "avatars"),
+      path.join(repoRoot, "apps", "admin", "public", "avatars"),
+      // Web app might serve avatars from its own public
+      path.join(repoRoot, "apps", "web", "public", "assets", "avatars"),
+      // Production paths
+      path.join("/var/www/chartvolt", "public", "assets", "avatars"),
+      path.join("/var/www/chartvolt", "public", "avatars"),
     ];
 
     // ---- Helper: find an image file on disk ----

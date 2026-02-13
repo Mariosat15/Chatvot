@@ -261,7 +261,6 @@ const emptyItem: Partial<MarketplaceItem> = {
     challengeReferralFeePercentage: undefined,
   },
   cosmeticType: "avatar",
-  imageUrl: "",
   supportedAssets: [],
   tags: [],
   riskLevel: "medium",
