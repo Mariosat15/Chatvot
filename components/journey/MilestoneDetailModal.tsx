@@ -168,23 +168,24 @@ export default function MilestoneDetailModal({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
+          {/* Scrollable Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 overflow-y-auto overscroll-contain"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-          />
-
+          >
+          <div className="min-h-full flex items-start justify-center py-8 px-4">
           {/* Pokemon-style Card */}
           <motion.div
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[360px] mx-4"
+            className="w-full max-w-[360px]"
             initial={{ opacity: 0, scale: 0.7, rotateY: -20 }}
             animate={{ opacity: 1, scale: 1, rotateY: 0 }}
             exit={{ opacity: 0, scale: 0.7, rotateY: 20 }}
             transition={{ type: "spring", damping: 18, stiffness: 250 }}
             style={{ perspective: "1000px" }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               className={`relative border-[6px] ${config.border} rounded-[18px] overflow-hidden shadow-2xl`}
@@ -450,6 +451,8 @@ export default function MilestoneDetailModal({
                 <span className="text-[8px] text-gray-500 font-mono">#{milestone.order || "?"}</span>
               </div>
             </div>
+          </motion.div>
+          </div>
           </motion.div>
         </>
       )}

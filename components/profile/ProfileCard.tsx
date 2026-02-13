@@ -128,22 +128,22 @@ export default function ProfileCard({
     <AnimatePresence>
       {show && (
         <>
-          {/* Backdrop */}
+          {/* Scrollable Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md overflow-y-auto overscroll-contain"
             onClick={onClose}
-          />
-
+          >
+          <div className="min-h-full flex items-start justify-center py-8 px-4">
           {/* Pokemon-style Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.7, rotateY: -20 }}
             animate={{ opacity: 1, scale: 1, rotateY: 0 }}
             exit={{ opacity: 0, scale: 0.7, rotateY: 20 }}
             transition={{ type: "spring", damping: 18, stiffness: 250 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-full max-w-[380px] mx-4"
+            className="w-full max-w-[380px]"
             style={{ perspective: "1000px" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -340,6 +340,8 @@ export default function ProfileCard({
                 <span className="text-[8px] text-gray-500 font-mono">{userId.slice(-8)}</span>
               </div>
             </div>
+          </motion.div>
+          </div>
           </motion.div>
         </>
       )}

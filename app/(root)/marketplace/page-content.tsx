@@ -1635,14 +1635,33 @@ function ItemDetailModal({
       : "text-emerald-400";
 
   const hasImage = !!item.imageUrl;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollHint, setShowScrollHint] = useState(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.scrollTop > 30) setShowScrollHint(false);
+      else setShowScrollHint(true);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // Check if content is scrollable at all
+    const timer = setTimeout(() => {
+      if (el.scrollHeight <= el.clientHeight + 20) setShowScrollHint(false);
+    }, 300);
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      ref={scrollRef}
+      className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 overflow-y-auto overscroll-contain"
       onClick={onClose}
     >
+      <div className="min-h-full flex items-start justify-center py-8 px-4">
       <div
-        className={`relative border-[6px] ${borderColor} rounded-[18px] overflow-hidden shadow-2xl w-full max-w-[400px] max-h-[90vh] flex flex-col`}
+        className={`relative border-[6px] ${borderColor} rounded-[18px] overflow-hidden shadow-2xl w-full max-w-[400px]`}
         style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1667,7 +1686,7 @@ function ItemDetailModal({
         </button>
 
         {/* === TOP BAR: Category + Name + Price === */}
-        <div className="px-4 pt-3 pb-1 flex-shrink-0">
+        <div className="px-4 pt-3 pb-1">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1.5">
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tagBg}`}>
@@ -1699,7 +1718,7 @@ function ItemDetailModal({
         </div>
 
         {/* === ART FRAME (Image or Icon) === */}
-        <div className="mx-3 mb-2 flex-shrink-0">
+        <div className="mx-3 mb-2">
           <div className={`relative rounded-lg border-2 ${borderColor} overflow-hidden bg-gradient-to-br ${headerBg}`}>
             <div className="absolute inset-0 opacity-15 pointer-events-none">
               <div className="absolute inset-0" style={{
@@ -1723,12 +1742,12 @@ function ItemDetailModal({
         </div>
 
         {/* === FLAVOR TEXT (Short Description) === */}
-        <div className="mx-4 mb-2 flex-shrink-0">
+        <div className="mx-4 mb-2">
           <p className="text-[11px] text-gray-400 italic text-center leading-snug line-clamp-2">{item.shortDescription}</p>
         </div>
 
-        {/* === SCROLLABLE CONTENT === */}
-        <div className="mx-3 mb-2 overflow-y-auto flex-1 min-h-0 space-y-2 pr-1">
+        {/* === CONTENT === */}
+        <div className="mx-3 mb-2 space-y-2">
           {/* Risk + Version badge row */}
           {!isGameMaster && (
             <div className="flex items-center gap-2 justify-center">
@@ -1880,7 +1899,7 @@ function ItemDetailModal({
         </div>
 
         {/* === ACTION BUTTON === */}
-        <div className="mx-3 mb-3 flex-shrink-0">
+        <div className="mx-3 mb-3">
           <button
             onClick={onPurchase}
             disabled={purchasing || item.owned}
@@ -1914,11 +1933,21 @@ function ItemDetailModal({
         </div>
 
         {/* Card ID */}
-        <div className="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 pb-3 flex items-center justify-between">
           <span className="text-[8px] text-gray-500">Chartvolt Marketplace</span>
           <span className="text-[8px] text-gray-500 font-mono">{item.slug}</span>
         </div>
       </div>
+      </div>
+
+      {/* Scroll down hint arrow */}
+      {showScrollHint && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-bounce">
+          <div className="bg-white/10 backdrop-blur-sm rounded-full p-2">
+            <ChevronDown className="h-5 w-5 text-white/60" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
