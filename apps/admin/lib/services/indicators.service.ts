@@ -31,6 +31,22 @@ export interface BollingerBandsData {
   lower: number;
 }
 
+export interface IchimokuData {
+  time: number;
+  tenkan: number;
+  kijun: number;
+  senkouA: number;
+  senkouB: number;
+  chikou: number;
+}
+
+export interface DonchianData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
 /**
  * Simple Moving Average (SMA)
  */
@@ -605,6 +621,337 @@ export function calculateMFI(
     result.push({
       time: data[i].time,
       value: mfi,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// NEW INDICATORS
+// ============================================================================
+
+/**
+ * Weighted Moving Average (WMA)
+ * Gives more weight to recent prices linearly
+ */
+export function calculateWMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let j = 0; j < period; j++) {
+      const weight = period - j;
+      weightedSum += data[i - j].close * weight;
+      weightTotal += weight;
+    }
+    result.push({ time: data[i].time, value: weightedSum / weightTotal });
+  }
+
+  return result;
+}
+
+/**
+ * Keltner Channels (EMA center + ATR bands)
+ */
+export function calculateKeltnerChannels(
+  data: OHLCData[],
+  period: number = 20,
+  multiplier: number = 2,
+): BollingerBandsData[] {
+  const ema = calculateEMA(data, period);
+  const atr = calculateATR(data, period);
+  const result: BollingerBandsData[] = [];
+
+  // Align EMA and ATR by time
+  const atrMap = new Map(atr.map((d) => [d.time, d.value]));
+
+  for (const e of ema) {
+    const atrVal = atrMap.get(e.time);
+    if (atrVal !== undefined) {
+      result.push({
+        time: e.time,
+        upper: e.value + multiplier * atrVal,
+        middle: e.value,
+        lower: e.value - multiplier * atrVal,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Double Exponential Moving Average (DEMA)
+ * DEMA = 2 * EMA(n) - EMA(EMA(n))
+ */
+export function calculateDEMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const ema1 = calculateEMA(data, period);
+  // Convert ema1 to OHLCData format for second pass
+  const ema1AsOhlc: OHLCData[] = ema1.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema2 = calculateEMA(ema1AsOhlc, period);
+
+  const ema2Map = new Map(ema2.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const e1 of ema1) {
+    const e2 = ema2Map.get(e1.time);
+    if (e2 !== undefined) {
+      result.push({ time: e1.time, value: 2 * e1.value - e2 });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Triple Exponential Moving Average (TEMA)
+ * TEMA = 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))
+ */
+export function calculateTEMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const ema1 = calculateEMA(data, period);
+  const ema1AsOhlc: OHLCData[] = ema1.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema2 = calculateEMA(ema1AsOhlc, period);
+  const ema2AsOhlc: OHLCData[] = ema2.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema3 = calculateEMA(ema2AsOhlc, period);
+
+  const ema2Map = new Map(ema2.map((d) => [d.time, d.value]));
+  const ema3Map = new Map(ema3.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const e1 of ema1) {
+    const e2 = ema2Map.get(e1.time);
+    const e3 = ema3Map.get(e1.time);
+    if (e2 !== undefined && e3 !== undefined) {
+      result.push({
+        time: e1.time,
+        value: 3 * e1.value - 3 * e2 + e3,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Hull Moving Average (HMA)
+ * HMA = WMA(2*WMA(n/2) - WMA(n), sqrt(n))
+ */
+export function calculateHMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const halfPeriod = Math.max(2, Math.round(period / 2));
+  const sqrtPeriod = Math.max(2, Math.round(Math.sqrt(period)));
+
+  const wmaHalf = calculateWMA(data, halfPeriod);
+  const wmaFull = calculateWMA(data, period);
+
+  // Create the difference series: 2 * WMA(n/2) - WMA(n)
+  const fullMap = new Map(wmaFull.map((d) => [d.time, d.value]));
+  const diffOhlc: OHLCData[] = [];
+
+  for (const h of wmaHalf) {
+    const f = fullMap.get(h.time);
+    if (f !== undefined) {
+      const val = 2 * h.value - f;
+      diffOhlc.push({
+        time: h.time,
+        open: val,
+        high: val,
+        low: val,
+        close: val,
+      });
+    }
+  }
+
+  return calculateWMA(diffOhlc, sqrtPeriod);
+}
+
+/**
+ * Ichimoku Cloud
+ */
+export function calculateIchimoku(
+  data: OHLCData[],
+  tenkanPeriod: number = 9,
+  kijunPeriod: number = 26,
+  senkouBPeriod: number = 52,
+): IchimokuData[] {
+  const result: IchimokuData[] = [];
+
+  function periodHighLow(end: number, period: number) {
+    let high = -Infinity;
+    let low = Infinity;
+    for (let i = Math.max(0, end - period + 1); i <= end; i++) {
+      if (data[i].high > high) high = data[i].high;
+      if (data[i].low < low) low = data[i].low;
+    }
+    return { high, low };
+  }
+
+  for (let i = senkouBPeriod - 1; i < data.length; i++) {
+    const tenkanHL = periodHighLow(i, tenkanPeriod);
+    const kijunHL = periodHighLow(i, kijunPeriod);
+    const senkouBHL = periodHighLow(i, senkouBPeriod);
+
+    const tenkan = (tenkanHL.high + tenkanHL.low) / 2;
+    const kijun = (kijunHL.high + kijunHL.low) / 2;
+    const senkouA = (tenkan + kijun) / 2;
+    const senkouB = (senkouBHL.high + senkouBHL.low) / 2;
+    const chikou = data[i].close;
+
+    result.push({
+      time: data[i].time,
+      tenkan,
+      kijun,
+      senkouA,
+      senkouB,
+      chikou,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Donchian Channel
+ */
+export function calculateDonchianChannel(
+  data: OHLCData[],
+  period: number = 20,
+): DonchianData[] {
+  const result: DonchianData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let high = -Infinity;
+    let low = Infinity;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].high > high) high = data[i - j].high;
+      if (data[i - j].low < low) low = data[i - j].low;
+    }
+    result.push({
+      time: data[i].time,
+      upper: high,
+      middle: (high + low) / 2,
+      lower: low,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * On Balance Volume (OBV)
+ */
+export function calculateOBV(data: OHLCData[]): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let obv = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) {
+      obv = data[i].volume || 0;
+    } else if (data[i].close > data[i - 1].close) {
+      obv += data[i].volume || 0;
+    } else if (data[i].close < data[i - 1].close) {
+      obv -= data[i].volume || 0;
+    }
+    result.push({ time: data[i].time, value: obv });
+  }
+
+  return result;
+}
+
+/**
+ * Rate of Change (ROC)
+ */
+export function calculateROC(
+  data: OHLCData[],
+  period: number = 12,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    const roc =
+      ((data[i].close - data[i - period].close) / data[i - period].close) *
+      100;
+    result.push({ time: data[i].time, value: roc });
+  }
+
+  return result;
+}
+
+/**
+ * Chaikin Money Flow (CMF)
+ */
+export function calculateCMF(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let mfvSum = 0;
+    let volSum = 0;
+
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j];
+      const range = d.high - d.low;
+      const mfMultiplier =
+        range === 0 ? 0 : (d.close - d.low - (d.high - d.close)) / range;
+      mfvSum += mfMultiplier * (d.volume || 1);
+      volSum += d.volume || 1;
+    }
+
+    result.push({
+      time: data[i].time,
+      value: volSum === 0 ? 0 : mfvSum / volSum,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Momentum Oscillator
+ */
+export function calculateMomentum(
+  data: OHLCData[],
+  period: number = 10,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    result.push({
+      time: data[i].time,
+      value: data[i].close - data[i - period].close,
     });
   }
 

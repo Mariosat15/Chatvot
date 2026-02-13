@@ -91,6 +91,27 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 20 },
     paramLabels: { period: "Period" },
   },
+  dema: {
+    name: "Double Exponential Moving Average",
+    shortName: "DEMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  tema: {
+    name: "Triple Exponential Moving Average",
+    shortName: "TEMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  hma: {
+    name: "Hull Moving Average",
+    shortName: "HMA",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
 
   // Bands
   bb: {
@@ -106,6 +127,24 @@ export const INDICATOR_TEMPLATES = {
     displayType: "overlay" as const,
     defaultParams: { period: 20, multiplier: 2 },
     paramLabels: { period: "Period", multiplier: "Multiplier" },
+  },
+  donchian: {
+    name: "Donchian Channel",
+    shortName: "DC",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  ichimoku: {
+    name: "Ichimoku Cloud",
+    shortName: "Ichimoku",
+    displayType: "overlay" as const,
+    defaultParams: { tenkanPeriod: 9, kijunPeriod: 26, senkouBPeriod: 52 },
+    paramLabels: {
+      tenkanPeriod: "Tenkan",
+      kijunPeriod: "Kijun",
+      senkouBPeriod: "Senkou B",
+    },
   },
 
   // Oscillators
@@ -172,6 +211,34 @@ export const INDICATOR_TEMPLATES = {
     shortName: "ATR",
     displayType: "oscillator" as const,
     defaultParams: { period: 14 },
+    paramLabels: { period: "Period" },
+  },
+  obv: {
+    name: "On Balance Volume",
+    shortName: "OBV",
+    displayType: "oscillator" as const,
+    defaultParams: {},
+    paramLabels: {},
+  },
+  roc: {
+    name: "Rate of Change",
+    shortName: "ROC",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 12 },
+    paramLabels: { period: "Period" },
+  },
+  cmf: {
+    name: "Chaikin Money Flow",
+    shortName: "CMF",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 20 },
+    paramLabels: { period: "Period" },
+  },
+  momentum: {
+    name: "Momentum",
+    shortName: "MOM",
+    displayType: "oscillator" as const,
+    defaultParams: { period: 10 },
     paramLabels: { period: "Period" },
   },
   sar: {

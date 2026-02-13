@@ -203,28 +203,36 @@ const RISK_LEVELS = ["low", "medium", "high"];
 
 // Indicator types that have chart implementations
 const INDICATOR_TYPES = [
-  {
-    value: "sma",
-    label: "Simple Moving Average (SMA)",
-    displayType: "overlay",
-  },
-  {
-    value: "ema",
-    label: "Exponential Moving Average (EMA)",
-    displayType: "overlay",
-  },
+  // Moving Averages (Overlays)
+  { value: "sma", label: "Simple Moving Average (SMA)", displayType: "overlay" },
+  { value: "ema", label: "Exponential Moving Average (EMA)", displayType: "overlay" },
+  { value: "wma", label: "Weighted Moving Average (WMA)", displayType: "overlay" },
+  { value: "dema", label: "Double Exponential MA (DEMA)", displayType: "overlay" },
+  { value: "tema", label: "Triple Exponential MA (TEMA)", displayType: "overlay" },
+  { value: "hma", label: "Hull Moving Average (HMA)", displayType: "overlay" },
+  // Bands / Channels (Overlays)
   { value: "bb", label: "Bollinger Bands", displayType: "overlay" },
-  {
-    value: "support_resistance",
-    label: "Support & Resistance",
-    displayType: "overlay",
-  },
-  {
-    value: "rsi",
-    label: "RSI (Relative Strength Index)",
-    displayType: "oscillator",
-  },
+  { value: "keltner", label: "Keltner Channels", displayType: "overlay" },
+  { value: "donchian", label: "Donchian Channel", displayType: "overlay" },
+  { value: "ichimoku", label: "Ichimoku Cloud", displayType: "overlay" },
+  // Other Overlays
+  { value: "support_resistance", label: "Support & Resistance", displayType: "overlay" },
+  { value: "vwap", label: "VWAP", displayType: "overlay" },
+  { value: "sar", label: "Parabolic SAR", displayType: "overlay" },
+  { value: "pivots", label: "Pivot Points", displayType: "overlay" },
+  // Oscillators
+  { value: "rsi", label: "RSI (Relative Strength Index)", displayType: "oscillator" },
   { value: "macd", label: "MACD", displayType: "oscillator" },
+  { value: "stoch", label: "Stochastic Oscillator", displayType: "oscillator" },
+  { value: "williamsR", label: "Williams %R", displayType: "oscillator" },
+  { value: "cci", label: "Commodity Channel Index (CCI)", displayType: "oscillator" },
+  { value: "adx", label: "Average Directional Index (ADX)", displayType: "oscillator" },
+  { value: "mfi", label: "Money Flow Index (MFI)", displayType: "oscillator" },
+  { value: "atr", label: "Average True Range (ATR)", displayType: "oscillator" },
+  { value: "obv", label: "On Balance Volume (OBV)", displayType: "oscillator" },
+  { value: "roc", label: "Rate of Change (ROC)", displayType: "oscillator" },
+  { value: "cmf", label: "Chaikin Money Flow (CMF)", displayType: "oscillator" },
+  { value: "momentum", label: "Momentum Oscillator", displayType: "oscillator" },
 ];
 
 const emptyItem: Partial<MarketplaceItem> = {

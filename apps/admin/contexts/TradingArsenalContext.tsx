@@ -13,9 +13,29 @@ import { IStrategyConfig } from "@/database/models/marketplace/marketplace-item.
 export type IndicatorType =
   | "sma"
   | "ema"
+  | "wma"
+  | "dema"
+  | "tema"
+  | "hma"
+  | "bb"
+  | "keltner"
+  | "donchian"
+  | "ichimoku"
   | "rsi"
   | "macd"
-  | "bb"
+  | "stoch"
+  | "williamsR"
+  | "cci"
+  | "adx"
+  | "mfi"
+  | "atr"
+  | "vwap"
+  | "sar"
+  | "pivots"
+  | "obv"
+  | "roc"
+  | "cmf"
+  | "momentum"
   | "support_resistance";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
@@ -208,15 +228,57 @@ const INDICATOR_TYPE_MAP: Record<
   sma: { type: "sma", displayType: "overlay" },
   "exponential moving average": { type: "ema", displayType: "overlay" },
   ema: { type: "ema", displayType: "overlay" },
+  "weighted moving average": { type: "wma", displayType: "overlay" },
+  wma: { type: "wma", displayType: "overlay" },
+  "double exponential": { type: "dema", displayType: "overlay" },
+  dema: { type: "dema", displayType: "overlay" },
+  "triple exponential": { type: "tema", displayType: "overlay" },
+  tema: { type: "tema", displayType: "overlay" },
+  "hull moving average": { type: "hma", displayType: "overlay" },
+  hma: { type: "hma", displayType: "overlay" },
 
   // Momentum Oscillators
   rsi: { type: "rsi", displayType: "oscillator" },
   "relative strength": { type: "rsi", displayType: "oscillator" },
   macd: { type: "macd", displayType: "oscillator" },
+  stochastic: { type: "stoch", displayType: "oscillator" },
+  stoch: { type: "stoch", displayType: "oscillator" },
+  "williams %r": { type: "williamsR", displayType: "oscillator" },
+  "williams r": { type: "williamsR", displayType: "oscillator" },
+  williamsR: { type: "williamsR", displayType: "oscillator" },
+  "commodity channel": { type: "cci", displayType: "oscillator" },
+  cci: { type: "cci", displayType: "oscillator" },
+  "average directional": { type: "adx", displayType: "oscillator" },
+  adx: { type: "adx", displayType: "oscillator" },
+  "money flow index": { type: "mfi", displayType: "oscillator" },
+  mfi: { type: "mfi", displayType: "oscillator" },
+  "on balance volume": { type: "obv", displayType: "oscillator" },
+  obv: { type: "obv", displayType: "oscillator" },
+  "rate of change": { type: "roc", displayType: "oscillator" },
+  roc: { type: "roc", displayType: "oscillator" },
+  "chaikin money flow": { type: "cmf", displayType: "oscillator" },
+  cmf: { type: "cmf", displayType: "oscillator" },
+  momentum: { type: "momentum", displayType: "oscillator" },
 
-  // Volatility
+  // Volatility / Bands
   bollinger: { type: "bb", displayType: "overlay" },
   bb: { type: "bb", displayType: "overlay" },
+  keltner: { type: "keltner", displayType: "overlay" },
+  "keltner channel": { type: "keltner", displayType: "overlay" },
+  donchian: { type: "donchian", displayType: "overlay" },
+  "donchian channel": { type: "donchian", displayType: "overlay" },
+  ichimoku: { type: "ichimoku", displayType: "overlay" },
+  "ichimoku cloud": { type: "ichimoku", displayType: "overlay" },
+
+  // Other Overlays
+  "average true range": { type: "atr", displayType: "oscillator" },
+  atr: { type: "atr", displayType: "oscillator" },
+  vwap: { type: "vwap", displayType: "overlay" },
+  "volume weighted": { type: "vwap", displayType: "overlay" },
+  "parabolic sar": { type: "sar", displayType: "overlay" },
+  sar: { type: "sar", displayType: "overlay" },
+  "pivot points": { type: "pivots", displayType: "overlay" },
+  pivots: { type: "pivots", displayType: "overlay" },
 
   // Support/Resistance
   support: { type: "support_resistance", displayType: "overlay" },
@@ -243,31 +305,37 @@ export function marketplaceItemToIndicator(
   const slug = item.name.toLowerCase();
   const settings = { ...item.defaultSettings, ...customSettings };
 
-  // Find matching indicator type
+  // Find matching indicator type - prefer explicit indicatorType field
   let indicatorConfig: {
     type: IndicatorType;
     displayType: "overlay" | "oscillator";
   } | null = null;
 
-  for (const [key, config] of Object.entries(INDICATOR_TYPE_MAP)) {
-    if (slug.includes(key)) {
-      indicatorConfig = config;
-      break;
+  // 1. Try using the explicit indicatorType field first
+  if (item.indicatorType && INDICATOR_TYPE_MAP[item.indicatorType]) {
+    indicatorConfig = INDICATOR_TYPE_MAP[item.indicatorType];
+  }
+
+  // 2. Fallback to name-based matching
+  if (!indicatorConfig) {
+    for (const [key, config] of Object.entries(INDICATOR_TYPE_MAP)) {
+      if (slug.includes(key)) {
+        indicatorConfig = config;
+        break;
+      }
     }
   }
 
   // Default to SMA if no match
   if (!indicatorConfig) {
     console.warn(
-      `⚠️ Unknown indicator type for "${item.name}", defaulting to SMA`,
+      `⚠️ Unknown indicator type for "${item.name}" (indicatorType: ${item.indicatorType}), defaulting to SMA`,
     );
     indicatorConfig = { type: "sma", displayType: "overlay" };
   }
 
   // Build parameters with defaults
-  const params: Record<string, number> = {
-    period: settings?.period || 20,
-  };
+  const params: Record<string, number> = {};
 
   // Add type-specific parameters
   switch (indicatorConfig.type) {
@@ -285,12 +353,46 @@ export function marketplaceItemToIndicator(
       params.slow = settings?.slowPeriod || 26;
       params.signal = settings?.signalPeriod || 9;
       break;
+    case "stoch":
+      params.kPeriod = settings?.kPeriod || 14;
+      params.dPeriod = settings?.dPeriod || 3;
+      break;
+    case "keltner":
+      params.period = settings?.period || 20;
+      params.multiplier = settings?.multiplier || 2;
+      break;
+    case "donchian":
+      params.period = settings?.period || 20;
+      break;
+    case "ichimoku":
+      params.tenkanPeriod = settings?.tenkanPeriod || 9;
+      params.kijunPeriod = settings?.kijunPeriod || 26;
+      params.senkouBPeriod = settings?.senkouBPeriod || 52;
+      break;
+    case "sar":
+      params.acceleration = settings?.acceleration || 0.02;
+      params.maximum = settings?.maximum || 0.2;
+      break;
+    case "roc":
+      params.period = settings?.period || 12;
+      break;
+    case "momentum":
+      params.period = settings?.period || 10;
+      break;
+    case "cmf":
+      params.period = settings?.period || 20;
+      break;
     case "support_resistance":
       params.period = settings?.period || 20;
       params.strength = settings?.strength || 2;
       break;
-    case "sma":
-    case "ema":
+    case "vwap":
+    case "obv":
+    case "pivots":
+      // No params needed
+      break;
+    default:
+      // Generic period-based indicators (SMA, EMA, WMA, DEMA, TEMA, HMA, CCI, ADX, MFI, ATR, etc.)
       params.period = settings?.period || 20;
       break;
   }

@@ -13,9 +13,29 @@ export type ItemStatus = "active" | "inactive" | "coming_soon" | "deprecated";
 export type IndicatorType =
   | "sma"
   | "ema"
+  | "wma"
+  | "dema"
+  | "tema"
+  | "hma"
   | "bb"
+  | "keltner"
+  | "donchian"
+  | "ichimoku"
   | "rsi"
   | "macd"
+  | "stoch"
+  | "williamsR"
+  | "cci"
+  | "adx"
+  | "mfi"
+  | "atr"
+  | "vwap"
+  | "sar"
+  | "pivots"
+  | "obv"
+  | "roc"
+  | "cmf"
+  | "momentum"
   | "support_resistance";
 
 // Strategy Condition Operators
@@ -271,7 +291,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     },
     indicatorType: {
       type: String,
-      enum: ["sma", "ema", "bb", "rsi", "macd", "support_resistance"],
+      enum: ["sma", "ema", "wma", "dema", "tema", "hma", "bb", "keltner", "donchian", "ichimoku", "rsi", "macd", "stoch", "williamsR", "cci", "adx", "mfi", "atr", "vwap", "sar", "pivots", "obv", "roc", "cmf", "momentum", "support_resistance"],
     },
     strategyConfig: StrategyConfigSchema,
     gameMasterConfig: {

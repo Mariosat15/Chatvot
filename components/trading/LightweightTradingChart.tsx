@@ -66,16 +66,29 @@ import { useTradingArsenal } from "@/contexts/TradingArsenalContext";
 import {
   calculateSMA,
   calculateEMA,
+  calculateWMA,
+  calculateDEMA,
+  calculateTEMA,
+  calculateHMA,
   calculateRSI,
   calculateMACD,
   calculateBollingerBands,
+  calculateKeltnerChannels,
+  calculateDonchianChannel,
+  calculateIchimoku,
   calculateStochastic,
   calculateWilliamsR,
   calculateCCI,
   calculateADX,
   calculateMFI,
+  calculateATR,
+  calculateVWAP,
   calculateParabolicSAR,
   calculatePivotPoints,
+  calculateOBV,
+  calculateROC,
+  calculateCMF,
+  calculateMomentum,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -989,7 +1002,7 @@ const LightweightTradingChart = ({
             );
           }
         } else if (indicator.type === "wma") {
-          const wmaData = calculateSMA(
+          const wmaData = calculateWMA(
             transformedCandles,
             indicator.parameters.period,
           );
@@ -1015,8 +1028,8 @@ const LightweightTradingChart = ({
           );
           indicatorSeriesRef.current.set(indicator.id, lineSeries);
         } else if (indicator.type === "keltner") {
-          // Keltner Channels - similar to Bollinger Bands
-          const bbData = calculateBollingerBands(
+          // Keltner Channels - EMA center + ATR bands
+          const bbData = calculateKeltnerChannels(
             transformedCandles,
             indicator.parameters.period || 20,
             indicator.parameters.multiplier || 2,
@@ -1176,10 +1189,7 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_${level}`, series);
           });
         } else if (indicator.type === "vwap") {
-          const vwapData = calculateEMA(
-            transformedCandles,
-            indicator.parameters.period || 20,
-          );
+          const vwapData = calculateVWAP(transformedCandles);
           const offsetData = applyOffset(vwapData, indicator.offset || 0);
 
           const lineSeries = chart.addLineSeries({
@@ -1305,6 +1315,287 @@ const LightweightTradingChart = ({
           });
 
           log(`📊 S/R Indicator: Found ${levelIndex} levels`);
+        } else if (indicator.type === "dema") {
+          const demaData = calculateDEMA(
+            transformedCandles,
+            indicator.parameters.period || 20,
+          );
+          const offsetData = applyOffset(demaData, indicator.offset || 0);
+
+          const lineSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            lineStyle: indicator.lineStyle as any,
+            title: indicator.customLabel || indicator.name,
+            priceScaleId: "right",
+            priceFormat: {
+              type: "price",
+              precision: indicator.precision || 5,
+            },
+          });
+
+          lineSeries.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+          indicatorSeriesRef.current.set(indicator.id, lineSeries);
+        } else if (indicator.type === "tema") {
+          const temaData = calculateTEMA(
+            transformedCandles,
+            indicator.parameters.period || 20,
+          );
+          const offsetData = applyOffset(temaData, indicator.offset || 0);
+
+          const lineSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            lineStyle: indicator.lineStyle as any,
+            title: indicator.customLabel || indicator.name,
+            priceScaleId: "right",
+            priceFormat: {
+              type: "price",
+              precision: indicator.precision || 5,
+            },
+          });
+
+          lineSeries.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+          indicatorSeriesRef.current.set(indicator.id, lineSeries);
+        } else if (indicator.type === "hma") {
+          const hmaData = calculateHMA(
+            transformedCandles,
+            indicator.parameters.period || 20,
+          );
+          const offsetData = applyOffset(hmaData, indicator.offset || 0);
+
+          const lineSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            lineStyle: indicator.lineStyle as any,
+            title: indicator.customLabel || indicator.name,
+            priceScaleId: "right",
+            priceFormat: {
+              type: "price",
+              precision: indicator.precision || 5,
+            },
+          });
+
+          lineSeries.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+          indicatorSeriesRef.current.set(indicator.id, lineSeries);
+        } else if (indicator.type === "ichimoku") {
+          const ichimokuData = calculateIchimoku(
+            transformedCandles,
+            indicator.parameters.tenkanPeriod || 9,
+            indicator.parameters.kijunPeriod || 26,
+            indicator.parameters.senkouBPeriod || 52,
+          );
+
+          // Tenkan-sen (Conversion Line) - fast
+          if (indicator.visibility?.main !== false) {
+            const tenkanSeries = chart.addLineSeries({
+              color: hexToRgba(
+                indicator.colors?.upper || "#2962ff",
+                indicator.opacity || 100,
+              ),
+              lineWidth: (indicator.lineWidth as any) || 1,
+              title: "Tenkan",
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            tenkanSeries.setData(
+              ichimokuData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.tenkan,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_tenkan`,
+              tenkanSeries,
+            );
+          }
+
+          // Kijun-sen (Base Line) - slow
+          if (indicator.visibility?.signal !== false) {
+            const kijunSeries = chart.addLineSeries({
+              color: hexToRgba(
+                indicator.colors?.lower || "#f23645",
+                indicator.opacity || 100,
+              ),
+              lineWidth: (indicator.lineWidth as any) || 1,
+              title: "Kijun",
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            kijunSeries.setData(
+              ichimokuData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.kijun,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_kijun`,
+              kijunSeries,
+            );
+          }
+
+          // Senkou Span A (Leading Span A)
+          if (indicator.visibility?.upper !== false) {
+            const senkouASeries = chart.addLineSeries({
+              color: hexToRgba(
+                indicator.colors?.positive || "#00e676",
+                indicator.opacity || 40,
+              ),
+              lineWidth: 1 as any,
+              lineStyle: 2 as any,
+              title: "Senkou A",
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            senkouASeries.setData(
+              ichimokuData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.senkouA,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_senkouA`,
+              senkouASeries,
+            );
+          }
+
+          // Senkou Span B (Leading Span B)
+          if (indicator.visibility?.lower !== false) {
+            const senkouBSeries = chart.addLineSeries({
+              color: hexToRgba(
+                indicator.colors?.negative || "#f23645",
+                indicator.opacity || 40,
+              ),
+              lineWidth: 1 as any,
+              lineStyle: 2 as any,
+              title: "Senkou B",
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            senkouBSeries.setData(
+              ichimokuData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.senkouB,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_senkouB`,
+              senkouBSeries,
+            );
+          }
+
+          log(`📊 Ichimoku Cloud rendered with ${ichimokuData.length} points`);
+        } else if (indicator.type === "donchian") {
+          const donchianData = calculateDonchianChannel(
+            transformedCandles,
+            indicator.parameters.period || 20,
+          );
+          const offsetData = applyOffset(donchianData, indicator.offset || 0);
+
+          // Upper band
+          if (indicator.visibility?.upper !== false) {
+            const upperColor = indicator.colors?.upper || indicator.color;
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(upperColor, indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "Donchian"} Upper`,
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            upperSeries.setData(
+              offsetData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.upper,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_upper`,
+              upperSeries,
+            );
+          }
+
+          // Middle band
+          if (indicator.visibility?.middle !== false) {
+            const middleColor = indicator.colors?.middle || indicator.color;
+            const middleSeries = chart.addLineSeries({
+              color: hexToRgba(middleColor, indicator.opacity || 60),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: 2 as any,
+              title: `${indicator.customLabel || "Donchian"} Middle`,
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            middleSeries.setData(
+              offsetData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.middle,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_middle`,
+              middleSeries,
+            );
+          }
+
+          // Lower band
+          if (indicator.visibility?.lower !== false) {
+            const lowerColor = indicator.colors?.lower || indicator.color;
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(lowerColor, indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "Donchian"} Lower`,
+              priceScaleId: "right",
+              priceFormat: {
+                type: "price",
+                precision: indicator.precision || 5,
+              },
+            });
+            lowerSeries.setData(
+              offsetData.map((d) => ({
+                time: d.time as UTCTimestamp,
+                value: d.lower,
+              })),
+            );
+            indicatorSeriesRef.current.set(
+              `${indicator.id}_lower`,
+              lowerSeries,
+            );
+          }
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -1649,12 +1940,11 @@ const LightweightTradingChart = ({
             title: String(oversold),
           });
         } else if (indicator.type === "atr") {
-          // ATR - calculate as simple volatility indicator
-          const rsiData = calculateRSI(
+          const atrData = calculateATR(
             transformedCandles,
             indicator.parameters.period || 14,
           );
-          const offsetData = applyOffset(rsiData, indicator.offset || 0);
+          const offsetData = applyOffset(atrData, indicator.offset || 0);
 
           const series = oscChart.addLineSeries({
             color: hexToRgba(indicator.color, indicator.opacity || 100),
@@ -1664,9 +1954,108 @@ const LightweightTradingChart = ({
           series.setData(
             offsetData.map((d) => ({
               time: d.time as UTCTimestamp,
-              value: d.value / 100, // Scale for ATR visualization
+              value: d.value,
             })),
           );
+        } else if (indicator.type === "obv") {
+          const obvData = calculateOBV(transformedCandles);
+          const offsetData = applyOffset(obvData, indicator.offset || 0);
+
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || "OBV",
+          });
+          series.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+        } else if (indicator.type === "roc") {
+          const rocData = calculateROC(
+            transformedCandles,
+            indicator.parameters.period || 12,
+          );
+          const offsetData = applyOffset(rocData, indicator.offset || 0);
+
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || "ROC",
+          });
+          series.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+
+          // Zero line
+          series.createPriceLine({
+            price: 0,
+            color: "rgba(255,255,255,0.3)",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: "",
+          });
+        } else if (indicator.type === "cmf") {
+          const cmfData = calculateCMF(
+            transformedCandles,
+            indicator.parameters.period || 20,
+          );
+          const offsetData = applyOffset(cmfData, indicator.offset || 0);
+
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || "CMF",
+          });
+          series.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+
+          // Zero line
+          series.createPriceLine({
+            price: 0,
+            color: "rgba(255,255,255,0.3)",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: "",
+          });
+        } else if (indicator.type === "momentum") {
+          const momData = calculateMomentum(
+            transformedCandles,
+            indicator.parameters.period || 10,
+          );
+          const offsetData = applyOffset(momData, indicator.offset || 0);
+
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || "Momentum",
+          });
+          series.setData(
+            offsetData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.value,
+            })),
+          );
+
+          // Zero line
+          series.createPriceLine({
+            price: 0,
+            color: "rgba(255,255,255,0.3)",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: "",
+          });
         } else {
           console.warn(
             `⚠️ Unknown oscillator indicator type: ${indicator.type}`,
