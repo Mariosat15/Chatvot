@@ -343,7 +343,8 @@ Create content that:
 1. Explains what the indicator does in simple terms
 2. Highlights its benefits for traders
 3. Mentions use cases and trading scenarios
-4. Is professional but engaging
+4. Includes clear, beginner-friendly instructions on how to use the indicator on the platform
+5. Is professional but engaging
 
 Your task is to create:
 
@@ -364,6 +365,16 @@ Your task is to create:
 - [Point 2]
 - [Point 3]
 
+## How to Use
+[Step-by-step instructions for using this indicator on the platform]
+1. After purchasing, go to the **Trading Chart** page.
+2. Open the **Trading Arsenal** panel (the rocket icon on the left sidebar).
+3. Find this indicator under your **Purchased Indicators** section.
+4. Toggle it **ON** to add it to your chart.
+5. [Explain what the user should look for on the chart -- e.g., line crossovers, color changes, zones, bands, etc.]
+6. [Explain how to interpret the signals -- e.g., "When the line crosses above 70, the asset may be overbought", "When the upper and lower bands squeeze together, expect a breakout", etc.]
+7. Combine with other indicators or price action for stronger confirmation before entering a trade.
+
 ## Settings
 [List the configurable settings and what they do]
 - **[Setting Name]**: [What it controls]
@@ -381,7 +392,7 @@ Respond in JSON format:
 {
   "name": "Indicator Name",
   "shortDescription": "Short description under 120 chars",
-  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n## How It Works\\n- [points]\\n\\n..."
+  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n## How It Works\\n- [points]\\n\\n## How to Use\\n1. [steps]\\n\\n..."
 }`;
 }
 
@@ -395,7 +406,8 @@ Create content that:
 1. Explains the strategy logic clearly
 2. Highlights when and why it generates signals
 3. Mentions risk level and ideal market conditions
-4. Is professional and builds confidence
+4. Includes clear, beginner-friendly instructions on how to activate and use the strategy on the platform
+5. Is professional and builds confidence
 
 Your task is to create:
 
@@ -426,6 +438,19 @@ Your task is to create:
 2. [Step 2]
 3. [Step 3]
 
+## How to Use
+[Step-by-step instructions for using this strategy on the platform]
+1. After purchasing, go to the **Trading Chart** page.
+2. Open the **Trading Arsenal** panel (the rocket icon on the left sidebar).
+3. Find this strategy under your **Purchased Strategies** section.
+4. Toggle it **ON** to activate it on your chart.
+5. The strategy will display **Buy** and **Sell** signals directly on your chart as visual markers.
+6. [Explain what the visual signals look like -- e.g., "Green arrows appear below candles for Buy signals, red arrows above candles for Sell signals"]
+7. Review each signal before placing a trade -- use it as guidance, not as a guarantee.
+8. You can combine this strategy with other indicators from your Trading Arsenal for extra confirmation.
+
+**Important:** This strategy provides signals for educational purposes. Always apply your own risk management (stop-loss, position sizing) before entering any trade.
+
 ## Best Used For
 [Ideal market conditions and trading styles]
 - [Use case 1]
@@ -440,7 +465,7 @@ Respond in JSON format:
 {
   "name": "Strategy Name",
   "shortDescription": "Short description under 120 chars",
-  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n..."
+  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n## How to Use\\n1. [steps]\\n\\n..."
 }`;
 }
 
