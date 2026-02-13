@@ -25,30 +25,30 @@ const RANK_CONFIG = {
   champion: {
     border: "border-yellow-400",
     headerBg: "from-yellow-400 via-amber-400 to-orange-500",
-    tagBg: "bg-yellow-100 text-yellow-800",
+    tagBg: "bg-yellow-500/20 text-yellow-400",
     tagLabel: "Champion",
-    textColor: "text-amber-800",
+    textColor: "text-amber-400",
   },
   elite: {
     border: "border-purple-400",
     headerBg: "from-purple-400 to-violet-500",
-    tagBg: "bg-purple-100 text-purple-700",
+    tagBg: "bg-purple-500/20 text-purple-400",
     tagLabel: "Elite",
-    textColor: "text-purple-800",
+    textColor: "text-purple-400",
   },
   veteran: {
     border: "border-blue-400",
     headerBg: "from-blue-400 to-cyan-500",
-    tagBg: "bg-blue-100 text-blue-700",
+    tagBg: "bg-blue-500/20 text-blue-400",
     tagLabel: "Veteran",
-    textColor: "text-blue-800",
+    textColor: "text-blue-400",
   },
   trader: {
-    border: "border-gray-400",
-    headerBg: "from-gray-400 to-slate-500",
-    tagBg: "bg-gray-200 text-gray-700",
+    border: "border-gray-600",
+    headerBg: "from-gray-500 to-slate-600",
+    tagBg: "bg-gray-700 text-gray-400",
     tagLabel: "Trader",
-    textColor: "text-gray-700",
+    textColor: "text-gray-300",
   },
 };
 
@@ -149,14 +149,14 @@ export default function ProfileCard({
           >
             <div
               className={`relative border-[6px] ${config.border} rounded-[18px] overflow-hidden shadow-2xl`}
-              style={{ background: "linear-gradient(135deg, #f5f0e1 0%, #e8dcc8 100%)" }}
+              style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
             >
               {/* Holographic shimmer for top ranks */}
               {stats?.rank && stats.rank <= 10 && (
                 <motion.div
-                  className="absolute inset-0 pointer-events-none z-30 opacity-30"
+                  className="absolute inset-0 pointer-events-none z-30 opacity-20"
                   style={{
-                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.8) 45%, transparent 50%)",
+                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 45%, transparent 50%)",
                     backgroundSize: "200% 200%",
                   }}
                   animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
@@ -180,7 +180,7 @@ export default function ProfileCard({
                       {config.tagLabel}
                     </span>
                     {stats?.userTitle && (
-                      <span className="text-[10px] text-gray-500 italic flex items-center gap-1">
+                      <span className="text-[10px] text-gray-400 italic flex items-center gap-1">
                         {stats.userTitleIcon && stats.userTitleIcon in GAME_ICONS ? (
                           <GameIcon name={stats.userTitleIcon as GameIconName} size={10} />
                         ) : null}
@@ -194,7 +194,7 @@ export default function ProfileCard({
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{username}</h2>
                   {stats?.rank && (
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">Rank</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Rank</span>
                       <span className={`text-lg font-extrabold ${config.textColor}`}>#{stats.rank}</span>
                       <Trophy className={`h-4 w-4 ${stats.rank <= 3 ? "text-yellow-500" : "text-gray-400"}`} />
                     </div>
@@ -247,68 +247,68 @@ export default function ProfileCard({
               {/* === BIO (Flavor text) === */}
               {bio && (
                 <div className="mx-4 mb-2">
-                  <p className="text-[11px] text-gray-600 italic text-center leading-snug line-clamp-3">&quot;{bio}&quot;</p>
+                  <p className="text-[11px] text-gray-400 italic text-center leading-snug line-clamp-3">&quot;{bio}&quot;</p>
                 </div>
               )}
 
               {/* === STATS SECTION (Attack-style) === */}
               <div className="mx-3 mb-2 space-y-1.5">
                 {/* Attack 1: Trading Stats */}
-                <div className="bg-white/60 border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100/80 border-b border-gray-300">
-                    <BarChart3 className="h-3.5 w-3.5 text-blue-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Trading Stats</span>
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+                    <BarChart3 className="h-3.5 w-3.5 text-blue-400" />
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-blue-400">Trading Stats</span>
                   </div>
-                  <div className="grid grid-cols-3 divide-x divide-gray-200">
-                    <StatCell label="Win Rate" value={`${(stats?.winRate || 0).toFixed(1)}%`} color="text-green-600" />
-                    <StatCell label="Trades" value={`${stats?.totalTrades || 0}`} color="text-blue-600" />
+                  <div className="grid grid-cols-3 divide-x divide-gray-700">
+                    <StatCell label="Win Rate" value={`${(stats?.winRate || 0).toFixed(1)}%`} color="text-green-400" />
+                    <StatCell label="Trades" value={`${stats?.totalTrades || 0}`} color="text-blue-400" />
                     <StatCell
                       label="P&L"
                       value={`${(stats?.totalPnl || 0) >= 0 ? "+" : ""}${(stats?.totalPnl || 0).toFixed(0)}`}
-                      color={(stats?.totalPnl || 0) >= 0 ? "text-green-600" : "text-red-600"}
+                      color={(stats?.totalPnl || 0) >= 0 ? "text-green-400" : "text-red-400"}
                     />
                   </div>
                 </div>
 
                 {/* Attack 2: Competition Stats */}
-                <div className="bg-white/60 border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100/80 border-b border-gray-300">
-                    <Trophy className="h-3.5 w-3.5 text-yellow-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-600">Battle Record</span>
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+                    <Trophy className="h-3.5 w-3.5 text-yellow-400" />
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-400">Battle Record</span>
                   </div>
-                  <div className="grid grid-cols-3 divide-x divide-gray-200">
+                  <div className="grid grid-cols-3 divide-x divide-gray-700">
                     <StatCell
                       label="Comps"
                       value={`${stats?.competitionsWon || 0}/${stats?.competitionsEntered || 0}`}
-                      color="text-yellow-600"
+                      color="text-yellow-400"
                     />
                     <StatCell
                       label="Challenges"
                       value={`${stats?.challengesWon || 0}/${stats?.challengesEntered || 0}`}
-                      color="text-orange-600"
+                      color="text-orange-400"
                     />
-                    <StatCell label="Badges" value={`${stats?.totalBadges || 0}`} color="text-pink-600" />
+                    <StatCell label="Badges" value={`${stats?.totalBadges || 0}`} color="text-pink-400" />
                   </div>
                 </div>
               </div>
 
               {/* === BOTTOM STATS BAR === */}
-              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-300 bg-white/50 border border-gray-300 rounded-lg overflow-hidden text-center">
+              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Score</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Score</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     {stats?.overallScore?.toFixed(0) || "0"}
                   </p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Rank</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rank</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     #{stats?.rank || "-"}
                   </p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Badges</p>
-                  <p className="text-xs font-bold text-pink-600 mt-0.5">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Badges</p>
+                  <p className="text-xs font-bold text-pink-400 mt-0.5">
                     {stats?.totalBadges || 0}
                   </p>
                 </div>
@@ -319,7 +319,7 @@ export default function ProfileCard({
                 <Button
                   variant="outline"
                   onClick={onClose}
-                  className="flex-1 border-gray-400 text-gray-600 hover:bg-gray-100 bg-white/60 text-xs h-9"
+                  className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700 bg-gray-800/60 text-xs h-9"
                 >
                   Close
                 </Button>
@@ -336,8 +336,8 @@ export default function ProfileCard({
 
               {/* Card ID */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[8px] text-gray-400">Chartvolt Trader Card</span>
-                <span className="text-[8px] text-gray-400 font-mono">{userId.slice(-8)}</span>
+                <span className="text-[8px] text-gray-500">Chartvolt Trader Card</span>
+                <span className="text-[8px] text-gray-500 font-mono">{userId.slice(-8)}</span>
               </div>
             </div>
           </motion.div>
@@ -350,7 +350,7 @@ export default function ProfileCard({
 function StatCell({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="py-2 px-2 text-center">
-      <p className="text-[9px] text-gray-500 uppercase font-semibold">{label}</p>
+      <p className="text-[9px] text-gray-400 uppercase font-semibold">{label}</p>
       <p className={cn("text-sm font-bold mt-0.5", color)}>{value}</p>
     </div>
   );

@@ -16,42 +16,42 @@ interface BadgeDetailCardProps {
 
 const RARITY_CONFIG = {
   common: {
-    border: "border-[#a0a0a0]",
-    headerBg: "from-gray-400 to-gray-500",
-    cardBg: "from-gray-100 to-gray-200",
-    textColor: "text-gray-700",
-    accentColor: "text-gray-600",
-    tagBg: "bg-gray-200 text-gray-700",
+    border: "border-gray-600",
+    headerBg: "from-gray-500 to-gray-600",
+    cardBg: "from-gray-800 to-gray-900",
+    textColor: "text-gray-300",
+    accentColor: "text-gray-400",
+    tagBg: "bg-gray-700 text-gray-400",
     shimmer: false,
     starCount: 1,
   },
   rare: {
     border: "border-blue-400",
     headerBg: "from-blue-400 to-cyan-500",
-    cardBg: "from-blue-50 to-cyan-100",
-    textColor: "text-blue-800",
-    accentColor: "text-blue-600",
-    tagBg: "bg-blue-100 text-blue-700",
+    cardBg: "from-blue-900 to-cyan-900",
+    textColor: "text-blue-400",
+    accentColor: "text-blue-400",
+    tagBg: "bg-blue-500/20 text-blue-400",
     shimmer: false,
     starCount: 2,
   },
   epic: {
     border: "border-purple-400",
     headerBg: "from-purple-500 to-pink-500",
-    cardBg: "from-purple-50 to-pink-100",
-    textColor: "text-purple-800",
-    accentColor: "text-purple-600",
-    tagBg: "bg-purple-100 text-purple-700",
+    cardBg: "from-purple-900 to-pink-900",
+    textColor: "text-purple-400",
+    accentColor: "text-purple-400",
+    tagBg: "bg-purple-500/20 text-purple-400",
     shimmer: true,
     starCount: 3,
   },
   legendary: {
     border: "border-yellow-400",
     headerBg: "from-yellow-400 via-orange-400 to-red-500",
-    cardBg: "from-yellow-50 via-orange-50 to-red-50",
-    textColor: "text-amber-900",
-    accentColor: "text-amber-700",
-    tagBg: "bg-amber-100 text-amber-800",
+    cardBg: "from-yellow-900 via-orange-900 to-red-900",
+    textColor: "text-amber-400",
+    accentColor: "text-amber-400",
+    tagBg: "bg-amber-500/20 text-amber-400",
     shimmer: true,
     starCount: 4,
   },
@@ -101,14 +101,14 @@ export default function BadgeDetailCard({
           >
             <div
               className={`relative border-[6px] ${config.border} rounded-[18px] overflow-hidden shadow-2xl`}
-              style={{ background: "linear-gradient(135deg, #f5f0e1 0%, #e8dcc8 100%)" }}
+              style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
             >
               {/* Holographic shimmer for epic/legendary */}
               {config.shimmer && (
                 <motion.div
-                  className="absolute inset-0 pointer-events-none z-30 opacity-30"
+                  className="absolute inset-0 pointer-events-none z-30 opacity-20"
                   style={{
-                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.8) 45%, transparent 50%)",
+                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 45%, transparent 50%)",
                     backgroundSize: "200% 200%",
                   }}
                   animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
@@ -132,10 +132,10 @@ export default function BadgeDetailCard({
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
                       {badge.rarity}
                     </span>
-                    <span className="text-[10px] text-gray-500 italic">{badge.category}</span>
+                    <span className="text-[10px] text-gray-400 italic">{badge.category}</span>
                   </div>
                   {badge.earned && (
-                    <span className="text-[10px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
                       EARNED
                     </span>
                   )}
@@ -145,8 +145,8 @@ export default function BadgeDetailCard({
                 <div className="flex items-center justify-between">
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{badge.name}</h2>
                   <div className="flex items-center gap-1">
-                    <span className="text-lg font-extrabold text-amber-600">{xpReward}</span>
-                    <span className="text-[10px] font-bold text-amber-500 uppercase">XP</span>
+                    <span className="text-lg font-extrabold text-amber-400">{xpReward}</span>
+                    <span className="text-[10px] font-bold text-amber-400 uppercase">XP</span>
                     <Star className="h-4 w-4 text-amber-500 fill-amber-400" />
                   </div>
                 </div>
@@ -191,14 +191,14 @@ export default function BadgeDetailCard({
 
               {/* === FLAVOR TEXT (Description) === */}
               <div className="mx-4 mb-2">
-                <p className="text-[11px] text-gray-600 italic text-center leading-snug">{badge.description}. {rarityDesc}.</p>
+                <p className="text-[11px] text-gray-400 italic text-center leading-snug">{badge.description}. {rarityDesc}.</p>
               </div>
 
               {/* === ATTACK / POWER SECTION (How to Earn) === */}
               <div className="mx-3 mb-2">
-                <div className="bg-white/60 border border-gray-300 rounded-lg overflow-hidden">
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
                   {/* Attack header */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/80 border-b border-gray-300">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/80 border-b border-gray-700">
                     <Target className={`h-4 w-4 ${config.accentColor}`} />
                     <span className={`text-xs font-bold uppercase tracking-wide ${config.accentColor}`}>
                       Requirement
@@ -211,8 +211,8 @@ export default function BadgeDetailCard({
 
                   {/* Attack description */}
                   <div className="px-3 py-2">
-                    <p className="text-sm font-semibold text-gray-800 mb-1">{requirement.requirement}</p>
-                    <div className="flex items-center justify-between text-[11px] text-gray-500">
+                    <p className="text-sm font-semibold text-gray-200 mb-1">{requirement.requirement}</p>
+                    <div className="flex items-center justify-between text-[11px] text-gray-400">
                       <span>{requirement.statLabel}</span>
                     </div>
 
@@ -220,8 +220,8 @@ export default function BadgeDetailCard({
                     {requirement.extras.length > 0 && (
                       <div className="mt-2 space-y-0.5">
                         {requirement.extras.map((extra, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                            <div className="w-1 h-1 rounded-full bg-gray-400" />
+                          <div key={i} className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                            <div className="w-1 h-1 rounded-full bg-gray-500" />
                             <span>{extra}</span>
                           </div>
                         ))}
@@ -230,9 +230,9 @@ export default function BadgeDetailCard({
 
                     {/* Tip */}
                     {requirement.tip && (
-                      <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                        <Sparkles className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
-                        <span className="text-[10px] text-amber-700">{requirement.tip}</span>
+                      <div className="mt-2 flex items-start gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
+                        <Sparkles className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                        <span className="text-[10px] text-amber-400">{requirement.tip}</span>
                       </div>
                     )}
                   </div>
@@ -240,13 +240,13 @@ export default function BadgeDetailCard({
               </div>
 
               {/* === BOTTOM STATS BAR (like Weakness/Resistance/Retreat) === */}
-              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-300 bg-white/50 border border-gray-300 rounded-lg overflow-hidden text-center">
+              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Category</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Category</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>{badge.category}</p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Rarity</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rarity</p>
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
                     {Array.from({ length: config.starCount }).map((_, i) => (
                       <Star key={i} className={`h-3 w-3 ${badge.earned ? "text-amber-500" : "text-gray-400"} fill-current`} />
@@ -254,8 +254,8 @@ export default function BadgeDetailCard({
                   </div>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">XP</p>
-                  <p className="text-xs font-bold text-amber-600 mt-0.5">+{xpReward}</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">XP</p>
+                  <p className="text-xs font-bold text-amber-400 mt-0.5">+{xpReward}</p>
                 </div>
               </div>
 
@@ -263,7 +263,7 @@ export default function BadgeDetailCard({
               <div className="mx-3 mb-3">
                 {/* Earned date */}
                 {badge.earned && badge.earnedAt && (
-                  <p className="text-[10px] text-gray-500 text-center italic mb-2">
+                  <p className="text-[10px] text-gray-400 text-center italic mb-2">
                     Earned on {new Date(badge.earnedAt).toLocaleDateString("en-US", {
                       year: "numeric",
                       month: "long",
@@ -277,9 +277,9 @@ export default function BadgeDetailCard({
                   onClick={onClose}
                   className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all ${
                     badge.earned
-                      ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
+                        ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
                       : isLevelLocked
-                        ? "bg-gray-300 text-gray-500 cursor-default"
+                        ? "bg-gray-700 text-gray-500 cursor-default"
                         : `bg-gradient-to-r ${config.headerBg} text-white shadow-lg hover:brightness-110`
                   }`}
                 >
@@ -294,8 +294,8 @@ export default function BadgeDetailCard({
 
               {/* Card ID at bottom */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[8px] text-gray-400">Chartvolt Trading Badge</span>
-                <span className="text-[8px] text-gray-400 font-mono">{badge.id}</span>
+                <span className="text-[8px] text-gray-500">Chartvolt Trading Badge</span>
+                <span className="text-[8px] text-gray-500 font-mono">{badge.id}</span>
               </div>
             </div>
           </motion.div>

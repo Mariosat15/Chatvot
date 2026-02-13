@@ -25,9 +25,9 @@ const STATUS_CONFIG = {
     border: "border-green-500",
     headerBg: "from-green-400 to-emerald-500",
     cardBg: "from-green-50 to-emerald-50",
-    textColor: "text-green-800",
-    accentColor: "text-green-600",
-    tagBg: "bg-green-100 text-green-700",
+    textColor: "text-green-400",
+    accentColor: "text-green-400",
+    tagBg: "bg-green-500/20 text-green-400",
     tagLabel: "Completed",
     buttonBg: "bg-gradient-to-r from-green-500 to-emerald-600",
   },
@@ -35,9 +35,9 @@ const STATUS_CONFIG = {
     border: "border-blue-500",
     headerBg: "from-blue-400 to-indigo-500",
     cardBg: "from-blue-50 to-indigo-50",
-    textColor: "text-blue-800",
-    accentColor: "text-blue-600",
-    tagBg: "bg-blue-100 text-blue-700",
+    textColor: "text-blue-400",
+    accentColor: "text-blue-400",
+    tagBg: "bg-blue-500/20 text-blue-400",
     tagLabel: "In Progress",
     buttonBg: "bg-gradient-to-r from-blue-500 to-indigo-600",
   },
@@ -45,29 +45,29 @@ const STATUS_CONFIG = {
     border: "border-amber-500",
     headerBg: "from-amber-400 to-orange-500",
     cardBg: "from-amber-50 to-orange-50",
-    textColor: "text-amber-800",
-    accentColor: "text-amber-600",
-    tagBg: "bg-amber-100 text-amber-700",
+    textColor: "text-amber-400",
+    accentColor: "text-amber-400",
+    tagBg: "bg-amber-500/20 text-amber-400",
     tagLabel: "Available",
     buttonBg: "bg-gradient-to-r from-amber-500 to-orange-600",
   },
   locked: {
-    border: "border-gray-400",
-    headerBg: "from-gray-400 to-slate-500",
+    border: "border-gray-600",
+    headerBg: "from-gray-500 to-slate-600",
     cardBg: "from-gray-50 to-slate-100",
-    textColor: "text-gray-700",
+    textColor: "text-gray-400",
     accentColor: "text-gray-500",
-    tagBg: "bg-gray-200 text-gray-600",
+    tagBg: "bg-gray-700 text-gray-400",
     tagLabel: "Locked",
-    buttonBg: "bg-gray-400",
+    buttonBg: "bg-gray-600",
   },
   level_locked: {
     border: "border-purple-400",
     headerBg: "from-purple-400 to-violet-500",
     cardBg: "from-purple-50 to-violet-50",
-    textColor: "text-purple-800",
-    accentColor: "text-purple-600",
-    tagBg: "bg-purple-100 text-purple-700",
+    textColor: "text-purple-400",
+    accentColor: "text-purple-400",
+    tagBg: "bg-purple-500/20 text-purple-400",
     tagLabel: "Level Required",
     buttonBg: "bg-gradient-to-r from-purple-500 to-violet-600",
   },
@@ -188,14 +188,14 @@ export default function MilestoneDetailModal({
           >
             <div
               className={`relative border-[6px] ${config.border} rounded-[18px] overflow-hidden shadow-2xl`}
-              style={{ background: "linear-gradient(135deg, #f5f0e1 0%, #e8dcc8 100%)" }}
+              style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
             >
               {/* Shimmer for completed */}
               {status === "completed" && (
                 <motion.div
-                  className="absolute inset-0 pointer-events-none z-30 opacity-30"
+                  className="absolute inset-0 pointer-events-none z-30 opacity-20"
                   style={{
-                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.8) 45%, transparent 50%)",
+                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 45%, transparent 50%)",
                     backgroundSize: "200% 200%",
                   }}
                   animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
@@ -218,18 +218,18 @@ export default function MilestoneDetailModal({
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
                       {config.tagLabel}
                     </span>
-                    <span className="text-[10px] text-gray-500 italic">
+                    <span className="text-[10px] text-gray-400 italic">
                       {NODE_TYPE_LABELS[milestone.nodeType] || milestone.nodeType}
                     </span>
                   </div>
-                  <span className="text-[10px] text-gray-400">#{milestone.order || "?"}</span>
+                  <span className="text-[10px] text-gray-500">#{milestone.order || "?"}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{milestone.name}</h2>
                   {xpReward > 0 && (
                     <div className="flex items-center gap-1">
-                      <span className="text-lg font-extrabold text-amber-600">{xpReward}</span>
+                      <span className="text-lg font-extrabold text-amber-400">{xpReward}</span>
                       <span className="text-[10px] font-bold text-amber-500 uppercase">XP</span>
                       <Star className="h-4 w-4 text-amber-500 fill-amber-400" />
                     </div>
@@ -288,13 +288,13 @@ export default function MilestoneDetailModal({
 
               {/* === FLAVOR TEXT === */}
               <div className="mx-4 mb-2">
-                <p className="text-[11px] text-gray-600 italic text-center leading-snug">{milestone.description}</p>
+                <p className="text-[11px] text-gray-400 italic text-center leading-snug">{milestone.description}</p>
               </div>
 
               {/* === REQUIREMENT SECTION (Attack-style) === */}
               <div className="mx-3 mb-2">
-                <div className="bg-white/60 border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/80 border-b border-gray-300">
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/80 border-b border-gray-700">
                     <Target className={`h-4 w-4 ${config.accentColor}`} />
                     <span className={`text-xs font-bold uppercase tracking-wide ${config.accentColor}`}>
                       Requirement
@@ -307,7 +307,7 @@ export default function MilestoneDetailModal({
                   </div>
 
                   <div className="px-3 py-2">
-                    <p className="text-sm font-semibold text-gray-800 mb-1">
+                    <p className="text-sm font-semibold text-gray-200 mb-1">
                       {formatCondition(milestone.completeCondition)}
                     </p>
 
@@ -315,12 +315,12 @@ export default function MilestoneDetailModal({
                     {status !== "completed" && milestone.completeCondition?.value && (
                       <div className="mt-2">
                         <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-gray-500">Progress</span>
+                          <span className="text-gray-400">Progress</span>
                           <span className={cn("font-semibold", config.accentColor)}>
                             {currentValue} / {target}
                           </span>
                         </div>
-                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300">
+                        <div className="h-3 bg-gray-700 rounded-full overflow-hidden border border-gray-600">
                           <motion.div
                             className={cn(
                               "h-full rounded-full",
@@ -333,7 +333,7 @@ export default function MilestoneDetailModal({
                             transition={{ duration: 0.6, ease: "easeOut" }}
                           />
                         </div>
-                        <div className="text-right text-[10px] text-gray-400 mt-0.5">{progressPercent}%</div>
+                        <div className="text-right text-[10px] text-gray-500 mt-0.5">{progressPercent}%</div>
                       </div>
                     )}
 
@@ -349,14 +349,14 @@ export default function MilestoneDetailModal({
               </div>
 
               {/* === BOTTOM STATS BAR === */}
-              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-300 bg-white/50 border border-gray-300 rounded-lg overflow-hidden text-center">
+              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Reward</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Reward</p>
                   <div className="flex items-center justify-center gap-1 mt-0.5">
                     {xpReward > 0 ? (
                       <>
                         <Star className="h-3 w-3 text-amber-500 fill-amber-400" />
-                        <span className="text-xs font-bold text-amber-600">+{xpReward} XP</span>
+                        <span className="text-xs font-bold text-amber-400">+{xpReward} XP</span>
                       </>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -364,7 +364,7 @@ export default function MilestoneDetailModal({
                   </div>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Badge</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Badge</p>
                   {milestone.rewards?.badgeId ? (
                     <Sparkles className="h-3.5 w-3.5 text-purple-500 mx-auto mt-0.5" />
                   ) : (
@@ -372,9 +372,9 @@ export default function MilestoneDetailModal({
                   )}
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-500 uppercase font-semibold">Title</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Title</p>
                   {milestone.rewards?.title ? (
-                    <span className="text-[10px] font-bold text-blue-600 mt-0.5 block truncate px-1">
+                    <span className="text-[10px] font-bold text-blue-400 mt-0.5 block truncate px-1">
                       {milestone.rewards.title}
                     </span>
                   ) : (
@@ -385,15 +385,15 @@ export default function MilestoneDetailModal({
 
               {/* === SEASONAL / BADGE REQUIREMENTS === */}
               {milestone.isSeasonal && (
-                <div className="mx-3 mb-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <div className="mx-3 mb-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                    <span className="text-[10px] font-bold text-amber-700">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                    <span className="text-[10px] font-bold text-amber-400">
                       {milestone.seasonTag ? `Season: ${milestone.seasonTag.replace(/_/g, " ")}` : "Limited Time"}
                     </span>
                   </div>
                   {milestone.seasonEnd && (
-                    <p className="text-[10px] text-amber-600 mt-0.5">
+                    <p className="text-[10px] text-amber-500 mt-0.5">
                       Until {new Date(milestone.seasonEnd).toLocaleDateString()}
                     </p>
                   )}
@@ -401,12 +401,12 @@ export default function MilestoneDetailModal({
               )}
 
               {milestone.requiredBadgeIds && milestone.requiredBadgeIds.length > 0 && (
-                <div className="mx-3 mb-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                <div className="mx-3 mb-2 bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-purple-500" />
-                    <span className="text-[10px] font-bold text-purple-700">Required Badges</span>
+                    <Shield className="h-3.5 w-3.5 text-purple-400" />
+                    <span className="text-[10px] font-bold text-purple-400">Required Badges</span>
                   </div>
-                  <p className="text-[10px] text-purple-600 mt-0.5">
+                  <p className="text-[10px] text-purple-300 mt-0.5">
                     {milestone.requiredBadgeIds.map(id => BADGE_NAME_MAP.get(id) || id).join(", ")}
                   </p>
                 </div>
@@ -414,8 +414,8 @@ export default function MilestoneDetailModal({
 
               {/* Celebration text */}
               {status === "completed" && milestone.celebrationText && (
-                <div className="mx-3 mb-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
-                  <p className="text-[11px] text-green-700 italic">&quot;{milestone.celebrationText}&quot;</p>
+                <div className="mx-3 mb-2 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2 text-center">
+                  <p className="text-[11px] text-green-400 italic">&quot;{milestone.celebrationText}&quot;</p>
                 </div>
               )}
 
@@ -446,8 +446,8 @@ export default function MilestoneDetailModal({
 
               {/* Card ID */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[8px] text-gray-400">Chartvolt Journey Milestone</span>
-                <span className="text-[8px] text-gray-400 font-mono">#{milestone.order || "?"}</span>
+                <span className="text-[8px] text-gray-500">Chartvolt Journey Milestone</span>
+                <span className="text-[8px] text-gray-500 font-mono">#{milestone.order || "?"}</span>
               </div>
             </div>
           </motion.div>

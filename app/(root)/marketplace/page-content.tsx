@@ -1612,447 +1612,311 @@ function ItemDetailModal({
     : isStrategy
       ? "text-orange-400"
       : indicatorInfo?.color || "text-emerald-400";
-  const gradientBg = isGameMaster
-    ? "from-yellow-500/20 to-amber-500/20"
+
+  const borderColor = isGameMaster
+    ? "border-yellow-400"
     : isStrategy
-      ? "from-orange-500/20 to-amber-500/20"
-      : "from-emerald-500/20 to-teal-500/20";
+      ? "border-orange-400"
+      : "border-emerald-400";
+  const headerBg = isGameMaster
+    ? "from-yellow-400 via-amber-400 to-orange-500"
+    : isStrategy
+      ? "from-orange-400 to-red-500"
+      : "from-emerald-400 to-teal-500";
+  const tagBg = isGameMaster
+    ? "bg-yellow-500/20 text-yellow-400"
+    : isStrategy
+      ? "bg-orange-500/20 text-orange-400"
+      : "bg-emerald-500/20 text-emerald-400";
+  const accentText = isGameMaster
+    ? "text-yellow-400"
+    : isStrategy
+      ? "text-orange-400"
+      : "text-emerald-400";
 
   const hasImage = !!item.imageUrl;
 
   return (
     <div
-      className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-700/50 shadow-2xl"
+        className={`relative border-[6px] ${borderColor} rounded-[18px] overflow-hidden shadow-2xl w-full max-w-[400px] max-h-[90vh] flex flex-col`}
+        style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Large Image Area (when image exists) */}
-        {hasImage && (
-          <div className="relative aspect-[16/9] bg-gray-900 overflow-hidden">
-            <img
-              src={item.imageUrl}
-              alt={item.name}
-              className="w-full h-full object-contain"
-            />
-            <div
-              className={cn(
-                "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
-                isGameMaster
-                  ? "from-yellow-500 to-amber-500"
-                  : isStrategy
-                    ? "from-orange-500 to-amber-500"
-                    : "from-emerald-500 to-teal-500",
-              )}
-            />
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-xl transition-colors text-white"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-            {/* Category badge over image */}
-            <div className="absolute bottom-4 left-4">
-              <span
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm border",
-                  isGameMaster
-                    ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-                    : isStrategy
-                      ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
-                      : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-                )}
-              >
-                {isGameMaster
-                  ? "Game Master"
-                  : isStrategy
-                    ? "Strategy"
-                    : "Indicator"}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Header */}
+        {/* Holographic shimmer */}
         <div
-          className={cn(
-            "relative border-b border-gray-800",
-            hasImage ? "p-6" : "p-8",
-          )}
+          className="absolute inset-0 pointer-events-none z-30 opacity-15 animate-shimmer"
+          style={{
+            background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.3) 45%, transparent 50%)",
+            backgroundSize: "200% 200%",
+            animation: "shimmer 4s linear infinite",
+          }}
+        />
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
         >
-          {!hasImage && (
-            <div
-              className={cn(
-                "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
-                isGameMaster
-                  ? "from-yellow-500 to-amber-500"
-                  : isStrategy
-                    ? "from-orange-500 to-amber-500"
-                    : "from-emerald-500 to-teal-500",
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* === TOP BAR: Category + Name + Price === */}
+        <div className="px-4 pt-3 pb-1 flex-shrink-0">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tagBg}`}>
+                {isGameMaster ? "Game Master" : isStrategy ? "Strategy" : "Indicator"}
+              </span>
+              {!isGameMaster && (
+                <span className="text-[10px] text-gray-400 italic">v{item.version}</span>
               )}
-            />
-          )}
-
-          {!hasImage && (
-            <button
-              onClick={onClose}
-              className="absolute top-6 right-6 p-2 hover:bg-gray-800 rounded-xl transition-colors text-gray-400 hover:text-white"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
-
-          <div className="flex items-start gap-5">
-            {!hasImage && (
-              <div
-                className={cn(
-                  "w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br flex-shrink-0",
-                  gradientBg,
-                )}
-              >
-                <CategoryIcon className={cn("h-8 w-8", iconColor)} />
-              </div>
+            </div>
+            {item.owned && (
+              <span className="text-[10px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
+                OWNED
+              </span>
             )}
-            <div className="flex-1 min-w-0">
-              {!hasImage && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className={cn(
-                      "px-2.5 py-0.5 rounded-full text-xs font-medium",
-                      isGameMaster
-                        ? "bg-yellow-500/10 text-yellow-400"
-                        : isStrategy
-                          ? "bg-orange-500/10 text-orange-400"
-                          : "bg-emerald-500/10 text-emerald-400",
-                    )}
-                  >
-                    {isGameMaster
-                      ? "Game Master"
-                      : isStrategy
-                        ? "Strategy"
-                        : "Indicator"}
-                  </span>
-                  {!isGameMaster && (
-                    <span className="text-xs text-gray-500">
-                      v{item.version}
-                    </span>
-                  )}
-                  {!isGameMaster && (
-                    <span
-                      className={cn(
-                        "px-2.5 py-0.5 rounded-full text-xs font-semibold",
-                        riskStyle.bg,
-                        riskStyle.text,
-                      )}
-                    >
-                      {item.riskLevel.replace("_", " ")} risk
-                    </span>
-                  )}
-                </div>
-              )}
-              <h2 className="text-2xl font-bold text-white mb-1">
-                {item.name}
-              </h2>
-              <p className="text-gray-400">{item.shortDescription}</p>
-              {hasImage && !isGameMaster && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-gray-500">v{item.version}</span>
-                  <span
-                    className={cn(
-                      "px-2.5 py-0.5 rounded-full text-xs font-semibold",
-                      riskStyle.bg,
-                      riskStyle.text,
-                    )}
-                  >
-                    {item.riskLevel.replace("_", " ")} risk
-                  </span>
-                </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <h2 className={`text-lg font-extrabold ${accentText} leading-tight truncate mr-2`}>{item.name}</h2>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {item.isFree ? (
+                <span className="text-lg font-extrabold text-green-400">FREE</span>
+              ) : (
+                <>
+                  <span className="text-lg font-extrabold text-amber-400">⚡{item.price.toLocaleString()}</span>
+                </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Content - Scrollable */}
-        <div className="p-8 overflow-y-auto max-h-[50vh]">
+        {/* === ART FRAME (Image or Icon) === */}
+        <div className="mx-3 mb-2 flex-shrink-0">
+          <div className={`relative rounded-lg border-2 ${borderColor} overflow-hidden bg-gradient-to-br ${headerBg}`}>
+            <div className="absolute inset-0 opacity-15 pointer-events-none">
+              <div className="absolute inset-0" style={{
+                backgroundImage: "radial-gradient(circle at 30% 30%, white 2px, transparent 2px), radial-gradient(circle at 70% 70%, white 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+              }} />
+            </div>
+
+            {hasImage ? (
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="w-full aspect-[16/10] object-contain relative z-10"
+              />
+            ) : (
+              <div className="w-full aspect-[16/10] flex items-center justify-center relative z-10">
+                <CategoryIcon className={cn("h-20 w-20 text-white drop-shadow-lg")} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* === FLAVOR TEXT (Short Description) === */}
+        <div className="mx-4 mb-2 flex-shrink-0">
+          <p className="text-[11px] text-gray-400 italic text-center leading-snug line-clamp-2">{item.shortDescription}</p>
+        </div>
+
+        {/* === SCROLLABLE CONTENT === */}
+        <div className="mx-3 mb-2 overflow-y-auto flex-1 min-h-0 space-y-2 pr-1">
+          {/* Risk + Version badge row */}
+          {!isGameMaster && (
+            <div className="flex items-center gap-2 justify-center">
+              <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold", riskStyle.bg, riskStyle.text)}>
+                {item.riskLevel.replace("_", " ")} risk
+              </span>
+              {item.originalPrice && item.originalPrice > item.price && (
+                <span className="text-[10px] text-gray-500 line-through">{item.originalPrice.toLocaleString()} credits</span>
+              )}
+            </div>
+          )}
+
           {/* Game Master Package Features */}
           {isGameMaster && item.gameMasterConfig && (
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Crown className="h-5 w-5 text-yellow-400" />
-                Package Features
-              </h3>
-              {item.gameMasterConfig.canCreateCompetitions !== false ? (
-                /* Full package with competitions */
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-5 border border-yellow-500/20">
-                    <Calendar className="h-6 w-6 text-yellow-400 mb-2" />
-                    <div className="text-2xl font-bold text-white">
-                      {item.gameMasterConfig.subscriptionDurationDays}
-                    </div>
-                    <div className="text-sm text-gray-400">Days Duration</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-2xl p-5 border border-emerald-500/20">
-                    <Percent className="h-6 w-6 text-emerald-400 mb-2" />
-                    <div className="text-2xl font-bold text-emerald-400">
-                      {item.gameMasterConfig.referralFeePercentage}%
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      Referral Earnings
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-5 border border-blue-500/20">
-                    <Zap className="h-6 w-6 text-blue-400 mb-2" />
-                    <div className="text-2xl font-bold text-white">
-                      {item.gameMasterConfig.maxCompetitionsPerDay}
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      Competitions/Day
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-5 border border-purple-500/20">
-                    <Users className="h-6 w-6 text-purple-400 mb-2" />
-                    <div className="text-2xl font-bold text-white">
-                      {item.gameMasterConfig.maxUsersPerCompetition}
-                    </div>
-                    <div className="text-sm text-gray-400">Max Users/Comp</div>
-                  </div>
+            <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+                <Crown className="h-3.5 w-3.5 text-yellow-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-400">Package Features</span>
+              </div>
+              <div className={cn(
+                "grid divide-x divide-gray-700",
+                item.gameMasterConfig.canCreateCompetitions !== false ? "grid-cols-4" : "grid-cols-2"
+              )}>
+                <div className="py-2 px-2 text-center">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Duration</p>
+                  <p className="text-sm font-bold text-white mt-0.5">{item.gameMasterConfig.subscriptionDurationDays}d</p>
                 </div>
-              ) : (
-                /* Referral-only package - no competition features */
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-5 border border-yellow-500/20">
-                      <Calendar className="h-6 w-6 text-yellow-400 mb-2" />
-                      <div className="text-2xl font-bold text-white">
-                        {item.gameMasterConfig.subscriptionDurationDays}
-                      </div>
-                      <div className="text-sm text-gray-400">Days Duration</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-2xl p-5 border border-emerald-500/20">
-                      <Percent className="h-6 w-6 text-emerald-400 mb-2" />
-                      <div className="text-2xl font-bold text-emerald-400">
-                        {item.gameMasterConfig.referralFeePercentage}%
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        Referral Earnings
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5">
-                    <div className="flex items-center gap-3 text-yellow-400 mb-2">
-                      <Users className="h-6 w-6" />
-                      <span className="text-lg font-bold">
-                        Referral-Only Package
-                      </span>
-                    </div>
-                    <p className="text-gray-400 text-sm">
-                      This package focuses on earning from referrals. You can
-                      earn from any competition or challenge your referred users
-                      participate in.
-                    </p>
-                  </div>
+                <div className="py-2 px-2 text-center">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Referral</p>
+                  <p className="text-sm font-bold text-emerald-400 mt-0.5">{item.gameMasterConfig.referralFeePercentage}%</p>
                 </div>
-              )}
+                {item.gameMasterConfig.canCreateCompetitions !== false && (
+                  <>
+                    <div className="py-2 px-2 text-center">
+                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Comps/Day</p>
+                      <p className="text-sm font-bold text-blue-400 mt-0.5">{item.gameMasterConfig.maxCompetitionsPerDay}</p>
+                    </div>
+                    <div className="py-2 px-2 text-center">
+                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Max Users</p>
+                      <p className="text-sm font-bold text-purple-400 mt-0.5">{item.gameMasterConfig.maxUsersPerCompetition}</p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
           {/* Stats - Only show for non-gamemaster items */}
           {!isGameMaster && (
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-gray-800/30 rounded-2xl p-5 text-center border border-gray-700/30">
-                <div className="text-3xl font-bold text-white mb-1">
-                  {item.totalPurchases}
-                </div>
-                <div className="text-sm text-gray-400">Users</div>
+            <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+                <BarChart3 className="h-3.5 w-3.5 text-blue-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-blue-400">Stats</span>
               </div>
-              <div className="bg-gray-800/30 rounded-2xl p-5 text-center border border-gray-700/30">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-                  <span className="text-3xl font-bold text-white">
-                    {item.averageRating > 0
-                      ? item.averageRating.toFixed(1)
-                      : "—"}
-                  </span>
+              <div className="grid grid-cols-3 divide-x divide-gray-700">
+                <div className="py-2 px-2 text-center">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Users</p>
+                  <p className="text-sm font-bold text-white mt-0.5">{item.totalPurchases}</p>
                 </div>
-                <div className="text-sm text-gray-400">Rating</div>
-              </div>
-              <div className="bg-gray-800/30 rounded-2xl p-5 text-center border border-gray-700/30">
-                <div className="text-3xl font-bold text-white mb-1">
-                  {item.totalRatings}
+                <div className="py-2 px-2 text-center">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rating</p>
+                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                    <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                    <span className="text-sm font-bold text-white">{item.averageRating > 0 ? item.averageRating.toFixed(1) : "—"}</span>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-400">Reviews</div>
+                <div className="py-2 px-2 text-center">
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Reviews</p>
+                  <p className="text-sm font-bold text-white mt-0.5">{item.totalRatings}</p>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Description */}
-          <div className="prose prose-invert max-w-none mb-8">
-            <div
-              className="text-gray-300 leading-relaxed whitespace-pre-line"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeHtml(
-                  item.fullDescription
-                    // Headers
-                    .replace(
-                      /^# (.*$)/gm,
-                      '<h2 class="text-xl font-bold text-white mt-6 mb-3 first:mt-0">$1</h2>',
-                    )
-                    .replace(
-                      /^## (.*$)/gm,
-                      '<h3 class="text-lg font-semibold text-white mt-5 mb-2">$1</h3>',
-                    )
-                    // Bold text (** or __)
-                    .replace(
-                      /\*\*(.*?)\*\*/g,
-                      '<strong class="text-white font-semibold">$1</strong>',
-                    )
-                    // Italic text for quotes (*"text"*)
-                    .replace(
-                      /\*"(.*?)"\*/g,
-                      '<em class="text-cyan-400 italic block mt-4 text-lg">"$1"</em>',
-                    )
-                    .replace(
-                      /\*(.*?)\*/g,
-                      '<em class="text-gray-400 italic">$1</em>',
-                    )
-                    // Bullet points (- or •)
-                    .replace(
-                      /^- (.*$)/gm,
-                      '<li class="ml-4 text-gray-300 list-disc">$1</li>',
-                    )
-                    .replace(
-                      /^• (.*$)/gm,
-                      '<li class="ml-4 text-gray-300 list-disc">$1</li>',
-                    )
-                    // Line breaks - convert double newlines to paragraph spacing
-                    .replace(/\n\n/g, '</p><p class="mt-4">')
-                    // Wrap in paragraph
-                    .replace(/^(.*)$/, "<p>$1</p>")
-                ),
-              }}
-            />
+          {/* Description Section */}
+          <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+              <Sparkles className={cn("h-3.5 w-3.5", accentText)} />
+              <span className={cn("text-[10px] font-bold uppercase tracking-wide", accentText)}>Description</span>
+            </div>
+            <div className="px-3 py-2">
+              <div
+                className="text-[11px] text-gray-300 leading-relaxed whitespace-pre-line prose-sm"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(
+                    item.fullDescription
+                      .replace(
+                        /^# (.*$)/gm,
+                        '<h2 class="text-sm font-bold text-white mt-3 mb-1.5 first:mt-0">$1</h2>',
+                      )
+                      .replace(
+                        /^## (.*$)/gm,
+                        '<h3 class="text-xs font-semibold text-white mt-2 mb-1">$1</h3>',
+                      )
+                      .replace(
+                        /\*\*(.*?)\*\*/g,
+                        '<strong class="text-white font-semibold">$1</strong>',
+                      )
+                      .replace(
+                        /\*"(.*?)"\*/g,
+                        '<em class="text-cyan-400 italic block mt-2 text-xs">"$1"</em>',
+                      )
+                      .replace(
+                        /\*(.*?)\*/g,
+                        '<em class="text-gray-400 italic">$1</em>',
+                      )
+                      .replace(
+                        /^- (.*$)/gm,
+                        '<li class="ml-3 text-gray-300 list-disc text-[11px]">$1</li>',
+                      )
+                      .replace(
+                        /^• (.*$)/gm,
+                        '<li class="ml-3 text-gray-300 list-disc text-[11px]">$1</li>',
+                      )
+                      .replace(/\n\n/g, '</p><p class="mt-2">')
+                      .replace(/^(.*)$/, "<p>$1</p>")
+                  ),
+                }}
+              />
+            </div>
           </div>
 
           {/* Risk Warning */}
           {item.riskWarning && (
-            <div
-              className={cn(
-                "rounded-2xl p-5 mb-8 border",
-                riskStyle.bg,
-                riskStyle.border,
-              )}
-            >
-              <div className="flex items-start gap-4">
-                <Shield
-                  className={cn("h-6 w-6 flex-shrink-0", riskStyle.text)}
-                />
+            <div className={cn("rounded-lg px-3 py-2 border", riskStyle.bg, riskStyle.border)}>
+              <div className="flex items-start gap-2">
+                <Shield className={cn("h-3.5 w-3.5 flex-shrink-0 mt-0.5", riskStyle.text)} />
                 <div>
-                  <h4 className={cn("font-semibold mb-1", riskStyle.text)}>
-                    Risk Warning
-                  </h4>
-                  <p className="text-sm text-gray-300">{item.riskWarning}</p>
+                  <h4 className={cn("text-[10px] font-bold uppercase", riskStyle.text)}>Risk Warning</h4>
+                  <p className="text-[10px] text-gray-300 mt-0.5">{item.riskWarning}</p>
                 </div>
               </div>
             </div>
           )}
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-2">
-            {item.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1.5 bg-gray-800/50 rounded-xl text-sm text-gray-400 border border-gray-700/30"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
+          {item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {item.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 bg-gray-800/50 rounded text-[10px] text-gray-400 border border-gray-700/30"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-8 border-t border-gray-800 bg-gray-900/50 flex items-center justify-between">
-          <div>
-            {item.isFree ? (
-              <div className="text-3xl font-bold text-green-400">FREE</div>
-            ) : (
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">
-                  ⚡ {item.price.toLocaleString()}
-                </span>
-                <span className="text-gray-400">credits</span>
-                {item.originalPrice && item.originalPrice > item.price && (
-                  <span className="text-lg text-gray-500 line-through">
-                    {item.originalPrice.toLocaleString()}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
+        {/* === ACTION BUTTON === */}
+        <div className="mx-3 mb-3 flex-shrink-0">
           <button
             onClick={onPurchase}
             disabled={purchasing || item.owned}
             className={cn(
-              "flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg transition-all",
+              "w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2",
               item.owned
-                ? isGameMaster
-                  ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30"
-                  : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
                 : isGameMaster
-                  ? "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-xl shadow-yellow-500/30"
-                  : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-xl shadow-emerald-500/30",
+                  ? "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/30"
+                  : `bg-gradient-to-r ${headerBg} text-white shadow-lg hover:brightness-110`,
             )}
           >
             {purchasing ? (
-              <div
-                className={cn(
-                  "animate-spin rounded-full h-6 w-6 border-2 border-t-transparent",
-                  isGameMaster ? "border-black" : "border-white",
-                )}
-              />
+              <div className={cn(
+                "animate-spin rounded-full h-5 w-5 border-2 border-t-transparent",
+                isGameMaster && !item.owned ? "border-black" : "border-white"
+              )} />
             ) : item.owned ? (
               <>
-                <Check className="h-6 w-6" />
+                <Check className="h-4 w-4" />
                 {isGameMaster ? "Already Active" : "Owned — Go to Arsenal"}
-                {!isGameMaster && <ArrowUpRight className="h-5 w-5" />}
+                {!isGameMaster && <ArrowUpRight className="h-3.5 w-3.5" />}
               </>
             ) : (
               <>
-                {isGameMaster ? (
-                  <Crown className="h-6 w-6" />
-                ) : (
-                  <ShoppingCart className="h-6 w-6" />
-                )}
+                {isGameMaster ? <Crown className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                 {isGameMaster ? "Become a Game Master" : "Purchase Now"}
               </>
             )}
           </button>
+        </div>
+
+        {/* Card ID */}
+        <div className="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+          <span className="text-[8px] text-gray-500">Chartvolt Marketplace</span>
+          <span className="text-[8px] text-gray-500 font-mono">{item.slug}</span>
         </div>
       </div>
     </div>
