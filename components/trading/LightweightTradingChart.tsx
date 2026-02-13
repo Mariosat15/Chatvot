@@ -1757,6 +1757,9 @@ const LightweightTradingChart = ({
 
         // Oscillator indicators (separate panels)
         const container = document.getElementById(`oscillator-${indicator.id}`);
+        // #region agent log
+        console.log('[DEBUG-CHART] Oscillator container lookup:', {indicatorId:indicator.id,type:indicator.type,containerFound:!!container});
+        // #endregion
         if (!container) return;
 
         const oscChart = createChart(container, {
@@ -2436,6 +2439,9 @@ const LightweightTradingChart = ({
         indicators.filter((i) => i.enabled).length,
         "enabled",
       );
+      // #region agent log
+      console.log('[DEBUG-CHART] Indicator useEffect triggered:', {count:indicators.length, enabled:indicators.filter((i:any)=>i.enabled).length, oscillators:indicators.filter((i:any)=>i.enabled&&i.displayType==='oscillator').map((i:any)=>({id:i.id,type:i.type})), candleDataLen:candleDataRef.current.length});
+      // #endregion
       updateIndicators(
         candleDataRef.current,
         chartRef.current,
@@ -3946,6 +3952,9 @@ const LightweightTradingChart = ({
           }
         }
 
+        // #region agent log
+        console.log('[DEBUG-CHART] Poll update:', {candleCount:latestCandles.length,oscillatorChartsActive:oscillatorChartsRef.current.size,candleDataRefLen:candleDataRef.current.length});
+        // #endregion
         // Update candleDataRef for indicators (time already in seconds from API)
         if (candleDataRef.current.length > 0 && latestCandles.length > 0) {
           const lastServerCandle = latestCandles[latestCandles.length - 1];
