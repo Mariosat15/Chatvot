@@ -178,6 +178,9 @@ const LightweightTradingChart = ({
 
   // ⚡ State to track TP/SL updates and position closures for immediate UI refresh
   const [tpslVersion, setTpslVersion] = useState(0);
+
+  // 📊 State to trigger indicator recalculation when candle data updates via polling
+  const [indicatorDataVersion, setIndicatorDataVersion] = useState(0);
   const closedPositionIdsRef = useRef<Set<string>>(new Set());
 
   // Listen for TP/SL updates and position closures to immediately redraw position lines
@@ -542,6 +545,7 @@ const LightweightTradingChart = ({
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<any>>>(new Map());
   const oscillatorChartsRef = useRef<Map<string, IChartApi>>(new Map());
+  const oscillatorSeriesRef = useRef<Map<string, ISeriesApi<any>[]>>(new Map());
   const candleDataRef = useRef<OHLCCandle[]>([]);
 
   // Convert OHLC to Heikin Ashi
@@ -820,7 +824,7 @@ const LightweightTradingChart = ({
       indicators.filter((i) => i.enabled).map((i) => i.type),
     );
 
-    // Clear existing indicator series
+    // Clear existing overlay indicator series from main chart
     indicatorSeriesRef.current.forEach((series) => {
       try {
         chart.removeSeries(series);
@@ -830,17 +834,29 @@ const LightweightTradingChart = ({
     });
     indicatorSeriesRef.current.clear();
 
-    // Clear existing oscillator charts
-    oscillatorChartsRef.current.forEach((oscChart) => {
-      try {
-        oscChart.remove();
-      } catch {
-        // Oscillator chart might already be removed
+    const enabledIndicators = indicators.filter((ind) => ind.enabled);
+
+    // For oscillator charts: remove series from reusable charts, destroy charts no longer needed
+    const activeOscIds = new Set(
+      enabledIndicators.filter((i) => i.displayType === "oscillator").map((i) => i.id),
+    );
+    // Remove series from ALL existing oscillator charts (we'll re-add updated data)
+    oscillatorSeriesRef.current.forEach((seriesList, id) => {
+      const oscChart = oscillatorChartsRef.current.get(id);
+      if (oscChart) {
+        seriesList.forEach((s) => {
+          try { oscChart.removeSeries(s); } catch { /* already removed */ }
+        });
       }
     });
-    oscillatorChartsRef.current.clear();
-
-    const enabledIndicators = indicators.filter((ind) => ind.enabled);
+    oscillatorSeriesRef.current.clear();
+    // Destroy oscillator charts whose indicators are no longer active
+    oscillatorChartsRef.current.forEach((oscChart, id) => {
+      if (!activeOscIds.has(id)) {
+        try { oscChart.remove(); } catch { /* already removed */ }
+        oscillatorChartsRef.current.delete(id);
+      }
+    });
     log("✅ Processing", enabledIndicators.length, "enabled indicators");
 
     enabledIndicators.forEach((indicator) => {
@@ -1755,40 +1771,47 @@ const LightweightTradingChart = ({
           indicator.priceSource || "close",
         );
 
-        // Oscillator indicators (separate panels)
+        // Oscillator indicators (separate panels) - reuse existing charts to avoid flicker
         const container = document.getElementById(`oscillator-${indicator.id}`);
-        // #region agent log
-        console.log('[DEBUG-CHART] Oscillator container lookup:', {indicatorId:indicator.id,type:indicator.type,containerFound:!!container});
-        // #endregion
         if (!container) return;
 
-        const oscChart = createChart(container, {
-          width: container.clientWidth,
-          height: 150,
-          layout: {
-            background: { color: "#131722" },
-            textColor: "#B2B5BE",
-            fontSize: 11,
-            fontFamily:
-              "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-            // @ts-expect-error attributionLogo is a newer lightweight-charts option not yet in types
-            attributionLogo: false, // Hide watermark
-          },
-          grid: {
-            vertLines: { color: "rgba(42, 46, 57, 0.6)" },
-            horzLines: { color: "rgba(42, 46, 57, 0.6)" },
-          },
-          timeScale: {
-            borderColor: "#2A2E39",
-            timeVisible: false,
-            secondsVisible: false,
-          },
-          rightPriceScale: {
-            borderColor: "#2A2E39",
-          },
-        });
+        let oscChart = oscillatorChartsRef.current.get(indicator.id);
+        if (!oscChart) {
+          oscChart = createChart(container, {
+            width: container.clientWidth,
+            height: 150,
+            layout: {
+              background: { color: "#131722" },
+              textColor: "#B2B5BE",
+              fontSize: 11,
+              fontFamily:
+                "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+              // @ts-expect-error attributionLogo is a newer lightweight-charts option not yet in types
+              attributionLogo: false, // Hide watermark
+            },
+            grid: {
+              vertLines: { color: "rgba(42, 46, 57, 0.6)" },
+              horzLines: { color: "rgba(42, 46, 57, 0.6)" },
+            },
+            timeScale: {
+              borderColor: "#2A2E39",
+              timeVisible: false,
+              secondsVisible: false,
+            },
+            rightPriceScale: {
+              borderColor: "#2A2E39",
+            },
+          });
+          oscillatorChartsRef.current.set(indicator.id, oscChart);
+        }
 
-        oscillatorChartsRef.current.set(indicator.id, oscChart);
+        // Track series for this oscillator so we can clean them up on next update
+        const oscSeriesList: ISeriesApi<any>[] = [];
+        // Proxy addLineSeries/addHistogramSeries to auto-track series
+        const _origAddLine = oscChart.addLineSeries.bind(oscChart);
+        const _origAddHist = oscChart.addHistogramSeries.bind(oscChart);
+        oscChart.addLineSeries = (...args: any[]) => { const s = _origAddLine(...args); oscSeriesList.push(s); return s; };
+        oscChart.addHistogramSeries = (...args: any[]) => { const s = _origAddHist(...args); oscSeriesList.push(s); return s; };
 
         if (indicator.type === "rsi") {
           const rsiData = calculateRSI(
@@ -2411,6 +2434,11 @@ const LightweightTradingChart = ({
           );
         }
 
+        // Restore original methods and save tracked series
+        oscChart.addLineSeries = _origAddLine;
+        oscChart.addHistogramSeries = _origAddHist;
+        oscillatorSeriesRef.current.set(indicator.id, oscSeriesList);
+
         oscChart.timeScale().fitContent();
       }
     });
@@ -2439,9 +2467,6 @@ const LightweightTradingChart = ({
         indicators.filter((i) => i.enabled).length,
         "enabled",
       );
-      // #region agent log
-      console.log('[DEBUG-CHART] Indicator useEffect triggered:', {count:indicators.length, enabled:indicators.filter((i:any)=>i.enabled).length, oscillators:indicators.filter((i:any)=>i.enabled&&i.displayType==='oscillator').map((i:any)=>({id:i.id,type:i.type})), candleDataLen:candleDataRef.current.length});
-      // #endregion
       updateIndicators(
         candleDataRef.current,
         chartRef.current,
@@ -2450,7 +2475,7 @@ const LightweightTradingChart = ({
     } else {
       log("⚠️ Chart not ready yet, skipping indicator update");
     }
-  }, [indicators]); // Re-run when indicators change
+  }, [indicators, indicatorDataVersion]); // Re-run when indicators change OR candle data updates
 
   // Strategy signal markers ref
   const signalMarkersRef = useRef<Map<string, any>>(new Map());
@@ -3952,9 +3977,6 @@ const LightweightTradingChart = ({
           }
         }
 
-        // #region agent log
-        console.log('[DEBUG-CHART] Poll update:', {candleCount:latestCandles.length,oscillatorChartsActive:oscillatorChartsRef.current.size,candleDataRefLen:candleDataRef.current.length});
-        // #endregion
         // Update candleDataRef for indicators (time already in seconds from API)
         if (candleDataRef.current.length > 0 && latestCandles.length > 0) {
           const lastServerCandle = latestCandles[latestCandles.length - 1];
@@ -3990,6 +4012,9 @@ const LightweightTradingChart = ({
             }
           }
         }
+
+        // Trigger indicator recalculation with updated candle data
+        setIndicatorDataVersion((v) => v + 1);
       } catch {
         // Network error or chart disposed - ignore
       }
@@ -4936,7 +4961,9 @@ const LightweightTradingChart = ({
             className="relative min-h-0"
             style={{
               flex: `1 1 0`,
-              minHeight: isFullscreen ? "300px" : "350px",
+              minHeight: activeOscillators.length > 0
+                ? (isFullscreen ? "200px" : "200px")
+                : (isFullscreen ? "300px" : "350px"),
             }}
           >
             {/* Symbol + Timeframe Label (top-left corner like TradingView) */}
@@ -5037,9 +5064,9 @@ const LightweightTradingChart = ({
             {/* New Drawing System is attached directly to the chart via primitives */}
           </div>
 
-          {/* Oscillator Panels - Resizable */}
+          {/* Oscillator Panels - Resizable, scrollable to prevent pushing timeframe bar off screen */}
           {activeOscillators.length > 0 && (
-            <>
+            <div className="flex flex-col min-h-0" style={{ maxHeight: "45%" }}>
               {/* Oscillator Drag Handle */}
               <div
                 onMouseDown={handleOscDragStart}
@@ -5048,27 +5075,29 @@ const LightweightTradingChart = ({
                 <div className="w-10 h-0.5 rounded-full bg-[#787b86] group-hover:bg-[#2962ff]" />
               </div>
 
-              {activeOscillators.map((indicator) => (
-                <div
-                  key={indicator.id}
-                  className="border-t border-[#2b2b43] flex-shrink-0"
-                >
-                  <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
-                    <span className="text-xs font-semibold text-[#d1d4dc]">
-                      {indicator.name}
-                    </span>
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: indicator.color }}
+              <div className="flex-1 overflow-y-auto dark-scrollbar min-h-0">
+                {activeOscillators.map((indicator) => (
+                  <div
+                    key={indicator.id}
+                    className="border-t border-[#2b2b43] flex-shrink-0"
+                  >
+                    <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
+                      <span className="text-xs font-semibold text-[#d1d4dc]">
+                        {indicator.name}
+                      </span>
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: indicator.color }}
+                      />
+                    </div>
+                    <div
+                      id={`oscillator-${indicator.id}`}
+                      style={{ height: `${oscillatorHeight}px`, width: "100%" }}
                     />
                   </div>
-                  <div
-                    id={`oscillator-${indicator.id}`}
-                    style={{ height: `${oscillatorHeight}px`, width: "100%" }}
-                  />
-                </div>
-              ))}
-            </>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Bottom Timeframe Quick-Select Bar (TradingView style) */}
