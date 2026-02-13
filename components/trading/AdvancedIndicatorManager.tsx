@@ -112,6 +112,15 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 20 },
     paramLabels: { period: "Period" },
   },
+  alma: { name: "Arnaud Legoux MA", shortName: "ALMA", displayType: "overlay" as const, defaultParams: { period: 20, offset: 0.85, sigma: 6 }, paramLabels: { period: "Period", offset: "Offset", sigma: "Sigma" } },
+  kama: { name: "Kaufman Adaptive MA", shortName: "KAMA", displayType: "overlay" as const, defaultParams: { period: 10 }, paramLabels: { period: "Period" } },
+  zlema: { name: "Zero-Lag EMA", shortName: "ZLEMA", displayType: "overlay" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  t3: { name: "Tillson T3", shortName: "T3", displayType: "overlay" as const, defaultParams: { period: 5, vFactor: 0.7 }, paramLabels: { period: "Period", vFactor: "Volume Factor" } },
+  smma: { name: "Smoothed MA", shortName: "SMMA", displayType: "overlay" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  lsma: { name: "Least Squares MA", shortName: "LSMA", displayType: "overlay" as const, defaultParams: { period: 25 }, paramLabels: { period: "Period" } },
+  vidya: { name: "Variable Index Dynamic Avg", shortName: "VIDYA", displayType: "overlay" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  mcginley: { name: "McGinley Dynamic", shortName: "McGinley", displayType: "overlay" as const, defaultParams: { period: 14 }, paramLabels: { period: "Period" } },
+  vwma: { name: "Volume Weighted MA", shortName: "VWMA", displayType: "overlay" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
 
   // Bands
   bb: {
@@ -140,12 +149,13 @@ export const INDICATOR_TEMPLATES = {
     shortName: "Ichimoku",
     displayType: "overlay" as const,
     defaultParams: { tenkanPeriod: 9, kijunPeriod: 26, senkouBPeriod: 52 },
-    paramLabels: {
-      tenkanPeriod: "Tenkan",
-      kijunPeriod: "Kijun",
-      senkouBPeriod: "Senkou B",
-    },
+    paramLabels: { tenkanPeriod: "Tenkan", kijunPeriod: "Kijun", senkouBPeriod: "Senkou B" },
   },
+  linreg_channel: { name: "Linear Regression Channel", shortName: "LinReg", displayType: "overlay" as const, defaultParams: { period: 100, deviations: 2 }, paramLabels: { period: "Period", deviations: "Deviations" } },
+  ma_envelope: { name: "Moving Average Envelope", shortName: "Envelope", displayType: "overlay" as const, defaultParams: { period: 20, percentage: 2.5 }, paramLabels: { period: "Period", percentage: "Percentage" } },
+  price_channel: { name: "Price Channel", shortName: "PC", displayType: "overlay" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  chandelier: { name: "Chandelier Exit", shortName: "ChanExit", displayType: "overlay" as const, defaultParams: { period: 22, multiplier: 3 }, paramLabels: { period: "Period", multiplier: "Multiplier" } },
+  supertrend: { name: "Supertrend", shortName: "ST", displayType: "overlay" as const, defaultParams: { period: 10, multiplier: 3 }, paramLabels: { period: "Period", multiplier: "Multiplier" } },
 
   // Oscillators
   rsi: {
@@ -241,6 +251,36 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 10 },
     paramLabels: { period: "Period" },
   },
+  // Trend oscillators
+  aroon: { name: "Aroon", shortName: "Aroon", displayType: "oscillator" as const, defaultParams: { period: 25 }, paramLabels: { period: "Period" } },
+  vortex: { name: "Vortex Indicator", shortName: "VI", displayType: "oscillator" as const, defaultParams: { period: 14 }, paramLabels: { period: "Period" } },
+  trix: { name: "TRIX", shortName: "TRIX", displayType: "oscillator" as const, defaultParams: { period: 15 }, paramLabels: { period: "Period" } },
+  dpo: { name: "Detrended Price Osc", shortName: "DPO", displayType: "oscillator" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  kst: { name: "Know Sure Thing", shortName: "KST", displayType: "oscillator" as const, defaultParams: {}, paramLabels: {} },
+  coppock: { name: "Coppock Curve", shortName: "Coppock", displayType: "oscillator" as const, defaultParams: { wmaPeriod: 10, longROC: 14, shortROC: 11 }, paramLabels: { wmaPeriod: "WMA Period", longROC: "Long ROC", shortROC: "Short ROC" } },
+  elder_ray: { name: "Elder Ray", shortName: "ElderRay", displayType: "oscillator" as const, defaultParams: { period: 13 }, paramLabels: { period: "Period" } },
+  // Volatility oscillators
+  std_dev: { name: "Standard Deviation", shortName: "StdDev", displayType: "oscillator" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  hist_volatility: { name: "Historical Volatility", shortName: "HV", displayType: "oscillator" as const, defaultParams: { period: 20 }, paramLabels: { period: "Period" } },
+  chaikin_volatility: { name: "Chaikin Volatility", shortName: "ChkVol", displayType: "oscillator" as const, defaultParams: { emaPeriod: 10, rocPeriod: 10 }, paramLabels: { emaPeriod: "EMA Period", rocPeriod: "ROC Period" } },
+  mass_index: { name: "Mass Index", shortName: "MI", displayType: "oscillator" as const, defaultParams: { emaPeriod: 9, sumPeriod: 25 }, paramLabels: { emaPeriod: "EMA Period", sumPeriod: "Sum Period" } },
+  ulcer_index: { name: "Ulcer Index", shortName: "UI", displayType: "oscillator" as const, defaultParams: { period: 14 }, paramLabels: { period: "Period" } },
+  rvi: { name: "Relative Volatility Index", shortName: "RVI", displayType: "oscillator" as const, defaultParams: { period: 10 }, paramLabels: { period: "Period" } },
+  // Volume oscillators
+  ad_line: { name: "Accum/Distribution Line", shortName: "A/D", displayType: "oscillator" as const, defaultParams: {}, paramLabels: {} },
+  force_index: { name: "Force Index", shortName: "FI", displayType: "oscillator" as const, defaultParams: { period: 13 }, paramLabels: { period: "Period" } },
+  eom: { name: "Ease of Movement", shortName: "EOM", displayType: "oscillator" as const, defaultParams: { period: 14 }, paramLabels: { period: "Period" } },
+  nvi: { name: "Negative Volume Index", shortName: "NVI", displayType: "oscillator" as const, defaultParams: {}, paramLabels: {} },
+  pvi: { name: "Positive Volume Index", shortName: "PVI", displayType: "oscillator" as const, defaultParams: {}, paramLabels: {} },
+  // Advanced oscillators
+  ultimate_osc: { name: "Ultimate Oscillator", shortName: "UO", displayType: "oscillator" as const, defaultParams: { period1: 7, period2: 14, period3: 28 }, paramLabels: { period1: "Fast", period2: "Mid", period3: "Slow" } },
+  awesome_osc: { name: "Awesome Oscillator", shortName: "AO", displayType: "oscillator" as const, defaultParams: {}, paramLabels: {} },
+  stochrsi: { name: "Stochastic RSI", shortName: "StochRSI", displayType: "oscillator" as const, defaultParams: { rsiPeriod: 14, stochPeriod: 14, kSmooth: 3, dSmooth: 3 }, paramLabels: { rsiPeriod: "RSI Period", stochPeriod: "Stoch Period", kSmooth: "K Smooth", dSmooth: "D Smooth" } },
+  tsi: { name: "True Strength Index", shortName: "TSI", displayType: "oscillator" as const, defaultParams: { longPeriod: 25, shortPeriod: 13 }, paramLabels: { longPeriod: "Long", shortPeriod: "Short" } },
+  ppo: { name: "Percentage Price Osc", shortName: "PPO", displayType: "oscillator" as const, defaultParams: { fast: 12, slow: 26, signal: 9 }, paramLabels: { fast: "Fast", slow: "Slow", signal: "Signal" } },
+  fisher: { name: "Fisher Transform", shortName: "Fisher", displayType: "oscillator" as const, defaultParams: { period: 9 }, paramLabels: { period: "Period" } },
+  connors_rsi: { name: "Connors RSI", shortName: "CRSI", displayType: "oscillator" as const, defaultParams: { rsiPeriod: 3, streakPeriod: 2, rocPeriod: 100 }, paramLabels: { rsiPeriod: "RSI", streakPeriod: "Streak", rocPeriod: "Rank" } },
+  smi_ergodic: { name: "SMI Ergodic", shortName: "SMI", displayType: "oscillator" as const, defaultParams: { shortPeriod: 5, longPeriod: 20, signalPeriod: 5 }, paramLabels: { shortPeriod: "Short", longPeriod: "Long", signalPeriod: "Signal" } },
   sar: {
     name: "Parabolic SAR",
     shortName: "SAR",

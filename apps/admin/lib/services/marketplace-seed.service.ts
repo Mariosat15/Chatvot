@@ -1162,6 +1162,268 @@ Sometimes the simplest indicator is the best. Momentum shows you pure price velo
 };
 
 // ============================================================================
+// BATCH 3: 40 MORE ADVANCED INDICATORS
+// ============================================================================
+
+// Helper to create indicator items compactly
+function mkIndicator(
+  name: string, slug: string, shortDesc: string, fullDesc: string,
+  indicatorType: string, displayType: "overlay" | "oscillator",
+  price: number, defaultSettings: Record<string, unknown>,
+  tags: string[], opts?: { isFeatured?: boolean; isFree?: boolean },
+): Partial<IMarketplaceItem> {
+  return {
+    name, slug, shortDescription: shortDesc, fullDescription: fullDesc,
+    category: "indicator", price, isFree: opts?.isFree ?? price === 0,
+    status: "active", isPublished: true, isFeatured: opts?.isFeatured ?? false,
+    version: "1.0.0", indicatorType: indicatorType as any,
+    codeTemplate: JSON.stringify({ type: indicatorType, displayType, description: shortDesc }, null, 2),
+    defaultSettings: { color: "#3b82f6", lineWidth: 2, ...defaultSettings },
+    supportedAssets: [], tags, riskLevel: "low",
+  };
+}
+
+const ALMA_IND = mkIndicator("Arnaud Legoux Moving Average", "arnaud-legoux-ma",
+  "ALMA uses Gaussian distribution for ultra-smooth, low-lag price tracking.",
+  `# Arnaud Legoux Moving Average (ALMA)\n\nUses a Gaussian-weighted window that can be shifted along the price series. Produces an incredibly smooth line with adjustable lag via the offset parameter.\n\n## Settings\n- **Period**: Window size (default: 20)\n- **Offset**: Shift factor 0-1 (default: 0.85)\n- **Sigma**: Gaussian width (default: 6)\n\n## Why Use ALMA\n- Smoother than EMA with less lag\n- Customizable via offset/sigma\n- Excellent for trend identification`,
+  "alma", "overlay", 200, { period: 20, offset: 0.85, sigma: 6, color: "#8b5cf6" },
+  ["moving-average", "alma", "gaussian", "smooth", "advanced"]);
+
+const KAMA_IND = mkIndicator("Kaufman Adaptive Moving Average", "kaufman-adaptive-ma",
+  "KAMA automatically adjusts speed based on market noise — fast in trends, slow in ranges.",
+  `# Kaufman Adaptive Moving Average (KAMA)\n\nAdapts its smoothing constant based on the Efficiency Ratio (direction vs noise). In strong trends it acts fast; in choppy markets it barely moves.\n\n## Settings\n- **Period**: ER lookback (default: 10)\n\n## Key Advantage\nSelf-adjusting — no need to switch between fast/slow MAs.`,
+  "kama", "overlay", 250, { period: 10, color: "#06b6d4" },
+  ["moving-average", "kama", "adaptive", "smart", "advanced"], { isFeatured: true });
+
+const ZLEMA_IND = mkIndicator("Zero-Lag EMA", "zero-lag-ema",
+  "ZLEMA removes inherent EMA lag by pre-adjusting price data.",
+  `# Zero-Lag Exponential Moving Average\n\nSubtracts the lag component from the data before applying EMA, resulting in a line that tracks current price more closely.\n\n## Settings\n- **Period**: EMA period (default: 20)\n\n## Best For\n- Scalping where every bar matters\n- Faster crossover signals`,
+  "zlema", "overlay", 150, { period: 20, color: "#f97316" },
+  ["moving-average", "zlema", "zero-lag", "fast"]);
+
+const T3_IND = mkIndicator("Tillson T3", "tillson-t3",
+  "T3 applies six-pass EMA smoothing for an incredibly smooth, responsive line.",
+  `# Tillson T3 Moving Average\n\nSix cascaded EMAs with volume factor control produce one of the smoothest moving averages available while maintaining good responsiveness.\n\n## Settings\n- **Period**: EMA period (default: 5)\n- **Volume Factor**: Smoothing control 0-1 (default: 0.7)\n\n## Why Traders Love T3\n- Ultra-smooth output\n- Very little overshoot\n- Great for trend determination`,
+  "t3", "overlay", 250, { period: 5, vFactor: 0.7, color: "#ec4899" },
+  ["moving-average", "t3", "tillson", "ultra-smooth", "advanced"], { isFeatured: true });
+
+const SMMA_IND = mkIndicator("Smoothed Moving Average", "smoothed-ma",
+  "SMMA provides extra smoothing compared to SMA with a unique recursive formula.",
+  `# Smoothed Moving Average (SMMA)\n\nSimilar to EMA but with a different smoothing approach: SMMA(n) = (SMMA(n-1) × (period-1) + close) / period.\n\n## Settings\n- **Period**: Lookback (default: 20)`,
+  "smma", "overlay", 100, { period: 20, color: "#22c55e" },
+  ["moving-average", "smma", "smooth"]);
+
+const LSMA_IND = mkIndicator("Least Squares Moving Average", "least-squares-ma",
+  "LSMA fits a regression line to price — shows where price should be mathematically.",
+  `# Least Squares Moving Average (LSMA)\n\nAlso called Linear Regression Value. Fits a straight line via least-squares and uses the endpoint as the current value.\n\n## Settings\n- **Period**: Regression window (default: 25)\n\n## Advantage\nShows the mathematical trend direction with no lag at the current bar.`,
+  "lsma", "overlay", 150, { period: 25, color: "#6366f1" },
+  ["moving-average", "lsma", "regression", "linear"]);
+
+const VIDYA_IND = mkIndicator("Variable Index Dynamic Average", "vidya",
+  "VIDYA adapts smoothing using the Chande Momentum Oscillator for volatility awareness.",
+  `# Variable Index Dynamic Average (VIDYA)\n\nUses CMO to gauge volatility and dynamically adjust EMA speed. High volatility = fast response; low volatility = smooth.\n\n## Settings\n- **Period**: Smoothing period (default: 20)`,
+  "vidya", "overlay", 200, { period: 20, color: "#a855f7" },
+  ["moving-average", "vidya", "adaptive", "volatility-aware"]);
+
+const MCGINLEY_IND = mkIndicator("McGinley Dynamic", "mcginley-dynamic",
+  "Self-adjusting MA that automatically speeds up in downtrends and slows in uptrends.",
+  `# McGinley Dynamic\n\nCreated by John McGinley, this indicator self-adjusts its speed based on the ratio of price to its current value. It virtually eliminates whipsaws.\n\n## Settings\n- **Period**: Base period (default: 14)\n\n## Why It's Special\n- Automatically adjusts speed\n- No parameter optimization needed\n- Stays close to price without whipsaws`,
+  "mcginley", "overlay", 200, { period: 14, color: "#0ea5e9" },
+  ["moving-average", "mcginley", "self-adjusting", "dynamic"]);
+
+const VWMA_IND = mkIndicator("Volume Weighted Moving Average", "volume-weighted-ma",
+  "VWMA weights each price bar by its volume — high-volume bars have more influence.",
+  `# Volume Weighted Moving Average (VWMA)\n\nLike SMA but each price is multiplied by its volume before averaging. High-volume bars dominate the calculation.\n\n## Settings\n- **Period**: Lookback (default: 20)\n\n## VWMA vs SMA\n- VWMA above SMA = buying pressure\n- VWMA below SMA = selling pressure`,
+  "vwma", "overlay", 150, { period: 20, color: "#14b8a6" },
+  ["moving-average", "vwma", "volume", "weighted"]);
+
+const SUPERTREND_IND = mkIndicator("Supertrend", "supertrend",
+  "Supertrend uses ATR to create a dynamic trailing stop that flips with trend changes.",
+  `# Supertrend\n\nOne of the most popular trend-following indicators. Uses ATR bands around the median price. When price crosses the band, the trend flips.\n\n## Settings\n- **Period**: ATR period (default: 10)\n- **Multiplier**: ATR multiplier (default: 3)\n\n## Trading\n- Green line below price = Uptrend (buy)\n- Red line above price = Downtrend (sell)\n- Band flip = Entry/exit signal`,
+  "supertrend", "overlay", 300, { period: 10, multiplier: 3, color: "#00e676" },
+  ["trend", "supertrend", "atr", "trailing-stop", "popular"], { isFeatured: true });
+
+const AROON_IND = mkIndicator("Aroon Oscillator", "aroon-oscillator",
+  "Aroon measures time since the highest high and lowest low to identify trends early.",
+  `# Aroon Oscillator\n\nAroon Up measures bars since highest high; Aroon Down measures bars since lowest low. Both scale 0-100.\n\n## Settings\n- **Period**: Lookback (default: 25)\n\n## Reading\n- Aroon Up > 70 + Down < 30 = Strong uptrend\n- Aroon Down > 70 + Up < 30 = Strong downtrend\n- Crossovers signal trend changes`,
+  "aroon", "oscillator", 200, { period: 25, color: "#00e676" },
+  ["trend", "aroon", "oscillator", "timing"]);
+
+const VORTEX_IND = mkIndicator("Vortex Indicator", "vortex-indicator",
+  "Vortex measures positive and negative trend movement to identify trend direction.",
+  `# Vortex Indicator\n\nCompares upward and downward price movement distances relative to true range. VI+ crossing above VI- signals bullish; below signals bearish.\n\n## Settings\n- **Period**: Smoothing (default: 14)`,
+  "vortex", "oscillator", 200, { period: 14, color: "#00e676" },
+  ["trend", "vortex", "directional"]);
+
+const TRIX_IND = mkIndicator("TRIX", "trix-indicator",
+  "TRIX is a triple-smoothed EMA rate of change — eliminates noise, shows pure momentum.",
+  `# TRIX (Triple Exponential Average)\n\nApplies EMA three times, then calculates the percentage change. The triple smoothing eliminates virtually all noise.\n\n## Settings\n- **Period**: EMA period (default: 15)\n\n## Signals\n- TRIX above zero = Bullish momentum\n- TRIX below zero = Bearish momentum\n- Zero crossovers = Trade signals`,
+  "trix", "oscillator", 200, { period: 15, color: "#8b5cf6" },
+  ["momentum", "trix", "triple-smoothed", "noise-free"]);
+
+const DPO_IND = mkIndicator("Detrended Price Oscillator", "detrended-price-osc",
+  "DPO removes the trend to show underlying cycles in price data.",
+  `# Detrended Price Oscillator (DPO)\n\nRemoves the longer-term trend from prices, leaving only the cyclical patterns. Useful for identifying cycle peaks and troughs.\n\n## Settings\n- **Period**: Detrending period (default: 20)`,
+  "dpo", "oscillator", 150, { period: 20, color: "#f59e0b" },
+  ["momentum", "dpo", "cycles", "detrended"]);
+
+const KST_IND = mkIndicator("Know Sure Thing", "know-sure-thing",
+  "KST combines four weighted ROC smoothings for a reliable momentum oscillator.",
+  `# Know Sure Thing (KST)\n\nDeveloped by Martin Pring. Combines smoothed ROC at 4 different timeframes (10,15,20,30) weighted 1:2:3:4.\n\n## Signals\n- KST above zero = Bullish\n- KST below zero = Bearish\n- Excellent for confirming trend changes`,
+  "kst", "oscillator", 250, { color: "#6366f1" },
+  ["momentum", "kst", "multi-timeframe", "weighted-roc"], { isFeatured: true });
+
+const COPPOCK_IND = mkIndicator("Coppock Curve", "coppock-curve",
+  "Coppock Curve identifies long-term buying opportunities after market bottoms.",
+  `# Coppock Curve\n\nDesigned to identify major market bottoms. Combines long-term and short-term ROC smoothed by WMA.\n\n## Settings\n- **WMA Period**: Smoothing (default: 10)\n- **Long ROC**: Long rate of change (default: 14)\n- **Short ROC**: Short rate of change (default: 11)\n\n## Use\nBuy signal when Coppock turns up from below zero.`,
+  "coppock", "oscillator", 200, { wmaPeriod: 10, longROC: 14, shortROC: 11, color: "#0ea5e9" },
+  ["momentum", "coppock", "long-term", "bottoms"]);
+
+const ELDER_RAY_IND = mkIndicator("Elder Ray", "elder-ray",
+  "Elder Ray shows bull and bear power — the strength of buyers vs sellers.",
+  `# Elder Ray (Bull/Bear Power)\n\nCreated by Dr. Alexander Elder. Bull Power = High - EMA; Bear Power = Low - EMA.\n\n## Settings\n- **Period**: EMA period (default: 13)\n\n## Trading\n- Both positive = Strong uptrend\n- Both negative = Strong downtrend\n- Divergences signal reversals`,
+  "elder_ray", "oscillator", 200, { period: 13, color: "#00e676" },
+  ["trend", "elder-ray", "bull-bear", "power"]);
+
+const STDDEV_IND = mkIndicator("Standard Deviation", "standard-deviation",
+  "Measures price volatility — how much price deviates from its mean.",
+  `# Standard Deviation\n\nThe foundation of volatility measurement. Shows how dispersed prices are from their average.\n\n## Settings\n- **Period**: Lookback (default: 20)\n\n## Use\n- Rising = Increasing volatility\n- Falling = Decreasing volatility\n- Used to determine position sizing and stop distances`,
+  "std_dev", "oscillator", 100, { period: 20, color: "#f59e0b" },
+  ["volatility", "std-dev", "statistics"]);
+
+const HISTVOL_IND = mkIndicator("Historical Volatility", "historical-volatility",
+  "Annualized volatility from log returns — the professional measure of market risk.",
+  `# Historical Volatility\n\nCalculates standard deviation of log returns, annualized to show volatility as a percentage.\n\n## Settings\n- **Period**: Lookback (default: 20)\n\n## Reading\n- 10-15% = Low volatility\n- 20-30% = Normal\n- 40%+ = High volatility`,
+  "hist_volatility", "oscillator", 200, { period: 20, color: "#ef4444" },
+  ["volatility", "historical", "risk", "professional"]);
+
+const CHKVOL_IND = mkIndicator("Chaikin Volatility", "chaikin-volatility",
+  "Measures the rate of change in the high-low spread — shows volatility acceleration.",
+  `# Chaikin Volatility\n\nCalculates the ROC of an EMA of the High-Low range. Shows whether volatility is expanding or contracting.\n\n## Settings\n- **EMA Period**: Smoothing (default: 10)\n- **ROC Period**: Change period (default: 10)`,
+  "chaikin_volatility", "oscillator", 150, { emaPeriod: 10, rocPeriod: 10, color: "#a855f7" },
+  ["volatility", "chaikin", "range"]);
+
+const MASSIDX_IND = mkIndicator("Mass Index", "mass-index",
+  "Mass Index detects trend reversals by measuring high-low range narrowing and widening.",
+  `# Mass Index\n\nLooks for a \"reversal bulge\" pattern where the EMA ratio sum rises above 27 then falls below 26.5.\n\n## Settings\n- **EMA Period**: (default: 9)\n- **Sum Period**: (default: 25)\n\n## Signal\nBulge above 27 followed by drop below 26.5 = Potential reversal.`,
+  "mass_index", "oscillator", 200, { emaPeriod: 9, sumPeriod: 25, color: "#ec4899" },
+  ["volatility", "mass-index", "reversal"]);
+
+const ULCER_IND = mkIndicator("Ulcer Index", "ulcer-index",
+  "Ulcer Index measures downside risk — how much drawdown investors experience.",
+  `# Ulcer Index\n\nUnlike standard deviation (which measures both up and down), Ulcer Index only measures downside volatility — the pain of drawdowns.\n\n## Settings\n- **Period**: Lookback (default: 14)\n\n## Why Use It\n- Measures real investor pain\n- Better risk metric than standard deviation\n- Used in the Ulcer Performance Index (Martin Ratio)`,
+  "ulcer_index", "oscillator", 150, { period: 14, color: "#f23645" },
+  ["volatility", "ulcer", "drawdown", "risk"]);
+
+const RVI_IND = mkIndicator("Relative Volatility Index", "relative-volatility-index",
+  "RVI applies RSI logic to standard deviation — shows directional volatility.",
+  `# Relative Volatility Index (RVI)\n\nApplies RSI-style smoothing to standard deviation values instead of price. Shows whether volatility is rising on up days or down days.\n\n## Settings\n- **Period**: Std Dev period (default: 10)\n\n## Reading\n- Above 50 = Volatility increasing on up moves\n- Below 50 = Volatility increasing on down moves`,
+  "rvi", "oscillator", 200, { period: 10, color: "#14b8a6" },
+  ["volatility", "rvi", "directional"]);
+
+const ADLINE_IND = mkIndicator("Accumulation/Distribution Line", "ad-line",
+  "A/D Line tracks cumulative money flow based on where price closes within its range.",
+  `# Accumulation/Distribution Line\n\nCumulative indicator: adds (close near high) or subtracts (close near low) volume-weighted values.\n\n## No Parameters\nUses the Close Location Value × Volume cumulatively.\n\n## Divergence Trading\n- Price making new highs + A/D not = Distribution (bearish)\n- Price making new lows + A/D not = Accumulation (bullish)`,
+  "ad_line", "oscillator", 150, { color: "#22c55e" },
+  ["volume", "accumulation", "distribution", "a-d-line"]);
+
+const FORCEIDX_IND = mkIndicator("Force Index", "force-index",
+  "Force Index combines price change and volume to measure buying/selling pressure.",
+  `# Force Index\n\nForce = (Close - Previous Close) × Volume, then smoothed with EMA.\n\n## Settings\n- **Period**: EMA smoothing (default: 13)\n\n## Signals\n- Positive = Buying force\n- Negative = Selling force\n- Zero-line crossovers = Shift in control`,
+  "force_index", "oscillator", 150, { period: 13, color: "#3b82f6" },
+  ["volume", "force", "buying-selling"]);
+
+const EOM_IND = mkIndicator("Ease of Movement", "ease-of-movement",
+  "EOM measures how easily price moves — combines range and volume efficiency.",
+  `# Ease of Movement\n\nMeasures the relationship between price movement and volume. High values = price moves easily on low volume.\n\n## Settings\n- **Period**: SMA smoothing (default: 14)\n\n## Reading\n- Above zero = Buyers have it easy\n- Below zero = Sellers have it easy`,
+  "eom", "oscillator", 150, { period: 14, color: "#f97316" },
+  ["volume", "ease-of-movement", "efficiency"]);
+
+const NVI_IND = mkIndicator("Negative Volume Index", "negative-volume-index",
+  "NVI only changes on low-volume days — tracks what smart money does quietly.",
+  `# Negative Volume Index\n\nOnly updates when today's volume is LOWER than yesterday's. Theory: smart money trades on quiet days.\n\n## No Parameters\nStarts at 1000 and accumulates.\n\n## Classic Signal\nNVI above its 255-day MA = 96% chance of a bull market (per Norman Fosback).`,
+  "nvi", "oscillator", 200, { color: "#6366f1" },
+  ["volume", "nvi", "smart-money"]);
+
+const PVI_IND = mkIndicator("Positive Volume Index", "positive-volume-index",
+  "PVI only changes on high-volume days — tracks crowd/emotional trading activity.",
+  `# Positive Volume Index\n\nOnly updates when today's volume is HIGHER than yesterday's. Theory: the crowd is most active on high-volume days.\n\n## No Parameters\nStarts at 1000 and accumulates.`,
+  "pvi", "oscillator", 200, { color: "#0ea5e9" },
+  ["volume", "pvi", "crowd"]);
+
+const ULTOSC_IND = mkIndicator("Ultimate Oscillator", "ultimate-oscillator",
+  "Combines three timeframes to reduce false signals that plague single-period oscillators.",
+  `# Ultimate Oscillator\n\nCreated by Larry Williams. Uses buying pressure across 7, 14, and 28-period timeframes, weighted 4:2:1.\n\n## Settings\n- **Period 1**: Fast (default: 7)\n- **Period 2**: Medium (default: 14)\n- **Period 3**: Slow (default: 28)\n\n## Signals\n- Above 70 = Overbought\n- Below 30 = Oversold\n- Divergences are the primary signal`,
+  "ultimate_osc", "oscillator", 200, { period1: 7, period2: 14, period3: 28, color: "#8b5cf6" },
+  ["oscillator", "ultimate", "multi-timeframe"]);
+
+const AWEOSC_IND = mkIndicator("Awesome Oscillator", "awesome-oscillator",
+  "Bill Williams' AO shows market momentum using the difference between 5 and 34-period SMAs.",
+  `# Awesome Oscillator\n\nSimply: SMA(5) of median price minus SMA(34) of median price. Created by Bill Williams.\n\n## No Parameters\nFixed 5 and 34-period SMAs of (High+Low)/2.\n\n## Signals\n- Zero-line crossover = Trend change\n- Twin peaks (saucer) = Continuation\n- Above zero = Bullish momentum`,
+  "awesome_osc", "oscillator", 150, { color: "#22c55e" },
+  ["momentum", "awesome", "bill-williams"]);
+
+const STOCHRSI_IND = mkIndicator("Stochastic RSI", "stochastic-rsi",
+  "StochRSI applies Stochastic formula to RSI — more sensitive and extreme readings.",
+  `# Stochastic RSI\n\nApplies the Stochastic oscillator formula to RSI values instead of price. Creates a more sensitive oscillator with faster signals.\n\n## Settings\n- **RSI Period**: (default: 14)\n- **Stoch Period**: (default: 14)\n- **K Smooth**: (default: 3)\n- **D Smooth**: (default: 3)\n\n## Signals\n- Above 80 = Overbought\n- Below 20 = Oversold\n- K/D crossovers`,
+  "stochrsi", "oscillator", 250, { rsiPeriod: 14, stochPeriod: 14, kSmooth: 3, dSmooth: 3, color: "#3b82f6" },
+  ["oscillator", "stochrsi", "stochastic", "rsi", "sensitive"], { isFeatured: true });
+
+const TSI_IND = mkIndicator("True Strength Index", "true-strength-index",
+  "TSI double-smooths price momentum to show clean trend direction and strength.",
+  `# True Strength Index (TSI)\n\nDouble-smooths momentum (price change) using two EMAs. The result is a clean oscillator between -100 and +100.\n\n## Settings\n- **Long Period**: Slow smoothing (default: 25)\n- **Short Period**: Fast smoothing (default: 13)\n\n## Trading\n- Above zero = Bullish\n- Below zero = Bearish\n- Divergences signal reversals`,
+  "tsi", "oscillator", 200, { longPeriod: 25, shortPeriod: 13, color: "#ef4444" },
+  ["momentum", "tsi", "double-smoothed"]);
+
+const PPO_IND = mkIndicator("Percentage Price Oscillator", "percentage-price-osc",
+  "PPO is MACD expressed as a percentage — enables comparison across different assets.",
+  `# Percentage Price Oscillator (PPO)\n\nLike MACD but expressed as a percentage of the slow EMA. This allows comparison between assets with different price levels.\n\n## Settings\n- **Fast**: Fast EMA (default: 12)\n- **Slow**: Slow EMA (default: 26)\n- **Signal**: Signal line (default: 9)\n\n## PPO vs MACD\n- PPO = (Fast EMA - Slow EMA) / Slow EMA × 100\n- Comparable across different priced assets`,
+  "ppo", "oscillator", 200, { fast: 12, slow: 26, signal: 9, color: "#f97316" },
+  ["momentum", "ppo", "percentage", "comparable"]);
+
+const FISHER_IND = mkIndicator("Fisher Transform", "fisher-transform",
+  "Fisher Transform converts prices to Gaussian distribution for sharp turning point signals.",
+  `# Fisher Transform\n\nApplies mathematical transformation that forces price into a Gaussian distribution, creating sharp peaks at turning points.\n\n## Settings\n- **Period**: Lookback (default: 9)\n\n## Key Benefit\nClear, sharp reversal signals — the Fisher Transform peaks are more defined than RSI or Stochastic extremes.`,
+  "fisher", "oscillator", 250, { period: 9, color: "#a855f7" },
+  ["oscillator", "fisher", "gaussian", "turning-points"], { isFeatured: true });
+
+const CRSI_IND = mkIndicator("Connors RSI", "connors-rsi",
+  "Connors RSI combines 3 components for a statistically robust mean-reversion signal.",
+  `# Connors RSI\n\nCombines: (1) Short-term RSI, (2) RSI of up/down streak length, (3) Percentile rank of recent returns.\n\n## Settings\n- **RSI Period**: (default: 3)\n- **Streak Period**: (default: 2)\n- **Rank Period**: (default: 100)\n\n## Trading\n- Below 10 = Strong buy signal\n- Above 90 = Strong sell signal\n- Developed by Larry Connors with backtested edge`,
+  "connors_rsi", "oscillator", 300, { rsiPeriod: 3, streakPeriod: 2, rocPeriod: 100, color: "#ec4899" },
+  ["oscillator", "connors", "mean-reversion", "statistical"], { isFeatured: true });
+
+const SMI_IND = mkIndicator("SMI Ergodic Oscillator", "smi-ergodic",
+  "SMI Ergodic uses TSI with a signal line for clean momentum crossover signals.",
+  `# SMI Ergodic Oscillator\n\nBased on the True Strength Index with an added signal line. Produces cleaner crossover signals than MACD.\n\n## Settings\n- **Short Period**: Fast (default: 5)\n- **Long Period**: Slow (default: 20)\n- **Signal Period**: Signal EMA (default: 5)\n\n## Signals\n- Main crosses above signal = Buy\n- Main crosses below signal = Sell`,
+  "smi_ergodic", "oscillator", 200, { shortPeriod: 5, longPeriod: 20, signalPeriod: 5, color: "#0ea5e9" },
+  ["oscillator", "smi", "ergodic", "crossover"]);
+
+const LINREG_IND = mkIndicator("Linear Regression Channel", "linear-regression-channel",
+  "Statistical channel with regression line center and standard error bands.",
+  `# Linear Regression Channel\n\nFits a regression line to price data and adds standard error bands above/below.\n\n## Settings\n- **Period**: Regression window (default: 100)\n- **Deviations**: Band width (default: 2)\n\n## Trading\n- Price at upper band = Potential short\n- Price at lower band = Potential long\n- Slope shows mathematical trend direction`,
+  "linreg_channel", "overlay", 250, { period: 100, deviations: 2, color: "#6366f1" },
+  ["channel", "regression", "statistical", "bands"]);
+
+const ENVELOPE_IND = mkIndicator("Moving Average Envelope", "ma-envelope",
+  "Fixed-percentage bands around SMA — simple but effective support/resistance zones.",
+  `# Moving Average Envelope\n\nPlaces bands at a fixed percentage above and below a simple moving average.\n\n## Settings\n- **Period**: SMA period (default: 20)\n- **Percentage**: Band distance (default: 2.5%)\n\n## Use Cases\n- Mean reversion trading at band boundaries\n- Identifying overextended price moves\n- Position sizing based on distance from MA`,
+  "ma_envelope", "overlay", 150, { period: 20, percentage: 2.5, color: "#14b8a6" },
+  ["channel", "envelope", "bands", "mean-reversion"]);
+
+const PRICECH_IND = mkIndicator("Price Channel", "price-channel",
+  "Breakout channel using prior period's highest high and lowest low.",
+  `# Price Channel\n\nUpper band = highest high of prior N periods. Lower band = lowest low of prior N periods. Similar to Donchian but uses prior period only.\n\n## Settings\n- **Period**: Lookback (default: 20)\n\n## Trading\n- Price breaks above upper = Bullish breakout\n- Price breaks below lower = Bearish breakout`,
+  "price_channel", "overlay", 150, { period: 20, color: "#f59e0b" },
+  ["channel", "breakout", "price-channel"]);
+
+const CHANDELIER_IND = mkIndicator("Chandelier Exit", "chandelier-exit",
+  "ATR-based trailing stop designed to keep you in trends and exit on reversals.",
+  `# Chandelier Exit\n\nTrailing stop: Exit Long = Highest High - (Multiplier × ATR). Exit Short = Lowest Low + (Multiplier × ATR).\n\n## Settings\n- **Period**: ATR/High-Low period (default: 22)\n- **Multiplier**: ATR multiple (default: 3)\n\n## Created by Charles Le Beau\n- Hangs from the highest high like a chandelier\n- Drops with the trend but never rises (for longs)\n- Excellent for trend-following exits`,
+  "chandelier", "overlay", 250, { period: 22, multiplier: 3, color: "#ef4444" },
+  ["channel", "chandelier", "exit", "trailing-stop", "atr"]);
+
+// ============================================================================
 // STRATEGY TEMPLATES
 // ============================================================================
 
@@ -1907,6 +2169,13 @@ const ALL_ITEMS = [
   ROC_INDICATOR, // Rate of Change
   CMF_INDICATOR, // Chaikin Money Flow
   MOMENTUM_INDICATOR, // Momentum Oscillator (Free)
+  // Batch 3: 40 Advanced Indicators
+  ALMA_IND, KAMA_IND, ZLEMA_IND, T3_IND, SMMA_IND, LSMA_IND, VIDYA_IND, MCGINLEY_IND, VWMA_IND,
+  SUPERTREND_IND, AROON_IND, VORTEX_IND, TRIX_IND, DPO_IND, KST_IND, COPPOCK_IND, ELDER_RAY_IND,
+  STDDEV_IND, HISTVOL_IND, CHKVOL_IND, MASSIDX_IND, ULCER_IND, RVI_IND,
+  ADLINE_IND, FORCEIDX_IND, EOM_IND, NVI_IND, PVI_IND,
+  ULTOSC_IND, AWEOSC_IND, STOCHRSI_IND, TSI_IND, PPO_IND, FISHER_IND, CRSI_IND, SMI_IND,
+  LINREG_IND, ENVELOPE_IND, PRICECH_IND, CHANDELIER_IND,
   // Strategies
   MA_CROSSOVER_STRATEGY, // MA + RSI strategy
   // Cosmetic Avatars

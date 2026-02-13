@@ -64,31 +64,22 @@ import Watchlist from "./Watchlist";
 import { GripHorizontal } from "lucide-react";
 import { useTradingArsenal } from "@/contexts/TradingArsenalContext";
 import {
-  calculateSMA,
-  calculateEMA,
-  calculateWMA,
-  calculateDEMA,
-  calculateTEMA,
-  calculateHMA,
-  calculateRSI,
-  calculateMACD,
-  calculateBollingerBands,
-  calculateKeltnerChannels,
-  calculateDonchianChannel,
-  calculateIchimoku,
-  calculateStochastic,
-  calculateWilliamsR,
-  calculateCCI,
-  calculateADX,
-  calculateMFI,
-  calculateATR,
-  calculateVWAP,
-  calculateParabolicSAR,
-  calculatePivotPoints,
-  calculateOBV,
-  calculateROC,
-  calculateCMF,
+  calculateSMA, calculateEMA, calculateWMA, calculateDEMA, calculateTEMA, calculateHMA,
+  calculateALMA, calculateKAMA, calculateZLEMA, calculateT3, calculateSMMA, calculateLSMA,
+  calculateVIDYA, calculateMcGinley,
+  calculateRSI, calculateMACD, calculateBollingerBands, calculateKeltnerChannels,
+  calculateDonchianChannel, calculateIchimoku, calculateStochastic, calculateWilliamsR,
+  calculateCCI, calculateADX, calculateMFI, calculateATR, calculateVWAP,
+  calculateParabolicSAR, calculatePivotPoints, calculateOBV, calculateROC, calculateCMF,
   calculateMomentum,
+  calculateSupertrend, calculateAroon, calculateVortex, calculateTRIX, calculateDPO,
+  calculateKST, calculateCoppock, calculateElderRay,
+  calculateStdDev, calculateHistVolatility, calculateChaikinVolatility, calculateMassIndex,
+  calculateUlcerIndex, calculateRVI,
+  calculateVWMA, calculateADLine, calculateForceIndex, calculateEOM, calculateNVI, calculatePVI,
+  calculateUltimateOscillator, calculateAwesomeOscillator, calculateStochRSI, calculateTSI,
+  calculatePPO, calculateFisherTransform, calculateConnorsRSI, calculateSMIErgodic,
+  calculateLinRegChannel, calculateMAEnvelope, calculatePriceChannel, calculateChandelierExit,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -1596,6 +1587,113 @@ const LightweightTradingChart = ({
               lowerSeries,
             );
           }
+
+        // --- NEW OVERLAY INDICATORS (Batch 2) ---
+        // Simple line overlays: ALMA, KAMA, ZLEMA, T3, SMMA, LSMA, VIDYA, McGinley, VWMA
+        } else if (["alma","kama","zlema","t3","smma","lsma","vidya","mcginley","vwma"].includes(indicator.type)) {
+          const calcMap: Record<string, () => { time: number; value: number }[]> = {
+            alma: () => calculateALMA(transformedCandles, indicator.parameters.period || 20, indicator.parameters.offset || 0.85, indicator.parameters.sigma || 6),
+            kama: () => calculateKAMA(transformedCandles, indicator.parameters.period || 10),
+            zlema: () => calculateZLEMA(transformedCandles, indicator.parameters.period || 20),
+            t3: () => calculateT3(transformedCandles, indicator.parameters.period || 5, indicator.parameters.vFactor || 0.7),
+            smma: () => calculateSMMA(transformedCandles, indicator.parameters.period || 20),
+            lsma: () => calculateLSMA(transformedCandles, indicator.parameters.period || 25),
+            vidya: () => calculateVIDYA(transformedCandles, indicator.parameters.period || 20),
+            mcginley: () => calculateMcGinley(transformedCandles, indicator.parameters.period || 14),
+            vwma: () => calculateVWMA(transformedCandles, indicator.parameters.period || 20),
+          };
+          const calcData = calcMap[indicator.type]?.() || [];
+          const offsetData = applyOffset(calcData, indicator.offset || 0);
+          const lineSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            lineStyle: indicator.lineStyle as any,
+            title: indicator.customLabel || indicator.name,
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+          });
+          lineSeries.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+          indicatorSeriesRef.current.set(indicator.id, lineSeries);
+
+        } else if (indicator.type === "supertrend") {
+          const stData = calculateSupertrend(transformedCandles, indicator.parameters.period || 10, indicator.parameters.multiplier || 3);
+          // Split into up/down segments for coloring
+          const upData: { time: number; value: number }[] = [];
+          const downData: { time: number; value: number }[] = [];
+          for (const d of stData) {
+            if (d.direction === 1) { upData.push({ time: d.time, value: d.value }); }
+            else { downData.push({ time: d.time, value: d.value }); }
+          }
+          if (upData.length > 0) {
+            const upSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.positive || "#00e676", indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              title: "Supertrend ▲",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            upSeries.setData(upData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_up`, upSeries);
+          }
+          if (downData.length > 0) {
+            const downSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.negative || "#f23645", indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              title: "Supertrend ▼",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            downSeries.setData(downData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_down`, downSeries);
+          }
+
+        // Channel overlays: linreg_channel, ma_envelope, price_channel, chandelier
+        } else if (["linreg_channel","ma_envelope","price_channel","chandelier"].includes(indicator.type)) {
+          const channelCalc: Record<string, () => { time: number; upper: number; middle: number; lower: number }[]> = {
+            linreg_channel: () => calculateLinRegChannel(transformedCandles, indicator.parameters.period || 100, indicator.parameters.deviations || 2),
+            ma_envelope: () => calculateMAEnvelope(transformedCandles, indicator.parameters.period || 20, indicator.parameters.percentage || 2.5),
+            price_channel: () => calculatePriceChannel(transformedCandles, indicator.parameters.period || 20),
+            chandelier: () => calculateChandelierExit(transformedCandles, indicator.parameters.period || 22, indicator.parameters.multiplier || 3),
+          };
+          const chData = channelCalc[indicator.type]?.() || [];
+          const offsetData = applyOffset(chData, indicator.offset || 0);
+
+          if (indicator.visibility?.upper !== false) {
+            const uSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || indicator.color, indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || indicator.name} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            uSeries.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.upper })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, uSeries);
+          }
+          if (indicator.visibility?.middle !== false) {
+            const mSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color, indicator.opacity || 60),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: 2 as any,
+              title: `${indicator.customLabel || indicator.name} Mid`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            mSeries.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.middle })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, mSeries);
+          }
+          if (indicator.visibility?.lower !== false) {
+            const lSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || indicator.color, indicator.opacity || 100),
+              lineWidth: indicator.lineWidth as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || indicator.name} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            lSeries.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.lower })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lSeries);
+          }
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2056,6 +2154,139 @@ const LightweightTradingChart = ({
             axisLabelVisible: false,
             title: "",
           });
+
+        // --- NEW OSCILLATOR INDICATORS (Batch 2) ---
+        // Simple line oscillators (no zero line): std_dev, hist_volatility, mass_index, ulcer_index, rvi, nvi, pvi, ad_line
+        } else if (["std_dev","hist_volatility","mass_index","ulcer_index","rvi","nvi","pvi","ad_line"].includes(indicator.type)) {
+          const oscCalc: Record<string, () => { time: number; value: number }[]> = {
+            std_dev: () => calculateStdDev(transformedCandles, indicator.parameters.period || 20),
+            hist_volatility: () => calculateHistVolatility(transformedCandles, indicator.parameters.period || 20),
+            mass_index: () => calculateMassIndex(transformedCandles, indicator.parameters.emaPeriod || 9, indicator.parameters.sumPeriod || 25),
+            ulcer_index: () => calculateUlcerIndex(transformedCandles, indicator.parameters.period || 14),
+            rvi: () => calculateRVI(transformedCandles, indicator.parameters.period || 10),
+            nvi: () => calculateNVI(transformedCandles),
+            pvi: () => calculatePVI(transformedCandles),
+            ad_line: () => calculateADLine(transformedCandles),
+          };
+          const calcData = oscCalc[indicator.type]?.() || [];
+          const offsetData = applyOffset(calcData, indicator.offset || 0);
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || indicator.name,
+          });
+          series.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+
+        // Zero-line oscillators: trix, dpo, kst, coppock, chaikin_volatility, force_index, eom, awesome_osc, fisher, tsi, connors_rsi, ultimate_osc
+        } else if (["trix","dpo","kst","coppock","chaikin_volatility","force_index","eom","awesome_osc","fisher","tsi","connors_rsi","ultimate_osc"].includes(indicator.type)) {
+          const zeroCalc: Record<string, () => { time: number; value: number }[]> = {
+            trix: () => calculateTRIX(transformedCandles, indicator.parameters.period || 15),
+            dpo: () => calculateDPO(transformedCandles, indicator.parameters.period || 20),
+            kst: () => calculateKST(transformedCandles),
+            coppock: () => calculateCoppock(transformedCandles, indicator.parameters.wmaPeriod || 10, indicator.parameters.longROC || 14, indicator.parameters.shortROC || 11),
+            chaikin_volatility: () => calculateChaikinVolatility(transformedCandles, indicator.parameters.emaPeriod || 10, indicator.parameters.rocPeriod || 10),
+            force_index: () => calculateForceIndex(transformedCandles, indicator.parameters.period || 13),
+            eom: () => calculateEOM(transformedCandles, indicator.parameters.period || 14),
+            awesome_osc: () => calculateAwesomeOscillator(transformedCandles),
+            fisher: () => calculateFisherTransform(transformedCandles, indicator.parameters.period || 9),
+            tsi: () => calculateTSI(transformedCandles, indicator.parameters.longPeriod || 25, indicator.parameters.shortPeriod || 13),
+            connors_rsi: () => calculateConnorsRSI(transformedCandles, indicator.parameters.rsiPeriod || 3, indicator.parameters.streakPeriod || 2, indicator.parameters.rocPeriod || 100),
+            ultimate_osc: () => calculateUltimateOscillator(transformedCandles, indicator.parameters.period1 || 7, indicator.parameters.period2 || 14, indicator.parameters.period3 || 28),
+          };
+          const calcData = zeroCalc[indicator.type]?.() || [];
+          const offsetData = applyOffset(calcData, indicator.offset || 0);
+          const series = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || indicator.name,
+          });
+          series.setData(offsetData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+          series.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+
+        // Dual-line oscillators: aroon (up/down), vortex (plus/minus), elder_ray (bull/bear)
+        } else if (indicator.type === "aroon") {
+          const aroonData = calculateAroon(transformedCandles, indicator.parameters.period || 25);
+          const upSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.positive || "#00e676", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "Aroon Up",
+          });
+          upSeries.setData(aroonData.map((d) => ({ time: d.time as UTCTimestamp, value: d.up })));
+          const downSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.negative || "#f23645", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "Aroon Down",
+          });
+          downSeries.setData(aroonData.map((d) => ({ time: d.time as UTCTimestamp, value: d.down })));
+
+        } else if (indicator.type === "vortex") {
+          const vortexData = calculateVortex(transformedCandles, indicator.parameters.period || 14);
+          const plusSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.positive || "#00e676", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "VI+",
+          });
+          plusSeries.setData(vortexData.map((d) => ({ time: d.time as UTCTimestamp, value: d.plus })));
+          const minusSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.negative || "#f23645", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "VI-",
+          });
+          minusSeries.setData(vortexData.map((d) => ({ time: d.time as UTCTimestamp, value: d.minus })));
+
+        } else if (indicator.type === "elder_ray") {
+          const elderData = calculateElderRay(transformedCandles, indicator.parameters.period || 13);
+          const bullSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.positive || "#00e676", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "Bull Power",
+          });
+          bullSeries.setData(elderData.map((d) => ({ time: d.time as UTCTimestamp, value: d.bull })));
+          const bearSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.negative || "#f23645", indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "Bear Power",
+          });
+          bearSeries.setData(elderData.map((d) => ({ time: d.time as UTCTimestamp, value: d.bear })));
+          bullSeries.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+
+        // StochRSI (K/D lines like Stochastic)
+        } else if (indicator.type === "stochrsi") {
+          const stochRSIData = calculateStochRSI(transformedCandles, indicator.parameters.rsiPeriod || 14, indicator.parameters.stochPeriod || 14, indicator.parameters.kSmooth || 3, indicator.parameters.dSmooth || 3);
+          const kSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.upper || indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: "StochRSI %K",
+          });
+          kSeries.setData(stochRSIData.map((d) => ({ time: d.time as UTCTimestamp, value: d.k })));
+          const dSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.signal || "#f23645", indicator.opacity || 80),
+            lineWidth: 1 as any,
+            title: "StochRSI %D",
+          });
+          dSeries.setData(stochRSIData.map((d) => ({ time: d.time as UTCTimestamp, value: d.d })));
+          kSeries.createPriceLine({ price: 80, color: hexToRgba("#f23645", 70), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "80" });
+          kSeries.createPriceLine({ price: 20, color: hexToRgba("#00e676", 70), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "20" });
+
+        // PPO and SMI Ergodic (MACD-style with line + signal + histogram)
+        } else if (indicator.type === "ppo" || indicator.type === "smi_ergodic") {
+          const ppoData = indicator.type === "ppo"
+            ? calculatePPO(transformedCandles, indicator.parameters.fast || 12, indicator.parameters.slow || 26, indicator.parameters.signal || 9)
+            : calculateSMIErgodic(transformedCandles, indicator.parameters.shortPeriod || 5, indicator.parameters.longPeriod || 20, indicator.parameters.signalPeriod || 5);
+          const mainSeries2 = oscChart.addLineSeries({
+            color: hexToRgba(indicator.color, indicator.opacity || 100),
+            lineWidth: indicator.lineWidth as any,
+            title: indicator.customLabel || indicator.name,
+          });
+          mainSeries2.setData(ppoData.map((d) => ({ time: d.time as UTCTimestamp, value: d.macd })));
+          const sigSeries = oscChart.addLineSeries({
+            color: hexToRgba(indicator.colors?.signal || "#f97316", indicator.opacity || 80),
+            lineWidth: 1 as any,
+            title: "Signal",
+          });
+          sigSeries.setData(ppoData.map((d) => ({ time: d.time as UTCTimestamp, value: d.signal })));
+          mainSeries2.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "" });
+
         } else {
           console.warn(
             `⚠️ Unknown oscillator indicator type: ${indicator.type}`,

@@ -11,32 +11,18 @@ import { IStrategyConfig } from "@/database/models/marketplace/marketplace-item.
 
 // All supported indicator types (must match chart implementations)
 export type IndicatorType =
-  | "sma"
-  | "ema"
-  | "wma"
-  | "dema"
-  | "tema"
-  | "hma"
-  | "bb"
-  | "keltner"
-  | "donchian"
-  | "ichimoku"
-  | "rsi"
-  | "macd"
-  | "stoch"
-  | "williamsR"
-  | "cci"
-  | "adx"
-  | "mfi"
-  | "atr"
-  | "vwap"
-  | "sar"
-  | "pivots"
-  | "obv"
-  | "roc"
-  | "cmf"
-  | "momentum"
-  | "support_resistance";
+  | "sma" | "ema" | "wma" | "dema" | "tema" | "hma"
+  | "alma" | "kama" | "zlema" | "t3" | "smma" | "lsma" | "vidya" | "mcginley"
+  | "bb" | "keltner" | "donchian" | "ichimoku"
+  | "linreg_channel" | "ma_envelope" | "price_channel" | "chandelier"
+  | "rsi" | "macd" | "stoch" | "williamsR" | "cci" | "adx" | "mfi" | "atr"
+  | "obv" | "roc" | "cmf" | "momentum"
+  | "ultimate_osc" | "awesome_osc" | "stochrsi" | "tsi" | "ppo"
+  | "fisher" | "connors_rsi" | "smi_ergodic"
+  | "supertrend" | "aroon" | "vortex" | "trix" | "dpo" | "kst" | "coppock" | "elder_ray"
+  | "std_dev" | "hist_volatility" | "chaikin_volatility" | "mass_index" | "ulcer_index" | "rvi"
+  | "vwap" | "vwma" | "ad_line" | "force_index" | "eom" | "nvi" | "pvi"
+  | "sar" | "pivots" | "support_resistance";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -284,6 +270,99 @@ const INDICATOR_TYPE_MAP: Record<
   support: { type: "support_resistance", displayType: "overlay" },
   resistance: { type: "support_resistance", displayType: "overlay" },
   "auto support": { type: "support_resistance", displayType: "overlay" },
+
+  // Batch 2: Advanced Moving Averages
+  alma: { type: "alma", displayType: "overlay" },
+  "arnaud legoux": { type: "alma", displayType: "overlay" },
+  kama: { type: "kama", displayType: "overlay" },
+  "kaufman adaptive": { type: "kama", displayType: "overlay" },
+  zlema: { type: "zlema", displayType: "overlay" },
+  "zero-lag": { type: "zlema", displayType: "overlay" },
+  "zero lag": { type: "zlema", displayType: "overlay" },
+  t3: { type: "t3", displayType: "overlay" },
+  "tillson t3": { type: "t3", displayType: "overlay" },
+  smma: { type: "smma", displayType: "overlay" },
+  "smoothed moving": { type: "smma", displayType: "overlay" },
+  lsma: { type: "lsma", displayType: "overlay" },
+  "least squares": { type: "lsma", displayType: "overlay" },
+  "linear regression ma": { type: "lsma", displayType: "overlay" },
+  vidya: { type: "vidya", displayType: "overlay" },
+  "variable index": { type: "vidya", displayType: "overlay" },
+  mcginley: { type: "mcginley", displayType: "overlay" },
+  "mcginley dynamic": { type: "mcginley", displayType: "overlay" },
+  vwma: { type: "vwma", displayType: "overlay" },
+  "volume weighted ma": { type: "vwma", displayType: "overlay" },
+
+  // Batch 2: Channels
+  linreg_channel: { type: "linreg_channel", displayType: "overlay" },
+  "linear regression channel": { type: "linreg_channel", displayType: "overlay" },
+  ma_envelope: { type: "ma_envelope", displayType: "overlay" },
+  "moving average envelope": { type: "ma_envelope", displayType: "overlay" },
+  envelope: { type: "ma_envelope", displayType: "overlay" },
+  price_channel: { type: "price_channel", displayType: "overlay" },
+  "price channel": { type: "price_channel", displayType: "overlay" },
+  chandelier: { type: "chandelier", displayType: "overlay" },
+  "chandelier exit": { type: "chandelier", displayType: "overlay" },
+
+  // Batch 2: Trend
+  supertrend: { type: "supertrend", displayType: "overlay" },
+  aroon: { type: "aroon", displayType: "oscillator" },
+  "aroon oscillator": { type: "aroon", displayType: "oscillator" },
+  vortex: { type: "vortex", displayType: "oscillator" },
+  "vortex indicator": { type: "vortex", displayType: "oscillator" },
+  trix: { type: "trix", displayType: "oscillator" },
+  dpo: { type: "dpo", displayType: "oscillator" },
+  "detrended price": { type: "dpo", displayType: "oscillator" },
+  kst: { type: "kst", displayType: "oscillator" },
+  "know sure thing": { type: "kst", displayType: "oscillator" },
+  coppock: { type: "coppock", displayType: "oscillator" },
+  "coppock curve": { type: "coppock", displayType: "oscillator" },
+  elder_ray: { type: "elder_ray", displayType: "oscillator" },
+  "elder ray": { type: "elder_ray", displayType: "oscillator" },
+
+  // Batch 2: Volatility
+  std_dev: { type: "std_dev", displayType: "oscillator" },
+  "standard deviation": { type: "std_dev", displayType: "oscillator" },
+  hist_volatility: { type: "hist_volatility", displayType: "oscillator" },
+  "historical volatility": { type: "hist_volatility", displayType: "oscillator" },
+  chaikin_volatility: { type: "chaikin_volatility", displayType: "oscillator" },
+  "chaikin volatility": { type: "chaikin_volatility", displayType: "oscillator" },
+  mass_index: { type: "mass_index", displayType: "oscillator" },
+  "mass index": { type: "mass_index", displayType: "oscillator" },
+  ulcer_index: { type: "ulcer_index", displayType: "oscillator" },
+  "ulcer index": { type: "ulcer_index", displayType: "oscillator" },
+  rvi: { type: "rvi", displayType: "oscillator" },
+  "relative volatility": { type: "rvi", displayType: "oscillator" },
+
+  // Batch 2: Volume
+  ad_line: { type: "ad_line", displayType: "oscillator" },
+  "accumulation/distribution": { type: "ad_line", displayType: "oscillator" },
+  force_index: { type: "force_index", displayType: "oscillator" },
+  "force index": { type: "force_index", displayType: "oscillator" },
+  eom: { type: "eom", displayType: "oscillator" },
+  "ease of movement": { type: "eom", displayType: "oscillator" },
+  nvi: { type: "nvi", displayType: "oscillator" },
+  "negative volume": { type: "nvi", displayType: "oscillator" },
+  pvi: { type: "pvi", displayType: "oscillator" },
+  "positive volume": { type: "pvi", displayType: "oscillator" },
+
+  // Batch 2: Advanced Oscillators
+  ultimate_osc: { type: "ultimate_osc", displayType: "oscillator" },
+  "ultimate oscillator": { type: "ultimate_osc", displayType: "oscillator" },
+  awesome_osc: { type: "awesome_osc", displayType: "oscillator" },
+  "awesome oscillator": { type: "awesome_osc", displayType: "oscillator" },
+  stochrsi: { type: "stochrsi", displayType: "oscillator" },
+  "stochastic rsi": { type: "stochrsi", displayType: "oscillator" },
+  tsi: { type: "tsi", displayType: "oscillator" },
+  "true strength": { type: "tsi", displayType: "oscillator" },
+  ppo: { type: "ppo", displayType: "oscillator" },
+  "percentage price": { type: "ppo", displayType: "oscillator" },
+  fisher: { type: "fisher", displayType: "oscillator" },
+  "fisher transform": { type: "fisher", displayType: "oscillator" },
+  connors_rsi: { type: "connors_rsi", displayType: "oscillator" },
+  "connors rsi": { type: "connors_rsi", displayType: "oscillator" },
+  smi_ergodic: { type: "smi_ergodic", displayType: "oscillator" },
+  "smi ergodic": { type: "smi_ergodic", displayType: "oscillator" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -389,10 +468,79 @@ export function marketplaceItemToIndicator(
     case "vwap":
     case "obv":
     case "pivots":
+    case "ad_line":
+    case "nvi":
+    case "pvi":
+    case "awesome_osc":
+    case "kst":
       // No params needed
       break;
+    case "alma":
+      params.period = settings?.period || 20;
+      params.offset = settings?.offset || 0.85;
+      params.sigma = settings?.sigma || 6;
+      break;
+    case "t3":
+      params.period = settings?.period || 5;
+      params.vFactor = settings?.vFactor || 0.7;
+      break;
+    case "linreg_channel":
+      params.period = settings?.period || 100;
+      params.deviations = settings?.deviations || 2;
+      break;
+    case "ma_envelope":
+      params.period = settings?.period || 20;
+      params.percentage = settings?.percentage || 2.5;
+      break;
+    case "supertrend":
+      params.period = settings?.period || 10;
+      params.multiplier = settings?.multiplier || 3;
+      break;
+    case "coppock":
+      params.wmaPeriod = settings?.wmaPeriod || 10;
+      params.longROC = settings?.longROC || 14;
+      params.shortROC = settings?.shortROC || 11;
+      break;
+    case "stochrsi":
+      params.rsiPeriod = settings?.rsiPeriod || 14;
+      params.stochPeriod = settings?.stochPeriod || 14;
+      params.kSmooth = settings?.kSmooth || 3;
+      params.dSmooth = settings?.dSmooth || 3;
+      break;
+    case "tsi":
+      params.longPeriod = settings?.longPeriod || 25;
+      params.shortPeriod = settings?.shortPeriod || 13;
+      break;
+    case "ppo":
+      params.fast = settings?.fast || 12;
+      params.slow = settings?.slow || 26;
+      params.signal = settings?.signal || 9;
+      break;
+    case "connors_rsi":
+      params.rsiPeriod = settings?.rsiPeriod || 3;
+      params.streakPeriod = settings?.streakPeriod || 2;
+      params.rocPeriod = settings?.rocPeriod || 100;
+      break;
+    case "smi_ergodic":
+      params.shortPeriod = settings?.shortPeriod || 5;
+      params.longPeriod = settings?.longPeriod || 20;
+      params.signalPeriod = settings?.signalPeriod || 5;
+      break;
+    case "ultimate_osc":
+      params.period1 = settings?.period1 || 7;
+      params.period2 = settings?.period2 || 14;
+      params.period3 = settings?.period3 || 28;
+      break;
+    case "mass_index":
+      params.emaPeriod = settings?.emaPeriod || 9;
+      params.sumPeriod = settings?.sumPeriod || 25;
+      break;
+    case "chaikin_volatility":
+      params.emaPeriod = settings?.emaPeriod || 10;
+      params.rocPeriod = settings?.rocPeriod || 10;
+      break;
     default:
-      // Generic period-based indicators (SMA, EMA, WMA, DEMA, TEMA, HMA, CCI, ADX, MFI, ATR, etc.)
+      // Generic period-based indicators
       params.period = settings?.period || 20;
       break;
   }

@@ -11,32 +11,25 @@ export type ItemStatus = "active" | "inactive" | "coming_soon" | "deprecated";
 
 // Indicator Types (chart implementations)
 export type IndicatorType =
-  | "sma"
-  | "ema"
-  | "wma"
-  | "dema"
-  | "tema"
-  | "hma"
-  | "bb"
-  | "keltner"
-  | "donchian"
-  | "ichimoku"
-  | "rsi"
-  | "macd"
-  | "stoch"
-  | "williamsR"
-  | "cci"
-  | "adx"
-  | "mfi"
-  | "atr"
-  | "vwap"
-  | "sar"
-  | "pivots"
-  | "obv"
-  | "roc"
-  | "cmf"
-  | "momentum"
-  | "support_resistance";
+  // Moving Averages
+  | "sma" | "ema" | "wma" | "dema" | "tema" | "hma"
+  | "alma" | "kama" | "zlema" | "t3" | "smma" | "lsma" | "vidya" | "mcginley"
+  // Bands / Channels
+  | "bb" | "keltner" | "donchian" | "ichimoku"
+  | "linreg_channel" | "ma_envelope" | "price_channel" | "chandelier"
+  // Oscillators
+  | "rsi" | "macd" | "stoch" | "williamsR" | "cci" | "adx" | "mfi" | "atr"
+  | "obv" | "roc" | "cmf" | "momentum"
+  | "ultimate_osc" | "awesome_osc" | "stochrsi" | "tsi" | "ppo"
+  | "fisher" | "connors_rsi" | "smi_ergodic"
+  // Trend
+  | "supertrend" | "aroon" | "vortex" | "trix" | "dpo" | "kst" | "coppock" | "elder_ray"
+  // Volatility
+  | "std_dev" | "hist_volatility" | "chaikin_volatility" | "mass_index" | "ulcer_index" | "rvi"
+  // Volume
+  | "vwap" | "vwma" | "ad_line" | "force_index" | "eom" | "nvi" | "pvi"
+  // Other
+  | "sar" | "pivots" | "support_resistance";
 
 // Strategy Condition Operators
 export type ConditionOperator =
@@ -291,7 +284,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     },
     indicatorType: {
       type: String,
-      enum: ["sma", "ema", "wma", "dema", "tema", "hma", "bb", "keltner", "donchian", "ichimoku", "rsi", "macd", "stoch", "williamsR", "cci", "adx", "mfi", "atr", "vwap", "sar", "pivots", "obv", "roc", "cmf", "momentum", "support_resistance"],
+      enum: ["sma","ema","wma","dema","tema","hma","alma","kama","zlema","t3","smma","lsma","vidya","mcginley","bb","keltner","donchian","ichimoku","linreg_channel","ma_envelope","price_channel","chandelier","rsi","macd","stoch","williamsR","cci","adx","mfi","atr","obv","roc","cmf","momentum","ultimate_osc","awesome_osc","stochrsi","tsi","ppo","fisher","connors_rsi","smi_ergodic","supertrend","aroon","vortex","trix","dpo","kst","coppock","elder_ray","std_dev","hist_volatility","chaikin_volatility","mass_index","ulcer_index","rvi","vwap","vwma","ad_line","force_index","eom","nvi","pvi","sar","pivots","support_resistance"],
     },
     strategyConfig: StrategyConfigSchema,
     gameMasterConfig: {
