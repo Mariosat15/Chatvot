@@ -550,10 +550,15 @@ const LightweightTradingChart = ({
   // Ref to always hold the latest updateIndicators function (avoids stale closure in poll loop)
   const updateIndicatorsFnRef = useRef<((candles: OHLCCandle[], chart: IChartApi, series: ISeriesApi<any>) => void) | null>(null);
 
-  // Lightweight refresh functions per oscillator - captured at creation time, calls series.update() to preserve zoom
-  const oscillatorRefreshFnsRef = useRef<Map<string, () => void>>(new Map());
-  // Ref for the lightweight refresh function (called from live update paths)
-  const refreshOscillatorsFnRef = useRef<(() => void) | null>(null);
+  // Lightweight refresh functions per oscillator - captured at creation time
+  // Each function accepts a mode: "light" (tail-slice + series.update) or "full" (all data + setData)
+  const oscillatorRefreshFnsRef = useRef<Map<string, (mode: "light" | "full") => void>>(new Map());
+  // Ref for the refresh dispatcher (called from live update paths)
+  const refreshOscillatorsFnRef = useRef<((mode?: "light" | "full") => void) | null>(null);
+  // Per-instance throttle for oscillator refresh (replaces global window.__lastIndicatorRefresh)
+  const lastOscRefreshRef = useRef<number>(0);
+  // Track whether WebSocket is actively connected (to skip polling refresh when WS is live)
+  const wsActiveRef = useRef<boolean>(false);
 
   // Convert OHLC to Heikin Ashi
   const convertToHeikinAshi = (candles: OHLCCandle[]): OHLCCandle[] => {
@@ -2449,71 +2454,122 @@ const LightweightTradingChart = ({
         oscChart.addHistogramSeries = _origAddHist;
         oscillatorSeriesRef.current.set(indicator.id, oscSeriesList);
 
-        // Store a refresh closure that uses setData() (per lightweight-charts docs)
-        // Saves/restores visible range to preserve zoom/scroll
+        // Two-tier refresh closure: "light" = tail-slice + series.update, "full" = all data + setData
         const _oscChartRef = oscChart;
         const _seriesRefs = [...oscSeriesList];
         const _indType = indicator.type;
         const _indParams = { ...indicator.parameters };
         const _priceSource = indicator.priceSource || "close";
-        const _indId = indicator.id;
-        oscillatorRefreshFnsRef.current.set(indicator.id, () => {
+
+        // Shared calculator builder (used by both light and full modes)
+        const buildCalc = (tc: OHLCCandle[]) => {
+          const p = _indParams;
+          const calc: Record<string, () => {time:any,value:number}[]> = {
+            rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
+            mfi:()=>calculateMFI(tc,p.period||14), momentum:()=>calculateMomentum(tc,p.period||10), roc:()=>calculateROC(tc,p.period||12),
+            atr:()=>calculateATR(tc,p.period||14), cmf:()=>calculateCMF(tc,p.period||20), obv:()=>calculateOBV(tc), adx:()=>calculateADX(tc,p.period||14),
+            trend_pulse:()=>calculateTrendPulse(tc,p.adxPeriod||14,p.rsiPeriod||14), market_regime:()=>calculateMarketRegime(tc,p.period||20),
+            trend_composite:()=>calculateTrendComposite(tc,p.period||14), composite_breadth:()=>calculateCompositeBreadth(tc),
+            reversal_signal:()=>calculateReversalSignal(tc,p.rsiPeriod||14), breakout_prob:()=>calculateBreakoutProb(tc,p.bbPeriod||20,p.keltPeriod||20),
+            heikin_ashi_trend:()=>calculateHeikinAshiTrend(tc,p.period||10), adaptive_rsi:()=>calculateAdaptiveRSI(tc,p.period||14),
+            trend_persistence:()=>calculateTrendPersistence(tc,p.period||20), choppy_market:()=>calculateChoppyMarket(tc,p.period||14),
+            sentiment_osc:()=>calculateSentimentOsc(tc,p.smooth||5), volatility_squeeze:()=>calculateVolatilitySqueeze(tc,p.period||20),
+            squeeze_momentum:()=>calculateSqueezeMomentum(tc,p.period||20), range_expansion:()=>calculateRangeExpansion(tc,p.period||14),
+            alpha_momentum:()=>calculateAlphaMomentum(tc,p.period||20), efficiency_ratio:()=>calculateEfficiencyRatio(tc,p.period||10),
+            momentum_wave:()=>calculateMomentumWave(tc,p.period||20), gap_momentum:()=>calculateGapMomentum(tc,p.period||14),
+            price_action_score:()=>calculatePriceActionScore(tc,p.period||10), ergodic_volume:()=>calculateErgodicVolume(tc,p.shortPeriod||5,p.longPeriod||20),
+            order_flow_imbalance:()=>calculateOrderFlowImbalance(tc,p.period||10), net_buying_pressure:()=>calculateNetBuyingPressure(tc,p.period||14),
+            volume_climax:()=>calculateVolumeClimax(tc,p.period||20), relative_vigor:()=>calculateRelativeVigor(tc,p.period||10),
+            intraday_intensity:()=>calculateIntradayIntensity(tc,p.period||21), volume_momentum:()=>calculateVolumeMomentum(tc,p.period||14),
+            liquidity_heatmap:()=>calculateLiquidityHeatmap(tc,p.period||50), mtf_momentum:()=>calculateMTFMomentum(tc),
+            whale_accumulation:()=>calculateWhaleAccumulation(tc,p.threshold||1.5), smart_money_flow:()=>calculateSmartMoneyFlow(tc,p.period||14),
+            fractal_dimension:()=>calculateFractalDimension(tc,p.period||30), volatility_ratio:()=>calculateVolatilityRatio(tc,p.shortPeriod||5,p.longPeriod||20),
+            cycle_detector:()=>calculateCycleDetector(tc,p.maxPeriod||50),
+          };
+          return calc;
+        };
+
+        oscillatorRefreshFnsRef.current.set(indicator.id, (mode: "light" | "full") => {
           if (!isMountedRef.current || candleDataRef.current.length < 20 || _seriesRefs.length === 0) return;
           // Check chart is still alive
-          try { _oscChartRef.timeScale(); } catch { return; } // disposed chart
-          const tc = transformCandlesForPriceSource(candleDataRef.current, _priceSource);
-          // Save visible range before updating
-          let savedRange: any = null;
-          try { savedRange = _oscChartRef.timeScale().getVisibleLogicalRange(); } catch {}
-          try {
-            const toTS = (d: { time: any; value: number }[]) => d.map(v => ({ time: v.time as UTCTimestamp, value: v.value }));
-            const p = _indParams;
+          try { _oscChartRef.timeScale(); } catch { return; }
+          const p = _indParams;
 
-            // === Multi-series types ===
-            if (_indType === "macd") {
-              const d = calculateMACD(tc, p.fast||12, p.slow||26, p.signal||9);
-              if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.signal })));
-              if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.macd })));
-              if (_seriesRefs[2]) _seriesRefs[2].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.histogram, color: v.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any)));
-            } else if (_indType === "stochastic") {
-              const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
-              if (_seriesRefs[0]) _seriesRefs[0].setData(toTS(d.k));
-              if (_seriesRefs[1]) _seriesRefs[1].setData(toTS(d.d));
-            } else if (_indType === "stoch_rsi") {
-              const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
-              if (_seriesRefs[0]) _seriesRefs[0].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.k })));
-              if (_seriesRefs[1]) _seriesRefs[1].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.d })));
-            } else {
-              // === Single-series types (all standard + premium oscillators) ===
-              const calc: Record<string, () => {time:any,value:number}[]> = {
-                rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
-                mfi:()=>calculateMFI(tc,p.period||14), momentum:()=>calculateMomentum(tc,p.period||10), roc:()=>calculateROC(tc,p.period||12),
-                atr:()=>calculateATR(tc,p.period||14), cmf:()=>calculateCMF(tc,p.period||20), obv:()=>calculateOBV(tc), adx:()=>calculateADX(tc,p.period||14),
-                trend_pulse:()=>calculateTrendPulse(tc,p.adxPeriod||14,p.rsiPeriod||14), market_regime:()=>calculateMarketRegime(tc,p.period||20),
-                trend_composite:()=>calculateTrendComposite(tc,p.period||14), composite_breadth:()=>calculateCompositeBreadth(tc),
-                reversal_signal:()=>calculateReversalSignal(tc,p.rsiPeriod||14), breakout_prob:()=>calculateBreakoutProb(tc,p.bbPeriod||20,p.keltPeriod||20),
-                heikin_ashi_trend:()=>calculateHeikinAshiTrend(tc,p.period||10), adaptive_rsi:()=>calculateAdaptiveRSI(tc,p.period||14),
-                trend_persistence:()=>calculateTrendPersistence(tc,p.period||20), choppy_market:()=>calculateChoppyMarket(tc,p.period||14),
-                sentiment_osc:()=>calculateSentimentOsc(tc,p.smooth||5), volatility_squeeze:()=>calculateVolatilitySqueeze(tc,p.period||20),
-                squeeze_momentum:()=>calculateSqueezeMomentum(tc,p.period||20), range_expansion:()=>calculateRangeExpansion(tc,p.period||14),
-                alpha_momentum:()=>calculateAlphaMomentum(tc,p.period||20), efficiency_ratio:()=>calculateEfficiencyRatio(tc,p.period||10),
-                momentum_wave:()=>calculateMomentumWave(tc,p.period||20), gap_momentum:()=>calculateGapMomentum(tc,p.period||14),
-                price_action_score:()=>calculatePriceActionScore(tc,p.period||10), ergodic_volume:()=>calculateErgodicVolume(tc,p.shortPeriod||5,p.longPeriod||20),
-                order_flow_imbalance:()=>calculateOrderFlowImbalance(tc,p.period||10), net_buying_pressure:()=>calculateNetBuyingPressure(tc,p.period||14),
-                volume_climax:()=>calculateVolumeClimax(tc,p.period||20), relative_vigor:()=>calculateRelativeVigor(tc,p.period||10),
-                intraday_intensity:()=>calculateIntradayIntensity(tc,p.period||21), volume_momentum:()=>calculateVolumeMomentum(tc,p.period||14),
-                liquidity_heatmap:()=>calculateLiquidityHeatmap(tc,p.period||50), mtf_momentum:()=>calculateMTFMomentum(tc),
-                whale_accumulation:()=>calculateWhaleAccumulation(tc,p.threshold||1.5), smart_money_flow:()=>calculateSmartMoneyFlow(tc,p.period||14),
-                fractal_dimension:()=>calculateFractalDimension(tc,p.period||30), volatility_ratio:()=>calculateVolatilityRatio(tc,p.shortPeriod||5,p.longPeriod||20),
-                cycle_detector:()=>calculateCycleDetector(tc,p.maxPeriod||50),
+          try {
+            if (mode === "light") {
+              // === LIGHT MODE: tail-slice (last 100 candles) + series.update() on last point ===
+              // Only recalculates from a small window, then updates just the last data point.
+              // series.update() naturally preserves zoom/scroll -- no range save/restore needed.
+              const tailLen = Math.min(candleDataRef.current.length, 100);
+              const tail = candleDataRef.current.slice(-tailLen);
+              const tc = transformCandlesForPriceSource(tail, _priceSource);
+
+              // Helper: update last point on a series via series.update()
+              const uLast = (s: ISeriesApi<any>, d: { time: any; value: number }[]) => {
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  s.update({ time: last.time as UTCTimestamp, value: last.value });
+                }
               };
-              const fn = calc[_indType];
-              if (fn && _seriesRefs[0]) { _seriesRefs[0].setData(toTS(fn())); }
+
+              if (_indType === "macd") {
+                const d = calculateMACD(tc, p.fast||12, p.slow||26, p.signal||9);
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.signal });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.macd });
+                  if (_seriesRefs[2]) _seriesRefs[2].update({ time: last.time as UTCTimestamp, value: last.histogram, color: last.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any);
+                }
+              } else if (_indType === "stochastic") {
+                const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
+                if (_seriesRefs[0]) uLast(_seriesRefs[0], d.k);
+                if (_seriesRefs[1]) uLast(_seriesRefs[1], d.d);
+              } else if (_indType === "stoch_rsi") {
+                const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
+                if (d.length > 0) {
+                  const last = d[d.length - 1] as any;
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.k });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.d });
+                }
+              } else {
+                const calc = buildCalc(tc);
+                const fn = calc[_indType];
+                if (fn && _seriesRefs[0]) { uLast(_seriesRefs[0], fn()); }
+              }
+
+            } else {
+              // === FULL MODE: all candles + setData() + range save/restore ===
+              // Used when a new candle period starts or a completed candle arrives.
+              const tc = transformCandlesForPriceSource(candleDataRef.current, _priceSource);
+              let savedRange: any = null;
+              try { savedRange = _oscChartRef.timeScale().getVisibleLogicalRange(); } catch {}
+
+              const toTS = (d: { time: any; value: number }[]) => d.map(v => ({ time: v.time as UTCTimestamp, value: v.value }));
+
+              if (_indType === "macd") {
+                const d = calculateMACD(tc, p.fast||12, p.slow||26, p.signal||9);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.signal })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.macd })));
+                if (_seriesRefs[2]) _seriesRefs[2].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.histogram, color: v.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any)));
+              } else if (_indType === "stochastic") {
+                const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(toTS(d.k));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(toTS(d.d));
+              } else if (_indType === "stoch_rsi") {
+                const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.k })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.d })));
+              } else {
+                const calc = buildCalc(tc);
+                const fn = calc[_indType];
+                if (fn && _seriesRefs[0]) { _seriesRefs[0].setData(toTS(fn())); }
+              }
+
+              // Restore visible range to preserve zoom/scroll
+              if (savedRange) { try { _oscChartRef.timeScale().setVisibleLogicalRange(savedRange); } catch {} }
             }
-            // Restore visible range to preserve zoom/scroll
-            if (savedRange) { try { _oscChartRef.timeScale().setVisibleLogicalRange(savedRange); } catch {} }
           } catch (err) {
-            console.warn(`[OSC-REFRESH] Error refreshing ${_indType}:`, err);
+            console.warn(`[OSC-REFRESH] Error refreshing ${_indType} (${mode}):`, err);
           }
         });
 
@@ -2530,12 +2586,13 @@ const LightweightTradingChart = ({
   // Keep the ref always pointing to the latest updateIndicators (captures latest `indicators` state)
   updateIndicatorsFnRef.current = updateIndicators;
 
-  // Lightweight refresh: recalculates data and calls setData() on existing oscillator series
-  // Saves/restores visible range to preserve zoom/scroll
-  refreshOscillatorsFnRef.current = () => {
+  // Two-tier refresh dispatcher:
+  // "light" = tail-slice + series.update() (fast, for forming candle updates, preserves zoom naturally)
+  // "full"  = all candles + setData() + range save/restore (accurate, for new candle periods / completed candles)
+  refreshOscillatorsFnRef.current = (mode: "light" | "full" = "full") => {
     if (oscillatorRefreshFnsRef.current.size === 0) return;
     oscillatorRefreshFnsRef.current.forEach((fn) => {
-      try { fn(); } catch { /* non-fatal */ }
+      try { fn(mode); } catch { /* non-fatal */ }
     });
   };
 
@@ -3175,10 +3232,12 @@ const LightweightTradingChart = ({
       positionLinesRef.current.clear();
       tpSlSeriesRef.current.clear();
       // Clear oscillator refs to prevent refresh closures from accessing disposed charts
+      refreshOscillatorsFnRef.current = null;
       oscillatorRefreshFnsRef.current.clear();
       oscillatorSeriesRef.current.clear();
       oscillatorChartsRef.current.forEach((osc) => { try { osc.remove(); } catch {} });
       oscillatorChartsRef.current.clear();
+      wsActiveRef.current = false;
 
       // Remove chart last using local reference
       if (chartInstance) {
@@ -3556,11 +3615,12 @@ const LightweightTradingChart = ({
       currentCandleRef.current = candleData;
 
       // Keep candleDataRef in sync with forming candle so indicators use the latest price
+      let isNewPeriod = false;
       if (candleDataRef.current.length > 0) {
         const lastIdx = candleDataRef.current.length - 1;
         const lastRefTime = candleDataRef.current[lastIdx].time;
         if (lastRefTime === candle.time) {
-          // Update existing candle in-place
+          // Update existing candle in-place (forming candle update)
           candleDataRef.current[lastIdx] = {
             ...candleDataRef.current[lastIdx],
             open: candleData.open,
@@ -3570,6 +3630,7 @@ const LightweightTradingChart = ({
           };
         } else if (candle.time > lastRefTime) {
           // New candle period started
+          isNewPeriod = true;
           candleDataRef.current.push({
             time: candle.time,
             open: candle.open,
@@ -3582,16 +3643,17 @@ const LightweightTradingChart = ({
         }
       }
 
-      // Lightweight indicator refresh from forming candle updates (every 1 second)
-      // Uses series.update() which preserves zoom/scroll state
+      // Two-tier oscillator refresh (per-instance throttle, 250ms)
+      // New candle period -> full refresh (accurate setData); forming update -> light refresh (fast series.update)
       const now = Date.now();
-      if (!((window as any).__lastIndicatorRefresh) || now - (window as any).__lastIndicatorRefresh > 1000) {
-        (window as any).__lastIndicatorRefresh = now;
-        try {
-          refreshOscillatorsFnRef.current?.();
-        } catch {
-          // Non-fatal indicator refresh error
-        }
+      if (isNewPeriod) {
+        // Always do a full refresh immediately when a new candle period starts
+        lastOscRefreshRef.current = now;
+        try { refreshOscillatorsFnRef.current?.("full"); } catch {}
+      } else if (now - lastOscRefreshRef.current > 250) {
+        // Light refresh for forming candle updates (tail-slice + series.update, preserves zoom)
+        lastOscRefreshRef.current = now;
+        try { refreshOscillatorsFnRef.current?.("light"); } catch {}
       }
     };
 
@@ -3802,6 +3864,10 @@ const LightweightTradingChart = ({
                       `   ⚠️ candlestickSeriesRef.current is null - cannot apply completed candles!`,
                     );
                   }
+
+                  // Full oscillator refresh after completed candles are applied
+                  // This ensures indicators reflect the finalized candle data immediately
+                  try { refreshOscillatorsFnRef.current?.("full"); } catch {}
                 }
 
                 const candleSource = isM
@@ -3865,6 +3931,7 @@ const LightweightTradingChart = ({
           };
 
           ws.onopen = () => {
+            wsActiveRef.current = true;
             // Subscribe to only the symbol this chart needs
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(
@@ -3877,6 +3944,7 @@ const LightweightTradingChart = ({
           };
 
           ws.onclose = () => {
+            wsActiveRef.current = false;
             if (!isCleanedUp) {
               // Reconnect after 2 seconds
               reconnectTimeout = setTimeout(connect, 2000);
@@ -3900,6 +3968,7 @@ const LightweightTradingChart = ({
       // Cleanup
       return () => {
         isCleanedUp = true;
+        wsActiveRef.current = false;
         if (reconnectTimeout) clearTimeout(reconnectTimeout);
         if (ws) {
           ws.close(1000, "Chart cleanup");
@@ -4150,11 +4219,10 @@ const LightweightTradingChart = ({
           }
         }
 
-        // Lightweight indicator refresh - uses series.update() to preserve zoom/scroll
-        try {
-          refreshOscillatorsFnRef.current?.();
-        } catch {
-          // Non-fatal indicator refresh error
+        // Full indicator refresh from polling -- but only when WebSocket is NOT active
+        // (WebSocket path already handles light/full refreshes; avoid double-refresh)
+        if (!wsActiveRef.current) {
+          try { refreshOscillatorsFnRef.current?.("full"); } catch {}
         }
       } catch {
         // Network error or chart disposed - ignore
