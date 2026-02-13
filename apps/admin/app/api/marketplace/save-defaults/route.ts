@@ -37,10 +37,10 @@ export async function POST(request: NextRequest) {
 
     // ---- Resolve directories ----
     // Find the repo root (monorepo) to place committed assets
+    // Find repo root dynamically (no hardcoded paths - works on any server)
     const possibleRoots = [
-      "/var/www/chartvolt", // Production
-      path.join(process.cwd(), "..", ".."), // Dev: apps/admin -> repo root
-      process.cwd(), // Fallback
+      path.join(process.cwd(), "..", ".."), // From apps/admin -> repo root
+      process.cwd(), // Fallback: cwd is repo root
     ];
 
     let repoRoot: string | null = null;
@@ -79,17 +79,12 @@ export async function POST(request: NextRequest) {
       path.join(repoRoot, "public", "assets", "marketplace"),
     ];
 
-    // Also check for avatar images (could be anywhere on the server)
+    // Also check for avatar images (no hardcoded paths)
     const avatarDirs = [
       path.join(repoRoot, "public", "assets", "avatars"),
       path.join(repoRoot, "public", "avatars"),
       path.join(repoRoot, "apps", "admin", "public", "assets", "avatars"),
       path.join(repoRoot, "apps", "admin", "public", "avatars"),
-      // Web app might serve avatars from its own public
-      path.join(repoRoot, "apps", "web", "public", "assets", "avatars"),
-      // Production paths
-      path.join("/var/www/chartvolt", "public", "assets", "avatars"),
-      path.join("/var/www/chartvolt", "public", "avatars"),
     ];
 
     // ---- Helper: generate filename variants (original + webp fallback) ----

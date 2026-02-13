@@ -63,10 +63,9 @@ export async function POST(request: NextRequest) {
 
     // Create upload directory for marketplace cosmetics
     // Try multiple paths for monorepo compatibility
+    // No hardcoded paths - works on any server for white-label
     const possibleUploadDirs = [
-      // Production: /var/www/chartvolt/public/uploads/marketplace
-      path.join("/var/www/chartvolt", "public", "uploads", "marketplace"),
-      // Monorepo local dev: from apps/admin up to root's public
+      // Monorepo: from apps/admin up to root's public
       path.join(process.cwd(), "..", "..", "public", "uploads", "marketplace"),
       // Fallback: current app's public folder
       path.join(process.cwd(), "public", "uploads", "marketplace"),

@@ -33,27 +33,15 @@ export async function GET(
       filenamesToTry.push(webpFilename);
     }
 
-    // Base directories to search
+    // Base directories to search (no hardcoded paths - works on any server)
+    const cwd = process.cwd();
     const baseDirs = [
-      // Committed assets (defaults saved via "Save as Defaults") - check first
-      path.join("/var/www/chartvolt", "public", "assets", "marketplace"),
-      path.join(process.cwd(), "..", "..", "public", "assets", "marketplace"),
-      path.join(process.cwd(), "public", "assets", "marketplace"),
-      // Production: /var/www/chartvolt/public/uploads/marketplace (runtime uploads)
-      path.join("/var/www/chartvolt", "public", "uploads", "marketplace"),
-      // Production admin fallback
-      path.join(
-        "/var/www/chartvolt",
-        "apps",
-        "admin",
-        "public",
-        "uploads",
-        "marketplace",
-      ),
-      // Local dev: main app's public folder (monorepo, from apps/admin)
-      path.join(process.cwd(), "..", "..", "public", "uploads", "marketplace"),
-      // Local dev: admin app's own public folder
-      path.join(process.cwd(), "public", "uploads", "marketplace"),
+      // Committed assets (defaults) - check first
+      path.join(cwd, "public", "assets", "marketplace"),
+      path.join(cwd, "..", "..", "public", "assets", "marketplace"),
+      // Runtime uploads
+      path.join(cwd, "public", "uploads", "marketplace"),
+      path.join(cwd, "..", "..", "public", "uploads", "marketplace"),
     ];
 
     let filePath: string | null = null;
