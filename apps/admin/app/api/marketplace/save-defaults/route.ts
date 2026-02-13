@@ -150,10 +150,10 @@ export async function POST(request: NextRequest) {
         if (found) return found;
       }
 
-      // Case 3: /assets/marketplace/name.ext (already committed)
+      // Case 3: /assets/marketplace/name.ext (already committed - with or without /api prefix)
       if (urlPath.includes("/assets/marketplace/")) {
         const filename = urlPath.split("/assets/marketplace/")[1];
-        const found = await tryFindInDirs(filename, [assetsDir]);
+        const found = await tryFindInDirs(filename, [assetsDir, ...uploadDirs]);
         if (found) return found;
       }
 
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
 
           try {
             await copyFile(sourceFile, targetPath);
-            newImageUrl = `/assets/marketplace/${targetFilename}`;
+            newImageUrl = `/api/assets/marketplace/${targetFilename}`;
             imagesCopied++;
             console.log(
               `  ✅ Copied image for "${item.slug}": ${sourceFile} → ${targetPath}`,
