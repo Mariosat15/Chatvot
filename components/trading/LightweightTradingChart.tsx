@@ -2449,64 +2449,72 @@ const LightweightTradingChart = ({
         oscChart.addHistogramSeries = _origAddHist;
         oscillatorSeriesRef.current.set(indicator.id, oscSeriesList);
 
-        // Store a lightweight refresh closure for this oscillator
-        // Captures series refs + indicator config at creation time
-        // Uses series.update() which preserves zoom/scroll (unlike setData/fitContent)
-        const _cs = [...oscSeriesList]; // captured series
-        const _ct = indicator.type;
-        const _cp = { ...indicator.parameters };
-        const _cps = indicator.priceSource || "close";
+        // Store a refresh closure that uses setData() (per lightweight-charts docs)
+        // Saves/restores visible range to preserve zoom/scroll
+        const _oscChartRef = oscChart;
+        const _seriesRefs = [...oscSeriesList];
+        const _indType = indicator.type;
+        const _indParams = { ...indicator.parameters };
+        const _priceSource = indicator.priceSource || "close";
+        const _indId = indicator.id;
         oscillatorRefreshFnsRef.current.set(indicator.id, () => {
-          if (candleDataRef.current.length < 20 || _cs.length === 0) return;
-          const tc = transformCandlesForPriceSource(candleDataRef.current, _cps);
+          if (!isMountedRef.current || candleDataRef.current.length < 20 || _seriesRefs.length === 0) return;
+          // Check chart is still alive
+          try { _oscChartRef.timeScale(); } catch { return; } // disposed chart
+          const tc = transformCandlesForPriceSource(candleDataRef.current, _priceSource);
+          // Save visible range before updating
+          let savedRange: any = null;
+          try { savedRange = _oscChartRef.timeScale().getVisibleLogicalRange(); } catch {}
           try {
-            // Update last 2 data points only (preserves zoom/scroll)
-            const uL = (s: ISeriesApi<any>, d: { time: any; value: number }[]) => {
-              if (d.length >= 2) { s.update({ time: d[d.length-2].time as UTCTimestamp, value: d[d.length-2].value }); s.update({ time: d[d.length-1].time as UTCTimestamp, value: d[d.length-1].value }); }
-              else if (d.length === 1) { s.update({ time: d[0].time as UTCTimestamp, value: d[0].value }); }
-            };
+            const toTS = (d: { time: any; value: number }[]) => d.map(v => ({ time: v.time as UTCTimestamp, value: v.value }));
+            const p = _indParams;
 
-            // Multi-series types (special handling)
-            if (_ct === "macd") {
-              const d = calculateMACD(tc, _cp.fast||12, _cp.slow||26, _cp.signal||9);
-              if (_cs[0]) uL(_cs[0], d.map(v=>({time:v.time, value:v.signal})));
-              if (_cs[1]) uL(_cs[1], d.map(v=>({time:v.time, value:v.macd})));
-              if (_cs[2]&&d.length>=1) { const l=d[d.length-1]; _cs[2].update({time:l.time as UTCTimestamp, value:l.histogram, color:l.histogram>=0?"rgba(38,166,154,0.6)":"rgba(239,83,80,0.6)"} as any); }
-              return;
+            // === Multi-series types ===
+            if (_indType === "macd") {
+              const d = calculateMACD(tc, p.fast||12, p.slow||26, p.signal||9);
+              if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.signal })));
+              if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.macd })));
+              if (_seriesRefs[2]) _seriesRefs[2].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.histogram, color: v.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any)));
+            } else if (_indType === "stochastic") {
+              const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
+              if (_seriesRefs[0]) _seriesRefs[0].setData(toTS(d.k));
+              if (_seriesRefs[1]) _seriesRefs[1].setData(toTS(d.d));
+            } else if (_indType === "stoch_rsi") {
+              const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
+              if (_seriesRefs[0]) _seriesRefs[0].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.k })));
+              if (_seriesRefs[1]) _seriesRefs[1].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.d })));
+            } else {
+              // === Single-series types (all standard + premium oscillators) ===
+              const calc: Record<string, () => {time:any,value:number}[]> = {
+                rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
+                mfi:()=>calculateMFI(tc,p.period||14), momentum:()=>calculateMomentum(tc,p.period||10), roc:()=>calculateROC(tc,p.period||12),
+                atr:()=>calculateATR(tc,p.period||14), cmf:()=>calculateCMF(tc,p.period||20), obv:()=>calculateOBV(tc), adx:()=>calculateADX(tc,p.period||14),
+                trend_pulse:()=>calculateTrendPulse(tc,p.adxPeriod||14,p.rsiPeriod||14), market_regime:()=>calculateMarketRegime(tc,p.period||20),
+                trend_composite:()=>calculateTrendComposite(tc,p.period||14), composite_breadth:()=>calculateCompositeBreadth(tc),
+                reversal_signal:()=>calculateReversalSignal(tc,p.rsiPeriod||14), breakout_prob:()=>calculateBreakoutProb(tc,p.bbPeriod||20,p.keltPeriod||20),
+                heikin_ashi_trend:()=>calculateHeikinAshiTrend(tc,p.period||10), adaptive_rsi:()=>calculateAdaptiveRSI(tc,p.period||14),
+                trend_persistence:()=>calculateTrendPersistence(tc,p.period||20), choppy_market:()=>calculateChoppyMarket(tc,p.period||14),
+                sentiment_osc:()=>calculateSentimentOsc(tc,p.smooth||5), volatility_squeeze:()=>calculateVolatilitySqueeze(tc,p.period||20),
+                squeeze_momentum:()=>calculateSqueezeMomentum(tc,p.period||20), range_expansion:()=>calculateRangeExpansion(tc,p.period||14),
+                alpha_momentum:()=>calculateAlphaMomentum(tc,p.period||20), efficiency_ratio:()=>calculateEfficiencyRatio(tc,p.period||10),
+                momentum_wave:()=>calculateMomentumWave(tc,p.period||20), gap_momentum:()=>calculateGapMomentum(tc,p.period||14),
+                price_action_score:()=>calculatePriceActionScore(tc,p.period||10), ergodic_volume:()=>calculateErgodicVolume(tc,p.shortPeriod||5,p.longPeriod||20),
+                order_flow_imbalance:()=>calculateOrderFlowImbalance(tc,p.period||10), net_buying_pressure:()=>calculateNetBuyingPressure(tc,p.period||14),
+                volume_climax:()=>calculateVolumeClimax(tc,p.period||20), relative_vigor:()=>calculateRelativeVigor(tc,p.period||10),
+                intraday_intensity:()=>calculateIntradayIntensity(tc,p.period||21), volume_momentum:()=>calculateVolumeMomentum(tc,p.period||14),
+                liquidity_heatmap:()=>calculateLiquidityHeatmap(tc,p.period||50), mtf_momentum:()=>calculateMTFMomentum(tc),
+                whale_accumulation:()=>calculateWhaleAccumulation(tc,p.threshold||1.5), smart_money_flow:()=>calculateSmartMoneyFlow(tc,p.period||14),
+                fractal_dimension:()=>calculateFractalDimension(tc,p.period||30), volatility_ratio:()=>calculateVolatilityRatio(tc,p.shortPeriod||5,p.longPeriod||20),
+                cycle_detector:()=>calculateCycleDetector(tc,p.maxPeriod||50),
+              };
+              const fn = calc[_indType];
+              if (fn && _seriesRefs[0]) { _seriesRefs[0].setData(toTS(fn())); }
             }
-            if (_ct === "stochastic") { const d=calculateStochastic(tc,_cp.kPeriod||14,_cp.dPeriod||3); if(_cs[0])uL(_cs[0],d.k); if(_cs[1])uL(_cs[1],d.d); return; }
-            if (_ct === "stoch_rsi") { const d=calculateStochRSI(tc,_cp.rsiPeriod||14,_cp.stochPeriod||14,_cp.kSmooth||3,_cp.dSmooth||3); if(_cs[0])uL(_cs[0],d.map((v:any)=>({time:v.time,value:v.k}))); if(_cs[1])uL(_cs[1],d.map((v:any)=>({time:v.time,value:v.d}))); return; }
-
-            // Single-series types (comprehensive calculator map covering all standard + premium oscillators)
-            const p = _cp;
-            const calc: Record<string, () => {time:any,value:number}[]> = {
-              rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
-              mfi:()=>calculateMFI(tc,p.period||14), momentum:()=>calculateMomentum(tc,p.period||10), roc:()=>calculateROC(tc,p.period||12),
-              atr:()=>calculateATR(tc,p.period||14), cmf:()=>calculateCMF(tc,p.period||20), obv:()=>calculateOBV(tc), adx:()=>calculateADX(tc,p.period||14),
-              // Premium bounded 0-100
-              trend_pulse:()=>calculateTrendPulse(tc,p.adxPeriod||14,p.rsiPeriod||14), market_regime:()=>calculateMarketRegime(tc,p.period||20),
-              trend_composite:()=>calculateTrendComposite(tc,p.period||14), composite_breadth:()=>calculateCompositeBreadth(tc),
-              reversal_signal:()=>calculateReversalSignal(tc,p.rsiPeriod||14), breakout_prob:()=>calculateBreakoutProb(tc,p.bbPeriod||20,p.keltPeriod||20),
-              heikin_ashi_trend:()=>calculateHeikinAshiTrend(tc,p.period||10), adaptive_rsi:()=>calculateAdaptiveRSI(tc,p.period||14),
-              trend_persistence:()=>calculateTrendPersistence(tc,p.period||20), choppy_market:()=>calculateChoppyMarket(tc,p.period||14),
-              // Premium zero-line
-              sentiment_osc:()=>calculateSentimentOsc(tc,p.smooth||5), volatility_squeeze:()=>calculateVolatilitySqueeze(tc,p.period||20),
-              squeeze_momentum:()=>calculateSqueezeMomentum(tc,p.period||20), range_expansion:()=>calculateRangeExpansion(tc,p.period||14),
-              alpha_momentum:()=>calculateAlphaMomentum(tc,p.period||20), efficiency_ratio:()=>calculateEfficiencyRatio(tc,p.period||10),
-              momentum_wave:()=>calculateMomentumWave(tc,p.period||20), gap_momentum:()=>calculateGapMomentum(tc,p.period||14),
-              price_action_score:()=>calculatePriceActionScore(tc,p.period||10), ergodic_volume:()=>calculateErgodicVolume(tc,p.shortPeriod||5,p.longPeriod||20),
-              order_flow_imbalance:()=>calculateOrderFlowImbalance(tc,p.period||10), net_buying_pressure:()=>calculateNetBuyingPressure(tc,p.period||14),
-              volume_climax:()=>calculateVolumeClimax(tc,p.period||20), relative_vigor:()=>calculateRelativeVigor(tc,p.period||10),
-              intraday_intensity:()=>calculateIntradayIntensity(tc,p.period||21), volume_momentum:()=>calculateVolumeMomentum(tc,p.period||14),
-              liquidity_heatmap:()=>calculateLiquidityHeatmap(tc,p.period||50), mtf_momentum:()=>calculateMTFMomentum(tc),
-              // Premium non-bounded
-              whale_accumulation:()=>calculateWhaleAccumulation(tc,p.threshold||1.5), smart_money_flow:()=>calculateSmartMoneyFlow(tc,p.period||14),
-              fractal_dimension:()=>calculateFractalDimension(tc,p.period||30), volatility_ratio:()=>calculateVolatilityRatio(tc,p.shortPeriod||5,p.longPeriod||20),
-              cycle_detector:()=>calculateCycleDetector(tc,p.maxPeriod||50),
-            };
-            const fn = calc[_ct];
-            if (fn && _cs[0]) { uL(_cs[0], fn()); }
-          } catch { /* non-fatal refresh error */ }
+            // Restore visible range to preserve zoom/scroll
+            if (savedRange) { try { _oscChartRef.timeScale().setVisibleLogicalRange(savedRange); } catch {} }
+          } catch (err) {
+            console.warn(`[OSC-REFRESH] Error refreshing ${_indType}:`, err);
+          }
         });
 
         // Only fitContent on newly created charts, not on data refreshes
@@ -2522,9 +2530,10 @@ const LightweightTradingChart = ({
   // Keep the ref always pointing to the latest updateIndicators (captures latest `indicators` state)
   updateIndicatorsFnRef.current = updateIndicators;
 
-  // Lightweight refresh: only updates the last data points on existing oscillator series
-  // Uses series.update() which preserves zoom/scroll state (unlike full rebuild)
+  // Lightweight refresh: recalculates data and calls setData() on existing oscillator series
+  // Saves/restores visible range to preserve zoom/scroll
   refreshOscillatorsFnRef.current = () => {
+    if (oscillatorRefreshFnsRef.current.size === 0) return;
     oscillatorRefreshFnsRef.current.forEach((fn) => {
       try { fn(); } catch { /* non-fatal */ }
     });
@@ -3165,6 +3174,11 @@ const LightweightTradingChart = ({
       volumeSeriesRef.current = null;
       positionLinesRef.current.clear();
       tpSlSeriesRef.current.clear();
+      // Clear oscillator refs to prevent refresh closures from accessing disposed charts
+      oscillatorRefreshFnsRef.current.clear();
+      oscillatorSeriesRef.current.clear();
+      oscillatorChartsRef.current.forEach((osc) => { try { osc.remove(); } catch {} });
+      oscillatorChartsRef.current.clear();
 
       // Remove chart last using local reference
       if (chartInstance) {
