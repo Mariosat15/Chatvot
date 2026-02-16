@@ -309,6 +309,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 20, volumeThreshold: 1.5, wickThreshold: 0.6, zoneLookback: 50, smoothPeriod: 10 },
     paramLabels: { period: "Volume SMA Period", volumeThreshold: "Volume Threshold", wickThreshold: "Wick Threshold", zoneLookback: "Zone Lookback", smoothPeriod: "Flow Smooth Period" },
   },
+  fractal_pulse_grid: {
+    name: "Fractal Pulse Grid",
+    shortName: "FPG",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20, atrPeriod: 14, baseLookback: 3, maxAge: 100, smoothPeriod: 8, breakTolerance: 0.25 },
+    paramLabels: { period: "Volatility Period", atrPeriod: "ATR Period", baseLookback: "Base Lookback", maxAge: "Max Level Age", smoothPeriod: "Pulse Smooth", breakTolerance: "Break Tolerance" },
+  },
 };
 
 const DEFAULT_COLORS = [

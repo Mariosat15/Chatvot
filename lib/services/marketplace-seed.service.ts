@@ -804,6 +804,112 @@ No indicator guarantees profits. Phantom Flow Zones is a tool to support your an
   riskLevel: "medium",
 };
 
+const FRACTAL_PULSE_GRID: Partial<IMarketplaceItem> = {
+  name: "Fractal Pulse Grid",
+  slug: "fractal-pulse-grid",
+  shortDescription:
+    "Adaptive market structure overlay using volatility-adaptive fractal swing detection, structural level tracking, and a pulse line revealing structural bias.",
+  fullDescription: `# Fractal Pulse Grid
+
+## Overview
+**Fractal Pulse Grid** is a premium overlay indicator that automatically maps the most important structural levels on your chart. Instead of manually drawing support and resistance lines, this indicator uses a volatility-adaptive fractal algorithm to detect true swing highs and swing lows, then tracks which levels are still "alive" (holding) versus broken — giving you a real-time structural map of the market.
+
+## How It Works
+
+### 1. Adaptive Fractal Detection
+Unlike basic Williams Fractals that use a fixed lookback, Fractal Pulse Grid adapts to current market conditions:
+- In **high volatility**: requires more confirmation bars before confirming a swing point (reduces false signals)
+- In **low volatility**: uses fewer confirmation bars (catches smaller but meaningful swings)
+- The adaptation is driven by the ATR ratio (current ATR vs. average ATR)
+
+### 2. Structural Level Tracking
+Every confirmed swing high becomes a **resistance level** and every swing low becomes a **support level**. The indicator then tracks each level's lifecycle:
+- **Active levels** are displayed on the chart as horizontal lines
+- **Tested levels** (price approached but bounced) become stronger — they've proven themselves
+- **Broken levels** (price closed beyond with conviction) are automatically removed
+- **Aged levels** expire after a configurable number of bars
+
+### 3. Best Level Selection
+At each bar, the indicator selects the most relevant resistance and support based on:
+- **Proximity**: Closer levels to current price are prioritized
+- **Recency**: More recent levels are weighted higher
+- **Test count**: Levels that have been tested multiple times are considered stronger
+
+### 4. Pulse Line
+The golden center line shows the **structural bias** — a smoothed midpoint between the active resistance and support that reveals:
+- **Rising pulse** = Bullish market structure (higher highs, higher lows)
+- **Falling pulse** = Bearish market structure (lower highs, lower lows)
+- **Flat pulse** = Consolidating / range-bound structure
+
+## How to Trade With It
+
+### Structure-Based Entries
+1. **Buy at support**: When price approaches the green support line, look for bullish confirmation (hammer, bullish engulfing)
+2. **Sell at resistance**: When price approaches the red resistance line, look for bearish confirmation
+3. **Use the pulse line** as a trend filter — only take longs when pulse is rising, shorts when falling
+
+### Break of Structure (BOS) Strategy
+1. When the **resistance line shifts higher** (old resistance broken, new one established above) = bullish BOS
+2. When the **support line shifts lower** = bearish BOS
+3. Trade in the direction of the structural break with the pulse line as confirmation
+
+### Pulse Line Trend Following
+1. Enter long when price pulls back to the **pulse line** in a rising structure
+2. Enter short when price rallies to the **pulse line** in a falling structure
+3. The pulse line acts as a dynamic equilibrium — price tends to revert to it
+
+### Grid Width Analysis
+1. When resistance and support are **far apart** = trending market with room to move
+2. When they **converge** = market compression, expect a breakout
+3. The direction of the breakout often aligns with the pulse line direction
+
+## Settings Guide
+- **Period** (20): Volatility normalization window for adaptive fractal detection
+- **ATR Period** (14): ATR calculation period for volatility measurement
+- **Base Lookback** (3): Minimum fractal confirmation bars per side — lower = more signals, higher = fewer but stronger
+- **Max Age** (100): Maximum bars a level persists before expiring — increase for higher timeframes
+- **Smooth Period** (8): Pulse line EMA smoothing — higher = smoother line, lower = more responsive
+- **Break Tolerance** (0.25): ATR fraction needed to confirm a level break — lower = more sensitive to breaks
+
+## What Makes This Unique
+Fractal Pulse Grid combines **three disciplines** that traders usually do manually:
+1. **Swing point identification** (usually done by eye)
+2. **Support/resistance level management** (usually drawn manually)
+3. **Market structure bias** (usually judged subjectively)
+
+All three are automated, adaptive, and updated in real-time. The adaptive fractal detection ensures the indicator works across all timeframes and volatility regimes without parameter changes.
+
+## Risk Warning
+No indicator guarantees profits. Fractal Pulse Grid is a tool to support your analysis, not replace it. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  price: 139,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "fractal_pulse_grid",
+  iconName: "Grid3X3",
+  codeTemplate: JSON.stringify({
+    type: "fractal_pulse_grid",
+    displayType: "overlay",
+    description: "Adaptive market structure overlay with fractal swing detection and structural level tracking",
+  }),
+  defaultSettings: {
+    period: 20,
+    atrPeriod: 14,
+    baseLookback: 3,
+    maxAge: 100,
+    smoothPeriod: 8,
+    breakTolerance: 0.25,
+    color: "#ffc107",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["structure", "fractals", "support-resistance", "swing", "adaptive", "premium", "overlay", "smart-money"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -812,6 +918,7 @@ const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
   PHANTOM_FLOW_ZONES,
+  FRACTAL_PULSE_GRID,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

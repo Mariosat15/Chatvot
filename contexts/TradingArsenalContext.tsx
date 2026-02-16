@@ -460,6 +460,8 @@ const INDICATOR_TYPE_MAP: Record<
   "nexus trend matrix": { type: "nexus_trend_matrix", displayType: "overlay" },
   phantom_flow_zones: { type: "phantom_flow_zones", displayType: "overlay" },
   "phantom flow zones": { type: "phantom_flow_zones", displayType: "overlay" },
+  fractal_pulse_grid: { type: "fractal_pulse_grid", displayType: "overlay" },
+  "fractal pulse grid": { type: "fractal_pulse_grid", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -684,6 +686,14 @@ export function marketplaceItemToIndicator(
       params.wickThreshold = settings?.wickThreshold || 0.6;
       params.zoneLookback = settings?.zoneLookback || 50;
       params.smoothPeriod = settings?.smoothPeriod || 10;
+      break;
+    case "fractal_pulse_grid":
+      params.period = settings?.period || 20;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.baseLookback = settings?.baseLookback || 3;
+      params.maxAge = settings?.maxAge || 100;
+      params.smoothPeriod = settings?.smoothPeriod || 8;
+      params.breakTolerance = settings?.breakTolerance || 0.25;
       break;
     default:
       // Generic period-based indicators

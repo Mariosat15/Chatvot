@@ -93,6 +93,7 @@ import {
   calculateDynamicPivots, calculatePriceActionScore, calculateErgodicVolume, calculateAnchoredVWAPBands,
   calculateNexusTrendMatrix,
   calculatePhantomFlowZones,
+  calculateFractalPulseGrid,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -1910,6 +1911,68 @@ const LightweightTradingChart = ({
             }
           }
 
+        // Fractal Pulse Grid: 3 series (resistance, pulse line, support)
+        } else if (indicator.type === "fractal_pulse_grid") {
+          const fpgData = calculateFractalPulseGrid(
+            transformedCandles,
+            indicator.parameters.period || 20,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.baseLookback || 3,
+            indicator.parameters.maxAge || 100,
+            indicator.parameters.smoothPeriod || 8,
+            indicator.parameters.breakTolerance || 0.25,
+          );
+
+          // Resistance line (red, dashed)
+          if (indicator.visibility?.upper !== false) {
+            const validRes = fpgData.filter((d) => !isNaN(d.resistance));
+            if (validRes.length > 0) {
+              const resSeries = chart.addLineSeries({
+                color: hexToRgba(indicator.colors?.upper || "#f44336", indicator.opacity || 80),
+                lineWidth: 2 as any,
+                lineStyle: 2 as any,
+                title: `${indicator.customLabel || "FPG"} Resistance`,
+                priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 },
+                lastValueVisible: false,
+              });
+              resSeries.setData(validRes.map((d) => ({ time: d.time as UTCTimestamp, value: d.resistance })));
+              indicatorSeriesRef.current.set(`${indicator.id}_resistance`, resSeries);
+            }
+          }
+
+          // Pulse line (golden, solid)
+          if (indicator.visibility?.middle !== false) {
+            const pulseSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#ffc107", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Fractal Pulse Grid",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            pulseSeries.setData(fpgData.map((d) => ({ time: d.time as UTCTimestamp, value: d.pulseLine })));
+            indicatorSeriesRef.current.set(`${indicator.id}_pulse`, pulseSeries);
+          }
+
+          // Support line (green, dashed)
+          if (indicator.visibility?.lower !== false) {
+            const validSup = fpgData.filter((d) => !isNaN(d.support));
+            if (validSup.length > 0) {
+              const supSeries = chart.addLineSeries({
+                color: hexToRgba(indicator.colors?.lower || "#4caf50", indicator.opacity || 80),
+                lineWidth: 2 as any,
+                lineStyle: 2 as any,
+                title: `${indicator.customLabel || "FPG"} Support`,
+                priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 },
+                lastValueVisible: false,
+              });
+              supSeries.setData(validSup.map((d) => ({ time: d.time as UTCTimestamp, value: d.support })));
+              indicatorSeriesRef.current.set(`${indicator.id}_support`, supSeries);
+            }
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2131,6 +2194,26 @@ const LightweightTradingChart = ({
                     if (supS) supS.setData(pfzData.filter(d => !isNaN(d.supplyZone)).map(d => ({ time: d.time as UTCTimestamp, value: d.supplyZone })));
                     if (flS) flS.setData(pfzData.map(d => ({ time: d.time as UTCTimestamp, value: d.flowLine })));
                     if (demS) demS.setData(pfzData.filter(d => !isNaN(d.demandZone)).map(d => ({ time: d.time as UTCTimestamp, value: d.demandZone })));
+                  }
+                }
+              } else if (_ovlType === "fractal_pulse_grid") {
+                const fpgData = calculateFractalPulseGrid(
+                  tc, p.period || 20, p.atrPeriod || 14, p.baseLookback || 3,
+                  p.maxAge || 100, p.smoothPeriod || 8, p.breakTolerance || 0.25,
+                );
+                if (fpgData.length > 0) {
+                  const resS = _ovlSeriesMap.get(`${_ovlId}_resistance`);
+                  const pulS = _ovlSeriesMap.get(`${_ovlId}_pulse`);
+                  const supS = _ovlSeriesMap.get(`${_ovlId}_support`);
+                  if (mode === "light") {
+                    const last = fpgData[fpgData.length - 1];
+                    if (resS && !isNaN(last.resistance)) resS.update({ time: last.time as UTCTimestamp, value: last.resistance });
+                    if (pulS) pulS.update({ time: last.time as UTCTimestamp, value: last.pulseLine });
+                    if (supS && !isNaN(last.support)) supS.update({ time: last.time as UTCTimestamp, value: last.support });
+                  } else {
+                    if (resS) resS.setData(fpgData.filter(d => !isNaN(d.resistance)).map(d => ({ time: d.time as UTCTimestamp, value: d.resistance })));
+                    if (pulS) pulS.setData(fpgData.map(d => ({ time: d.time as UTCTimestamp, value: d.pulseLine })));
+                    if (supS) supS.setData(fpgData.filter(d => !isNaN(d.support)).map(d => ({ time: d.time as UTCTimestamp, value: d.support })));
                   }
                 }
               }

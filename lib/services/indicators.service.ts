@@ -3201,3 +3201,205 @@ export function calculatePhantomFlowZones(
 
   return result;
 }
+
+// ============================================================================
+// FRACTAL PULSE GRID — Premium Marketplace Indicator
+// Adaptive market structure overlay: volatility-adaptive fractal swing detection,
+// structural level tracking with break/test logic, and a pulse line showing bias.
+// ============================================================================
+
+export interface FractalPulseGridData {
+  time: number;
+  resistance: number;  // Active structural resistance level, NaN when none
+  support: number;     // Active structural support level, NaN when none
+  pulseLine: number;   // Adaptive smoothed midpoint of structure
+  structureBias: number; // -100 to +100 (positive = bullish structure)
+}
+
+export function calculateFractalPulseGrid(
+  data: OHLCData[],
+  period: number = 20,
+  atrPeriod: number = 14,
+  baseLookback: number = 3,
+  maxAge: number = 100,
+  smoothPeriod: number = 8,
+  breakTolerance: number = 0.25,
+): FractalPulseGridData[] {
+  if (data.length < Math.max(period, atrPeriod) + baseLookback * 2 + 5) return [];
+
+  // --- Step 1: Compute ATR for volatility adaptation ---
+  const atrArr: number[] = new Array(data.length).fill(0);
+  for (let i = 1; i < data.length; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    if (i < atrPeriod) {
+      atrArr[i] = atrArr[i - 1] + (tr - atrArr[i - 1]) / i;
+    } else {
+      atrArr[i] = atrArr[i - 1] + (tr - atrArr[i - 1]) / atrPeriod;
+    }
+  }
+
+  // ATR SMA for volatility normalization
+  const atrSma: number[] = new Array(data.length).fill(0);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += atrArr[i - j];
+    atrSma[i] = sum / period;
+  }
+
+  // --- Step 2: Detect adaptive fractals and track levels ---
+  interface SwingLevel {
+    bar: number;
+    price: number;
+    type: "high" | "low";
+    testCount: number;
+  }
+
+  const activeHighs: SwingLevel[] = [];
+  const activeLows: SwingLevel[] = [];
+  const startBar = Math.max(period, atrPeriod) + baseLookback;
+  const result: FractalPulseGridData[] = [];
+  const alpha = 2 / (smoothPeriod + 1);
+  let pulseEma = NaN;
+  let prevResistance = NaN;
+  let prevSupport = NaN;
+  let biasSmooth = 0;
+
+  for (let i = startBar; i < data.length; i++) {
+    const curAtr = atrArr[i] || 0.0001;
+    const breakDist = curAtr * breakTolerance;
+    const volRatio = atrSma[i] > 0 ? atrArr[i] / atrSma[i] : 1;
+    const adaptiveLookback = Math.max(2, Math.min(6,
+      Math.round(baseLookback * Math.max(0.7, Math.min(1.8, volRatio)))),
+    );
+
+    // --- Fractal detection (need future bars, so detect for bar i - adaptiveLookback) ---
+    const checkBar = i - adaptiveLookback;
+    if (checkBar >= startBar - baseLookback && checkBar > 0) {
+      let isSwingHigh = true;
+      let isSwingLow = true;
+      for (let j = 1; j <= adaptiveLookback; j++) {
+        const leftIdx = checkBar - j;
+        const rightIdx = checkBar + j;
+        if (leftIdx < 0 || rightIdx >= data.length) { isSwingHigh = false; isSwingLow = false; break; }
+        if (data[leftIdx].high >= data[checkBar].high || data[rightIdx].high >= data[checkBar].high) isSwingHigh = false;
+        if (data[leftIdx].low <= data[checkBar].low || data[rightIdx].low <= data[checkBar].low) isSwingLow = false;
+      }
+
+      if (isSwingHigh) {
+        const tooClose = activeHighs.some(
+          (h) => Math.abs(h.price - data[checkBar].high) < curAtr * 0.3 && checkBar - h.bar < period,
+        );
+        if (!tooClose) {
+          activeHighs.push({ bar: checkBar, price: data[checkBar].high, type: "high", testCount: 0 });
+        }
+      }
+      if (isSwingLow) {
+        const tooClose = activeLows.some(
+          (l) => Math.abs(l.price - data[checkBar].low) < curAtr * 0.3 && checkBar - l.bar < period,
+        );
+        if (!tooClose) {
+          activeLows.push({ bar: checkBar, price: data[checkBar].low, type: "low", testCount: 0 });
+        }
+      }
+    }
+
+    // --- Expire old levels and detect breaks/tests ---
+    for (let h = activeHighs.length - 1; h >= 0; h--) {
+      const lvl = activeHighs[h];
+      if (i - lvl.bar > maxAge) { activeHighs.splice(h, 1); continue; }
+      if (lvl.bar > i) continue;
+      if (data[i].close > lvl.price + breakDist) { activeHighs.splice(h, 1); continue; }
+      if (data[i].high >= lvl.price - breakDist && data[i].close <= lvl.price + breakDist * 0.5) {
+        lvl.testCount++;
+      }
+    }
+
+    for (let l = activeLows.length - 1; l >= 0; l--) {
+      const lvl = activeLows[l];
+      if (i - lvl.bar > maxAge) { activeLows.splice(l, 1); continue; }
+      if (lvl.bar > i) continue;
+      if (data[i].close < lvl.price - breakDist) { activeLows.splice(l, 1); continue; }
+      if (data[i].low <= lvl.price + breakDist && data[i].close >= lvl.price - breakDist * 0.5) {
+        lvl.testCount++;
+      }
+    }
+
+    // --- Select best resistance (closest above price, weighted by recency + tests) ---
+    let bestRes = NaN;
+    let bestResScore = -Infinity;
+    for (const h of activeHighs) {
+      if (h.bar > i || h.price <= data[i].close) continue;
+      const proximity = 1 / (1 + (h.price - data[i].close) / curAtr);
+      const recency = 1 - (i - h.bar) / maxAge * 0.5;
+      const testBonus = 1 + h.testCount * 0.3;
+      const score = proximity * recency * testBonus;
+      if (score > bestResScore) { bestResScore = score; bestRes = h.price; }
+    }
+
+    // --- Select best support (closest below price, weighted by recency + tests) ---
+    let bestSup = NaN;
+    let bestSupScore = -Infinity;
+    for (const l of activeLows) {
+      if (l.bar > i || l.price >= data[i].close) continue;
+      const proximity = 1 / (1 + (data[i].close - l.price) / curAtr);
+      const recency = 1 - (i - l.bar) / maxAge * 0.5;
+      const testBonus = 1 + l.testCount * 0.3;
+      const score = proximity * recency * testBonus;
+      if (score > bestSupScore) { bestSupScore = score; bestSup = l.price; }
+    }
+
+    // Carry forward previous levels when no active level found
+    if (isNaN(bestRes) && !isNaN(prevResistance)) bestRes = prevResistance;
+    if (isNaN(bestSup) && !isNaN(prevSupport)) bestSup = prevSupport;
+    prevResistance = bestRes;
+    prevSupport = bestSup;
+
+    // --- Pulse line: adaptive midpoint ---
+    let mid: number;
+    if (!isNaN(bestRes) && !isNaN(bestSup)) {
+      mid = (bestRes + bestSup) / 2;
+    } else if (!isNaN(bestRes)) {
+      mid = bestRes - curAtr;
+    } else if (!isNaN(bestSup)) {
+      mid = bestSup + curAtr;
+    } else {
+      mid = (data[i].high + data[i].low + data[i].close) / 3;
+    }
+
+    if (isNaN(pulseEma)) {
+      pulseEma = mid;
+    } else {
+      const structureShifting = (bestRes !== prevResistance) || (bestSup !== prevSupport);
+      const effectiveAlpha = structureShifting ? alpha * 1.5 : alpha;
+      pulseEma = effectiveAlpha * mid + (1 - effectiveAlpha) * pulseEma;
+    }
+
+    // --- Structure bias ---
+    let bias = 0;
+    if (!isNaN(pulseEma) && curAtr > 0) {
+      const pricePos = (data[i].close - pulseEma) / curAtr;
+      const priceBias = Math.max(-1, Math.min(1, pricePos * 0.5));
+      const supDist = !isNaN(bestSup) ? (data[i].close - bestSup) / curAtr : 0;
+      const resDist = !isNaN(bestRes) ? (bestRes - data[i].close) / curAtr : 0;
+      const levelBias = resDist > 0 && supDist > 0
+        ? Math.max(-1, Math.min(1, (supDist - resDist) / (supDist + resDist)))
+        : 0;
+      bias = (priceBias * 0.6 + levelBias * 0.4) * 100;
+    }
+    biasSmooth = biasSmooth * 0.8 + bias * 0.2;
+
+    result.push({
+      time: data[i].time,
+      resistance: bestRes,
+      support: bestSup,
+      pulseLine: pulseEma,
+      structureBias: Math.round(Math.max(-100, Math.min(100, biasSmooth))),
+    });
+  }
+
+  return result;
+}
