@@ -741,8 +741,14 @@ export async function seedMarketplaceItems(
 
   // Also add any items from JSON that are NOT in the hardcoded list
   // (these are cosmetic items created manually by admin and saved as defaults)
+  // SKIP indicator/strategy items — they were removed and will be rebuilt one-by-one
   for (const [slug, jsonData] of Object.entries(savedDefaults)) {
     if (!processedSlugs.has(slug)) {
+      const cat = jsonData.category?.toLowerCase();
+      if (cat === "indicator" || cat === "strategy") {
+        console.log(`⏭️ [Seed] Skipping ${cat} from JSON: ${slug}`);
+        continue;
+      }
       mergedItems.push(jsonData);
       processedSlugs.add(slug);
     }
