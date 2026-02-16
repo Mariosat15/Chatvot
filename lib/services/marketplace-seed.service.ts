@@ -17,6 +17,8 @@ import {
   MarketplaceItem,
   IMarketplaceItem,
 } from "@/database/models/marketplace/marketplace-item.model";
+import { readFile } from "fs/promises";
+import path from "path";
 
 // ============================================================================
 // INDICATOR TEMPLATES - Only indicators with chart implementations
@@ -2468,7 +2470,75 @@ export async function seedMarketplaceItems(
 
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
-  for (const itemData of ALL_ITEMS) {
+  // ---- Load saved defaults JSON (contains imageUrl and admin-customized data) ----
+  let savedDefaults: Record<string, any> = {};
+  try {
+    const possiblePaths = [
+      path.join(process.cwd(), "apps", "admin", "lib", "data", "marketplace-defaults.json"),
+      path.join(process.cwd(), "..", "..", "apps", "admin", "lib", "data", "marketplace-defaults.json"),
+      path.join(process.cwd(), "lib", "data", "marketplace-defaults.json"),
+    ];
+
+    for (const jsonPath of possiblePaths) {
+      try {
+        const raw = await readFile(jsonPath, "utf-8");
+        const items = JSON.parse(raw);
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item.slug) {
+              savedDefaults[item.slug] = item;
+            }
+          }
+          console.log(`📄 [Seed] Loaded ${items.length} saved defaults from ${jsonPath}`);
+        }
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    if (Object.keys(savedDefaults).length === 0) {
+      console.log(`📄 [Seed] No marketplace-defaults.json found, using hardcoded data only`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Seed] Could not load defaults JSON:`, err);
+  }
+
+  // ---- Build merged item list: hardcoded + JSON defaults ----
+  const mergedItems: any[] = [];
+  const processedSlugs = new Set<string>();
+
+  for (const hardcoded of ALL_ITEMS) {
+    const jsonData = savedDefaults[hardcoded.slug];
+    if (jsonData) {
+      mergedItems.push({
+        ...hardcoded,
+        imageUrl: jsonData.imageUrl || hardcoded.imageUrl,
+        iconName: jsonData.iconName || hardcoded.iconName,
+        fullDescription: jsonData.fullDescription || hardcoded.fullDescription,
+        shortDescription: jsonData.shortDescription || hardcoded.shortDescription,
+        price: jsonData.price ?? hardcoded.price,
+        originalPrice: jsonData.originalPrice ?? hardcoded.originalPrice,
+        tags: (jsonData.tags && jsonData.tags.length > 0) ? jsonData.tags : hardcoded.tags,
+        isFeatured: jsonData.isFeatured ?? hardcoded.isFeatured,
+      });
+    } else {
+      mergedItems.push(hardcoded);
+    }
+    processedSlugs.add(hardcoded.slug);
+  }
+
+  // Also add items from JSON not in hardcoded list (admin-created items)
+  for (const [slug, jsonData] of Object.entries(savedDefaults)) {
+    if (!processedSlugs.has(slug)) {
+      mergedItems.push(jsonData);
+      processedSlugs.add(slug);
+    }
+  }
+
+  console.log(`📦 [Seed] Processing ${mergedItems.length} items (${ALL_ITEMS.length} hardcoded + ${Object.keys(savedDefaults).length} from JSON)`);
+
+  for (const itemData of mergedItems) {
     try {
       // Check if item already exists
       const existing = await MarketplaceItem.findOne({ slug: itemData.slug });
@@ -2479,7 +2549,7 @@ export async function seedMarketplaceItems(
         existing.indicatorType = itemData.indicatorType;
         existing.strategyConfig = itemData.strategyConfig as any;
         existing.cosmeticType = itemData.cosmeticType as any;
-        // PRESERVE existing imageUrl if admin has uploaded one - only set if empty
+        // RESTORE imageUrl from defaults if existing is empty
         if (!existing.imageUrl && itemData.imageUrl) {
           existing.imageUrl = itemData.imageUrl;
         }
@@ -2490,7 +2560,7 @@ export async function seedMarketplaceItems(
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
         existing.defaultSettings =
           itemData.defaultSettings || existing.defaultSettings;
-        // PRESERVE existing descriptions if admin has customized them
+        // RESTORE descriptions from defaults if existing is empty
         if (!existing.fullDescription && itemData.fullDescription) {
           existing.fullDescription = itemData.fullDescription;
         }
@@ -2508,7 +2578,6 @@ export async function seedMarketplaceItems(
         }
         existing.isFree = itemData.isFree ?? existing.isFree;
         // ALWAYS sync isFeatured from template to ensure consistency
-        // Admin can still change it manually after seeding
         if (itemData.isFeatured !== undefined) {
           existing.isFeatured = itemData.isFeatured;
         }
@@ -2525,7 +2594,7 @@ export async function seedMarketplaceItems(
         continue;
       }
 
-      // Create new item
+      // Create new item (includes imageUrl from merged data)
       await MarketplaceItem.create({
         ...itemData,
         createdBy: adminId,
