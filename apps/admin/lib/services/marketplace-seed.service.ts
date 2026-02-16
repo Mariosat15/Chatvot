@@ -813,6 +813,25 @@ export async function seedMarketplaceItems(
     }
   }
 
+  // ---- Final cleanup: remove any DB items NOT in the processed list ----
+  // This prevents stale duplicates from lingering in the marketplace
+  try {
+    const validSlugs = Array.from(processedSlugs);
+    const staleItems = await MarketplaceItem.find({
+      slug: { $nin: validSlugs },
+    });
+    if (staleItems.length > 0) {
+      const staleIds = staleItems.map((i: any) => i._id);
+      const staleSlugs = staleItems.map((i: any) => `${i.slug} (${i.category})`);
+      const { UserPurchase } = await import("@/database/models/marketplace/user-purchase.model");
+      await UserPurchase.deleteMany({ itemId: { $in: staleIds } });
+      await MarketplaceItem.deleteMany({ slug: { $nin: validSlugs } });
+      console.log(`🗑️ [Seed] Removed ${staleItems.length} stale items not in seed list: ${staleSlugs.join(", ")}`);
+    }
+  } catch (cleanupErr) {
+    console.warn(`⚠️ [Seed] Stale item cleanup failed:`, cleanupErr);
+  }
+
   console.log(
     `✅ Marketplace seeded: ${result.created} created, ${result.updated} updated`,
   );
