@@ -3,6 +3,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
 import { writeFile, mkdir, access, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 export async function POST(request: NextRequest) {
   try {
@@ -118,6 +120,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Backup file to database for persistence across deployments
+    try {
+      await connectToDatabase();
+      const ext = fileExtension.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+        gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", ico: "image/x-icon",
+      };
+      const contentType = contentTypes[ext] || "image/png";
+      const base64Data = buffer.toString("base64");
+
+      let settings = await WhiteLabel.findOne();
+      if (!settings) { settings = new WhiteLabel(); }
+      const brandingFiles = (settings as any).brandingFiles || new Map();
+      brandingFiles.set(filename, {
+        data: base64Data,
+        contentType,
+        updatedAt: new Date(),
+      });
+      (settings as any).brandingFiles = brandingFiles;
+      await settings.save();
+      console.log(`💾 [Upload] File backed up to DB: ${filename} (${Math.round(base64Data.length / 1024)}KB base64)`);
+    } catch (dbErr) {
+      console.warn(`⚠️ [Upload] Could not backup file to DB:`, dbErr);
+    }
+
     // Return API-served path (works in production without rebuild)
     // Use API route for dynamic serving, with timestamp for cache-busting
     const publicPath = `/api/assets/images/${filename}?t=${timestamp}`;
@@ -127,7 +155,7 @@ export async function POST(request: NextRequest) {
       success: true,
       path: publicPath,
       filename,
-      uploadDir, // Include for debugging
+      uploadDir,
       fileSize: buffer.length,
     });
   } catch (error) {

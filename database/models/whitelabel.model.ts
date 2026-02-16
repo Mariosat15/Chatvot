@@ -8,6 +8,9 @@ export interface WhiteLabelDocument extends Document {
   dashboardPreview: string;
   favicon: string;
 
+  // Branding file backup (base64-encoded file data stored in DB for persistence)
+  brandingFiles: Map<string, { data: string; contentType: string; updatedAt: Date }>;
+
   // General Settings
   nodeEnv: string;
   nextPublicBaseUrl: string;
@@ -88,6 +91,20 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     favicon: {
       type: String,
       default: "/favicon.ico",
+    },
+
+    // Branding file backup (base64-encoded, auto-restored if disk files are lost)
+    brandingFiles: {
+      type: Map,
+      of: new Schema(
+        {
+          data: { type: String, required: true },
+          contentType: { type: String, required: true },
+          updatedAt: { type: Date, default: Date.now },
+        },
+        { _id: false },
+      ),
+      default: new Map(),
     },
 
     // General Settings
