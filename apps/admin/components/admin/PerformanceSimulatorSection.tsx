@@ -1200,7 +1200,7 @@ export default function PerformanceSimulatorSection() {
                 </Card>
 
                 {/* Concurrent Mode (Load Testing) */}
-                <Card className="bg-gray-800/50 !border-orange-500/30">
+                <Card className="bg-gray-800/50 border-orange-500/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-white text-lg flex items-center gap-2">
                       <Zap className="h-5 w-5 text-orange-400" />
