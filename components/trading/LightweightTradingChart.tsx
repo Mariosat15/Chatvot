@@ -91,6 +91,7 @@ import {
   calculateMomentumWave, calculateGapMomentum, calculateHeikinAshiTrend, calculateCycleDetector,
   calculateAdaptiveRSI, calculateMeanReversionBand, calculateTrendRibbon, calculateRelativeVigor,
   calculateDynamicPivots, calculatePriceActionScore, calculateErgodicVolume, calculateAnchoredVWAPBands,
+  calculateNexusTrendMatrix,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -1777,6 +1778,75 @@ const LightweightTradingChart = ({
             s.setData(ribbonData.map(d => ({ time: d.time as UTCTimestamp, value: d[key] })));
             indicatorSeriesRef.current.set(`${indicator.id}_${key}`, s);
           });
+
+        // Nexus Trend Matrix: 3 series (upper, core, lower) with trend-based coloring
+        } else if (indicator.type === "nexus_trend_matrix") {
+          const ntmData = calculateNexusTrendMatrix(
+            transformedCandles,
+            indicator.parameters.period || 20,
+            indicator.parameters.fastPeriod || 2,
+            indicator.parameters.slowPeriod || 30,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.atrMultiplier || 2.0,
+            indicator.parameters.trendSmoothPeriod || 10,
+          );
+
+          // Determine colors based on trend score for each data point
+          const getColor = (score: number): string => {
+            if (score >= 30) return "#00e676";      // Strong uptrend - green
+            if (score >= 10) return "#66bb6a";       // Mild uptrend - light green
+            if (score <= -30) return "#f44336";      // Strong downtrend - red
+            if (score <= -10) return "#ef5350";      // Mild downtrend - light red
+            return "#9e9e9e";                        // Ranging - gray
+          };
+
+          // Use the dominant trend color for the series
+          const avgScore = ntmData.length > 0
+            ? ntmData.reduce((sum, d) => sum + d.trendScore, 0) / ntmData.length
+            : 0;
+          const dominantColor = getColor(avgScore);
+
+          // Upper band
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || dominantColor, indicator.opacity || 60),
+              lineWidth: 1 as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "NTM"} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            upperSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.upper })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          // Core adaptive line (KAMA)
+          if (indicator.visibility?.middle !== false) {
+            const coreSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#ffa726", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Nexus Trend Matrix",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            coreSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.core })));
+            indicatorSeriesRef.current.set(`${indicator.id}_core`, coreSeries);
+          }
+
+          // Lower band
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || dominantColor, indicator.opacity || 60),
+              lineWidth: 1 as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "NTM"} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            lowerSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.lower })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
 
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);

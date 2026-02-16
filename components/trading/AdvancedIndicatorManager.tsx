@@ -295,6 +295,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: {},
     paramLabels: {},
   },
+  nexus_trend_matrix: {
+    name: "Nexus Trend Matrix",
+    shortName: "NTM",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20, fastPeriod: 2, slowPeriod: 30, atrPeriod: 14, atrMultiplier: 2.0, trendSmoothPeriod: 10 },
+    paramLabels: { period: "KAMA Period", fastPeriod: "Fast Period", slowPeriod: "Slow Period", atrPeriod: "ATR Period", atrMultiplier: "ATR Multiplier", trendSmoothPeriod: "Trend Smooth" },
+  },
 };
 
 const DEFAULT_COLORS = [

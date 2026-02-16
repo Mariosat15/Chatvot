@@ -611,11 +611,111 @@ At 10% referral rate, your passive income potential is unmatched:
 };
 
 // ============================================================================
-// ALL ITEMS - Cosmetics and Game Master Packages only
-// (Indicators and strategies removed for one-by-one rebuild)
+// MARKETPLACE INDICATORS (rebuilt one-by-one)
+// ============================================================================
+
+const NEXUS_TREND_MATRIX: Partial<IMarketplaceItem> = {
+  name: "Nexus Trend Matrix",
+  slug: "nexus-trend-matrix",
+  shortDescription:
+    "Adaptive trend overlay combining KAMA core, ATR volatility bands, and multi-factor trend scoring with color-coded zones.",
+  fullDescription: `# Nexus Trend Matrix
+
+## Overview
+The **Nexus Trend Matrix** is a premium all-in-one overlay indicator that combines three powerful analysis techniques into a single, clean visual directly on your price chart. No separate oscillator panel needed — everything you need is right on the candles.
+
+## Three Core Components
+
+### 1. Adaptive Trend Core (Center Line)
+The orange center line uses the **Kaufman Adaptive Moving Average (KAMA)** algorithm. Unlike a standard moving average, KAMA automatically adjusts its sensitivity:
+- **Trending markets**: The line reacts quickly to follow price
+- **Choppy/ranging markets**: The line becomes smooth and filters out noise
+
+This means you get fast signals when it matters and fewer false signals during sideways action.
+
+### 2. Dynamic Volatility Bands (Upper & Lower)
+The bands surrounding the core line expand and contract based on **Average True Range (ATR)**, the gold standard for measuring market volatility:
+- **Wide bands** = high volatility, expect larger price swings
+- **Narrow bands** = low volatility, potential breakout building
+- **Price touching upper band** = extended to the upside
+- **Price touching lower band** = extended to the downside
+
+### 3. Trend Strength Coloring
+The bands change color based on a composite score that combines:
+- **KAMA slope** (trend direction and speed)
+- **Directional strength** (bullish vs bearish pressure)
+- **Price momentum** (position relative to the adaptive line)
+
+**Color Guide:**
+- **Green** = Strong uptrend confirmed — look for buy opportunities
+- **Red** = Strong downtrend confirmed — look for sell opportunities
+- **Gray** = Ranging / uncertain — stay out or reduce position size
+
+## How to Trade With It
+
+### Trend Following
+1. Wait for bands to turn **green**
+2. Enter long when price pulls back to the **core line** (orange)
+3. Set stop-loss below the **lower band**
+4. Take profit when bands turn **gray** or **red**
+
+### Mean Reversion
+1. When bands are **green**, buy dips to the **lower band**
+2. When bands are **red**, sell rallies to the **upper band**
+3. Avoid trading when bands are **gray** (no clear trend)
+
+### Breakout Confirmation
+1. Watch for bands to narrow (squeeze)
+2. Enter on breakout when bands expand AND change color
+3. Green expansion = long breakout confirmed
+4. Red expansion = short breakout confirmed
+
+## Settings Guide
+- **Period** (20): KAMA efficiency ratio lookback — higher = smoother, lower = more responsive
+- **Fast Period** (2): KAMA fast constant — lower = faster reaction in trends
+- **Slow Period** (30): KAMA slow constant — higher = more filtering in ranges
+- **ATR Period** (14): Volatility measurement lookback
+- **ATR Multiplier** (2.0): Band width — higher = wider bands, fewer signals
+- **Trend Smooth** (10): Trend score smoothing — higher = more stable colors
+
+## Risk Warning
+No indicator guarantees profits. The Nexus Trend Matrix is a tool to support your analysis, not replace it. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  price: 89,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "nexus_trend_matrix",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "nexus_trend_matrix",
+    displayType: "overlay",
+    description: "Adaptive KAMA core + ATR volatility bands + multi-factor trend scoring",
+  }),
+  defaultSettings: {
+    period: 20,
+    fastPeriod: 2,
+    slowPeriod: 30,
+    atrPeriod: 14,
+    atrMultiplier: 2.0,
+    trendSmoothPeriod: 10,
+    color: "#ffa726",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["trend", "adaptive", "bands", "premium", "overlay", "kama", "volatility", "atr"],
+  riskLevel: "medium",
+};
+
+// ============================================================================
+// ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
 
 const ALL_ITEMS = [
+  // Indicators
+  NEXUS_TREND_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
@@ -651,33 +751,8 @@ export async function seedMarketplaceItems(
 
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
-  // ---- Step 0: Clean up ALL indicator and strategy items from DB ----
-  // Indicators and strategies are being rebuilt one-by-one.
-  // This ensures a clean slate each time seed runs.
-  try {
-    const { UserPurchase } = await import("@/database/models/marketplace/user-purchase.model");
-
-    // Find all indicator/strategy item IDs
-    const itemsToDelete = await MarketplaceItem.find(
-      { category: { $in: ["indicator", "strategy"] } },
-      { _id: 1 }
-    );
-    const itemIds = itemsToDelete.map((i: any) => i._id);
-
-    if (itemIds.length > 0) {
-      // Delete orphaned purchases first
-      const purchaseResult = await UserPurchase.deleteMany({ itemId: { $in: itemIds } });
-      if (purchaseResult.deletedCount > 0) {
-        console.log(`🗑️ [Seed] Removed ${purchaseResult.deletedCount} orphaned indicator/strategy purchases`);
-      }
-
-      // Delete the items themselves
-      const deleteResult = await MarketplaceItem.deleteMany({ category: { $in: ["indicator", "strategy"] } });
-      console.log(`🗑️ [Seed] Removed ${deleteResult.deletedCount} indicator/strategy items from DB (rebuilding one-by-one)`);
-    }
-  } catch (err) {
-    console.warn(`⚠️ [Seed] Could not clean indicator/strategy items:`, err);
-  }
+  // NOTE: Stale items (including old indicators not in the seed list) are cleaned up
+  // at the end of the seed function by comparing against processedSlugs.
 
   // ---- Load saved defaults JSON (contains imageUrl and admin-customized data) ----
   let savedDefaults: Record<string, any> = {};

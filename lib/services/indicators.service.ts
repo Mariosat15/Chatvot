@@ -2186,7 +2186,8 @@ export function calculateCompositeBreadth(data: OHLCData[]): IndicatorData[] {
   const cci = calculateCCI(data, 20);
   const rsiMap = new Map(rsi.map(d => [d.time, d.value]));
   const macdMap = new Map(macd.map(d => [d.time, d.macd > d.signal ? 1 : -1]));
-  const stochMap = new Map(stoch.map(d => [d.time, d.k > d.d ? 1 : -1]));
+  const stochKMap = new Map(stoch.k.map(d => [d.time, d.value]));
+  const stochDMap = new Map(stoch.d.map(d => [d.time, d.value]));
   const cciMap = new Map(cci.map(d => [d.time, d.value > 0 ? 1 : -1]));
   const ema20 = calculateEMA(data, 20);
   const emaMap = new Map(ema20.map(d => [d.time, d.value]));
@@ -2195,7 +2196,7 @@ export function calculateCompositeBreadth(data: OHLCData[]): IndicatorData[] {
     const signals: number[] = [];
     const r = rsiMap.get(d.time); if (r !== undefined) signals.push(r > 50 ? 1 : -1);
     const m = macdMap.get(d.time); if (m !== undefined) signals.push(m);
-    const s = stochMap.get(d.time); if (s !== undefined) signals.push(s);
+    const sk = stochKMap.get(d.time); const sd = stochDMap.get(d.time); if (sk !== undefined && sd !== undefined) signals.push(sk > sd ? 1 : -1);
     const c = cciMap.get(d.time); if (c !== undefined) signals.push(c);
     const e = emaMap.get(d.time); if (e !== undefined) signals.push(d.close > e ? 1 : -1);
     if (signals.length >= 3) {
@@ -2892,5 +2893,153 @@ export function calculateAnchoredVWAPBands(data: OHLCData[], deviations: number 
     const stdDev = Math.sqrt(Math.max(0, variance));
     result.push({ time: d.time, upper: vwap + deviations * stdDev, middle: vwap, lower: vwap - deviations * stdDev });
   }
+  return result;
+}
+
+// ============================================================================
+// NEXUS TREND MATRIX — Premium Marketplace Indicator
+// Combines KAMA adaptive core + ATR volatility bands + multi-factor trend score
+// ============================================================================
+
+export interface NexusTrendMatrixData {
+  time: number;
+  core: number;       // KAMA adaptive center line
+  upper: number;      // Core + ATR-based upper band
+  lower: number;      // Core - ATR-based lower band
+  trendScore: number; // -100 to +100 composite trend strength
+}
+
+export function calculateNexusTrendMatrix(
+  data: OHLCData[],
+  period: number = 20,
+  fastPeriod: number = 2,
+  slowPeriod: number = 30,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 2.0,
+  trendSmoothPeriod: number = 10,
+): NexusTrendMatrixData[] {
+  if (data.length < Math.max(period, atrPeriod, trendSmoothPeriod) + 10) return [];
+
+  // --- Component 1: KAMA Adaptive Core ---
+  const fastSC = 2 / (fastPeriod + 1);
+  const slowSC = 2 / (slowPeriod + 1);
+  const kamaValues: number[] = new Array(data.length).fill(NaN);
+
+  if (data.length > period) {
+    kamaValues[period] = data[period].close;
+    for (let i = period + 1; i < data.length; i++) {
+      const direction = Math.abs(data[i].close - data[i - period].close);
+      let volatility = 0;
+      for (let j = 0; j < period; j++) {
+        volatility += Math.abs(data[i - j].close - data[i - j - 1].close);
+      }
+      const er = volatility === 0 ? 0 : direction / volatility;
+      const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+      kamaValues[i] = kamaValues[i - 1] + sc * (data[i].close - kamaValues[i - 1]);
+    }
+  }
+
+  // --- Component 2: ATR for dynamic bands ---
+  const atrValues: number[] = new Array(data.length).fill(NaN);
+  if (data.length > atrPeriod) {
+    let atrSum = 0;
+    for (let i = 1; i <= atrPeriod; i++) {
+      const tr = Math.max(
+        data[i].high - data[i].low,
+        Math.abs(data[i].high - data[i - 1].close),
+        Math.abs(data[i].low - data[i - 1].close),
+      );
+      atrSum += tr;
+    }
+    atrValues[atrPeriod] = atrSum / atrPeriod;
+    for (let i = atrPeriod + 1; i < data.length; i++) {
+      const tr = Math.max(
+        data[i].high - data[i].low,
+        Math.abs(data[i].high - data[i - 1].close),
+        Math.abs(data[i].low - data[i - 1].close),
+      );
+      atrValues[i] = (atrValues[i - 1] * (atrPeriod - 1) + tr) / atrPeriod;
+    }
+  }
+
+  // --- Component 3: Multi-factor trend score ---
+  // Factor A: KAMA slope (direction and magnitude)
+  // Factor B: ADX-like directional strength
+  // Factor C: Price momentum relative to KAMA
+  const rawScores: number[] = new Array(data.length).fill(0);
+  const slopeLookback = Math.max(3, Math.floor(period / 4));
+
+  for (let i = period + slopeLookback; i < data.length; i++) {
+    if (isNaN(kamaValues[i]) || isNaN(kamaValues[i - slopeLookback])) continue;
+
+    // Factor A: Normalized KAMA slope (-50 to +50)
+    const kamaSlope = (kamaValues[i] - kamaValues[i - slopeLookback]) / slopeLookback;
+    const avgPrice = (data[i].high + data[i].low) / 2;
+    const normalizedSlope = avgPrice === 0 ? 0 : (kamaSlope / avgPrice) * 10000;
+    const slopeScore = Math.max(-50, Math.min(50, normalizedSlope * 10));
+
+    // Factor B: Directional strength via +DI/-DI ratio (-30 to +30)
+    let plusDMSum = 0, minusDMSum = 0, trSum = 0;
+    const diLookback = Math.min(atrPeriod, i);
+    for (let j = 1; j <= diLookback; j++) {
+      const idx = i - diLookback + j;
+      if (idx < 1) continue;
+      const upMove = data[idx].high - data[idx - 1].high;
+      const downMove = data[idx - 1].low - data[idx].low;
+      plusDMSum += (upMove > downMove && upMove > 0) ? upMove : 0;
+      minusDMSum += (downMove > upMove && downMove > 0) ? downMove : 0;
+      trSum += Math.max(
+        data[idx].high - data[idx].low,
+        Math.abs(data[idx].high - data[idx - 1].close),
+        Math.abs(data[idx].low - data[idx - 1].close),
+      );
+    }
+    const plusDI = trSum === 0 ? 0 : (plusDMSum / trSum) * 100;
+    const minusDI = trSum === 0 ? 0 : (minusDMSum / trSum) * 100;
+    const diDiff = plusDI - minusDI;
+    const diSum = plusDI + minusDI;
+    const dirScore = diSum === 0 ? 0 : (diDiff / diSum) * 30;
+
+    // Factor C: Price position relative to KAMA (-20 to +20)
+    const priceDeviation = data[i].close - kamaValues[i];
+    const atrVal = isNaN(atrValues[i]) ? 1 : Math.max(atrValues[i], 0.00001);
+    const positionScore = Math.max(-20, Math.min(20, (priceDeviation / atrVal) * 10));
+
+    rawScores[i] = slopeScore + dirScore + positionScore;
+  }
+
+  // Smooth the trend score with EMA
+  const smoothedScores: number[] = new Array(data.length).fill(0);
+  const smoothAlpha = 2 / (trendSmoothPeriod + 1);
+  let smoothInit = false;
+  for (let i = 0; i < data.length; i++) {
+    if (rawScores[i] !== 0 && !smoothInit) {
+      smoothedScores[i] = rawScores[i];
+      smoothInit = true;
+    } else if (smoothInit) {
+      smoothedScores[i] = smoothAlpha * rawScores[i] + (1 - smoothAlpha) * smoothedScores[i - 1];
+    }
+  }
+
+  // --- Assemble output ---
+  const result: NexusTrendMatrixData[] = [];
+  const startIdx = Math.max(period + slopeLookback, atrPeriod + 1);
+
+  for (let i = startIdx; i < data.length; i++) {
+    if (isNaN(kamaValues[i]) || isNaN(atrValues[i])) continue;
+
+    const atr = atrValues[i];
+    const core = kamaValues[i];
+    const trendScore = Math.max(-100, Math.min(100, Math.round(smoothedScores[i])));
+
+    result.push({
+      time: data[i].time,
+      core,
+      upper: core + atrMultiplier * atr,
+      lower: core - atrMultiplier * atr,
+      trendScore,
+    });
+  }
+
   return result;
 }

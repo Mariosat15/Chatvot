@@ -456,6 +456,8 @@ const INDICATOR_TYPE_MAP: Record<
   "ergodic volume": { type: "ergodic_volume", displayType: "oscillator" },
   anchored_vwap_bands: { type: "anchored_vwap_bands", displayType: "overlay" },
   "anchored vwap bands": { type: "anchored_vwap_bands", displayType: "overlay" },
+  nexus_trend_matrix: { type: "nexus_trend_matrix", displayType: "overlay" },
+  "nexus trend matrix": { type: "nexus_trend_matrix", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -665,6 +667,14 @@ export function marketplaceItemToIndicator(
       break;
     case "trend_ribbon":
       // No params - uses fixed Fibonacci EMAs
+      break;
+    case "nexus_trend_matrix":
+      params.period = settings?.period || 20;
+      params.fastPeriod = settings?.fastPeriod || 2;
+      params.slowPeriod = settings?.slowPeriod || 30;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.atrMultiplier = settings?.atrMultiplier || 2.0;
+      params.trendSmoothPeriod = settings?.trendSmoothPeriod || 10;
       break;
     default:
       // Generic period-based indicators
