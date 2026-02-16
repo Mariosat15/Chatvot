@@ -1,0 +1,4821 @@
+{
+  "milestones": [
+    {
+      "id": "pirate_cove_identity_verified",
+      "mapId": "pirate_cove",
+      "name": "Identity Verified",
+      "description": "Complete KYC verification to unlock full features",
+      "shortDescription": "Complete KYC verification to unlock full features",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 341,
+        "y": 111
+      },
+      "nodeType": "milestone",
+      "icon": "shield1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_welcome_aboard"
+      },
+      "completeCondition": {
+        "type": "kyc_verified",
+        "value": 1,
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "pirate_cove_treasure_chest"
+      ],
+      "connectedFrom": [
+        "pirate_cove_welcome_aboard"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_five_trades",
+      "mapId": "pirate_cove",
+      "name": "Getting Started",
+      "description": "Complete 5 total trades",
+      "shortDescription": "Complete 5 total trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 109,
+        "y": 419
+      },
+      "nodeType": "milestone",
+      "icon": "sword",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_profit_lock"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 14,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "pirate_cove_three_wins"
+      ],
+      "connectedFrom": [
+        "pirate_cove_profit_lock"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_treasure_chest",
+      "mapId": "pirate_cove",
+      "name": "Treasure Chest",
+      "description": "Make your first deposit and fund your account",
+      "shortDescription": "Make your first deposit and fund your account",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 543,
+        "y": 110
+      },
+      "nodeType": "checkpoint",
+      "icon": "pirateShip",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_identity_verified"
+      },
+      "completeCondition": {
+        "type": "first_deposit",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "pirate_cove_first_voyage"
+      ],
+      "connectedFrom": [
+        "pirate_cove_identity_verified"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_safety_net",
+      "mapId": "pirate_cove",
+      "name": "Safety Net",
+      "description": "Use a stop loss on a trade - protect your capital",
+      "shortDescription": "Use a stop loss on a trade - protect your capital",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 564,
+        "y": 253
+      },
+      "nodeType": "milestone",
+      "icon": "shield1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_learning_loss"
+      },
+      "completeCondition": {
+        "type": "stop_loss_used",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "pirate_cove_profit_lock"
+      ],
+      "connectedFrom": [
+        "pirate_cove_learning_loss"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_three_wins",
+      "mapId": "pirate_cove",
+      "name": "Triple Treasure",
+      "description": "Achieve 3 winning trades",
+      "shortDescription": "Achieve 3 winning trades",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 349,
+        "y": 408
+      },
+      "nodeType": "checkpoint",
+      "icon": "gems",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_five_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 3,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "pirate_cove_first_streak"
+      ],
+      "connectedFrom": [
+        "pirate_cove_five_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_first_voyage",
+      "mapId": "pirate_cove",
+      "name": "First Voyage",
+      "description": "Execute your very first trade",
+      "shortDescription": "Execute your very first trade",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 773,
+        "y": 103
+      },
+      "nodeType": "milestone",
+      "icon": "compass",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_treasure_chest"
+      },
+      "completeCondition": {
+        "type": "first_trade",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "pirate_cove_first_victory"
+      ],
+      "connectedFrom": [
+        "pirate_cove_treasure_chest"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "pirate_cove_profit_lock",
+      "mapId": "pirate_cove",
+      "name": "Profit Lock",
+      "description": "Use a take profit on a trade - secure your gains",
+      "shortDescription": "Use a take profit on a trade - secure your gains",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 779,
+        "y": 275
+      },
+      "nodeType": "milestone",
+      "icon": "pirateShip",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_safety_net"
+      },
+      "completeCondition": {
+        "type": "take_profit_used",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "pirate_cove_five_trades"
+      ],
+      "connectedFrom": [
+        "pirate_cove_safety_net"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "pirate_cove_first_streak",
+      "mapId": "pirate_cove",
+      "name": "Hot Streak",
+      "description": "Win 2 trades in a row",
+      "shortDescription": "Win 2 trades in a row",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 556,
+        "y": 413
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_three_wins"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 2,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "pirate_cove_pirate_complete"
+      ],
+      "connectedFrom": [
+        "pirate_cove_three_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 11,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_welcome_aboard",
+      "mapId": "pirate_cove",
+      "name": "Welcome Aboard",
+      "description": "Create your trading account and join the adventure",
+      "shortDescription": "Create your trading account and join the adventure",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 133,
+        "y": 98
+      },
+      "nodeType": "start",
+      "icon": "pirateShip",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "account_created",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 5
+      },
+      "connectedTo": [
+        "pirate_cove_identity_verified"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": true,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_first_victory",
+      "mapId": "pirate_cove",
+      "name": "First Victory",
+      "description": "Win your first trade - congratulations!",
+      "shortDescription": "Win your first trade - congratulations!",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 102,
+        "y": 247
+      },
+      "nodeType": "checkpoint",
+      "icon": "treasure",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_first_voyage"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "pirate_cove_learning_loss"
+      ],
+      "connectedFrom": [
+        "pirate_cove_first_voyage"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_learning_loss",
+      "mapId": "pirate_cove",
+      "name": "Learning the Ropes",
+      "description": "Experience your first loss - it's part of the journey",
+      "shortDescription": "Experience your first loss - it's part of the jour",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 345,
+        "y": 269
+      },
+      "nodeType": "milestone",
+      "icon": "anchor",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_first_victory"
+      },
+      "completeCondition": {
+        "type": "losing_trades",
+        "value": 7,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 10
+      },
+      "connectedTo": [
+        "pirate_cove_safety_net"
+      ],
+      "connectedFrom": [
+        "pirate_cove_first_victory"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "pirate_cove_pirate_complete",
+      "mapId": "pirate_cove",
+      "name": "Pirate Trader",
+      "description": "Complete 10 total trades and finish onboarding",
+      "shortDescription": "Complete 10 total trades and finish onboarding",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 798,
+        "y": 432
+      },
+      "nodeType": "legendary",
+      "icon": "skull",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "pirate_cove_first_streak"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 6,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "pirate_cove_first_streak"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 12,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "risk_balanced"
+      ]
+    },
+    {
+      "id": "space_station_eight_wins",
+      "mapId": "space_station",
+      "name": "Nebula Navigator",
+      "description": "Achieve 8 winning trades",
+      "shortDescription": "Achieve 8 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 577,
+        "y": 245
+      },
+      "nodeType": "milestone",
+      "icon": "star1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_streak_three"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 16,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "space_station_three_assets"
+      ],
+      "connectedFrom": [
+        "space_station_streak_three"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_three_assets",
+      "mapId": "space_station",
+      "name": "Galaxy Explorer",
+      "description": "Trade 3 different asset pairs",
+      "shortDescription": "Trade 3 different asset pairs",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 778,
+        "y": 255
+      },
+      "nodeType": "milestone",
+      "icon": "star1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_eight_wins"
+      },
+      "completeCondition": {
+        "type": "unique_pairs_traded",
+        "value": 11,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "space_station_thirty_trades"
+      ],
+      "connectedFrom": [
+        "space_station_eight_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "space_station_thirty_trades",
+      "mapId": "space_station",
+      "name": "Light Speed",
+      "description": "Execute 30 total trades",
+      "shortDescription": "Execute 30 total trades",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 115,
+        "y": 418
+      },
+      "nodeType": "checkpoint",
+      "icon": "star1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_three_assets"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 44,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "space_station_space_commander"
+      ],
+      "connectedFrom": [
+        "space_station_three_assets"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_space_entry",
+      "mapId": "space_station",
+      "name": "Launch Sequence",
+      "description": "Complete Pirate Cove and enter Space Station",
+      "shortDescription": "Complete Pirate Cove and enter Space Station",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 137,
+        "y": 90
+      },
+      "nodeType": "start",
+      "icon": "star1",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "pirate_cove",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 10
+      },
+      "connectedTo": [
+        "space_station_fifteen_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "pirate_cove"
+      }
+    },
+    {
+      "id": "space_station_fifteen_trades",
+      "mapId": "space_station",
+      "name": "Orbital Momentum",
+      "description": "Execute 15 total trades",
+      "shortDescription": "Execute 15 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 324,
+        "y": 93
+      },
+      "nodeType": "milestone",
+      "icon": "star1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_space_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 19,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "space_station_five_wins"
+      ],
+      "connectedFrom": [
+        "space_station_space_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_explore_assets",
+      "mapId": "space_station",
+      "name": "Asset Explorer",
+      "description": "Trade 2 different asset pairs",
+      "shortDescription": "Trade 2 different asset pairs",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 795,
+        "y": 91
+      },
+      "nodeType": "milestone",
+      "icon": "star1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_five_wins"
+      },
+      "completeCondition": {
+        "type": "unique_pairs_traded",
+        "value": 6,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "space_station_twenty_trades"
+      ],
+      "connectedFrom": [
+        "space_station_five_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "space_station_five_wins",
+      "mapId": "space_station",
+      "name": "Star Collector",
+      "description": "Achieve 5 winning trades",
+      "shortDescription": "Achieve 5 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 558,
+        "y": 107
+      },
+      "nodeType": "checkpoint",
+      "icon": "star1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_fifteen_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 8,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "space_station_explore_assets"
+      ],
+      "connectedFrom": [
+        "space_station_fifteen_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_twenty_trades",
+      "mapId": "space_station",
+      "name": "Escape Velocity",
+      "description": "Execute 20 total trades",
+      "shortDescription": "Execute 20 total trades",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 127,
+        "y": 265
+      },
+      "nodeType": "milestone",
+      "icon": "star1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_explore_assets"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 28,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "space_station_streak_three"
+      ],
+      "connectedFrom": [
+        "space_station_explore_assets"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_space_commander",
+      "mapId": "space_station",
+      "name": "Space Commander",
+      "description": "Achieve 12 winning trades",
+      "shortDescription": "Achieve 12 winning trades",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 324,
+        "y": 423
+      },
+      "nodeType": "legendary",
+      "icon": "star1",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_thirty_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 24,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "space_station_thirty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "space_station_streak_three",
+      "mapId": "space_station",
+      "name": "Cosmic Streak",
+      "description": "Win 3 trades in a row",
+      "shortDescription": "Win 3 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 342,
+        "y": 258
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "space_station_twenty_trades"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 9,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [
+        "space_station_eight_wins"
+      ],
+      "connectedFrom": [
+        "space_station_twenty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_first_complete",
+      "mapId": "medieval_castle",
+      "name": "Tournament Finisher",
+      "description": "Complete your first competition - well fought!",
+      "shortDescription": "Complete your first competition - well fought!",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 780,
+        "y": 246
+      },
+      "nodeType": "checkpoint",
+      "icon": "trophy",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_twenty_wins"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 9,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "medieval_castle_four_assets"
+      ],
+      "connectedFrom": [
+        "medieval_castle_twenty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "medieval_castle_castle_gates",
+      "mapId": "medieval_castle",
+      "name": "Castle Gates",
+      "description": "Complete Space Station and enter the Castle",
+      "shortDescription": "Complete Space Station and enter the Castle",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 106,
+        "y": 112
+      },
+      "nodeType": "start",
+      "icon": "sword1",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "space_station",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 15
+      },
+      "connectedTo": [
+        "medieval_castle_forty_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "space_station"
+      }
+    },
+    {
+      "id": "medieval_castle_first_tournament",
+      "mapId": "medieval_castle",
+      "name": "Tournament Entry",
+      "description": "Enter your first competition - brave warrior!",
+      "shortDescription": "Enter your first competition - brave warrior!",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 777,
+        "y": 89
+      },
+      "nodeType": "checkpoint",
+      "icon": "sword1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_fifteen_wins"
+      },
+      "completeCondition": {
+        "type": "competitions_entered",
+        "value": 5,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [
+        "medieval_castle_streak_four"
+      ],
+      "connectedFrom": [
+        "medieval_castle_fifteen_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "trade_25"
+      ]
+    },
+    {
+      "id": "medieval_castle_twenty_wins",
+      "mapId": "medieval_castle",
+      "name": "Battle Hardened",
+      "description": "Achieve 20 winning trades",
+      "shortDescription": "Achieve 20 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 574,
+        "y": 275
+      },
+      "nodeType": "checkpoint",
+      "icon": "sword1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_fifty_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 30,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [
+        "medieval_castle_first_complete"
+      ],
+      "connectedFrom": [
+        "medieval_castle_fifty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_four_assets",
+      "mapId": "medieval_castle",
+      "name": "Kingdom Explorer",
+      "description": "Trade 4 different asset pairs",
+      "shortDescription": "Trade 4 different asset pairs",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 127,
+        "y": 425
+      },
+      "nodeType": "milestone",
+      "icon": "sword1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_first_complete"
+      },
+      "completeCondition": {
+        "type": "unique_pairs_traded",
+        "value": 13,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [
+        "medieval_castle_castle_champion"
+      ],
+      "connectedFrom": [
+        "medieval_castle_first_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_fifteen_wins",
+      "mapId": "medieval_castle",
+      "name": "Shield Bearer",
+      "description": "Achieve 15 winning trades",
+      "shortDescription": "Achieve 15 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 570,
+        "y": 96
+      },
+      "nodeType": "checkpoint",
+      "icon": "sword1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_forty_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 20,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "medieval_castle_first_tournament"
+      ],
+      "connectedFrom": [
+        "medieval_castle_forty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_forty_trades",
+      "mapId": "medieval_castle",
+      "name": "Squire Training",
+      "description": "Execute 40 total trades",
+      "shortDescription": "Execute 40 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 341,
+        "y": 98
+      },
+      "nodeType": "milestone",
+      "icon": "sword",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_castle_gates"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 49,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "medieval_castle_fifteen_wins"
+      ],
+      "connectedFrom": [
+        "medieval_castle_castle_gates"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_streak_four",
+      "mapId": "medieval_castle",
+      "name": "Knight's Streak",
+      "description": "Win 4 trades in a row",
+      "shortDescription": "Win 4 trades in a row",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 125,
+        "y": 257
+      },
+      "nodeType": "milestone",
+      "icon": "sword1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_first_tournament"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 9,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [
+        "medieval_castle_fifty_trades"
+      ],
+      "connectedFrom": [
+        "medieval_castle_first_tournament"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_fifty_trades",
+      "mapId": "medieval_castle",
+      "name": "Veteran Warrior",
+      "description": "Execute 50 total trades",
+      "shortDescription": "Execute 50 total trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 339,
+        "y": 264
+      },
+      "nodeType": "milestone",
+      "icon": "sword1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_streak_four"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 65,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "medieval_castle_twenty_wins"
+      ],
+      "connectedFrom": [
+        "medieval_castle_streak_four"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "medieval_castle_castle_champion",
+      "mapId": "medieval_castle",
+      "name": "Castle Champion",
+      "description": "Achieve 25 winning trades",
+      "shortDescription": "Achieve 25 winning trades",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 347,
+        "y": 416
+      },
+      "nodeType": "legendary",
+      "icon": "crown",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "medieval_castle_four_assets"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 39,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 50
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "medieval_castle_four_assets"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_hundred_trades",
+      "mapId": "cyber_city",
+      "name": "Century Code",
+      "description": "Execute 100 total trades",
+      "shortDescription": "Execute 100 total trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 570,
+        "y": 248
+      },
+      "nodeType": "checkpoint",
+      "icon": "tech1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_two_comps_complete"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 126,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 40
+      },
+      "connectedTo": [
+        "cyber_city_forty_wins"
+      ],
+      "connectedFrom": [
+        "cyber_city_two_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_forty_wins",
+      "mapId": "cyber_city",
+      "name": "Matrix Master",
+      "description": "Achieve 40 winning trades",
+      "shortDescription": "Achieve 40 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 763,
+        "y": 258
+      },
+      "nodeType": "milestone",
+      "icon": "tech1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_hundred_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 55,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "cyber_city_five_assets"
+      ],
+      "connectedFrom": [
+        "cyber_city_hundred_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "cyber_city_seventy_trades",
+      "mapId": "cyber_city",
+      "name": "Data Stream",
+      "description": "Execute 70 total trades",
+      "shortDescription": "Execute 70 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 328,
+        "y": 98
+      },
+      "nodeType": "milestone",
+      "icon": "tech1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_cyber_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 85,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "cyber_city_thirty_wins"
+      ],
+      "connectedFrom": [
+        "cyber_city_cyber_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_thirty_wins",
+      "mapId": "cyber_city",
+      "name": "Algorithm Success",
+      "description": "Achieve 30 winning trades",
+      "shortDescription": "Achieve 30 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 577,
+        "y": 100
+      },
+      "nodeType": "checkpoint",
+      "icon": "tech1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_seventy_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 38,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 30
+      },
+      "connectedTo": [
+        "cyber_city_three_comps_entered"
+      ],
+      "connectedFrom": [
+        "cyber_city_seventy_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_five_assets",
+      "mapId": "cyber_city",
+      "name": "Network Navigator",
+      "description": "Trade 5 different asset pairs",
+      "shortDescription": "Trade 5 different asset pairs",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 118,
+        "y": 432
+      },
+      "nodeType": "milestone",
+      "icon": "tech1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_forty_wins"
+      },
+      "completeCondition": {
+        "type": "unique_pairs_traded",
+        "value": 14,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [
+        "cyber_city_cyber_lord"
+      ],
+      "connectedFrom": [
+        "cyber_city_forty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_cyber_entry",
+      "mapId": "cyber_city",
+      "name": "System Boot",
+      "description": "Complete Medieval Castle and enter Cyber City",
+      "shortDescription": "Complete Medieval Castle and enter Cyber City",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 132,
+        "y": 103
+      },
+      "nodeType": "start",
+      "icon": "tech1",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "medieval_castle",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 20
+      },
+      "connectedTo": [
+        "cyber_city_seventy_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "medieval_castle"
+      }
+    },
+    {
+      "id": "cyber_city_three_comps_entered",
+      "mapId": "cyber_city",
+      "name": "Competition Circuit",
+      "description": "Enter 3 competitions",
+      "shortDescription": "Enter 3 competitions",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 772,
+        "y": 98
+      },
+      "nodeType": "milestone",
+      "icon": "tech1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_thirty_wins"
+      },
+      "completeCondition": {
+        "type": "competitions_entered",
+        "value": 7,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [
+        "cyber_city_streak_five"
+      ],
+      "connectedFrom": [
+        "cyber_city_thirty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "cyber_city_streak_five",
+      "mapId": "cyber_city",
+      "name": "Neural Streak",
+      "description": "Win 5 trades in a row",
+      "shortDescription": "Win 5 trades in a row",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 131,
+        "y": 273
+      },
+      "nodeType": "checkpoint",
+      "icon": "tech1",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_three_comps_entered"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 10,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 40
+      },
+      "connectedTo": [
+        "cyber_city_two_comps_complete"
+      ],
+      "connectedFrom": [
+        "cyber_city_three_comps_entered"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_two_comps_complete",
+      "mapId": "cyber_city",
+      "name": "Double Finisher",
+      "description": "Complete 2 competitions",
+      "shortDescription": "Complete 2 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 331,
+        "y": 269
+      },
+      "nodeType": "milestone",
+      "icon": "tech1",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_streak_five"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 8,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "cyber_city_hundred_trades"
+      ],
+      "connectedFrom": [
+        "cyber_city_streak_five"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "cyber_city_cyber_lord",
+      "mapId": "cyber_city",
+      "name": "Cyber Lord",
+      "description": "Complete 3 competitions and prove your worth",
+      "shortDescription": "Complete 3 competitions and prove your worth",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 352,
+        "y": 433
+      },
+      "nodeType": "legendary",
+      "icon": "tech1",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "cyber_city_five_assets"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 13,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 60
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "cyber_city_five_assets"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_first_podium",
+      "mapId": "ancient_temple",
+      "name": "First Podium",
+      "description": "Finish in TOP 3 of a competition - amazing!",
+      "shortDescription": "Finish in TOP 3 of a competition - amazing!",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 119,
+        "y": 270
+      },
+      "nodeType": "checkpoint",
+      "icon": "trophy",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_five_comps_entered"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 75
+      },
+      "connectedTo": [
+        "ancient_temple_streak_seven"
+      ],
+      "connectedFrom": [
+        "ancient_temple_five_comps_entered"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries",
+        "risk_survivor"
+      ]
+    },
+    {
+      "id": "ancient_temple_five_comps_entered",
+      "mapId": "ancient_temple",
+      "name": "Temple Warrior",
+      "description": "Enter 5 competitions",
+      "shortDescription": "Enter 5 competitions",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 788,
+        "y": 89
+      },
+      "nodeType": "milestone",
+      "icon": "scrollAward",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_fifty_wins"
+      },
+      "completeCondition": {
+        "type": "competitions_entered",
+        "value": 9,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 40
+      },
+      "connectedTo": [
+        "ancient_temple_first_podium"
+      ],
+      "connectedFrom": [
+        "ancient_temple_fifty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "ancient_temple_sixty_wins",
+      "mapId": "ancient_temple",
+      "name": "Temple Guardian",
+      "description": "Achieve 60 winning trades",
+      "shortDescription": "Achieve 60 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 762,
+        "y": 267
+      },
+      "nodeType": "checkpoint",
+      "icon": "scrollAward",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_four_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 79,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 50
+      },
+      "connectedTo": [
+        "ancient_temple_trading_days_seven"
+      ],
+      "connectedFrom": [
+        "ancient_temple_four_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "ancient_temple_temple_master",
+      "mapId": "ancient_temple",
+      "name": "Temple Master",
+      "description": "Achieve 2 podium finishes",
+      "shortDescription": "Achieve 2 podium finishes",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 330,
+        "y": 435
+      },
+      "nodeType": "legendary",
+      "icon": "scrollAward",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_trading_days_seven"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 2,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 85
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "ancient_temple_trading_days_seven"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_four_comps_complete",
+      "mapId": "ancient_temple",
+      "name": "Arena Veteran",
+      "description": "Complete 4 competitions",
+      "shortDescription": "Complete 4 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 547,
+        "y": 272
+      },
+      "nodeType": "milestone",
+      "icon": "scrollAward",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_streak_seven"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 11,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 50
+      },
+      "connectedTo": [
+        "ancient_temple_sixty_wins"
+      ],
+      "connectedFrom": [
+        "ancient_temple_streak_seven"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_trading_days_seven",
+      "mapId": "ancient_temple",
+      "name": "Weekly Devotion",
+      "description": "Trade for 7 consecutive days",
+      "shortDescription": "Trade for 7 consecutive days",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 111,
+        "y": 431
+      },
+      "nodeType": "milestone",
+      "icon": "scrollAward",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_sixty_wins"
+      },
+      "completeCondition": {
+        "type": "daily_trading_streak",
+        "value": 17,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "ancient_temple_temple_master"
+      ],
+      "connectedFrom": [
+        "ancient_temple_sixty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_temple_entry",
+      "mapId": "ancient_temple",
+      "name": "Temple Gates",
+      "description": "Complete Cyber City and enter the Ancient Temple",
+      "shortDescription": "Complete Cyber City and enter the Ancient Temple",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 103,
+        "y": 112
+      },
+      "nodeType": "start",
+      "icon": "scrollAward",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "cyber_city",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 25
+      },
+      "connectedTo": [
+        "ancient_temple_one_fifty_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "cyber_city"
+      }
+    },
+    {
+      "id": "ancient_temple_one_fifty_trades",
+      "mapId": "ancient_temple",
+      "name": "Ancient Wisdom",
+      "description": "Execute 150 total trades",
+      "shortDescription": "Execute 150 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 344,
+        "y": 97
+      },
+      "nodeType": "milestone",
+      "icon": "scrollAward",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_temple_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 181,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [
+        "ancient_temple_fifty_wins"
+      ],
+      "connectedFrom": [
+        "ancient_temple_temple_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_fifty_wins",
+      "mapId": "ancient_temple",
+      "name": "Oracle's Path",
+      "description": "Achieve 50 winning trades",
+      "shortDescription": "Achieve 50 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 552,
+        "y": 104
+      },
+      "nodeType": "checkpoint",
+      "icon": "scrollAward",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_one_fifty_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 62,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 40
+      },
+      "connectedTo": [
+        "ancient_temple_five_comps_entered"
+      ],
+      "connectedFrom": [
+        "ancient_temple_one_fifty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "ancient_temple_streak_seven",
+      "mapId": "ancient_temple",
+      "name": "Pharaoh's Streak",
+      "description": "Win 7 trades in a row",
+      "shortDescription": "Win 7 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 356,
+        "y": 264
+      },
+      "nodeType": "milestone",
+      "icon": "scrollAward",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "ancient_temple_first_podium"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 14,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 55
+      },
+      "connectedTo": [
+        "ancient_temple_four_comps_complete"
+      ],
+      "connectedFrom": [
+        "ancient_temple_first_podium"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_six_comps_complete",
+      "mapId": "volcanic_island",
+      "name": "Eruption Champion",
+      "description": "Complete 6 competitions",
+      "shortDescription": "Complete 6 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 573,
+        "y": 258
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_streak_ten"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 14,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 55
+      },
+      "connectedTo": [
+        "volcanic_island_eighty_wins"
+      ],
+      "connectedFrom": [
+        "volcanic_island_streak_ten"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_volcano_god",
+      "mapId": "volcanic_island",
+      "name": "Volcano God",
+      "description": "Win 2 competitions (1st place)",
+      "shortDescription": "Win 2 competitions (1st place)",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 353,
+        "y": 408
+      },
+      "nodeType": "legendary",
+      "icon": "fireSpell",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_six_assets"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 2,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 120
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "volcanic_island_six_assets"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_seventy_wins",
+      "mapId": "volcanic_island",
+      "name": "Inferno Trader",
+      "description": "Achieve 70 winning trades",
+      "shortDescription": "Achieve 70 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 546,
+        "y": 114
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_two_hundred_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 86,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 50
+      },
+      "connectedTo": [
+        "volcanic_island_three_podiums"
+      ],
+      "connectedFrom": [
+        "volcanic_island_two_hundred_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_six_assets",
+      "mapId": "volcanic_island",
+      "name": "Lava Diversifier",
+      "description": "Trade 6 different asset pairs",
+      "shortDescription": "Trade 6 different asset pairs",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 121,
+        "y": 418
+      },
+      "nodeType": "milestone",
+      "icon": "gems",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_eighty_wins"
+      },
+      "completeCondition": {
+        "type": "unique_pairs_traded",
+        "value": 16,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "volcanic_island_volcano_god"
+      ],
+      "connectedFrom": [
+        "volcanic_island_eighty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_two_hundred_trades",
+      "mapId": "volcanic_island",
+      "name": "Lava Flow",
+      "description": "Execute 200 total trades",
+      "shortDescription": "Execute 200 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 360,
+        "y": 103
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_volcano_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 241,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "volcanic_island_seventy_wins"
+      ],
+      "connectedFrom": [
+        "volcanic_island_volcano_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_first_victory_comp",
+      "mapId": "volcanic_island",
+      "name": "First Champion",
+      "description": "Win your first competition (1st place) - LEGENDARY!",
+      "shortDescription": "Win your first competition (1st place) - LEGENDARY",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 113,
+        "y": 263
+      },
+      "nodeType": "checkpoint",
+      "icon": "crown",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_three_podiums"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 1,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "volcanic_island_streak_ten"
+      ],
+      "connectedFrom": [
+        "volcanic_island_three_podiums"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_volcano_entry",
+      "mapId": "volcanic_island",
+      "name": "Volcano Landing",
+      "description": "Complete Ancient Temple and enter Volcanic Island",
+      "shortDescription": "Complete Ancient Temple and enter Volcanic Island",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 137,
+        "y": 93
+      },
+      "nodeType": "start",
+      "icon": "fireSpell",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "ancient_temple",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 35
+      },
+      "connectedTo": [
+        "volcanic_island_two_hundred_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "ancient_temple"
+      }
+    },
+    {
+      "id": "volcanic_island_three_podiums",
+      "mapId": "volcanic_island",
+      "name": "Podium Regular",
+      "description": "Achieve 3 podium finishes (top 3)",
+      "shortDescription": "Achieve 3 podium finishes (top 3)",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 761,
+        "y": 98
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_seventy_wins"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 3,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 70
+      },
+      "connectedTo": [
+        "volcanic_island_first_victory_comp"
+      ],
+      "connectedFrom": [
+        "volcanic_island_seventy_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "volcanic_island_streak_ten",
+      "mapId": "volcanic_island",
+      "name": "Phoenix Streak",
+      "description": "Win 10 trades in a row",
+      "shortDescription": "Win 10 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 354,
+        "y": 256
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_first_victory_comp"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 17,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 65
+      },
+      "connectedTo": [
+        "volcanic_island_six_comps_complete"
+      ],
+      "connectedFrom": [
+        "volcanic_island_first_victory_comp"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "volcanic_island_eighty_wins",
+      "mapId": "volcanic_island",
+      "name": "Fire Master",
+      "description": "Achieve 80 winning trades",
+      "shortDescription": "Achieve 80 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 794,
+        "y": 253
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "volcanic_island_six_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 103,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 55
+      },
+      "connectedTo": [
+        "volcanic_island_six_assets"
+      ],
+      "connectedFrom": [
+        "volcanic_island_six_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "arctic_fortress_arctic_entry",
+      "mapId": "arctic_fortress",
+      "name": "Arctic Arrival",
+      "description": "Complete Volcanic Island and enter Arctic Fortress",
+      "shortDescription": "Complete Volcanic Island and enter Arctic Fortress",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 128,
+        "y": 86
+      },
+      "nodeType": "start",
+      "icon": "iceSpell",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "volcanic_island",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 45
+      },
+      "connectedTo": [
+        "arctic_fortress_three_hundred_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "volcanic_island"
+      }
+    },
+    {
+      "id": "arctic_fortress_four_wins",
+      "mapId": "arctic_fortress",
+      "name": "Ice Champion",
+      "description": "Win 4 competitions (1st place)",
+      "shortDescription": "Win 4 competitions (1st place)",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 131,
+        "y": 275
+      },
+      "nodeType": "checkpoint",
+      "icon": "iceSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_five_podiums"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 4,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 110
+      },
+      "connectedTo": [
+        "arctic_fortress_streak_twelve"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_five_podiums"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_streak_twelve",
+      "mapId": "arctic_fortress",
+      "name": "Avalanche Streak",
+      "description": "Win 12 trades in a row",
+      "shortDescription": "Win 12 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 331,
+        "y": 253
+      },
+      "nodeType": "milestone",
+      "icon": "iceSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_four_wins"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 20,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 80
+      },
+      "connectedTo": [
+        "arctic_fortress_ten_comps_complete"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_four_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_trading_days_fourteen",
+      "mapId": "arctic_fortress",
+      "name": "Frost Dedication",
+      "description": "Trade for 14 consecutive days",
+      "shortDescription": "Trade for 14 consecutive days",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 124,
+        "y": 410
+      },
+      "nodeType": "milestone",
+      "icon": "iceSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_one_twenty_wins"
+      },
+      "completeCondition": {
+        "type": "daily_trading_streak",
+        "value": 25,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 65
+      },
+      "connectedTo": [
+        "arctic_fortress_ice_emperor"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_one_twenty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_one_twenty_wins",
+      "mapId": "arctic_fortress",
+      "name": "Glacier Lord",
+      "description": "Achieve 120 winning trades",
+      "shortDescription": "Achieve 120 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 781,
+        "y": 245
+      },
+      "nodeType": "checkpoint",
+      "icon": "iceSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_ten_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 151,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 80
+      },
+      "connectedTo": [
+        "arctic_fortress_trading_days_fourteen"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_ten_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "arctic_fortress_three_hundred_trades",
+      "mapId": "arctic_fortress",
+      "name": "Blizzard Trader",
+      "description": "Execute 300 total trades",
+      "shortDescription": "Execute 300 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 350,
+        "y": 86
+      },
+      "nodeType": "milestone",
+      "icon": "iceSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_arctic_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 361,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 60
+      },
+      "connectedTo": [
+        "arctic_fortress_hundred_wins"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_arctic_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_five_podiums",
+      "mapId": "arctic_fortress",
+      "name": "Podium Master",
+      "description": "Achieve 5 podium finishes",
+      "shortDescription": "Achieve 5 podium finishes",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 786,
+        "y": 95
+      },
+      "nodeType": "milestone",
+      "icon": "iceSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_hundred_wins"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 5,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 85
+      },
+      "connectedTo": [
+        "arctic_fortress_four_wins"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_hundred_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_podiums",
+        "trade_100"
+      ]
+    },
+    {
+      "id": "arctic_fortress_ten_comps_complete",
+      "mapId": "arctic_fortress",
+      "name": "Arctic Veteran",
+      "description": "Complete 10 competitions",
+      "shortDescription": "Complete 10 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 566,
+        "y": 246
+      },
+      "nodeType": "milestone",
+      "icon": "iceSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_streak_twelve"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 18,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 75
+      },
+      "connectedTo": [
+        "arctic_fortress_one_twenty_wins"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_streak_twelve"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_hundred_wins",
+      "mapId": "arctic_fortress",
+      "name": "Frost Champion",
+      "description": "Achieve 100 winning trades",
+      "shortDescription": "Achieve 100 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 578,
+        "y": 102
+      },
+      "nodeType": "checkpoint",
+      "icon": "iceSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_three_hundred_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 122,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 70
+      },
+      "connectedTo": [
+        "arctic_fortress_five_podiums"
+      ],
+      "connectedFrom": [
+        "arctic_fortress_three_hundred_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "arctic_fortress_ice_emperor",
+      "mapId": "arctic_fortress",
+      "name": "Ice Emperor",
+      "description": "Win 6 competitions (1st place)",
+      "shortDescription": "Win 6 competitions (1st place)",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 334,
+        "y": 418
+      },
+      "nodeType": "legendary",
+      "icon": "iceSpell",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "arctic_fortress_trading_days_fourteen"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 6,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 150
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "arctic_fortress_trading_days_fourteen"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_one_fifty_wins",
+      "mapId": "dragon_realm",
+      "name": "Fire Breather",
+      "description": "Achieve 150 winning trades",
+      "shortDescription": "Achieve 150 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 565,
+        "y": 100
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_four_hundred_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 182,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 95
+      },
+      "connectedTo": [
+        "dragon_realm_eight_podiums"
+      ],
+      "connectedFrom": [
+        "dragon_realm_four_hundred_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_eight_podiums",
+      "mapId": "dragon_realm",
+      "name": "Dragon Champion",
+      "description": "Achieve 8 podium finishes",
+      "shortDescription": "Achieve 8 podium finishes",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 767,
+        "y": 103
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_one_fifty_wins"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 8,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "dragon_realm_ten_wins"
+      ],
+      "connectedFrom": [
+        "dragon_realm_one_fifty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "dragon_realm_comeback",
+      "mapId": "dragon_realm",
+      "name": "Dragon's Comeback",
+      "description": "Win a competition after being in bottom half at midpoint",
+      "shortDescription": "Win a competition after being in bottom half at mi",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 130,
+        "y": 407
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_two_hundred_wins"
+      },
+      "completeCondition": {
+        "type": "comeback_victory",
+        "value": 10,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "dragon_realm_dragon_king"
+      ],
+      "connectedFrom": [
+        "dragon_realm_two_hundred_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_dragon_entry",
+      "mapId": "dragon_realm",
+      "name": "Dragon's Gate",
+      "description": "Complete Arctic Fortress and enter Dragon Realm",
+      "shortDescription": "Complete Arctic Fortress and enter Dragon Realm",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 118,
+        "y": 111
+      },
+      "nodeType": "start",
+      "icon": "fireSpell",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "arctic_fortress",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 55
+      },
+      "connectedTo": [
+        "dragon_realm_four_hundred_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "arctic_fortress"
+      }
+    },
+    {
+      "id": "dragon_realm_ten_wins",
+      "mapId": "dragon_realm",
+      "name": "Dragon Slayer",
+      "description": "Win 10 competitions (1st place)",
+      "shortDescription": "Win 10 competitions (1st place)",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 123,
+        "y": 260
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_eight_podiums"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 10,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 150
+      },
+      "connectedTo": [
+        "dragon_realm_streak_fifteen"
+      ],
+      "connectedFrom": [
+        "dragon_realm_eight_podiums"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_dragon_king",
+      "mapId": "dragon_realm",
+      "name": "Dragon King",
+      "description": "Win 15 competitions (1st place)",
+      "shortDescription": "Win 15 competitions (1st place)",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 329,
+        "y": 422
+      },
+      "nodeType": "legendary",
+      "icon": "fireSpell",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_comeback"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 15,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 200
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "dragon_realm_comeback"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_four_hundred_trades",
+      "mapId": "dragon_realm",
+      "name": "Dragon Trader",
+      "description": "Execute 400 total trades",
+      "shortDescription": "Execute 400 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 335,
+        "y": 103
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_dragon_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 481,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 80
+      },
+      "connectedTo": [
+        "dragon_realm_one_fifty_wins"
+      ],
+      "connectedFrom": [
+        "dragon_realm_dragon_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_streak_fifteen",
+      "mapId": "dragon_realm",
+      "name": "Dragon's Fury",
+      "description": "Win 15 trades in a row",
+      "shortDescription": "Win 15 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 355,
+        "y": 249
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_ten_wins"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 23,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "dragon_realm_fifteen_comps_complete"
+      ],
+      "connectedFrom": [
+        "dragon_realm_ten_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_fifteen_comps_complete",
+      "mapId": "dragon_realm",
+      "name": "Realm Conqueror",
+      "description": "Complete 15 competitions",
+      "shortDescription": "Complete 15 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 576,
+        "y": 264
+      },
+      "nodeType": "milestone",
+      "icon": "fireSpell",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_streak_fifteen"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 24,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 90
+      },
+      "connectedTo": [
+        "dragon_realm_two_hundred_wins"
+      ],
+      "connectedFrom": [
+        "dragon_realm_streak_fifteen"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "dragon_realm_two_hundred_wins",
+      "mapId": "dragon_realm",
+      "name": "Dragon Lord",
+      "description": "Achieve 200 winning trades",
+      "shortDescription": "Achieve 200 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 766,
+        "y": 245
+      },
+      "nodeType": "checkpoint",
+      "icon": "fireSpell",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "dragon_realm_fifteen_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 247,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 120
+      },
+      "connectedTo": [
+        "dragon_realm_comeback"
+      ],
+      "connectedFrom": [
+        "dragon_realm_fifteen_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "celestial_kingdom_five_hundred_trades",
+      "mapId": "celestial_kingdom",
+      "name": "Star Trader",
+      "description": "Execute 500 total trades",
+      "shortDescription": "Execute 500 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 337,
+        "y": 91
+      },
+      "nodeType": "milestone",
+      "icon": "star2",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_celestial_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 601,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "celestial_kingdom_two_fifty_wins"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_celestial_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_twelve_podiums",
+      "mapId": "celestial_kingdom",
+      "name": "Celestial Regular",
+      "description": "Achieve 12 podium finishes",
+      "shortDescription": "Achieve 12 podium finishes",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 782,
+        "y": 94
+      },
+      "nodeType": "milestone",
+      "icon": "star2",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_two_fifty_wins"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 12,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 130
+      },
+      "connectedTo": [
+        "celestial_kingdom_twenty_wins"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_two_fifty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "celestial_kingdom_streak_twenty",
+      "mapId": "celestial_kingdom",
+      "name": "Stellar Streak",
+      "description": "Win 20 trades in a row",
+      "shortDescription": "Win 20 trades in a row",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 347,
+        "y": 256
+      },
+      "nodeType": "milestone",
+      "icon": "star2",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_twenty_wins"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 29,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 150
+      },
+      "connectedTo": [
+        "celestial_kingdom_twenty_comps_complete"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_twenty_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_two_fifty_wins",
+      "mapId": "celestial_kingdom",
+      "name": "Constellation Master",
+      "description": "Achieve 250 winning trades",
+      "shortDescription": "Achieve 250 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 560,
+        "y": 113
+      },
+      "nodeType": "checkpoint",
+      "icon": "star2",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_five_hundred_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 302,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 120
+      },
+      "connectedTo": [
+        "celestial_kingdom_twelve_podiums"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_five_hundred_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_twenty_wins",
+      "mapId": "celestial_kingdom",
+      "name": "Divine Champion",
+      "description": "Win 20 competitions (1st place)",
+      "shortDescription": "Win 20 competitions (1st place)",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 132,
+        "y": 252
+      },
+      "nodeType": "checkpoint",
+      "icon": "star2",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_twelve_podiums"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 20,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 200
+      },
+      "connectedTo": [
+        "celestial_kingdom_streak_twenty"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_twelve_podiums"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_trading_titan",
+      "mapId": "celestial_kingdom",
+      "name": "Trading Titan",
+      "description": "Win 25 competitions (1st place)",
+      "shortDescription": "Win 25 competitions (1st place)",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 347,
+        "y": 426
+      },
+      "nodeType": "legendary",
+      "icon": "star2",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_trading_days_thirty"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 25,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 300
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "celestial_kingdom_trading_days_thirty"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_celestial_entry",
+      "mapId": "celestial_kingdom",
+      "name": "Celestial Ascension",
+      "description": "Complete Dragon Realm and ascend to the Celestial Kingdom",
+      "shortDescription": "Complete Dragon Realm and ascend to the Celestial ",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 116,
+        "y": 108
+      },
+      "nodeType": "start",
+      "icon": "star2",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "dragon_realm",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 75
+      },
+      "connectedTo": [
+        "celestial_kingdom_five_hundred_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_10_wins",
+        "trade_500"
+      ],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "dragon_realm"
+      }
+    },
+    {
+      "id": "celestial_kingdom_twenty_comps_complete",
+      "mapId": "celestial_kingdom",
+      "name": "Tournament Titan",
+      "description": "Complete 20 competitions",
+      "shortDescription": "Complete 20 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 560,
+        "y": 268
+      },
+      "nodeType": "milestone",
+      "icon": "star2",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_streak_twenty"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 30,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 120
+      },
+      "connectedTo": [
+        "celestial_kingdom_three_hundred_wins"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_streak_twenty"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "celestial_kingdom_three_hundred_wins",
+      "mapId": "celestial_kingdom",
+      "name": "Archangel Trader",
+      "description": "Achieve 300 winning trades",
+      "shortDescription": "Achieve 300 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 769,
+        "y": 256
+      },
+      "nodeType": "checkpoint",
+      "icon": "star2",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_twenty_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 367,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 150
+      },
+      "connectedTo": [
+        "celestial_kingdom_trading_days_thirty"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_twenty_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "celestial_kingdom_trading_days_thirty",
+      "mapId": "celestial_kingdom",
+      "name": "Monthly Devotion",
+      "description": "Trade for 30 consecutive days",
+      "shortDescription": "Trade for 30 consecutive days",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 136,
+        "y": 428
+      },
+      "nodeType": "milestone",
+      "icon": "star2",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "celestial_kingdom_three_hundred_wins"
+      },
+      "completeCondition": {
+        "type": "daily_trading_streak",
+        "value": 44,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 130
+      },
+      "connectedTo": [
+        "celestial_kingdom_trading_titan"
+      ],
+      "connectedFrom": [
+        "celestial_kingdom_three_hundred_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_legend_entry",
+      "mapId": "hall_of_legends",
+      "name": "Legend Entry",
+      "description": "Complete Celestial Kingdom and enter the Hall of Legends",
+      "shortDescription": "Complete Celestial Kingdom and enter the Hall of L",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 135,
+        "y": 112
+      },
+      "nodeType": "start",
+      "icon": "crown",
+      "color": "#22C55E",
+      "size": "medium",
+      "completeCondition": {
+        "type": "map_completed",
+        "value": "celestial_kingdom",
+        "comparison": "eq"
+      },
+      "rewards": {
+        "xp": 100
+      },
+      "connectedTo": [
+        "hall_of_legends_seven_fifty_trades"
+      ],
+      "connectedFrom": [],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 1,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [],
+      "unlockCondition": {
+        "type": "map_completed",
+        "milestoneId": "celestial_kingdom"
+      }
+    },
+    {
+      "id": "hall_of_legends_trading_god",
+      "mapId": "hall_of_legends",
+      "name": "Trading God",
+      "description": "Win 50 competitions (1st place) - ULTIMATE ACHIEVEMENT",
+      "shortDescription": "Win 50 competitions (1st place) - ULTIMATE ACHIEVE",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 347,
+        "y": 424
+      },
+      "nodeType": "legendary",
+      "icon": "crown",
+      "color": "#F59E0B",
+      "size": "large",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_thousand_trades"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 50,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 1000
+      },
+      "connectedTo": [],
+      "connectedFrom": [
+        "hall_of_legends_thousand_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 10,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_seven_fifty_trades",
+      "mapId": "hall_of_legends",
+      "name": "Legendary Trader",
+      "description": "Execute 750 total trades",
+      "shortDescription": "Execute 750 total trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 340,
+        "y": 97
+      },
+      "nodeType": "milestone",
+      "icon": "crown",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_legend_entry"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 901,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 150
+      },
+      "connectedTo": [
+        "hall_of_legends_four_hundred_wins"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_legend_entry"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 2,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_four_hundred_wins",
+      "mapId": "hall_of_legends",
+      "name": "Master of Victory",
+      "description": "Achieve 400 winning trades",
+      "shortDescription": "Achieve 400 winning trades",
+      "zoneId": "zone_1",
+      "position": {
+        "x": 557,
+        "y": 113
+      },
+      "nodeType": "checkpoint",
+      "icon": "crown",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_seven_fifty_trades"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 400,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 180
+      },
+      "connectedTo": [
+        "hall_of_legends_twenty_podiums"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_seven_fifty_trades"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 3,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_streak_thirty",
+      "mapId": "hall_of_legends",
+      "name": "Immortal Streak",
+      "description": "Win 30 trades in a row - INCREDIBLE!",
+      "shortDescription": "Win 30 trades in a row - INCREDIBLE!",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 326,
+        "y": 271
+      },
+      "nodeType": "milestone",
+      "icon": "crown",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_thirty_five_wins"
+      },
+      "completeCondition": {
+        "type": "win_streak",
+        "value": 41,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 250
+      },
+      "connectedTo": [
+        "hall_of_legends_thirty_comps_complete"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_thirty_five_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 6,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_five_hundred_wins",
+      "mapId": "hall_of_legends",
+      "name": "God of Wins",
+      "description": "Achieve 500 winning trades",
+      "shortDescription": "Achieve 500 winning trades",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 785,
+        "y": 254
+      },
+      "nodeType": "checkpoint",
+      "icon": "crown",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_thirty_comps_complete"
+      },
+      "completeCondition": {
+        "type": "winning_trades",
+        "value": 607,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 280
+      },
+      "connectedTo": [
+        "hall_of_legends_thousand_trades"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_thirty_comps_complete"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 8,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_early_bird"
+      ]
+    },
+    {
+      "id": "hall_of_legends_thousand_trades",
+      "mapId": "hall_of_legends",
+      "name": "Trading Immortal",
+      "description": "Execute 1000 total trades",
+      "shortDescription": "Execute 1000 total trades",
+      "zoneId": "zone_4",
+      "position": {
+        "x": 114,
+        "y": 427
+      },
+      "nodeType": "checkpoint",
+      "icon": "crown",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_five_hundred_wins"
+      },
+      "completeCondition": {
+        "type": "total_trades",
+        "value": 1208,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 350
+      },
+      "connectedTo": [
+        "hall_of_legends_trading_god"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_five_hundred_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 9,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_twenty_podiums",
+      "mapId": "hall_of_legends",
+      "name": "Eternal Podium",
+      "description": "Achieve 20 podium finishes",
+      "shortDescription": "Achieve 20 podium finishes",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 764,
+        "y": 113
+      },
+      "nodeType": "milestone",
+      "icon": "crown",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_four_hundred_wins"
+      },
+      "completeCondition": {
+        "type": "podium_finishes",
+        "value": 20,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 200
+      },
+      "connectedTo": [
+        "hall_of_legends_thirty_five_wins"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_four_hundred_wins"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 4,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": [
+        "comp_5_entries"
+      ]
+    },
+    {
+      "id": "hall_of_legends_thirty_five_wins",
+      "mapId": "hall_of_legends",
+      "name": "Legendary Champion",
+      "description": "Win 35 competitions (1st place)",
+      "shortDescription": "Win 35 competitions (1st place)",
+      "zoneId": "zone_2",
+      "position": {
+        "x": 119,
+        "y": 265
+      },
+      "nodeType": "checkpoint",
+      "icon": "crown",
+      "color": "#8B5CF6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_twenty_podiums"
+      },
+      "completeCondition": {
+        "type": "first_place_finishes",
+        "value": 35,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 350
+      },
+      "connectedTo": [
+        "hall_of_legends_streak_thirty"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_twenty_podiums"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 5,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    },
+    {
+      "id": "hall_of_legends_thirty_comps_complete",
+      "mapId": "hall_of_legends",
+      "name": "Tournament God",
+      "description": "Complete 30 competitions",
+      "shortDescription": "Complete 30 competitions",
+      "zoneId": "zone_3",
+      "position": {
+        "x": 565,
+        "y": 247
+      },
+      "nodeType": "milestone",
+      "icon": "crown",
+      "color": "#3B82F6",
+      "size": "medium",
+      "unlockCondition": {
+        "type": "milestone_complete",
+        "milestoneId": "hall_of_legends_streak_thirty"
+      },
+      "completeCondition": {
+        "type": "competitions_completed",
+        "value": 42,
+        "comparison": "gte"
+      },
+      "rewards": {
+        "xp": 180
+      },
+      "connectedTo": [
+        "hall_of_legends_five_hundred_wins"
+      ],
+      "connectedFrom": [
+        "hall_of_legends_streak_thirty"
+      ],
+      "isRequired": true,
+      "isAutoComplete": false,
+      "order": 7,
+      "isActive": true,
+      "isSeasonal": false,
+      "requiredBadgeIds": []
+    }
+  ],
+  "maps": [
+    {
+      "mapId": "pirate_cove",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/pirate-cove.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "pirate_cove_welcome_aboard",
+      "description": "Navigate through the pirate challenges",
+      "difficulty": 1,
+      "estimatedXP": 200,
+      "isActive": true,
+      "name": "Pirate Cove",
+      "nextMapId": "space_station",
+      "previousMapId": null,
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 1,
+      "theme": "pirate",
+      "totalMilestones": 12,
+      "version": 4,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "space_station",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/space-station.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "space_station_space_entry",
+      "description": "Navigate through the space challenges",
+      "difficulty": 2,
+      "estimatedXP": 250,
+      "isActive": true,
+      "name": "Space Station",
+      "nextMapId": "medieval_castle",
+      "previousMapId": "pirate_cove",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 2,
+      "theme": "space",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "medieval_castle",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/medieval-castle.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "medieval_castle_castle_gates",
+      "description": "Navigate through the medieval challenges",
+      "difficulty": 3,
+      "estimatedXP": 350,
+      "isActive": true,
+      "name": "Medieval Castle",
+      "nextMapId": "cyber_city",
+      "previousMapId": "space_station",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 3,
+      "theme": "medieval",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "cyber_city",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/cyber-city.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "cyber_city_cyber_entry",
+      "description": "Navigate through the cyber challenges",
+      "difficulty": 4,
+      "estimatedXP": 450,
+      "isActive": true,
+      "name": "Cyber City",
+      "nextMapId": "ancient_temple",
+      "previousMapId": "medieval_castle",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 4,
+      "theme": "cyber",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "ancient_temple",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/ancient-temple.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "ancient_temple_temple_entry",
+      "description": "Navigate through the ancient challenges",
+      "difficulty": 5,
+      "estimatedXP": 600,
+      "isActive": true,
+      "name": "Ancient Temple",
+      "nextMapId": "volcanic_island",
+      "previousMapId": "cyber_city",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 5,
+      "theme": "ancient",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "volcanic_island",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/volcanic-island.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "volcanic_island_volcano_entry",
+      "description": "Navigate through the volcanic challenges",
+      "difficulty": 6,
+      "estimatedXP": 800,
+      "isActive": true,
+      "name": "Volcanic Island",
+      "nextMapId": "arctic_fortress",
+      "previousMapId": "ancient_temple",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 6,
+      "theme": "volcanic",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "arctic_fortress",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/arctic-fortress.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "arctic_fortress_arctic_entry",
+      "description": "Navigate through the arctic challenges",
+      "difficulty": 7,
+      "estimatedXP": 1100,
+      "isActive": true,
+      "name": "Arctic Fortress",
+      "nextMapId": "dragon_realm",
+      "previousMapId": "volcanic_island",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 7,
+      "theme": "arctic",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "dragon_realm",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/dragon-realm.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "dragon_realm_dragon_entry",
+      "description": "Navigate through the dragon challenges",
+      "difficulty": 8,
+      "estimatedXP": 1600,
+      "isActive": true,
+      "name": "Dragon Realm",
+      "nextMapId": "celestial_kingdom",
+      "previousMapId": "arctic_fortress",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 8,
+      "theme": "dragon",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "celestial_kingdom",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/celestial-kingdom.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "celestial_kingdom_celestial_entry",
+      "description": "Navigate through the celestial challenges",
+      "difficulty": 9,
+      "estimatedXP": 2600,
+      "isActive": true,
+      "name": "Celestial Kingdom",
+      "nextMapId": "hall_of_legends",
+      "previousMapId": "dragon_realm",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 9,
+      "theme": "celestial",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    },
+    {
+      "mapId": "hall_of_legends",
+      "backgroundColor": "#1a3a5c",
+      "backgroundImage": "/assets/maps/hall-of-legends.png",
+      "completionRequirement": 100,
+      "defaultStartNode": "hall_of_legends_legend_entry",
+      "description": "Navigate through the legendary challenges",
+      "difficulty": 10,
+      "estimatedXP": 5500,
+      "isActive": true,
+      "name": "Hall of Legends",
+      "nextMapId": null,
+      "previousMapId": "celestial_kingdom",
+      "requiredLevelToStart": 1,
+      "sequenceOrder": 10,
+      "theme": "legendary",
+      "totalMilestones": 10,
+      "version": 1,
+      "zones": [
+        {
+          "id": "zone_1",
+          "name": "Starting Area",
+          "description": "",
+          "order": 1,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#22C55E",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_2",
+          "name": "Challenge Zone",
+          "description": "",
+          "order": 2,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#3B82F6",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_3",
+          "name": "Advanced Area",
+          "description": "",
+          "order": 3,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#F59E0B",
+          "icon": "flag",
+          "isUnlockable": true
+        },
+        {
+          "id": "zone_4",
+          "name": "Final Stretch",
+          "description": "",
+          "order": 4,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "color": "#EF4444",
+          "icon": "flag",
+          "isUnlockable": true
+        }
+      ]
+    }
+  ]
+}
