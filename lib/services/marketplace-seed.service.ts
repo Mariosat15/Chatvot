@@ -2509,7 +2509,9 @@ export async function seedMarketplaceItems(
   const processedSlugs = new Set<string>();
 
   for (const hardcoded of ALL_ITEMS) {
-    const jsonData = savedDefaults[hardcoded.slug];
+    const slug = hardcoded.slug as string;
+    if (!slug) { mergedItems.push(hardcoded); continue; }
+    const jsonData = savedDefaults[slug];
     if (jsonData) {
       mergedItems.push({
         ...hardcoded,
@@ -2525,7 +2527,7 @@ export async function seedMarketplaceItems(
     } else {
       mergedItems.push(hardcoded);
     }
-    processedSlugs.add(hardcoded.slug);
+    processedSlugs.add(slug);
   }
 
   // Also add items from JSON not in hardcoded list (admin-created items)

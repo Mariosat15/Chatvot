@@ -2510,7 +2510,9 @@ export async function seedMarketplaceItems(
   const processedSlugs = new Set<string>();
 
   for (const hardcoded of ALL_ITEMS) {
-    const jsonData = savedDefaults[hardcoded.slug];
+    const slug = hardcoded.slug as string;
+    if (!slug) { mergedItems.push(hardcoded); continue; }
+    const jsonData = savedDefaults[slug];
     if (jsonData) {
       // Merge: hardcoded provides structure (codeTemplate, indicatorType etc.)
       // JSON provides admin-customized fields (imageUrl, descriptions, price, tags)
@@ -2528,7 +2530,7 @@ export async function seedMarketplaceItems(
     } else {
       mergedItems.push(hardcoded);
     }
-    processedSlugs.add(hardcoded.slug);
+    processedSlugs.add(slug);
   }
 
   // Also add any items from JSON that are NOT in the hardcoded list

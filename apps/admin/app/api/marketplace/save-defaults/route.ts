@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { requireAdminAuth } from "@/lib/admin/auth";
-import { readFile, writeFile, mkdir, access, copyFile } from "fs/promises";
+import { readFile, writeFile, mkdir, access, copyFile, readdir, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
 
@@ -14,8 +14,7 @@ import path from "path";
  * 2. Writes a JSON defaults file with all item data
  * 3. Updates imageUrl in DB to point to the committed static path
  *
- * After running this, the admin should commit and push so that
- * white-label instances and fresh DB seeds get all items + images.
+ * After running this, commit and push so white-label instances get everything.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,18 +34,15 @@ export async function POST(request: NextRequest) {
       `💾 [Save Defaults] Starting - ${items.length} items to process`,
     );
 
-    // ---- Resolve directories ----
-    // Find the repo root (monorepo) to place committed assets
-    // Find repo root dynamically (no hardcoded paths - works on any server)
+    // ---- Resolve repo root dynamically ----
     const possibleRoots = [
-      path.join(process.cwd(), "..", ".."), // From apps/admin -> repo root
-      process.cwd(), // Fallback: cwd is repo root
+      path.join(process.cwd(), "..", ".."),
+      process.cwd(),
     ];
 
     let repoRoot: string | null = null;
     for (const root of possibleRoots) {
       try {
-        // Verify this is the repo root by checking for package.json
         await access(path.join(root, "package.json"), constants.R_OK);
         repoRoot = root;
         break;
@@ -64,92 +60,106 @@ export async function POST(request: NextRequest) {
 
     console.log(`📁 [Save Defaults] Repo root: ${repoRoot}`);
 
-    // Create committed assets directory
     const assetsDir = path.join(repoRoot, "public", "assets", "marketplace");
     await mkdir(assetsDir, { recursive: true });
 
-    // Create data directory for JSON defaults
     const dataDir = path.join(repoRoot, "apps", "admin", "lib", "data");
     await mkdir(dataDir, { recursive: true });
 
-    // ---- Source directories for finding existing images ----
-    const uploadDirs = [
+    // ---- All directories to search for images ----
+    const allSearchDirs = [
       path.join(repoRoot, "public", "uploads", "marketplace"),
       path.join(repoRoot, "apps", "admin", "public", "uploads", "marketplace"),
       path.join(repoRoot, "public", "assets", "marketplace"),
-    ];
-
-    // Also check for avatar images (no hardcoded paths)
-    const avatarDirs = [
       path.join(repoRoot, "public", "assets", "avatars"),
       path.join(repoRoot, "public", "avatars"),
-      path.join(repoRoot, "apps", "admin", "public", "assets", "avatars"),
-      path.join(repoRoot, "apps", "admin", "public", "avatars"),
     ];
 
-    // ---- Helper: generate filename variants (original + webp fallback) ----
-    function getFilenameVariants(filename: string): string[] {
-      const variants = [filename];
-      // If the filename has a non-webp extension, also try .webp
-      // (upload route converts all images to .webp)
-      const webpVariant = filename.replace(
-        /\.(jpg|jpeg|png|gif|bmp|tiff)$/i,
-        ".webp",
-      );
-      if (webpVariant !== filename) {
-        variants.push(webpVariant);
-      }
-      return variants;
+    // ---- Build a full file index of all upload directories (once) ----
+    // Maps filename (lowercase) -> full path, and also indexes by slug fragments
+    const fileIndex: Map<string, string> = new Map();
+    for (const dir of allSearchDirs) {
+      try {
+        const files = await readdir(dir);
+        for (const f of files) {
+          const fullPath = path.join(dir, f);
+          try {
+            const s = await stat(fullPath);
+            if (s.isFile() && s.size > 0) {
+              fileIndex.set(f.toLowerCase(), fullPath);
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* dir doesn't exist */ }
     }
 
-    // ---- Helper: try to find file in directories with variants ----
-    async function tryFindInDirs(
-      filename: string,
-      dirs: string[],
-    ): Promise<string | null> {
-      const variants = getFilenameVariants(filename);
-      for (const variant of variants) {
-        for (const dir of dirs) {
-          const fullPath = path.join(dir, variant);
-          try {
-            await access(fullPath, constants.R_OK);
-            return fullPath;
-          } catch {
-            continue;
+    console.log(`📂 [Save Defaults] Indexed ${fileIndex.size} files across all directories`);
+
+    // ---- Helper: find best image for an item ----
+    function findImageForItem(imageUrl: string | undefined, slug: string): string | null {
+      // Strategy 1: exact filename from imageUrl
+      if (imageUrl) {
+        const urlPath = imageUrl.split("?")[0];
+        const filename = urlPath.split("/").pop();
+        if (filename) {
+          const found = fileIndex.get(filename.toLowerCase());
+          if (found) return found;
+          // Try .webp variant
+          const webpName = filename.replace(/\.(jpg|jpeg|png|gif|bmp|tiff)$/i, ".webp");
+          if (webpName !== filename) {
+            const foundWebp = fileIndex.get(webpName.toLowerCase());
+            if (foundWebp) return foundWebp;
           }
         }
       }
-      return null;
-    }
 
-    // ---- Helper: find an image file on disk ----
-    async function findImageFile(
-      imageUrl: string,
-    ): Promise<string | null> {
-      if (!imageUrl) return null;
+      // Strategy 2: look for {slug}.webp in assets dir (already committed)
+      const slugFile = fileIndex.get(`${slug}.webp`);
+      if (slugFile) return slugFile;
 
-      // Extract filename from URL (handle query params)
-      const urlPath = imageUrl.split("?")[0];
+      // Strategy 3: search uploads for files containing the slug in the filename
+      // Pick the NEWEST file (highest timestamp in filename)
+      const slugLower = slug.toLowerCase();
+      // Also try without common prefixes (avatar-, cosmetic-, etc.)
+      const slugVariants = [slugLower];
+      if (slugLower.startsWith("avatar-")) slugVariants.push(slugLower.slice(7));
+      if (slugLower.startsWith("game-master-")) slugVariants.push(slugLower);
 
-      // Case 1: /api/assets/marketplace/filename.webp (or .png → .webp)
-      if (urlPath.includes("/api/assets/marketplace/")) {
-        const filename = urlPath.split("/api/assets/marketplace/")[1];
-        const found = await tryFindInDirs(filename, uploadDirs);
-        if (found) return found;
+      let bestMatch: string | null = null;
+      let bestTimestamp = 0;
+
+      for (const [filename, fullPath] of fileIndex.entries()) {
+        // Skip non-image files
+        if (!filename.endsWith(".webp") && !filename.endsWith(".png") && !filename.endsWith(".jpg")) continue;
+
+        for (const sv of slugVariants) {
+          // Check if filename contains the slug
+          // e.g. "avatar-avatar-shadow-trader-1770966280005.webp" contains "shadow-trader"
+          // e.g. "avatar-bollinger-bands-1769416451404.webp" contains "bollinger-bands"
+          if (filename.includes(sv)) {
+            // Extract timestamp from filename to pick newest
+            const timestampMatch = filename.match(/(\d{13})/);
+            const ts = timestampMatch ? parseInt(timestampMatch[1], 10) : 0;
+            if (ts > bestTimestamp || !bestMatch) {
+              bestTimestamp = ts;
+              bestMatch = fullPath;
+            }
+            break;
+          }
+        }
       }
 
-      // Case 2: /assets/avatars/name.png (or .webp)
-      if (urlPath.includes("/assets/avatars/")) {
-        const filename = urlPath.split("/assets/avatars/")[1];
-        const found = await tryFindInDirs(filename, avatarDirs);
-        if (found) return found;
-      }
+      if (bestMatch) return bestMatch;
 
-      // Case 3: /assets/marketplace/name.ext (already committed - with or without /api prefix)
-      if (urlPath.includes("/assets/marketplace/")) {
-        const filename = urlPath.split("/assets/marketplace/")[1];
-        const found = await tryFindInDirs(filename, [assetsDir, ...uploadDirs]);
-        if (found) return found;
+      // Strategy 4: for generic "avatar-item-TIMESTAMP" uploads, try matching by the
+      // timestamp that was in the original imageUrl
+      if (imageUrl) {
+        const tsMatch = imageUrl.match(/(\d{13})/);
+        if (tsMatch) {
+          for (const [filename, fullPath] of fileIndex.entries()) {
+            if (filename.includes(tsMatch[1])) return fullPath;
+          }
+        }
       }
 
       return null;
@@ -158,45 +168,39 @@ export async function POST(request: NextRequest) {
     // ---- Process each item ----
     let imagesCopied = 0;
     let imagesMissing = 0;
+    let imagesSkipped = 0;
     const defaultItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
       let newImageUrl = item.imageUrl || "";
 
-      // If the item has an image, try to copy it to the committed directory
-      if (item.imageUrl) {
-        const sourceFile = await findImageFile(item.imageUrl);
+      // Find the best image file for this item
+      const sourceFile = findImageForItem(item.imageUrl, item.slug);
 
-        if (sourceFile) {
-          // Determine target filename: use slug + original extension
-          const ext = path.extname(sourceFile) || ".webp";
-          const targetFilename = `${item.slug}${ext}`;
-          const targetPath = path.join(assetsDir, targetFilename);
+      if (sourceFile) {
+        const ext = path.extname(sourceFile) || ".webp";
+        const targetFilename = `${item.slug}${ext}`;
+        const targetPath = path.join(assetsDir, targetFilename);
 
-          try {
-            await copyFile(sourceFile, targetPath);
-            newImageUrl = `/api/assets/marketplace/${targetFilename}`;
-            imagesCopied++;
-            console.log(
-              `  ✅ Copied image for "${item.slug}": ${sourceFile} → ${targetPath}`,
-            );
-          } catch (copyErr) {
-            console.error(
-              `  ❌ Failed to copy image for "${item.slug}":`,
-              copyErr,
-            );
-            imagesMissing++;
-          }
-        } else {
-          console.warn(
-            `  ⚠️ Image file not found for "${item.slug}": ${item.imageUrl}`,
+        try {
+          await copyFile(sourceFile, targetPath);
+          newImageUrl = `/api/assets/marketplace/${targetFilename}`;
+          imagesCopied++;
+          console.log(
+            `  ✅ "${item.slug}": ${path.basename(sourceFile)} → ${targetFilename}`,
           );
+        } catch (copyErr) {
+          console.error(`  ❌ Copy failed for "${item.slug}":`, copyErr);
           imagesMissing++;
-          // Keep the existing URL - might still work
         }
+      } else if (item.imageUrl) {
+        console.warn(`  ⚠️ No image found for "${item.slug}" (DB: ${item.imageUrl})`);
+        imagesMissing++;
+      } else {
+        imagesSkipped++;
       }
 
-      // Build the default item data (exclude transient/runtime fields)
+      // Build the default item data
       const defaultItem: Record<string, unknown> = {
         name: item.name,
         slug: item.slug,
@@ -223,17 +227,9 @@ export async function POST(request: NextRequest) {
         riskWarning: item.riskWarning,
       };
 
-      // Include strategy config if present
-      if (item.strategyConfig) {
-        defaultItem.strategyConfig = item.strategyConfig;
-      }
+      if (item.strategyConfig) defaultItem.strategyConfig = item.strategyConfig;
+      if (item.gameMasterConfig) defaultItem.gameMasterConfig = item.gameMasterConfig;
 
-      // Include game master config if present
-      if (item.gameMasterConfig) {
-        defaultItem.gameMasterConfig = item.gameMasterConfig;
-      }
-
-      // Remove undefined values for cleaner JSON
       for (const key of Object.keys(defaultItem)) {
         if (defaultItem[key] === undefined || defaultItem[key] === null) {
           delete defaultItem[key];
@@ -242,7 +238,7 @@ export async function POST(request: NextRequest) {
 
       defaultItems.push(defaultItem);
 
-      // Update the item in DB with the new static image path
+      // Update the item in DB with the new committed image path
       if (newImageUrl && newImageUrl !== item.imageUrl) {
         await MarketplaceItem.updateOne(
           { _id: item._id },
@@ -256,26 +252,21 @@ export async function POST(request: NextRequest) {
     const jsonContent = JSON.stringify(defaultItems, null, 2);
     await writeFile(jsonPath, jsonContent, "utf-8");
 
-    console.log(
-      `💾 [Save Defaults] Complete! ${defaultItems.length} items saved to ${jsonPath}`,
-    );
-    console.log(
-      `   Images: ${imagesCopied} copied, ${imagesMissing} missing/not found`,
-    );
-    console.log(
-      `   📌 IMPORTANT: Commit and push the following to include defaults in the repo:`,
-    );
-    console.log(`   - ${assetsDir}/ (marketplace images)`);
-    console.log(`   - ${jsonPath} (items data)`);
+    console.log(`💾 [Save Defaults] Complete! ${defaultItems.length} items saved`);
+    console.log(`   ✅ Images copied: ${imagesCopied}`);
+    console.log(`   ⚠️ Images missing: ${imagesMissing}`);
+    console.log(`   ⏭️ No image: ${imagesSkipped}`);
+    console.log(`   📌 Now run: scripts/sync-defaults-to-git.sh (or commit manually)`);
 
     return NextResponse.json({
       success: true,
       totalItems: defaultItems.length,
       imagesCopied,
       imagesMissing,
+      imagesSkipped,
       jsonPath: "apps/admin/lib/data/marketplace-defaults.json",
       assetsDir: "public/assets/marketplace/",
-      message: `Saved ${defaultItems.length} items as defaults. ${imagesCopied} images copied. Now commit and push to include in the repo.`,
+      message: `Saved ${defaultItems.length} items. ${imagesCopied} images copied, ${imagesMissing} missing, ${imagesSkipped} no image. Commit and push to include in repo.`,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
