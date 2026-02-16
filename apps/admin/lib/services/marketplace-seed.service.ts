@@ -2455,6 +2455,59 @@ const ALL_ITEMS = [
 ];
 
 // ============================================================================
+// DEPRECATED SLUGS — old duplicate items to remove from DB on seed
+// These had different names but identical indicatorType as current items.
+// ============================================================================
+const DEPRECATED_SLUGS = [
+  "momentum-insight-oscillator",   // awesome_osc → keep awesome-oscillator
+  "stochrsi-precision",            // stochrsi → keep stochastic-rsi
+  "true-signal-insight",           // tsi → keep true-strength-index
+  "ppo-precision",                 // ppo → keep percentage-price-osc
+  "fisher-signal-pro",             // fisher → keep fisher-transform
+  "connors-rsi-pro",               // connors_rsi → keep connors-rsi
+  "ergodic-trend-tracker",         // smi_ergodic → keep smi-ergodic
+  "ma-envelope-tracker",           // ma_envelope → keep ma-envelope
+  "dynamic-price-channel",         // price_channel → keep price-channel
+  "trendpulse-navigator",          // trend_pulse → keep trend-pulse
+  "market-mood-mapper",            // market_regime → keep market-regime-detector
+  "dynamic-trend-tracker",         // trend_composite → keep trend-strength-composite
+  "market-depth-analyzer",         // composite_breadth → keep composite-breadth-score
+  "pivot-reversal-pro",            // reversal_signal → keep reversal-signal-detector
+  "prospective-range-predictor",   // predictive_range → keep predictive-range
+  "breakout-probability-indicator",// breakout_prob → keep breakout-probability
+  "whale-gathering-indicator",     // whale_accumulation → keep whale-accumulation
+  "smart-money-tracker",           // smart_money_flow → keep smart-money-flow
+  "volume-climax-alert",           // volume_climax → keep volume-climax
+  "buy-pressure-tracker",          // net_buying_pressure → keep net-buying-pressure
+  "flow-imbalance-tracker",        // order_flow_imbalance → keep order-flow-imbalance
+  "intraday-pulse",                // intraday_intensity → keep intraday-intensity-index
+  "momentum-volume-gauge",         // volume_momentum → keep volume-momentum
+  "squeeze-breakout-pro",          // volatility_squeeze → keep volatility-squeeze
+  "volatility-insight",            // volatility_ratio → keep volatility-ratio
+  "range-expansion-detector",      // range_expansion → keep range-expansion-index
+  "chop-signal",                   // choppy_market → keep choppy-market-index
+  "fractal-dimension-analysis",    // fractal_dimension → keep fractal-dimension
+  "momentum-bands",                // acceleration_bands → keep acceleration-bands
+  "dynamic-range-tracker",         // adaptive_channel → keep adaptive-channel
+  "alpha-momentum-tracker",        // alpha_momentum → keep alpha-momentum
+  "efficiency-ratio-tracker",      // efficiency_ratio → keep efficiency-ratio-oscillator
+  "trendendurance-tracker",        // trend_persistence → keep trend-persistence
+  "momentum-master",               // mtf_momentum → keep multi-timeframe-momentum
+  "momentum-surge",                // momentum_wave → keep momentum-wave
+  "momentum-gap-tracker",          // gap_momentum → keep gap-momentum
+  "heikin-ashi-trend-tracker",     // heikin_ashi_trend → keep heikin-ashi-trend
+  "cycle-seeker",                  // cycle_detector → keep cycle-detector
+  "flexi-rsi",                     // adaptive_rsi → keep adaptive-rsi
+  "reversion-bands",               // mean_reversion_band → keep mean-reversion-bands
+  "trendflow-ribbon",              // trend_ribbon → keep trend-ribbon
+  "vigor-momentum-tracker",        // relative_vigor → keep relative-vigor-index
+  "dynamic-pivot-analyzer",        // dynamic_pivots → keep dynamic-pivot-zones
+  "price-action-insight",          // price_action_score → keep price-action-score
+  "ergodic-volume-profiler",       // ergodic_volume → keep ergodic-volume-oscillator
+  "dynamic-vwap-bands",            // anchored_vwap_bands → keep anchored-vwap-bands
+];
+
+// ============================================================================
 // SEED FUNCTION
 // ============================================================================
 
@@ -2469,6 +2522,16 @@ export async function seedMarketplaceItems(
   await connectToDatabase();
 
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+  // ---- Step 0: Clean up deprecated duplicate items from DB ----
+  try {
+    const deleteResult = await MarketplaceItem.deleteMany({ slug: { $in: DEPRECATED_SLUGS } });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`🗑️ [Seed] Removed ${deleteResult.deletedCount} deprecated duplicate items from DB`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Seed] Could not clean deprecated items:`, err);
+  }
 
   // ---- Load saved defaults JSON (contains imageUrl and admin-customized data) ----
   let savedDefaults: Record<string, any> = {};
