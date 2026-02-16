@@ -1,0 +1,923 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="Microsoft Word 15">
+<meta name="Originator" content="Microsoft Word 15">
+<style>
+  @page { size: A4; margin: 2.5cm; }
+  body { font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #1a1a2e; }
+  h1 { font-size: 22pt; font-weight: bold; color: #0f3460; margin-top: 24pt; margin-bottom: 12pt; border-bottom: 2px solid #0f3460; padding-bottom: 6pt; page-break-before: always; }
+  h1.first-heading { page-break-before: avoid; }
+  h2 { font-size: 16pt; font-weight: bold; color: #16213e; margin-top: 18pt; margin-bottom: 8pt; }
+  h3 { font-size: 13pt; font-weight: bold; color: #1a1a2e; margin-top: 14pt; margin-bottom: 6pt; }
+  p { margin-top: 4pt; margin-bottom: 8pt; text-align: justify; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8pt; margin-bottom: 12pt; font-size: 10pt; }
+  th { background-color: #0f3460; color: white; font-weight: bold; padding: 6pt 8pt; text-align: left; border: 1px solid #0f3460; }
+  td { padding: 5pt 8pt; border: 1px solid #ccc; vertical-align: top; }
+  tr:nth-child(even) td { background-color: #f4f6fa; }
+  tr.total-row td { font-weight: bold; background-color: #e8ecf4 !important; border-top: 2px solid #0f3460; }
+  tr.spacer-row td { border: none; background: none !important; height: 4pt; padding: 0; }
+  .negative { color: #c0392b; } .positive { color: #27ae60; }
+  .cover-page { page-break-after: always; text-align: center; padding-top: 200pt; }
+  .cover-title { font-size: 42pt; font-weight: bold; color: #0f3460; letter-spacing: 4pt; }
+  .cover-subtitle { font-size: 18pt; color: #16213e; margin-top: 12pt; }
+  .cover-period { font-size: 14pt; color: #555; margin-top: 24pt; }
+  .cover-confidential { font-size: 10pt; color: #888; margin-top: 80pt; font-style: italic; }
+  .toc-page { page-break-after: always; }
+  .toc-entry { font-size: 11pt; margin: 6pt 0; padding-left: 20pt; }
+  .toc-part { font-size: 13pt; font-weight: bold; color: #0f3460; margin-top: 14pt; margin-bottom: 4pt; }
+  .section-divider { page-break-before: always; text-align: center; padding-top: 180pt; padding-bottom: 40pt; }
+  .part-title { font-size: 28pt; font-weight: bold; color: #0f3460; border-bottom: 3px solid #0f3460; padding-bottom: 10pt; display: inline-block; }
+  .part-subtitle { font-size: 13pt; color: #555; margin-top: 12pt; }
+  ul { margin-top: 4pt; margin-bottom: 8pt; } li { margin-bottom: 4pt; }
+  .callout { background-color: #f0f4ff; border-left: 4px solid #0f3460; padding: 10pt 14pt; margin: 12pt 0; font-style: italic; }
+  .footer-note { font-size: 9pt; color: #888; font-style: italic; margin-top: 40pt; border-top: 1px solid #ccc; padding-top: 8pt; }
+</style>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover-page">
+  <div class="cover-title">CHARTVOLT</div>
+  <div class="cover-subtitle">Investor Business Plan</div>
+  <div class="cover-period">2026 &ndash; 2029</div>
+  <div style="margin-top:60pt;"><span style="font-size:13pt;color:#0f3460;font-weight:bold;">Seed Round: &euro;300,000</span></div>
+  <div class="cover-confidential">Confidential &mdash; For Investor Review Only<br>Prepared: February 2026</div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc-page">
+  <h1 class="first-heading" style="page-break-before:avoid;">Table of Contents</h1>
+  <div class="toc-part">Part I &mdash; Business Plan</div>
+  <div class="toc-entry">1. Executive Summary</div>
+  <div class="toc-entry">2. Market Opportunity</div>
+  <div class="toc-entry">3. Product Overview</div>
+  <div class="toc-entry">4. Company Structure</div>
+  <div class="toc-entry">5. Revenue Model &mdash; Detailed Assumptions</div>
+  <div class="toc-entry">6. Year 1 Revenue &mdash; Detailed Breakdown</div>
+  <div class="toc-entry">7. Detailed Operating Costs &mdash; Year 1</div>
+  <div class="toc-entry">8. Growth Projections &mdash; Year 2 and Year 3</div>
+  <div class="toc-entry">9. Consolidated Financial Table</div>
+  <div class="toc-entry">10. Unit Economics</div>
+  <div class="toc-entry">11. Personnel Plan</div>
+  <div class="toc-entry">12. Marketing Strategy</div>
+  <div class="toc-entry">13. Key Milestones and Timeline</div>
+  <div class="toc-entry">14. Competitive Advantages</div>
+  <div class="toc-entry">15. Risk Analysis and Mitigation</div>
+  <div class="toc-entry">16. Funding Requirement and Use of Funds</div>
+  <div class="toc-entry">17. Exit Strategy</div>
+  <div class="toc-part">Part II &mdash; Financial Model</div>
+  <div class="toc-entry">18. Revenue Breakdown by Stream (Quarterly)</div>
+  <div class="toc-entry">19. Cost Structure (Quarterly)</div>
+  <div class="toc-entry">20. Profit and Loss Summary</div>
+  <div class="toc-entry">21. EBITDA Calculation</div>
+  <div class="toc-entry">22. Cash Flow Statement</div>
+  <div class="toc-entry">23. Break-Even Analysis</div>
+  <div class="toc-entry">24. Valuation Model</div>
+  <div class="toc-part">Part III &mdash; Sensitivity Analysis</div>
+  <div class="toc-entry">25. Scenario Definitions</div>
+  <div class="toc-entry">26. Low Case</div>
+  <div class="toc-entry">27. Mid Case (Base)</div>
+  <div class="toc-entry">28. High Case</div>
+  <div class="toc-entry">29. Scenario Comparison</div>
+  <div class="toc-entry">30. Variable Sensitivity Tables</div>
+  <div class="toc-part">Part IV &mdash; Pitch Deck</div>
+  <div class="toc-entry">31. Investor Presentation (15 Slides)</div>
+</div>
+
+<!-- PART I -->
+<div class="section-divider"><div class="part-title">Part I</div><div class="part-subtitle">Business Plan</div></div>
+
+<!-- 1 -->
+<h1>1. Executive Summary</h1>
+<p>Chartvolt is a <strong>gamified trading infrastructure platform</strong> designed to increase engagement, retention, and monetization in retail trading.</p>
+<p>The platform combines:</p>
+<ul>
+  <li>Professional-grade trading tools with real-time charting and 106 technical indicators</li>
+  <li>Structured competition mechanics with monetized weekly tournaments</li>
+  <li>Peer-to-peer challenges with platform rake</li>
+  <li>A <strong>Game Master ecosystem</strong> where power-users pay monthly subscriptions to create competitions and earn referral income</li>
+  <li>Badge and milestone progression systems (266+ badges, 169+ milestones)</li>
+  <li>Multi-tenant white-label deployment for brokers and prop firms</li>
+</ul>
+
+<p><strong>Revenue is generated through three engines:</strong></p>
+<p><strong>B2B &mdash; White-Label Licensing:</strong> Recurring SaaS revenue from brokers and prop firms. &euro;6,000/month + &euro;10,000 setup fee per client.</p>
+<p><strong>B2C &mdash; Engagement Monetization:</strong> Competition rake (30%), challenge rake (30%), premium subscriptions, and marketplace commissions.</p>
+<p><strong>Game Master Network:</strong> Monthly subscriptions (&euro;100&ndash;&euro;1,000/month) sold to community leaders who create competitions and recruit new traders via referral codes, driving zero-CAC user acquisition.</p>
+
+<div class="callout">The business is profitable from Year 1 with a lean 6-person team and efficient &euro;8K/month marketing. Year 1 delivers &euro;122,000 profit, Year 2 delivers &euro;562,000, and Year 3 delivers &euro;1,340,000. Cumulative 3-year profit: &euro;2,024,000.</div>
+
+<table>
+  <tr><th>Metric</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Total Users (organic + GM-referred)</td><td>500</td><td>1,000</td><td>2,000</td></tr>
+  <tr><td>Game Masters</td><td>25</td><td>60</td><td>120</td></tr>
+  <tr><td>White-Label Clients</td><td>2</td><td>5</td><td>8</td></tr>
+  <tr><td>Total Revenue</td><td>&euro;560,000</td><td>&euro;1,135,000</td><td>&euro;2,040,000</td></tr>
+  <tr><td>Total Costs</td><td>&euro;438,000</td><td>&euro;573,000</td><td>&euro;700,000</td></tr>
+  <tr class="total-row"><td>Net Profit</td><td class="positive">&euro;122,000</td><td class="positive">&euro;562,000</td><td class="positive">&euro;1,340,000</td></tr>
+  <tr><td>EBITDA</td><td>&euro;125,000</td><td>&euro;567,000</td><td>&euro;1,348,000</td></tr>
+  <tr><td>Net Margin</td><td>21.8%</td><td>49.5%</td><td>65.7%</td></tr>
+</table>
+
+<p><strong>Current Status:</strong> MVP complete. Full platform operational.</p>
+<p><strong>Funding Sought:</strong> &euro;300,000 seed investment for marketing, working capital, infrastructure scaling, and sales development.</p>
+
+<!-- 2 -->
+<h1>2. Market Opportunity</h1>
+<p>Retail trading participation continues to grow globally. The global online trading platform market is projected to exceed USD 15 billion by 2028. However:</p>
+<p><strong>Trader retention is low.</strong> 70% of new traders churn within 90 days.</p>
+<p><strong>Platform differentiation is limited.</strong> Most platforms offer identical tools.</p>
+<p><strong>Brokers compete on acquisition costs.</strong> CAC ranges &euro;200&ndash;800 per trader.</p>
+<p><strong>Community engagement is underdeveloped.</strong> Social and competitive features are absent or superficial.</p>
+<p><strong>Chartvolt addresses all four problems</strong> by embedding gamification, competitions, progression, and a Game Master community network into trading:</p>
+<ul>
+  <li>2&ndash;3x longer session duration through achievements</li>
+  <li>Monetizable engagement through competitions and challenges</li>
+  <li>Turnkey WL retention solution for brokers</li>
+  <li>Switching costs through progress, badges, and leaderboard position</li>
+  <li><strong>Game Masters as paid micro-influencers</strong> self-funding user acquisition</li>
+</ul>
+
+<!-- 3 -->
+<h1>3. Product Overview</h1>
+<h2>Trading Infrastructure</h2>
+<ul>
+  <li>Real-time WebSocket price streaming (Massive.com)</li>
+  <li>66 built-in + 40 premium marketplace indicators</li>
+  <li>Strategy signal overlays, candlestick charting, multi-timeframe (1m&ndash;1W)</li>
+</ul>
+
+<h2>Gamification Engine</h2>
+<ul>
+  <li>169+ milestones across themed worlds, 266+ badges, level progression</li>
+  <li>Weekly competitions with prize pools, P2P challenges, global leaderboards</li>
+</ul>
+
+<h2>Game Master Ecosystem</h2>
+<p>GMs purchase monthly packages to create competitions, earn referral commissions, and build trading communities.</p>
+<h3>Game Master Tiers</h3>
+<table>
+  <tr><th>Feature</th><th>Starter (&euro;100/mo)</th><th>Pro (&euro;300/mo)</th><th>Elite (&euro;500/mo)</th><th>Legend (&euro;1,000/mo)</th></tr>
+  <tr><td>Competitions per day</td><td>1</td><td>3</td><td>5</td><td>10</td></tr>
+  <tr><td>Max participants</td><td>30</td><td>75</td><td>100</td><td>150</td></tr>
+  <tr><td>Referral on competition entries</td><td>2%</td><td>4%</td><td>6%</td><td>15%</td></tr>
+  <tr><td>Referral on challenge entries</td><td>&mdash;</td><td>&mdash;</td><td>6%</td><td>15%</td></tr>
+  <tr><td>Referral code &amp; dashboard</td><td>Yes</td><td>Yes</td><td>Advanced</td><td>Advanced + Custom</td></tr>
+  <tr><td>Featured listing</td><td>&mdash;</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+</table>
+
+<h3>How the Game Master Flywheel Works</h3>
+<p>1. GM buys a package (&euro;100&ndash;&euro;1,000/month).<br>
+2. Gets unique referral link. Promotes to audience.<br>
+3. Referred users enter competitions/challenges. Platform takes 30% fee.<br>
+4. GM earns 2&ndash;15% from the platform&rsquo;s 30% cut.<br>
+5. GM recruits more users to maximize earnings.<br>
+6. More users = more competitions = more subscriptions = more revenue.</p>
+
+<div class="callout"><strong>Key:</strong> Every GM is a self-funded acquisition channel. Platform pays &euro;0 CAC for GM-referred users. Referral payouts come from the platform fee, not additional cost.</div>
+
+<h3>GM ROI Examples</h3>
+<table>
+  <tr><th>Tier</th><th>Cost</th><th>Break-Even</th><th>Example</th></tr>
+  <tr><td>Starter</td><td>&euro;100/mo</td><td>10 users &times; 1 comp</td><td>10 &times; &euro;500 &times; 2% = &euro;100</td></tr>
+  <tr><td>Pro</td><td>&euro;300/mo</td><td>15 users &times; 1 comp</td><td>15 &times; &euro;500 &times; 4% = &euro;300</td></tr>
+  <tr><td>Elite</td><td>&euro;500/mo</td><td>12 users &times; 1 comp + 2 challenges</td><td>12 &times; (&euro;30 + &euro;6) = &euro;432+</td></tr>
+  <tr><td>Legend</td><td>&euro;1,000/mo</td><td>14 users &times; 1 comp</td><td>14 &times; &euro;500 &times; 15% = &euro;1,050</td></tr>
+</table>
+
+<h2>Marketplace Ecosystem</h2>
+<ul><li>Premium indicators, strategies, avatars, GM packages, AI content, 30% commission</li></ul>
+
+<h2>White-Label Capability</h2>
+<ul><li>Multi-tenant, custom branding, separate DB, full feature parity, &lt;24h deployment</li></ul>
+
+<h2>Technology Stack</h2>
+<table>
+  <tr><th>Layer</th><th>Technology</th></tr>
+  <tr><td>Frontend</td><td>Next.js 16, React 19, TypeScript, Tailwind CSS</td></tr>
+  <tr><td>Backend</td><td>Node.js, MongoDB/Mongoose, WebSocket (Socket.io)</td></tr>
+  <tr><td>Infrastructure</td><td>Hostinger VPS, PM2, Upstash Redis</td></tr>
+  <tr><td>Payments</td><td>Stripe, Nuvei</td></tr>
+  <tr><td>KYC / AI / Data</td><td>Veriff, OpenAI GPT-4o, Massive.com</td></tr>
+</table>
+
+<!-- 4 -->
+<h1>4. Company Structure</h1>
+<h2>Chartvolt Ltd (Cyprus)</h2>
+<p>Owns IP. Operates Chartvolt.com. All B2C, marketplace, competitions, GM program. 12.5% tax. EU passporting.</p>
+<h2>Chartvolt Solutions Ltd (Estonia)</h2>
+<p>White-label B2B licensing. 0% tax on reinvested profits. E-residency.</p>
+<h3>Incorporation Costs</h3>
+<table>
+  <tr><th>Item</th><th>Cost (&euro;)</th></tr>
+  <tr><td>Cyprus Ltd</td><td>3,000</td></tr>
+  <tr><td>Estonia OU</td><td>2,000</td></tr>
+  <tr><td>Legal structuring</td><td>2,000</td></tr>
+  <tr><td>Bank accounts</td><td>1,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>8,000</td></tr>
+</table>
+
+<!-- 5 -->
+<h1>5. Revenue Model &mdash; Detailed Assumptions</h1>
+<h3>Growth Trajectory</h3>
+<table>
+  <tr><th>Parameter</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Organic B2C users</td><td>400</td><td>800</td><td>1,500</td></tr>
+  <tr><td>GM-referred users (zero CAC)</td><td>100</td><td>200</td><td>500</td></tr>
+  <tr><td><strong>Total active users</strong></td><td><strong>500</strong></td><td><strong>1,000</strong></td><td><strong>2,000</strong></td></tr>
+  <tr><td>Game Masters</td><td>25</td><td>60</td><td>120</td></tr>
+  <tr><td>White-label clients</td><td>2</td><td>5</td><td>8</td></tr>
+  <tr><td>Competitions per week</td><td>4</td><td>6</td><td>8</td></tr>
+  <tr><td>Avg. traders per comp</td><td>8</td><td>10</td><td>12</td></tr>
+  <tr><td>Challenges per week</td><td>25</td><td>35</td><td>50</td></tr>
+  <tr><td>Platform commission</td><td>30%</td><td>30%</td><td>30%</td></tr>
+  <tr><td>Avg. competition entry</td><td>&euro;500</td><td>&euro;500</td><td>&euro;500</td></tr>
+  <tr><td>Avg. challenge entry</td><td>&euro;50</td><td>&euro;50</td><td>&euro;50</td></tr>
+  <tr><td>Subscription price</td><td>&euro;29/mo</td><td>&euro;29/mo</td><td>&euro;29/mo</td></tr>
+  <tr><td>Subscription conversion</td><td>15%</td><td>25%</td><td>25%</td></tr>
+</table>
+
+<h3>Game Master Assumptions</h3>
+<table>
+  <tr><th>Parameter</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Total Game Masters</td><td>25</td><td>60</td><td>120</td></tr>
+  <tr><td>Tier mix (Starter/Pro/Elite/Legend)</td><td>40/30/20/10%</td><td>35/30/25/10%</td><td>30/30/25/15%</td></tr>
+  <tr><td>Weighted avg. price/month</td><td>&euro;260</td><td>&euro;300</td><td>&euro;320</td></tr>
+  <tr><td>Avg. months active</td><td>8</td><td>10</td><td>11</td></tr>
+  <tr><td>Avg. referred users per GM</td><td>4</td><td>3.3</td><td>4.2</td></tr>
+</table>
+
+<!-- 6 -->
+<h1>6. Year 1 Revenue &mdash; Detailed Breakdown</h1>
+<h3>White-Label Revenue</h3>
+<table>
+  <tr><th>Component</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Monthly license fees</td><td>2 &times; &euro;6,000 &times; 12</td><td>144,000</td></tr>
+  <tr><td>Setup fees</td><td>2 &times; &euro;10,000</td><td>20,000</td></tr>
+  <tr class="total-row"><td>Total White-Label</td><td></td><td>164,000</td></tr>
+</table>
+<h3>Competition Revenue</h3>
+<table>
+  <tr><th>Component</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Platform competitions</td><td>208/yr &times; &euro;4,000 pool &times; 30%</td><td>249,600</td></tr>
+  <tr><td>GM-created competitions</td><td>~50 additional/year</td><td>30,400</td></tr>
+  <tr class="total-row"><td>Total Competitions (gross)</td><td></td><td>280,000</td></tr>
+</table>
+<h3>Challenge Revenue</h3>
+<table>
+  <tr><th>Component</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Annual challenges</td><td>1,200 &times; &euro;100 &times; 30%</td><td>36,000</td></tr>
+  <tr class="total-row"><td>Total Challenges (gross)</td><td></td><td>36,000</td></tr>
+</table>
+<h3>Subscription Revenue</h3>
+<table>
+  <tr><th>Component</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Subscribers</td><td>500 &times; 15% = 75 &times; &euro;348</td><td>26,000</td></tr>
+</table>
+<h3>Marketplace Revenue</h3>
+<table>
+  <tr><th>Component</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Platform commission (30%)</td><td>500 users &times; &euro;13/yr &times; 30%</td><td>2,000</td></tr>
+</table>
+<h3>Game Master Package Revenue</h3>
+<table>
+  <tr><th>Tier</th><th>GMs</th><th>Calculation</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Starter (40%)</td><td>10</td><td>10 &times; &euro;100 &times; 8 mo</td><td>8,000</td></tr>
+  <tr><td>Pro (30%)</td><td>8</td><td>8 &times; &euro;300 &times; 8 mo</td><td>19,200</td></tr>
+  <tr><td>Elite (20%)</td><td>5</td><td>5 &times; &euro;500 &times; 8 mo</td><td>20,000</td></tr>
+  <tr><td>Legend (10%)</td><td>2</td><td>2 &times; &euro;1,000 &times; 8 mo</td><td>16,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>25</td><td></td><td>52,000</td></tr>
+</table>
+<h3>Year 1 Revenue Summary</h3>
+<table>
+  <tr><th>Revenue Source</th><th>Amount (&euro;)</th><th>%</th></tr>
+  <tr><td>Competitions (gross)</td><td>280,000</td><td>50.0%</td></tr>
+  <tr><td>White-Label</td><td>164,000</td><td>29.3%</td></tr>
+  <tr><td>Game Master Packages</td><td>52,000</td><td>9.3%</td></tr>
+  <tr><td>Challenges (gross)</td><td>36,000</td><td>6.4%</td></tr>
+  <tr><td>Subscriptions</td><td>26,000</td><td>4.6%</td></tr>
+  <tr><td>Marketplace</td><td>2,000</td><td>0.4%</td></tr>
+  <tr class="total-row"><td>Total Revenue</td><td>560,000</td><td>100%</td></tr>
+</table>
+
+<!-- 7 -->
+<h1>7. Detailed Operating Costs &mdash; Year 1</h1>
+<h3>Personnel (6 Team Members)</h3>
+<table>
+  <tr><th>Role</th><th>Responsibilities</th><th>Monthly (&euro;)</th><th>Annual (&euro;)</th></tr>
+  <tr><td>CEO / Founder</td><td>Strategy, BD, marketing, investor relations</td><td>10,000</td><td>120,000</td></tr>
+  <tr><td>Senior Full-Stack Developer</td><td>Architecture, core features, deployments</td><td>4,000</td><td>48,000</td></tr>
+  <tr><td>Mid-Level Developer</td><td>Features, WL customizations, GM dashboard</td><td>3,000</td><td>36,000</td></tr>
+  <tr><td>Platform / Support Manager</td><td>User support, GM support, QA</td><td>2,200</td><td>26,400</td></tr>
+  <tr><td>Payments / Compliance Officer</td><td>Payments, KYC, GM payouts, disputes</td><td>2,500</td><td>30,000</td></tr>
+  <tr><td>Customer Success Manager</td><td>WL onboarding, GM onboarding, retention</td><td>1,550</td><td>18,600</td></tr>
+  <tr class="total-row"><td>Total Personnel</td><td></td><td>23,250</td><td>279,000</td></tr>
+</table>
+
+<h3>Marketing (&euro;8,000/month)</h3>
+<table>
+  <tr><th>Channel</th><th>Annual (&euro;)</th></tr>
+  <tr><td>Paid Ads (Meta, Google, TikTok)</td><td>48,000</td></tr>
+  <tr><td>Influencer Partnerships &amp; GM Recruitment</td><td>18,000</td></tr>
+  <tr><td>Content &amp; Video Production</td><td>12,000</td></tr>
+  <tr><td>Trade Shows &amp; Travel</td><td>12,000</td></tr>
+  <tr><td>CRM &amp; Outreach Tools</td><td>6,000</td></tr>
+  <tr class="total-row"><td>Total Marketing</td><td>96,000</td></tr>
+</table>
+<p>The CEO directly manages all marketing and growth strategy, supported by the Customer Success Manager for content and GM onboarding. The Game Master network itself acts as an organic, self-funded marketing channel &mdash; every GM actively recruits users at zero cost to the platform.</p>
+
+<h3>Infrastructure and Technology</h3>
+<table>
+  <tr><th>Service</th><th>Annual (&euro;)</th></tr>
+  <tr><td>Massive.com (data feed)</td><td>3,600</td></tr>
+  <tr><td>Veriff (KYC)</td><td>4,800</td></tr>
+  <tr><td>MongoDB Atlas</td><td>2,400</td></tr>
+  <tr><td>Hostinger VPS (x2)</td><td>2,400</td></tr>
+  <tr><td>Google Workspace</td><td>1,200</td></tr>
+  <tr><td>Domains</td><td>480</td></tr>
+  <tr><td>OpenAI API</td><td>2,400</td></tr>
+  <tr><td>Upstash Redis</td><td>600</td></tr>
+  <tr><td>Nuvei (payments)</td><td>2,400</td></tr>
+  <tr><td>Email / SMTP</td><td>600</td></tr>
+  <tr><td>SSL, CDN, monitoring</td><td>1,200</td></tr>
+  <tr><td>Accounting (2 entities)</td><td>4,800</td></tr>
+  <tr><td>Insurance</td><td>1,800</td></tr>
+  <tr><td>Stripe fees</td><td>3,320</td></tr>
+  <tr class="total-row"><td>Total Infrastructure</td><td>33,000</td></tr>
+</table>
+
+<h3>GM Referral Payouts</h3>
+<table>
+  <tr><th>Component</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Competition referral earnings</td><td>16,000</td></tr>
+  <tr><td>Challenge referral earnings</td><td>4,000</td></tr>
+  <tr class="total-row"><td>Total GM Payouts (from platform fee)</td><td>20,000</td></tr>
+</table>
+
+<h3>Legal and Corporate</h3>
+<table>
+  <tr><th>Item</th><th>Cost (&euro;)</th></tr>
+  <tr><td>Company incorporation (both entities)</td><td>8,000</td></tr>
+  <tr><td>Ongoing legal advisory</td><td>2,000</td></tr>
+  <tr class="total-row"><td>Total Legal &amp; Other</td><td>10,000</td></tr>
+</table>
+
+<h3>Year 1 Total Cost Summary</h3>
+<table>
+  <tr><th>Category</th><th>Amount (&euro;)</th><th>%</th></tr>
+  <tr><td>Personnel</td><td>279,000</td><td>63.7%</td></tr>
+  <tr><td>Marketing</td><td>96,000</td><td>21.9%</td></tr>
+  <tr><td>Infrastructure</td><td>33,000</td><td>7.5%</td></tr>
+  <tr><td>GM Referral Payouts</td><td>20,000</td><td>4.6%</td></tr>
+  <tr><td>Legal &amp; Other</td><td>10,000</td><td>2.3%</td></tr>
+  <tr class="total-row"><td>Total Costs</td><td>438,000</td><td>100%</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Year 1 Net Profit: &euro;122,000</strong> (21.8% margin)<br>
+  Revenue: &euro;560,000 | Costs: &euro;438,000<br><br>
+  Lean cost structure with 6 people, focused &euro;8K/month marketing, and the Game Master network as a zero-cost user acquisition engine. The business is comfortably profitable from Year 1.
+</div>
+
+<!-- 8 -->
+<h1>8. Growth Projections &mdash; Year 2 and Year 3</h1>
+
+<h3>Year 2 &mdash; &euro;562,000 Net Profit</h3>
+<p>Users double to 1,000. 3 new WL clients. GM network grows to 60. Team expands to 8 with BD Manager and second developer.</p>
+<table>
+  <tr><th>Revenue Stream</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Competitions (gross)</td><td>420,000</td></tr>
+  <tr><td>White-Label (5 &times; &euro;72K + 3 new &times; &euro;10K)</td><td>390,000</td></tr>
+  <tr><td>GM Packages (60 &times; &euro;300 avg &times; 10 mo)</td><td>180,000</td></tr>
+  <tr><td>Subscriptions (250 &times; &euro;348)</td><td>87,000</td></tr>
+  <tr><td>Challenges (gross)</td><td>54,000</td></tr>
+  <tr><td>Marketplace</td><td>4,000</td></tr>
+  <tr class="total-row"><td>Total Revenue</td><td>1,135,000</td></tr>
+</table>
+<table>
+  <tr><th>Cost Category</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Personnel (8 team)</td><td>360,000</td></tr>
+  <tr><td>Marketing (&euro;8K/month)</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>55,000</td></tr>
+  <tr><td>GM Referral Payouts</td><td>50,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>12,000</td></tr>
+  <tr class="total-row"><td>Total Costs</td><td>573,000</td></tr>
+</table>
+<div class="callout"><strong>Year 2 Net Profit: &euro;562,000</strong> | Margin: 49.5% | Revenue growth: +103%</div>
+
+<h3>Year 3 &mdash; &euro;1,340,000 Net Profit</h3>
+<p>2,000 users. 120 GMs generating &euro;423K in subscriptions. 8 WL clients. Team grows to 10. Costs grow 22% while revenue grows 80%.</p>
+<table>
+  <tr><th>Revenue Stream</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Competitions (gross)</td><td>750,000</td></tr>
+  <tr><td>White-Label (8 &times; &euro;72K + 3 new &times; &euro;10K)</td><td>606,000</td></tr>
+  <tr><td>GM Packages (120 &times; &euro;320 avg &times; 11 mo)</td><td>423,000</td></tr>
+  <tr><td>Subscriptions (500 &times; &euro;348)</td><td>174,000</td></tr>
+  <tr><td>Challenges (gross)</td><td>78,000</td></tr>
+  <tr><td>Marketplace</td><td>9,000</td></tr>
+  <tr class="total-row"><td>Total Revenue</td><td>2,040,000</td></tr>
+</table>
+<table>
+  <tr><th>Cost Category</th><th>Amount (&euro;)</th></tr>
+  <tr><td>Personnel (10 team)</td><td>437,000</td></tr>
+  <tr><td>Marketing (&euro;8K/month)</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>50,000</td></tr>
+  <tr><td>GM Referral Payouts</td><td>105,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>12,000</td></tr>
+  <tr class="total-row"><td>Total Costs</td><td>700,000</td></tr>
+</table>
+<div class="callout"><strong>Year 3 Net Profit: &euro;1,340,000</strong> | Margin: 65.7% | Revenue growth: +80%</div>
+
+<!-- 9 -->
+<h1>9. Consolidated Financial Table</h1>
+<table>
+  <tr><th>Category</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td><strong>Total Users</strong></td><td>500</td><td>1,000</td><td>2,000</td></tr>
+  <tr><td><strong>Game Masters</strong></td><td>25</td><td>60</td><td>120</td></tr>
+  <tr><td><strong>WL Clients</strong></td><td>2</td><td>5</td><td>8</td></tr>
+  <tr><td><strong>Team Size</strong></td><td>6</td><td>8</td><td>10</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td>Competitions (gross)</td><td>280,000</td><td>420,000</td><td>750,000</td></tr>
+  <tr><td>White-Label</td><td>164,000</td><td>390,000</td><td>606,000</td></tr>
+  <tr><td>Game Master Packages</td><td>52,000</td><td>180,000</td><td>423,000</td></tr>
+  <tr><td>Challenges (gross)</td><td>36,000</td><td>54,000</td><td>78,000</td></tr>
+  <tr><td>Subscriptions</td><td>26,000</td><td>87,000</td><td>174,000</td></tr>
+  <tr><td>Marketplace</td><td>2,000</td><td>4,000</td><td>9,000</td></tr>
+  <tr class="total-row"><td>Total Revenue</td><td>560,000</td><td>1,135,000</td><td>2,040,000</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td>Personnel</td><td>279,000</td><td>360,000</td><td>437,000</td></tr>
+  <tr><td>Marketing</td><td>96,000</td><td>96,000</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>33,000</td><td>55,000</td><td>50,000</td></tr>
+  <tr><td>GM Referral Payouts</td><td>20,000</td><td>50,000</td><td>105,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>10,000</td><td>12,000</td><td>12,000</td></tr>
+  <tr class="total-row"><td>Total Costs</td><td>438,000</td><td>573,000</td><td>700,000</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr class="total-row"><td>Net Profit</td><td class="positive">&euro;122,000</td><td class="positive">&euro;562,000</td><td class="positive">&euro;1,340,000</td></tr>
+  <tr><td>Net Margin</td><td>21.8%</td><td>49.5%</td><td>65.7%</td></tr>
+  <tr><td>Revenue Growth (YoY)</td><td>&mdash;</td><td>+103%</td><td>+80%</td></tr>
+  <tr><td><strong>Cumulative Profit</strong></td><td>122,000</td><td>684,000</td><td>2,024,000</td></tr>
+</table>
+
+<!-- 10 -->
+<h1>10. Unit Economics</h1>
+<table>
+  <tr><th>Metric</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Revenue per employee</td><td>&euro;93,333</td><td>&euro;141,875</td><td>&euro;204,000</td></tr>
+  <tr><td>Revenue per user</td><td>&euro;1,120</td><td>&euro;1,135</td><td>&euro;1,020</td></tr>
+  <tr><td>Blended CAC (organic)</td><td>&euro;144</td><td>&euro;72</td><td>&euro;38</td></tr>
+  <tr><td>CAC (GM-referred)</td><td>&euro;0</td><td>&euro;0</td><td>&euro;0</td></tr>
+  <tr><td>B2C LTV (2-year)</td><td>&euro;1,516</td><td>&euro;1,516</td><td>&euro;1,516</td></tr>
+  <tr><td>LTV:CAC (organic)</td><td>10.5x</td><td>21.1x</td><td>39.9x</td></tr>
+  <tr><td>LTV:CAC (GM-referred)</td><td>Infinite</td><td>Infinite</td><td>Infinite</td></tr>
+</table>
+
+<!-- 11 -->
+<h1>11. Personnel Plan</h1>
+<h3>Year 1 &mdash; 6 Team Members (&euro;279,000)</h3>
+<table>
+  <tr><th>#</th><th>Role</th><th>Monthly</th><th>Annual</th></tr>
+  <tr><td>1</td><td>CEO / Founder</td><td>&euro;10,000</td><td>&euro;120,000</td></tr>
+  <tr><td>2</td><td>Senior Full-Stack Developer</td><td>&euro;4,000</td><td>&euro;48,000</td></tr>
+  <tr><td>3</td><td>Mid-Level Developer</td><td>&euro;3,000</td><td>&euro;36,000</td></tr>
+  <tr><td>4</td><td>Platform / Support Manager</td><td>&euro;2,200</td><td>&euro;26,400</td></tr>
+  <tr><td>5</td><td>Payments / Compliance Officer</td><td>&euro;2,500</td><td>&euro;30,000</td></tr>
+  <tr><td>6</td><td>Customer Success Manager</td><td>&euro;1,550</td><td>&euro;18,600</td></tr>
+</table>
+<h3>Growth</h3>
+<table>
+  <tr><th>Year</th><th>Head</th><th>New Hires</th><th>Annual</th></tr>
+  <tr><td>Year 1</td><td>6</td><td>Founding team</td><td>&euro;279,000</td></tr>
+  <tr><td>Year 2</td><td>8</td><td>+BD Manager, +Mid Dev</td><td>&euro;360,000</td></tr>
+  <tr><td>Year 3</td><td>10</td><td>+QA, +DevOps</td><td>&euro;437,000</td></tr>
+</table>
+
+<!-- 12 -->
+<h1>12. Marketing Strategy</h1>
+<p><strong>Budget: &euro;96,000/year (&euro;8,000/month)</strong></p>
+<p>The CEO leads all marketing and growth strategy directly. The Game Master network serves as a powerful, self-funded organic channel that supplements paid marketing.</p>
+<h3>B2C Marketing</h3>
+<ul>
+  <li><strong>Paid Ads (&euro;4,000/mo):</strong> Meta, Google, TikTok</li>
+  <li><strong>Influencer &amp; GM Recruitment (&euro;1,500/mo):</strong> Trading YouTubers, educators</li>
+  <li><strong>Content Production (&euro;1,000/mo):</strong> Tutorials, competition highlights</li>
+</ul>
+<h3>B2B Marketing</h3>
+<ul>
+  <li><strong>Trade Shows (&euro;1,000/mo amortized):</strong> iFX EXPO, Finance Magnates</li>
+  <li><strong>LinkedIn &amp; CRM Tools (&euro;500/mo):</strong> Outreach to 300+ brokers</li>
+</ul>
+
+<!-- 13 -->
+<h1>13. Key Milestones and Timeline</h1>
+<h3>Year 1</h3>
+<table>
+  <tr><th>Period</th><th>Milestones</th></tr>
+  <tr><td>Month 1&ndash;3</td><td>Incorporate. Hire 6 people. Launch. First 5 GMs.</td></tr>
+  <tr><td>Month 4&ndash;6</td><td>150 users. First WL client. 10 GMs. Competitions running.</td></tr>
+  <tr><td>Month 7&ndash;9</td><td>300 users. 2 WL clients. 18 GMs. 50+ subscribers.</td></tr>
+  <tr><td>Month 10&ndash;12</td><td>500 users. 25 GMs. &euro;560K revenue. &euro;122K profit.</td></tr>
+</table>
+<h3>Year 2</h3>
+<table>
+  <tr><th>Period</th><th>Milestones</th></tr>
+  <tr><td>Month 13&ndash;18</td><td>Hire to 8. 4 WL clients. 40 GMs. 600+ users.</td></tr>
+  <tr><td>Month 19&ndash;24</td><td>1,000 users. 5 WL. 60 GMs. &euro;1,135K revenue. &euro;562K profit.</td></tr>
+</table>
+<h3>Year 3</h3>
+<table>
+  <tr><th>Period</th><th>Milestones</th></tr>
+  <tr><td>Month 25&ndash;30</td><td>Hire to 10. 7 WL. 90 GMs. 1,400+ users.</td></tr>
+  <tr><td>Month 31&ndash;36</td><td>2,000 users. 8 WL. 120 GMs. &euro;2,040K revenue. &euro;1,340K profit.</td></tr>
+</table>
+
+<!-- 14 -->
+<h1>14. Competitive Advantages</h1>
+<table>
+  <tr><th>Feature</th><th>Chartvolt</th><th>Traditional</th><th>Other Gamified</th></tr>
+  <tr><td>Real-time charts + 106 indicators</td><td>Yes</td><td>Yes</td><td>Limited</td></tr>
+  <tr><td>400+ milestones &amp; badges</td><td>Yes</td><td>No</td><td>Limited</td></tr>
+  <tr><td>Monetized competitions</td><td>Yes</td><td>No</td><td>Some</td></tr>
+  <tr><td>P2P challenges</td><td>Yes</td><td>No</td><td>No</td></tr>
+  <tr><td><strong>Game Master network</strong></td><td><strong>Yes</strong></td><td><strong>No</strong></td><td><strong>No</strong></td></tr>
+  <tr><td>White-label (&lt;24h)</td><td>Yes</td><td>Weeks</td><td>No</td></tr>
+  <tr><td>AI + Marketplace</td><td>Yes</td><td>No</td><td>No</td></tr>
+</table>
+
+<!-- 15 -->
+<h1>15. Risk Analysis and Mitigation</h1>
+<table>
+  <tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr>
+  <tr><td>Slow WL adoption</td><td>Medium</td><td>High</td><td>Free pilot. Focus prop firms. Dedicated CS.</td></tr>
+  <tr><td>Low GM adoption</td><td>Medium</td><td>Medium</td><td>Strong ROI. Direct outreach to 500+ educators.</td></tr>
+  <tr><td>User acquisition</td><td>Medium</td><td>Medium</td><td>GM network as backup. Diversified channels.</td></tr>
+  <tr><td>Key person risk</td><td>Medium</td><td>High</td><td>Full docs. Senior dev can lead. Advisory board.</td></tr>
+  <tr><td>Regulatory</td><td>Low</td><td>High</td><td>Tools not advice. WL clients hold licenses.</td></tr>
+  <tr><td>Scaling</td><td>Low</td><td>Medium</td><td>MongoDB scaling. Redis. Horizontal architecture.</td></tr>
+</table>
+
+<!-- 16 -->
+<h1>16. Funding Requirement and Use of Funds</h1>
+<h3>Seed Round: &euro;300,000</h3>
+<div class="callout">This is acceleration capital. The model is profitable from Year 1 with 21.8% margin. The seed amplifies growth and provides buffer during ramp-up.</div>
+<table>
+  <tr><th>Category</th><th>Amount (&euro;)</th><th>%</th></tr>
+  <tr><td>Marketing &amp; GM Recruitment</td><td>100,000</td><td>33%</td></tr>
+  <tr><td>Working Capital &amp; Operations</td><td>80,000</td><td>27%</td></tr>
+  <tr><td>Infrastructure Scaling</td><td>50,000</td><td>17%</td></tr>
+  <tr><td>Personnel Buffer (3-month runway)</td><td>50,000</td><td>17%</td></tr>
+  <tr><td>Legal &amp; Compliance</td><td>20,000</td><td>7%</td></tr>
+  <tr class="total-row"><td>Total</td><td>300,000</td><td>100%</td></tr>
+</table>
+<h3>Investor Return Scenarios</h3>
+<table>
+  <tr><th>Equity</th><th>Investment</th><th>Y3 Value (8x ARR)</th><th>Y3 Value (12x ARR)</th><th>ROI</th></tr>
+  <tr><td>15%</td><td>&euro;300,000</td><td>&euro;2,448,000</td><td>&euro;3,672,000</td><td>8.2&ndash;12.2x</td></tr>
+  <tr><td>20%</td><td>&euro;300,000</td><td>&euro;3,264,000</td><td>&euro;4,896,000</td><td>10.9&ndash;16.3x</td></tr>
+  <tr><td>25%</td><td>&euro;300,000</td><td>&euro;4,080,000</td><td>&euro;6,120,000</td><td>13.6&ndash;20.4x</td></tr>
+</table>
+
+<!-- 17 -->
+<h1>17. Exit Strategy</h1>
+<p><strong>Option A: Acquisition (Year 3&ndash;5):</strong> &euro;16.3&ndash;24.5M at 8&ndash;12x ARR.</p>
+<p><strong>Option B: Series A (Year 3&ndash;4):</strong> Raise &euro;5&ndash;15M with &euro;2.04M ARR and 65.7% margin.</p>
+<p><strong>Option C: Dividends:</strong> Cumulative &euro;2,024,000 profit by Year 3. Self-funded expansion.</p>
+
+<!-- PART II -->
+<div class="section-divider"><div class="part-title">Part II</div><div class="part-subtitle">Financial Model</div></div>
+
+<!-- 18 -->
+<h1>18. Revenue Breakdown by Stream (Quarterly)</h1>
+<h3>Year 1</h3>
+<table>
+  <tr><th>Stream</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Competitions</td><td>35,000</td><td>70,000</td><td>70,000</td><td>105,000</td><td>280,000</td></tr>
+  <tr><td>White-Label</td><td>0</td><td>30,000</td><td>54,000</td><td>80,000</td><td>164,000</td></tr>
+  <tr><td>GM Packages</td><td>5,200</td><td>10,400</td><td>15,600</td><td>20,800</td><td>52,000</td></tr>
+  <tr><td>Challenges</td><td>4,500</td><td>9,000</td><td>9,000</td><td>13,500</td><td>36,000</td></tr>
+  <tr><td>Subscriptions</td><td>2,000</td><td>4,000</td><td>8,000</td><td>12,000</td><td>26,000</td></tr>
+  <tr><td>Marketplace</td><td>200</td><td>400</td><td>600</td><td>800</td><td>2,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>46,900</td><td>123,800</td><td>157,200</td><td>232,100</td><td>560,000</td></tr>
+</table>
+<h3>Year 2</h3>
+<table>
+  <tr><th>Stream</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Competitions</td><td>84,000</td><td>105,000</td><td>105,000</td><td>126,000</td><td>420,000</td></tr>
+  <tr><td>White-Label</td><td>66,000</td><td>96,000</td><td>108,000</td><td>120,000</td><td>390,000</td></tr>
+  <tr><td>GM Packages</td><td>36,000</td><td>42,000</td><td>48,000</td><td>54,000</td><td>180,000</td></tr>
+  <tr><td>Challenges</td><td>10,800</td><td>13,500</td><td>13,500</td><td>16,200</td><td>54,000</td></tr>
+  <tr><td>Subscriptions</td><td>14,000</td><td>20,000</td><td>24,000</td><td>29,000</td><td>87,000</td></tr>
+  <tr><td>Marketplace</td><td>600</td><td>900</td><td>1,100</td><td>1,400</td><td>4,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>211,400</td><td>277,400</td><td>299,600</td><td>346,600</td><td>1,135,000</td></tr>
+</table>
+<h3>Year 3</h3>
+<table>
+  <tr><th>Stream</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Competitions</td><td>168,750</td><td>187,500</td><td>187,500</td><td>206,250</td><td>750,000</td></tr>
+  <tr><td>White-Label</td><td>128,000</td><td>148,000</td><td>160,000</td><td>170,000</td><td>606,000</td></tr>
+  <tr><td>GM Packages</td><td>88,000</td><td>102,000</td><td>112,000</td><td>121,000</td><td>423,000</td></tr>
+  <tr><td>Challenges</td><td>17,550</td><td>19,500</td><td>19,500</td><td>21,450</td><td>78,000</td></tr>
+  <tr><td>Subscriptions</td><td>34,800</td><td>40,600</td><td>46,400</td><td>52,200</td><td>174,000</td></tr>
+  <tr><td>Marketplace</td><td>1,600</td><td>2,200</td><td>2,400</td><td>2,800</td><td>9,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>438,700</td><td>499,800</td><td>527,800</td><td>573,700</td><td>2,040,000</td></tr>
+</table>
+
+<!-- 19 -->
+<h1>19. Cost Structure (Quarterly)</h1>
+<h3>Year 1</h3>
+<table>
+  <tr><th>Category</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Personnel</td><td>69,750</td><td>69,750</td><td>69,750</td><td>69,750</td><td>279,000</td></tr>
+  <tr><td>Marketing</td><td>20,000</td><td>24,000</td><td>24,000</td><td>28,000</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>7,500</td><td>8,000</td><td>8,500</td><td>9,000</td><td>33,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>5,000</td><td>2,000</td><td>1,500</td><td>1,500</td><td>10,000</td></tr>
+  <tr><td>GM Payouts</td><td>2,000</td><td>4,000</td><td>6,000</td><td>8,000</td><td>20,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>104,250</td><td>107,750</td><td>109,750</td><td>116,250</td><td>438,000</td></tr>
+</table>
+<h3>Year 2</h3>
+<table>
+  <tr><th>Category</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Personnel</td><td>90,000</td><td>90,000</td><td>90,000</td><td>90,000</td><td>360,000</td></tr>
+  <tr><td>Marketing</td><td>24,000</td><td>24,000</td><td>24,000</td><td>24,000</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>12,500</td><td>13,500</td><td>14,000</td><td>15,000</td><td>55,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>3,000</td><td>3,000</td><td>3,000</td><td>3,000</td><td>12,000</td></tr>
+  <tr><td>GM Payouts</td><td>9,000</td><td>12,000</td><td>13,000</td><td>16,000</td><td>50,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>138,500</td><td>142,500</td><td>144,000</td><td>148,000</td><td>573,000</td></tr>
+</table>
+<h3>Year 3</h3>
+<table>
+  <tr><th>Category</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th></tr>
+  <tr><td>Personnel</td><td>109,250</td><td>109,250</td><td>109,250</td><td>109,250</td><td>437,000</td></tr>
+  <tr><td>Marketing</td><td>24,000</td><td>24,000</td><td>24,000</td><td>24,000</td><td>96,000</td></tr>
+  <tr><td>Infrastructure</td><td>11,500</td><td>12,500</td><td>13,000</td><td>13,000</td><td>50,000</td></tr>
+  <tr><td>Legal &amp; Other</td><td>3,000</td><td>3,000</td><td>3,000</td><td>3,000</td><td>12,000</td></tr>
+  <tr><td>GM Payouts</td><td>20,000</td><td>25,000</td><td>28,000</td><td>32,000</td><td>105,000</td></tr>
+  <tr class="total-row"><td>Total</td><td>167,750</td><td>173,750</td><td>177,250</td><td>181,250</td><td>700,000</td></tr>
+</table>
+
+<!-- 20 -->
+<h1>20. Profit and Loss Summary</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td><strong>Total Revenue</strong></td><td>560,000</td><td>1,135,000</td><td>2,040,000</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td>Personnel</td><td>(279,000)</td><td>(360,000)</td><td>(437,000)</td></tr>
+  <tr><td>Marketing</td><td>(96,000)</td><td>(96,000)</td><td>(96,000)</td></tr>
+  <tr><td>Infrastructure</td><td>(33,000)</td><td>(55,000)</td><td>(50,000)</td></tr>
+  <tr><td>GM Payouts</td><td>(20,000)</td><td>(50,000)</td><td>(105,000)</td></tr>
+  <tr><td>Legal &amp; Other</td><td>(10,000)</td><td>(12,000)</td><td>(12,000)</td></tr>
+  <tr class="total-row"><td>Total Costs</td><td>(438,000)</td><td>(573,000)</td><td>(700,000)</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td><strong>Operating Profit</strong></td><td>122,000</td><td>562,000</td><td>1,340,000</td></tr>
+  <tr><td>D&amp;A</td><td>(3,000)</td><td>(5,000)</td><td>(8,000)</td></tr>
+  <tr><td>Interest</td><td>0</td><td>3,000</td><td>6,000</td></tr>
+  <tr><td><strong>Profit Before Tax</strong></td><td>119,000</td><td>560,000</td><td>1,338,000</td></tr>
+  <tr><td>Tax (12.5%)</td><td>(14,875)</td><td>(70,000)</td><td>(167,250)</td></tr>
+  <tr class="total-row"><td>Net Profit After Tax</td><td class="positive">104,125</td><td class="positive">490,000</td><td class="positive">1,170,750</td></tr>
+</table>
+
+<!-- 21 -->
+<h1>21. EBITDA Calculation</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Operating Profit</td><td>122,000</td><td>562,000</td><td>1,340,000</td></tr>
+  <tr><td>+ D&amp;A</td><td>3,000</td><td>5,000</td><td>8,000</td></tr>
+  <tr class="total-row"><td>EBITDA</td><td>125,000</td><td>567,000</td><td>1,348,000</td></tr>
+  <tr><td>EBITDA Margin</td><td>22.3%</td><td>50.0%</td><td>66.1%</td></tr>
+</table>
+
+<!-- 22 -->
+<h1>22. Cash Flow Statement</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td colspan="4"><strong>Operating</strong></td></tr>
+  <tr><td>EBITDA</td><td>125,000</td><td>567,000</td><td>1,348,000</td></tr>
+  <tr><td>Tax</td><td>(10,000)</td><td>(45,000)</td><td>(120,000)</td></tr>
+  <tr><td>Working capital</td><td>(15,000)</td><td>(20,000)</td><td>(25,000)</td></tr>
+  <tr class="total-row"><td>Net Operating</td><td>100,000</td><td>502,000</td><td>1,203,000</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td colspan="4"><strong>Investing</strong></td></tr>
+  <tr><td>Seed received</td><td>300,000</td><td>0</td><td>0</td></tr>
+  <tr><td>Capex</td><td>(5,000)</td><td>(10,000)</td><td>(15,000)</td></tr>
+  <tr class="spacer-row"><td></td><td></td><td></td><td></td></tr>
+  <tr><td><strong>Opening Cash</strong></td><td>0</td><td>395,000</td><td>887,000</td></tr>
+  <tr class="total-row"><td><strong>Closing Cash</strong></td><td><strong>395,000</strong></td><td><strong>887,000</strong></td><td><strong>2,075,000</strong></td></tr>
+</table>
+<p>Year 3 closing cash: <strong>&euro;2,075,000</strong> &mdash; nearly 7x the original investment.</p>
+
+<!-- 23 -->
+<h1>23. Break-Even Analysis</h1>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Monthly fixed costs</td><td>~&euro;36,500</td></tr>
+  <tr><td>Contribution margin</td><td>~89%</td></tr>
+  <tr><td>Monthly break-even revenue</td><td>~&euro;41,011</td></tr>
+  <tr><td>Break-even timing</td><td>Month 3&ndash;4</td></tr>
+</table>
+<h3>By White-Label Count (Year 1)</h3>
+<table>
+  <tr><th>WL</th><th>Total Revenue</th><th>vs. Costs (&euro;438K)</th></tr>
+  <tr><td>0</td><td>&euro;396,000</td><td class="negative">&minus;&euro;42K</td></tr>
+  <tr><td>1</td><td>&euro;478,000</td><td class="positive">+&euro;40K</td></tr>
+  <tr><td><strong>2</strong></td><td><strong>&euro;560,000</strong></td><td class="positive"><strong>+&euro;122K (Base)</strong></td></tr>
+  <tr><td>3</td><td>&euro;642,000</td><td class="positive">+&euro;204K</td></tr>
+</table>
+
+<!-- 24 -->
+<h1>24. Valuation Model</h1>
+<h3>ARR-Based</h3>
+<table>
+  <tr><th>Multiple</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>8x ARR</td><td>&euro;4,480,000</td><td>&euro;9,080,000</td><td>&euro;16,320,000</td></tr>
+  <tr><td>10x ARR</td><td>&euro;5,600,000</td><td>&euro;11,350,000</td><td>&euro;20,400,000</td></tr>
+  <tr><td>12x ARR</td><td>&euro;6,720,000</td><td>&euro;13,620,000</td><td>&euro;24,480,000</td></tr>
+</table>
+<h3>EBITDA-Based</h3>
+<table>
+  <tr><th>Multiple</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>15x</td><td>&euro;1,875,000</td><td>&euro;8,505,000</td><td>&euro;20,220,000</td></tr>
+  <tr><td>20x</td><td>&euro;2,500,000</td><td>&euro;11,340,000</td><td>&euro;26,960,000</td></tr>
+  <tr><td>25x</td><td>&euro;3,125,000</td><td>&euro;14,175,000</td><td>&euro;33,700,000</td></tr>
+</table>
+<p>Year 3 range: <strong>&euro;16&ndash;24M</strong> (ARR) converging with EBITDA at <strong>&euro;20&ndash;27M</strong>.</p>
+
+<!-- PART III -->
+<div class="section-divider"><div class="part-title">Part III</div><div class="part-subtitle">Sensitivity Analysis</div></div>
+
+<!-- 25 -->
+<h1>25. Scenario Definitions</h1>
+<table>
+  <tr><th>Parameter</th><th>Low</th><th>Mid (Base)</th><th>High</th></tr>
+  <tr><td>Users (Y1/Y2/Y3)</td><td>300/600/1,000</td><td>500/1,000/2,000</td><td>700/1,400/3,000</td></tr>
+  <tr><td>GMs (Y1/Y2/Y3)</td><td>10/25/50</td><td>25/60/120</td><td>40/100/200</td></tr>
+  <tr><td>WL (Y1/Y2/Y3)</td><td>1/3/5</td><td>2/5/8</td><td>3/7/12</td></tr>
+</table>
+
+<!-- 26 -->
+<h1>26. Low Case</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Users / GMs / WL</td><td>300 / 10 / 1</td><td>600 / 25 / 3</td><td>1,000 / 50 / 5</td></tr>
+  <tr class="total-row"><td>Revenue</td><td>252,860</td><td>605,152</td><td>1,007,300</td></tr>
+  <tr><td>Costs</td><td>419,000</td><td>526,000</td><td>623,000</td></tr>
+  <tr class="total-row"><td>Net Profit</td><td class="negative">(166,140)</td><td class="positive">79,152</td><td class="positive">384,300</td></tr>
+  <tr><td>Cumulative</td><td>(166,140)</td><td>(86,988)</td><td>297,312</td></tr>
+</table>
+<p>Loss absorbed by seed. Cumulative positive by Year 3.</p>
+
+<!-- 27 -->
+<h1>27. Mid Case (Base)</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Users / GMs / WL</td><td>500 / 25 / 2</td><td>1,000 / 60 / 5</td><td>2,000 / 120 / 8</td></tr>
+  <tr class="total-row"><td>Revenue</td><td>560,000</td><td>1,135,000</td><td>2,040,000</td></tr>
+  <tr><td>Costs</td><td>438,000</td><td>573,000</td><td>700,000</td></tr>
+  <tr class="total-row"><td>Net Profit</td><td class="positive">122,000</td><td class="positive">562,000</td><td class="positive">1,340,000</td></tr>
+  <tr><td>EBITDA</td><td>125,000</td><td>567,000</td><td>1,348,000</td></tr>
+  <tr><td>Cumulative</td><td>122,000</td><td>684,000</td><td>2,024,000</td></tr>
+</table>
+
+<!-- 28 -->
+<h1>28. High Case</h1>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Users / GMs / WL</td><td>700 / 40 / 3</td><td>1,400 / 100 / 7</td><td>3,000 / 200 / 12</td></tr>
+  <tr class="total-row"><td>Revenue</td><td>829,270</td><td>1,694,100</td><td>2,997,700</td></tr>
+  <tr><td>Costs</td><td>457,000</td><td>610,000</td><td>767,000</td></tr>
+  <tr class="total-row"><td>Net Profit</td><td class="positive">372,270</td><td class="positive">1,084,100</td><td class="positive">2,230,700</td></tr>
+  <tr><td>Cumulative</td><td>372,270</td><td>1,456,370</td><td>3,687,070</td></tr>
+</table>
+
+<!-- 29 -->
+<h1>29. Scenario Comparison</h1>
+<h3>Year 3</h3>
+<table>
+  <tr><th>Metric</th><th>Low</th><th>Mid</th><th>High</th></tr>
+  <tr><td>Revenue</td><td>&euro;1,007,300</td><td>&euro;2,040,000</td><td>&euro;2,997,700</td></tr>
+  <tr><td>Net Profit</td><td>&euro;384,300</td><td>&euro;1,340,000</td><td>&euro;2,230,700</td></tr>
+  <tr><td>Cumulative</td><td>&euro;297,312</td><td>&euro;2,024,000</td><td>&euro;3,687,070</td></tr>
+</table>
+<h3>Valuation (Year 3)</h3>
+<table>
+  <tr><th>Scenario</th><th>8x ARR</th><th>12x ARR</th></tr>
+  <tr><td>Low</td><td>&euro;8.1M</td><td>&euro;12.1M</td></tr>
+  <tr><td>Mid</td><td>&euro;16.3M</td><td>&euro;24.5M</td></tr>
+  <tr><td>High</td><td>&euro;24.0M</td><td>&euro;36.0M</td></tr>
+</table>
+<h3>Investment Recovery</h3>
+<table>
+  <tr><th>Scenario</th><th>Investment</th><th>Y3 Cash</th><th>Recovery</th></tr>
+  <tr><td>Low</td><td>&euro;300,000</td><td>&euro;597,000</td><td class="positive">2.0x</td></tr>
+  <tr><td>Mid</td><td>&euro;300,000</td><td>&euro;2,075,000</td><td class="positive">6.9x</td></tr>
+  <tr><td>High</td><td>&euro;300,000</td><td>&euro;3,987,000</td><td class="positive">13.3x</td></tr>
+</table>
+<div class="callout">All scenarios recover the &euro;300,000 investment by Year 3.</div>
+
+<!-- 30 -->
+<h1>30. Variable Sensitivity Tables</h1>
+<h3>Competition Entry Size (Y1)</h3>
+<table>
+  <tr><th>Avg Entry</th><th>Comp Revenue</th><th>Total Revenue</th><th>Y1 Result</th></tr>
+  <tr><td>&euro;200</td><td>&euro;112,000</td><td>&euro;392,000</td><td class="negative">&minus;&euro;46K</td></tr>
+  <tr><td>&euro;350</td><td>&euro;196,000</td><td>&euro;476,000</td><td class="positive">+&euro;38K</td></tr>
+  <tr><td><strong>&euro;500</strong></td><td><strong>&euro;280,000</strong></td><td><strong>&euro;560,000</strong></td><td class="positive"><strong>+&euro;122K</strong></td></tr>
+  <tr><td>&euro;750</td><td>&euro;420,000</td><td>&euro;700,000</td><td class="positive">+&euro;262K</td></tr>
+  <tr><td>&euro;1,000</td><td>&euro;560,000</td><td>&euro;840,000</td><td class="positive">+&euro;402K</td></tr>
+</table>
+<h3>Game Master Count (Y1)</h3>
+<table>
+  <tr><th>GMs</th><th>GM Revenue</th><th>Total Revenue</th><th>Profit</th></tr>
+  <tr><td>0</td><td>&euro;0</td><td>&euro;488,000</td><td class="positive">+&euro;70K</td></tr>
+  <tr><td>10</td><td>&euro;20,800</td><td>&euro;517,000</td><td class="positive">+&euro;91K</td></tr>
+  <tr><td><strong>25</strong></td><td><strong>&euro;52,000</strong></td><td><strong>&euro;560,000</strong></td><td class="positive"><strong>+&euro;122K</strong></td></tr>
+  <tr><td>40</td><td>&euro;83,200</td><td>&euro;603,000</td><td class="positive">+&euro;153K</td></tr>
+  <tr><td>60</td><td>&euro;124,800</td><td>&euro;660,000</td><td class="positive">+&euro;198K</td></tr>
+</table>
+<h3>White-Label Count (Y1)</h3>
+<table>
+  <tr><th>WL</th><th>WL Revenue</th><th>Total Revenue</th><th>Profit</th></tr>
+  <tr><td>0</td><td>&euro;0</td><td>&euro;396,000</td><td class="negative">&minus;&euro;42K</td></tr>
+  <tr><td>1</td><td>&euro;82,000</td><td>&euro;478,000</td><td class="positive">+&euro;40K</td></tr>
+  <tr><td><strong>2</strong></td><td><strong>&euro;164,000</strong></td><td><strong>&euro;560,000</strong></td><td class="positive"><strong>+&euro;122K</strong></td></tr>
+  <tr><td>3</td><td>&euro;246,000</td><td>&euro;642,000</td><td class="positive">+&euro;204K</td></tr>
+  <tr><td>4</td><td>&euro;328,000</td><td>&euro;724,000</td><td class="positive">+&euro;286K</td></tr>
+</table>
+
+<!-- PART IV -->
+<div class="section-divider"><div class="part-title">Part IV</div><div class="part-subtitle">Investor Presentation</div></div>
+
+<h1>31. Pitch Deck</h1>
+
+<h2>Slide 1: CHARTVOLT</h2>
+<p style="font-size:16pt;color:#0f3460;text-align:center;"><strong>Gamified Trading Infrastructure</strong></p>
+<p style="text-align:center;">Seed Round: &euro;300,000</p>
+
+<h2>Slide 2: The Problem</h2>
+<p>70% trader churn in 90 days. &euro;200&ndash;800 CAC. Identical platforms. No retention.</p>
+
+<h2>Slide 3: The Solution</h2>
+<p>Gamification + competitions + progression on professional trading tools. White-label for brokers. <strong>Game Master network</strong> for self-funded user acquisition.</p>
+
+<h2>Slide 4: Market</h2>
+<p>USD 10B+ market. 3,000+ brokers. 500+ prop firms. 15M+ traders. Thousands of educators. No full-stack competitor.</p>
+
+<h2>Slide 5: Product</h2>
+<p>106 indicators. 169+ milestones. 266+ badges. Competitions. Challenges. AI marketplace. White-label. 4-tier Game Master system.</p>
+
+<h2>Slide 6: Revenue Model</h2>
+<table>
+  <tr><th>Stream</th><th>Model</th><th>Margin</th></tr>
+  <tr><td>White-Label</td><td>&euro;6K/mo + &euro;10K setup</td><td>~85%</td></tr>
+  <tr><td>Competitions</td><td>30% rake</td><td>~88%</td></tr>
+  <tr><td><strong>Game Master</strong></td><td><strong>&euro;100&ndash;1,000/mo</strong></td><td><strong>~80%</strong></td></tr>
+  <tr><td>Subscriptions</td><td>&euro;29/mo</td><td>~90%</td></tr>
+  <tr><td>Challenges + Marketplace</td><td>30% rake / commission</td><td>~90%</td></tr>
+</table>
+
+<h2>Slide 7: The Game Master Flywheel</h2>
+<p>GM pays &euro;100&ndash;1,000/month. Recruits users (referral code). Users enter competitions. Platform earns 30%. GM earns 2&ndash;15% from platform cut. <strong>Year 3: 120 GMs = &euro;423K direct + 500 users at &euro;0 CAC.</strong></p>
+
+<h2>Slide 8: Traction</h2>
+<p>MVP complete. Full platform ready for launch.</p>
+
+<h2>Slide 9: Year 1</h2>
+<p><strong>&euro;560K revenue | &euro;438K costs | &euro;122K profit (21.8% margin)</strong><br>
+6 people. &euro;8K/mo marketing. 25 GMs. 500 users. 2 WL clients.</p>
+
+<h2>Slide 10: 3-Year Projections</h2>
+<table>
+  <tr><th></th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr>
+  <tr><td>Users / GMs / WL</td><td>500 / 25 / 2</td><td>1,000 / 60 / 5</td><td>2,000 / 120 / 8</td></tr>
+  <tr><td>Revenue</td><td>&euro;560K</td><td>&euro;1,135K</td><td>&euro;2,040K</td></tr>
+  <tr><td>Profit</td><td>&euro;122K</td><td>&euro;562K</td><td>&euro;1,340K</td></tr>
+  <tr><td>Margin</td><td>22%</td><td>50%</td><td>66%</td></tr>
+</table>
+<p>Cumulative: &euro;2,024,000 | Y3 Cash: &euro;2,075,000</p>
+
+<h2>Slide 11: Unit Economics</h2>
+<p>LTV:CAC (organic) 10.5x. GM-referred CAC: &euro;0. Revenue/employee: &euro;93K&rarr;&euro;204K.</p>
+
+<h2>Slide 12: Team</h2>
+<p>Y1: 6 (CEO, Sr Dev, Mid Dev, Platform Mgr, Compliance, CS). Y2: 8. Y3: 10. Lean, remote.</p>
+
+<h2>Slide 13: The Ask</h2>
+<p><strong>&euro;300,000 seed.</strong> Already profitable. Marketing 33%, Operations 27%, Infra 17%, Personnel 17%, Legal 7%.</p>
+
+<h2>Slide 14: Exit and Returns</h2>
+<p>Y3: <strong>&euro;16&ndash;24M</strong> (8&ndash;12x ARR). 20% equity = <strong>10.9&ndash;16.3x ROI</strong>. Cash: &euro;2.08M.</p>
+
+<h2>Slide 15: Contact</h2>
+<p style="text-align:center;font-size:14pt;"><strong>CHARTVOLT</strong><br>chartvolt.com | chartvolt.com/whitelabel<br><em>Let&rsquo;s Build the Future of Trading</em></p>
+
+<!-- FOOTER -->
+<div class="footer-note">
+  Confidential. Financial projections are estimates based on current market conditions and management assumptions. All figures in EUR.<br>
+  Prepared: February 2026 | Chartvolt Ltd
+</div>
+
+</body>
+</html>
