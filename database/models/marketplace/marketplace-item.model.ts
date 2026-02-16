@@ -41,8 +41,9 @@ export type IndicatorType =
   | "momentum_wave" | "gap_momentum" | "heikin_ashi_trend" | "cycle_detector"
   | "adaptive_rsi" | "mean_reversion_band" | "trend_ribbon" | "relative_vigor"
   | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands"
-  // Nexus Trend Matrix (premium overlay)
-  | "nexus_trend_matrix";
+  // Premium overlays
+  | "nexus_trend_matrix"
+  | "phantom_flow_zones";
 
 // Strategy Condition Operators
 export type ConditionOperator =
@@ -297,7 +298,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     },
     indicatorType: {
       type: String,
-      enum: ["sma","ema","wma","dema","tema","hma","alma","kama","zlema","t3","smma","lsma","vidya","mcginley","bb","keltner","donchian","ichimoku","linreg_channel","ma_envelope","price_channel","chandelier","rsi","macd","stoch","williamsR","cci","adx","mfi","atr","obv","roc","cmf","momentum","ultimate_osc","awesome_osc","stochrsi","tsi","ppo","fisher","connors_rsi","smi_ergodic","supertrend","aroon","vortex","trix","dpo","kst","coppock","elder_ray","std_dev","hist_volatility","chaikin_volatility","mass_index","ulcer_index","rvi","vwap","vwma","ad_line","force_index","eom","nvi","pvi","sar","pivots","support_resistance","trend_pulse","market_regime","trend_composite","composite_breadth","reversal_signal","predictive_range","breakout_prob","sentiment_osc","whale_accumulation","smart_money_flow","volume_climax","net_buying_pressure","order_flow_imbalance","intraday_intensity","volume_momentum","liquidity_heatmap","volatility_squeeze","squeeze_momentum","volatility_ratio","range_expansion","choppy_market","fractal_dimension","acceleration_bands","adaptive_channel","alpha_momentum","efficiency_ratio","trend_persistence","mtf_momentum","momentum_wave","gap_momentum","heikin_ashi_trend","cycle_detector","adaptive_rsi","mean_reversion_band","trend_ribbon","relative_vigor","dynamic_pivots","price_action_score","ergodic_volume","anchored_vwap_bands","nexus_trend_matrix"],
+      enum: ["sma","ema","wma","dema","tema","hma","alma","kama","zlema","t3","smma","lsma","vidya","mcginley","bb","keltner","donchian","ichimoku","linreg_channel","ma_envelope","price_channel","chandelier","rsi","macd","stoch","williamsR","cci","adx","mfi","atr","obv","roc","cmf","momentum","ultimate_osc","awesome_osc","stochrsi","tsi","ppo","fisher","connors_rsi","smi_ergodic","supertrend","aroon","vortex","trix","dpo","kst","coppock","elder_ray","std_dev","hist_volatility","chaikin_volatility","mass_index","ulcer_index","rvi","vwap","vwma","ad_line","force_index","eom","nvi","pvi","sar","pivots","support_resistance","trend_pulse","market_regime","trend_composite","composite_breadth","reversal_signal","predictive_range","breakout_prob","sentiment_osc","whale_accumulation","smart_money_flow","volume_climax","net_buying_pressure","order_flow_imbalance","intraday_intensity","volume_momentum","liquidity_heatmap","volatility_squeeze","squeeze_momentum","volatility_ratio","range_expansion","choppy_market","fractal_dimension","acceleration_bands","adaptive_channel","alpha_momentum","efficiency_ratio","trend_persistence","mtf_momentum","momentum_wave","gap_momentum","heikin_ashi_trend","cycle_detector","adaptive_rsi","mean_reversion_band","trend_ribbon","relative_vigor","dynamic_pivots","price_action_score","ergodic_volume","anchored_vwap_bands","nexus_trend_matrix","phantom_flow_zones"],
     },
     strategyConfig: StrategyConfigSchema,
     cosmeticType: {

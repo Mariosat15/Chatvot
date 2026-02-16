@@ -709,6 +709,101 @@ No indicator guarantees profits. The Nexus Trend Matrix is a tool to support you
   riskLevel: "medium",
 };
 
+const PHANTOM_FLOW_ZONES: Partial<IMarketplaceItem> = {
+  name: "Phantom Flow Zones",
+  slug: "phantom-flow-zones",
+  shortDescription:
+    "Institutional supply/demand zone detector using volume absorption analysis, wick rejection scoring, and dynamic zone projection.",
+  fullDescription: `# Phantom Flow Zones
+
+## Overview
+**Phantom Flow Zones** is a premium overlay indicator that reveals where institutional "smart money" is likely accumulating or distributing. Instead of chasing price, this indicator shows you the invisible levels where large players are placing their orders — giving you a significant edge in identifying high-probability entries and exits.
+
+## How It Works
+
+### 1. Volume Absorption Detection
+The indicator identifies candles where unusually high volume occurs with a small body size. This "absorption" pattern means large orders are being filled without significantly moving price — a classic sign of institutional activity:
+- **High volume + small body** = Large orders absorbing selling/buying pressure
+- The bigger the volume spike with the smaller the body, the stronger the signal
+
+### 2. Wick Rejection Analysis
+Long wicks (shadows) relative to the candle body indicate price rejection at key levels. When combined with volume absorption, these wick rejections pinpoint exact price levels where institutional orders are sitting:
+- **Long lower wick** = Demand/buying interest (institutions buying the dip)
+- **Long upper wick** = Supply/selling interest (institutions selling the rally)
+
+### 3. Dynamic Zone Projection
+When both absorption and wick rejection signals align, the indicator projects dynamic **supply and demand zones** directly on your chart:
+- **Cyan/Blue zones** = Demand zones (institutional buying detected)
+- **Magenta/Pink zones** = Supply zones (institutional selling detected)
+- **Zones persist** until price breaks through them with conviction
+- **Zones fade** as they age — more recent zones are more relevant
+
+### 4. Institutional Flow Line
+The center line (cyan) shows the **net institutional bias** — a volume-weighted smoothed midpoint that reveals the overall direction institutions are pushing price:
+- **Flow line rising** = Net institutional buying
+- **Flow line falling** = Net institutional selling
+- **Flow line flat** = Institutions are neutral / range-bound
+
+## How to Trade With It
+
+### Zone Bounce Strategy
+1. Wait for price to approach a **cyan demand zone** from above
+2. Look for bullish candle patterns at the zone (hammer, engulfing)
+3. Enter long with stop-loss below the zone
+4. Target the nearest **magenta supply zone** above
+
+### Zone Break Strategy
+1. When price **breaks through** a supply/demand zone with strong volume
+2. The broken zone is invalidated (removed from chart)
+3. This signals a shift in institutional sentiment
+4. Trade in the direction of the breakout
+
+### Flow Line Confluence
+1. Use the **flow line** as dynamic support/resistance
+2. In uptrends: buy pullbacks to the flow line
+3. In downtrends: sell rallies to the flow line
+4. When flow line aligns with a zone, the level is extra strong
+
+## Settings Guide
+- **Period** (20): Volume SMA lookback — determines what counts as "normal" volume
+- **Volume Threshold** (1.5): Minimum volume spike multiplier — lower = more zones, higher = only extreme events
+- **Wick Threshold** (0.6): Minimum wick-to-range ratio for rejection signals
+- **Zone Lookback** (50): How many bars a zone persists before expiring
+- **Smooth Period** (10): Flow line EMA smoothing — higher = smoother line
+
+## What Makes This Unique
+Unlike simple support/resistance indicators, Phantom Flow Zones uses **real volume data** combined with **candle structure analysis** to identify levels that matter to institutional traders. This is the type of analysis that professional traders pay thousands for — now available as an overlay on your chart.
+
+## Risk Warning
+No indicator guarantees profits. Phantom Flow Zones is a tool to support your analysis, not replace it. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  price: 119,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "phantom_flow_zones",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "phantom_flow_zones",
+    displayType: "overlay",
+    description: "Institutional supply/demand zone detector with volume absorption and wick rejection analysis",
+  }),
+  defaultSettings: {
+    period: 20,
+    volumeThreshold: 1.5,
+    wickThreshold: 0.6,
+    zoneLookback: 50,
+    smoothPeriod: 10,
+    color: "#00bcd4",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["smart-money", "institutional", "supply-demand", "zones", "volume", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -716,6 +811,7 @@ No indicator guarantees profits. The Nexus Trend Matrix is a tool to support you
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
+  PHANTOM_FLOW_ZONES,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

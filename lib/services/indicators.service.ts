@@ -3043,3 +3043,161 @@ export function calculateNexusTrendMatrix(
 
   return result;
 }
+
+// ============================================================================
+// PHANTOM FLOW ZONES — Premium Marketplace Indicator
+// Detects institutional accumulation/distribution via volume absorption,
+// wick rejection, and projects dynamic supply/demand zones on chart.
+// ============================================================================
+
+export interface PhantomFlowZonesData {
+  time: number;
+  flowLine: number;    // Volume-weighted smoothed midpoint (institutional bias)
+  demandZone: number;  // Demand (support) level, NaN when inactive
+  supplyZone: number;  // Supply (resistance) level, NaN when inactive
+  signalStrength: number; // 0-100 strength of the current zone signal
+}
+
+export function calculatePhantomFlowZones(
+  data: OHLCData[],
+  period: number = 20,
+  volumeThreshold: number = 1.5,
+  wickThreshold: number = 0.6,
+  zoneLookback: number = 50,
+  smoothPeriod: number = 10,
+): PhantomFlowZonesData[] {
+  if (data.length < period + 5) return [];
+
+  // --- Step 1: Compute volume SMA for spike detection ---
+  const volSma: number[] = new Array(data.length).fill(0);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += (data[i - j].volume || 1);
+    }
+    volSma[i] = sum / period;
+  }
+
+  // --- Step 2: Detect absorption and rejection events ---
+  interface ZoneEvent {
+    bar: number;
+    level: number;
+    type: "demand" | "supply";
+    strength: number;
+  }
+  const events: ZoneEvent[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    const d = data[i];
+    const vol = d.volume || 1;
+    const avgVol = volSma[i] || 1;
+    const range = d.high - d.low;
+    if (range <= 0) continue;
+
+    const body = Math.abs(d.close - d.open);
+    const upperWick = d.high - Math.max(d.close, d.open);
+    const lowerWick = Math.min(d.close, d.open) - d.low;
+
+    // Volume ratio: how much volume relative to average
+    const volumeRatio = vol / avgVol;
+
+    // Absorption score: high volume + small body = orders being absorbed
+    const bodyRatio = body / range;
+    const absorptionScore = volumeRatio * (1 - bodyRatio);
+
+    // Wick rejection: large wicks relative to range
+    const wickRatio = (upperWick + lowerWick) / range;
+
+    // Combined signal
+    const signal = absorptionScore * (0.5 + wickRatio * 0.5);
+
+    // Must exceed volume threshold AND have meaningful wicks
+    if (volumeRatio >= volumeThreshold && wickRatio >= wickThreshold * 0.5 && signal > 1.0) {
+      const strength = Math.min(100, Math.round(signal * 40));
+
+      if (d.close >= d.open) {
+        events.push({ bar: i, level: d.low, type: "demand", strength });
+      } else {
+        events.push({ bar: i, level: d.high, type: "supply", strength });
+      }
+    } else if (volumeRatio >= volumeThreshold * 0.8 && wickRatio >= wickThreshold) {
+      const strength = Math.min(80, Math.round(wickRatio * volumeRatio * 30));
+      if (lowerWick > upperWick) {
+        events.push({ bar: i, level: d.low, type: "demand", strength });
+      } else {
+        events.push({ bar: i, level: d.high, type: "supply", strength });
+      }
+    }
+  }
+
+  // --- Step 3: Compute flow line (volume-weighted EMA of typical price) ---
+  const flowLineValues: number[] = new Array(data.length).fill(NaN);
+  const alpha = 2 / (smoothPeriod + 1);
+  let flowInit = false;
+
+  for (let i = period; i < data.length; i++) {
+    const tp = (data[i].high + data[i].low + data[i].close) / 3;
+    const vol = data[i].volume || 1;
+    const avgVol = volSma[i] || 1;
+    const weight = Math.min(vol / avgVol, 3);
+    const effectiveAlpha = alpha * (0.5 + weight * 0.5);
+
+    if (!flowInit) {
+      flowLineValues[i] = tp;
+      flowInit = true;
+    } else {
+      flowLineValues[i] = effectiveAlpha * tp + (1 - effectiveAlpha) * flowLineValues[i - 1];
+    }
+  }
+
+  // --- Step 4: Project zones forward and assemble output ---
+  const result: PhantomFlowZonesData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    if (isNaN(flowLineValues[i])) continue;
+
+    let demandLevel = NaN;
+    let supplyLevel = NaN;
+    let demandStrength = 0;
+    let supplyStrength = 0;
+
+    for (let e = events.length - 1; e >= 0; e--) {
+      const ev = events[e];
+      const age = i - ev.bar;
+      if (age < 0) continue;
+      if (age > zoneLookback) break;
+
+      let broken = false;
+      for (let k = ev.bar + 1; k <= i; k++) {
+        if (ev.type === "demand" && data[k].close < ev.level - (data[k].high - data[k].low) * 0.5) {
+          broken = true; break;
+        }
+        if (ev.type === "supply" && data[k].close > ev.level + (data[k].high - data[k].low) * 0.5) {
+          broken = true; break;
+        }
+      }
+      if (broken) continue;
+
+      const ageFactor = 1 - (age / zoneLookback) * 0.7;
+      const effectiveStrength = ev.strength * ageFactor;
+
+      if (ev.type === "demand" && effectiveStrength > demandStrength) {
+        demandLevel = ev.level;
+        demandStrength = effectiveStrength;
+      } else if (ev.type === "supply" && effectiveStrength > supplyStrength) {
+        supplyLevel = ev.level;
+        supplyStrength = effectiveStrength;
+      }
+    }
+
+    result.push({
+      time: data[i].time,
+      flowLine: flowLineValues[i],
+      demandZone: demandLevel,
+      supplyZone: supplyLevel,
+      signalStrength: Math.round(Math.max(demandStrength, supplyStrength)),
+    });
+  }
+
+  return result;
+}

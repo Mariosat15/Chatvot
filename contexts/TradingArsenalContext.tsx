@@ -458,6 +458,8 @@ const INDICATOR_TYPE_MAP: Record<
   "anchored vwap bands": { type: "anchored_vwap_bands", displayType: "overlay" },
   nexus_trend_matrix: { type: "nexus_trend_matrix", displayType: "overlay" },
   "nexus trend matrix": { type: "nexus_trend_matrix", displayType: "overlay" },
+  phantom_flow_zones: { type: "phantom_flow_zones", displayType: "overlay" },
+  "phantom flow zones": { type: "phantom_flow_zones", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -675,6 +677,13 @@ export function marketplaceItemToIndicator(
       params.atrPeriod = settings?.atrPeriod || 14;
       params.atrMultiplier = settings?.atrMultiplier || 2.0;
       params.trendSmoothPeriod = settings?.trendSmoothPeriod || 10;
+      break;
+    case "phantom_flow_zones":
+      params.period = settings?.period || 20;
+      params.volumeThreshold = settings?.volumeThreshold || 1.5;
+      params.wickThreshold = settings?.wickThreshold || 0.6;
+      params.zoneLookback = settings?.zoneLookback || 50;
+      params.smoothPeriod = settings?.smoothPeriod || 10;
       break;
     default:
       // Generic period-based indicators
