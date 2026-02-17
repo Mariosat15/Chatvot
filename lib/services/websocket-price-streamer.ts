@@ -2176,6 +2176,7 @@ async function startRedisPriceRelay(): Promise<void> {
     console.log(
       "🟢 [Redis Relay] Connected to Redis, subscribing to price channel...",
     );
+    priceHealthMonitor.updateConnectionStatus("connected", 0);
   });
 
   subscriber.on("error", (err: Error) => {
@@ -2186,6 +2187,7 @@ async function startRedisPriceRelay(): Promise<void> {
 
   subscriber.on("close", () => {
     console.log("🟡 [Redis Relay] Redis connection closed, will reconnect...");
+    priceHealthMonitor.updateConnectionStatus("reconnecting", 0);
   });
 
   await subscriber.subscribe(REDIS_PRICE_CHANNEL);
@@ -2202,6 +2204,21 @@ async function startRedisPriceRelay(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: message,
       });
+
+      // Update health monitor with relayed prices so admin panel
+      // shows correct status regardless of which server it hits
+      try {
+        const parsed = JSON.parse(message);
+        if (parsed.prices && Array.isArray(parsed.prices)) {
+          for (const p of parsed.prices) {
+            if (p.symbol && p.mid) {
+              priceHealthMonitor.updatePrice(p.symbol, p.mid, "websocket");
+            }
+          }
+        }
+      } catch {
+        // Don't let health monitor errors break the relay
+      }
 
       relayedCount++;
       const now = Date.now();
@@ -2717,6 +2734,12 @@ async function autoInitialize(): Promise<void> {
     console.log(
       "📡 [AUTO-INIT] Secondary server detected - starting Redis price relay...",
     );
+
+    // Initialize price health monitor on secondary too so admin panel
+    // shows correct health status regardless of which server it hits
+    await priceHealthMonitor.initialize();
+    priceHealthMonitor.updateConnectionStatus("connected", 0);
+
     try {
       // Small delay to let Redis connection establish first
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -2732,6 +2755,7 @@ async function autoInitialize(): Promise<void> {
       console.error(
         "   Ensure Redis is configured and Multi-Server Price Sync is ON in admin panel.",
       );
+      priceHealthMonitor.updateConnectionStatus("disconnected", 0);
     }
     return;
   }
