@@ -692,14 +692,28 @@ export const GAME_ICONS: Record<GameIconName, string> = Object.fromEntries(
 ) as Record<GameIconName, string>;
 
 /**
- * Helper to get icon path with dynamic base URL support
+ * Convert a /game-icons/filename.png path to an admin API route path.
+ * The admin app serves game icons via /api/assets/game-icons/[filename].
+ */
+function toAdminIconPath(iconPath: string): string {
+  const filename = iconPath.replace('/game-icons/', '');
+  return `/api/assets/game-icons/${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Helper to get icon path with dynamic base URL support.
+ * When NEXT_PUBLIC_APP_URL is set, loads from main app directly.
+ * Otherwise, routes through the admin's own API proxy route.
  */
 export function getGameIconPath(name: GameIconName): string {
   const basePath = GAME_ICON_PATHS[name];
   if (!basePath) return '';
   
   const baseUrl = getAssetsBaseUrl();
-  return baseUrl ? `${baseUrl}${basePath}` : basePath;
+  if (baseUrl) return `${baseUrl}${basePath}`;
+  
+  // No base URL set - use admin's API route to serve from filesystem
+  return toAdminIconPath(basePath);
 }
 
 /**
@@ -708,9 +722,9 @@ export function getGameIconPath(name: GameIconName): string {
 export function getAllGameIconPaths(): Record<GameIconName, string> {
   const baseUrl = getAssetsBaseUrl();
   return Object.fromEntries(
-    Object.entries(GAME_ICON_PATHS).map(([key, path]) => [
+    Object.entries(GAME_ICON_PATHS).map(([key, iconPath]) => [
       key,
-      baseUrl ? `${baseUrl}${path}` : path
+      baseUrl ? `${baseUrl}${iconPath}` : toAdminIconPath(iconPath)
     ])
   ) as Record<GameIconName, string>;
 }
