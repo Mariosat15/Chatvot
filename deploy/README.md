@@ -836,7 +836,67 @@ sudo ./setup-new-customer.sh --secondary
 
 The script will ask for: domain, MongoDB URI, admin credentials, and the primary Redis host/port/password. Use the primary server's public IP as Redis host (e.g., `148.230.124.57`). The worker process will not start on this server (only runs on primary).
 
-**Step 4: Add to Cloudflare DNS**
+**Step 4: Install Cloudflare Origin SSL Certificate**
+
+Since Cloudflare proxies all traffic, Let's Encrypt cannot verify domains directly.
+Use a Cloudflare Origin Certificate instead (free, lasts 15 years, no renewal needed).
+
+1. Go to [Cloudflare dashboard](https://dash.cloudflare.com) > **chartvolt.com** > **SSL/TLS** > **Origin Server**
+2. Click **Create Certificate**
+3. Keep defaults: RSA 2048, hostnames `chartvolt.com` + `*.chartvolt.com`, 15 years
+4. Click **Create** — copy both the **Origin Certificate** and **Private Key** (key is shown only once!)
+
+On the secondary server:
+
+```bash
+# Create certificate file — paste the Origin Certificate inside
+sudo nano /etc/ssl/cloudflare-origin.pem
+
+# Create key file — paste the Private Key inside
+sudo nano /etc/ssl/cloudflare-origin-key.pem
+
+# Secure the key file
+sudo chmod 600 /etc/ssl/cloudflare-origin-key.pem
+```
+
+Update NGINX to use these certs. Edit `/etc/nginx/sites-available/chartvolt` and replace the SSL lines in **both** server blocks (main app + admin):
+
+```nginx
+# In the chartvolt.com server block:
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ssl_certificate /etc/ssl/cloudflare-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin-key.pem;
+    server_name chartvolt.com www.chartvolt.com;
+    # ... rest of config ...
+}
+
+# In the admin.chartvolt.com server block:
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ssl_certificate /etc/ssl/cloudflare-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin-key.pem;
+    server_name admin.chartvolt.com;
+    # ... rest of config ...
+}
+```
+
+Remove any old Let's Encrypt/Certbot SSL lines (`ssl_certificate`, `ssl_certificate_key`, `include /etc/letsencrypt/...`, `ssl_dhparam`).
+
+Test and reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Make sure Cloudflare SSL/TLS mode is set to **Full (Strict)** (SSL/TLS > Overview).
+
+> **Note:** You only need to create the Cloudflare Origin Certificate once. Use the same cert files on all secondary servers since the `*.chartvolt.com` wildcard covers everything.
+
+**Step 5: Add to Cloudflare DNS**
 
 In Cloudflare dashboard > DNS > Records, add 3 new records with the new VPS IP:
 
@@ -848,12 +908,12 @@ In Cloudflare dashboard > DNS > Records, add 3 new records with the new VPS IP:
 
 Cloudflare will automatically distribute traffic between all servers.
 
-**Step 5: Enable Multi-Server Price Sync (only once)**
+**Step 6: Enable Multi-Server Price Sync (only once)**
 
 In admin panel: Settings > Redis > Toggle "Multi-Server Price Sync" ON.
 This only needs to be done once (setting is stored in the shared database).
 
-**Step 6: Verify in Admin Panel**
+**Step 7: Verify in Admin Panel**
 
 Go to admin panel > Server Fleet. The new server should appear within 30 seconds with status "online".
 
