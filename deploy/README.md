@@ -836,6 +836,28 @@ sudo ./setup-new-customer.sh --secondary
 
 The script will ask for: domain, MongoDB URI, admin credentials, and the primary Redis host/port/password. Use the primary server's public IP as Redis host (e.g., `148.230.124.57`). The worker process will not start on this server (only runs on primary).
 
+**Step 3b: Copy Shared Secrets from Primary (CRITICAL)**
+
+Both servers **MUST** share the same JWT secrets. Otherwise, users logged in via one server will get authentication errors when Cloudflare routes them to the other server (because each server signs tokens with its own secret, and the other server can't verify them).
+
+On the **primary server**, get the secrets:
+
+```bash
+grep -E "AUTH_SECRET|ADMIN_JWT_SECRET" /var/www/chartvolt/.env
+```
+
+On the **secondary server**, replace the auto-generated values with the primary's:
+
+```bash
+nano /var/www/chartvolt/.env
+# Replace AUTH_SECRET=... with the primary's value
+# Replace ADMIN_JWT_SECRET=... with the primary's value
+# Save and restart:
+pm2 restart all
+```
+
+> **Why?** When a user logs in on Server A, their browser gets a JWT signed with Server A's secret. If the next request goes to Server B (via Cloudflare), Server B must use the SAME secret to verify that token. Different secrets = `ERR_JWS_SIGNATURE_VERIFICATION_FAILED` = user appears logged out.
+
 **Step 4: Install Cloudflare Origin SSL Certificate**
 
 Since Cloudflare proxies all traffic, Let's Encrypt cannot verify domains directly.
@@ -916,6 +938,18 @@ This only needs to be done once (setting is stored in the shared database).
 **Step 7: Verify in Admin Panel**
 
 Go to admin panel > Server Fleet. The new server should appear within 30 seconds with status "online".
+
+### Removing a Secondary Server
+
+**IMPORTANT:** Always remove DNS records BEFORE shutting down a server. Otherwise Cloudflare keeps routing traffic to a dead server and ~50% of requests will fail.
+
+1. **Cloudflare DNS**: Delete the 3 A records pointing to the server's IP (`@`, `www`, `admin`)
+2. **Wait 1-2 minutes** for DNS propagation
+3. **Shut down** the server (or stop PM2: `pm2 stop all`)
+4. **MongoDB Atlas**: Optionally remove the server's IP from Network Access
+5. **Primary firewall**: Optionally remove the firewall rule: `sudo ufw delete allow from OLD_VPS_IP to any port 6379`
+
+The server will automatically disappear from the Server Fleet dashboard after 90 seconds (heartbeat timeout).
 
 ### Stage 3: Dedicated Redis Server (Optional)
 
