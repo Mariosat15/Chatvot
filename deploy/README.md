@@ -1,149 +1,161 @@
 # Chartvolt Deployment Guide
 
-Complete guide for deploying Chartvolt to a Hostinger VPS.
+Complete guide for deploying Chartvolt to a Hostinger VPS (or any Ubuntu/Debian server).
+This guide supports white-label deployments with custom domains.
 
-## 🌐 Production Details
+---
 
-| Item | Value |
-|------|-------|
-| **Domain** | chartvolt.com |
-| **Admin Domain** | admin.chartvolt.com |
-| **VPS IP** | 148.230.124.57 |
-| **Provider** | Hostinger |
+## Prerequisites
+
+Before starting, make sure you have:
+
+- [ ] **Hostinger VPS** (Ubuntu 22.04+, 4GB RAM minimum recommended)
+- [ ] **Domain name** purchased and ready to configure DNS
+- [ ] **MongoDB Atlas** account with a cluster created ([mongodb.com/atlas](https://www.mongodb.com/atlas))
+- [ ] **GitHub access** to the Chartvolt repository (HTTPS clone URL)
+- [ ] **SSH access** to your VPS (root or sudo user)
+
+---
 
 ## Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│                    HOSTINGER VPS (148.230.124.57)                     │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────────┐  │
-│  │  NGINX (Reverse Proxy)                                          │  │
-│  │  - chartvolt.com → User App (3000)                              │  │
-│  │  - chartvolt.com/ws → WebSocket Server (3003)                   │  │
-│  │  - chartvolt.com/api/auth/* → API Server (4000)                 │  │
-│  │  - admin.chartvolt.com → Admin App (3001)                       │  │
-│  │  - admin.chartvolt.com/ws → WebSocket Server (3003)             │  │
-│  │  - SSL/TLS termination                                          │  │
-│  └─────────────────────────────────────────────────────────────────┘  │
-│                              │                                        │
-│    ┌─────────────────────────┼────────────────────────────┐          │
-│    │          │           │         │           │         │          │
-│  ┌─▼────┐  ┌──▼───┐  ┌────▼────┐  ┌─▼───────┐  ┌─▼──────┐           │
-│  │ USER │  │ADMIN │  │   API   │  │WEBSOCKET│  │ WORKER │           │
-│  │ APP  │  │ APP  │  │ SERVER  │  │ SERVER  │  │        │           │
-│  │:3000 │  │:3001 │  │ :4000   │  │ :3003   │  │(no port│           │
-│  └──┬───┘  └──┬───┘  └────┬────┘  └────┬────┘  └───┬────┘           │
-│     └─────────┴───────────┴────────────┴───────────┘                 │
-│                              │                                        │
-│                       ┌──────▼──────┐                                 │
-│                       │   MongoDB   │                                 │
-│                       │  (Atlas)    │                                 │
-│                       └─────────────┘                                 │
-└───────────────────────────────────────────────────────────────────────┘
-
-PM2 Processes:
-┌─────────────────────┬──────┬─────────────────────────────────────┐
-│ Name                │ Port │ Description                         │
-├─────────────────────┼──────┼─────────────────────────────────────┤
-│ chartvolt-web       │ 3000 │ Main user application (Next.js)     │
-│ chartvolt-admin     │ 3001 │ Admin dashboard (Next.js)           │
-│ chartvolt-api       │ 4000 │ API server (auth, bcrypt)           │
-│ chartvolt-websocket │ 3003 │ WebSocket server (real-time chat)   │
-│ chartvolt-worker    │  -   │ Background worker (no HTTP port)    │
-└─────────────────────┴──────┴─────────────────────────────────────┘
-
-WebSocket Routes:
-┌───────────────────────────┬───────────────────────────────────────┐
-│ URL                       │ Purpose                               │
-├───────────────────────────┼───────────────────────────────────────┤
-│ wss://chartvolt.com/ws    │ User real-time messaging & presence   │
-│ wss://admin.chartvolt.com/ws │ Admin real-time messaging & sync   │
-└───────────────────────────┴───────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                     YOUR VPS SERVER                                │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  NGINX (Reverse Proxy + SSL)                                 │  │
+│  │  - yourdomain.com       → User App (3000)                    │  │
+│  │  - yourdomain.com/ws    → WebSocket Server (3003)            │  │
+│  │  - yourdomain.com/api/* → API Server (4000)                  │  │
+│  │  - admin.yourdomain.com → Admin App (3001)                   │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              │                                     │
+│    ┌─────────┬───────────┬───┴──────┬───────────┬──────────┐      │
+│  ┌─▼────┐  ┌─▼────┐  ┌──▼───┐  ┌───▼────┐  ┌───▼───┐             │
+│  │ USER │  │ADMIN │  │ API  │  │WEBSOCK │  │WORKER │             │
+│  │ APP  │  │ APP  │  │SERVER│  │ SERVER │  │       │             │
+│  │:3000 │  │:3001 │  │:4000 │  │ :3003  │  │(no IP)│             │
+│  └──┬───┘  └──┬───┘  └──┬───┘  └───┬────┘  └──┬────┘             │
+│     └─────────┴─────────┴──────────┴──────────┘                   │
+│                           │              │                         │
+│                    ┌──────▼──────┐ ┌─────▼─────┐                  │
+│                    │  MongoDB    │ │   Redis    │                  │
+│                    │  (Atlas)    │ │ (local)    │                  │
+│                    └─────────────┘ └───────────┘                  │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-## Prerequisites
+**PM2 Processes:**
 
-- Hostinger VPS (4GB RAM minimum recommended)
-- Domain name configured with DNS pointing to VPS IP (148.230.124.57)
-- MongoDB Atlas account (or self-hosted MongoDB)
+| Name                | Port | Description                       |
+|---------------------|------|-----------------------------------|
+| chartvolt-web       | 3000 | Main user application (Next.js)   |
+| chartvolt-admin     | 3001 | Admin dashboard (Next.js)         |
+| chartvolt-api       | 4000 | API server (auth, bcrypt)         |
+| chartvolt-websocket | 3003 | WebSocket server (real-time)      |
+| chartvolt-worker    | -    | Background worker (cron jobs)     |
 
-## Quick Start
+---
 
-### 1. Initial Server Setup
+## Option 1: Fully Automated Setup (Recommended)
+
+Run a single script that handles everything: server software, Redis, repo clone, `.env` generation, build, database, NGINX, PM2, and SSL.
 
 ```bash
-# Connect to your VPS
-ssh root@148.230.124.57
+# 1. SSH into your VPS
+ssh root@YOUR_SERVER_IP
 
-# Download and run setup script
-curl -O https://raw.githubusercontent.com/Mariosat15/Chatvot/main/deploy/setup-server.sh
+# 2. Download the setup script
+curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-new-customer.sh
+chmod +x setup-new-customer.sh
+
+# 3. Run it (it will ask for your domain, MongoDB URI, admin email, etc.)
+sudo ./setup-new-customer.sh
+```
+
+The script will:
+1. Install Node.js, PM2, NGINX, Certbot, Redis
+2. Configure Redis with a generated password
+3. Clone your repository
+4. Generate `.env` from your inputs (with random secrets)
+5. Create `.env` symlink for admin app
+6. Install dependencies and build all apps
+7. Set up the database (indexes + seed data)
+8. Configure NGINX with your domain (including rate limiting)
+9. Start all services with PM2
+10. Set up SSL certificates (if DNS is ready)
+11. Print a summary with all credentials
+
+**After the script completes**, configure Redis in the admin panel:
+- Go to `https://admin.yourdomain.com` > Settings > Redis
+- Enter: Host `127.0.0.1`, Port `6379`, Password (printed by the script)
+
+---
+
+## Option 2: Step-by-Step Manual Setup
+
+### Step 1: Server Software
+
+```bash
+ssh root@YOUR_SERVER_IP
+
+# Run the server setup script (installs Node.js, PM2, NGINX, Redis, Certbot)
+curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-server.sh
 chmod +x setup-server.sh
 sudo ./setup-server.sh
 ```
 
-### 2. Clone Repository
+Save the Redis password printed at the end.
+
+### Step 2: Clone Repository
 
 ```bash
 cd /var/www/chartvolt
-git clone https://github.com/Mariosat15/Chatvot.git .
+git clone https://github.com/YOUR_GITHUB_USER/YOUR_REPO.git .
 ```
 
-### 3. Configure Environment
+### Step 3: Configure Environment
 
 ```bash
-# Copy example env file
 cp env_minimal_example.txt .env
-
-# Edit with your values
 nano .env
 ```
 
-Required environment variables:
+Fill in these required values:
+
 ```env
-# MongoDB
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/chartvolt
-
-# Authentication
+NODE_ENV=production
+NEXT_PUBLIC_BASE_URL=https://yourdomain.com
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+ADMIN_URL=https://admin.yourdomain.com
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname
 BETTER_AUTH_SECRET=your-secret-key-min-32-chars
-BETTER_AUTH_URL=https://chartvolt.com
-
-# App URLs
-NEXT_PUBLIC_APP_URL=https://chartvolt.com
-ADMIN_URL=https://admin.chartvolt.com
-
-# Admin
-ADMIN_EMAIL=admin@chartvolt.com
+BETTER_AUTH_URL=https://yourdomain.com
+ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=your-secure-password
-
-# API Server
+ADMIN_JWT_SECRET=your-admin-jwt-secret-min-32-chars
 API_PORT=4000
-
-# WebSocket Server (Real-time Messaging)
-# Single WebSocket server handles both user and admin connections
-# Both chartvolt.com/ws and admin.chartvolt.com/ws route to same server
 WEBSOCKET_PORT=3003
-NEXT_PUBLIC_WEBSOCKET_URL=wss://chartvolt.com/ws
+NEXT_PUBLIC_WEBSOCKET_URL=wss://yourdomain.com/ws
 WEBSOCKET_INTERNAL_URL=http://localhost:3003
-
-# Stripe (optional)
-STRIPE_SECRET_KEY=sk_...
-STRIPE_PUBLISHABLE_KEY=pk_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Paddle (optional)
-PADDLE_VENDOR_ID=...
-PADDLE_API_KEY=...
 ```
 
+Generate random secrets with:
+```bash
+openssl rand -hex 32
+```
 
-Ctrl + O  →  Save
-Enter     →  Confirm
-Ctrl + X  →  Exit
+Create `.env` symlink for admin app:
+```bash
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+```
 
-### 4. Install Dependencies
+### Step 4: Install Dependencies
 
 ```bash
+cd /var/www/chartvolt
+
 # Main app
 npm install
 
@@ -153,441 +165,427 @@ cd apps/admin && npm install && cd ../..
 # API server
 cd api-server && npm install && cd ..
 
-# WebSocket server (Real-time messaging)
+# WebSocket server
 cd websocket-server && npm install && cd ..
 ```
 
-I Recommend Option 1 id issue with files
-mv Chatvot/* .
-mv Chatvot/.* . 2>/dev/null
-rm -rf Chatvot
-ls
-
-get pull git pull origin main
-### 5. Build All Apps
+### Step 5: Build All Apps
 
 ```bash
-# Build all apps
 npm run build          # Main app
 npm run build:admin    # Admin app
 npm run build:api      # API server
+cd websocket-server && npm run build && cd ..  # WebSocket server
 npm run worker:build   # Worker
-
-# Build WebSocket server
-cd websocket-server && npm run build && cd ..
 ```
 
-Or use the single command (if configured):
-```bash
-pm2 flush
-git pull origin main
-npm run build:all
-pm2 restart all
-pm2 logs --lines 30
-```
-
-### 6. Database Setup (NEW INSTALLATIONS ONLY)
-
-For **new white label deployments**, run the database setup script to create indexes and seed default data:
+### Step 6: Database Setup
 
 ```bash
-# Run database setup
+# Creates indexes and seeds default data
 node scripts/setup-database.js
 ```
 
-This script will:
-- ✅ Create all required MongoDB indexes (for fast queries)
-- ✅ Seed default trading symbols (EUR/USD, GBP/USD, etc.)
-- ✅ Create default market data settings
-- ✅ Verify setup is complete
-
-**Options:**
+Options:
 ```bash
-# Only create indexes (skip seeding data)
-node scripts/setup-database.js --indexes-only
-
-# Only seed data (skip index creation)
-node scripts/setup-database.js --seed-only
-
-# Force re-seed data (overwrites existing)
-node scripts/setup-database.js --force
-```
-
-> ⚠️ **Skip this step for existing deployments** - only run on fresh databases!
-
-### 7. Configure NGINX
-
-> ⚠️ **IMPORTANT: Rate Limiting Must Be Added Manually**
-> 
-> Nginx requires rate limiting zones to be defined in the main config file BEFORE using them.
-
-```bash
-# STEP 1: Add rate limiting to main nginx.conf
-sudo nano /etc/nginx/nginx.conf
-```
-
-**Add these lines inside the `http {}` block (REQUIRED):**
-```nginx
-http {
-    # ... existing settings ...
-    
-    # Rate limiting zones (ADD THIS - REQUIRED!)
-    limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
-    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
-    limit_req_status 429;
-    
-    # ... rest of config ...
-}
-```
-
-```bash
-# STEP 2: Copy site config
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
-
-# STEP 3: The config already has chartvolt.com - verify it's correct
-sudo cat /etc/nginx/sites-available/chartvolt | grep server_name
-# Should show: server_name chartvolt.com www.chartvolt.com;
-# And: server_name admin.chartvolt.com;
-
-# STEP 4: Enable site and disable default
-sudo ln -s /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# STEP 5: Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 8. Start Applications
-
-```bash
-# Start all apps with PM2
-pm2 start ecosystem.config.js
-
-if │ 3  │ chartvolt-api       │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 30   │ errored   │ 0%       │ 0b       │ root     │ disabled 
--------------
-then Generate secret put it in .env
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 
-sed -i "s/BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$(openssl rand -hex 32)/" .env
-Verify it changed:
-grep BETTER_AUTH_SECRET .env
-
-Reload and restart:
-export $(grep -v '^#' .env | xargs)
-pm2 delete chartvolt-api 2>/dev/null
-pm2 start api-server/dist/index.js --name chartvolt-api
-pm2 save
-pm2 status
-
-# Save PM2 configuration
-pm2 save
-
-# View status
-pm2 status
-```
-
-### 9. SSL Certificate (Let's Encrypt)
-
-```bash
-# After DNS is propagated (chartvolt.com → 148.230.124.57)
-sudo certbot --nginx -d chartvolt.com -d www.chartvolt.com -d admin.chartvolt.com
-
-# Auto-renewal is configured automatically
-# Test renewal with:
-sudo certbot renew --dry-run
-```
-
-----------MongoDB Atlas IP Whitelist Issue!-------
-Go to MongoDB Atlas
-Select your cluster (Cluster0)
-SECURITY section → Database & Network Access
-Click on "Database & Network Access" - that's where you add the IP whitelist!
-Select the "Network Access" tab (or "IP Access List")
-Click "+ Add IP Address"
-Enter: 148.230.124.57 (your VPS IP)
-Click Confirm
-
----
-
-## 🏷️ White Label Deployment
-
-For deploying Chartvolt to new customers with their own database:
-
-### Option 1: Full Automated Setup (Recommended)
-
-```bash
-# On a fresh server, run the complete setup script
-sudo ./deploy/setup-new-customer.sh
-```
-
-This handles everything: server setup, code, database, nginx, and PM2.
-
-### Option 2: Manual with deploy.sh
-
-```bash
-# Standard update (existing installation)
-./deploy/sh
-
-# New customer installation (includes database setup)
-./deploy.sh --new
-
-# Only setup database (skip code deployment)
-./deploy.sh --db-only
-
-# Force re-seed database data
-./deploy.sh --db-only --force-db
-```
-
-### Option 3: Database Setup Only
-
-```bash
-# Create indexes and seed default data
-node scripts/setup-database.js
-
-# Options:
 node scripts/setup-database.js --indexes-only  # Only create indexes
 node scripts/setup-database.js --seed-only     # Only seed data
 node scripts/setup-database.js --force         # Force re-seed
 ```
 
-### What Database Setup Creates:
+> **Note:** Only run on fresh databases. Skip for existing deployments.
 
-| Item | Description |
-|------|-------------|
-| **Indexes** | All required MongoDB indexes for fast queries |
-| **Trading Symbols** | 30+ forex pairs (EUR/USD, GBP/USD, etc.) |
-| **Market Settings** | Default WebSocket intervals, candle limits |
+### Step 7: Configure NGINX
+
+```bash
+# Copy the template config
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+
+# Replace domain placeholders with your actual domain
+sudo sed -i 's/ADMIN_DOMAIN_PLACEHOLDER/admin.yourdomain.com/g' /etc/nginx/sites-available/chartvolt
+sudo sed -i 's/DOMAIN_PLACEHOLDER/yourdomain.com/g' /etc/nginx/sites-available/chartvolt
+
+# Add rate limiting to main nginx.conf (inside the http {} block)
+sudo nano /etc/nginx/nginx.conf
+```
+
+Add these lines inside the `http {}` block:
+```nginx
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+limit_req_status 429;
+```
+
+Then enable the site:
+```bash
+# Enable site
+sudo ln -s /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
+
+# Remove default site
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and reload
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Step 8: Start Services
+
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup systemd -u root --hp /root
+```
+
+### Step 9: SSL Certificates
+
+Make sure DNS A records are configured first (see DNS Setup section below).
+
+```bash
+sudo certbot --nginx \
+  -d yourdomain.com \
+  -d www.yourdomain.com \
+  -d admin.yourdomain.com
+
+# Verify auto-renewal
+sudo certbot renew --dry-run
+```
+
+### Step 10: Configure Redis in Admin Panel
+
+1. Go to `https://admin.yourdomain.com`
+2. Login with your admin credentials
+3. Go to Settings > Redis
+4. Enter: Host `127.0.0.1`, Port `6379`, Password (from setup-server.sh output)
+5. Click "Test Connection" then "Save"
+
+### Step 11: MongoDB Atlas IP Whitelist
+
+1. Go to [MongoDB Atlas](https://cloud.mongodb.com)
+2. Select your cluster
+3. Go to Security > Network Access
+4. Click "+ Add IP Address"
+5. Enter your VPS IP address
+6. Click Confirm
 
 ---
 
-## Management Commands
+## DNS Setup
 
-### PM2 Commands
+Configure these DNS A records at your domain registrar (e.g., Hostinger):
 
-admin not log in -------------
-Quick Fix - Create Symlink:
-ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
-Then restart:
-pm2 restart chartvolt-admin
+| Type | Name    | Value (IP)     | TTL  |
+|------|---------|----------------|------|
+| A    | @       | YOUR_SERVER_IP | 3600 |
+| A    | www     | YOUR_SERVER_IP | 3600 |
+| A    | admin   | YOUR_SERVER_IP | 3600 |
 
-Or Copy the .env:
-cp /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
-pm2 restart chartvolt-admin
--------
-this is to update the server with latest git for admin
+**Propagation:** DNS changes can take 5 minutes to 48 hours. Check with:
+```bash
+dig yourdomain.com +short
+dig admin.yourdomain.com +short
+```
+
+Wait until both return your server's IP before setting up SSL.
+
+---
+
+## Redis Configuration
+
+Redis is installed and configured automatically by the setup scripts. Here's what's configured:
+
+| Setting         | Value              |
+|-----------------|--------------------|
+| Bind            | 127.0.0.1 (local)  |
+| Port            | 6379               |
+| Password        | Auto-generated      |
+| Max Memory      | 8GB                |
+| Eviction Policy | allkeys-lru        |
+
+### Redis Management
+
+```bash
+# Check Redis status
+systemctl status redis-server
+
+# Restart Redis
+sudo systemctl restart redis-server
+
+# Connect to Redis CLI
+redis-cli -a YOUR_REDIS_PASSWORD
+
+# Check memory usage
+redis-cli -a YOUR_REDIS_PASSWORD INFO memory
+
+# Flush all cached data (use with caution)
+redis-cli -a YOUR_REDIS_PASSWORD FLUSHALL
+```
+
+### Redis Troubleshooting
+
+```bash
+# Check if Redis is running
+systemctl is-active redis-server
+
+# View Redis logs
+sudo journalctl -u redis-server --no-pager -n 50
+
+# Test connection
+redis-cli -a YOUR_REDIS_PASSWORD ping
+# Should return: PONG
+
+# Check configuration
+redis-cli -a YOUR_REDIS_PASSWORD CONFIG GET maxmemory
+redis-cli -a YOUR_REDIS_PASSWORD CONFIG GET bind
+```
+
+---
+
+## White-Label Deployment
+
+For each new client deployment:
+
+### What Changes Per Client
+
+| Item               | Changes To                           |
+|--------------------|--------------------------------------|
+| Domain             | Client's domain                      |
+| Admin Domain       | admin.clientdomain.com               |
+| MongoDB            | New database/cluster                 |
+| Admin Credentials  | Client's admin email/password        |
+| Redis Password     | Auto-generated per server            |
+| SSL Certificates   | Auto-generated via Certbot           |
+| Auth Secrets       | Auto-generated per deployment        |
+
+### What Stays the Same
+
+- All application code
+- NGINX template (domains replaced by script)
+- PM2 ecosystem config
+- Redis configuration (auto-generated)
+- Database schema and seed data
+
+### Quick Deploy for New Client
+
+```bash
+# On a fresh VPS:
+sudo ./deploy/setup-new-customer.sh
+# Follow the prompts, done in ~10 minutes
+```
+
+---
+
+## Deploying Updates
+
+For existing installations, use the deploy script:
+
+```bash
+./deploy/deploy.sh              # Normal update (pull, build, reload)
+./deploy/deploy.sh --new        # New install (includes DB setup)
+./deploy/deploy.sh --db-only    # Only run database setup
+./deploy/deploy.sh --force-db   # Force re-seed database
+```
+
+Or manually:
+```bash
+cd /var/www/chartvolt
+git pull origin main
+npm install
+cd apps/admin && npm install && cd ../..
+cd api-server && npm install && cd ..
+cd websocket-server && npm install && cd ..
+npm run build
+npm run build:admin
+npm run build:api
+cd websocket-server && npm run build && cd ..
+npm run worker:build
+pm2 reload ecosystem.config.js
+```
+
+### Update Individual Apps
+
+```bash
+# Update only admin app
 cd /var/www/chartvolt
 git pull origin main
 npm run build:admin
 pm2 restart chartvolt-admin
 
-
-----------------------this is to update the server with latest git for worker
-
-cd /var/www/chartvolt 
+# Update only worker
+cd /var/www/chartvolt
 git pull origin main
 npm run worker:build
 pm2 restart chartvolt-worker
-pm2 logs chartvolt-worker --lines 50
 
-```bash
-# View all apps status
-pm2 status
-
-# View logs
-pm2 logs                       # All logs
-pm2 logs chartvolt-web         # User app only
-pm2 logs chartvolt-admin       # Admin app only
-pm2 logs chartvolt-api         # API server only
-pm2 logs chartvolt-websocket   # WebSocket server only
-pm2 logs chartvolt-worker      # Worker only
-
-# Restart apps
-pm2 restart all                # Restart all
-pm2 restart chartvolt-web      # Restart specific app
-pm2 restart chartvolt-websocket # Restart WebSocket server
-
-# Monitor resources
-pm2 monit
-
-# Stop all
-pm2 stop all
-```
-
-### Deployment Updates
-
-```bash
-# Quick deploy
-./deploy/deploy.sh
-
-# Or manually:
+# Update only WebSocket server
+cd /var/www/chartvolt
 git pull origin main
-npm run build:all
-pm2 reload ecosystem.config.js
+cd websocket-server && npm run build && cd ..
+pm2 restart chartvolt-websocket
 ```
 
-### Nginx Commands
+---
+
+## Management Commands
+
+### PM2
 
 ```bash
-# Test configuration
-sudo nginx -t
-
-# Reload without downtime
-sudo systemctl reload nginx
-
-# View access logs
-tail -f /var/log/nginx/chartvolt-access.log
-
-# View error logs
-tail -f /var/log/nginx/chartvolt-error.log
+pm2 status                        # View all app statuses
+pm2 logs                          # All logs (live)
+pm2 logs chartvolt-web            # User app logs
+pm2 logs chartvolt-admin          # Admin app logs
+pm2 logs chartvolt-api            # API server logs
+pm2 logs chartvolt-websocket      # WebSocket server logs
+pm2 logs chartvolt-worker         # Worker logs
+pm2 restart all                   # Restart all apps
+pm2 restart chartvolt-web         # Restart specific app
+pm2 monit                         # Real-time monitoring dashboard
+pm2 stop all                      # Stop all apps
+pm2 save                          # Save current process list
+pm2 resurrect                     # Restore saved process list
 ```
 
-## Monitoring
-
-### Check App Health
+### NGINX
 
 ```bash
-# User app (local)
-curl http://localhost:3000/health
-
-# Admin app (local)
-curl http://localhost:3001/health
-
-# API server (local)
-curl http://localhost:4000/api/health
-
-# WebSocket server (local)
-curl http://localhost:3003/health
-curl http://localhost:3003/stats   # Connection stats
-
-# External (after SSL setup)
-curl https://chartvolt.com/health
-curl https://admin.chartvolt.com/health
-curl https://chartvolt.com/ws-health
-
-# WebSocket test (both domains share same WebSocket server)
-# User app WebSocket:
-wscat -c wss://chartvolt.com/ws
-# Admin app WebSocket:
-wscat -c wss://admin.chartvolt.com/ws
+sudo nginx -t                     # Test configuration
+sudo systemctl reload nginx       # Reload without downtime
+sudo systemctl restart nginx      # Full restart
+tail -f /var/log/nginx/app-access.log     # User app access logs
+tail -f /var/log/nginx/app-error.log      # User app error logs
+tail -f /var/log/nginx/admin-access.log   # Admin access logs
+tail -f /var/log/nginx/admin-error.log    # Admin error logs
 ```
 
-### Resource Usage
+### Health Checks
 
 ```bash
-# PM2 monitoring dashboard
-pm2 monit
+# Local (on the server)
+curl http://localhost:3000/health      # User app
+curl http://localhost:3001/health      # Admin app
+curl http://localhost:4000/api/health  # API server
+curl http://localhost:3003/health      # WebSocket server
+redis-cli -a YOUR_REDIS_PASSWORD ping  # Redis
 
-# System resources
-htop
-
-# Disk usage
-df -h
-
-# Memory usage
-free -m
+# External (after SSL)
+curl https://yourdomain.com/health
+curl https://admin.yourdomain.com/health
+curl https://yourdomain.com/ws-health
 ```
+
+### System Resources
+
+```bash
+pm2 monit          # PM2 monitoring dashboard
+htop               # System processes
+df -h              # Disk usage
+free -m            # Memory usage
+```
+
+---
 
 ## Troubleshooting
 
 ### App Not Starting
 
 ```bash
-# Check PM2 logs
-pm2 logs chartvolt-web --lines 100
-
-# Check if port is in use
-lsof -i :3000
-lsof -i :3001
-
-# Restart app
-pm2 restart chartvolt-web
+pm2 logs chartvolt-web --lines 100    # Check logs
+lsof -i :3000                         # Check if port is in use
+pm2 restart chartvolt-web             # Restart the app
 ```
 
 ### NGINX 502 Bad Gateway
 
 ```bash
-# Check if apps are running
-pm2 status
+pm2 status                             # Are apps running?
+tail -100 /var/log/nginx/app-error.log # Check NGINX error log
+curl http://127.0.0.1:3000             # Can you reach the app directly?
+```
 
-# Check nginx error log
-tail -100 /var/log/nginx/chartvolt-error.log
+### Admin Can't Login
 
-# Verify upstream
-curl http://127.0.0.1:3000
+The admin app needs access to `.env`. Ensure the symlink exists:
+```bash
+ls -la /var/www/chartvolt/apps/admin/.env
+# Should show: .env -> /var/www/chartvolt/.env
+
+# If missing, create it:
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+pm2 restart chartvolt-admin
 ```
 
 ### Database Connection Issues
 
 ```bash
-# Test connection manually
-node -e "require('mongoose').connect('your-mongodb-uri').then(() => console.log('OK'))"
+# Test MongoDB connection
+node -e "require('mongoose').connect(process.env.MONGODB_URI).then(() => console.log('OK')).catch(e => console.error(e))"
 
-# Check worker logs
-pm2 logs chartvolt-worker
+# Check if VPS IP is whitelisted in MongoDB Atlas
+# Atlas > Network Access > Verify your server IP is listed
+```
+
+### Redis Not Working
+
+```bash
+systemctl status redis-server          # Check service status
+redis-cli -a YOUR_PASSWORD ping        # Test connection
+sudo journalctl -u redis-server -n 50  # View Redis logs
+sudo systemctl restart redis-server    # Restart Redis
 ```
 
 ### SSL Certificate Issues
 
 ```bash
-# Renew certificates
-sudo certbot renew --dry-run
-
-# Check certificate status
-sudo certbot certificates
+sudo certbot certificates              # Check certificate status
+sudo certbot renew --dry-run           # Test auto-renewal
+sudo certbot --nginx -d yourdomain.com # Re-run certbot if needed
 ```
+
+### WebSocket Not Connecting
+
+```bash
+# Check if WebSocket server is running
+pm2 logs chartvolt-websocket --lines 50
+
+# Test WebSocket health
+curl http://localhost:3003/health
+
+# Verify NGINX is proxying /ws correctly
+grep -A5 "location /ws" /etc/nginx/sites-available/chartvolt
+```
+
+---
 
 ## Backup
 
 ### MongoDB
 
-MongoDB Atlas provides automatic backups. For self-hosted:
-
+MongoDB Atlas provides automatic backups. For manual backup:
 ```bash
-# Backup
-mongodump --uri="your-mongodb-uri" --out=/backup/$(date +%Y%m%d)
-
-# Restore
-mongorestore --uri="your-mongodb-uri" /backup/20231218
+mongodump --uri="YOUR_MONGODB_URI" --out=/backup/$(date +%Y%m%d)
+mongorestore --uri="YOUR_MONGODB_URI" /backup/20260217
 ```
 
 ### PM2 Configuration
 
 ```bash
-# Already saved with:
-pm2 save
-
-# To restore:
-pm2 resurrect
+pm2 save        # Save current process list
+pm2 resurrect   # Restore from saved
 ```
 
-## Scaling
-
-### Vertical Scaling
-
-Upgrade Hostinger VPS plan for more resources.
-
-### Horizontal Scaling
-
-1. Increase PM2 instances:
-```javascript
-// ecosystem.config.js
-{
-  name: 'chartvolt-web',
-  instances: 2, // or 'max' for all CPUs
-  exec_mode: 'cluster',
-}
-```
-
-2. Load balancer with multiple servers (advanced)
+---
 
 ## Security Checklist
 
 - [ ] SSH key authentication enabled
-- [ ] Password authentication disabled
-- [ ] UFW firewall configured
-- [ ] Fail2ban installed (optional)
-- [ ] SSL/TLS enabled
+- [ ] Password authentication disabled in SSH
+- [ ] UFW firewall enabled (HTTP, HTTPS, SSH only)
+- [ ] SSL/TLS certificates installed
+- [ ] Redis bound to localhost with password
 - [ ] Admin subdomain rate-limited
-- [ ] Environment variables secured
-- [ ] Regular security updates
-
+- [ ] MongoDB Atlas IP whitelist configured
+- [ ] Strong admin password set
+- [ ] Environment variables secured (not in git)
+- [ ] Regular system updates applied

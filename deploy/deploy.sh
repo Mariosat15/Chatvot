@@ -234,6 +234,24 @@ pm2 reload ecosystem.config.js
   echo ""
 echo "📊 Current status:"
 pm2 status
+
+# ============================================
+# REDIS HEALTH CHECK
+# ============================================
+echo ""
+echo "🔍 Checking Redis status..."
+if systemctl is-active --quiet redis-server 2>/dev/null; then
+  REDIS_STATUS="✅ Redis: running"
+  # Try to ping (will fail without password, but that's fine - just checking the service)
+  if redis-cli ping 2>/dev/null | grep -q "PONG"; then
+    REDIS_STATUS="✅ Redis: running (no auth)"
+  elif redis-cli -a "$(grep -oP 'requirepass \K.*' /etc/redis/redis.conf 2>/dev/null)" ping 2>/dev/null | grep -q "PONG"; then
+    REDIS_STATUS="✅ Redis: running (authenticated)"
+  fi
+else
+  REDIS_STATUS="⚠️  Redis: not running (check: systemctl status redis-server)"
+fi
+echo "$REDIS_STATUS"
 fi
 
 echo ""
@@ -253,3 +271,4 @@ echo "  curl http://localhost:3000/health    # User app"
 echo "  curl http://localhost:3001/health    # Admin app"
 echo "  curl http://localhost:4000/api/health # API server"
 echo "  curl http://localhost:3003/health    # WebSocket server"
+echo "  redis-cli ping                       # Redis"
