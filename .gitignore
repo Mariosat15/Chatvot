@@ -1,4 +1,4 @@
-﻿# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -67,7 +67,11 @@ public/uploads/cosmetics/
 public/uploads/indicators/
 public/uploads/strategies/
 public/uploads/gamemaster/
-public/uploads/marketplace/
+
+# Marketplace images - track default .webp images but ignore user uploads
+# Use: git add -f public/uploads/marketplace/*.webp to add new defaults
+public/uploads/marketplace/*
+!public/uploads/marketplace/*.webp
 
 # Logs
 logs/
