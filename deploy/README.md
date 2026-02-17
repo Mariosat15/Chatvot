@@ -797,43 +797,58 @@ This runs 4 instances of the web app behind PM2's built-in load balancer. Gives 
 
 When you need more capacity, add a second server:
 
-**Step 1: Prepare Primary Server's Redis for Remote Access**
+**Step 1: Open Redis on Primary Server (only needed once for the first secondary)**
 
-On your primary VPS, open Redis to accept connections from the secondary:
+SSH into your primary server and run these 3 commands:
 
 ```bash
-# Edit Redis config to bind to private network IP too
-sudo nano /etc/redis/redis.conf
-# Change: bind 127.0.0.1 ::1
-# To:     bind 127.0.0.1 YOUR_PRIMARY_PRIVATE_IP
+# 1. Allow the new VPS IP through firewall (replace NEW_VPS_IP with actual IP)
+sudo ufw allow from NEW_VPS_IP to any port 6379
 
-# Allow secondary server through firewall
-sudo ufw allow from SECONDARY_VPS_IP to any port 6379
+# 2. Make Redis listen on all interfaces (secured by firewall + password)
+sudo sed -i 's/^bind 127.0.0.1.*/bind 0.0.0.0/' /etc/redis/redis.conf
 
-# Restart Redis
+# 3. Restart Redis and verify
 sudo systemctl restart redis-server
+redis-cli -a YOUR_REDIS_PASSWORD ping
+# Should return: PONG
 ```
 
-**Step 2: Deploy Secondary Server**
+For future secondary servers, you only need command 1 (firewall rule for the new IP).
+
+**Step 2: Whitelist in MongoDB Atlas**
+
+1. Go to [cloud.mongodb.com](https://cloud.mongodb.com)
+2. Security > Network Access > "+ Add IP Address"
+3. Enter the new VPS IP
+4. Wait 1-2 minutes for propagation
+
+**Step 3: Deploy Secondary Server**
+
+SSH into the new VPS and run:
 
 ```bash
-ssh root@NEW_VPS_IP
-curl -O https://raw.githubusercontent.com/YOUR_REPO/main/deploy/setup-new-customer.sh
+apt update && apt install -y curl git
+curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-new-customer.sh
 chmod +x setup-new-customer.sh
 sudo ./setup-new-customer.sh --secondary
 ```
 
-The script will ask for the primary Redis host/port/password. The worker process will not start on this server (only runs on primary).
+The script will ask for: domain, MongoDB URI, admin credentials, and the primary Redis host/port/password. Use the primary server's public IP as Redis host (e.g., `148.230.124.57`). The worker process will not start on this server (only runs on primary).
 
-**Step 3: Add to Cloudflare Load Balancer**
+**Step 4: Add to Cloudflare DNS**
 
-See the Cloudflare Setup section below.
+In Cloudflare dashboard > DNS > Records, add 3 new records with the new VPS IP:
 
-**Step 4: Whitelist in MongoDB Atlas**
+| Type | Name    | Content     | Proxy   |
+|------|---------|-------------|---------|
+| A    | @       | NEW_VPS_IP  | Proxied |
+| A    | www     | NEW_VPS_IP  | Proxied |
+| A    | admin   | NEW_VPS_IP  | Proxied |
 
-Add the new server's IP to MongoDB Atlas > Network Access.
+Cloudflare will automatically distribute traffic between all servers.
 
-**Step 5: Enable Multi-Server Price Sync**
+**Step 5: Enable Multi-Server Price Sync (only once)**
 
 In admin panel: Settings > Redis > Toggle "Multi-Server Price Sync" ON.
 This only needs to be done once (setting is stored in the shared database).
