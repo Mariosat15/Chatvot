@@ -31,17 +31,9 @@ export async function GET(
       path.join(cwd, "public", "game-icons", sanitizedFilename),
     ];
 
-    // #region agent log
-    console.log(`🎮 [Game Icons] Request: ${sanitizedFilename} | cwd: ${cwd}`);
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game-icons-route:entry',message:'Game icon request',data:{filename,sanitizedFilename,cwd,possiblePaths},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
-
     for (const filePath of possiblePaths) {
       try {
         await access(filePath, constants.R_OK);
-        // #region agent log
-        console.log(`🎮 [Game Icons] FOUND: ${filePath}`);
-        // #endregion
         const fileBuffer = await readFile(filePath);
         const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
 
@@ -56,9 +48,6 @@ export async function GET(
       }
     }
 
-    // #region agent log
-    console.log(`🎮 [Game Icons] NOT FOUND: ${sanitizedFilename} | Searched: ${possiblePaths.join(', ')}`);
-    // #endregion
     return NextResponse.json({ error: "Icon not found" }, { status: 404 });
   } catch (error) {
     console.error("❌ [Game Icons] Error:", error);

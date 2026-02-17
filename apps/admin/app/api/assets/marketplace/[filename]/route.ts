@@ -48,11 +48,6 @@ export async function GET(
       path.join(cwd, "public", "uploads", "marketplace"),
     ];
 
-    // #region agent log
-    console.log(`🛒 [Marketplace Serve] Request: ${sanitizedFilename} | cwd: ${cwd}`);
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:entry',message:'Marketplace image request',data:{sanitizedFilename,cwd,baseDirs},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-    // #endregion
-
     let filePath: string | null = null;
     let actualFilename: string = sanitizedFilename;
 
@@ -73,9 +68,6 @@ export async function GET(
 
     // If found on disk, serve directly
     if (filePath) {
-      // #region agent log
-      console.log(`🛒 [Marketplace Serve] FOUND on disk: ${filePath}`);
-      // #endregion
       const fileBuffer = await readFile(filePath);
       const ext = actualFilename.split(".").pop()?.toLowerCase();
       const contentType = getContentType(ext);
@@ -87,11 +79,6 @@ export async function GET(
         },
       });
     }
-
-    // #region agent log
-    console.log(`🛒 [Marketplace Serve] Not on disk, trying DB for: ${sanitizedFilename}`);
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:disk-miss',message:'Not found on disk, trying DB',data:{sanitizedFilename},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-    // #endregion
 
     // Not on disk - try to serve from MongoDB (imageData on MarketplaceItem)
     try {
@@ -105,11 +92,6 @@ export async function GET(
       const item = await MarketplaceItem.findOne({
         imageUrl: { $regex: sanitizedFilename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") },
       }).select("+imageData +imageContentType");
-
-      // #region agent log
-      console.log(`🛒 [Marketplace Serve] DB result: found=${!!item}, hasImageData=${!!item?.imageData}, slug=${item?.slug}`);
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:db-result',message:'DB lookup result',data:{sanitizedFilename,itemFound:!!item,hasImageData:!!item?.imageData,slug:item?.slug},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
 
       if (item?.imageData) {
         console.log(
