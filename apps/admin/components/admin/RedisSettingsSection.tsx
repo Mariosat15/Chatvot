@@ -46,8 +46,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface RedisSettings {
-  upstashRedisUrl: string;
-  upstashRedisToken: string;
+  redisHost: string;
+  redisPort: number;
+  redisPassword: string;
   redisEnabled: boolean;
   redisPriceSyncEnabled: boolean; // Enable for multi-server deployments
   inngestSigningKey: string;
@@ -86,8 +87,9 @@ interface WebSocketStatus {
 
 export default function RedisSettingsSection() {
   const [settings, setSettings] = useState<RedisSettings>({
-    upstashRedisUrl: "",
-    upstashRedisToken: "",
+    redisHost: "127.0.0.1",
+    redisPort: 6379,
+    redisPassword: "",
     redisEnabled: false,
     redisPriceSyncEnabled: false,
     inngestSigningKey: "",
@@ -153,8 +155,9 @@ export default function RedisSettingsSection() {
       if (response.ok) {
         const data = await response.json();
         setSettings({
-          upstashRedisUrl: data.upstashRedisUrl || "",
-          upstashRedisToken: data.upstashRedisToken || "",
+          redisHost: data.redisHost || "127.0.0.1",
+          redisPort: data.redisPort || 6379,
+          redisPassword: data.redisPassword || "",
           redisEnabled: data.redisEnabled || false,
           redisPriceSyncEnabled: data.redisPriceSyncEnabled ?? false, // Enable for multi-server deployments
           inngestSigningKey: data.inngestSigningKey || "",
@@ -257,8 +260,8 @@ export default function RedisSettingsSection() {
   };
 
   const handleTestConnection = async () => {
-    if (!settings.upstashRedisUrl || !settings.upstashRedisToken) {
-      toast.error("Please enter Redis URL and Token first");
+    if (!settings.redisHost) {
+      toast.error("Please enter Redis Host first");
       return;
     }
 
@@ -270,8 +273,9 @@ export default function RedisSettingsSection() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: settings.upstashRedisUrl,
-          token: settings.upstashRedisToken,
+          host: settings.redisHost,
+          port: settings.redisPort,
+          password: settings.redisPassword,
         }),
       });
 
@@ -329,19 +333,10 @@ export default function RedisSettingsSection() {
             Redis Cache Settings
           </h2>
           <p className="text-gray-400 mt-1">
-            Configure Upstash Redis for high-performance price caching and trade
+            Configure self-hosted Redis for high-performance price caching and trade
             queues
           </p>
         </div>
-        <a
-          href="https://console.upstash.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Open Upstash Console
-        </a>
       </div>
 
       {/* Why Redis Alert */}
@@ -376,44 +371,53 @@ export default function RedisSettingsSection() {
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Shield className="h-5 w-5 text-green-400" />
-              Upstash Redis Credentials
+              Redis Connection Settings
             </CardTitle>
             <CardDescription>
-              Get these from your{" "}
-              <a
-                href="https://console.upstash.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline"
-              >
-                Upstash Console
-              </a>{" "}
-              → Your Database → REST API section
+              Configure your self-hosted Redis server connection. Default is
+              localhost (127.0.0.1) on port 6379.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="redis-url" className="text-gray-300">
-                UPSTASH_REDIS_REST_URL
-              </Label>
-              <Input
-                id="redis-url"
-                type="text"
-                placeholder="https://xyz-12345.upstash.io"
-                value={settings.upstashRedisUrl}
-                onChange={(e) =>
-                  setSettings({ ...settings, upstashRedisUrl: e.target.value })
-                }
-                className="bg-gray-900 border-gray-700 text-white"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="redis-host" className="text-gray-300">
+                  Redis Host
+                </Label>
+                <Input
+                  id="redis-host"
+                  type="text"
+                  placeholder="127.0.0.1"
+                  value={settings.redisHost}
+                  onChange={(e) =>
+                    setSettings({ ...settings, redisHost: e.target.value })
+                  }
+                  className="bg-gray-900 border-gray-700 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="redis-port" className="text-gray-300">
+                  Redis Port
+                </Label>
+                <Input
+                  id="redis-port"
+                  type="number"
+                  placeholder="6379"
+                  value={settings.redisPort}
+                  onChange={(e) =>
+                    setSettings({ ...settings, redisPort: parseInt(e.target.value) || 6379 })
+                  }
+                  className="bg-gray-900 border-gray-700 text-white"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label
-                htmlFor="redis-token"
+                htmlFor="redis-password"
                 className="text-gray-300 flex items-center justify-between"
               >
-                <span>UPSTASH_REDIS_REST_TOKEN</span>
+                <span>Redis Password (optional)</span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -430,14 +434,14 @@ export default function RedisSettingsSection() {
                 </Button>
               </Label>
               <Input
-                id="redis-token"
+                id="redis-password"
                 type={showTokens ? "text" : "password"}
-                placeholder="AXxxxxxxxxxxxxxxxxxxxxxx"
-                value={settings.upstashRedisToken}
+                placeholder="Leave empty if no password"
+                value={settings.redisPassword}
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    upstashRedisToken: e.target.value,
+                    redisPassword: e.target.value,
                   })
                 }
                 className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
@@ -451,8 +455,7 @@ export default function RedisSettingsSection() {
                   onClick={handleTestConnection}
                   disabled={
                     testing ||
-                    !settings.upstashRedisUrl ||
-                    !settings.upstashRedisToken
+                    !settings.redisHost
                   }
                   variant="outline"
                   className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"

@@ -1,7 +1,8 @@
-import { Redis } from "@upstash/redis";
+import Redis from "ioredis";
 export interface RedisConfig {
-  url: string;
-  token: string;
+  host: string;
+  port: number;
+  password: string;
   enabled: boolean;
 }
 /**
@@ -17,8 +18,9 @@ export declare function getRedis(): Promise<Redis | null>;
  * Test Redis connection
  */
 export declare function testRedisConnection(
-  url: string,
-  token: string,
+  host: string,
+  port: number,
+  password?: string,
 ): Promise<{
   success: boolean;
   message: string;

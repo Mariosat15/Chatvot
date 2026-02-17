@@ -32,8 +32,9 @@ export async function GET() {
     if (!settings) {
       return NextResponse.json({
         // Redis settings
-        upstashRedisUrl: "",
-        upstashRedisToken: "",
+        redisHost: "127.0.0.1",
+        redisPort: 6379,
+        redisPassword: "",
         redisEnabled: false,
         redisPriceSyncEnabled: false,
         // Inngest settings
@@ -47,8 +48,9 @@ export async function GET() {
 
     return NextResponse.json({
       // Redis settings
-      upstashRedisUrl: settings.upstashRedisUrl || "",
-      upstashRedisToken: settings.upstashRedisToken || "",
+      redisHost: settings.redisHost || "127.0.0.1",
+      redisPort: settings.redisPort || 6379,
+      redisPassword: settings.redisPassword || "",
       redisEnabled: settings.redisEnabled || false,
       redisPriceSyncEnabled: settings.redisPriceSyncEnabled || false,
       // Inngest settings
@@ -105,8 +107,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       // Redis settings
-      upstashRedisUrl,
-      upstashRedisToken,
+      redisHost,
+      redisPort,
+      redisPassword,
       redisEnabled,
       redisPriceSyncEnabled,
       // Inngest settings
@@ -135,8 +138,9 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           // Redis settings
-          upstashRedisUrl: upstashRedisUrl || "",
-          upstashRedisToken: upstashRedisToken || "",
+          redisHost: redisHost || "127.0.0.1",
+          redisPort: redisPort || 6379,
+          redisPassword: redisPassword || "",
           redisEnabled: redisEnabled || false,
           redisPriceSyncEnabled: redisPriceSyncEnabled || false,
           // Inngest settings
@@ -162,14 +166,15 @@ export async function POST(request: NextRequest) {
       { upsert: true, new: true },
     );
 
-    // Force Redis to reconnect with new credentials
+    // Force Redis to reconnect with new settings
     reconnectRedis();
 
     return NextResponse.json({
       success: true,
       message: "Settings saved successfully",
       settings: {
-        upstashRedisUrl: settings.upstashRedisUrl,
+        redisHost: settings.redisHost,
+        redisPort: settings.redisPort,
         redisEnabled: settings.redisEnabled,
         priceFeedMode: settings.priceFeedMode,
         priceFeedWebsocketEnabled: settings.priceFeedWebsocketEnabled,

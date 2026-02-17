@@ -1,6 +1,6 @@
 "use server";
 
-import { Redis } from "@upstash/redis";
+import Redis from "ioredis";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 
@@ -11,8 +11,9 @@ let lastConfigCheck = 0;
 const CONFIG_CHECK_INTERVAL = 60000; // Check config every minute
 
 export interface RedisConfig {
-  url: string;
-  token: string;
+  host: string;
+  port: number;
+  password: string;
   enabled: boolean;
 }
 
@@ -24,13 +25,14 @@ export async function getRedisConfig(): Promise<RedisConfig | null> {
     await connectToDatabase();
     const settings = await WhiteLabel.findOne();
 
-    if (!settings?.upstashRedisUrl || !settings?.upstashRedisToken) {
+    if (!settings?.redisHost) {
       return null;
     }
 
     return {
-      url: settings.upstashRedisUrl,
-      token: settings.upstashRedisToken,
+      host: settings.redisHost || "127.0.0.1",
+      port: settings.redisPort || 6379,
+      password: settings.redisPassword || "",
       enabled: settings.redisEnabled ?? false,
     };
   } catch (error) {
@@ -61,6 +63,10 @@ export async function getRedis(): Promise<Redis | null> {
   lastConfigCheck = now;
 
   if (!config || !config.enabled) {
+    // Disconnect existing instance if disabling
+    if (redisInstance) {
+      try { redisInstance.quit(); } catch { /* ignore */ }
+    }
     redisInstance = null;
     redisDisabled = true;
     return null;
@@ -70,10 +76,42 @@ export async function getRedis(): Promise<Redis | null> {
   redisDisabled = false;
 
   try {
-    redisInstance = new Redis({
-      url: config.url,
-      token: config.token,
+    // Disconnect old instance before creating new one
+    if (redisInstance) {
+      try { redisInstance.quit(); } catch { /* ignore */ }
+    }
+
+    const opts: Record<string, unknown> = {
+      host: config.host,
+      port: config.port,
+      connectTimeout: 5000,
+      commandTimeout: 3000,
+      maxRetriesPerRequest: 3,
+      retryStrategy(times: number) {
+        return Math.min(times * 100, 3000);
+      },
+      lazyConnect: false,
+      enableReadyCheck: true,
+    };
+
+    if (config.password) {
+      opts.password = config.password;
+    }
+
+    redisInstance = new Redis(opts as any);
+
+    redisInstance.on("error", (err) => {
+      console.error("🔴 [Redis] Connection error:", err.message);
     });
+
+    redisInstance.on("connect", () => {
+      console.log("🟢 [Redis] Connected to server");
+    });
+
+    redisInstance.on("close", () => {
+      console.log("🟡 [Redis] Connection closed");
+    });
+
     return redisInstance;
   } catch (error) {
     console.error("Failed to create Redis instance:", error);
@@ -86,23 +124,40 @@ export async function getRedis(): Promise<Redis | null> {
  * Test Redis connection
  */
 export async function testRedisConnection(
-  url: string,
-  token: string,
+  host: string,
+  port: number,
+  password?: string,
 ): Promise<{
   success: boolean;
   message: string;
   latency?: number;
 }> {
+  let testRedis: Redis | null = null;
   try {
-    const redis = new Redis({ url, token });
+    const opts: Record<string, unknown> = {
+      host,
+      port,
+      connectTimeout: 5000,
+      commandTimeout: 3000,
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+    };
+    if (password) opts.password = password;
+
+    testRedis = new Redis(opts as any);
     const start = Date.now();
 
+    await testRedis.connect();
+
     // Test basic operations
-    await redis.set("test:connection", "ok", { ex: 10 });
-    const result = await redis.get("test:connection");
-    await redis.del("test:connection");
+    await testRedis.setex("test:connection", 10, "ok");
+    const result = await testRedis.get("test:connection");
+    await testRedis.del("test:connection");
 
     const latency = Date.now() - start;
+
+    await testRedis.quit();
+    testRedis = null;
 
     if (result === "ok") {
       return {
@@ -117,6 +172,9 @@ export async function testRedisConnection(
       message: "Connection established but read/write test failed",
     };
   } catch (error) {
+    if (testRedis) {
+      try { testRedis.quit(); } catch { /* ignore */ }
+    }
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error",
@@ -152,9 +210,11 @@ export async function setPrice(
   }
 
   try {
-    await redis.set(`${PRICE_KEY_PREFIX}${symbol}`, JSON.stringify(price), {
-      ex: PRICE_TTL,
-    });
+    await redis.setex(
+      `${PRICE_KEY_PREFIX}${symbol}`,
+      PRICE_TTL,
+      JSON.stringify(price),
+    );
     return true;
   } catch (error) {
     console.error("Failed to set price for", symbol, error);
@@ -178,9 +238,11 @@ export async function setPrices(
     const pipeline = redis.pipeline();
 
     prices.forEach((price, symbol) => {
-      pipeline.set(`${PRICE_KEY_PREFIX}${symbol}`, JSON.stringify(price), {
-        ex: PRICE_TTL,
-      });
+      pipeline.setex(
+        `${PRICE_KEY_PREFIX}${symbol}`,
+        PRICE_TTL,
+        JSON.stringify(price),
+      );
     });
 
     await pipeline.exec();
@@ -202,7 +264,7 @@ export async function getPrice(symbol: string): Promise<CachedPrice | null> {
   }
 
   try {
-    const data = await redis.get<string>(`${PRICE_KEY_PREFIX}${symbol}`);
+    const data = await redis.get(`${PRICE_KEY_PREFIX}${symbol}`);
 
     if (!data) {
       return null;
@@ -230,7 +292,7 @@ export async function getPrices(
 
   try {
     const keys = symbols.map((s) => `${PRICE_KEY_PREFIX}${s}`);
-    const values = await redis.mget<string[]>(...keys);
+    const values = await redis.mget(...keys);
 
     values.forEach((value, index) => {
       if (value) {
@@ -267,13 +329,13 @@ export async function getAllPrices(): Promise<Map<string, CachedPrice>> {
       return result;
     }
 
-    const values = await redis.mget<string[]>(...keys);
+    const values = await redis.mget(...keys);
 
     keys.forEach((key, index) => {
       if (values[index]) {
         try {
           const symbol = key.replace(PRICE_KEY_PREFIX, "");
-          result.set(symbol, JSON.parse(values[index]));
+          result.set(symbol, JSON.parse(values[index] as string));
         } catch {
           // Skip invalid JSON
         }
@@ -342,7 +404,7 @@ export async function dequeueTradeForProcessing(): Promise<QueuedTrade | null> {
 
   try {
     // Pop from end of queue
-    const data = await redis.rpop<string>(TRADE_QUEUE_KEY);
+    const data = await redis.rpop(TRADE_QUEUE_KEY);
 
     if (!data) {
       return null;
@@ -474,8 +536,9 @@ export async function checkRateLimit(
 
     const results = await multi.exec();
 
-    const count = results[0] as number;
-    let ttl = results[1] as number;
+    // ioredis multi results are [error, value][] arrays
+    const count = results?.[0]?.[1] as number;
+    let ttl = results?.[1]?.[1] as number;
 
     // Set expiry if key is new
     if (ttl === -1) {
@@ -566,6 +629,9 @@ export async function clearPriceCache(): Promise<boolean> {
  * Force reconnect to Redis (clear cached instance)
  */
 export async function reconnectRedis(): Promise<void> {
+  if (redisInstance) {
+    try { redisInstance.quit(); } catch { /* ignore */ }
+  }
   redisInstance = null;
   redisDisabled = false;
   lastConfigCheck = 0;

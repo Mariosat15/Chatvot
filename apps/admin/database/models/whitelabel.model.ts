@@ -38,11 +38,15 @@ export interface WhiteLabelDocument extends Document {
   adminPassword: string;
   adminName: string;
 
-  // Redis Configuration (Upstash)
-  upstashRedisUrl: string;
-  upstashRedisToken: string;
+  // Redis Configuration (Self-hosted)
+  redisHost: string;
+  redisPort: number;
+  redisPassword: string;
   redisEnabled: boolean;
   redisPriceSyncEnabled: boolean; // Enable for multi-server deployments
+  // Legacy Upstash fields (kept for backward compatibility)
+  upstashRedisUrl: string;
+  upstashRedisToken: string;
 
   // Inngest Configuration
   inngestSigningKey: string;
@@ -168,12 +172,16 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       default: "Admin",
     },
 
-    // Redis Configuration (Upstash)
-    upstashRedisUrl: {
+    // Redis Configuration (Self-hosted)
+    redisHost: {
       type: String,
-      default: "",
+      default: "127.0.0.1",
     },
-    upstashRedisToken: {
+    redisPort: {
+      type: Number,
+      default: 6379,
+    },
+    redisPassword: {
       type: String,
       default: "",
     },
@@ -184,6 +192,15 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     redisPriceSyncEnabled: {
       type: Boolean,
       default: false, // Enable only for multi-server deployments
+    },
+    // Legacy Upstash fields (kept for backward compatibility)
+    upstashRedisUrl: {
+      type: String,
+      default: "",
+    },
+    upstashRedisToken: {
+      type: String,
+      default: "",
     },
 
     // Inngest Configuration

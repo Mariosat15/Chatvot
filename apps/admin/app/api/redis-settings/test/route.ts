@@ -9,16 +9,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { url, token } = await request.json();
+    const { host, port, password } = await request.json();
 
-    if (!url || !token) {
+    if (!host) {
       return NextResponse.json(
-        { success: false, message: "URL and token are required" },
+        { success: false, message: "Redis host is required" },
         { status: 400 },
       );
     }
 
-    const result = await testRedisConnection(url, token);
+    const result = await testRedisConnection(
+      host,
+      port || 6379,
+      password || undefined,
+    );
 
     return NextResponse.json(result);
   } catch (error) {
