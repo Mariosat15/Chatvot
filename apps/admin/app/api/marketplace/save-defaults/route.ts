@@ -189,6 +189,26 @@ export async function POST(request: NextRequest) {
           console.log(
             `  ✅ "${item.slug}": ${path.basename(sourceFile)} → ${targetFilename}`,
           );
+
+          // Backfill image to MongoDB for multi-server persistence
+          try {
+            const imgBuffer = await readFile(sourceFile);
+            const base64Data = imgBuffer.toString("base64");
+            await MarketplaceItem.updateOne(
+              { _id: item._id },
+              {
+                $set: {
+                  imageData: base64Data,
+                  imageContentType: "image/webp",
+                },
+              },
+            );
+            console.log(
+              `  💾 "${item.slug}": image backed up to DB (${Math.round(base64Data.length / 1024)}KB)`,
+            );
+          } catch (dbBackfillErr) {
+            console.warn(`  ⚠️ "${item.slug}": DB backfill failed:`, dbBackfillErr);
+          }
         } catch (copyErr) {
           console.error(`  ❌ Copy failed for "${item.slug}":`, copyErr);
           imagesMissing++;

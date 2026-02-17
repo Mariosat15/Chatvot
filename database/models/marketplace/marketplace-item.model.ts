@@ -133,6 +133,10 @@ export interface IMarketplaceItem extends Document {
   thumbnailUrl?: string;
   screenshots?: string[];
 
+  // Image stored in DB (base64) for multi-server / deployment persistence
+  imageData?: string; // base64-encoded image
+  imageContentType?: string; // e.g., "image/webp"
+
   // Technical Details
   version: string;
   indicatorType?: IndicatorType; // For indicator items
@@ -307,6 +311,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       enum: ["avatar", "profile_frame", "badge", "title"],
     },
     imageUrl: String, // Image URL for any item type
+    imageData: { type: String, select: false }, // base64-encoded image (excluded from queries by default)
+    imageContentType: { type: String }, // e.g., "image/webp"
     iconName: String, // Lucide icon name for non-cosmetic items
     gameMasterConfig: {
       maxCompetitionsPerDay: { type: Number, min: 1, default: 1 },

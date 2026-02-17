@@ -10,7 +10,8 @@ import {
   MarketplaceItem,
   IMarketplaceItem,
 } from "@/database/models/marketplace/marketplace-item.model";
-import { readFile } from "fs/promises";
+import { readFile, access } from "fs/promises";
+import { constants } from "fs";
 import path from "path";
 
 // ============================================================================
@@ -939,6 +940,48 @@ const ALL_ITEMS = [
 ];
 
 // ============================================================================
+// HELPER: Backfill imageData to DB from disk (for multi-server persistence)
+// ============================================================================
+
+async function backfillImageToDb(slug: string, imageUrl: string | undefined): Promise<void> {
+  if (!imageUrl) return;
+
+  // Check if the item already has imageData
+  const existing = await MarketplaceItem.findOne({ slug }).select("+imageData").lean() as any;
+  if (existing?.imageData) return; // Already has image in DB
+
+  // Try to find the image file on disk
+  const urlPath = imageUrl.split("?")[0];
+  const filename = urlPath.split("/").pop();
+  if (!filename) return;
+
+  const cwd = process.cwd();
+  const searchDirs = [
+    path.join(cwd, "public", "assets", "marketplace"),
+    path.join(cwd, "public", "uploads", "marketplace"),
+    path.join(cwd, "..", "..", "public", "assets", "marketplace"),
+    path.join(cwd, "..", "..", "public", "uploads", "marketplace"),
+  ];
+
+  for (const dir of searchDirs) {
+    const filePath = path.join(dir, filename);
+    try {
+      await access(filePath, constants.R_OK);
+      const imgBuffer = await readFile(filePath);
+      const base64Data = imgBuffer.toString("base64");
+      await MarketplaceItem.updateOne(
+        { slug },
+        { $set: { imageData: base64Data, imageContentType: "image/webp" } },
+      );
+      console.log(`  💾 [Seed] Backfilled image to DB for "${slug}" (${Math.round(base64Data.length / 1024)}KB)`);
+      return;
+    } catch {
+      // File not found at this path, try next
+    }
+  }
+}
+
+// ============================================================================
 // SEED FUNCTION
 // ============================================================================
 
@@ -1076,14 +1119,18 @@ export async function seedMarketplaceItems(
         }
         await existing.save();
         result.updated++;
+        // Backfill image to DB if on disk and not yet in DB
+        await backfillImageToDb(itemData.slug, existing.imageUrl || itemData.imageUrl).catch(() => {});
         continue;
       }
 
-      await MarketplaceItem.create({
+      const newItem = await MarketplaceItem.create({
         ...itemData,
         createdBy: adminId,
       });
       result.created++;
+      // Backfill image to DB if on disk
+      await backfillImageToDb(itemData.slug, newItem.imageUrl || itemData.imageUrl).catch(() => {});
     } catch (error) {
       result.errors.push(
         `Failed to create ${itemData.slug}: ${error instanceof Error ? error.message : "Unknown error"}`,

@@ -167,6 +167,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Backup image to database for multi-server persistence
+    try {
+      const { connectToDatabase } = await import("@/database/mongoose");
+      const { MarketplaceItem } = await import(
+        "@/database/models/marketplace/marketplace-item.model"
+      );
+      await connectToDatabase();
+
+      const base64Data = optimizedBuffer.toString("base64");
+      const result = await MarketplaceItem.updateOne(
+        { slug: itemSlug },
+        {
+          $set: {
+            imageData: base64Data,
+            imageContentType: "image/webp",
+          },
+        },
+      );
+
+      if (result.matchedCount > 0) {
+        console.log(
+          `💾 [Marketplace Upload] Image backed up to DB for "${itemSlug}" (${Math.round(base64Data.length / 1024)}KB base64)`,
+        );
+      } else {
+        console.warn(
+          `⚠️ [Marketplace Upload] No item found with slug "${itemSlug}" - DB backup skipped`,
+        );
+      }
+    } catch (dbErr) {
+      console.warn(`⚠️ [Marketplace Upload] Could not backup image to DB:`, dbErr);
+    }
+
     // Return API-served path (works in production without rebuild)
     // Use API route for dynamic serving, with timestamp for cache-busting
     const publicPath = `/api/assets/marketplace/${filename}?t=${timestamp}`;

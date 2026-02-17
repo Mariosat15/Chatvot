@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, access } from "fs/promises";
+import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
 
@@ -8,7 +8,8 @@ import { constants } from "fs";
  * Serve marketplace cosmetic images from the uploads directory
  * This allows the user app to access uploaded cosmetic images (avatars, etc.)
  *
- * Smart fallback: If original file not found, tries .webp version (after optimization)
+ * Fallback chain: disk -> MongoDB (imageData on MarketplaceItem) -> 404
+ * If found in DB, auto-restores to disk for future requests.
  */
 export async function GET(
   req: NextRequest,
@@ -63,40 +64,66 @@ export async function GET(
       }
     }
 
-    if (!filePath) {
-      console.error(
-        `❌ Marketplace image not found in any location: ${sanitizedFilename} (also tried: ${webpFilename})`,
+    // If found on disk, serve directly
+    if (filePath) {
+      const fileBuffer = await readFile(filePath);
+      const ext = actualFilename.split(".").pop()?.toLowerCase();
+      const contentType = getContentType(ext);
+
+      return new NextResponse(fileBuffer as unknown as BodyInit, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    // Not on disk - try to serve from MongoDB (imageData on MarketplaceItem)
+    try {
+      const { connectToDatabase } = await import("@/database/mongoose");
+      const { MarketplaceItem } = await import(
+        "@/database/models/marketplace/marketplace-item.model"
       );
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+      await connectToDatabase();
+
+      // Find item whose imageUrl contains this filename
+      const item = await MarketplaceItem.findOne({
+        imageUrl: { $regex: sanitizedFilename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") },
+      }).select("+imageData +imageContentType");
+
+      if (item?.imageData) {
+        console.log(
+          `🔄 [Marketplace Serve] Restoring image from DB: ${sanitizedFilename} (item: ${item.slug})`,
+        );
+        const buffer = Buffer.from(item.imageData, "base64");
+
+        // Auto-restore to disk for future requests
+        try {
+          const restoreDir = baseDirs[1]; // public/uploads/marketplace
+          await mkdir(restoreDir, { recursive: true });
+          await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
+          console.log(
+            `✅ [Marketplace Serve] Auto-restored to disk: ${sanitizedFilename}`,
+          );
+        } catch (restoreErr) {
+          console.warn(`⚠️ [Marketplace Serve] Could not auto-restore to disk:`, restoreErr);
+        }
+
+        return new NextResponse(buffer as unknown as BodyInit, {
+          headers: {
+            "Content-Type": item.imageContentType || "image/webp",
+            "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.warn(`⚠️ [Marketplace Serve] DB fallback failed:`, dbErr);
     }
 
-    // Log if we used the webp fallback
-    if (actualFilename !== sanitizedFilename) {
-      // Serving optimized WebP fallback
-    }
-
-    const fileBuffer = await readFile(filePath);
-
-    // Determine content type from actual file (may be webp fallback)
-    const ext = actualFilename.split(".").pop()?.toLowerCase();
-    const contentTypes: Record<string, string> = {
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      webp: "image/webp",
-      svg: "image/svg+xml",
-      ico: "image/x-icon",
-    };
-    const contentType = contentTypes[ext || "png"] || "image/png";
-
-    return new NextResponse(fileBuffer as unknown as BodyInit, {
-      headers: {
-        "Content-Type": contentType,
-        // Allow caching for marketplace images (1 hour, revalidate for 1 day)
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
-      },
-    });
+    console.error(
+      `❌ Marketplace image not found (disk or DB): ${sanitizedFilename}`,
+    );
+    return NextResponse.json({ error: "Image not found" }, { status: 404 });
   } catch (error) {
     console.error("Error serving marketplace image:", error);
     return NextResponse.json(
@@ -104,4 +131,17 @@ export async function GET(
       { status: 500 },
     );
   }
+}
+
+function getContentType(ext: string | undefined): string {
+  const contentTypes: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    ico: "image/x-icon",
+  };
+  return contentTypes[ext || "png"] || "image/png";
 }
