@@ -34,16 +34,24 @@ export async function GET(
       filenamesToTry.push(webpFilename);
     }
 
-    // Base directories to search (no hardcoded paths - works on any server)
+    // Base directories to search
     const cwd = process.cwd();
     const baseDirs = [
-      // Committed assets (defaults) - check first
-      path.join(cwd, "public", "assets", "marketplace"),
+      // Production: absolute paths (most reliable on VPS)
+      path.join("/var/www/chartvolt", "public", "assets", "marketplace"),
+      path.join("/var/www/chartvolt", "public", "uploads", "marketplace"),
+      // Monorepo: admin cwd is apps/admin, go up 2 levels to repo root
       path.join(cwd, "..", "..", "public", "assets", "marketplace"),
-      // Runtime uploads
-      path.join(cwd, "public", "uploads", "marketplace"),
       path.join(cwd, "..", "..", "public", "uploads", "marketplace"),
+      // Direct: if cwd is repo root
+      path.join(cwd, "public", "assets", "marketplace"),
+      path.join(cwd, "public", "uploads", "marketplace"),
     ];
+
+    // #region agent log
+    console.log(`🛒 [Marketplace Serve] Request: ${sanitizedFilename} | cwd: ${cwd}`);
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:entry',message:'Marketplace image request',data:{sanitizedFilename,cwd,baseDirs},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
 
     let filePath: string | null = null;
     let actualFilename: string = sanitizedFilename;
@@ -65,6 +73,9 @@ export async function GET(
 
     // If found on disk, serve directly
     if (filePath) {
+      // #region agent log
+      console.log(`🛒 [Marketplace Serve] FOUND on disk: ${filePath}`);
+      // #endregion
       const fileBuffer = await readFile(filePath);
       const ext = actualFilename.split(".").pop()?.toLowerCase();
       const contentType = getContentType(ext);
@@ -76,6 +87,11 @@ export async function GET(
         },
       });
     }
+
+    // #region agent log
+    console.log(`🛒 [Marketplace Serve] Not on disk, trying DB for: ${sanitizedFilename}`);
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:disk-miss',message:'Not found on disk, trying DB',data:{sanitizedFilename},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
 
     // Not on disk - try to serve from MongoDB (imageData on MarketplaceItem)
     try {
@@ -90,22 +106,37 @@ export async function GET(
         imageUrl: { $regex: sanitizedFilename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") },
       }).select("+imageData +imageContentType");
 
+      // #region agent log
+      console.log(`🛒 [Marketplace Serve] DB result: found=${!!item}, hasImageData=${!!item?.imageData}, slug=${item?.slug}`);
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'marketplace-route:db-result',message:'DB lookup result',data:{sanitizedFilename,itemFound:!!item,hasImageData:!!item?.imageData,slug:item?.slug},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+
       if (item?.imageData) {
         console.log(
           `🔄 [Marketplace Serve] Restoring image from DB: ${sanitizedFilename} (item: ${item.slug})`,
         );
         const buffer = Buffer.from(item.imageData, "base64");
 
-        // Auto-restore to disk for future requests
+        // Auto-restore to disk for future requests (use production path first, then cwd)
         try {
-          const restoreDir = baseDirs[2]; // public/uploads/marketplace (admin-local)
+          const restoreDir = baseDirs[0]; // /var/www/chartvolt/public/assets/marketplace
           await mkdir(restoreDir, { recursive: true });
           await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
           console.log(
-            `✅ [Marketplace Serve] Auto-restored to disk: ${sanitizedFilename}`,
+            `✅ [Marketplace Serve] Auto-restored to disk: ${path.join(restoreDir, sanitizedFilename)}`,
           );
         } catch (restoreErr) {
-          console.warn(`⚠️ [Marketplace Serve] Could not auto-restore to disk:`, restoreErr);
+          // Try cwd-relative path
+          try {
+            const restoreDir2 = baseDirs[2]; // ../../public/assets/marketplace
+            await mkdir(restoreDir2, { recursive: true });
+            await writeFile(path.join(restoreDir2, sanitizedFilename), buffer);
+            console.log(
+              `✅ [Marketplace Serve] Auto-restored to disk (alt): ${path.join(restoreDir2, sanitizedFilename)}`,
+            );
+          } catch {
+            console.warn(`⚠️ [Marketplace Serve] Could not auto-restore to disk:`, restoreErr);
+          }
         }
 
         return new NextResponse(buffer, {

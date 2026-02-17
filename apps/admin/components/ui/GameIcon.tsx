@@ -20,7 +20,7 @@ interface GameIconProps {
  * 
  * A reusable component for displaying game-themed icons in the admin panel.
  * Supports white-label deployments by using dynamic asset URLs.
- * Uses Next.js Image component for optimization.
+ * Uses regular img tag for API routes and external URLs, Next.js Image for static paths.
  */
 export function GameIcon({
   name,
@@ -41,10 +41,11 @@ export function GameIcon({
     return <span className={cn("flex-shrink-0", className)} style={{ fontSize: size * 0.75 }}>{name}</span>;
   }
 
-  // Use regular img tag for external URLs (white-label), Next Image for local
-  const isExternalUrl = iconPath.startsWith('http');
+  // Use regular img tag for external URLs, API routes, and white-label paths
+  // Next.js Image optimization can have issues with dynamic API routes
+  const useRegularImg = iconPath.startsWith('http') || iconPath.startsWith('/api/');
   
-  if (isExternalUrl) {
+  if (useRegularImg) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img

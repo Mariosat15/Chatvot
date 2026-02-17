@@ -21,18 +21,27 @@ export async function GET(
     const sanitizedFilename = path.basename(decodeURIComponent(filename).split("?")[0]);
 
     // Try multiple possible locations for the file
+    const cwd = process.cwd();
     const possiblePaths = [
-      // Production: /var/www/chartvolt/public/game-icons/
+      // Production: absolute path (most reliable)
       path.join("/var/www/chartvolt", "public", "game-icons", sanitizedFilename),
-      // Local dev: main app's public folder (monorepo root, from apps/admin)
-      path.join(process.cwd(), "..", "..", "public", "game-icons", sanitizedFilename),
-      // Fallback: cwd-relative (if running from project root)
-      path.join(process.cwd(), "public", "game-icons", sanitizedFilename),
+      // Monorepo: admin cwd is apps/admin, go up 2 levels to repo root
+      path.join(cwd, "..", "..", "public", "game-icons", sanitizedFilename),
+      // Direct: if cwd is repo root
+      path.join(cwd, "public", "game-icons", sanitizedFilename),
     ];
+
+    // #region agent log
+    console.log(`🎮 [Game Icons] Request: ${sanitizedFilename} | cwd: ${cwd}`);
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game-icons-route:entry',message:'Game icon request',data:{filename,sanitizedFilename,cwd,possiblePaths},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     for (const filePath of possiblePaths) {
       try {
         await access(filePath, constants.R_OK);
+        // #region agent log
+        console.log(`🎮 [Game Icons] FOUND: ${filePath}`);
+        // #endregion
         const fileBuffer = await readFile(filePath);
         const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
 
@@ -47,9 +56,12 @@ export async function GET(
       }
     }
 
+    // #region agent log
+    console.log(`🎮 [Game Icons] NOT FOUND: ${sanitizedFilename} | Searched: ${possiblePaths.join(', ')}`);
+    // #endregion
     return NextResponse.json({ error: "Icon not found" }, { status: 404 });
   } catch (error) {
-    console.error("❌ Error serving game icon:", error);
+    console.error("❌ [Game Icons] Error:", error);
     return NextResponse.json({ error: "Failed to serve icon" }, { status: 500 });
   }
 }
