@@ -376,6 +376,205 @@ sudo ./deploy/setup-new-customer.sh
 
 ---
 
+## Post-Deployment Setup Checklist
+
+After the deployment script completes, follow this checklist to make the app fully operational.
+**Estimated time: 10-15 minutes.**
+
+### What Happens Automatically (No Action Needed)
+
+These are created by the deployment script and auto-seed on first use:
+
+- [x] Database indexes (30+ collections indexed for fast queries)
+- [x] 30+ trading symbols (EUR/USD, GBP/USD, USD/JPY, etc.)
+- [x] Market data settings (WebSocket intervals, candle limits)
+- [x] Marketplace items (3 premium indicators, 12 cosmetic avatars, 3 Game Master packages)
+- [x] 69 notification templates (trading, competition, achievement, system)
+- [x] Badges & XP configuration (50+ levels, achievement badges)
+- [x] WhiteLabel settings document (created with defaults)
+- [x] Worker cron jobs (margin checks, competitions, badge evaluation)
+- [x] Redis installed and secured with generated password
+- [x] NGINX configured with your domain and rate limiting
+- [x] SSL certificates (if DNS was ready during setup)
+- [x] `.env` file generated with random secrets
+- [x] `.env` symlink for admin app
+
+### Step 1: MongoDB Atlas IP Whitelist (REQUIRED)
+
+Your new VPS server cannot connect to MongoDB until you whitelist its IP.
+
+1. Go to [MongoDB Atlas](https://cloud.mongodb.com)
+2. Select your cluster
+3. Go to **Security > Network Access** (left sidebar)
+4. Click **"+ Add IP Address"**
+5. Enter your new VPS IP address (printed by the setup script)
+6. Click **Confirm**
+7. Wait 1-2 minutes for the change to propagate
+
+**Verify it works:**
+```bash
+# On the VPS, check if the app can connect:
+pm2 logs chartvolt-web --lines 20
+# Should show: "Connected to MongoDB" (not connection errors)
+```
+
+> If you have multiple white-label servers, each server's IP must be whitelisted separately. Alternatively, use `0.0.0.0/0` to allow all IPs (less secure but simpler).
+
+### Step 2: First Admin Login (REQUIRED)
+
+1. Open `https://admin.yourdomain.com` in your browser
+2. Login with the credentials you entered during the setup script
+3. Change the admin password if prompted
+
+> If admin login fails, verify the `.env` symlink exists:
+> ```bash
+> ls -la /var/www/chartvolt/apps/admin/.env
+> # Should show: .env -> /var/www/chartvolt/.env
+> ```
+
+### Step 3: Massive.com API Keys (REQUIRED - for trading data)
+
+Without these, **charts won't load and prices won't stream**.
+
+1. Go to [massive.com](https://massive.com) and get your API keys
+2. In admin panel: **Settings > Environment Variables**
+3. Set these two keys:
+   - `massiveApiKey` — server-side API key (used for historical data, candle fetching)
+   - `nextPublicMassiveApiKey` — client-side API key (used for WebSocket price streaming)
+4. Save
+
+**Verify it works:**
+```bash
+# Restart the web app to pick up new keys:
+pm2 restart chartvolt-web
+
+# Check for price streaming:
+pm2 logs chartvolt-web --lines 30
+# Should show: "WebSocket connected" and price updates
+```
+
+Then open `https://yourdomain.com`, navigate to a chart, and verify:
+- Candles are loading (historical data)
+- Prices are updating in real-time (WebSocket streaming)
+
+### Step 4: Redis Configuration (REQUIRED)
+
+1. In admin panel: **Settings > Redis**
+2. Enter the credentials from the setup script output:
+   - **Redis Host:** `127.0.0.1`
+   - **Redis Port:** `6379`
+   - **Redis Password:** (the password printed by the setup script)
+3. Click **"Test Connection"** — should show "Connection successful!"
+4. Toggle **"Enable Redis Cache"** ON
+5. Leave **"Multi-Server Price Sync"** OFF (single server)
+6. Save
+
+> Redis provides: trade queue processing, rate limiting, and optional price caching.
+
+### Step 5: Email Configuration (REQUIRED - for user emails)
+
+Without this, users won't receive welcome emails, password resets, or notifications.
+
+1. In admin panel: **Settings > Environment Variables**
+2. Configure Nodemailer:
+   - `nodemailerEmail` — a Gmail address (e.g., `noreply@yourdomain.com` or a Gmail account)
+   - `nodemailerPassword` — a **Gmail App Password** (NOT your regular Gmail password)
+
+**How to get a Gmail App Password:**
+1. Go to [myaccount.google.com/security](https://myaccount.google.com/security)
+2. Enable **2-Step Verification** if not already enabled
+3. Go to **App passwords** (search "App passwords" in the security page)
+4. Select app: "Mail", device: "Other" (enter "Chartvolt")
+5. Copy the 16-character password
+6. Paste it as `nodemailerPassword`
+
+**Verify it works:**
+- Register a test user on `https://yourdomain.com`
+- Check if the welcome email arrives
+
+### Step 6: Branding & White-Label Appearance (REQUIRED)
+
+1. In admin panel: **Settings > Branding**
+2. Upload:
+   - **App Logo** — main logo shown in the navigation bar
+   - **Favicon** — browser tab icon (recommended: 32x32 or 64x64 .ico/.png)
+   - **Email Logo** — logo used in email templates
+3. Set:
+   - **App Name** — the client's brand name
+   - **Theme Colors** — primary/secondary colors
+   - **Footer Text** — copyright text
+
+> After uploading branding images, they are automatically persisted in the database for durability across deployments.
+
+### Step 7: Payment Provider (IF accepting payments)
+
+Only needed if the client will sell marketplace items, Game Master subscriptions, etc.
+
+1. In admin panel: **Settings > Payment Providers**
+2. Configure **Stripe** (recommended):
+   - `STRIPE_SECRET_KEY` — starts with `sk_live_...`
+   - `STRIPE_PUBLISHABLE_KEY` — starts with `pk_live_...`
+   - `STRIPE_WEBHOOK_SECRET` — starts with `whsec_...`
+
+**Stripe Webhook Setup:**
+1. Go to [Stripe Dashboard > Webhooks](https://dashboard.stripe.com/webhooks)
+2. Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
+3. Select events: `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.payment_failed`
+4. Copy the webhook signing secret to admin panel
+
+### Step 8: Optional Configuration
+
+These are nice-to-have but not required for the app to function:
+
+| Setting | Where | Purpose |
+|---------|-------|---------|
+| OpenAI API Key | Settings > Environment Variables | AI-powered email personalization |
+| Inngest Keys | Settings > Environment Variables | Event-driven email delivery (cloud mode) |
+| Competition Settings | Settings > Competitions | Default rules, durations, prize structures |
+| Risk Management | Settings > Trading | Max leverage, margin requirements |
+| Currency Settings | Settings > General | Display currency (EUR, USD, etc.) |
+
+### Step 9: Final Verification
+
+Run through this checklist to confirm everything works:
+
+- [ ] **Homepage loads:** `https://yourdomain.com` shows the landing page
+- [ ] **Admin loads:** `https://admin.yourdomain.com` shows the admin dashboard
+- [ ] **User registration:** Register a test user, confirm welcome email arrives
+- [ ] **Charts work:** Open a trading chart, candles load, prices stream in real-time
+- [ ] **Marketplace:** Items are visible (avatars, indicators, Game Master packages)
+- [ ] **Redis connected:** Admin > Redis shows "Connected" with green badge
+- [ ] **All services running:** SSH and run `pm2 status` — all 5 services show "online"
+- [ ] **Worker active:** `pm2 logs chartvolt-worker --lines 20` shows job execution
+- [ ] **SSL working:** Browser shows padlock icon on both domains
+- [ ] **WebSocket:** `curl https://yourdomain.com/ws-health` returns OK
+
+```bash
+# Quick health check from VPS:
+curl -s http://localhost:3000/health && echo " ✅ User App"
+curl -s http://localhost:3001/health && echo " ✅ Admin App"
+curl -s http://localhost:4000/api/health && echo " ✅ API Server"
+curl -s http://localhost:3003/health && echo " ✅ WebSocket"
+systemctl is-active redis-server && echo "✅ Redis"
+```
+
+### Summary: Time Estimate Per Step
+
+| Step | Time | Required? |
+|------|------|-----------|
+| 1. MongoDB IP Whitelist | 2 min | Yes |
+| 2. First Admin Login | 1 min | Yes |
+| 3. Massive.com API Keys | 2 min | Yes |
+| 4. Redis Configuration | 1 min | Yes |
+| 5. Email Configuration | 5 min | Yes |
+| 6. Branding | 5 min | Yes |
+| 7. Payment Provider | 5 min | If selling |
+| 8. Optional Settings | 5 min | No |
+| 9. Verification | 3 min | Yes |
+| **Total** | **~15-25 min** | |
+
+---
+
 ## Deploying Updates
 
 For existing installations, use the deploy script:
