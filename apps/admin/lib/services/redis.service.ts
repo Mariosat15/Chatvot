@@ -10,6 +10,11 @@ let redisDisabled = false; // Track if Redis was explicitly disabled
 let lastConfigCheck = 0;
 const CONFIG_CHECK_INTERVAL = 60000; // Check config every minute
 
+// Track last known config to avoid unnecessary reconnections
+let lastHost = "";
+let lastPort = 0;
+let lastPassword = "";
+
 export interface RedisConfig {
   host: string;
   port: number;
@@ -75,10 +80,21 @@ export async function getRedis(): Promise<Redis | null> {
   // Redis is enabled, create instance
   redisDisabled = false;
 
+  // Check if config actually changed - if not, reuse existing connection
+  const configChanged =
+    config.host !== lastHost ||
+    config.port !== lastPort ||
+    config.password !== lastPassword;
+
+  if (redisInstance && !configChanged) {
+    return redisInstance;
+  }
+
   try {
-    // Disconnect old instance before creating new one
+    // Disconnect old instance before creating new one (config changed)
     if (redisInstance) {
       try { redisInstance.quit(); } catch { /* ignore */ }
+      redisInstance = null;
     }
 
     const opts: Record<string, unknown> = {
@@ -111,6 +127,11 @@ export async function getRedis(): Promise<Redis | null> {
     redisInstance.on("close", () => {
       console.log("🟡 [Redis] Connection closed");
     });
+
+    // Store current config for future comparison
+    lastHost = config.host;
+    lastPort = config.port;
+    lastPassword = config.password;
 
     return redisInstance;
   } catch (error) {
@@ -635,4 +656,7 @@ export async function reconnectRedis(): Promise<void> {
   redisInstance = null;
   redisDisabled = false;
   lastConfigCheck = 0;
+  lastHost = "";
+  lastPort = 0;
+  lastPassword = "";
 }

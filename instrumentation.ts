@@ -25,5 +25,16 @@ export async function register() {
         console.error("❌ [Instrumentation] Failed to warm cache:", err);
       }
     }, 5000); // 5 second delay to let server fully initialize
+
+    // Start server fleet heartbeat (reports stats to MongoDB every 30s)
+    setTimeout(async () => {
+      try {
+        const { startHeartbeat } =
+          await import("./lib/services/server-heartbeat.service");
+        startHeartbeat();
+      } catch (err) {
+        console.error("❌ [Instrumentation] Failed to start heartbeat:", err);
+      }
+    }, 10000); // 10 second delay to let MongoDB connect first
   }
 }

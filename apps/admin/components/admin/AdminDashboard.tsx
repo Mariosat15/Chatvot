@@ -97,6 +97,7 @@ import LandingPageBuilder from "@/components/admin/LandingPageBuilder";
 import RedisSettingsSection from "@/components/admin/RedisSettingsSection";
 import MdbClusterSection from "@/components/admin/MdbClusterSection";
 import ServerMonitorSection from "@/components/admin/ServerMonitorSection";
+import ServerFleetSection from "@/components/admin/ServerFleetSection";
 import ServerOptionsSection from "@/components/admin/ServerOptionsSection";
 import DevSettingsSection from "@/components/admin/DevSettingsSection";
 import ImageOptimizerSection from "@/components/admin/ImageOptimizerSection";
@@ -590,6 +591,11 @@ const menuGroups: MenuGroup[] = [
             icon: <Activity className="h-4 w-4" />,
           },
           {
+            id: "server-fleet",
+            label: "Server Fleet",
+            icon: <Globe className="h-4 w-4" />,
+          },
+          {
             id: "server-options",
             label: "Server Options",
             icon: <Cog className="h-4 w-4" />,
@@ -1017,6 +1023,8 @@ export default function AdminDashboard({
         return <PaymentProvidersSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
+      case "server-fleet":
+        return <ServerFleetSection key={currentRefreshKey} />;
       case "server-options":
         return <ServerOptionsSection key={currentRefreshKey} />;
       case "redis":

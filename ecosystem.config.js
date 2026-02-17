@@ -18,6 +18,33 @@ require('dotenv').config();
 const ADMIN_HEAP_MB = Math.max(1024, parseInt(process.env.ADMIN_HEAP_MB || '4096', 10) || 4096);
 const ADMIN_MAX_MEMORY_RESTART = `${Math.ceil(ADMIN_HEAP_MB / 1024)}G`;
 
+// Multi-server support: IS_PRIMARY defaults to true (backward compatible)
+// Set IS_PRIMARY=false in .env on secondary servers to skip the worker
+const IS_PRIMARY = process.env.IS_PRIMARY !== 'false';
+
+// PM2 cluster mode: set WEB_INSTANCES in .env to scale the web app (default 1)
+const WEB_INSTANCES = Math.max(1, parseInt(process.env.WEB_INSTANCES || '1', 10) || 1);
+
+// Worker config (only included on primary servers)
+const workerApp = {
+  name: 'chartvolt-worker',
+  script: 'dist/worker/index.js',
+  cwd: __dirname,
+  env: {
+    NODE_ENV: 'production',
+    IS_WORKER: 'true',
+  },
+  instances: 1,
+  exec_mode: 'fork',
+  autorestart: true,
+  watch: false,
+  max_memory_restart: '512M',
+  error_file: './logs/worker-error.log',
+  out_file: './logs/worker-out.log',
+  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+  kill_timeout: 10000,
+};
+
 module.exports = {
   apps: [
     // ============================================
@@ -32,8 +59,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
-      instances: 1, // Can increase for clustering
-      exec_mode: 'fork',
+      instances: WEB_INSTANCES,
+      exec_mode: WEB_INSTANCES > 1 ? 'cluster' : 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
@@ -74,27 +101,9 @@ module.exports = {
     },
 
     // ============================================
-    // BACKGROUND WORKER
+    // BACKGROUND WORKER (only on primary server)
     // ============================================
-    {
-      name: 'chartvolt-worker',
-      script: 'dist/worker/index.js',
-      cwd: __dirname,
-      env: {
-        NODE_ENV: 'production',
-        IS_WORKER: 'true',  // CRITICAL: Prevents WebSocket connection - worker reads from MongoDB cache
-      },
-      instances: 1, // Only 1 worker needed
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '512M',
-      error_file: './logs/worker-error.log',
-      out_file: './logs/worker-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      // Graceful shutdown
-      kill_timeout: 10000,
-    },
+    ...(IS_PRIMARY ? [workerApp] : []),
 
     // ============================================
     // API SERVER (Bcrypt Worker Threads)

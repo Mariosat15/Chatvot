@@ -19,7 +19,8 @@
 #
 # Usage:
 #   chmod +x deploy/setup-new-customer.sh
-#   sudo ./deploy/setup-new-customer.sh
+#   sudo ./deploy/setup-new-customer.sh               # Primary server (full setup)
+#   sudo ./deploy/setup-new-customer.sh --secondary    # Secondary server (no Redis, no worker, no DB seed)
 #
 # Prerequisites:
 #   - Fresh Ubuntu/Debian server (Hostinger VPS)
@@ -27,9 +28,22 @@
 #   - Domain name with DNS A records pointing to this server's IP
 #   - MongoDB Atlas connection string ready
 #   - Git repository URL ready
+#   - (Secondary only) Primary server's Redis host/port/password
 #
 
 set -e
+
+# ============================================
+# PARSE ARGUMENTS
+# ============================================
+IS_SECONDARY=false
+for arg in "$@"; do
+  case $arg in
+    --secondary)
+      IS_SECONDARY=true
+      ;;
+  esac
+done
 
 # ============================================
 # COLORS
@@ -67,7 +81,11 @@ print_error() {
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     CHARTVOLT WHITE LABEL SETUP                          ║${NC}"
-echo -e "${BLUE}║     Complete automated installation                      ║${NC}"
+if [ "$IS_SECONDARY" = true ]; then
+echo -e "${YELLOW}║     MODE: SECONDARY SERVER (no Redis, no worker)         ║${NC}"
+else
+echo -e "${BLUE}║     MODE: PRIMARY SERVER (full installation)             ║${NC}"
+fi
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -132,12 +150,40 @@ if [ -z "$ADMIN_PASSWORD" ]; then
   exit 1
 fi
 
+# Secondary server: ask for primary Redis connection
+REDIS_HOST=""
+REDIS_PORT=""
+REDIS_PASSWORD=""
+if [ "$IS_SECONDARY" = true ]; then
+  echo ""
+  echo -e "${YELLOW}Secondary server needs to connect to the primary server's Redis:${NC}"
+  read -p "Primary Redis Host (e.g. 10.0.0.1 or primary VPS IP): " REDIS_HOST
+  if [ -z "$REDIS_HOST" ]; then
+    print_error "Redis host is required for secondary servers"
+    exit 1
+  fi
+  read -p "Primary Redis Port [6379]: " REDIS_PORT
+  REDIS_PORT=${REDIS_PORT:-6379}
+  read -s -p "Primary Redis Password: " REDIS_PASSWORD
+  echo ""
+  if [ -z "$REDIS_PASSWORD" ]; then
+    print_error "Redis password is required for secondary servers"
+    exit 1
+  fi
+fi
+
 echo ""
 echo "Configuration summary:"
 echo "  Domain:       https://${DOMAIN}"
 echo "  Admin:        https://${ADMIN_DOMAIN}"
 echo "  Repository:   ${REPO_URL}"
 echo "  Admin email:  ${ADMIN_EMAIL}"
+if [ "$IS_SECONDARY" = true ]; then
+echo "  Server role:  SECONDARY"
+echo "  Redis host:   ${REDIS_HOST}:${REDIS_PORT}"
+else
+echo "  Server role:  PRIMARY"
+fi
 echo ""
 read -p "Continue with these settings? (y/n): " CONFIRM
 if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
@@ -184,72 +230,80 @@ print_success "Certbot installed"
 # STEP 2: INSTALL AND CONFIGURE REDIS
 # ============================================
 
-print_header "STEP 2/10: REDIS INSTALLATION"
-
-apt install -y redis-server
-
-REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
-REDIS_CONF="/etc/redis/redis.conf"
-
-cp "$REDIS_CONF" "${REDIS_CONF}.bak"
-
-# Bind to localhost only
-if grep -q "^bind " "$REDIS_CONF"; then
-  sed -i 's/^bind .*/bind 127.0.0.1 ::1/' "$REDIS_CONF"
+if [ "$IS_SECONDARY" = true ]; then
+  print_header "STEP 2/10: REDIS (SKIPPED - using primary server's Redis)"
+  echo "Secondary server will connect to Redis at ${REDIS_HOST}:${REDIS_PORT}"
+  print_success "Redis config collected from input"
 else
-  echo "bind 127.0.0.1 ::1" >> "$REDIS_CONF"
-fi
+  print_header "STEP 2/10: REDIS INSTALLATION"
 
-# Set password
-if grep -q "^requirepass " "$REDIS_CONF"; then
-  sed -i "s/^requirepass .*/requirepass ${REDIS_PASSWORD}/" "$REDIS_CONF"
-elif grep -q "^# requirepass " "$REDIS_CONF"; then
-  sed -i "s/^# requirepass .*/requirepass ${REDIS_PASSWORD}/" "$REDIS_CONF"
-else
-  echo "requirepass ${REDIS_PASSWORD}" >> "$REDIS_CONF"
-fi
+  apt install -y redis-server
 
-# Memory limit
-if grep -q "^maxmemory " "$REDIS_CONF"; then
-  sed -i 's/^maxmemory .*/maxmemory 8gb/' "$REDIS_CONF"
-else
-  echo "maxmemory 8gb" >> "$REDIS_CONF"
-fi
+  REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
+  REDIS_HOST="127.0.0.1"
+  REDIS_PORT="6379"
+  REDIS_CONF="/etc/redis/redis.conf"
 
-# Eviction policy
-if grep -q "^maxmemory-policy " "$REDIS_CONF"; then
-  sed -i 's/^maxmemory-policy .*/maxmemory-policy allkeys-lru/' "$REDIS_CONF"
-else
-  echo "maxmemory-policy allkeys-lru" >> "$REDIS_CONF"
-fi
+  cp "$REDIS_CONF" "${REDIS_CONF}.bak"
 
-# Performance tuning
-echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null || true
+  # Bind to localhost only
+  if grep -q "^bind " "$REDIS_CONF"; then
+    sed -i 's/^bind .*/bind 127.0.0.1 ::1/' "$REDIS_CONF"
+  else
+    echo "bind 127.0.0.1 ::1" >> "$REDIS_CONF"
+  fi
 
-if [ ! -f /etc/rc.local ] || ! grep -q "transparent_hugepage" /etc/rc.local 2>/dev/null; then
-  cat > /etc/rc.local << 'RCEOF'
+  # Set password
+  if grep -q "^requirepass " "$REDIS_CONF"; then
+    sed -i "s/^requirepass .*/requirepass ${REDIS_PASSWORD}/" "$REDIS_CONF"
+  elif grep -q "^# requirepass " "$REDIS_CONF"; then
+    sed -i "s/^# requirepass .*/requirepass ${REDIS_PASSWORD}/" "$REDIS_CONF"
+  else
+    echo "requirepass ${REDIS_PASSWORD}" >> "$REDIS_CONF"
+  fi
+
+  # Memory limit
+  if grep -q "^maxmemory " "$REDIS_CONF"; then
+    sed -i 's/^maxmemory .*/maxmemory 8gb/' "$REDIS_CONF"
+  else
+    echo "maxmemory 8gb" >> "$REDIS_CONF"
+  fi
+
+  # Eviction policy
+  if grep -q "^maxmemory-policy " "$REDIS_CONF"; then
+    sed -i 's/^maxmemory-policy .*/maxmemory-policy allkeys-lru/' "$REDIS_CONF"
+  else
+    echo "maxmemory-policy allkeys-lru" >> "$REDIS_CONF"
+  fi
+
+  # Performance tuning
+  echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null || true
+
+  if [ ! -f /etc/rc.local ] || ! grep -q "transparent_hugepage" /etc/rc.local 2>/dev/null; then
+    cat > /etc/rc.local << 'RCEOF'
 #!/bin/bash
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
 exit 0
 RCEOF
-  chmod +x /etc/rc.local
-fi
+    chmod +x /etc/rc.local
+  fi
 
-if ! grep -q "net.core.somaxconn" /etc/sysctl.conf 2>/dev/null; then
-  echo "net.core.somaxconn = 65535" >> /etc/sysctl.conf
-fi
-if ! grep -q "vm.overcommit_memory" /etc/sysctl.conf 2>/dev/null; then
-  echo "vm.overcommit_memory = 1" >> /etc/sysctl.conf
-fi
-sysctl -p > /dev/null 2>&1 || true
+  if ! grep -q "net.core.somaxconn" /etc/sysctl.conf 2>/dev/null; then
+    echo "net.core.somaxconn = 65535" >> /etc/sysctl.conf
+  fi
+  if ! grep -q "vm.overcommit_memory" /etc/sysctl.conf 2>/dev/null; then
+    echo "vm.overcommit_memory = 1" >> /etc/sysctl.conf
+  fi
+  sysctl -p > /dev/null 2>&1 || true
 
-systemctl enable redis-server
-systemctl restart redis-server
+  systemctl enable redis-server
+  systemctl restart redis-server
 
-if redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q "PONG"; then
-  print_success "Redis installed and secured"
-else
-  print_warning "Redis may not have started correctly. Check: systemctl status redis-server"
+  if redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q "PONG"; then
+    print_success "Redis installed and secured"
+  else
+    print_warning "Redis may not have started correctly. Check: systemctl status redis-server"
+  fi
 fi
 
 # ============================================
@@ -289,15 +343,30 @@ print_success "Repository ready"
 
 print_header "STEP 5/10: GENERATE ENVIRONMENT FILE"
 
+# Generate unique server ID
+SERVER_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || openssl rand -hex 16)
+
+# Determine server role
+if [ "$IS_SECONDARY" = true ]; then
+  SERVER_ROLE="false"
+else
+  SERVER_ROLE="true"
+fi
+
 cat > /var/www/chartvolt/.env << ENVEOF
 # ============================================
 # CHARTVOLT ENVIRONMENT - Auto-generated
 # Generated: $(date)
 # Domain: ${DOMAIN}
+# Server Role: $(if [ "$IS_SECONDARY" = true ]; then echo "SECONDARY"; else echo "PRIMARY"; fi)
 # ============================================
 
 # Node Environment
 NODE_ENV=production
+
+# Server Identity (for fleet management)
+SERVER_ID=${SERVER_ID}
+IS_PRIMARY=${SERVER_ROLE}
 
 # App URLs
 NEXT_PUBLIC_BASE_URL=https://${DOMAIN}
@@ -376,8 +445,13 @@ print_header "STEP 7/10: DATABASE SETUP"
 
 cd /var/www/chartvolt
 
-echo "Setting up database (creating indexes, seeding data)..."
-node scripts/setup-database.js
+if [ "$IS_SECONDARY" = true ]; then
+  echo "Secondary server: creating indexes only (data already seeded by primary)..."
+  node scripts/setup-database.js --indexes-only
+else
+  echo "Setting up database (creating indexes, seeding data)..."
+  node scripts/setup-database.js
+fi
 
 if [ $? -ne 0 ]; then
   print_error "Database setup failed!"
@@ -501,12 +575,14 @@ echo ""
 echo "  App URL:         https://${DOMAIN}"
 echo "  Admin URL:       https://${ADMIN_DOMAIN}"
 echo "  Server IP:       ${SERVER_IP}"
+echo "  Server ID:       ${SERVER_ID}"
+echo "  Server Role:     $(if [ "$IS_SECONDARY" = true ]; then echo "SECONDARY"; else echo "PRIMARY"; fi)"
 echo ""
 echo "  Admin Email:     ${ADMIN_EMAIL}"
 echo "  Admin Password:  (the one you entered)"
 echo ""
-echo "  Redis Host:      127.0.0.1"
-echo "  Redis Port:      6379"
+echo "  Redis Host:      ${REDIS_HOST:-127.0.0.1}"
+echo "  Redis Port:      ${REDIS_PORT:-6379}"
 echo "  Redis Password:  ${REDIS_PASSWORD}"
 echo ""
 echo "  Auth Secret:     ${BETTER_AUTH_SECRET}"
@@ -516,6 +592,19 @@ echo "============================================================"
 echo ""
 echo "NEXT STEPS:"
 echo ""
+if [ "$IS_SECONDARY" = true ]; then
+echo "  1. Add this server's IP to Cloudflare origin pool"
+echo "     (for load balancing across multiple servers)"
+echo ""
+echo "  2. Add this server's IP to MongoDB Atlas whitelist:"
+echo "     Atlas > Network Access > Add IP: ${SERVER_IP}"
+echo ""
+echo "  3. Verify this server appears in admin panel:"
+echo "     ${ADMIN_DOMAIN} > Server Fleet"
+echo ""
+echo "  4. Redis is already configured (connecting to primary at ${REDIS_HOST}:${REDIS_PORT})"
+echo "     Worker is disabled on this server (runs on primary only)."
+else
 echo "  1. Configure Redis in admin panel:"
 echo "     Go to ${ADMIN_DOMAIN} > Settings > Redis"
 echo "     Host: 127.0.0.1, Port: 6379, Password: (above)"
@@ -534,6 +623,7 @@ echo "     sudo certbot --nginx -d ${DOMAIN} -d www.${DOMAIN} -d ${ADMIN_DOMAIN}
 echo ""
 echo "  5. Add MongoDB Atlas IP whitelist:"
 echo "     MongoDB Atlas > Network Access > Add IP: ${SERVER_IP}"
+fi
 echo ""
 echo "USEFUL COMMANDS:"
 echo "  pm2 status          # View service status"

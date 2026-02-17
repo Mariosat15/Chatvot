@@ -776,6 +776,168 @@ pm2 resurrect   # Restore from saved
 
 ---
 
+## Scaling to Multiple Servers
+
+### Stage 1: PM2 Cluster Mode (Same Server, More Capacity)
+
+Use all your CPU cores without adding servers. Edit `.env`:
+
+```env
+WEB_INSTANCES=4
+```
+
+Then restart PM2:
+```bash
+pm2 reload ecosystem.config.js
+```
+
+This runs 4 instances of the web app behind PM2's built-in load balancer. Gives you ~3-4x more capacity on the same VPS. No code changes needed.
+
+### Stage 2: Add a Secondary VPS
+
+When you need more capacity, add a second server:
+
+**Step 1: Prepare Primary Server's Redis for Remote Access**
+
+On your primary VPS, open Redis to accept connections from the secondary:
+
+```bash
+# Edit Redis config to bind to private network IP too
+sudo nano /etc/redis/redis.conf
+# Change: bind 127.0.0.1 ::1
+# To:     bind 127.0.0.1 YOUR_PRIMARY_PRIVATE_IP
+
+# Allow secondary server through firewall
+sudo ufw allow from SECONDARY_VPS_IP to any port 6379
+
+# Restart Redis
+sudo systemctl restart redis-server
+```
+
+**Step 2: Deploy Secondary Server**
+
+```bash
+ssh root@NEW_VPS_IP
+curl -O https://raw.githubusercontent.com/YOUR_REPO/main/deploy/setup-new-customer.sh
+chmod +x setup-new-customer.sh
+sudo ./setup-new-customer.sh --secondary
+```
+
+The script will ask for the primary Redis host/port/password. The worker process will not start on this server (only runs on primary).
+
+**Step 3: Add to Cloudflare Load Balancer**
+
+See the Cloudflare Setup section below.
+
+**Step 4: Whitelist in MongoDB Atlas**
+
+Add the new server's IP to MongoDB Atlas > Network Access.
+
+**Step 5: Enable Multi-Server Price Sync**
+
+In admin panel: Settings > Redis > Toggle "Multi-Server Price Sync" ON.
+This only needs to be done once (setting is stored in the shared database).
+
+**Step 6: Verify in Admin Panel**
+
+Go to admin panel > Server Fleet. The new server should appear within 30 seconds with status "online".
+
+### Stage 3: Dedicated Redis Server (Optional)
+
+For 50K+ users, move Redis to its own VPS:
+
+1. Install Redis on a new VPS using `setup-server.sh`
+2. Configure Redis to bind to its private IP
+3. Firewall: only allow your app server IPs on port 6379
+4. Update all app servers' Redis config (via admin panel) to point to the Redis VPS
+
+---
+
+## Cloudflare Setup (Load Balancing)
+
+Cloudflare provides free/cheap load balancing with health checks, session affinity, DDoS protection, and CDN.
+
+### Step 1: Create Cloudflare Account
+
+1. Go to [cloudflare.com](https://cloudflare.com) and create an account
+2. Click "Add a Site" and enter your domain (e.g., `yourdomain.com`)
+3. Select a plan (Free works for basic, Pro for advanced load balancing)
+
+### Step 2: Change Nameservers
+
+1. Cloudflare will show you two nameservers (e.g., `ada.ns.cloudflare.com`)
+2. Go to your domain registrar (e.g., Hostinger)
+3. Change the nameservers from Hostinger's to Cloudflare's
+4. Wait for propagation (can take up to 24 hours, usually ~30 minutes)
+
+### Step 3: Configure DNS Records
+
+In Cloudflare DNS dashboard, add:
+
+| Type | Name    | Content (IP)       | Proxy |
+|------|---------|--------------------|-------|
+| A    | @       | PRIMARY_VPS_IP     | Proxied (orange cloud) |
+| A    | www     | PRIMARY_VPS_IP     | Proxied |
+| A    | admin   | PRIMARY_VPS_IP     | Proxied |
+
+When you add secondary servers, add more A records with the same names pointing to the new IPs. Cloudflare will round-robin between them.
+
+### Step 4: SSL Configuration
+
+1. Go to SSL/TLS in Cloudflare dashboard
+2. Set mode to **Full (Strict)** (each VPS has its own Certbot certificate)
+3. Enable "Always Use HTTPS"
+
+### Step 5: Load Balancing (Cloudflare Pro or higher)
+
+For proper health-check-based load balancing:
+
+1. Go to **Traffic > Load Balancing**
+2. Create an **Origin Pool**:
+   - Add all your VPS IPs as origins
+   - Set health check: HTTP, path `/health`, interval 30s
+   - Health check expects 200 status code
+3. Create a **Load Balancer**:
+   - Hostname: `yourdomain.com`
+   - Attach your origin pool
+   - Enable **Session Affinity** (cookie-based) -- critical for WebSocket
+   - Steering policy: "Least connections" or "Random"
+4. Repeat for `admin.yourdomain.com` if needed
+
+### Step 6: WebSocket Support
+
+Cloudflare supports WebSocket proxying by default on all plans. Session Affinity ensures a user's WebSocket connection stays on the same server.
+
+### Adding a New Server to Cloudflare
+
+When you deploy a new VPS:
+
+1. Go to Cloudflare DNS
+2. Add new A records for `@`, `www`, and `admin` pointing to the new VPS IP
+3. Enable Proxied (orange cloud)
+4. If using Load Balancer: add the new IP to your origin pool
+
+The new server starts receiving traffic within minutes.
+
+---
+
+## Server Fleet Monitoring
+
+The admin panel includes a **Server Fleet** dashboard (Settings > Server Fleet) that shows:
+
+- All servers with their role (Primary/Secondary), status, and IP
+- Real-time CPU, memory, and disk usage per server
+- PM2 process statuses per server
+- Redis connectivity status
+- WebSocket connection count per server
+- Last heartbeat timestamp
+
+Each server sends a heartbeat every 30 seconds. If a heartbeat is missed for 90+ seconds, the server is marked as "offline" in the dashboard.
+
+You can remove decommissioned servers from the fleet via the dashboard.
+
+---
+
 ## Security Checklist
 
 - [ ] SSH key authentication enabled
