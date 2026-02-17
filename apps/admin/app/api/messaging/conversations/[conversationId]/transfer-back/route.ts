@@ -251,38 +251,26 @@ export async function POST(
         `✅ [TransferBack] Transfer back successful: ${conversationId}`,
       );
 
-      // Notify via WebSocket
+      // Broadcast via WebSocket to ALL servers (local + Redis pub/sub)
       try {
-        const wsInternalUrl =
-          process.env.WS_INTERNAL_URL || "http://localhost:3003";
-
-        await fetch(`${wsInternalUrl}/internal/chat-transferred`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            isChatTransferred: false,
-            assignedEmployeeId: originalEmployeeId,
-            assignedEmployeeName: originalEmployeeName,
-            // Clear transfer fields
-            chatTransferredTo: null,
-            chatTransferredToName: null,
-            chatTransferredFrom: null,
-            chatTransferredFromName: null,
-          }),
+        const { broadcastWsEvent } = await import("@/lib/services/ws-broadcast.service");
+        await broadcastWsEvent("/internal/chat-transferred", {
+          conversationId,
+          isChatTransferred: false,
+          assignedEmployeeId: originalEmployeeId,
+          assignedEmployeeName: originalEmployeeName,
+          chatTransferredTo: null,
+          chatTransferredToName: null,
+          chatTransferredFrom: null,
+          chatTransferredFromName: null,
         });
-
-        await fetch(`${wsInternalUrl}/internal/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            message: {
-              id: "transfer-back-" + Date.now(),
-              ...systemMessage,
-              createdAt: systemMessage.createdAt.toISOString(),
-            },
-          }),
+        await broadcastWsEvent("/internal/message", {
+          conversationId,
+          message: {
+            id: "transfer-back-" + Date.now(),
+            ...systemMessage,
+            createdAt: systemMessage.createdAt.toISOString(),
+          },
         });
       } catch (wsError) {
         console.warn(

@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
-import fs from "fs/promises";
-import path from "path";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 export async function GET() {
@@ -163,114 +161,8 @@ export async function PUT(request: NextRequest) {
     await settings.save();
     console.log("✅ Database updated successfully");
 
-    // Update .env file with ALL current values
-    const envPath = path.join(process.cwd(), ".env");
-
-    // Read existing .env to preserve admin credentials
-    let existingEnvContent = "";
-    try {
-      existingEnvContent = await fs.readFile(envPath, "utf-8");
-    } catch {
-      console.log(".env file does not exist yet");
-    }
-
-    const getExistingEnvValue = (key: string, defaultValue: string) => {
-      const match = existingEnvContent.match(new RegExp(`^${key}=(.*)$`, "m"));
-      return match ? match[1].replace(/['"]/g, "") : defaultValue;
-    };
-
-    console.log("📝 Starting .env file update...");
-    console.log("📍 .env path:", envPath);
-
-    // Build complete .env content from database
-    const envLines: string[] = [];
-
-    // General Settings
-    envLines.push("NODE_ENV='" + (settings.nodeEnv || "development") + "'");
-    envLines.push(
-      "NEXT_PUBLIC_BASE_URL=" +
-        (settings.nextPublicBaseUrl || "http://localhost:3000"),
-    );
-    envLines.push("");
-
-    // MongoDB
-    envLines.push("# MONGODB");
-    envLines.push("MONGODB_URI=" + (settings.mongodbUri || ""));
-    envLines.push("");
-
-    // Better Auth
-    envLines.push("# BETTER AUTH");
-    envLines.push("BETTER_AUTH_SECRET=" + (settings.betterAuthSecret || ""));
-    envLines.push(
-      "BETTER_AUTH_URL=" + (settings.betterAuthUrl || "http://localhost:3000"),
-    );
-    envLines.push("");
-
-    // OpenAI
-    envLines.push("# OPENAI");
-    envLines.push("OPENAI_API_KEY=" + (settings.openaiApiKey || ""));
-    envLines.push("OPENAI_MODEL=" + (settings.openaiModel || "gpt-4o-mini"));
-    envLines.push(
-      "OPENAI_ENABLED=" + (settings.openaiEnabled ? "true" : "false"),
-    );
-    envLines.push(
-      "OPENAI_FOR_EMAILS=" + (settings.openaiForEmails ? "true" : "false"),
-    );
-    envLines.push("");
-
-    // Nodemailer
-    envLines.push("#NODEMAILER");
-    envLines.push("NODEMAILER_EMAIL=" + (settings.nodemailerEmail || ""));
-    envLines.push("NODEMAILER_PASSWORD=" + (settings.nodemailerPassword || ""));
-    envLines.push("");
-
-    // Massive API
-    envLines.push("# MASSIVE.COM (Real-time Forex data)");
-    envLines.push("MASSIVE_API_KEY=" + (settings.massiveApiKey || ""));
-    envLines.push(
-      "NEXT_PUBLIC_MASSIVE_API_KEY=" + (settings.nextPublicMassiveApiKey || ""),
-    );
-    envLines.push("");
-
-    // Admin Panel - preserved from existing .env (not manageable from admin panel for security)
-    const existingAdminEmail = getExistingEnvValue(
-      "ADMIN_EMAIL",
-      "admin@email.com",
-    );
-    const existingAdminPassword = getExistingEnvValue(
-      "ADMIN_PASSWORD",
-      "admin123",
-    );
-    const existingAdminJwtSecret = getExistingEnvValue(
-      "ADMIN_JWT_SECRET",
-      "your-super-secret-admin-key-change-in-production",
-    );
-
-    envLines.push("# ADMIN PANEL");
-    envLines.push("ADMIN_EMAIL=" + existingAdminEmail);
-    envLines.push("ADMIN_PASSWORD=" + existingAdminPassword);
-    envLines.push("ADMIN_JWT_SECRET=" + existingAdminJwtSecret);
-
-    const envContent = envLines.join("\n");
-
-    console.log(
-      "📄 Generated .env content (" + envContent.split("\n").length + " lines)",
-    );
-
-    try {
-      await fs.writeFile(envPath, envContent, "utf-8");
-      console.log("✅ Successfully wrote to .env file");
-      console.log("✅ File saved at:", envPath);
-    } catch (error) {
-      console.error("❌ Error writing to .env file:", error);
-      return NextResponse.json(
-        {
-          error:
-            "Database updated but failed to write .env file: " + String(error),
-        },
-        { status: 500 },
-      );
-    }
+    // Settings are stored in MongoDB (WhiteLabel model) and shared across all servers.
+    // No .env file write needed — all services read from MongoDB first via getSettings().
 
     // Log audit action
     try {
@@ -295,7 +187,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message:
-        "All environment variables updated. Please restart your application.",
+        "All settings updated in database. Changes take effect immediately on all servers.",
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {

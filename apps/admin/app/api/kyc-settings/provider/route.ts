@@ -3,8 +3,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import AuditLog from "@/database/models/audit-log.model";
 import { getAdminSession } from "@/lib/admin/auth";
-import fs from "fs/promises";
-import path from "path";
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,52 +39,8 @@ export async function POST(req: NextRequest) {
       veriffBaseUrl: baseUrl || "https://stationapi.veriff.com",
     });
 
-    // Update .env file
-    try {
-      const envPath = path.join(process.cwd(), "..", "..", ".env");
-      let envContent = "";
-
-      try {
-        envContent = await fs.readFile(envPath, "utf-8");
-      } catch {
-        // If .env doesn't exist, try the root .env
-        const rootEnvPath = path.join(process.cwd(), ".env");
-        try {
-          envContent = await fs.readFile(rootEnvPath, "utf-8");
-        } catch {
-          envContent = "";
-        }
-      }
-
-      // Update or add environment variables
-      const envVars: Record<string, string> = {
-        VERIFF_API_KEY: apiKey,
-        VERIFF_API_SECRET: apiSecret,
-        VERIFF_BASE_URL: baseUrl || "https://stationapi.veriff.com",
-      };
-
-      for (const [key, value] of Object.entries(envVars)) {
-        const regex = new RegExp(`^${key}=.*$`, "m");
-        if (regex.test(envContent)) {
-          envContent = envContent.replace(regex, `${key}=${value}`);
-        } else {
-          envContent += `\n${key}=${value}`;
-        }
-      }
-
-      // Try to write to the main .env file
-      const mainEnvPath = path.join(process.cwd(), "..", "..", ".env");
-      try {
-        await fs.writeFile(mainEnvPath, envContent.trim() + "\n");
-      } catch {
-        // If that fails, try the root
-        const rootEnvPath = path.join(process.cwd(), ".env");
-        await fs.writeFile(rootEnvPath, envContent.trim() + "\n");
-      }
-    } catch (envError) {
-      console.error("Error updating .env file:", envError);
-      // Continue even if .env update fails - database is updated
-    }
+    // KYC credentials are stored in MongoDB (KYCSettings model) and shared
+    // across all servers automatically. No .env file write needed.
 
     // Create audit log
     await AuditLog.logAction({

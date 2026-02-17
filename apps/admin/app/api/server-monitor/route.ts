@@ -37,10 +37,14 @@ async function getPM2Processes(): Promise<PM2Process[]> {
 async function getWebSocketConnections(): Promise<{
   connections: number;
   subscribedSymbols: number;
+  fleetTotalConnections: number;
 }> {
+  let localConnections = 0;
+  let localSubscribedSymbols = 0;
+  let fleetTotalConnections = 0;
+
+  // Get local WebSocket stats
   try {
-    // The WebSocket server runs on WEBSOCKET_PORT (default 3003) internally
-    // Use localhost to access the internal HTTP /stats endpoint
     const wsPort = process.env.WEBSOCKET_PORT || "3003";
     const statsUrl = `http://localhost:${wsPort}/stats`;
 
@@ -51,23 +55,40 @@ async function getWebSocketConnections(): Promise<{
 
     if (response.ok) {
       const data = await response.json();
-      return {
-        connections: data.connections || 0,
-        subscribedSymbols: data.subscribedSymbols || 0,
-      };
+      localConnections = data.connections || 0;
+      localSubscribedSymbols = data.subscribedSymbols || 0;
     }
-    console.log(
-      `[Server Monitor] WebSocket stats fetch failed: ${response.status}`,
-    );
-    return { connections: 0, subscribedSymbols: 0 };
-  } catch (error) {
-    // If we can't reach the websocket server, return 0
-    console.log(
-      `[Server Monitor] WebSocket stats error:`,
-      error instanceof Error ? error.message : error,
-    );
-    return { connections: 0, subscribedSymbols: 0 };
+  } catch {
+    // Local WebSocket server unreachable
   }
+
+  // Get fleet-wide total from MongoDB heartbeat data
+  try {
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+    if (db) {
+      const OFFLINE_THRESHOLD = 90000;
+      const cutoff = new Date(Date.now() - OFFLINE_THRESHOLD);
+      const servers = await db
+        .collection("servers")
+        .find({ lastHeartbeat: { $gte: cutoff } })
+        .project({ "stats.wsConnections": 1 })
+        .toArray();
+      fleetTotalConnections = servers.reduce(
+        (sum: number, s: any) => sum + (s.stats?.wsConnections || 0),
+        0,
+      );
+    }
+  } catch {
+    // Fall back to local only
+    fleetTotalConnections = localConnections;
+  }
+
+  return {
+    connections: localConnections,
+    subscribedSymbols: localSubscribedSymbols,
+    fleetTotalConnections,
+  };
 }
 
 interface DatabaseStats {

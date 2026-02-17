@@ -3,8 +3,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 import Stripe from "stripe";
-import fs from "fs";
-import path from "path";
 
 /**
  * Auto-Configure Webhook Endpoint
@@ -15,7 +13,7 @@ import path from "path";
  * Requirements:
  * - Must have valid API key with webhook permissions
  * - Must NOT be on localhost (Stripe can't reach localhost)
- * - Saves webhook secret to BOTH database and .env file
+ * - Saves webhook secret to database (shared across all servers)
  *
  * This does NOT affect existing functionality:
  * - Manual webhook setup still works
@@ -177,10 +175,8 @@ async function autoConfigureStripe(
   providerDoc.webhookUrl = webhookUrl;
   await providerDoc.save();
 
-  // Save to .env file if enabled
-  if (providerDoc.saveToEnv) {
-    await saveToEnvFile("STRIPE_WEBHOOK_SECRET", webhookSecret);
-  }
+  // Webhook secret is stored in MongoDB (PaymentProvider credentials)
+  // and shared across all servers automatically.
 
   console.log(`✅ Stripe webhook configured successfully`);
   console.log(`   Endpoint ID: ${webhookEndpoint.id}`);
@@ -196,7 +192,7 @@ async function autoConfigureStripe(
     webhookSecret: webhookSecret, // Return secret so admin can see it
     events: REQUIRED_STRIPE_EVENTS,
     secretSaved: true,
-    message: `Webhook created successfully! Secret saved to ${providerDoc.saveToEnv ? "database and .env" : "database"}.`,
+    message: `Webhook created successfully! Secret saved to database.`,
   };
 }
 
@@ -337,33 +333,3 @@ async function autoConfigurePaddle(
   };
 }
 
-/**
- * Save a value to the .env file
- */
-async function saveToEnvFile(key: string, value: string): Promise<void> {
-  try {
-    const envPath = path.join(process.cwd(), "..", "..", ".env");
-
-    let envContent = "";
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, "utf8");
-    }
-
-    // Check if key exists
-    const regex = new RegExp(`^${key}=.*$`, "m");
-
-    if (regex.test(envContent)) {
-      // Update existing
-      envContent = envContent.replace(regex, `${key}=${value}`);
-    } else {
-      // Add new
-      envContent += `\n# Auto-configured webhook secret\n${key}=${value}\n`;
-    }
-
-    fs.writeFileSync(envPath, envContent, "utf8");
-    console.log(`✅ Saved ${key} to .env file`);
-  } catch (error) {
-    console.error(`⚠️ Could not save to .env file:`, error);
-    // Don't throw - database save is the primary storage
-  }
-}

@@ -36,5 +36,16 @@ export async function register() {
         console.error("❌ [Instrumentation] Failed to start heartbeat:", err);
       }
     }, 10000); // 10 second delay to let MongoDB connect first
+
+    // Start WebSocket event relay for cross-server messaging
+    setTimeout(async () => {
+      try {
+        const { startWsEventRelay } =
+          await import("./lib/services/ws-event-relay.service");
+        await startWsEventRelay();
+      } catch (err) {
+        console.error("❌ [Instrumentation] Failed to start WS relay:", err);
+      }
+    }, 15000); // 15 second delay to let Redis connect first
   }
 }

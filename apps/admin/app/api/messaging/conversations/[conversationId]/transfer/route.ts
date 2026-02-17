@@ -400,39 +400,26 @@ export async function POST(
       await session.commitTransaction();
       console.log(`✅ [Transfer] Chat transfer successful: ${conversationId}`);
 
-      // Notify via WebSocket (outside transaction)
+      // Broadcast via WebSocket to ALL servers (local + Redis pub/sub)
       try {
-        const wsInternalUrl =
-          process.env.WS_INTERNAL_URL || "http://localhost:3003";
-
-        // Notify both employees and customer
-        await fetch(`${wsInternalUrl}/internal/chat-transferred`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            isChatTransferred: true,
-            chatTransferredTo: toEmployeeId,
-            chatTransferredToName: toEmployeeName,
-            chatTransferredFrom: originalEmployeeId,
-            chatTransferredFromName: originalEmployeeName,
-            assignedEmployeeId: toEmployeeId,
-            assignedEmployeeName: toEmployeeName,
-          }),
+        const { broadcastWsEvent } = await import("@/lib/services/ws-broadcast.service");
+        await broadcastWsEvent("/internal/chat-transferred", {
+          conversationId,
+          isChatTransferred: true,
+          chatTransferredTo: toEmployeeId,
+          chatTransferredToName: toEmployeeName,
+          chatTransferredFrom: originalEmployeeId,
+          chatTransferredFromName: originalEmployeeName,
+          assignedEmployeeId: toEmployeeId,
+          assignedEmployeeName: toEmployeeName,
         });
-
-        // Send system message via WebSocket
-        await fetch(`${wsInternalUrl}/internal/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            message: {
-              id: systemMessage._id?.toString() || "transfer-" + Date.now(),
-              ...systemMessage,
-              createdAt: systemMessage.createdAt.toISOString(),
-            },
-          }),
+        await broadcastWsEvent("/internal/message", {
+          conversationId,
+          message: {
+            id: systemMessage._id?.toString() || "transfer-" + Date.now(),
+            ...systemMessage,
+            createdAt: systemMessage.createdAt.toISOString(),
+          },
         });
       } catch (wsError) {
         console.warn("⚠️ [Transfer] WebSocket notification failed:", wsError);

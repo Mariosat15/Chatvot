@@ -4,8 +4,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { requireAdminAuth } from "@/lib/admin/auth";
-import fs from "fs/promises";
-import path from "path";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 export async function PUT(request: NextRequest) {
@@ -76,38 +74,9 @@ export async function PUT(request: NextRequest) {
 
     await settings.save();
     console.log("✅ WhiteLabel model updated in database");
-    console.log("   - adminEmail:", settings.adminEmail);
-    console.log("   - adminPassword:", newPassword ? "[SET]" : "[UNCHANGED]");
 
-    // Update .env file
-    try {
-      const envPath = path.join(process.cwd(), ".env");
-      let envContent = await fs.readFile(envPath, "utf-8");
-
-      // Update ADMIN_EMAIL
-      if (envContent.includes("ADMIN_EMAIL=")) {
-        envContent = envContent.replace(
-          /^ADMIN_EMAIL=.*$/m,
-          `ADMIN_EMAIL=${settings.adminEmail}`,
-        );
-        console.log("✏️  Updated ADMIN_EMAIL in .env:", settings.adminEmail);
-      }
-
-      // Update ADMIN_PASSWORD if new password provided
-      if (newPassword && envContent.includes("ADMIN_PASSWORD=")) {
-        envContent = envContent.replace(
-          /^ADMIN_PASSWORD=.*$/m,
-          `ADMIN_PASSWORD=${newPassword}`,
-        );
-        console.log("✏️  Updated ADMIN_PASSWORD in .env");
-      }
-
-      await fs.writeFile(envPath, envContent, "utf-8");
-      console.log("✅ .env file updated successfully");
-    } catch (envError) {
-      console.error("❌ Failed to update .env file:", envError);
-      // Don't fail the request if .env update fails
-    }
+    // Credentials are stored in MongoDB (Admin + WhiteLabel models) and shared across all servers.
+    // No .env file write needed.
 
     // Revalidate admin pages
     revalidatePath("/dashboard");

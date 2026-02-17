@@ -2235,6 +2235,63 @@ async function startRedisPriceRelay(): Promise<void> {
   });
 }
 
+// ============================================
+// CROSS-SERVER WEBSOCKET EVENT RELAY
+// ============================================
+// Admin messaging routes publish events to Redis channel chartvolt:ws-events.
+// This subscriber runs on every server and relays those events to the local
+// WebSocket server so clients connected to ANY server receive real-time updates.
+
+const WS_EVENTS_CHANNEL = "chartvolt:ws-events";
+
+async function startWsEventsRelay(): Promise<void> {
+  const { getRedisConfig: getConfig } = await import("./redis.service");
+  const config = await getConfig();
+
+  if (!config || !config.enabled) return;
+
+  const Redis = (await import("ioredis")).default;
+  const os = await import("os");
+  const localServerId = process.env.SERVER_ID || os.hostname();
+
+  const opts: Record<string, unknown> = {
+    host: config.host,
+    port: config.port,
+    maxRetriesPerRequest: null,
+    retryStrategy(times: number) {
+      return Math.min(times * 2000, 30000);
+    },
+    lazyConnect: false,
+  };
+  if (config.password) opts.password = config.password;
+
+  const subscriber = new Redis(opts as any);
+  const wsInternalUrl =
+    process.env.WEBSOCKET_INTERNAL_URL || "http://localhost:3003";
+
+  subscriber.on("error", () => {});
+
+  await subscriber.subscribe(WS_EVENTS_CHANNEL);
+  console.log("📡 [WS Events Relay] Subscribed — messaging events will reach all servers");
+
+  subscriber.on("message", async (channel: string, message: string) => {
+    if (channel !== WS_EVENTS_CHANNEL) return;
+    try {
+      const { endpoint, payload, sourceServerId } = JSON.parse(message);
+      // Skip events that originated from this server (already delivered locally)
+      if (sourceServerId === localServerId) return;
+
+      await fetch(`${wsInternalUrl}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Non-critical — message is already saved to DB
+    }
+  });
+}
+
 /**
  * Load broadcast interval from admin settings
  * NOTE: Query MongoDB directly to bypass Mongoose model caching issues
@@ -2757,6 +2814,9 @@ async function autoInitialize(): Promise<void> {
       );
       priceHealthMonitor.updateConnectionStatus("disconnected", 0);
     }
+
+    // Start WS events relay on secondary too (for cross-server messaging)
+    startWsEventsRelay().catch(() => {});
     return;
   }
 
@@ -2785,6 +2845,9 @@ async function autoInitialize(): Promise<void> {
         snapshotError,
       );
     }
+
+    // Start WS events relay on primary too (for cross-server messaging)
+    startWsEventsRelay().catch(() => {});
   } catch (error) {
     console.error("❌ [AUTO-INIT] Failed:", error);
   }

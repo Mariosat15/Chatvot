@@ -4,6 +4,8 @@ import { existsSync } from "fs";
 import path from "path";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 // POST - Upload hero images
 export async function POST(request: NextRequest) {
@@ -44,23 +46,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 400 });
     }
 
-    // Create upload directory
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "hero");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    // Try multiple upload directories (production first)
+    const possibleUploadDirs = [
+      path.join("/var/www/chartvolt", "public", "uploads", "hero"),
+      path.join(process.cwd(), "..", "..", "public", "uploads", "hero"),
+      path.join(process.cwd(), "public", "uploads", "hero"),
+    ];
 
     // Generate unique filename
     const ext = file.name.split(".").pop();
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 8);
     const filename = `${type}-${timestamp}-${randomStr}.${ext}`;
-    const filepath = path.join(uploadDir, filename);
 
-    // Write file
+    // Write file to first writable directory
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+
+    let uploadDir: string | null = null;
+    for (const dir of possibleUploadDirs) {
+      try {
+        if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+        const filepath = path.join(dir, filename);
+        await writeFile(filepath, buffer);
+        uploadDir = dir;
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    if (!uploadDir) {
+      return NextResponse.json(
+        { error: "No writable upload directory available" },
+        { status: 500 },
+      );
+    }
+
+    // Backup file to MongoDB for persistence across servers/deployments
+    try {
+      await connectToDatabase();
+      const contentTypes: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+        gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+        mp4: "video/mp4", webm: "video/webm",
+      };
+      const contentType = contentTypes[(ext || "png").toLowerCase()] || file.type;
+      const base64Data = buffer.toString("base64");
+
+      let settings = await WhiteLabel.findOne();
+      if (!settings) settings = new WhiteLabel();
+      const brandingFiles = (settings as any).brandingFiles || new Map();
+      brandingFiles.set(filename, {
+        data: base64Data,
+        contentType,
+        updatedAt: new Date(),
+      });
+      (settings as any).brandingFiles = brandingFiles;
+      await settings.save();
+      console.log(`💾 [Hero Upload] Backed up to DB: ${filename}`);
+    } catch (dbErr) {
+      console.warn(`⚠️ [Hero Upload] Could not backup to DB:`, dbErr);
+    }
 
     // Create audit log
     await auditLogService.log({
@@ -75,9 +122,10 @@ export async function POST(request: NextRequest) {
       metadata: { filename, type, size: file.size },
     });
 
+    // Return API-served path so it works across all servers
     return NextResponse.json({
       success: true,
-      url: `/uploads/hero/${filename}`,
+      url: `/api/assets/hero/${filename}`,
       filename,
       message: "File uploaded successfully",
     });
@@ -125,11 +173,21 @@ export async function DELETE(request: NextRequest) {
       filename,
     );
 
-    // Check if file exists and delete
+    // Check if file exists and delete from disk
     if (existsSync(filepath)) {
       const { unlink } = await import("fs/promises");
       await unlink(filepath);
     }
+
+    // Also remove from database backup
+    try {
+      await connectToDatabase();
+      let settings = await WhiteLabel.findOne();
+      if (settings?.brandingFiles?.has(filename)) {
+        settings.brandingFiles.delete(filename);
+        await settings.save();
+      }
+    } catch {}
 
     // Create audit log
     await auditLogService.log({

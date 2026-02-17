@@ -157,22 +157,16 @@ export async function POST(
       });
     }
 
-    // Notify via WebSocket (use internal URL for server-to-server)
+    // Broadcast via WebSocket to ALL servers (local + Redis pub/sub)
     try {
-      const wsInternalUrl =
-        process.env.WS_INTERNAL_URL || "http://localhost:3003";
-
-      await fetch(`${wsInternalUrl}/internal/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId,
-          message: {
-            id: systemMessage.conversationId?.toString(),
-            ...systemMessage,
-            createdAt: systemMessage.createdAt.toISOString(),
-          },
-        }),
+      const { broadcastWsEvent } = await import("@/lib/services/ws-broadcast.service");
+      await broadcastWsEvent("/internal/message", {
+        conversationId,
+        message: {
+          id: systemMessage.conversationId?.toString(),
+          ...systemMessage,
+          createdAt: systemMessage.createdAt.toISOString(),
+        },
       });
     } catch (wsError) {
       console.warn("WebSocket notification failed:", wsError);

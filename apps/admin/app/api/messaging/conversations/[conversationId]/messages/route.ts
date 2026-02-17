@@ -183,35 +183,15 @@ export async function POST(
       createdAt: new Date(),
     };
 
-    // Notify via WebSocket so customer receives the message in real-time
-    // Use internal URL for server-to-server communication (not public wss:// URL)
+    // Broadcast via WebSocket to ALL servers (local + Redis pub/sub)
     try {
-      const wsInternalUrl =
-        process.env.WS_INTERNAL_URL || "http://localhost:3003";
-
-      console.log(
-        `📤 [SendMsg] Broadcasting via WebSocket: ${wsInternalUrl}/internal/message`,
-      );
-
-      const wsResponse = await fetch(`${wsInternalUrl}/internal/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId,
-          message: messageResponse,
-        }),
+      const { broadcastWsEvent } = await import("@/lib/services/ws-broadcast.service");
+      await broadcastWsEvent("/internal/message", {
+        conversationId,
+        message: messageResponse,
       });
-
-      if (wsResponse.ok) {
-        console.log(`✅ [SendMsg] WebSocket broadcast successful`);
-      } else {
-        console.warn(
-          `⚠️ [SendMsg] WebSocket broadcast failed: ${wsResponse.status}`,
-        );
-      }
     } catch (wsError) {
       console.warn(`⚠️ [SendMsg] WebSocket notification failed:`, wsError);
-      // Don't fail the request if WebSocket fails - message is already saved
     }
 
     return NextResponse.json({ message: messageResponse });
