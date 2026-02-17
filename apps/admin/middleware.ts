@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/api/assets/"];
 
 // API routes prefix
 const API_ROUTES_PREFIX = "/api/";
