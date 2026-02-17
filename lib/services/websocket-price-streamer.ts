@@ -2064,6 +2064,160 @@ let currentBroadcastIntervalMs = 200; // Default, can be changed by admin
 let lastBroadcastSettingsCheck = 0;
 const BROADCAST_SETTINGS_CHECK_INTERVAL = 30000; // Check admin settings every 30 seconds
 
+// ============================================
+// MULTI-SERVER PRICE SYNC VIA REDIS PUB/SUB
+// ============================================
+// Primary publishes forming candles + prices to Redis channel
+// Secondary subscribes and relays to its local WebSocket server
+
+const REDIS_PRICE_CHANNEL = "chartvolt:price-broadcast";
+let multiServerSyncEnabled = false;
+let lastSyncSettingsCheck = 0;
+const SYNC_SETTINGS_CHECK_INTERVAL = 30000;
+
+/**
+ * Non-blocking check if multi-server sync is enabled (cached)
+ * Updates the flag asynchronously, returns immediately
+ */
+function checkMultiServerSync(): void {
+  const now = Date.now();
+  if (now - lastSyncSettingsCheck < SYNC_SETTINGS_CHECK_INTERVAL) return;
+  lastSyncSettingsCheck = now;
+
+  (async () => {
+    try {
+      const { connectToDatabase: connectDB } = await import(
+        "@/database/mongoose"
+      );
+      const mongoose = await import("mongoose");
+      await connectDB();
+      const db = mongoose.connection.db;
+      if (!db) return;
+      const settings = await db.collection("whitelabels").findOne({});
+      multiServerSyncEnabled = !!(
+        settings?.redisPriceSyncEnabled && settings?.redisEnabled
+      );
+    } catch {
+      // Keep previous value on error
+    }
+  })();
+}
+
+/**
+ * Publish price broadcast payload to Redis for secondary servers
+ * Fire-and-forget: errors are silently ignored
+ */
+async function publishPriceBroadcastToRedis(
+  payloadJson: string,
+): Promise<void> {
+  try {
+    const { getRedis: getRedisInstance } = await import("./redis.service");
+    const redis = await getRedisInstance();
+    if (redis) {
+      await redis.publish(REDIS_PRICE_CHANNEL, payloadJson);
+    }
+  } catch {
+    // Silently fail - secondary servers will get the next update in ~200ms
+  }
+}
+
+/**
+ * Start Redis price relay for SECONDARY servers
+ * Subscribes to the Redis pub/sub channel and relays price data
+ * to the local WebSocket server so browser clients get real-time updates
+ */
+async function startRedisPriceRelay(): Promise<void> {
+  console.log(
+    "📡 [Redis Relay] Starting price relay for secondary server...",
+  );
+
+  const { getRedisConfig: getConfig } = await import("./redis.service");
+  const config = await getConfig();
+
+  if (!config || !config.enabled) {
+    console.error(
+      "❌ [Redis Relay] Redis not configured or disabled. Cannot relay prices.",
+    );
+    console.error(
+      "   Go to Admin > Redis Settings and configure the primary server's Redis host.",
+    );
+    return;
+  }
+
+  const Redis = (await import("ioredis")).default;
+
+  const opts: Record<string, unknown> = {
+    host: config.host,
+    port: config.port,
+    connectTimeout: 10000,
+    maxRetriesPerRequest: null, // Required for subscriber mode
+    retryStrategy(times: number) {
+      return Math.min(times * 1000, 30000);
+    },
+    lazyConnect: false,
+    enableReadyCheck: true,
+  };
+
+  if (config.password) {
+    opts.password = config.password;
+  }
+
+  // Create a SEPARATE Redis connection for subscribing
+  // (subscriber connections cannot be used for regular commands)
+  const subscriber = new Redis(opts as any);
+
+  const wsInternalUrl =
+    process.env.WEBSOCKET_INTERNAL_URL || "http://localhost:3003";
+
+  let relayedCount = 0;
+  let lastRelayLog = 0;
+
+  subscriber.on("connect", () => {
+    console.log(
+      "🟢 [Redis Relay] Connected to Redis, subscribing to price channel...",
+    );
+  });
+
+  subscriber.on("error", (err: Error) => {
+    if (Math.random() < 0.1) {
+      console.error("🔴 [Redis Relay] Redis error:", err.message);
+    }
+  });
+
+  subscriber.on("close", () => {
+    console.log("🟡 [Redis Relay] Redis connection closed, will reconnect...");
+  });
+
+  await subscriber.subscribe(REDIS_PRICE_CHANNEL);
+  console.log(
+    `📡 [Redis Relay] Subscribed to ${REDIS_PRICE_CHANNEL} - ready to relay prices`,
+  );
+
+  subscriber.on("message", async (channel: string, message: string) => {
+    if (channel !== REDIS_PRICE_CHANNEL) return;
+
+    try {
+      await fetch(`${wsInternalUrl}/internal/prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: message,
+      });
+
+      relayedCount++;
+      const now = Date.now();
+      if (now - lastRelayLog > 60000) {
+        console.log(
+          `📡 [Redis Relay] Relayed ${relayedCount} price broadcasts in last 60s`,
+        );
+        relayedCount = 0;
+        lastRelayLog = now;
+      }
+    } catch {
+      // Silently fail - next update comes in ~200ms
+    }
+  });
+}
+
 /**
  * Load broadcast interval from admin settings
  * NOTE: Query MongoDB directly to bypass Mongoose model caching issues
@@ -2129,6 +2283,8 @@ async function checkAndUpdateBroadcastInterval(): Promise<void> {
 async function broadcastFormingCandles(): Promise<void> {
   // Periodically check if admin changed the interval
   checkAndUpdateBroadcastInterval().catch(() => {});
+  // Periodically check if multi-server sync is enabled
+  checkMultiServerSync();
   const state = getState();
 
   // Get only CHANGED symbols for delta broadcast
@@ -2187,112 +2343,104 @@ async function broadcastFormingCandles(): Promise<void> {
   const wsInternalUrl =
     process.env.WEBSOCKET_INTERNAL_URL || "http://localhost:3003";
 
+  // Build the payload JSON once (reused for local WS and Redis publish)
+  const bodyJson = JSON.stringify({
+    prices: prices.map((p) => ({
+      symbol: p.symbol,
+      bid: p.bid,
+      ask: p.ask,
+      mid: p.mid,
+      timestamp: p.timestamp,
+    })),
+    formingCandles: formingCandles.map((c) => ({
+      symbol: c.symbol,
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "1m",
+    })),
+    formingCandles5m: formingCandles5m.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "5m",
+    })),
+    formingCandles15m: formingCandles15m.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "15m",
+    })),
+    formingCandles30m: formingCandles30m.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "30m",
+    })),
+    formingCandles1h: formingCandles1h.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "1h",
+    })),
+    formingCandles4h: formingCandles4h.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "4h",
+    })),
+    formingCandlesD: formingCandlesD.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "D",
+    })),
+    formingCandlesW: formingCandlesW.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "W",
+    })),
+    formingCandlesM: formingCandlesM.map((c) => ({
+      symbol: c.symbol,
+      time: c.periodStart,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      timeframe: "M",
+    })),
+    completedCandles: state.completedCandlesToBroadcast,
+  });
+
   try {
     const response = await fetch(`${wsInternalUrl}/internal/prices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prices: prices.map((p) => ({
-          symbol: p.symbol,
-          bid: p.bid,
-          ask: p.ask,
-          mid: p.mid,
-          timestamp: p.timestamp,
-        })),
-        // 1m forming candles
-        formingCandles: formingCandles.map((c) => ({
-          symbol: c.symbol,
-          time: c.time,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "1m",
-        })),
-        // 5m forming candles (from cache - no calculation)
-        formingCandles5m: formingCandles5m.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "5m",
-        })),
-        // 15m forming candles (from cache - no calculation)
-        formingCandles15m: formingCandles15m.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "15m",
-        })),
-        // 30m forming candles (from cache - no calculation)
-        formingCandles30m: formingCandles30m.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "30m",
-        })),
-        // 1h forming candles (from cache - no calculation)
-        formingCandles1h: formingCandles1h.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "1h",
-        })),
-        // 4h forming candles (from cache - no calculation)
-        formingCandles4h: formingCandles4h.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "4h",
-        })),
-        // Daily forming candles (from cache - no calculation)
-        formingCandlesD: formingCandlesD.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "D",
-        })),
-        // Weekly forming candles (from cache - no calculation)
-        formingCandlesW: formingCandlesW.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "W",
-        })),
-        // Monthly forming candles (from cache - no calculation)
-        formingCandlesM: formingCandlesM.map((c) => ({
-          symbol: c.symbol,
-          time: c.periodStart,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          timeframe: "M",
-        })),
-        // ⭐ COMPLETED CANDLES - broadcast so clients update their historical data
-        // This prevents chart divergence when candles complete
-        completedCandles: state.completedCandlesToBroadcast,
-      }),
+      body: bodyJson,
     });
 
     // Clear the completed candles queue after successful broadcast
@@ -2309,6 +2457,11 @@ async function broadcastFormingCandles(): Promise<void> {
       console.warn(
         `⚠️ [Broadcast] WebSocket server returned ${response.status}`,
       );
+    }
+
+    // Publish to Redis for secondary servers (if multi-server sync enabled)
+    if (multiServerSyncEnabled) {
+      publishPriceBroadcastToRedis(bodyJson).catch(() => {});
     }
   } catch (error) {
     // Log only occasionally to avoid spam
@@ -2539,9 +2692,6 @@ async function autoInitialize(): Promise<void> {
 
   // Use global state to prevent re-initialization across HMR
   if (state.initialized) {
-    // console.log(
-      // `ℹ️ [AUTO-INIT] Already initialized (ID: ${state.connectionId})`,
-    // );
     return;
   }
   state.initialized = true;
@@ -2549,27 +2699,46 @@ async function autoInitialize(): Promise<void> {
   // Only initialize on server-side
   if (typeof window !== "undefined") return;
 
-  // ⚠️ IMPORTANT: Only WEB app (port 3000) connects to WebSocket
-  // Worker and ADMIN use MongoDB cache for prices (written by WEB)
-  // This prevents the "1 connection per asset class" conflict with Massive.com
-  if (isWorkerProcess()) {
-    // console.log("ℹ️ [WEBSOCKET] Worker detected - skipping WebSocket init");
-    // console.log(
-      // "   Worker will read prices from MongoDB cache (written by WEB app)",
-    // );
+  // Worker and Admin skip WebSocket entirely
+  if (isWorkerProcess()) return;
+  if (isAdminProcess()) return;
+
+  // Detect if this is a SECONDARY server
+  const isPrimary = process.env.IS_PRIMARY !== "false";
+
+  if (!isPrimary) {
+    // ============================================
+    // SECONDARY SERVER: Relay prices from Redis
+    // ============================================
+    // Secondary servers don't connect to Massive.com directly.
+    // Instead, they subscribe to Redis pub/sub where the primary
+    // publishes real-time prices, and relay them to the local
+    // WebSocket server so browser clients get live chart updates.
+    console.log(
+      "📡 [AUTO-INIT] Secondary server detected - starting Redis price relay...",
+    );
+    try {
+      // Small delay to let Redis connection establish first
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await startRedisPriceRelay();
+      console.log(
+        "✅ [AUTO-INIT] Redis price relay active - charts will update in real-time",
+      );
+    } catch (error) {
+      console.error("❌ [AUTO-INIT] Failed to start Redis relay:", error);
+      console.error(
+        "   Charts on this server will not update in real-time.",
+      );
+      console.error(
+        "   Ensure Redis is configured and Multi-Server Price Sync is ON in admin panel.",
+      );
+    }
     return;
   }
 
-  if (isAdminProcess()) {
-    // console.log("ℹ️ [WEBSOCKET] Admin app detected - skipping WebSocket init");
-    // console.log("   Admin will read WebSocket status from WEB app via API");
-    return;
-  }
-
-  // console.log(
-    // "🚀 [AUTO-INIT] Starting WebSocket and TP/SL cache initialization...",
-  // );
-
+  // ============================================
+  // PRIMARY SERVER: Connect to Massive.com WebSocket
+  // ============================================
   try {
     await initializeWebSocket();
 
@@ -2577,7 +2746,6 @@ async function autoInitialize(): Promise<void> {
     await seedCompletedCandlesBuffer();
 
     // Seed higher timeframe caches (4h, D, W, M) from historical 1m data
-    // This ensures forming candles have accurate OHLC from period start, not just server start
     await seedHigherTimeframeCaches();
 
     // Start broadcasting forming candles to WebSocket server
@@ -2587,17 +2755,12 @@ async function autoInitialize(): Promise<void> {
     try {
       const { priceSnapshotService } = await import("./price-snapshot.service");
       priceSnapshotService.start();
-      // console.log("📸 [AUTO-INIT] Price snapshot service started");
     } catch (snapshotError) {
       console.error(
         "⚠️ [AUTO-INIT] Failed to start price snapshot service:",
         snapshotError,
       );
     }
-
-    // console.log(
-      // "✅ [AUTO-INIT] WebSocket, TP/SL cache, snapshots, and broadcast ready",
-    // );
   } catch (error) {
     console.error("❌ [AUTO-INIT] Failed:", error);
   }
