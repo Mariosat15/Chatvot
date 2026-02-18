@@ -5377,3 +5377,131 @@ export function calculateMirageDepthScanner(
 
   return result;
 }
+
+// ============================================================================
+// QUANTUM DRIFT MAPPER — Detrended Fluctuation Analysis (DFA)
+// ============================================================================
+
+export interface QuantumDriftMapperData {
+  time: number;
+  driftLine: number;
+  upper: number;
+  lower: number;
+  alpha: number;
+  regime: "persistent" | "antipersistent" | "random";
+  signal: "drift_start" | "snap_start" | "none";
+}
+
+export function calculateQuantumDriftMapper(
+  data: OHLCData[],
+  dfaWindow: number = 40,
+  corridorMultiplier: number = 1.5,
+  smooth: number = 5,
+  persistenceThreshold: number = 0.6,
+): QuantumDriftMapperData[] {
+  const minBars = dfaWindow + smooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    logReturns[i] = closes[i] > 0 && closes[i - 1] > 0 ? Math.log(closes[i] / closes[i - 1]) : 0;
+  }
+
+  const alphaRaw = new Array(len).fill(0.5);
+  const halfWin = Math.floor(dfaWindow / 2);
+
+  for (let i = dfaWindow; i < len; i++) {
+    const segment = logReturns.slice(i - dfaWindow + 1, i + 1);
+    const mean = segment.reduce((s, v) => s + v, 0) / segment.length;
+    const cumDev = new Array(segment.length);
+    cumDev[0] = segment[0] - mean;
+    for (let j = 1; j < segment.length; j++) cumDev[j] = cumDev[j - 1] + (segment[j] - mean);
+
+    const scales = [4, 8, Math.max(12, halfWin)];
+    const logS: number[] = [];
+    const logF: number[] = [];
+
+    for (const s of scales) {
+      if (s > segment.length) continue;
+      const numBoxes = Math.floor(segment.length / s);
+      if (numBoxes < 1) continue;
+      let totalFluc = 0;
+      for (let b = 0; b < numBoxes; b++) {
+        const start = b * s;
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+        for (let k = 0; k < s; k++) {
+          sx += k; sy += cumDev[start + k]; sxy += k * cumDev[start + k]; sx2 += k * k;
+        }
+        const denom = s * sx2 - sx * sx;
+        const slope = denom !== 0 ? (s * sxy - sx * sy) / denom : 0;
+        const intercept = (sy - slope * sx) / s;
+        let rms = 0;
+        for (let k = 0; k < s; k++) {
+          const fit = intercept + slope * k;
+          const diff = cumDev[start + k] - fit;
+          rms += diff * diff;
+        }
+        totalFluc += Math.sqrt(rms / s);
+      }
+      const avgF = totalFluc / numBoxes;
+      if (avgF > 1e-12) { logS.push(Math.log(s)); logF.push(Math.log(avgF)); }
+    }
+
+    if (logS.length >= 2) {
+      let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+      const n = logS.length;
+      for (let j = 0; j < n; j++) { sx += logS[j]; sy += logF[j]; sxy += logS[j] * logF[j]; sx2 += logS[j] * logS[j]; }
+      const denom = n * sx2 - sx * sx;
+      alphaRaw[i] = denom !== 0 ? (n * sxy - sx * sy) / denom : 0.5;
+    }
+  }
+
+  const alphaSmooth = new Array(len).fill(0.5);
+  const ek = 2 / (smooth + 1);
+  alphaSmooth[dfaWindow] = alphaRaw[dfaWindow];
+  for (let i = dfaWindow + 1; i < len; i++) {
+    alphaSmooth[i] = alphaSmooth[i - 1] + ek * (alphaRaw[i] - alphaSmooth[i - 1]);
+  }
+
+  const driftLine = new Array(len).fill(0);
+  driftLine[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const a = Math.max(0.1, Math.min(2.0, alphaSmooth[i]));
+    const adaptLen = Math.max(3, Math.round(dfaWindow * (1.5 - a)));
+    const k = 2 / (adaptLen + 1);
+    driftLine[i] = driftLine[i - 1] + k * (closes[i] - driftLine[i - 1]);
+  }
+
+  const atrArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - closes[i - 1]), Math.abs(data[i].low - closes[i - 1]));
+    atrArr[i] = atrArr[i - 1] + (2 / 15) * (tr - atrArr[i - 1]);
+  }
+
+  const result: QuantumDriftMapperData[] = [];
+  let prevRegime: QuantumDriftMapperData["regime"] = "random";
+
+  for (let i = minBars; i < len; i++) {
+    const a = alphaSmooth[i];
+    const regime: QuantumDriftMapperData["regime"] =
+      a >= persistenceThreshold ? "persistent" :
+      a <= (1.0 - persistenceThreshold) ? "antipersistent" : "random";
+
+    let signal: QuantumDriftMapperData["signal"] = "none";
+    if (regime === "persistent" && prevRegime !== "persistent") signal = "drift_start";
+    else if (regime === "antipersistent" && prevRegime !== "antipersistent") signal = "snap_start";
+
+    const spread = atrArr[i] * corridorMultiplier * (0.5 + a);
+    prevRegime = regime;
+    result.push({
+      time: data[i].time, driftLine: driftLine[i],
+      upper: driftLine[i] + spread, lower: driftLine[i] - spread,
+      alpha: a, regime, signal,
+    });
+  }
+
+  return result;
+}

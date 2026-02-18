@@ -48,7 +48,8 @@ export type IndicatorType =
   | "chaos_sentinel"
   | "helix_phase_engine"
   | "prism_wavelet_cascade"
-  | "mirage_depth_scanner";
+  | "mirage_depth_scanner"
+  | "quantum_drift_mapper";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -507,6 +508,8 @@ const INDICATOR_TYPE_MAP: Record<
   "prism wavelet cascade": { type: "prism_wavelet_cascade", displayType: "overlay" },
   mirage_depth_scanner: { type: "mirage_depth_scanner", displayType: "overlay" },
   "mirage depth scanner": { type: "mirage_depth_scanner", displayType: "overlay" },
+  quantum_drift_mapper: { type: "quantum_drift_mapper", displayType: "overlay" },
+  "quantum drift mapper": { type: "quantum_drift_mapper", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -831,6 +834,25 @@ export function marketplaceItemToIndicator(
       params.ampMultiplier = settings?.ampMultiplier || 1.5;
       params.velocitySmooth = settings?.velocitySmooth || 5;
       params.leadSensitivity = settings?.leadSensitivity || 55;
+      break;
+    case "prism_wavelet_cascade":
+      params.waveletDepth = settings?.waveletDepth || 3;
+      params.smoothPeriod = settings?.smoothPeriod || 8;
+      params.alignThreshold = settings?.alignThreshold || 70;
+      params.splitThreshold = settings?.splitThreshold || 30;
+      break;
+    case "mirage_depth_scanner":
+      params.windowLength = settings?.windowLength || 30;
+      params.corridorMultiplier = settings?.corridorMultiplier || 1.5;
+      params.depthSmooth = settings?.depthSmooth || 5;
+      params.signalThreshold = settings?.signalThreshold || 65;
+      break;
+    case "quantum_drift_mapper":
+      params.dfaPeriod = settings?.dfaPeriod || 30;
+      params.dfaScales = settings?.dfaScales || 5;
+      params.corridorMultiplier = settings?.corridorMultiplier || 1.5;
+      params.smooth = settings?.smooth || 5;
+      params.persistenceThreshold = settings?.persistenceThreshold || 60;
       break;
     default:
       // Generic period-based indicators

@@ -1871,6 +1871,37 @@ const MIRAGE_DEPTH_SCANNER: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const QUANTUM_DRIFT_MAPPER: Partial<IMarketplaceItem> = {
+  name: "Quantum Drift Mapper",
+  slug: "quantum-drift-mapper",
+  shortDescription:
+    "Detrended Fluctuation Analysis overlay that measures long-range price correlations to predict trending vs mean-reverting regimes. Adaptive drift line with persistence corridor.",
+  fullDescription: `# Quantum Drift Mapper\n\n## Overview\n**Quantum Drift Mapper** applies **Detrended Fluctuation Analysis (DFA)** — a technique from statistical physics — to measure long-range correlations in price data.\n\n## How It Works\n- **α > 0.6** (Persistent): Trending market — momentum continues\n- **α ≈ 0.5** (Random Walk): Neutral\n- **α < 0.4** (Anti-Persistent): Mean-reverting market — price snaps back\n\n## Visual Guide\n- **Electric blue/white** = Persistent (trending)\n- **Amber/orange** = Anti-persistent (mean-reverting)\n- **DRIFT ▲**: Trend starting | **SNAP ▼**: Mean-reversion imminent`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 49.99,
+  status: "published",
+  indicatorType: "quantum_drift_mapper",
+  iconName: "Zap",
+  codeTemplate: JSON.stringify({
+    type: "quantum_drift_mapper",
+    displayType: "overlay",
+    description: "DFA-based long-range correlation analysis with adaptive drift line and persistence corridor",
+  }),
+  defaultSettings: {
+    dfaWindow: 30,
+    dfaOrder: 2,
+    corridorMultiplier: 1.5,
+    persistenceSmooth: 5,
+    driftSensitivity: 60,
+    color: "#4fc3f7",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["dfa", "persistence", "correlation", "premium", "overlay", "adaptive", "regime", "mean-reversion", "trending", "statistical-physics"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1891,6 +1922,7 @@ const ALL_ITEMS = [
   HELIX_PHASE_ENGINE,
   PRISM_WAVELET_CASCADE,
   MIRAGE_DEPTH_SCANNER,
+  QUANTUM_DRIFT_MAPPER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

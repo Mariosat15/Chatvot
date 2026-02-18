@@ -421,6 +421,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { windowLength: 30, corridorMultiplier: 1.5, depthSmooth: 5, signalThreshold: 65 },
     paramLabels: { windowLength: "Window Length", corridorMultiplier: "Corridor Width", depthSmooth: "Depth Smooth", signalThreshold: "Signal Threshold" },
   },
+  quantum_drift_mapper: {
+    name: "Quantum Drift Mapper",
+    shortName: "QDM",
+    displayType: "overlay" as const,
+    defaultParams: { dfaPeriod: 30, dfaScales: 5, corridorMultiplier: 1.5, smooth: 5, persistenceThreshold: 60 },
+    paramLabels: { dfaPeriod: "DFA Period", dfaScales: "DFA Scales", corridorMultiplier: "Corridor Width", smooth: "Smoothing", persistenceThreshold: "Persistence Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

@@ -109,6 +109,7 @@ import {
   calculateHelixPhaseEngine,
   calculatePrismWaveletCascade,
   calculateMirageDepthScanner,
+  calculateQuantumDriftMapper,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3059,6 +3060,69 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Quantum Drift Mapper: DFA persistence corridor + adaptive drift line + per-bar coloring
+        } else if (indicator.type === "quantum_drift_mapper") {
+          const qdmData = calculateQuantumDriftMapper(
+            transformedCandles,
+            indicator.parameters.dfaWindow || 40,
+            indicator.parameters.corridorMultiplier || 1.5,
+            indicator.parameters.smooth || 5,
+            indicator.parameters.persistenceThreshold || 0.6,
+          );
+
+          const qdmColor = (alpha: number, regime: string): string => {
+            if (regime === "persistent") return alpha > 0.7 ? "#e0f7fa" : "#00e5ff";
+            if (regime === "antipersistent") return alpha < 0.35 ? "#ff6d00" : "#ffd740";
+            return "#b0bec5";
+          };
+
+          const qdmMarkers: any[] = [];
+          for (const d of qdmData) {
+            if (d.signal === "drift_start") qdmMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e5ff", shape: "arrowUp" as const, text: "DRIFT", size: 2 });
+            else if (d.signal === "snap_start") qdmMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff6d00", shape: "arrowDown" as const, text: "SNAP", size: 2 });
+          }
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: "#b0bec5", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "QDM"} Upper`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            upperSeries.setData(qdmData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.upper,
+              color: hexToRgba(qdmColor(d.alpha, d.regime), 40),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const driftSeries = chart.addLineSeries({
+              color: "#00e5ff", lineWidth: 3 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Quantum Drift Mapper", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            driftSeries.setData(qdmData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.driftLine,
+              color: hexToRgba(qdmColor(d.alpha, d.regime), 100),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_drift`, driftSeries);
+            const sorted = qdmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { driftSeries.setMarkers(sorted); } catch {}
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: "#b0bec5", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "QDM"} Lower`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            lowerSeries.setData(qdmData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.lower,
+              color: hexToRgba(qdmColor(d.alpha, d.regime), 40),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3614,7 +3678,6 @@ const LightweightTradingChart = ({
                     }
                   });
                 }
-              }
               } else if (_ovlType === "mirage_depth_scanner") {
                 const mdsData = calculateMirageDepthScanner(
                   tc, p.windowLength || 30, p.corridorMultiplier || 1.5, p.depthSmooth || 5, p.signalThreshold || 65,
@@ -3634,6 +3697,27 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
                     if (cS) cS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.trendLine, color: hexToRgba(mdsC(d.depthScore, d.regime), 100) })));
                     if (lS) lS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
+                  }
+                }
+              } else if (_ovlType === "quantum_drift_mapper") {
+                const qdmData = calculateQuantumDriftMapper(
+                  tc, p.dfaWindow || 40, p.corridorMultiplier || 1.5, p.smooth || 5, p.persistenceThreshold || 0.6,
+                );
+                if (qdmData.length > 0) {
+                  const qdmC = (a: number, r: string) => r === "persistent" ? (a > 0.7 ? "#e0f7fa" : "#00e5ff") : r === "antipersistent" ? (a < 0.35 ? "#ff6d00" : "#ffd740") : "#b0bec5";
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const cS = _ovlSeriesMap.get(`${_ovlId}_drift`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = qdmData[qdmData.length - 1];
+                    const c = qdmC(last.alpha, last.regime);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 40) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.driftLine, color: hexToRgba(c, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 40) } as any);
+                  } else {
+                    if (uS) uS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
+                    if (cS) cS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.driftLine, color: hexToRgba(qdmC(d.alpha, d.regime), 100) })));
+                    if (lS) lS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
                   }
                 }
               }

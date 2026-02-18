@@ -2305,6 +2305,70 @@ The oscillatory component creates a dynamic corridor (upper/lower bands) around 
   riskLevel: "medium",
 };
 
+const QUANTUM_DRIFT_MAPPER: Partial<IMarketplaceItem> = {
+  name: "Quantum Drift Mapper",
+  slug: "quantum-drift-mapper",
+  shortDescription:
+    "Detrended Fluctuation Analysis overlay that measures long-range price correlations to predict trending vs mean-reverting regimes. Adaptive drift line with persistence corridor.",
+  fullDescription: `# Quantum Drift Mapper
+
+## Overview
+**Quantum Drift Mapper** applies **Detrended Fluctuation Analysis (DFA)** — a technique from statistical physics — to measure long-range correlations in price data. It determines whether the market is in a persistent (trending) or anti-persistent (mean-reverting) state.
+
+## How It Works
+
+### DFA Scaling Exponent (α)
+The DFA exponent measures self-similarity in the price series:
+- **α > 0.6** (Persistent): Price movements tend to continue — trending market
+- **α ≈ 0.5** (Random Walk): No predictability — neutral
+- **α < 0.4** (Anti-Persistent): Price movements tend to reverse — mean-reverting market
+
+### Adaptive Drift Line
+A moving average whose effective period adapts to the DFA exponent:
+- When α is high (trending): period shortens → line follows price closely
+- When α is low (mean-reverting): period lengthens → line smooths out noise
+
+### Persistence Corridor
+Dynamic upper/lower bands that reflect market regime:
+- **Wide bands** in trending regimes (large moves expected)
+- **Narrow bands** in mean-reverting regimes (range-bound expected)
+
+## Visual Guide
+- **Electric blue/white** = Persistent (trending) — trade with momentum
+- **Amber/orange** = Anti-persistent (mean-reverting) — fade extremes
+- **Silver/gray** = Transition — reduce size
+
+## How to Trade
+1. **DRIFT signal** (▲): Persistence just spiked → trend starting, enter with direction
+2. **SNAP signal** (▼): Persistence just dropped → mean-reversion imminent, fade extremes
+3. **Blue drift line**: Follow the trend direction
+4. **Amber drift line**: Trade mean-reversion back to the line
+5. **Corridor width**: Use as volatility guide for stop-loss placement`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 49.99,
+  status: "published",
+  indicatorType: "quantum_drift_mapper",
+  iconName: "Zap",
+  codeTemplate: JSON.stringify({
+    type: "quantum_drift_mapper",
+    displayType: "overlay",
+    description: "DFA-based long-range correlation analysis with adaptive drift line and persistence corridor",
+  }),
+  defaultSettings: {
+    dfaWindow: 30,
+    dfaOrder: 2,
+    corridorMultiplier: 1.5,
+    persistenceSmooth: 5,
+    driftSensitivity: 60,
+    color: "#4fc3f7",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["dfa", "persistence", "correlation", "premium", "overlay", "adaptive", "regime", "mean-reversion", "trending", "statistical-physics"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2325,6 +2389,7 @@ const ALL_ITEMS = [
   HELIX_PHASE_ENGINE,
   PRISM_WAVELET_CASCADE,
   MIRAGE_DEPTH_SCANNER,
+  QUANTUM_DRIFT_MAPPER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
