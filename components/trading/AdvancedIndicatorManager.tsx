@@ -414,6 +414,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { waveletDepth: 3, smoothPeriod: 8, alignThreshold: 70, splitThreshold: 30 },
     paramLabels: { waveletDepth: "Wavelet Depth", smoothPeriod: "Smooth Period", alignThreshold: "Align Threshold", splitThreshold: "Split Threshold" },
   },
+  mirage_depth_scanner: {
+    name: "Mirage Depth Scanner",
+    shortName: "MDS",
+    displayType: "overlay" as const,
+    defaultParams: { windowLength: 30, corridorMultiplier: 1.5, depthSmooth: 5, signalThreshold: 65 },
+    paramLabels: { windowLength: "Window Length", corridorMultiplier: "Corridor Width", depthSmooth: "Depth Smooth", signalThreshold: "Signal Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

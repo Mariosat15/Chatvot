@@ -47,7 +47,8 @@ export type IndicatorType =
   | "phantom_divergence_tracker"
   | "chaos_sentinel"
   | "helix_phase_engine"
-  | "prism_wavelet_cascade";
+  | "prism_wavelet_cascade"
+  | "mirage_depth_scanner";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -504,6 +505,8 @@ const INDICATOR_TYPE_MAP: Record<
   "helix phase engine": { type: "helix_phase_engine", displayType: "overlay" },
   prism_wavelet_cascade: { type: "prism_wavelet_cascade", displayType: "overlay" },
   "prism wavelet cascade": { type: "prism_wavelet_cascade", displayType: "overlay" },
+  mirage_depth_scanner: { type: "mirage_depth_scanner", displayType: "overlay" },
+  "mirage depth scanner": { type: "mirage_depth_scanner", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator

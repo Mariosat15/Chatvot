@@ -2233,6 +2233,78 @@ A proprietary metric measures how closely the 4 layers agree:
   riskLevel: "medium",
 };
 
+const MIRAGE_DEPTH_SCANNER: Partial<IMarketplaceItem> = {
+  name: "Mirage Depth Scanner",
+  slug: "mirage-depth-scanner",
+  shortDescription:
+    "Singular Spectrum Analysis overlay that extracts the true trend via eigendecomposition, separating signal from noise with a pulsating depth corridor and emerge/submerge markers.",
+  fullDescription: `# Mirage Depth Scanner
+
+## Overview
+**Mirage Depth Scanner** uses **Singular Spectrum Analysis (SSA)** — a powerful technique from climate science and geophysics — to decompose price into mathematically optimal **trend**, **oscillatory**, and **noise** components via eigendecomposition of the trajectory matrix. Unlike moving averages that blur price, SSA extracts the *true underlying trend* with minimal lag.
+
+## How It Works
+
+### Singular Spectrum Analysis
+1. A **trajectory matrix** is built from rolling price windows
+2. The **covariance matrix** is computed and its dominant eigenvectors extracted via power iteration
+3. The **leading eigenvector** reconstructs the pure trend component
+4. The **residual** captures oscillatory cycles and noise
+
+### Depth Score (0–100)
+Measures what percentage of total price variance is explained by the trend component:
+- **High depth (>65)**: Strong trend dominates — reliable directional signals
+- **Low depth (<35)**: Noise dominates — choppy, range-bound conditions
+- **Transition**: Shifting between regimes
+
+### Signal Corridor
+The oscillatory component creates a dynamic corridor (upper/lower bands) around the trend line. Width reflects cycle amplitude — wider corridors indicate stronger oscillations.
+
+## Visual Design
+- **Depth Line**: Thick trend line — gold/emerald when bullish, crimson/violet when bearish
+- **Signal Corridor**: Upper/lower bands showing oscillatory amplitude
+- **EMERGE** marker: Trend emerging from noise (depth score crosses above threshold)
+- **SUBMERGE** marker: Trend weakening (depth score drops below threshold)
+
+## How to Trade
+1. **Follow the Depth Line direction** when depth score is high (deep regime)
+2. **EMERGE signals**: Strong entry — trend just became dominant, momentum aligning
+3. **SUBMERGE signals**: Exit/reduce — trend dissolving into noise
+4. **Corridor width**: Wide = strong oscillation (range trades), narrow = clean trend
+5. **Color changes**: Gold→emerald = accelerating bull; crimson→violet = accelerating bear
+6. **Avoid trading** in surface regime (low depth) — noise dominates
+
+## Parameters
+- **Window Length** (default 30): SSA embedding dimension — larger = smoother trend
+- **Corridor Multiplier** (default 1.5): Scales oscillatory bands
+- **Depth Smooth** (default 5): EMA smoothing on depth score
+- **Signal Threshold** (default 65): Depth level for emerge/submerge signals`,
+  category: "indicators",
+  subcategory: "premium",
+  price: 69.99,
+  currency: "USD",
+  status: "published",
+  featured: true,
+  indicatorType: "mirage_depth_scanner",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "mirage_depth_scanner",
+    displayType: "overlay",
+    description: "SSA eigendecomposition trend extraction with depth corridor and regime detection",
+  }),
+  defaultSettings: {
+    windowLength: 30,
+    corridorMultiplier: 1.5,
+    depthSmooth: 5,
+    signalThreshold: 65,
+    color: "#ffd700",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["ssa", "eigendecomposition", "trend-extraction", "premium", "overlay", "depth", "signal-processing", "corridor", "regime", "noise-separation"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2252,6 +2324,7 @@ const ALL_ITEMS = [
   CHAOS_SENTINEL,
   HELIX_PHASE_ENGINE,
   PRISM_WAVELET_CASCADE,
+  MIRAGE_DEPTH_SCANNER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

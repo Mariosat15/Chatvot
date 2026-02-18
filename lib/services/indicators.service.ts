@@ -5253,3 +5253,127 @@ export function calculatePrismWaveletCascade(
 
   return result;
 }
+
+// ============================================================================
+// MIRAGE DEPTH SCANNER — Singular Spectrum Analysis (SSA) trend extraction
+// ============================================================================
+
+export interface MirageDepthScannerData {
+  time: number;
+  trendLine: number;
+  upper: number;
+  lower: number;
+  depthScore: number;
+  regime: "deep" | "surface" | "transition";
+  signal: "emerge" | "submerge" | "none";
+}
+
+export function calculateMirageDepthScanner(
+  data: OHLCData[],
+  windowLength: number = 30,
+  corridorMultiplier: number = 1.5,
+  depthSmooth: number = 5,
+  signalThreshold: number = 65,
+): MirageDepthScannerData[] {
+  const L = Math.max(8, Math.min(windowLength, Math.floor(data.length / 3)));
+  const minBars = L * 2 + depthSmooth + 5;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const ssaTrend = new Array(len).fill(0);
+  const ssaOsc = new Array(len).fill(0);
+  const rawDepth = new Array(len).fill(50);
+
+  for (let t = L; t < len; t++) {
+    const K = L;
+    const segment = closes.slice(t - L - K + 1, t + 1);
+    const segLen = segment.length;
+    if (segLen < L + K - 1) { ssaTrend[t] = closes[t]; continue; }
+
+    const mean = segment.reduce((a, b) => a + b, 0) / segLen;
+
+    const autoCorr = new Array(L).fill(0);
+    for (let lag = 0; lag < L; lag++) {
+      let s = 0, cnt = 0;
+      for (let j = 0; j < segLen - lag; j++) {
+        s += (segment[j] - mean) * (segment[j + lag] - mean);
+        cnt++;
+      }
+      autoCorr[lag] = cnt > 0 ? s / cnt : 0;
+    }
+
+    let eigVec = new Array(L).fill(1 / Math.sqrt(L));
+    for (let iter = 0; iter < 12; iter++) {
+      const newVec = new Array(L).fill(0);
+      for (let i = 0; i < L; i++) {
+        for (let j = 0; j < L; j++) {
+          newVec[i] += autoCorr[Math.abs(i - j)] * eigVec[j];
+        }
+      }
+      let norm = 0;
+      for (let i = 0; i < L; i++) norm += newVec[i] * newVec[i];
+      norm = Math.sqrt(norm);
+      if (norm > 0) for (let i = 0; i < L; i++) eigVec[i] = newVec[i] / norm;
+    }
+
+    let eigenVal1 = 0;
+    for (let i = 0; i < L; i++) {
+      let v = 0;
+      for (let j = 0; j < L; j++) v += autoCorr[Math.abs(i - j)] * eigVec[j];
+      eigenVal1 += eigVec[i] * v;
+    }
+
+    let proj = 0;
+    const windowData = segment.slice(segLen - L);
+    for (let i = 0; i < L; i++) proj += (windowData[i] - mean) * eigVec[i];
+
+    ssaTrend[t] = mean + proj * eigVec[L - 1];
+    ssaOsc[t] = closes[t] - ssaTrend[t];
+
+    const totalVar = autoCorr[0] * L;
+    rawDepth[t] = totalVar > 0 ? Math.min(100, Math.max(0, (eigenVal1 / totalVar) * 100)) : 50;
+  }
+
+  for (let t = 1; t < L; t++) ssaTrend[t] = closes[t];
+
+  const smoothK = 2 / (depthSmooth + 1);
+  const smoothTrend = [...ssaTrend];
+  const smoothDepth = [...rawDepth];
+  const smoothOsc = new Array(len).fill(0);
+  for (let i = L + 1; i < len; i++) {
+    smoothTrend[i] = smoothTrend[i - 1] + smoothK * (ssaTrend[i] - smoothTrend[i - 1]);
+    smoothDepth[i] = smoothDepth[i - 1] + smoothK * (rawDepth[i] - smoothDepth[i - 1]);
+    smoothOsc[i] = smoothOsc[i - 1] + smoothK * (Math.abs(ssaOsc[i]) - smoothOsc[i - 1]);
+  }
+
+  const startIdx = L + depthSmooth + 2;
+  const result: MirageDepthScannerData[] = [];
+  let prevRegime: MirageDepthScannerData["regime"] = "transition";
+
+  for (let i = startIdx; i < len; i++) {
+    const corridor = smoothOsc[i] * corridorMultiplier;
+    const depth = smoothDepth[i];
+    const regime: MirageDepthScannerData["regime"] =
+      depth >= signalThreshold + 10 ? "deep" :
+      depth <= signalThreshold - 15 ? "surface" : "transition";
+
+    let signal: MirageDepthScannerData["signal"] = "none";
+    if (regime === "deep" && prevRegime !== "deep") signal = "emerge";
+    else if (regime === "surface" && prevRegime !== "surface") signal = "submerge";
+
+    prevRegime = regime;
+    result.push({
+      time: data[i].time,
+      trendLine: smoothTrend[i],
+      upper: smoothTrend[i] + corridor,
+      lower: smoothTrend[i] - corridor,
+      depthScore: depth,
+      regime,
+      signal,
+    });
+  }
+
+  return result;
+}

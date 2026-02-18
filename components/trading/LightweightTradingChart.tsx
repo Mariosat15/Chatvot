@@ -108,6 +108,7 @@ import {
   calculateChaosSentinel,
   calculateHelixPhaseEngine,
   calculatePrismWaveletCascade,
+  calculateMirageDepthScanner,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2992,6 +2993,72 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_${key}`, series);
           });
 
+        // Mirage Depth Scanner: SSA trend line + oscillatory corridor + depth regime coloring
+        } else if (indicator.type === "mirage_depth_scanner") {
+          const mdsData = calculateMirageDepthScanner(
+            transformedCandles,
+            indicator.parameters.windowLength || 30,
+            indicator.parameters.corridorMultiplier || 1.5,
+            indicator.parameters.depthSmooth || 5,
+            indicator.parameters.signalThreshold || 65,
+          );
+
+          const mdsColor = (depth: number, regime: string): string => {
+            if (regime === "deep") return depth > 80 ? "#00e676" : "#66bb6a";
+            if (regime === "surface") return depth < 40 ? "#f44336" : "#ef5350";
+            return "#ffd740";
+          };
+
+          const mdsMarkers: any[] = [];
+          for (const d of mdsData) {
+            if (d.signal === "emerge") {
+              mdsMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e676", shape: "arrowUp" as const, text: "EMERGE", size: 2 });
+            } else if (d.signal === "submerge") {
+              mdsMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#f44336", shape: "arrowDown" as const, text: "SUBMERGE", size: 2 });
+            }
+          }
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: "#9e9e9e", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "MDS"} Upper`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            upperSeries.setData(mdsData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.upper,
+              color: hexToRgba(mdsColor(d.depthScore, d.regime), 35),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const trendSeries = chart.addLineSeries({
+              color: "#ffd740", lineWidth: 3 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Mirage Depth Scanner", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            trendSeries.setData(mdsData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.trendLine,
+              color: hexToRgba(mdsColor(d.depthScore, d.regime), 100),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_trend`, trendSeries);
+            const sorted = mdsMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { trendSeries.setMarkers(sorted); } catch {}
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: "#9e9e9e", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "MDS"} Lower`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            lowerSeries.setData(mdsData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.lower,
+              color: hexToRgba(mdsColor(d.depthScore, d.regime), 35),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3546,6 +3613,28 @@ const LightweightTradingChart = ({
                       }));
                     }
                   });
+                }
+              }
+              } else if (_ovlType === "mirage_depth_scanner") {
+                const mdsData = calculateMirageDepthScanner(
+                  tc, p.windowLength || 30, p.corridorMultiplier || 1.5, p.depthSmooth || 5, p.signalThreshold || 65,
+                );
+                if (mdsData.length > 0) {
+                  const mdsC = (d: number, r: string) => r === "deep" ? (d > 80 ? "#00e676" : "#66bb6a") : r === "surface" ? (d < 40 ? "#f44336" : "#ef5350") : "#ffd740";
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const cS = _ovlSeriesMap.get(`${_ovlId}_trend`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = mdsData[mdsData.length - 1];
+                    const c = mdsC(last.depthScore, last.regime);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 35) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.trendLine, color: hexToRgba(c, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 35) } as any);
+                  } else {
+                    if (uS) uS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
+                    if (cS) cS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.trendLine, color: hexToRgba(mdsC(d.depthScore, d.regime), 100) })));
+                    if (lS) lS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
+                  }
                 }
               }
               // Note: support_resistance is static (level detection) -- not updated in real-time

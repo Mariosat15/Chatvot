@@ -1839,6 +1839,38 @@ const PRISM_WAVELET_CASCADE: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const MIRAGE_DEPTH_SCANNER: Partial<IMarketplaceItem> = {
+  name: "Mirage Depth Scanner",
+  slug: "mirage-depth-scanner",
+  shortDescription:
+    "Singular Spectrum Analysis overlay — extracts true trend via eigendecomposition, pulsating depth corridor, emerge/submerge regime signals.",
+  fullDescription: "# Mirage Depth Scanner\n\nUses **Singular Spectrum Analysis (SSA)** to decompose price into trend, oscillatory, and noise components via eigendecomposition. The **Depth Line** shows the true extracted trend (gold/emerald for bull, crimson/violet for bear). The **Signal Corridor** visualizes oscillatory cycle amplitude. **EMERGE** signals when trend surfaces from noise; **SUBMERGE** when it weakens.\n\n## How to Trade\n1. Follow Depth Line direction when depth score is high\n2. EMERGE = strong entry, SUBMERGE = exit/reduce\n3. Corridor width indicates oscillation strength\n4. Avoid trading in surface regime (noise dominates)",
+  category: "indicators",
+  subcategory: "premium",
+  price: 69.99,
+  currency: "USD",
+  status: "published",
+  featured: true,
+  indicatorType: "mirage_depth_scanner",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "mirage_depth_scanner",
+    displayType: "overlay",
+    description: "SSA eigendecomposition trend extraction with depth corridor and regime detection",
+  }),
+  defaultSettings: {
+    windowLength: 30,
+    corridorMultiplier: 1.5,
+    depthSmooth: 5,
+    signalThreshold: 65,
+    color: "#ffd700",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["ssa", "eigendecomposition", "trend-extraction", "premium", "overlay", "depth", "corridor", "regime"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1858,6 +1890,7 @@ const ALL_ITEMS = [
   CHAOS_SENTINEL,
   HELIX_PHASE_ENGINE,
   PRISM_WAVELET_CASCADE,
+  MIRAGE_DEPTH_SCANNER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
