@@ -3529,3 +3529,132 @@ export function calculateVortexDriftCloud(
 
   return result;
 }
+
+// ============================================================================
+// ORION MOMENTUM SHIELD - Momentum-reactive overlay with EHMA and VNM bands
+// ============================================================================
+
+export interface OrionMomentumShieldData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  vnm: number;       // Volatility-Normalized Momentum (-100 to +100)
+  phase: "surge" | "drift" | "fade"; // momentum phase
+}
+
+export function calculateOrionMomentumShield(
+  data: OHLCData[],
+  hmaPeriod: number = 16,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 1.8,
+  momentumPeriod: number = 12,
+  surgeThreshold: number = 40,
+  fadeSmooth: number = 5,
+): OrionMomentumShieldData[] {
+  const minBars = Math.max(hmaPeriod * 2, atrPeriod, momentumPeriod) + fadeSmooth + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- EMA helper ---
+  const ema = (src: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const k = 2 / (period + 1);
+    let acc = 0;
+    let cnt = 0;
+    for (let i = 0; i < len; i++) {
+      if (isNaN(src[i])) continue;
+      if (isNaN(out[i - 1] ?? NaN) || cnt < period) {
+        acc += src[i];
+        cnt++;
+        out[i] = acc / cnt;
+      } else {
+        out[i] = src[i] * k + out[i - 1] * (1 - k);
+      }
+    }
+    return out;
+  };
+
+  // --- WMA helper ---
+  const wma = (src: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const denom = (period * (period + 1)) / 2;
+    for (let i = period - 1; i < len; i++) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += src[i - period + 1 + j] * (j + 1);
+      }
+      out[i] = sum / denom;
+    }
+    return out;
+  };
+
+  // --- EHMA: Exponential Hull Moving Average ---
+  // EHMA = WMA(2*EMA(N/2) - EMA(N), sqrt(N))
+  const halfPeriod = Math.max(2, Math.round(hmaPeriod / 2));
+  const sqrtPeriod = Math.max(2, Math.round(Math.sqrt(hmaPeriod)));
+  const emaHalf = ema(closes, halfPeriod);
+  const emaFull = ema(closes, hmaPeriod);
+  const diff: number[] = new Array(len).fill(NaN);
+  for (let i = 0; i < len; i++) {
+    if (!isNaN(emaHalf[i]) && !isNaN(emaFull[i])) {
+      diff[i] = 2 * emaHalf[i] - emaFull[i];
+    }
+  }
+  const ehma = wma(diff, sqrtPeriod);
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Volatility-Normalized Momentum (VNM) ---
+  // Raw momentum (ROC) normalized by ATR → scale roughly -100 to +100
+  const vnmRaw: number[] = new Array(len).fill(0);
+  for (let i = momentumPeriod; i < len; i++) {
+    const roc = closes[i] - closes[i - momentumPeriod];
+    vnmRaw[i] = atr[i] > 0 ? (roc / atr[i]) * 20 : 0;
+    vnmRaw[i] = Math.max(-100, Math.min(100, vnmRaw[i]));
+  }
+
+  // Smooth VNM
+  const vnm = ema(vnmRaw, fadeSmooth);
+
+  // --- Build output ---
+  const result: OrionMomentumShieldData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (isNaN(ehma[i]) || atr[i] === 0) continue;
+
+    const midline = ehma[i];
+    const momentumAbs = Math.abs(vnm[i] || 0);
+    const expansionFactor = 1 + (momentumAbs / 100) * 0.8;
+    const bandWidth = atr[i] * bandMultiplier * expansionFactor;
+
+    let phase: "surge" | "drift" | "fade" = "drift";
+    if (momentumAbs >= surgeThreshold) phase = "surge";
+    else if (momentumAbs < surgeThreshold * 0.4) phase = "fade";
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      vnm: Math.round(vnm[i] || 0),
+      phase,
+    });
+  }
+
+  return result;
+}

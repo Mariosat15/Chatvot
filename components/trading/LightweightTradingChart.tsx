@@ -95,6 +95,7 @@ import {
   calculatePhantomFlowZones,
   calculateFractalPulseGrid,
   calculateVortexDriftCloud,
+  calculateOrionMomentumShield,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2046,6 +2047,77 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Orion Momentum Shield: 3 series (upper, midline, lower) with VNM-based coloring
+        } else if (indicator.type === "orion_momentum_shield") {
+          const omsData = calculateOrionMomentumShield(
+            transformedCandles,
+            indicator.parameters.hmaPeriod || 16,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.bandMultiplier || 1.8,
+            indicator.parameters.momentumPeriod || 12,
+            indicator.parameters.surgeThreshold || 40,
+            indicator.parameters.fadeSmooth || 5,
+          );
+
+          const phaseColor = (vnm: number, phase: string) => {
+            if (phase === "surge") return vnm > 0 ? "#22c55e" : "#ef4444";
+            if (phase === "fade") return "#6b7280";
+            return vnm > 0 ? (indicator.colors?.upper || "#34d399") : (indicator.colors?.lower || "#fb923c");
+          };
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || "#34d399", indicator.opacity || 65),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "OMS"} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            upperSeries.setData(omsData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.upper,
+              color: hexToRgba(phaseColor(d.vnm, d.phase), indicator.opacity || 65),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const midSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#a78bfa", indicator.opacity || 90),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Orion Momentum Shield",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            midSeries.setData(omsData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.middle,
+              color: hexToRgba(phaseColor(d.vnm, d.phase), indicator.opacity || 90),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || "#fb923c", indicator.opacity || 65),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "OMS"} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            lowerSeries.setData(omsData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.lower,
+              color: hexToRgba(phaseColor(d.vnm, d.phase), indicator.opacity || 65),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2307,6 +2379,26 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
                     if (mS) mS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
                     if (lS) lS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                  }
+                }
+              } else if (_ovlType === "orion_momentum_shield") {
+                const omsData = calculateOrionMomentumShield(
+                  tc, p.hmaPeriod || 16, p.atrPeriod || 14, p.bandMultiplier || 1.8,
+                  p.momentumPeriod || 12, p.surgeThreshold || 40, p.fadeSmooth || 5,
+                );
+                if (omsData.length > 0) {
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const mS = _ovlSeriesMap.get(`${_ovlId}_middle`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = omsData[omsData.length - 1];
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
+                    if (mS) mS.update({ time: last.time as UTCTimestamp, value: last.middle });
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                  } else {
+                    if (uS) uS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+                    if (mS) mS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+                    if (lS) lS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
                   }
                 }
               }

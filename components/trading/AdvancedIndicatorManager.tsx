@@ -323,6 +323,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { smoothPeriod: 21, atrPeriod: 14, bandMultiplier: 2.0, adxPeriod: 14, adxThreshold: 25, momentumLookback: 10 },
     paramLabels: { smoothPeriod: "Smoother Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", adxPeriod: "ADX Period", adxThreshold: "Trend Threshold", momentumLookback: "Momentum Lookback" },
   },
+  orion_momentum_shield: {
+    name: "Orion Momentum Shield",
+    shortName: "OMS",
+    displayType: "overlay" as const,
+    defaultParams: { hmaPeriod: 16, atrPeriod: 14, bandMultiplier: 1.8, momentumPeriod: 12, surgeThreshold: 40, fadeSmooth: 5 },
+    paramLabels: { hmaPeriod: "EHMA Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", momentumPeriod: "Momentum Period", surgeThreshold: "Surge Threshold", fadeSmooth: "Fade Smoothing" },
+  },
 };
 
 const DEFAULT_COLORS = [

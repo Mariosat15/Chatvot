@@ -1018,6 +1018,125 @@ No indicator guarantees profits. The Vortex Drift Cloud is a decision-support to
   riskLevel: "medium",
 };
 
+const ORION_MOMENTUM_SHIELD: Partial<IMarketplaceItem> = {
+  name: "Orion Momentum Shield",
+  slug: "orion-momentum-shield",
+  shortDescription:
+    "Momentum-reactive overlay with ultra-fast EHMA midline, volatility-normalized momentum coloring, and bands that expand on surges and compress on fades.",
+  fullDescription: `# Orion Momentum Shield
+
+## Overview
+The **Orion Momentum Shield** is a premium on-chart overlay that makes momentum visible directly on price. Traditional momentum indicators (RSI, MACD) sit in a separate panel, forcing you to look away from the chart. Orion puts that information right where it matters — wrapping price in an adaptive shield that physically reacts to momentum changes.
+
+The core innovation is **Volatility-Normalized Momentum (VNM)** — raw price momentum divided by current volatility. This means a 50-pip move in a volatile market registers differently than a 50-pip move in a quiet market, giving you a true picture of momentum strength relative to conditions.
+
+## Three Core Components
+
+### 1. Exponential Hull Moving Average (EHMA)
+The midline uses a hybrid of Hull Moving Average speed with EMA smoothness:
+- **Formula**: WMA(2×EMA(N/2) - EMA(N), √N)
+- **Result**: Ultra-responsive to trend changes with minimal noise
+- Reacts to reversals 2-3 bars faster than a standard EMA of the same period
+- Acts as dynamic support in uptrends and resistance in downtrends
+
+### 2. Momentum-Expanding Bands
+Unlike fixed-width bands, Orion's bands physically react to momentum:
+- **Surge phase** (strong momentum): Bands expand outward, showing the market has fuel
+- **Drift phase** (moderate momentum): Normal band width, steady trend
+- **Fade phase** (dying momentum): Bands compress inward, warning that the move is exhausting
+- **Band width** = ATR × Multiplier × (1 + |VNM|/100 × 0.8)
+
+This means you can literally see momentum building and fading by watching how wide the bands are.
+
+### 3. Three-Phase Color System
+Each bar is colored by its momentum phase:
+- **Green (Surge+)** = Strong bullish momentum — price is surging upward
+- **Red (Surge-)** = Strong bearish momentum — price is plunging
+- **Teal (Drift+)** = Moderate bullish drift — steady upward movement
+- **Orange (Drift-)** = Moderate bearish drift — steady downward movement
+- **Gray (Fade)** = Momentum exhaustion — potential reversal zone
+
+## How to Trade With It
+
+### Momentum Trading (Primary Strategy)
+1. Enter long when bands turn **green** (bullish surge) after a gray fade
+2. Enter short when bands turn **red** (bearish surge) after a gray fade
+3. **Wider bands = stronger conviction** — size up on expansion
+4. Set stop-loss beyond the opposite band
+
+### Exhaustion Reversal Trading
+1. Watch for bands to be in **surge** (green/red) with wide expansion
+2. When bands start **compressing** and color shifts to **gray fade**, the move is dying
+3. Enter counter-trend at the fade signal, targeting the midline
+4. This catches the transition from momentum to mean reversion
+
+### Trend Riding
+1. In a **green/teal drift**: stay long as long as price stays above the EHMA midline
+2. In a **red/orange drift**: stay short as long as price stays below midline
+3. Trail your stop-loss to the lower band (for longs) or upper band (for shorts)
+4. Exit when color shifts to **gray** (momentum dying)
+
+### Breakout Confirmation
+1. Spot a chart pattern or consolidation
+2. Wait for the bands to compress (gray fade phase)
+3. Enter when bands suddenly expand AND change to surge color
+4. Green surge expansion = confirmed bullish breakout
+5. Red surge expansion = confirmed bearish breakout
+
+## Settings Guide
+- **EHMA Period** (16): Hull-EMA hybrid period — lower = faster response, higher = smoother
+- **ATR Period** (14): Volatility lookback for band width calculation
+- **Band Width** (1.8): Base multiplier for band distance from midline
+- **Momentum Period** (12): Rate-of-change lookback for VNM calculation
+- **Surge Threshold** (40): VNM level that triggers surge phase (lower = more sensitive)
+- **Fade Smoothing** (5): Smoothing applied to VNM — higher = fewer phase flips
+
+## What Makes It Different
+| Feature | Traditional Indicators | Orion Momentum Shield |
+|---------|----------------------|----------------------|
+| Momentum display | Separate panel (RSI/MACD) | Directly on chart |
+| Normalization | Raw values | Volatility-adjusted |
+| Band behavior | Static width | Momentum-reactive expansion |
+| Phase detection | Manual interpretation | Automatic 3-phase coloring |
+| Lag | 3-5 bars typical | 1-2 bars (EHMA) |
+
+## Tips for Best Results
+- Combine with **volume** — surge phases with high volume are stronger
+- Use on **5m-4H timeframes** for best balance of signals vs noise
+- The **fade phase** is your early warning — prepare for a potential reversal
+- When in doubt about direction, wait for a **surge after fade** (momentum restart)
+
+## Risk Warning
+No indicator guarantees profits. The Orion Momentum Shield helps visualize momentum, but markets can remain irrational longer than you can remain solvent. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 19,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "orion_momentum_shield",
+  iconName: "Shield",
+  codeTemplate: JSON.stringify({
+    type: "orion_momentum_shield",
+    displayType: "overlay",
+    description: "Momentum-reactive overlay with EHMA midline and volatility-normalized momentum bands",
+  }),
+  defaultSettings: {
+    hmaPeriod: 16,
+    atrPeriod: 14,
+    bandMultiplier: 1.8,
+    momentumPeriod: 12,
+    surgeThreshold: 40,
+    fadeSmooth: 5,
+    color: "#a78bfa",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["momentum", "volatility", "adaptive", "premium", "overlay", "hull", "bands", "reversal", "exhaustion"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -1028,6 +1147,7 @@ const ALL_ITEMS = [
   PHANTOM_FLOW_ZONES,
   FRACTAL_PULSE_GRID,
   VORTEX_DRIFT_CLOUD,
+  ORION_MOMENTUM_SHIELD,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

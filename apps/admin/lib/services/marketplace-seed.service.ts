@@ -911,6 +911,194 @@ No indicator guarantees profits. Fractal Pulse Grid is a tool to support your an
   riskLevel: "medium",
 };
 
+const VORTEX_DRIFT_CLOUD: Partial<IMarketplaceItem> = {
+  name: "Vortex Drift Cloud",
+  slug: "vortex-drift-cloud",
+  shortDescription:
+    "Adaptive trend-following channel with zero-lag Super Smoother midline, ADX-weighted volatility bands, and per-bar momentum coloring.",
+  fullDescription: `# Vortex Drift Cloud
+
+## Overview
+The **Vortex Drift Cloud** is a premium on-chart indicator that wraps price in an intelligent, adaptive channel. It combines a near-zero-lag midline with volatility bands that respond to trend strength — giving you a complete visual picture of trend direction, momentum, and volatility regime in one overlay.
+
+Unlike traditional channels (Bollinger Bands, Keltner), the Vortex Drift Cloud uses an **Ehlers Super Smoother** filter for the midline — a digital signal processing technique that removes market noise with virtually no lag. The bands then adapt their width based on both volatility (ATR) and trend strength (ADX), so they widen during strong directional moves and compress during consolidation.
+
+## Three Core Components
+
+### 1. Super Smoother Midline (Center Line)
+The midline uses the **Ehlers 2-pole Super Smoother** filter, a digital signal processing technique from aerospace engineering applied to trading:
+- **Near-zero lag** — reacts to price changes almost instantly compared to traditional moving averages
+- **Exceptional noise filtering** — removes random price fluctuations while preserving the true trend signal
+- Acts as **dynamic support** in uptrends and **dynamic resistance** in downtrends
+
+### 2. ADX-Weighted Adaptive Bands
+The upper and lower bands are not fixed-width like Bollinger Bands. Instead, they adapt to both volatility AND trend strength:
+- **Band width** = ATR × Multiplier × ADX Weight Factor
+- In **strong trends** (high ADX): bands widen to accommodate momentum
+- In **ranging markets** (low ADX): bands compress, signaling consolidation
+- **Compression → Expansion** patterns signal potential breakouts
+
+### 3. Per-Bar Momentum Coloring
+Every bar's channel color shifts based on real-time trend classification:
+- **Cyan/Teal** = Bullish momentum — midline rising AND price above midline
+- **Orange** = Bearish pressure — midline falling AND price below midline
+- **Gray** = Indecision/Neutral — mixed signals, no clear direction
+
+## How to Trade With It
+
+### Trend Following
+1. Wait for the cloud to turn **cyan** (bullish)
+2. Enter long when price pulls back to the **midline** or **lower band**
+3. Set stop-loss below the **lower band** (adaptive to volatility)
+4. Hold as long as the cloud stays **cyan**
+5. Exit when the cloud turns **gray** or **orange**
+
+### Band Bounce Trading
+1. In a **cyan cloud**: buy when price touches the **lower band** (support bounce)
+2. In an **orange cloud**: sell when price touches the **upper band** (resistance rejection)
+3. **Avoid trading bounces** in a gray cloud (no directional conviction)
+
+### Breakout Anticipation
+1. Watch for **band compression** (narrow channel + gray color)
+2. This signals the market is coiling for a move
+3. Enter in the direction of the **first colored band expansion**
+4. The wider the preceding compression, the stronger the potential breakout
+
+### Trend Reversal Detection
+1. Watch for color transitions: **cyan → gray → orange** (bearish reversal)
+2. Or: **orange → gray → cyan** (bullish reversal)
+3. The **gray transition zone** acts as an early warning
+4. Confirm reversal when price closes beyond the midline in the new direction
+
+## Settings Guide
+- **Smoother Period** (21): Super Smoother filter length — higher = smoother but slower
+- **ATR Period** (14): Volatility lookback for band width calculation
+- **Band Width** (2.0): Multiplier for band distance from midline
+- **ADX Period** (14): Trend strength measurement lookback
+- **Trend Threshold** (25): ADX level that distinguishes trending from ranging
+- **Momentum Lookback** (10): Bars to compare for trend direction coloring
+
+## Risk Warning
+No indicator guarantees profits. The Vortex Drift Cloud is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  price: 15,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "vortex_drift_cloud",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "vortex_drift_cloud",
+    displayType: "overlay",
+    description: "Adaptive trend channel with Super Smoother midline and ADX-weighted volatility bands",
+  }),
+  defaultSettings: {
+    smoothPeriod: 21,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    adxPeriod: 14,
+    adxThreshold: 25,
+    momentumLookback: 10,
+    color: "#22d3ee",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["trend", "channel", "volatility", "adaptive", "premium", "overlay", "momentum", "adx", "super-smoother"],
+  riskLevel: "medium",
+};
+
+const ORION_MOMENTUM_SHIELD: Partial<IMarketplaceItem> = {
+  name: "Orion Momentum Shield",
+  slug: "orion-momentum-shield",
+  shortDescription:
+    "Momentum-reactive overlay with ultra-fast EHMA midline, volatility-normalized momentum coloring, and bands that expand on surges and compress on fades.",
+  fullDescription: `# Orion Momentum Shield
+
+## Overview
+The **Orion Momentum Shield** is a premium on-chart overlay that makes momentum visible directly on price. Traditional momentum indicators (RSI, MACD) sit in a separate panel, forcing you to look away from the chart. Orion puts that information right where it matters — wrapping price in an adaptive shield that physically reacts to momentum changes.
+
+The core innovation is **Volatility-Normalized Momentum (VNM)** — raw price momentum divided by current volatility. This means a 50-pip move in a volatile market registers differently than a 50-pip move in a quiet market, giving you a true picture of momentum strength relative to conditions.
+
+## Three Core Components
+
+### 1. Exponential Hull Moving Average (EHMA)
+The midline uses a hybrid of Hull Moving Average speed with EMA smoothness:
+- **Formula**: WMA(2×EMA(N/2) - EMA(N), √N)
+- **Result**: Ultra-responsive to trend changes with minimal noise
+- Reacts to reversals 2-3 bars faster than a standard EMA of the same period
+
+### 2. Momentum-Expanding Bands
+Unlike fixed-width bands, Orion's bands physically react to momentum:
+- **Surge phase** (strong momentum): Bands expand outward
+- **Drift phase** (moderate momentum): Normal band width
+- **Fade phase** (dying momentum): Bands compress inward, warning of exhaustion
+
+### 3. Three-Phase Color System
+- **Green (Surge+)** = Strong bullish momentum
+- **Red (Surge-)** = Strong bearish momentum
+- **Teal (Drift+)** / **Orange (Drift-)** = Moderate directional movement
+- **Gray (Fade)** = Momentum exhaustion — potential reversal zone
+
+## How to Trade With It
+
+### Momentum Trading
+1. Enter long when bands turn **green** (bullish surge) after a gray fade
+2. Enter short when bands turn **red** (bearish surge) after a gray fade
+3. **Wider bands = stronger conviction**
+4. Set stop-loss beyond the opposite band
+
+### Exhaustion Reversal Trading
+1. Watch for bands in **surge** (green/red) with wide expansion
+2. When bands start **compressing** and shift to **gray fade**, the move is dying
+3. Enter counter-trend at the fade signal, targeting the midline
+
+### Trend Riding
+1. In **green/teal drift**: stay long above the EHMA midline
+2. In **red/orange drift**: stay short below midline
+3. Trail stop-loss to the lower band (longs) or upper band (shorts)
+4. Exit when color shifts to **gray**
+
+## Settings Guide
+- **EHMA Period** (16): Hull-EMA hybrid period — lower = faster, higher = smoother
+- **ATR Period** (14): Volatility lookback for band width
+- **Band Width** (1.8): Base multiplier for band distance
+- **Momentum Period** (12): Rate-of-change lookback for VNM
+- **Surge Threshold** (40): VNM level triggering surge phase
+- **Fade Smoothing** (5): Smoothing on VNM — higher = fewer phase flips
+
+## Risk Warning
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 19,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "orion_momentum_shield",
+  iconName: "Shield",
+  codeTemplate: JSON.stringify({
+    type: "orion_momentum_shield",
+    displayType: "overlay",
+    description: "Momentum-reactive overlay with EHMA midline and volatility-normalized momentum bands",
+  }),
+  defaultSettings: {
+    hmaPeriod: 16,
+    atrPeriod: 14,
+    bandMultiplier: 1.8,
+    momentumPeriod: 12,
+    surgeThreshold: 40,
+    fadeSmooth: 5,
+    color: "#a78bfa",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["momentum", "volatility", "adaptive", "premium", "overlay", "hull", "bands", "reversal", "exhaustion"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -920,6 +1108,8 @@ const ALL_ITEMS = [
   NEXUS_TREND_MATRIX,
   PHANTOM_FLOW_ZONES,
   FRACTAL_PULSE_GRID,
+  VORTEX_DRIFT_CLOUD,
+  ORION_MOMENTUM_SHIELD,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

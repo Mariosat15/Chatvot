@@ -34,7 +34,8 @@ export type IndicatorType =
   | "momentum_wave" | "gap_momentum" | "heikin_ashi_trend" | "cycle_detector"
   | "adaptive_rsi" | "mean_reversion_band" | "trend_ribbon" | "relative_vigor"
   | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands"
-  | "vortex_drift_cloud";
+  | "vortex_drift_cloud"
+  | "orion_momentum_shield";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -465,6 +466,8 @@ const INDICATOR_TYPE_MAP: Record<
   "fractal pulse grid": { type: "fractal_pulse_grid", displayType: "overlay" },
   vortex_drift_cloud: { type: "vortex_drift_cloud", displayType: "overlay" },
   "vortex drift cloud": { type: "vortex_drift_cloud", displayType: "overlay" },
+  orion_momentum_shield: { type: "orion_momentum_shield", displayType: "overlay" },
+  "orion momentum shield": { type: "orion_momentum_shield", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -705,6 +708,14 @@ export function marketplaceItemToIndicator(
       params.adxPeriod = settings?.adxPeriod || 14;
       params.adxThreshold = settings?.adxThreshold || 25;
       params.momentumLookback = settings?.momentumLookback || 10;
+      break;
+    case "orion_momentum_shield":
+      params.hmaPeriod = settings?.hmaPeriod || 16;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.bandMultiplier = settings?.bandMultiplier || 1.8;
+      params.momentumPeriod = settings?.momentumPeriod || 12;
+      params.surgeThreshold = settings?.surgeThreshold || 40;
+      params.fadeSmooth = settings?.fadeSmooth || 5;
       break;
     default:
       // Generic period-based indicators
