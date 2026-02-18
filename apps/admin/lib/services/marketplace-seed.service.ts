@@ -1700,6 +1700,59 @@ No indicator guarantees profits. Always use proper risk management.`,
   riskLevel: "medium",
 };
 
+const CHAOS_SENTINEL: Partial<IMarketplaceItem> = {
+  name: "Chaos Sentinel",
+  slug: "chaos-sentinel",
+  shortDescription:
+    "Chaos theory overlay using Lyapunov exponent to detect orderly vs chaotic market regimes. Attractor line with regime-colored segments and transition signals.",
+  fullDescription: `# Chaos Sentinel
+
+## Overview
+**Chaos Sentinel** applies chaos theory mathematics to detect whether the market is in an orderly (predictable) or chaotic (random) state using the Lyapunov exponent.
+
+## How It Works
+- **Low Lyapunov**: Market is orderly — trends persist, signals reliable
+- **High Lyapunov**: Market is chaotic — random noise dominates
+
+## Three Regimes
+- **Order** (blue): Ideal for trend-following
+- **Transition** (yellow): Reduce position size
+- **Chaos** (red): Avoid trading or use mean-reversion only
+
+## Settings
+- **Attractor Period** (21): DEMA period for equilibrium line
+- **Lyapunov Period** (14): Lookback for chaos measurement
+- **Smoothing** (5): Noise reduction
+- **Chaos Threshold** (50): Sensitivity (0-100)
+
+No indicator guarantees profits. Always use proper risk management.`,
+  category: "indicator",
+  price: 40,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "chaos_sentinel",
+  iconName: "Flame",
+  codeTemplate: JSON.stringify({
+    type: "chaos_sentinel",
+    displayType: "overlay",
+    description: "Chaos theory overlay with Lyapunov exponent regime detection",
+  }),
+  defaultSettings: {
+    attractorPeriod: 21,
+    lyapunovPeriod: 14,
+    smoothing: 5,
+    chaosThreshold: 50,
+    color: "#3b82f6",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["chaos", "lyapunov", "regime", "premium", "overlay", "attractor", "order", "stability"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1716,6 +1769,7 @@ const ALL_ITEMS = [
   FLUX_MOMENTUM_TRAIL,
   APEX_PREDATOR_SIGNAL,
   PHANTOM_DIVERGENCE_TRACKER,
+  CHAOS_SENTINEL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

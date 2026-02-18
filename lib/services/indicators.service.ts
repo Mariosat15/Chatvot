@@ -4886,3 +4886,92 @@ export function calculatePhantomDivergenceTracker(
 
   return result;
 }
+
+// ============================================================================
+// CHAOS SENTINEL - Lyapunov-based market stability detection
+// ============================================================================
+
+export interface ChaosSentinelData {
+  time: number;
+  attractor: number;
+  lyapunov: number;
+  regime: "order" | "transition" | "chaos";
+  signal: "order_start" | "chaos_start" | "none";
+}
+
+export function calculateChaosSentinel(
+  data: OHLCData[],
+  attractorPeriod: number = 21,
+  lyapunovPeriod: number = 14,
+  smoothing: number = 5,
+  chaosThreshold: number = 50,
+): ChaosSentinelData[] {
+  const minBars = Math.max(attractorPeriod, lyapunovPeriod) + smoothing + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // Attractor: Ehlers 2-pole Super Smoother
+  const freq = Math.sqrt(2) * Math.PI / attractorPeriod;
+  const a1 = Math.exp(-freq);
+  const b1 = 2 * a1 * Math.cos(freq);
+  const c2 = b1;
+  const c3 = -(a1 * a1);
+  const c1 = 1 - c2 - c3;
+  const att = new Array(len).fill(0);
+  att[0] = closes[0]; att[1] = closes[1];
+  for (let i = 2; i < len; i++) {
+    att[i] = c1 * (closes[i] + closes[i - 1]) / 2 + c2 * att[i - 1] + c3 * att[i - 2];
+  }
+
+  // Lyapunov exponent estimation (rolling absolute log-return average)
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const r = closes[i] / closes[i - 1];
+    logReturns[i] = r > 0 ? Math.log(r) : 0;
+  }
+
+  const rawLyap = new Array(len).fill(0);
+  for (let i = lyapunovPeriod; i < len; i++) {
+    let sum = 0;
+    for (let j = i - lyapunovPeriod + 1; j <= i; j++) sum += Math.abs(logReturns[j]);
+    rawLyap[i] = sum / lyapunovPeriod;
+  }
+
+  // Normalize to 0-100 using rolling min/max
+  const normWindow = attractorPeriod * 3;
+  const lyap = new Array(len).fill(50);
+  for (let i = normWindow; i < len; i++) {
+    let mn = Infinity, mx = -Infinity;
+    for (let j = i - normWindow; j <= i; j++) {
+      if (rawLyap[j] < mn) mn = rawLyap[j];
+      if (rawLyap[j] > mx) mx = rawLyap[j];
+    }
+    lyap[i] = mx > mn ? ((rawLyap[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // Smooth
+  const smoothK = 2 / (smoothing + 1);
+  for (let i = minBars; i < len; i++) {
+    lyap[i] = lyap[i - 1] + smoothK * (lyap[i] - lyap[i - 1]);
+  }
+
+  const result: ChaosSentinelData[] = [];
+  let prevRegime: "order" | "transition" | "chaos" = "transition";
+
+  for (let i = minBars; i < len; i++) {
+    const regime: "order" | "transition" | "chaos" =
+      lyap[i] >= chaosThreshold + 15 ? "chaos" :
+      lyap[i] <= chaosThreshold - 15 ? "order" : "transition";
+
+    let signal: ChaosSentinelData["signal"] = "none";
+    if (regime === "order" && prevRegime !== "order") signal = "order_start";
+    else if (regime === "chaos" && prevRegime !== "chaos") signal = "chaos_start";
+
+    prevRegime = regime;
+    result.push({ time: data[i].time, attractor: att[i], lyapunov: lyap[i], regime, signal });
+  }
+
+  return result;
+}

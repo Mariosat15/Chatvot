@@ -44,7 +44,8 @@ export type IndicatorType =
   | "wraith_convergence_engine"
   | "flux_momentum_trail"
   | "apex_predator_signal"
-  | "phantom_divergence_tracker";
+  | "phantom_divergence_tracker"
+  | "chaos_sentinel";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -495,6 +496,8 @@ const INDICATOR_TYPE_MAP: Record<
   "apex predator signal": { type: "apex_predator_signal", displayType: "overlay" },
   phantom_divergence_tracker: { type: "phantom_divergence_tracker", displayType: "overlay" },
   "phantom divergence tracker": { type: "phantom_divergence_tracker", displayType: "overlay" },
+  chaos_sentinel: { type: "chaos_sentinel", displayType: "overlay" },
+  "chaos sentinel": { type: "chaos_sentinel", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -806,6 +809,12 @@ export function marketplaceItemToIndicator(
       params.volPeriod = settings?.volPeriod || 20;
       params.atrPeriod = settings?.atrPeriod || 14;
       params.divergenceThreshold = settings?.divergenceThreshold || 60;
+      break;
+    case "chaos_sentinel":
+      params.attractorPeriod = settings?.attractorPeriod || 21;
+      params.lyapunovPeriod = settings?.lyapunovPeriod || 14;
+      params.smoothing = settings?.smoothing || 5;
+      params.chaosThreshold = settings?.chaosThreshold || 50;
       break;
     default:
       // Generic period-based indicators

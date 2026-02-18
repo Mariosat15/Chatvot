@@ -2029,6 +2029,73 @@ No indicator guarantees profits. Always use proper risk management.`,
   riskLevel: "medium",
 };
 
+const CHAOS_SENTINEL: Partial<IMarketplaceItem> = {
+  name: "Chaos Sentinel",
+  slug: "chaos-sentinel",
+  shortDescription:
+    "Chaos theory overlay using Lyapunov exponent to detect orderly vs chaotic market regimes. Attractor line with regime-colored segments and transition signals.",
+  fullDescription: `# Chaos Sentinel
+
+## Overview
+**Chaos Sentinel** applies chaos theory mathematics to market analysis. It calculates the **Lyapunov exponent** — a measure from dynamical systems theory — to determine whether the market is in an orderly (predictable/trending) state or a chaotic (random/unpredictable) state.
+
+## How It Works
+
+### Lyapunov Exponent
+The Lyapunov exponent measures the rate of divergence between nearby trajectories in a dynamical system:
+- **Low Lyapunov** (< threshold): Market is orderly — price movements are predictable, trends persist
+- **High Lyapunov** (≥ threshold): Market is chaotic — price movements are random, mean-reverting noise dominates
+
+### Attractor Line
+A smoothed equilibrium price (DEMA) represents the market's "attractor" — the fair value price tends to gravitate toward.
+
+### Three Regimes
+- **Order** (blue segments): Market trending predictably — ideal for trend-following
+- **Transition** (yellow): Shifting between states — reduce position size
+- **Chaos** (red segments): Market random/unpredictable — avoid trading or use mean-reversion only
+
+## How to Trade
+1. **Trade only in Order regime**: When the line is blue, trend signals are reliable
+2. **Reduce size in Transition**: Yellow = uncertainty, cut position size by half
+3. **Avoid Chaos**: Red = random market, most indicators will whipsaw
+4. **ORDER signal**: Market just entered orderly state → look for trend entries
+5. **CHAOS signal**: Market just entered chaotic state → close trend positions
+
+## Settings
+- **Attractor Period** (21): DEMA period for the equilibrium line
+- **Lyapunov Period** (14): Lookback for chaos measurement
+- **Smoothing** (5): Lyapunov smoothing to reduce noise
+- **Chaos Threshold** (50): Sensitivity (0-100, lower = more chaos detection)
+
+## Risk Warning
+No indicator guarantees profits. Always use proper position sizing and risk management.`,
+  category: "indicator",
+  price: 40,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "chaos_sentinel",
+  iconName: "Flame",
+  codeTemplate: JSON.stringify({
+    type: "chaos_sentinel",
+    displayType: "overlay",
+    description: "Chaos theory overlay with Lyapunov exponent regime detection and attractor line",
+  }),
+  defaultSettings: {
+    attractorPeriod: 21,
+    lyapunovPeriod: 14,
+    smoothing: 5,
+    chaosThreshold: 50,
+    color: "#3b82f6",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["chaos", "lyapunov", "regime", "premium", "overlay", "attractor", "order", "stability", "dynamical-systems"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2045,6 +2112,7 @@ const ALL_ITEMS = [
   FLUX_MOMENTUM_TRAIL,
   APEX_PREDATOR_SIGNAL,
   PHANTOM_DIVERGENCE_TRACKER,
+  CHAOS_SENTINEL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

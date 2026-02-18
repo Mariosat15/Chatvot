@@ -393,6 +393,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { smoothPeriod: 21, volPeriod: 20, atrPeriod: 14, divergenceThreshold: 60 },
     paramLabels: { smoothPeriod: "Smooth Period", volPeriod: "Vol. Period", atrPeriod: "ATR Period", divergenceThreshold: "Div. Threshold" },
   },
+  chaos_sentinel: {
+    name: "Chaos Sentinel",
+    shortName: "CS",
+    displayType: "overlay" as const,
+    defaultParams: { attractorPeriod: 21, lyapunovPeriod: 14, smoothing: 5, chaosThreshold: 50 },
+    paramLabels: { attractorPeriod: "Attractor Period", lyapunovPeriod: "Lyapunov Period", smoothing: "Smoothing", chaosThreshold: "Chaos Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

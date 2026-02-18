@@ -105,6 +105,7 @@ import {
   calculateFluxMomentumTrail,
   calculateApexPredatorSignal,
   calculatePhantomDivergenceTracker,
+  calculateChaosSentinel,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2750,6 +2751,78 @@ const LightweightTradingChart = ({
           const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
           try { pSeries.setMarkers(sorted); } catch {}
 
+        // Chaos Sentinel: attractor line + order/chaos regime coloring + transition markers
+        } else if (indicator.type === "chaos_sentinel") {
+          const csData = calculateChaosSentinel(
+            transformedCandles,
+            indicator.parameters.attractorPeriod || 21,
+            indicator.parameters.lyapunovPeriod || 14,
+            indicator.parameters.smoothing || 5,
+            indicator.parameters.chaosThreshold || 50,
+          );
+
+          const orderData: { time: number; value: number }[] = [];
+          const chaosData: { time: number; value: number }[] = [];
+          const transData: { time: number; value: number }[] = [];
+          const orderMarkers: any[] = [];
+          const chaosMarkers: any[] = [];
+
+          for (const d of csData) {
+            if (d.regime === "order") orderData.push({ time: d.time, value: d.attractor });
+            else if (d.regime === "chaos") chaosData.push({ time: d.time, value: d.attractor });
+            else transData.push({ time: d.time, value: d.attractor });
+
+            if (d.signal === "order_start") {
+              orderMarkers.push({
+                time: d.time as UTCTimestamp, position: "belowBar" as const,
+                color: "#3b82f6", shape: "arrowUp" as const, text: "ORDER", size: 2,
+              });
+            } else if (d.signal === "chaos_start") {
+              chaosMarkers.push({
+                time: d.time as UTCTimestamp, position: "aboveBar" as const,
+                color: "#ef4444", shape: "arrowDown" as const, text: "CHAOS", size: 2,
+              });
+            }
+          }
+
+          // Order segments (blue)
+          if (orderData.length > 0) {
+            const oSeries = chart.addLineSeries({
+              color: hexToRgba("#3b82f6", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
+              title: `${indicator.customLabel || "CS"} Order`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            oSeries.setData(orderData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_order`, oSeries);
+            try { oSeries.setMarkers(orderMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+          }
+
+          // Chaos segments (red)
+          if (chaosData.length > 0) {
+            const cSeries = chart.addLineSeries({
+              color: hexToRgba("#ef4444", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
+              title: `${indicator.customLabel || "CS"} Chaos`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            cSeries.setData(chaosData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_chaos`, cSeries);
+            try { cSeries.setMarkers(chaosMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+          }
+
+          // Transition segments (gray)
+          if (transData.length > 0) {
+            const tSeries = chart.addLineSeries({
+              color: hexToRgba("#94a3b8", 60),
+              lineWidth: 1 as any, lineStyle: 2 as any,
+              title: "", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            tSeries.setData(transData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_trans`, tSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3214,6 +3287,31 @@ const LightweightTradingChart = ({
                   } else {
                     if (priceS) priceS.setData(pdtData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceLine })));
                     if (momS) momS.setData(pdtData.map(d => ({ time: d.time as UTCTimestamp, value: d.momentumLine })));
+                  }
+                }
+              } else if (_ovlType === "chaos_sentinel") {
+                const csData = calculateChaosSentinel(
+                  tc, p.attractorPeriod || 21, p.lyapunovPeriod || 14, p.smoothing || 5, p.chaosThreshold || 50,
+                );
+                if (csData.length > 0) {
+                  const orderS = _ovlSeriesMap.get(`${_ovlId}_order`);
+                  const chaosS = _ovlSeriesMap.get(`${_ovlId}_chaos`);
+                  const transS = _ovlSeriesMap.get(`${_ovlId}_trans`);
+                  if (mode === "light") {
+                    const last = csData[csData.length - 1];
+                    if (last.regime === "order" && orderS) orderS.update({ time: last.time as UTCTimestamp, value: last.attractor });
+                    else if (last.regime === "chaos" && chaosS) chaosS.update({ time: last.time as UTCTimestamp, value: last.attractor });
+                    else if (transS) transS.update({ time: last.time as UTCTimestamp, value: last.attractor });
+                  } else {
+                    const oD: any[] = []; const cD: any[] = []; const tD: any[] = [];
+                    for (const d of csData) {
+                      if (d.regime === "order") oD.push({ time: d.time as UTCTimestamp, value: d.attractor });
+                      else if (d.regime === "chaos") cD.push({ time: d.time as UTCTimestamp, value: d.attractor });
+                      else tD.push({ time: d.time as UTCTimestamp, value: d.attractor });
+                    }
+                    if (orderS) orderS.setData(oD);
+                    if (chaosS) chaosS.setData(cD);
+                    if (transS) transS.setData(tD);
                   }
                 }
               }
