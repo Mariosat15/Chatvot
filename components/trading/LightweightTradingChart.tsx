@@ -110,6 +110,7 @@ import {
   calculatePrismWaveletCascade,
   calculateMirageDepthScanner,
   calculateQuantumDriftMapper,
+  calculateSovereignGravityArc,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3123,6 +3124,78 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        } else if (indicator.type === "sovereign_gravity_arc") {
+          const sgaData = calculateSovereignGravityArc(
+            transformedCandles,
+            indicator.parameters.gravityWindow || 30,
+            indicator.parameters.orbitalRadius || 2.0,
+            indicator.parameters.velocitySmooth || 5,
+            indicator.parameters.escapeMultiplier || 1.8,
+          );
+
+          // Color: orbital=deep violet, capturing=cyan, escape=white-magenta gradient
+          const sgaColor = (velNorm: number, state: string): string => {
+            if (state === "escape_up" || state === "escape_down") {
+              return velNorm > 0.85 ? "#ffffff" : velNorm > 0.7 ? "#f3e5f5" : "#e040fb";
+            }
+            if (state === "capturing") return "#00e5ff";
+            return velNorm > 0.5 ? "#ce93d8" : "#9c27b0";
+          };
+
+          const sgaMarkers: any[] = [];
+          for (const d of sgaData) {
+            if (d.signal === "escape") {
+              if (d.state === "escape_up") {
+                sgaMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#e040fb", shape: "arrowUp" as const, text: "ESCAPE ↑", size: 2 });
+              } else {
+                sgaMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#e040fb", shape: "arrowDown" as const, text: "ESCAPE ↓", size: 2 });
+              }
+            } else if (d.signal === "capture") {
+              sgaMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#00e5ff", shape: "circle" as const, text: "ORBIT", size: 1 });
+            }
+          }
+
+          if (indicator.visibility?.upper !== false) {
+            const sgaUpperSeries = chart.addLineSeries({
+              color: "#7b1fa2", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "SGA"} Upper`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            sgaUpperSeries.setData(sgaData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.upper,
+              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 50),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, sgaUpperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const sgaCenterSeries = chart.addLineSeries({
+              color: "#9c27b0", lineWidth: 2 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Sovereign Gravity Arc", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            sgaCenterSeries.setData(sgaData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.center,
+              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 100),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_center`, sgaCenterSeries);
+            const sortedSga = sgaMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { sgaCenterSeries.setMarkers(sortedSga); } catch {}
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const sgaLowerSeries = chart.addLineSeries({
+              color: "#7b1fa2", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "SGA"} Lower`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            sgaLowerSeries.setData(sgaData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.lower,
+              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 50),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, sgaLowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3718,6 +3791,27 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
                     if (cS) cS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.driftLine, color: hexToRgba(qdmC(d.alpha, d.regime), 100) })));
                     if (lS) lS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
+                  }
+                }
+              } else if (_ovlType === "sovereign_gravity_arc") {
+                const sgaData = calculateSovereignGravityArc(
+                  tc, p.gravityWindow || 30, p.orbitalRadius || 2.0, p.velocitySmooth || 5, p.escapeMultiplier || 1.8,
+                );
+                if (sgaData.length > 0) {
+                  const sgaC = (v: number, s: string) => (s === "escape_up" || s === "escape_down") ? (v > 0.85 ? "#ffffff" : v > 0.7 ? "#f3e5f5" : "#e040fb") : s === "capturing" ? "#00e5ff" : v > 0.5 ? "#ce93d8" : "#9c27b0";
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const cS = _ovlSeriesMap.get(`${_ovlId}_center`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = sgaData[sgaData.length - 1];
+                    const c = sgaC(last.velocityNorm, last.state);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 50) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.center, color: hexToRgba(c, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 50) } as any);
+                  } else {
+                    if (uS) uS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
+                    if (cS) cS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.center, color: hexToRgba(sgaC(d.velocityNorm, d.state), 100) })));
+                    if (lS) lS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
                   }
                 }
               }

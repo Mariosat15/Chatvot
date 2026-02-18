@@ -1906,6 +1906,38 @@ const QUANTUM_DRIFT_MAPPER: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const SOVEREIGN_GRAVITY_ARC: Partial<IMarketplaceItem> = {
+  name: "Sovereign Gravity Arc",
+  slug: "sovereign-gravity-arc",
+  shortDescription:
+    "Volume-weighted gravity field with orbital mechanics — maps price into orbital and escape states, firing high-conviction breakout and capture signals.",
+  fullDescription: `# Sovereign Gravity Arc\n\n## Overview\n**Sovereign Gravity Arc** applies orbital mechanics and gravitational physics to price action. It computes a **Volume-Weighted Gravity Center** — the price level with the highest transactional mass — and wraps it in an **Orbital Arc Band** whose width adapts to real volatility (ATR).\n\n## State Classification\n- 🟣 **Orbital** — price orbiting the gravity center (consolidation)\n- ⚡ **Escape Up** — breakout above the arc with high radial velocity\n- ⚡ **Escape Down** — breakdown below the arc with high radial velocity\n- 🔵 **Capturing** — escaped price returning to orbit (reversal warning)\n\n## Signals\n- **ESCAPE ↑ / ↓** arrows: First bar of an escape event — high-conviction breakout entry\n- **ORBIT**: Price recaptured — potential reversal or pullback\n\n## Visual Guide\n- Deep violet center line → Orbital state (slow velocity)\n- Bright magenta → white center line → High velocity, approaching escape\n- Dashed violet arcs → Orbital boundary (upper and lower)\n\n## How to Trade\n1. **ESCAPE ↑** arrow: Enter long, stop below the lower arc\n2. **ESCAPE ↓** arrow: Enter short, stop above the upper arc\n3. **ORBIT** marker: Close breakout trade or fade extremes\n4. **Arc width**: Dynamic stop-loss guide — outside arc = outside gravity`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 54.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "sovereign_gravity_arc",
+  iconName: "Globe2",
+  codeTemplate: JSON.stringify({
+    type: "sovereign_gravity_arc",
+    displayType: "overlay",
+    description: "Volume-weighted gravity field with orbital mechanics — detects escape breakouts and orbital capture reversals",
+  }),
+  defaultSettings: {
+    gravityWindow: 30,
+    orbitalRadius: 2.0,
+    velocitySmooth: 5,
+    escapeMultiplier: 1.8,
+    color: "#ce93d8",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["gravity", "orbital", "volume-weighted", "breakout", "premium", "overlay", "adaptive", "physics", "momentum", "escape"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1927,6 +1959,7 @@ const ALL_ITEMS = [
   PRISM_WAVELET_CASCADE,
   MIRAGE_DEPTH_SCANNER,
   QUANTUM_DRIFT_MAPPER,
+  SOVEREIGN_GRAVITY_ARC,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

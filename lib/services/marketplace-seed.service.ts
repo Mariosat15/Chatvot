@@ -2375,6 +2375,73 @@ Dynamic upper/lower bands that reflect market regime:
   riskLevel: "medium",
 };
 
+const SOVEREIGN_GRAVITY_ARC = {
+  name: "Sovereign Gravity Arc",
+  slug: "sovereign-gravity-arc",
+  description: `## Sovereign Gravity Arc
+
+A revolutionary on-chart overlay that applies orbital mechanics and gravitational physics to price action. The indicator computes a **Volume-Weighted Gravity Center** — the price level with the highest transactional mass — and wraps it in an **Orbital Arc Band** whose width adapts to real volatility (ATR). Price either orbits this gravity well or escapes it.
+
+### Core Mechanics
+
+**Gravity Center (center line)**
+Calculated as a volume-weighted centroid of typical price over a rolling \`gravityWindow\`, smoothed with an adaptive EMA. This is the price level where the most trading "mass" has accumulated — a magnetic attractor.
+
+**Orbital Arc (upper / lower bands)**
+The center ± ATR × \`orbitalRadius\`. Price that stays within this arc is in an "orbital" state — bound by gravitational force. Bands widen during volatility expansion and contract during calm.
+
+**Radial Velocity**
+Measures how fast price is accelerating away from the gravity center, normalized to the recent velocity range (0–1). High velocity = price is escaping. Low velocity = price is trapped in orbit.
+
+**State Classification**
+- 🟣 **Orbital** — price is within the arc, orbiting the gravity center
+- ⚡ **Escape Up** — price has broken above the arc with high velocity (bullish breakout)
+- ⚡ **Escape Down** — price has broken below the arc with high velocity (bearish breakout)
+- 🔵 **Capturing** — escaped price is falling back into the arc (reversal warning)
+
+### Signals
+- **ESCAPE ↑ / ESCAPE ↓** (arrows): First bar of an escape event — high-conviction breakout entry
+- **ORBIT** (circle): Price captured back into the gravity field — potential reversal or continuation pullback
+
+### Visual Guide
+- **Deep violet line** → Orbital state, slow velocity — consolidation
+- **Bright magenta → white** → Increasing velocity, approaching escape threshold
+- **Dashed violet arcs** → Orbital boundary (upper and lower)
+- The center line **glows brighter** as velocity increases — visual warning system built in
+
+## How to Trade
+
+1. **ESCAPE ↑** arrow: Strong bullish breakout confirmed — enter long, set stop below the arc
+2. **ESCAPE ↓** arrow: Strong bearish breakout confirmed — enter short, set stop above the arc
+3. **ORBIT** marker: Escape failed, price returning — close breakout trade or fade extremes
+4. **Orbital phase** (violet center): Wait for direction — trade with trend on the next escape
+5. **Arc width**: Use as dynamic stop-loss guide — stops outside the arc = respect gravity`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 54.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "sovereign_gravity_arc",
+  iconName: "Globe2",
+  codeTemplate: JSON.stringify({
+    type: "sovereign_gravity_arc",
+    displayType: "overlay",
+    description: "Volume-weighted gravity field with orbital mechanics — detects escape breakouts and orbital capture reversals",
+  }),
+  defaultSettings: {
+    gravityWindow: 30,
+    orbitalRadius: 2.0,
+    velocitySmooth: 5,
+    escapeMultiplier: 1.8,
+    color: "#ce93d8",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["gravity", "orbital", "volume-weighted", "breakout", "premium", "overlay", "adaptive", "physics", "momentum", "escape"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2396,6 +2463,7 @@ const ALL_ITEMS = [
   PRISM_WAVELET_CASCADE,
   MIRAGE_DEPTH_SCANNER,
   QUANTUM_DRIFT_MAPPER,
+  SOVEREIGN_GRAVITY_ARC,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

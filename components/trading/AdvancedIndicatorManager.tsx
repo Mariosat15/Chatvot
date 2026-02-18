@@ -428,6 +428,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { dfaPeriod: 30, dfaScales: 5, corridorMultiplier: 1.5, smooth: 5, persistenceThreshold: 60 },
     paramLabels: { dfaPeriod: "DFA Period", dfaScales: "DFA Scales", corridorMultiplier: "Corridor Width", smooth: "Smoothing", persistenceThreshold: "Persistence Threshold" },
   },
+  sovereign_gravity_arc: {
+    name: "Sovereign Gravity Arc",
+    shortName: "SGA",
+    displayType: "overlay" as const,
+    defaultParams: { gravityWindow: 30, orbitalRadius: 2.0, velocitySmooth: 5, escapeMultiplier: 1.8 },
+    paramLabels: { gravityWindow: "Gravity Window", orbitalRadius: "Orbital Radius", velocitySmooth: "Velocity Smooth", escapeMultiplier: "Escape Multiplier" },
+  },
 };
 
 const DEFAULT_COLORS = [

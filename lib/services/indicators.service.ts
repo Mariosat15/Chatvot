@@ -5505,3 +5505,124 @@ export function calculateQuantumDriftMapper(
 
   return result;
 }
+
+// ============================================================================
+// SOVEREIGN GRAVITY ARC — Volume-Weighted Gravity Field + Orbital Mechanics
+// ============================================================================
+
+export interface SovereignGravityArcData {
+  time: number;
+  center: number;        // Volume-weighted gravity center line
+  upper: number;         // Upper orbital arc boundary
+  lower: number;         // Lower orbital arc boundary
+  velocityNorm: number;  // Normalized radial velocity 0-1
+  state: "orbital" | "escape_up" | "escape_down" | "capturing";
+  signal: "none" | "escape" | "capture";
+}
+
+export function calculateSovereignGravityArc(
+  data: OHLCData[],
+  gravityWindow: number = 30,
+  orbitalRadius: number = 2.0,
+  velocitySmooth: number = 5,
+  escapeMultiplier: number = 1.8,
+): SovereignGravityArcData[] {
+  const minBars = gravityWindow + velocitySmooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const volumes = data.map(d => (d as any).volume ?? 1);
+
+  // Step 1 — Volume-weighted price centroid over rolling gravityWindow
+  const rawCenter = new Array(len).fill(0);
+  for (let i = gravityWindow - 1; i < len; i++) {
+    let wSum = 0, vSum = 0;
+    for (let j = i - gravityWindow + 1; j <= i; j++) {
+      const tp = (data[j].high + data[j].low + closes[j]) / 3;
+      const w = volumes[j];
+      wSum += tp * w;
+      vSum += w;
+    }
+    rawCenter[i] = vSum > 0 ? wSum / vSum : closes[i];
+  }
+
+  // Step 2 — Smooth center with EMA for a clean arc line
+  const centerLine = new Array(len).fill(0);
+  const ck = 2 / (velocitySmooth + 1);
+  centerLine[gravityWindow - 1] = rawCenter[gravityWindow - 1];
+  for (let i = gravityWindow; i < len; i++) {
+    centerLine[i] = centerLine[i - 1] + ck * (rawCenter[i] - centerLine[i - 1]);
+  }
+
+  // Step 3 — ATR for orbital band width
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - closes[i - 1]),
+      Math.abs(data[i].low - closes[i - 1]),
+    );
+    atr[i] = atr[i - 1] + (2 / 15) * (tr - atr[i - 1]);
+  }
+
+  // Step 4 — Radial velocity: EMA of normalized displacement from center
+  const radVelRaw = new Array(len).fill(0);
+  const vk = 2 / (velocitySmooth + 1);
+  for (let i = gravityWindow; i < len; i++) {
+    const disp = atr[i] > 0 ? (closes[i] - centerLine[i]) / atr[i] : 0;
+    radVelRaw[i] = i === gravityWindow
+      ? disp
+      : radVelRaw[i - 1] + vk * (disp - radVelRaw[i - 1]);
+  }
+
+  // Step 5 — Normalize velocity to 0–1 using rolling max
+  const velocityNormArr = new Array(len).fill(0);
+  for (let i = gravityWindow; i < len; i++) {
+    let maxAbs = 0.001;
+    for (let j = Math.max(gravityWindow, i - gravityWindow + 1); j <= i; j++) {
+      if (Math.abs(radVelRaw[j]) > maxAbs) maxAbs = Math.abs(radVelRaw[j]);
+    }
+    velocityNormArr[i] = Math.min(1, Math.abs(radVelRaw[i]) / maxAbs);
+  }
+
+  // Step 6 — State + signal classification
+  const result: SovereignGravityArcData[] = [];
+  let prevState: SovereignGravityArcData["state"] = "orbital";
+  const escapeThresh = escapeMultiplier / (escapeMultiplier + 1);
+
+  for (let i = minBars; i < len; i++) {
+    const center = centerLine[i];
+    const band = atr[i] * orbitalRadius;
+    const upper = center + band;
+    const lower = center - band;
+    const velNorm = velocityNormArr[i];
+    const escapeReached = velNorm > escapeThresh;
+
+    let state: SovereignGravityArcData["state"];
+    if (closes[i] > upper && escapeReached) {
+      state = "escape_up";
+    } else if (closes[i] < lower && escapeReached) {
+      state = "escape_down";
+    } else if (
+      (prevState === "escape_up" || prevState === "escape_down") &&
+      closes[i] >= lower && closes[i] <= upper
+    ) {
+      state = "capturing";
+    } else {
+      state = "orbital";
+    }
+
+    let signal: SovereignGravityArcData["signal"] = "none";
+    if ((state === "escape_up" || state === "escape_down") && prevState === "orbital") {
+      signal = "escape";
+    } else if (state === "capturing" && prevState !== "capturing" && prevState !== "orbital") {
+      signal = "capture";
+    }
+
+    prevState = state;
+    result.push({ time: data[i].time, center, upper, lower, velocityNorm: velNorm, state, signal });
+  }
+
+  return result;
+}

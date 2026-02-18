@@ -49,7 +49,8 @@ export type IndicatorType =
   | "helix_phase_engine"
   | "prism_wavelet_cascade"
   | "mirage_depth_scanner"
-  | "quantum_drift_mapper";
+  | "quantum_drift_mapper"
+  | "sovereign_gravity_arc";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -510,6 +511,8 @@ const INDICATOR_TYPE_MAP: Record<
   "mirage depth scanner": { type: "mirage_depth_scanner", displayType: "overlay" },
   quantum_drift_mapper: { type: "quantum_drift_mapper", displayType: "overlay" },
   "quantum drift mapper": { type: "quantum_drift_mapper", displayType: "overlay" },
+  sovereign_gravity_arc: { type: "sovereign_gravity_arc", displayType: "overlay" },
+  "sovereign gravity arc": { type: "sovereign_gravity_arc", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -853,6 +856,12 @@ export function marketplaceItemToIndicator(
       params.corridorMultiplier = settings?.corridorMultiplier || 1.5;
       params.smooth = settings?.smooth || 5;
       params.persistenceThreshold = settings?.persistenceThreshold || 60;
+      break;
+    case "sovereign_gravity_arc":
+      params.gravityWindow = settings?.gravityWindow || 30;
+      params.orbitalRadius = settings?.orbitalRadius || 2.0;
+      params.velocitySmooth = settings?.velocitySmooth || 5;
+      params.escapeMultiplier = settings?.escapeMultiplier || 1.8;
       break;
     default:
       // Generic period-based indicators
