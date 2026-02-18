@@ -379,6 +379,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { fastPeriod: 8, slowPeriod: 21, rocPeriod: 12, atrPeriod: 14, surgeThreshold: 70 },
     paramLabels: { fastPeriod: "Fast Period", slowPeriod: "Slow Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", surgeThreshold: "Surge Threshold" },
   },
+  apex_predator_signal: {
+    name: "Apex Predator Signal",
+    shortName: "APS",
+    displayType: "overlay" as const,
+    defaultParams: { zlemaPeriod: 21, rocPeriod: 12, atrPeriod: 14, volPeriod: 20, minConfluence: 2 },
+    paramLabels: { zlemaPeriod: "ZLEMA Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", volPeriod: "Volume Period", minConfluence: "Min Confluence" },
+  },
 };
 
 const DEFAULT_COLORS = [

@@ -4654,3 +4654,120 @@ function _momentumToColor(m: number): string {
     return "#94a3b8";
   }
 }
+
+// ============================================================================
+// APEX PREDATOR SIGNAL - Multi-factor confluence signal engine
+// ============================================================================
+
+export interface ApexPredatorSignalData {
+  time: number;
+  line: number;
+  direction: 1 | -1;
+  confluence: number;
+  signal: "apex_bull" | "apex_bear" | "stalk_bull" | "stalk_bear" | "none";
+}
+
+export function calculateApexPredatorSignal(
+  data: OHLCData[],
+  zlemaPeriod: number = 21,
+  rocPeriod: number = 12,
+  atrPeriod: number = 14,
+  volPeriod: number = 20,
+  minConfluence: number = 2,
+): ApexPredatorSignalData[] {
+  const minBars = Math.max(zlemaPeriod * 2, rocPeriod, atrPeriod, volPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const volumes = data.map((d) => d.volume || 0);
+  const len = data.length;
+
+  // ZLEMA (Zero-Lag EMA)
+  const lag = Math.floor((zlemaPeriod - 1) / 2);
+  const k = 2 / (zlemaPeriod + 1);
+  const zlema = new Array(len).fill(0);
+  zlema[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const src = i >= lag ? 2 * closes[i] - closes[i - lag] : closes[i];
+    zlema[i] = src * k + zlema[i - 1] * (1 - k);
+  }
+
+  // ATR
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) aSum += tr[i];
+  atr[atrPeriod - 1] = aSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+
+  // Volume average
+  const volAvg = new Array(len).fill(0);
+  let vSum = 0;
+  for (let i = 0; i < volPeriod && i < len; i++) vSum += volumes[i];
+  volAvg[volPeriod - 1] = vSum / volPeriod;
+  for (let i = volPeriod; i < len; i++) volAvg[i] = (volAvg[i - 1] * (volPeriod - 1) + volumes[i]) / volPeriod;
+
+  // ROC
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) {
+    roc[i] = closes[i - rocPeriod] !== 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  }
+
+  // ATR ratio (current vs rolling average for squeeze detection)
+  const atrRatio = new Array(len).fill(1);
+  for (let i = volPeriod; i < len; i++) {
+    let atrAvg = 0;
+    for (let j = i - volPeriod; j < i; j++) atrAvg += atr[j];
+    atrAvg /= volPeriod;
+    atrRatio[i] = atrAvg > 0 ? atr[i] / atrAvg : 1;
+  }
+
+  const result: ApexPredatorSignalData[] = [];
+  let prevDir = 0;
+
+  for (let i = minBars; i < len; i++) {
+    const dir = closes[i] > zlema[i] ? 1 : -1;
+    const dirFlip = prevDir !== 0 && dir !== prevDir;
+
+    // Factor 1: Trend flip (ZLEMA crossover)
+    const f1 = dirFlip ? 1 : 0;
+
+    // Factor 2: Momentum surge (ROC magnitude)
+    const absRoc = Math.abs(roc[i]);
+    const rocThresh = atr[i] > 0 ? (atr[i] / closes[i]) * 100 * 3 : 0.5;
+    const f2 = absRoc > rocThresh ? 1 : 0;
+
+    // Factor 3: Volatility expansion (ATR breakout from squeeze)
+    const f3 = atrRatio[i] > 1.4 ? 1 : 0;
+
+    // Factor 4: Volume confirmation
+    const f4 = volAvg[i] > 0 && volumes[i] > volAvg[i] * 1.3 ? 1 : 0;
+
+    const confluence = f1 + f2 + f3 + f4;
+
+    let signal: ApexPredatorSignalData["signal"] = "none";
+    if (dirFlip && confluence >= 3) {
+      signal = dir === 1 ? "apex_bull" : "apex_bear";
+    } else if (dirFlip && confluence >= minConfluence) {
+      signal = dir === 1 ? "stalk_bull" : "stalk_bear";
+    }
+
+    prevDir = dir;
+
+    result.push({
+      time: data[i].time,
+      line: zlema[i],
+      direction: dir as 1 | -1,
+      confluence,
+      signal,
+    });
+  }
+
+  return result;
+}

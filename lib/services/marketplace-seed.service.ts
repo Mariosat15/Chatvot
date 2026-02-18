@@ -1894,6 +1894,79 @@ No indicator guarantees profits. Flux Momentum Trail visualizes momentum strengt
   riskLevel: "medium",
 };
 
+const APEX_PREDATOR_SIGNAL: Partial<IMarketplaceItem> = {
+  name: "Apex Predator Signal",
+  slug: "apex-predator-signal",
+  shortDescription:
+    "Multi-factor confluence signal engine. Runs 4 independent detectors (trend flip, momentum surge, volatility expansion, volume confirmation) and only fires when multiple factors align.",
+  fullDescription: `# Apex Predator Signal
+
+## Overview
+**Apex Predator Signal** is a premium on-chart signal generator that combines **4 independent detection systems** running in parallel. Unlike trend-visualization indicators, this focuses on **WHEN to trade** — signals are rare but high-conviction because they require multi-factor confirmation.
+
+## How It Works
+
+### 4 Independent Detectors
+1. **Trend Flip**: Zero-Lag EMA direction change detection
+2. **Momentum Surge**: Rate of Change exceeding dynamic threshold
+3. **Volatility Expansion**: ATR ratio detecting breakout conditions
+4. **Volume Confirmation**: Volume spike above rolling average
+
+### Confluence Scoring (0–4)
+Each bar receives a score from 0 to 4 based on how many detectors are active:
+- **4/4**: Maximum confluence — all systems agree
+- **3/4**: High confluence — strong setup
+- **2/4**: Moderate — potential setup forming
+- **0–1/4**: No signal — stay out
+
+### Signal Types
+- **APEX** (3–4 confluence): Full-strength entry signal — the "predator strike"
+- **STALK** (2 confluence on trend flip): Moderate setup — the "stalking phase"
+
+## How to Trade
+1. **Wait for APEX signals** — these are the highest-quality entries
+2. **APEX ▲ (Bull)**: Price above ZLEMA + momentum surge + vol expansion + volume confirm → Long entry
+3. **APEX ▼ (Bear)**: Price below ZLEMA + momentum surge + vol expansion + volume confirm → Short entry
+4. **STALK signals**: Use for early positioning or to tighten existing stops
+5. **No signal**: Stay flat — the predator waits for the perfect strike
+
+## Settings
+- **ZLEMA Period** (21): Zero-Lag EMA smoothing period
+- **ROC Period** (12): Rate of change lookback
+- **ATR Period** (14): Volatility measurement period
+- **Volume Period** (20): Volume average lookback
+- **Min Confluence** (2): Minimum factors for any signal
+
+## Risk Warning
+No indicator guarantees profits. Apex Predator Signal filters for high-probability setups but all trading involves risk. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 36,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "apex_predator_signal",
+  iconName: "Crosshair",
+  codeTemplate: JSON.stringify({
+    type: "apex_predator_signal",
+    displayType: "overlay",
+    description: "Multi-factor confluence signal engine with 4 independent detectors",
+  }),
+  defaultSettings: {
+    zlemaPeriod: 21,
+    rocPeriod: 12,
+    atrPeriod: 14,
+    volPeriod: 20,
+    minConfluence: 2,
+    color: "#f59e0b",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["signal", "confluence", "multi-factor", "premium", "overlay", "predator", "entry", "zlema", "momentum", "volume"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1908,6 +1981,7 @@ const ALL_ITEMS = [
   ECLIPSE_STEALTH_TRAIL,
   WRAITH_CONVERGENCE_ENGINE,
   FLUX_MOMENTUM_TRAIL,
+  APEX_PREDATOR_SIGNAL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

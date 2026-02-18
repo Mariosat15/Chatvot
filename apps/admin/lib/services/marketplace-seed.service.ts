@@ -1601,6 +1601,58 @@ No indicator guarantees profits. Always use stop-losses and proper position sizi
   riskLevel: "medium",
 };
 
+const APEX_PREDATOR_SIGNAL: Partial<IMarketplaceItem> = {
+  name: "Apex Predator Signal",
+  slug: "apex-predator-signal",
+  shortDescription:
+    "Multi-factor confluence signal engine. Runs 4 independent detectors and only fires when multiple factors align for high-conviction entries.",
+  fullDescription: `# Apex Predator Signal
+
+## Overview
+**Apex Predator Signal** combines **4 independent detection systems** running in parallel. Signals are rare but high-conviction because they require multi-factor confirmation.
+
+## 4 Independent Detectors
+1. **Trend Flip**: Zero-Lag EMA direction change
+2. **Momentum Surge**: ROC exceeding dynamic threshold
+3. **Volatility Expansion**: ATR ratio detecting breakout conditions
+4. **Volume Confirmation**: Volume spike above rolling average
+
+## Signal Types
+- **APEX** (3–4 confluence): Full-strength entry signal
+- **STALK** (2 confluence): Moderate setup forming
+
+## Settings
+- **ZLEMA Period** (21), **ROC Period** (12), **ATR Period** (14), **Volume Period** (20), **Min Confluence** (2)
+
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 36,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "apex_predator_signal",
+  iconName: "Crosshair",
+  codeTemplate: JSON.stringify({
+    type: "apex_predator_signal",
+    displayType: "overlay",
+    description: "Multi-factor confluence signal engine with 4 independent detectors",
+  }),
+  defaultSettings: {
+    zlemaPeriod: 21,
+    rocPeriod: 12,
+    atrPeriod: 14,
+    volPeriod: 20,
+    minConfluence: 2,
+    color: "#f59e0b",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["signal", "confluence", "multi-factor", "premium", "overlay", "predator", "entry"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1615,6 +1667,7 @@ const ALL_ITEMS = [
   ECLIPSE_STEALTH_TRAIL,
   WRAITH_CONVERGENCE_ENGINE,
   FLUX_MOMENTUM_TRAIL,
+  APEX_PREDATOR_SIGNAL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

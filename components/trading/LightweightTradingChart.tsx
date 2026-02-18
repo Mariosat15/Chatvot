@@ -103,6 +103,7 @@ import {
   calculateEclipseStealthTrail,
   calculateWraithConvergenceEngine,
   calculateFluxMomentumTrail,
+  calculateApexPredatorSignal,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2622,6 +2623,81 @@ const LightweightTradingChart = ({
           const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
           try { trailSeries.setMarkers(sorted); } catch {}
 
+        // Apex Predator Signal: ZLEMA reference line + multi-factor confluence markers
+        } else if (indicator.type === "apex_predator_signal") {
+          const apsData = calculateApexPredatorSignal(
+            transformedCandles,
+            indicator.parameters.zlemaPeriod || 21,
+            indicator.parameters.rocPeriod || 12,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.volPeriod || 20,
+            indicator.parameters.minConfluence || 2,
+          );
+
+          const bullData: { time: number; value: number }[] = [];
+          const bearData: { time: number; value: number }[] = [];
+          const bullMarkers: any[] = [];
+          const bearMarkers: any[] = [];
+
+          for (const d of apsData) {
+            if (d.direction === 1) bullData.push({ time: d.time, value: d.line });
+            else bearData.push({ time: d.time, value: d.line });
+
+            if (d.signal === "apex_bull") {
+              bullMarkers.push({
+                time: d.time as UTCTimestamp, position: "belowBar" as const,
+                color: "#22c55e", shape: "arrowUp" as const, text: "APEX ▲", size: 2,
+              });
+            } else if (d.signal === "apex_bear") {
+              bearMarkers.push({
+                time: d.time as UTCTimestamp, position: "aboveBar" as const,
+                color: "#ef4444", shape: "arrowDown" as const, text: "APEX ▼", size: 2,
+              });
+            } else if (d.signal === "stalk_bull") {
+              bullMarkers.push({
+                time: d.time as UTCTimestamp, position: "belowBar" as const,
+                color: "#4ade80", shape: "arrowUp" as const, text: "STALK", size: 1,
+              });
+            } else if (d.signal === "stalk_bear") {
+              bearMarkers.push({
+                time: d.time as UTCTimestamp, position: "aboveBar" as const,
+                color: "#f87171", shape: "arrowDown" as const, text: "STALK", size: 1,
+              });
+            }
+          }
+
+          if (bullData.length > 0) {
+            const bullSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "APS"} Bull`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
+            const sorted2 = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted2); } catch {}
+          }
+
+          if (bearData.length > 0) {
+            const bearSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "APS"} Bear`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
+            const sorted2 = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted2); } catch {}
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3048,6 +3124,28 @@ const LightweightTradingChart = ({
                     } else {
                       trailS.setData(fmtData.map(d => ({ time: d.time as UTCTimestamp, value: d.trail, color: d.color })));
                     }
+                  }
+                }
+              } else if (_ovlType === "apex_predator_signal") {
+                const apsData = calculateApexPredatorSignal(
+                  tc, p.zlemaPeriod || 21, p.rocPeriod || 12, p.atrPeriod || 14,
+                  p.volPeriod || 20, p.minConfluence || 2,
+                );
+                if (apsData.length > 0) {
+                  const bullS = _ovlSeriesMap.get(`${_ovlId}_bull`);
+                  const bearS = _ovlSeriesMap.get(`${_ovlId}_bear`);
+                  if (mode === "light") {
+                    const last = apsData[apsData.length - 1];
+                    if (last.direction === 1 && bullS) bullS.update({ time: last.time as UTCTimestamp, value: last.line });
+                    else if (bearS) bearS.update({ time: last.time as UTCTimestamp, value: last.line });
+                  } else {
+                    const bullD: any[] = []; const bearD: any[] = [];
+                    for (const d of apsData) {
+                      if (d.direction === 1) bullD.push({ time: d.time as UTCTimestamp, value: d.line });
+                      else bearD.push({ time: d.time as UTCTimestamp, value: d.line });
+                    }
+                    if (bullS) bullS.setData(bullD);
+                    if (bearS) bearS.setData(bearD);
                   }
                 }
               }

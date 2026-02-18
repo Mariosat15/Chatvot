@@ -42,7 +42,8 @@ export type IndicatorType =
   | "aurora_cascade_flow"
   | "eclipse_stealth_trail"
   | "wraith_convergence_engine"
-  | "flux_momentum_trail";
+  | "flux_momentum_trail"
+  | "apex_predator_signal";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -489,6 +490,8 @@ const INDICATOR_TYPE_MAP: Record<
   "wraith convergence engine": { type: "wraith_convergence_engine", displayType: "overlay" },
   flux_momentum_trail: { type: "flux_momentum_trail", displayType: "overlay" },
   "flux momentum trail": { type: "flux_momentum_trail", displayType: "overlay" },
+  apex_predator_signal: { type: "apex_predator_signal", displayType: "overlay" },
+  "apex predator signal": { type: "apex_predator_signal", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -787,6 +790,13 @@ export function marketplaceItemToIndicator(
       params.rocPeriod = settings?.rocPeriod || 12;
       params.atrPeriod = settings?.atrPeriod || 14;
       params.surgeThreshold = settings?.surgeThreshold || 70;
+      break;
+    case "apex_predator_signal":
+      params.zlemaPeriod = settings?.zlemaPeriod || 21;
+      params.rocPeriod = settings?.rocPeriod || 12;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.volPeriod = settings?.volPeriod || 20;
+      params.minConfluence = settings?.minConfluence || 2;
       break;
     default:
       // Generic period-based indicators
