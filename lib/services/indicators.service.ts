@@ -4009,3 +4009,154 @@ export function calculateCipherHarmonicVeil(
 
   return result;
 }
+
+// ============================================================================
+// TITAN PULSE SIGNAL - Adaptive single-line trend + buy/sell signal markers
+// ============================================================================
+
+export interface TitanPulseSignalData {
+  time: number;
+  level: number;          // the single trend line price
+  direction: 1 | -1;     // 1 = bullish (support), -1 = bearish (resistance)
+  signal: "strong_buy" | "buy" | "strong_sell" | "sell" | "none";
+  strength: number;       // 0–100 signal confidence
+}
+
+export function calculateTitanPulseSignal(
+  data: OHLCData[],
+  kamaPeriod: number = 10,
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 1.5,
+  squeezeLookback: number = 20,
+  signalThreshold: number = 40,
+): TitanPulseSignalData[] {
+  const minBars = Math.max(kamaPeriod, atrPeriod, squeezeLookback) + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Kaufman Adaptive Moving Average (KAMA) ---
+  const fastSC = 2 / (kamaFast + 1);
+  const slowSC = 2 / (kamaSlow + 1);
+  const kama = new Array(len).fill(0);
+  kama[0] = closes[0];
+  for (let i = 1; i < kamaPeriod; i++) kama[i] = closes[i];
+
+  for (let i = kamaPeriod; i < len; i++) {
+    const direction = Math.abs(closes[i] - closes[i - kamaPeriod]);
+    let volatility = 0;
+    for (let j = i - kamaPeriod + 1; j <= i; j++) {
+      volatility += Math.abs(closes[j] - closes[j - 1]);
+    }
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = (er * (fastSC - slowSC) + slowSC);
+    const smoothConst = sc * sc;
+    kama[i] = kama[i - 1] + smoothConst * (closes[i] - kama[i - 1]);
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- ATR rate of change (for squeeze detection) ---
+  const atrRoc: number[] = new Array(len).fill(0);
+  for (let i = squeezeLookback; i < len; i++) {
+    const prevAtr = atr[i - squeezeLookback];
+    atrRoc[i] = prevAtr > 0 ? (atr[i] - prevAtr) / prevAtr : 0;
+  }
+
+  // --- ATR percentile within lookback (squeeze = low ATR relative to recent) ---
+  const atrSqueeze: boolean[] = new Array(len).fill(false);
+  for (let i = squeezeLookback; i < len; i++) {
+    let countBelow = 0;
+    for (let j = i - squeezeLookback; j < i; j++) {
+      if (atr[j] > atr[i]) countBelow++;
+    }
+    atrSqueeze[i] = countBelow / squeezeLookback > 0.7;
+  }
+
+  // --- Build adaptive trend line with flip logic ---
+  const result: TitanPulseSignalData[] = [];
+  let dir = 1;      // 1 = bull, -1 = bear
+  let trendLevel = closes[minBars - 1];
+  let prevDir = 1;
+  let barsInTrend = 0;
+  let wasInSqueeze = false;
+
+  for (let i = minBars; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const offset = atr[i] * atrMultiplier;
+    const bullLevel = kama[i] - offset;  // support
+    const bearLevel = kama[i] + offset;  // resistance
+
+    prevDir = dir;
+
+    if (dir === 1) {
+      trendLevel = Math.max(trendLevel, bullLevel);
+      if (closes[i] < trendLevel) {
+        dir = -1;
+        trendLevel = bearLevel;
+        barsInTrend = 0;
+      }
+    } else {
+      trendLevel = Math.min(trendLevel, bearLevel);
+      if (closes[i] > trendLevel) {
+        dir = 1;
+        trendLevel = bullLevel;
+        barsInTrend = 0;
+      }
+    }
+    barsInTrend++;
+
+    // --- Signal detection (confluence scoring) ---
+    let score = 0;
+
+    // Signal 1: Trend flip (highest weight)
+    const isFlip = dir !== prevDir;
+    if (isFlip) score += 45;
+
+    // Signal 2: Momentum surge — price accelerating away from the line
+    const distFromLine = Math.abs(closes[i] - trendLevel);
+    const momentumRatio = atr[i] > 0 ? distFromLine / atr[i] : 0;
+    if (momentumRatio > 1.5 && barsInTrend <= 5) score += 30;
+    else if (momentumRatio > 1.0 && barsInTrend <= 3) score += 20;
+
+    // Signal 3: Volatility expansion after squeeze
+    const inSqueeze = atrSqueeze[i];
+    if (wasInSqueeze && !inSqueeze && atrRoc[i] > 0.1) {
+      score += 25;
+    }
+    wasInSqueeze = inSqueeze;
+
+    // Determine signal type
+    const strength = Math.min(100, score);
+    let signal: TitanPulseSignalData["signal"] = "none";
+    if (strength >= signalThreshold) {
+      if (dir === 1) signal = strength >= 70 ? "strong_buy" : "buy";
+      else signal = strength >= 70 ? "strong_sell" : "sell";
+    }
+
+    result.push({
+      time: data[i].time,
+      level: trendLevel,
+      direction: dir as 1 | -1,
+      signal,
+      strength,
+    });
+  }
+
+  return result;
+}

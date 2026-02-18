@@ -344,6 +344,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { maxCyclePeriod: 50, hurstPeriod: 100, atrPeriod: 14, bandMultiplier: 2.0, smooth: 5 },
     paramLabels: { maxCyclePeriod: "Max Cycle Period", hurstPeriod: "Hurst Window", atrPeriod: "ATR Period", bandMultiplier: "Band Width", smooth: "Smoothing" },
   },
+  titan_pulse_signal: {
+    name: "Titan Pulse Signal",
+    shortName: "TPS",
+    displayType: "overlay" as const,
+    defaultParams: { kamaPeriod: 10, kamaFast: 2, kamaSlow: 30, atrPeriod: 14, atrMultiplier: 1.5, squeezeLookback: 20, signalThreshold: 40 },
+    paramLabels: { kamaPeriod: "KAMA Period", kamaFast: "Fast SC", kamaSlow: "Slow SC", atrPeriod: "ATR Period", atrMultiplier: "ATR Multiplier", squeezeLookback: "Squeeze Lookback", signalThreshold: "Signal Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

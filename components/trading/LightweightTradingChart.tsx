@@ -98,6 +98,7 @@ import {
   calculateOrionMomentumShield,
   calculateNebulaPhaseBands,
   calculateCipherHarmonicVeil,
+  calculateTitanPulseSignal,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2263,6 +2264,82 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Titan Pulse Signal: split up/down line (like Supertrend) + signal markers
+        } else if (indicator.type === "titan_pulse_signal") {
+          const tpsData = calculateTitanPulseSignal(
+            transformedCandles,
+            indicator.parameters.kamaPeriod || 10,
+            indicator.parameters.kamaFast || 2,
+            indicator.parameters.kamaSlow || 30,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.atrMultiplier || 1.5,
+            indicator.parameters.squeezeLookback || 20,
+            indicator.parameters.signalThreshold || 40,
+          );
+
+          const upData: { time: number; value: number }[] = [];
+          const downData: { time: number; value: number }[] = [];
+          const buyMarkers: any[] = [];
+          const sellMarkers: any[] = [];
+
+          for (const d of tpsData) {
+            if (d.direction === 1) upData.push({ time: d.time, value: d.level });
+            else downData.push({ time: d.time, value: d.level });
+
+            if (d.signal === "strong_buy" || d.signal === "buy") {
+              buyMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "belowBar" as const,
+                color: d.signal === "strong_buy" ? "#22c55e" : "#4ade80",
+                shape: d.signal === "strong_buy" ? "arrowUp" as const : "circle" as const,
+                text: d.signal === "strong_buy" ? "BUY" : "",
+              });
+            } else if (d.signal === "strong_sell" || d.signal === "sell") {
+              sellMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "aboveBar" as const,
+                color: d.signal === "strong_sell" ? "#ef4444" : "#f87171",
+                shape: d.signal === "strong_sell" ? "arrowDown" as const : "circle" as const,
+                text: d.signal === "strong_sell" ? "SELL" : "",
+              });
+            }
+          }
+
+          if (upData.length > 0) {
+            const upSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "TPS"} Bull`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            upSeries.setData(upData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_up`, upSeries);
+          }
+
+          if (downData.length > 0) {
+            const downSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "TPS"} Bear`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            downSeries.setData(downData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_down`, downSeries);
+          }
+
+          // Place signal markers on the up series (or down if no up)
+          const markerSeries = indicatorSeriesRef.current.get(`${indicator.id}_up`) || indicatorSeriesRef.current.get(`${indicator.id}_down`);
+          if (markerSeries) {
+            const allMarkers = [...buyMarkers, ...sellMarkers].sort((a, b) => (a.time as number) - (b.time as number));
+            try { markerSeries.setMarkers(allMarkers); } catch {}
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2584,6 +2661,29 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
                     if (mS) mS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
                     if (lS) lS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                  }
+                }
+              } else if (_ovlType === "titan_pulse_signal") {
+                const tpsData = calculateTitanPulseSignal(
+                  tc, p.kamaPeriod || 10, p.kamaFast || 2, p.kamaSlow || 30,
+                  p.atrPeriod || 14, p.atrMultiplier || 1.5, p.squeezeLookback || 20,
+                  p.signalThreshold || 40,
+                );
+                if (tpsData.length > 0) {
+                  const upS = _ovlSeriesMap.get(`${_ovlId}_up`);
+                  const dnS = _ovlSeriesMap.get(`${_ovlId}_down`);
+                  if (mode === "light") {
+                    const last = tpsData[tpsData.length - 1];
+                    if (last.direction === 1 && upS) upS.update({ time: last.time as UTCTimestamp, value: last.level });
+                    else if (dnS) dnS.update({ time: last.time as UTCTimestamp, value: last.level });
+                  } else {
+                    const upD: any[] = []; const dnD: any[] = [];
+                    for (const d of tpsData) {
+                      if (d.direction === 1) upD.push({ time: d.time as UTCTimestamp, value: d.level });
+                      else dnD.push({ time: d.time as UTCTimestamp, value: d.level });
+                    }
+                    if (upS) upS.setData(upD);
+                    if (dnS) dnS.setData(dnD);
                   }
                 }
               }

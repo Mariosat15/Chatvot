@@ -1388,6 +1388,126 @@ No indicator guarantees profits. The Cipher Harmonic Veil provides statistically
   riskLevel: "medium",
 };
 
+const TITAN_PULSE_SIGNAL: Partial<IMarketplaceItem> = {
+  name: "Titan Pulse Signal",
+  slug: "titan-pulse-signal",
+  shortDescription:
+    "Adaptive single-line trend indicator with built-in buy/sell signal markers. Combines Kaufman adaptive filter, ATR-offset flip logic, and confluence-based signal detection.",
+  fullDescription: `# Titan Pulse Signal
+
+## Overview
+**Titan Pulse Signal** is a premium on-chart overlay that breaks away from traditional band indicators. Instead of wrapping price in upper/lower bands, it plots a **single intelligent trend line** that flips between support and resistance — like a next-generation Supertrend powered by adaptive mathematics and a built-in signal engine.
+
+The line turns **green when bullish** (acting as dynamic support below price) and **red when bearish** (acting as dynamic resistance above price). At key inflection points, **buy and sell signal markers** appear directly on the chart, removing guesswork entirely.
+
+## Three Core Components
+
+### 1. Kaufman Adaptive Moving Average (KAMA) Engine
+The core uses KAMA — an efficiency-ratio adaptive filter:
+- **In strong trends**: KAMA speeds up, keeping the line close to price
+- **In choppy markets**: KAMA slows down, preventing false signals
+- **Efficiency Ratio** = |Direction| / Volatility over N bars
+- This means the indicator literally measures how efficient the market's movement is and adapts in real-time
+
+### 2. ATR-Offset Flip Logic
+Like Supertrend but adaptive:
+- **Bullish mode**: Line = KAMA - (ATR × Multiplier) → acts as trailing support
+- **Bearish mode**: Line = KAMA + (ATR × Multiplier) → acts as trailing resistance
+- **Flip trigger**: When price crosses the line, direction reverses
+- The line ratchets (only moves in the trend direction, never against), creating clean entries
+
+### 3. Signal Confluence Engine
+Three independent signal generators scored 0-100:
+- **Trend Flip** (45 pts): When the line changes direction — the primary signal
+- **Momentum Surge** (30 pts): Price accelerates away from line by >1.5× ATR in the first few bars
+- **Squeeze Breakout** (25 pts): ATR was in the bottom 30th percentile, then suddenly expands
+- Signals fire when combined score exceeds the threshold
+- **Strong signals** (≥70): Triangle markers — high-conviction entries
+- **Regular signals** (≥40): Circle markers — moderate-conviction entries
+
+## How to Trade With It
+
+### Trend Following (Primary Strategy)
+1. Go **LONG** when the line turns green (flips to support)
+2. Go **SHORT** when the line turns red (flips to resistance)
+3. Use the line itself as your **trailing stop-loss**
+4. Strong signal markers = size up, regular signals = standard size
+
+### Signal Confirmation Trading
+1. Wait for a **strong signal marker** (triangle) to appear
+2. Enter in the signal direction
+3. Place stop-loss just beyond the trend line
+4. Target: Next major support/resistance or 2:1 risk-reward
+
+### Squeeze Breakout Trading
+1. Notice when the line stays flat and tight (low ATR period)
+2. A signal marker during a squeeze breakout = explosive move incoming
+3. Enter immediately on the marker, trail stop on the line
+4. These are often the highest-probability signals
+
+### Re-Entry Trading
+1. In an established trend (line green/red for 20+ bars)
+2. Price pulls back toward the line but doesn't cross
+3. A regular signal appears as price bounces off the line
+4. Enter as a continuation trade — ride the existing trend
+
+## Settings Guide
+- **KAMA Period** (10): Efficiency ratio lookback — higher = smoother, slower adaptation
+- **KAMA Fast** (2): Fast smoothing constant — lower = more responsive to trend starts
+- **KAMA Slow** (30): Slow smoothing constant — higher = more filtering in chop
+- **ATR Period** (14): Volatility lookback for line offset
+- **ATR Multiplier** (1.5): How far the line sits from KAMA — higher = fewer flips, wider stops
+- **Squeeze Lookback** (20): Window for detecting volatility contraction
+- **Signal Threshold** (40): Minimum confluence score to generate a signal — higher = fewer but stronger signals
+
+## What Makes It Different
+| Feature | Band Indicators | Supertrend | Titan Pulse Signal |
+|---------|----------------|------------|-------------------|
+| Lines | 3 (upper/mid/lower) | 1 (fixed speed) | 1 (adaptive speed) |
+| Adaptation | Static or ATR-only | ATR-only | Efficiency-ratio + ATR |
+| Signals | None (manual reading) | Direction only | Auto buy/sell markers |
+| Confluence | N/A | N/A | 3-factor scoring engine |
+| False signals in chop | Many | Moderate | Few (KAMA slows down) |
+
+## Tips for Best Results
+- Works on **all timeframes** — 1m scalping to weekly swing trading
+- In **ranging markets**, raise the ATR Multiplier to 2.0+ to reduce whipsaws
+- **Strong signals after a squeeze** are the highest-probability setups
+- Combine with **volume** — signals with rising volume are more reliable
+- The **line itself is your stop-loss** — no need to calculate separately
+
+## Risk Warning
+No indicator guarantees profits. Titan Pulse Signal helps identify trend direction and high-probability entries, but all trading involves risk. Always use proper position sizing and risk management.`,
+  category: "indicator",
+  price: 32,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "titan_pulse_signal",
+  iconName: "Crosshair",
+  codeTemplate: JSON.stringify({
+    type: "titan_pulse_signal",
+    displayType: "overlay",
+    description: "Adaptive single-line trend with buy/sell signal markers and confluence scoring",
+  }),
+  defaultSettings: {
+    kamaPeriod: 10,
+    kamaFast: 2,
+    kamaSlow: 30,
+    atrPeriod: 14,
+    atrMultiplier: 1.5,
+    squeezeLookback: 20,
+    signalThreshold: 40,
+    color: "#3b82f6",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["trend", "signal", "adaptive", "premium", "overlay", "kama", "supertrend", "buy-sell", "confluence", "momentum"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1397,6 +1517,7 @@ const ALL_ITEMS = [
   ORION_MOMENTUM_SHIELD,
   NEBULA_PHASE_BANDS,
   CIPHER_HARMONIC_VEIL,
+  TITAN_PULSE_SIGNAL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

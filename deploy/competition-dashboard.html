@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>CHARTVOLT LIVE - Trading Arena</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0a0a12;
+    --bg-secondary: #111128;
+    --bg-card: #161633;
+    --bg-track: #0d0d1f;
+    --gold: #ffd700;
+    --gold-dark: #b8860b;
+    --silver: #c0c0c0;
+    --bronze: #cd7f32;
+    --neon-cyan: #00f0ff;
+    --neon-magenta: #ff00e5;
+    --neon-green: #39ff14;
+    --neon-red: #ff1744;
+    --neon-orange: #ff6d00;
+    --neon-blue: #2979ff;
+    --text-primary: #e8eaed;
+    --text-secondary: #9aa0a6;
+    --text-dim: #5f6368;
+    --border: rgba(255,255,255,0.06);
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ===== HEADER BAR ===== */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 32px;
+    background: linear-gradient(180deg, rgba(17,17,40,0.98) 0%, rgba(10,10,18,0.95) 100%);
+    border-bottom: 1px solid var(--border);
+    height: 64px;
+    position: sticky; top: 0;
+    z-index: 100;
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta), var(--neon-cyan));
+    opacity: 0.7;
+  }
+
+  .logo-section { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 900;
+    font-family: 'Orbitron', sans-serif;
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0,240,255,0.3);
+  }
+  .logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(90deg, var(--neon-cyan), #fff);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    letter-spacing: 3px;
+  }
+  .logo-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px; color: var(--neon-magenta);
+    letter-spacing: 5px; text-transform: uppercase;
+    margin-top: -2px;
+  }
+
+  .header-center {
+    display: flex; align-items: center; gap: 16px;
+    position: absolute; left: 50%; transform: translateX(-50%);
+  }
+  .nav-tab {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 6px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+    background: none;
+  }
+  .nav-tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.03); }
+  .nav-tab.active {
+    color: var(--neon-cyan);
+    border-color: rgba(0,240,255,0.3);
+    background: rgba(0,240,255,0.06);
+  }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .live-indicator {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--neon-red);
+    letter-spacing: 2px;
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    background: var(--neon-red);
+    border-radius: 50%;
+    animation: livePulse 1s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--neon-red);
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px; font-weight: 600;
+  }
+
+  /* ===== VIEW CONTAINERS ===== */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ===== LOBBY VIEW ===== */
+  .lobby {
+    padding: 28px 32px 80px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .lobby-hero {
+    text-align: center;
+    padding: 40px 0 32px;
+  }
+  .lobby-hero h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 32px; font-weight: 800;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--gold), var(--neon-magenta));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+  }
+  .lobby-hero p {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+  }
+
+  .lobby-stats {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 24px 0 36px;
+  }
+  .lobby-stat {
+    text-align: center;
+    padding: 12px 24px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .lobby-stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px; font-weight: 700;
+  }
+  .lobby-stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 6px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    background: none;
+    text-transform: uppercase;
+  }
+  .filter-btn:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.12); }
+  .filter-btn.active { color: var(--neon-cyan); border-color: rgba(0,240,255,0.4); background: rgba(0,240,255,0.08); }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    margin-top: 32px;
+  }
+  .section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .section-count {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  /* ===== EVENT CARD ===== */
+  .event-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    position: relative;
+  }
+  .event-card:hover {
+    border-color: rgba(0,240,255,0.25);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 30px rgba(0,240,255,0.05);
+  }
+  .event-card.featured {
+    border-color: rgba(255,215,0,0.2);
+  }
+  .event-card.featured:hover {
+    border-color: rgba(255,215,0,0.4);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 30px rgba(255,215,0,0.08);
+  }
+
+  .card-banner {
+    height: 6px;
+    width: 100%;
+  }
+  .banner-live { background: linear-gradient(90deg, var(--neon-red), var(--neon-orange)); }
+  .banner-starting { background: linear-gradient(90deg, var(--neon-cyan), var(--neon-blue)); }
+  .banner-upcoming { background: linear-gradient(90deg, var(--neon-magenta), #7c3aed); }
+  .banner-challenge { background: linear-gradient(90deg, var(--gold), var(--neon-orange)); }
+  .banner-ended { background: linear-gradient(90deg, var(--text-dim), #3a3a4a); }
+
+  .card-body { padding: 18px 20px 16px; }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .card-type-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .badge-competition { color: var(--neon-cyan); background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.2); }
+  .badge-challenge { color: var(--gold); background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.2); }
+  .card-status {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status-live { color: var(--neon-red); }
+  .status-starting { color: var(--neon-cyan); }
+  .status-upcoming { color: var(--neon-magenta); }
+  .status-ended { color: var(--text-dim); }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot.live { background: var(--neon-red); animation: livePulse 1s infinite; }
+  .status-dot.starting { background: var(--neon-cyan); animation: livePulse 1.5s infinite; }
+
+  .card-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-bottom: 14px;
+  }
+
+  .card-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .meta-item {
+    text-align: center;
+    padding: 8px 4px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+  .meta-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px; font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .meta-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .card-players {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .player-avatars {
+    display: flex;
+    align-items: center;
+  }
+  .player-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    border: 2px solid var(--bg-card);
+    margin-left: -8px;
+    position: relative;
+  }
+  .player-avatar:first-child { margin-left: 0; }
+  .player-overflow {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid var(--bg-card);
+    margin-left: -8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px; font-weight: 700;
+    color: var(--text-secondary);
+  }
+  .card-enter-btn {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 18px;
+    border-radius: 6px;
+    border: 1px solid rgba(0,240,255,0.3);
+    background: rgba(0,240,255,0.08);
+    color: var(--neon-cyan);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .card-enter-btn:hover {
+    background: rgba(0,240,255,0.15);
+    border-color: rgba(0,240,255,0.5);
+    box-shadow: 0 0 15px rgba(0,240,255,0.15);
+  }
+  .card-enter-btn.gold {
+    border-color: rgba(255,215,0,0.3);
+    background: rgba(255,215,0,0.08);
+    color: var(--gold);
+  }
+  .card-enter-btn.gold:hover {
+    background: rgba(255,215,0,0.15);
+    border-color: rgba(255,215,0,0.5);
+    box-shadow: 0 0 15px rgba(255,215,0,0.15);
+  }
+  .card-enter-btn.disabled {
+    border-color: rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+    color: var(--text-dim);
+    cursor: default;
+    pointer-events: none;
+  }
+
+  /* ===== LIVE VIEW ===== */
+  .live-view { height: calc(100vh - 64px); overflow: hidden; }
+
+  .live-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 28px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .back-btn {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: none; border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .back-btn:hover { color: var(--neon-cyan); background: rgba(0,240,255,0.06); }
+  .live-event-info {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .event-badge-sm {
+    background: linear-gradient(135deg, rgba(255,0,229,0.15), rgba(0,240,255,0.15));
+    border: 1px solid rgba(255,0,229,0.3);
+    border-radius: 6px;
+    padding: 4px 14px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px; font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .live-timer-group {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .timer {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 15px rgba(0,240,255,0.5);
+    letter-spacing: 2px;
+  }
+  .prize-pool {
+    background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,215,0,0.05));
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 6px;
+    padding: 4px 14px;
+    text-align: center;
+  }
+  .prize-label { font-size: 8px; color: var(--gold-dark); letter-spacing: 2px; text-transform: uppercase; }
+  .prize-amount {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px; font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 0 10px rgba(255,215,0,0.4);
+  }
+
+  /* Ticker */
+  .ticker-bar {
+    background: linear-gradient(90deg, rgba(0,240,255,0.05), rgba(255,0,229,0.05));
+    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .ticker-content {
+    display: inline-flex;
+    gap: 40px;
+    animation: tickerScroll 30s linear infinite;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .ticker-content span { white-space: nowrap; }
+  .ticker-highlight { color: var(--neon-cyan); font-weight: 700; }
+  .ticker-gold { color: var(--gold); }
+  .ticker-green { color: var(--neon-green); }
+  .ticker-red { color: var(--neon-red); }
+  @keyframes tickerScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Main race layout */
+  .race-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    height: calc(100vh - 64px - 46px - 32px);
+  }
+
+  .race-section {
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .race-track {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+  }
+
+  .racer-row {
+    display: grid;
+    grid-template-columns: 32px 180px 1fr 110px;
+    align-items: center;
+    gap: 10px;
+    height: 62px;
+    background: var(--bg-track);
+    border-radius: 10px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .racer-row:nth-child(1) { border-color: rgba(255,215,0,0.25); background: linear-gradient(90deg, rgba(255,215,0,0.06), var(--bg-track) 40%); }
+  .racer-row:nth-child(2) { border-color: rgba(192,192,192,0.2); background: linear-gradient(90deg, rgba(192,192,192,0.04), var(--bg-track) 40%); }
+  .racer-row:nth-child(3) { border-color: rgba(205,127,50,0.2); background: linear-gradient(90deg, rgba(205,127,50,0.04), var(--bg-track) 40%); }
+
+  .rank {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px; font-weight: 800;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+  }
+  .rank-1 { color: var(--gold); background: rgba(255,215,0,0.12); text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+  .rank-2 { color: var(--silver); background: rgba(192,192,192,0.1); }
+  .rank-3 { color: var(--bronze); background: rgba(205,127,50,0.1); }
+  .rank-n { color: var(--text-dim); background: rgba(255,255,255,0.03); }
+
+  .racer-info { display: flex; align-items: center; gap: 10px; }
+  .avatar-container { position: relative; width: 40px; height: 40px; border-radius: 50%; overflow: visible; flex-shrink: 0; }
+  .avatar-ring { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid transparent; z-index: 1; }
+  .ring-gold { border-color: var(--gold); box-shadow: 0 0 10px rgba(255,215,0,0.3); }
+  .ring-silver { border-color: var(--silver); box-shadow: 0 0 6px rgba(192,192,192,0.2); }
+  .ring-bronze { border-color: var(--bronze); box-shadow: 0 0 6px rgba(205,127,50,0.2); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; position: relative; z-index: 2; }
+  .crown { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 12px; z-index: 10; animation: crownBounce 2s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(255,215,0,0.6)); }
+  @keyframes crownBounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+  .racer-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .racer-title { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+
+  .track-container { position: relative; height: 34px; background: rgba(255,255,255,0.02); border-radius: 17px; overflow: hidden; border: 1px solid rgba(255,255,255,0.04); }
+  .track-bar { position: absolute; top: 2px; bottom: 2px; left: 2px; border-radius: 15px; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; min-width: 50px; }
+  .track-bar::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 30px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15)); border-radius: 15px; }
+  .track-runner { position: absolute; right: -3px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 5; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 0 15px rgba(0,0,0,0.5); animation: runnerBob 2s ease-in-out infinite; }
+  @keyframes runnerBob { 0%, 100% { transform: translateY(-50%) translateX(0); } 50% { transform: translateY(-50%) translateX(3px); } }
+  .track-pnl { font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 700; position: relative; z-index: 3; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+
+  .racer-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .pnl-value { font-family: 'Orbitron', sans-serif; font-size: 15px; font-weight: 700; }
+  .pnl-positive { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.3); }
+  .pnl-negative { color: var(--neon-red); text-shadow: 0 0 10px rgba(255,23,68,0.3); }
+  .pnl-pct { font-size: 10px; color: var(--text-secondary); font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+
+  /* Sidebar */
+  .sidebar { background: var(--bg-secondary); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar-block { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-title { font-family: 'Orbitron', sans-serif; font-size: 9px; font-weight: 600; color: var(--text-dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+  .stat-value { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .stat-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+
+  .wr-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .wr-name { width: 72px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wr-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
+  .wr-bar { height: 100%; border-radius: 3px; transition: width 1s ease; }
+  .wr-pct { width: 32px; font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 600; text-align: right; }
+
+  .activity-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03); animation: fadeSlideIn 0.5s ease; }
+  @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .activity-icon { width: 24px; height: 24px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+  .activity-text { font-size: 11px; color: var(--text-secondary); line-height: 1.3; }
+  .activity-name { font-weight: 600; color: var(--text-primary); }
+  .activity-time { font-size: 9px; color: var(--text-dim); margin-top: 1px; }
+
+  /* Particles */
+  .particles { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .particle { position: absolute; width: 2px; height: 2px; background: var(--neon-cyan); border-radius: 50%; opacity: 0; animation: particleFloat 8s linear infinite; }
+  @keyframes particleFloat { 0% { opacity: 0; transform: translateY(100vh) scale(0); } 10% { opacity: 0.6; } 90% { opacity: 0.2; } 100% { opacity: 0; transform: translateY(-10vh) scale(1); } }
+
+  .glow-1 { box-shadow: 0 0 25px rgba(255,215,0,0.06); }
+  .glow-2 { box-shadow: 0 0 15px rgba(192,192,192,0.04); }
+
+  .bottom-strip {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 32px;
+    background: rgba(10,10,18,0.95); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; font-family: 'Rajdhani', sans-serif; font-size: 11px; color: var(--text-dim); z-index: 100;
+  }
+  .bottom-strip a { color: var(--neon-cyan); text-decoration: none; }
+
+  /* Fade transition */
+  .fade-enter { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="particles" id="particles"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo-section">
+    <div class="logo-icon">CV</div>
+    <div>
+      <div class="logo-text">CHARTVOLT</div>
+      <div class="logo-sub">Trading Arena</div>
+    </div>
+  </div>
+  <div class="header-center">
+    <button class="nav-tab active" onclick="showView('lobby')">Browse Events</button>
+    <button class="nav-tab" id="liveTab" onclick="if(currentEvent) showView('live')" style="opacity:0.4;pointer-events:none;">Live View</button>
+  </div>
+  <div class="header-right">
+    <div class="live-indicator"><div class="live-dot"></div> LIVE</div>
+    <div class="user-badge">🐺 ShadowWolf</div>
+  </div>
+</header>
+
+<!-- ========== LOBBY VIEW ========== -->
+<div class="view active" id="lobbyView">
+<div class="lobby fade-enter">
+
+  <div class="lobby-hero">
+    <h1>Trading Arena</h1>
+    <p>Choose a competition or challenge to spectate or join. Multiple events run simultaneously.</p>
+  </div>
+
+  <div class="lobby-stats">
+    <div class="lobby-stat">
+      <div class="lobby-stat-value" style="color:var(--neon-red)">4</div>
+      <div class="lobby-stat-label">Live Now</div>
+    </div>
+    <div class="lobby-stat">
+      <div class="lobby-stat-value" style="color:var(--neon-cyan)">3</div>
+      <div class="lobby-stat-label">Starting Soon</div>
+    </div>
+    <div class="lobby-stat">
+      <div class="lobby-stat-value" style="color:var(--neon-magenta)">5</div>
+      <div class="lobby-stat-label">Upcoming</div>
+    </div>
+    <div class="lobby-stat">
+      <div class="lobby-stat-value" style="color:var(--gold)">$127K</div>
+      <div class="lobby-stat-label">Total Prizes</div>
+    </div>
+    <div class="lobby-stat">
+      <div class="lobby-stat-value" style="color:var(--neon-green)">284</div>
+      <div class="lobby-stat-label">Active Traders</div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterCards('all', this)">All</button>
+    <button class="filter-btn" onclick="filterCards('competition', this)">Competitions</button>
+    <button class="filter-btn" onclick="filterCards('challenge', this)">Challenges</button>
+    <button class="filter-btn" onclick="filterCards('live', this)">Live Now</button>
+    <button class="filter-btn" onclick="filterCards('starting', this)">Starting Soon</button>
+    <button class="filter-btn" onclick="filterCards('upcoming', this)">Upcoming</button>
+  </div>
+
+  <div id="cardsContainer"></div>
+
+</div>
+</div>
+
+<!-- ========== LIVE RACE VIEW ========== -->
+<div class="view" id="liveView">
+<div class="live-view fade-enter">
+
+  <div class="live-top-bar">
+    <button class="back-btn" onclick="showView('lobby')">&#8592; Back to Lobby</button>
+    <div class="live-event-info">
+      <div class="live-indicator"><div class="live-dot"></div> LIVE</div>
+      <div class="event-badge-sm" id="liveEventName">GRAND PRIX ROUND 4</div>
+    </div>
+    <div class="live-timer-group">
+      <div class="prize-pool">
+        <div class="prize-label">Prize Pool</div>
+        <div class="prize-amount" id="livePrize">$25,000</div>
+      </div>
+      <div class="timer" id="timer">02:14:37</div>
+    </div>
+  </div>
+
+  <div class="ticker-bar">
+    <div class="ticker-content">
+      <span><span class="ticker-highlight">EURUSD</span> 1.0842 <span class="ticker-green">+0.32%</span></span>
+      <span><span class="ticker-highlight">GBPUSD</span> 1.2715 <span class="ticker-green">+0.18%</span></span>
+      <span><span class="ticker-highlight">USDJPY</span> 149.82 <span class="ticker-red">-0.45%</span></span>
+      <span><span class="ticker-highlight">XAUUSD</span> 2,031.50 <span class="ticker-green">+1.12%</span></span>
+      <span><span class="ticker-gold">ALERT</span> ShadowWolf closed +$2,340 on EURUSD</span>
+      <span><span class="ticker-highlight">AUDUSD</span> 0.6583 <span class="ticker-red">-0.21%</span></span>
+      <span><span class="ticker-highlight">USDCAD</span> 1.3492 <span class="ticker-green">+0.09%</span></span>
+      <span><span class="ticker-gold">ALERT</span> CryptoOracle opened LONG GBPUSD 2.5 lots</span>
+      <span><span class="ticker-highlight">EURUSD</span> 1.0842 <span class="ticker-green">+0.32%</span></span>
+      <span><span class="ticker-highlight">GBPUSD</span> 1.2715 <span class="ticker-green">+0.18%</span></span>
+      <span><span class="ticker-highlight">USDJPY</span> 149.82 <span class="ticker-red">-0.45%</span></span>
+      <span><span class="ticker-highlight">XAUUSD</span> 2,031.50 <span class="ticker-green">+1.12%</span></span>
+      <span><span class="ticker-gold">ALERT</span> ShadowWolf closed +$2,340 on EURUSD</span>
+      <span><span class="ticker-highlight">AUDUSD</span> 0.6583 <span class="ticker-red">-0.21%</span></span>
+      <span><span class="ticker-highlight">USDCAD</span> 1.3492 <span class="ticker-green">+0.09%</span></span>
+      <span><span class="ticker-gold">ALERT</span> CryptoOracle opened LONG GBPUSD 2.5 lots</span>
+    </div>
+  </div>
+
+  <div class="race-layout">
+    <div class="race-section">
+      <div class="section-title">Race to Profit &mdash; Live Standings</div>
+      <div class="race-track" id="raceTrack"></div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-block">
+        <div class="sidebar-title">Arena Stats</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" style="color:var(--neon-cyan)" id="totalTrades">847</div><div class="stat-label">Trades</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:var(--neon-green)" id="totalVolume">$4.2M</div><div class="stat-label">Volume</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:var(--gold)" id="totalPlayers">12</div><div class="stat-label">Players</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:var(--neon-magenta)" id="avgWinRate">64%</div><div class="stat-label">Avg WR</div></div>
+        </div>
+      </div>
+      <div class="sidebar-block">
+        <div class="sidebar-title">Win Rate</div>
+        <div id="winRates"></div>
+      </div>
+      <div class="sidebar-block" style="flex:1">
+        <div class="sidebar-title">Live Activity</div>
+        <div id="activityFeed"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="bottom-strip">
+  <span>CHARTVOLT TRADING ARENA &bull; All data simulated for demonstration</span>
+  <span>Powered by <a href="#">Chartvolt</a> &bull; Stream ID: CVA-2026-LIVE</span>
+</div>
+
+<script>
+// ========== EVENT DATA ==========
+const events = [
+  { id: 1, type: "competition", title: "Grand Prix Round 4", desc: "The flagship weekly competition. Top 3 split the prize pool. Forex majors only.", status: "live", prize: "$25,000", players: 12, maxPlayers: 16, timeLeft: "02:14:37", duration: "4h", featured: true, avatars: ["🐺","🔮","⚔️","🐍","⛈️"], entry: "250 credits" },
+  { id: 2, type: "challenge", title: "Scalping Blitz", desc: "Maximum trades in 30 minutes. Only scalps under 5-min hold count. Pure speed.", status: "live", prize: "$5,000", players: 24, maxPlayers: 32, timeLeft: "00:18:42", duration: "30m", featured: false, avatars: ["👻","🦅","🧊","🦊"], entry: "50 credits" },
+  { id: 3, type: "competition", title: "Gold Rush Derby", desc: "XAUUSD only. Ride the gold wave. Highest P&L on gold trades wins.", status: "live", prize: "$15,000", players: 18, maxPlayers: 24, timeLeft: "01:45:10", duration: "3h", featured: true, avatars: ["🌑","⚡","🏄","🐺","🔮"], entry: "150 credits" },
+  { id: 4, type: "challenge", title: "Zero to Hero", desc: "Start with $1,000 demo. First to double it wins. No drawdown limit.", status: "live", prize: "$3,000", players: 41, maxPlayers: 50, timeLeft: "03:22:05", duration: "6h", featured: false, avatars: ["⚔️","🐍","⛈️","👻","🦅"], entry: "Free" },
+  { id: 5, type: "competition", title: "Pairs Battle Royale", desc: "EURUSD vs GBPUSD. Pick your side. Best trader on either pair takes it all.", status: "starting", prize: "$18,000", players: 9, maxPlayers: 20, timeLeft: "Starting in 12 min", duration: "2h", featured: true, avatars: ["🧊","🦊","🌑"], entry: "200 credits" },
+  { id: 6, type: "challenge", title: "Win Streak Hunter", desc: "Longest consecutive winning trade streak. Minimum 10 trades to qualify.", status: "starting", prize: "$4,000", players: 15, maxPlayers: 30, timeLeft: "Starting in 28 min", duration: "1h", featured: false, avatars: ["⚡","🏄","🐺","🔮"], entry: "75 credits" },
+  { id: 7, type: "competition", title: "Night Owl Session", desc: "Asian session trading. JPY and AUD pairs. Runs midnight to 6 AM UTC.", status: "starting", prize: "$12,000", players: 6, maxPlayers: 16, timeLeft: "Starting in 1h 45m", duration: "6h", featured: false, avatars: ["⚔️","🐍","⛈️"], entry: "100 credits" },
+  { id: 8, type: "challenge", title: "Risk Manager Elite", desc: "Trade for 2 hours with max 2% drawdown. Highest return with tightest risk wins.", status: "upcoming", prize: "$8,000", players: 0, maxPlayers: 24, timeLeft: "Tomorrow 14:00 UTC", duration: "2h", featured: true, avatars: [], entry: "120 credits" },
+  { id: 9, type: "competition", title: "Weekend Warriors Cup", desc: "48-hour marathon competition. Trade any pair. Endurance meets skill.", status: "upcoming", prize: "$50,000", players: 0, maxPlayers: 64, timeLeft: "Sat 00:00 UTC", duration: "48h", featured: true, avatars: [], entry: "500 credits" },
+  { id: 10, type: "challenge", title: "Reversal King", desc: "Score points for catching reversals. Counter-trend trading only.", status: "upcoming", prize: "$6,000", players: 0, maxPlayers: 20, timeLeft: "Wed 16:00 UTC", duration: "3h", featured: false, avatars: [], entry: "80 credits" },
+  { id: 11, type: "competition", title: "Volatility Vortex", desc: "Trade during NFP release. Highest P&L in the 30-min window around news.", status: "upcoming", prize: "$20,000", players: 0, maxPlayers: 32, timeLeft: "Fri 13:15 UTC", duration: "30m", featured: true, avatars: [], entry: "300 credits" },
+  { id: 12, type: "challenge", title: "Precision Sniper", desc: "Fewest trades to reach $500 profit. Quality over quantity.", status: "upcoming", prize: "$3,500", players: 0, maxPlayers: 20, timeLeft: "Thu 10:00 UTC", duration: "4h", featured: false, avatars: [], entry: "60 credits" },
+];
+
+const statusOrder = { live: 0, starting: 1, upcoming: 2, ended: 3 };
+
+function renderCards(filter) {
+  const container = document.getElementById("cardsContainer");
+  container.innerHTML = "";
+
+  let filtered = events;
+  if (filter === "competition" || filter === "challenge") filtered = events.filter(e => e.type === filter);
+  else if (filter === "live" || filter === "starting" || filter === "upcoming") filtered = events.filter(e => e.status === filter);
+
+  const grouped = { live: [], starting: [], upcoming: [], ended: [] };
+  filtered.forEach(e => { if (grouped[e.status]) grouped[e.status].push(e); });
+
+  for (const [status, items] of Object.entries(grouped)) {
+    if (items.length === 0) continue;
+    const labels = { live: "Live Now", starting: "Starting Soon", upcoming: "Upcoming", ended: "Completed" };
+
+    const header = document.createElement("div");
+    header.className = "section-header";
+    header.innerHTML = `<div class="section-label">${labels[status]}</div><div class="section-count">${items.length} event${items.length > 1 ? 's' : ''}</div>`;
+    container.appendChild(header);
+
+    const grid = document.createElement("div");
+    grid.className = "cards-grid";
+
+    items.forEach(ev => {
+      const card = document.createElement("div");
+      card.className = "event-card" + (ev.featured ? " featured" : "");
+      card.setAttribute("data-type", ev.type);
+      card.setAttribute("data-status", ev.status);
+
+      const bannerClass = ev.status === "live" ? "banner-live" : ev.status === "starting" ? "banner-starting" : ev.type === "challenge" ? "banner-challenge" : "banner-upcoming";
+      const badgeClass = ev.type === "competition" ? "badge-competition" : "badge-challenge";
+      const statusClass = "status-" + ev.status;
+      const dotClass = ev.status === "live" ? "live" : ev.status === "starting" ? "starting" : "";
+      const btnClass = ev.status === "live" ? "" : ev.status === "starting" ? "" : ev.status === "upcoming" ? "disabled" : "disabled";
+      const btnLabel = ev.status === "live" ? "Watch Live" : ev.status === "starting" ? "Join Now" : ev.status === "upcoming" ? "Notify Me" : "Results";
+      const btnColor = ev.type === "challenge" ? "gold" : "";
+
+      let avatarsHtml = "";
+      ev.avatars.slice(0, 4).forEach((a, i) => {
+        avatarsHtml += `<div class="player-avatar" style="background:linear-gradient(135deg,#1a1a2e,#2d2d44);z-index:${10 - i}">${a}</div>`;
+      });
+      if (ev.players > 4) avatarsHtml += `<div class="player-overflow">+${ev.players - 4}</div>`;
+      if (ev.players === 0) avatarsHtml = `<span style="font-size:11px;color:var(--text-dim)">No players yet</span>`;
+
+      card.innerHTML = `
+        <div class="card-banner ${bannerClass}"></div>
+        <div class="card-body">
+          <div class="card-top">
+            <div class="card-type-badge ${badgeClass}">${ev.type}</div>
+            <div class="card-status ${statusClass}">
+              ${dotClass ? '<span class="status-dot ' + dotClass + '"></span>' : ''}
+              ${ev.status === "live" ? "LIVE" : ev.status === "starting" ? "STARTING" : ev.status === "upcoming" ? "UPCOMING" : "ENDED"}
+            </div>
+          </div>
+          <div class="card-title">${ev.title}</div>
+          <div class="card-desc">${ev.desc}</div>
+          <div class="card-meta">
+            <div class="meta-item">
+              <div class="meta-value" style="color:var(--gold)">${ev.prize}</div>
+              <div class="meta-label">Prize Pool</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-value" style="color:var(--neon-cyan)">${ev.players}/${ev.maxPlayers}</div>
+              <div class="meta-label">Players</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-value" style="color:${ev.status === 'live' ? 'var(--neon-red)' : 'var(--text-secondary)'}">${ev.status === 'live' || ev.status === 'starting' ? ev.timeLeft.split(' ').pop() : ev.duration}</div>
+              <div class="meta-label">${ev.status === 'live' ? 'Remaining' : ev.status === 'starting' ? 'Starts In' : 'Duration'}</div>
+            </div>
+          </div>
+          <div class="card-players">
+            <div class="player-avatars">${avatarsHtml}</div>
+            <button class="card-enter-btn ${btnColor} ${btnClass}" onclick="event.stopPropagation(); enterEvent(${ev.id})">${btnLabel}</button>
+          </div>
+        </div>
+      `;
+
+      card.addEventListener("click", () => enterEvent(ev.id));
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  }
+}
+
+let activeFilter = "all";
+function filterCards(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  renderCards(filter);
+}
+
+// ========== VIEW SWITCHING ==========
+let currentEvent = null;
+
+function showView(view) {
+  document.getElementById("lobbyView").classList.remove("active");
+  document.getElementById("liveView").classList.remove("active");
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+
+  if (view === "lobby") {
+    document.getElementById("lobbyView").classList.add("active");
+    document.querySelector(".nav-tab:first-child").classList.add("active");
+    document.body.style.overflow = "auto";
+  } else {
+    document.getElementById("liveView").classList.add("active");
+    document.getElementById("liveTab").classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+}
+
+function enterEvent(id) {
+  const ev = events.find(e => e.id === id);
+  if (!ev || ev.status === "upcoming") return;
+  currentEvent = ev;
+
+  document.getElementById("liveEventName").textContent = ev.title.toUpperCase();
+  document.getElementById("livePrize").textContent = ev.prize;
+  document.getElementById("totalPlayers").textContent = ev.players;
+
+  const liveTab = document.getElementById("liveTab");
+  liveTab.style.opacity = "1";
+  liveTab.style.pointerEvents = "auto";
+
+  showView("live");
+  renderRace();
+  renderWinRates();
+  renderActivity();
+}
+
+// ========== RACE DATA ==========
+const competitors = [
+  { name: "ShadowWolf",   avatar: "🐺", bg: "linear-gradient(135deg,#1a1a2e,#16213e)", title: "Phantom Operative",  pnl: 12450, trades: 87, winRate: 78 },
+  { name: "CryptoOracle",  avatar: "🔮", bg: "linear-gradient(135deg,#2d1b69,#11998e)", title: "Quantum Sage",       pnl: 9870,  trades: 62, winRate: 72 },
+  { name: "BladeRunner",   avatar: "⚔️", bg: "linear-gradient(135deg,#1a0000,#4a0e0e)", title: "Blood Shogun",       pnl: 8340,  trades: 95, winRate: 65 },
+  { name: "NeonViper",     avatar: "🐍", bg: "linear-gradient(135deg,#0d2818,#1b4332)", title: "Cyber Ronin",        pnl: 7215,  trades: 74, winRate: 69 },
+  { name: "StormChaser",   avatar: "⛈️", bg: "linear-gradient(135deg,#0c1445,#1a237e)", title: "Storm Centurion",    pnl: 5680,  trades: 53, winRate: 66 },
+  { name: "PhantomAce",    avatar: "👻", bg: "linear-gradient(135deg,#1a1a2e,#2d2d44)", title: "Void Hunter",        pnl: 4920,  trades: 81, winRate: 58 },
+  { name: "GoldenEagle",   avatar: "🦅", bg: "linear-gradient(135deg,#2a1a00,#4a3000)", title: "Alchemist Prime",    pnl: 3750,  trades: 44, winRate: 73 },
+  { name: "IceBreaker",    avatar: "🧊", bg: "linear-gradient(135deg,#0a192f,#172a45)", title: "Nebula Sniper",      pnl: 2890,  trades: 68, winRate: 54 },
+  { name: "RedFox",        avatar: "🦊", bg: "linear-gradient(135deg,#3b0a0a,#5c1a1a)", title: "Inferno Lord",       pnl: 1240,  trades: 91, winRate: 48 },
+  { name: "DarkMatter",    avatar: "🌑", bg: "linear-gradient(135deg,#0a0a1a,#1a1a2e)", title: "Digital Assassin",   pnl: 560,   trades: 37, winRate: 51 },
+  { name: "QuantumLeap",   avatar: "⚡", bg: "linear-gradient(135deg,#1a0a2e,#2e1a4e)", title: "Shadow Trader",      pnl: -1230, trades: 56, winRate: 39 },
+  { name: "SilverSurge",   avatar: "🏄", bg: "linear-gradient(135deg,#1a2a3a,#2a3a4a)", title: "Crypto Oracle",      pnl: -3450, trades: 72, winRate: 35 },
+];
+
+const trackColors = [
+  "linear-gradient(90deg,rgba(255,215,0,0.35),rgba(255,215,0,0.15))",
+  "linear-gradient(90deg,rgba(192,192,192,0.3),rgba(192,192,192,0.12))",
+  "linear-gradient(90deg,rgba(205,127,50,0.3),rgba(205,127,50,0.12))",
+  "linear-gradient(90deg,rgba(0,240,255,0.2),rgba(0,240,255,0.08))",
+  "linear-gradient(90deg,rgba(41,121,255,0.2),rgba(41,121,255,0.08))",
+  "linear-gradient(90deg,rgba(255,0,229,0.15),rgba(255,0,229,0.06))",
+  "linear-gradient(90deg,rgba(57,255,20,0.15),rgba(57,255,20,0.06))",
+  "linear-gradient(90deg,rgba(255,109,0,0.15),rgba(255,109,0,0.06))",
+  "linear-gradient(90deg,rgba(255,23,68,0.12),rgba(255,23,68,0.05))",
+  "linear-gradient(90deg,rgba(156,39,176,0.12),rgba(156,39,176,0.05))",
+  "linear-gradient(90deg,rgba(100,100,120,0.1),rgba(100,100,120,0.04))",
+  "linear-gradient(90deg,rgba(80,80,100,0.1),rgba(80,80,100,0.04))",
+];
+const medalRings = ["ring-gold","ring-silver","ring-bronze"];
+const rankClasses = ["rank-1","rank-2","rank-3"];
+
+function formatPnl(v) { return (v >= 0 ? "+" : "") + "$" + Math.abs(v).toLocaleString(); }
+function getProgress(pnl, maxPnl) { if (maxPnl <= 0) return 10; return Math.max(8, Math.min(95, (pnl / maxPnl) * 88 + 7)); }
+
+function renderRace() {
+  const sorted = [...competitors].sort((a, b) => b.pnl - a.pnl);
+  const maxPnl = Math.max(...sorted.map(c => c.pnl), 1);
+  const track = document.getElementById("raceTrack");
+  track.innerHTML = "";
+  sorted.forEach((c, i) => {
+    const progress = getProgress(c.pnl, maxPnl);
+    const row = document.createElement("div");
+    row.className = "racer-row" + (i < 2 ? " glow-" + (i + 1) : "");
+    row.innerHTML = `
+      <div class="rank ${i < 3 ? rankClasses[i] : 'rank-n'}">${i + 1}</div>
+      <div class="racer-info">
+        <div class="avatar-container">
+          ${i === 0 ? '<div class="crown">👑</div>' : ''}
+          ${i < 3 ? '<div class="avatar-ring ' + medalRings[i] + '"></div>' : ''}
+          <div class="avatar" style="background:${c.bg}">${c.avatar}</div>
+        </div>
+        <div><div class="racer-name">${c.name}</div><div class="racer-title">${c.title}</div></div>
+      </div>
+      <div class="track-container">
+        <div class="track-bar" style="width:${progress}%;background:${trackColors[i]}">
+          <span class="track-pnl">${formatPnl(c.pnl)}</span>
+          <div class="track-runner" style="background:${c.bg}">${c.avatar}</div>
+        </div>
+      </div>
+      <div class="racer-stats">
+        <div class="pnl-value ${c.pnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">${formatPnl(c.pnl)}</div>
+        <div class="pnl-pct">${c.trades} trades &bull; ${c.winRate}% WR</div>
+      </div>`;
+    track.appendChild(row);
+  });
+}
+
+function renderWinRates() {
+  const sorted = [...competitors].sort((a, b) => b.winRate - a.winRate).slice(0, 8);
+  const container = document.getElementById("winRates");
+  container.innerHTML = "";
+  const colors = ["var(--gold)","var(--silver)","var(--bronze)","var(--neon-cyan)","var(--neon-blue)","var(--neon-magenta)","var(--neon-green)","var(--neon-orange)"];
+  sorted.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "wr-row";
+    row.innerHTML = `<div class="wr-name">${c.avatar} ${c.name}</div><div class="wr-bar-bg"><div class="wr-bar" style="width:${c.winRate}%;background:${colors[i]}"></div></div><div class="wr-pct" style="color:${colors[i]}">${c.winRate}%</div>`;
+    container.appendChild(row);
+  });
+}
+
+const activities = [
+  { icon: "📈", bg: "rgba(57,255,20,0.1)", text: '<span class="activity-name">ShadowWolf</span> closed <span style="color:var(--neon-green)">+$2,340</span> EURUSD', time: "12s ago" },
+  { icon: "🎯", bg: "rgba(0,240,255,0.1)", text: '<span class="activity-name">CryptoOracle</span> opened LONG GBPUSD', time: "34s ago" },
+  { icon: "⚡", bg: "rgba(255,215,0,0.1)", text: '<span class="activity-name">BladeRunner</span> 10-trade win streak!', time: "1m ago" },
+  { icon: "📉", bg: "rgba(255,23,68,0.1)", text: '<span class="activity-name">SilverSurge</span> stopped out <span style="color:var(--neon-red)">-$680</span>', time: "2m ago" },
+  { icon: "🏆", bg: "rgba(255,215,0,0.1)", text: '<span class="activity-name">ShadowWolf</span> took #1 position', time: "3m ago" },
+  { icon: "🔥", bg: "rgba(255,109,0,0.1)", text: '<span class="activity-name">NeonViper</span> closed <span style="color:var(--neon-green)">+$1,150</span> XAUUSD', time: "4m ago" },
+  { icon: "📈", bg: "rgba(57,255,20,0.1)", text: '<span class="activity-name">GoldenEagle</span> SHORT USDJPY 1.8 lots', time: "5m ago" },
+  { icon: "💀", bg: "rgba(255,23,68,0.1)", text: '<span class="activity-name">QuantumLeap</span> margin call warning', time: "6m ago" },
+];
+
+function renderActivity() {
+  const container = document.getElementById("activityFeed");
+  container.innerHTML = "";
+  activities.forEach(a => {
+    const item = document.createElement("div");
+    item.className = "activity-item";
+    item.innerHTML = `<div class="activity-icon" style="background:${a.bg}">${a.icon}</div><div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time}</div></div>`;
+    container.appendChild(item);
+  });
+}
+
+// Particles
+function createParticles() {
+  const container = document.getElementById("particles");
+  for (let i = 0; i < 25; i++) {
+    const p = document.createElement("div");
+    p.className = "particle";
+    p.style.left = Math.random() * 100 + "%";
+    p.style.animationDelay = Math.random() * 8 + "s";
+    p.style.animationDuration = (6 + Math.random() * 6) + "s";
+    if (Math.random() > 0.5) p.style.background = "var(--neon-magenta)";
+    container.appendChild(p);
+  }
+}
+
+// Timer
+let timeLeft = 2 * 3600 + 14 * 60 + 37;
+function updateTimer() {
+  const h = Math.floor(timeLeft / 3600);
+  const m = Math.floor((timeLeft % 3600) / 60);
+  const s = timeLeft % 60;
+  document.getElementById("timer").textContent = String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  if (timeLeft > 0) timeLeft--;
+}
+
+// Simulate live
+function simulateUpdate() {
+  competitors.forEach(c => {
+    c.pnl = Math.round(c.pnl + (Math.random() - 0.42) * 400);
+    if (Math.random() < 0.15) c.trades++;
+    c.winRate = Math.round(Math.max(20, Math.min(95, c.winRate + (Math.random() - 0.48) * 2)));
+  });
+  if (document.getElementById("liveView").classList.contains("active")) {
+    renderRace();
+    renderWinRates();
+    document.getElementById("totalTrades").textContent = competitors.reduce((s, c) => s + c.trades, 0);
+    document.getElementById("avgWinRate").textContent = Math.round(competitors.reduce((s, c) => s + c.winRate, 0) / competitors.length) + "%";
+  }
+
+  // Simulate lobby player count changes
+  events.forEach(ev => {
+    if (ev.status === "live" && Math.random() < 0.1 && ev.players < ev.maxPlayers) ev.players++;
+    if (ev.status === "starting" && Math.random() < 0.2 && ev.players < ev.maxPlayers) ev.players++;
+  });
+  if (document.getElementById("lobbyView").classList.contains("active")) renderCards(activeFilter);
+}
+
+const extraActs = [
+  { icon: "🚀", bg: "rgba(57,255,20,0.1)", text: '<span class="activity-name">ShadowWolf</span> <span style="color:var(--neon-green)">+$1,870</span> GBPUSD scalp' },
+  { icon: "🎲", bg: "rgba(0,240,255,0.1)", text: '<span class="activity-name">IceBreaker</span> reversed SHORT → LONG' },
+  { icon: "💎", bg: "rgba(255,215,0,0.1)", text: '<span class="activity-name">GoldenEagle</span> 75% win rate milestone' },
+  { icon: "🐻", bg: "rgba(255,23,68,0.1)", text: '<span class="activity-name">RedFox</span> SHORT XAUUSD 3.0 lots' },
+  { icon: "🔔", bg: "rgba(255,0,229,0.1)", text: 'Top 3 reshuffled! New leader emerging' },
+];
+let actIdx = 0;
+function rotateActivity() {
+  const extra = extraActs[actIdx % extraActs.length]; actIdx++;
+  activities.pop();
+  activities.unshift({ ...extra, time: "just now" });
+  activities.forEach((a, i) => { if (i > 0) a.time = (i < 3 ? (i * 15) + "s" : (i - 1) + "m") + " ago"; });
+  if (document.getElementById("liveView").classList.contains("active")) renderActivity();
+}
+
+// Init
+renderCards("all");
+createParticles();
+setInterval(updateTimer, 1000);
+setInterval(simulateUpdate, 3000);
+setInterval(rotateActivity, 5000);
+</script>
+</body>
+</html>

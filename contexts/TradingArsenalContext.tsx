@@ -37,7 +37,8 @@ export type IndicatorType =
   | "vortex_drift_cloud"
   | "orion_momentum_shield"
   | "nebula_phase_bands"
-  | "cipher_harmonic_veil";
+  | "cipher_harmonic_veil"
+  | "titan_pulse_signal";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -474,6 +475,8 @@ const INDICATOR_TYPE_MAP: Record<
   "nebula phase bands": { type: "nebula_phase_bands", displayType: "overlay" },
   cipher_harmonic_veil: { type: "cipher_harmonic_veil", displayType: "overlay" },
   "cipher harmonic veil": { type: "cipher_harmonic_veil", displayType: "overlay" },
+  titan_pulse_signal: { type: "titan_pulse_signal", displayType: "overlay" },
+  "titan pulse signal": { type: "titan_pulse_signal", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -736,6 +739,15 @@ export function marketplaceItemToIndicator(
       params.atrPeriod = settings?.atrPeriod || 14;
       params.bandMultiplier = settings?.bandMultiplier || 2.0;
       params.smooth = settings?.smooth || 5;
+      break;
+    case "titan_pulse_signal":
+      params.kamaPeriod = settings?.kamaPeriod || 10;
+      params.kamaFast = settings?.kamaFast || 2;
+      params.kamaSlow = settings?.kamaSlow || 30;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.atrMultiplier = settings?.atrMultiplier || 1.5;
+      params.squeezeLookback = settings?.squeezeLookback || 20;
+      params.signalThreshold = settings?.signalThreshold || 40;
       break;
     default:
       // Generic period-based indicators
