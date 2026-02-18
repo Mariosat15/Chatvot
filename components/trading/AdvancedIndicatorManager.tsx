@@ -337,6 +337,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { kalmanGain: 0.05, entropyPeriod: 20, atrPeriod: 14, bandMultiplier: 2.0, phaseSmooth: 5 },
     paramLabels: { kalmanGain: "Kalman Gain", entropyPeriod: "Entropy Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", phaseSmooth: "Phase Smoothing" },
   },
+  cipher_harmonic_veil: {
+    name: "Cipher Harmonic Veil",
+    shortName: "CHV",
+    displayType: "overlay" as const,
+    defaultParams: { maxCyclePeriod: 50, hurstPeriod: 100, atrPeriod: 14, bandMultiplier: 2.0, smooth: 5 },
+    paramLabels: { maxCyclePeriod: "Max Cycle Period", hurstPeriod: "Hurst Window", atrPeriod: "ATR Period", bandMultiplier: "Band Width", smooth: "Smoothing" },
+  },
 };
 
 const DEFAULT_COLORS = [

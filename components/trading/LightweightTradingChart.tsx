@@ -97,6 +97,7 @@ import {
   calculateVortexDriftCloud,
   calculateOrionMomentumShield,
   calculateNebulaPhaseBands,
+  calculateCipherHarmonicVeil,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2192,6 +2193,76 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Cipher Harmonic Veil: 3 series (upper, midline, lower) with Hurst regime coloring
+        } else if (indicator.type === "cipher_harmonic_veil") {
+          const chvData = calculateCipherHarmonicVeil(
+            transformedCandles,
+            indicator.parameters.maxCyclePeriod || 50,
+            indicator.parameters.hurstPeriod || 100,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.bandMultiplier || 2.0,
+            indicator.parameters.smooth || 5,
+          );
+
+          const regimeColor = (regime: string, direction: "up" | "down" | "mid") => {
+            if (regime === "persistent") return direction === "down" ? "#dc2626" : "#2563eb";
+            if (regime === "antipersistent") return "#f59e0b";
+            return "#94a3b8";
+          };
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || "#60a5fa", indicator.opacity || 55),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "CHV"} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            upperSeries.setData(chvData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.upper,
+              color: hexToRgba(regimeColor(d.regime, "up"), indicator.opacity || 55),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const midSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#3b82f6", indicator.opacity || 90),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Cipher Harmonic Veil",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            midSeries.setData(chvData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.middle,
+              color: hexToRgba(regimeColor(d.regime, "mid"), indicator.opacity || 90),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || "#f97316", indicator.opacity || 55),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "CHV"} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            lowerSeries.setData(chvData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.lower,
+              color: hexToRgba(regimeColor(d.regime, "down"), indicator.opacity || 55),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2493,6 +2564,26 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
                     if (mS) mS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
                     if (lS) lS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                  }
+                }
+              } else if (_ovlType === "cipher_harmonic_veil") {
+                const chvData = calculateCipherHarmonicVeil(
+                  tc, p.maxCyclePeriod || 50, p.hurstPeriod || 100, p.atrPeriod || 14,
+                  p.bandMultiplier || 2.0, p.smooth || 5,
+                );
+                if (chvData.length > 0) {
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const mS = _ovlSeriesMap.get(`${_ovlId}_middle`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = chvData[chvData.length - 1];
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
+                    if (mS) mS.update({ time: last.time as UTCTimestamp, value: last.middle });
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                  } else {
+                    if (uS) uS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+                    if (mS) mS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+                    if (lS) lS.setData(chvData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
                   }
                 }
               }

@@ -1195,6 +1195,91 @@ No indicator guarantees profits. Always use stop-losses and proper position sizi
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
 
+const CIPHER_HARMONIC_VEIL: Partial<IMarketplaceItem> = {
+  name: "Cipher Harmonic Veil",
+  slug: "cipher-harmonic-veil",
+  shortDescription:
+    "Self-tuning overlay using autocorrelation cycle detection and Hurst exponent fractal analysis to adapt bands to the market's natural rhythm and regime.",
+  fullDescription: `# Cipher Harmonic Veil
+
+## Overview
+The **Cipher Harmonic Veil** is a premium on-chart overlay that listens to the market's hidden rhythm. Every market has a dominant cycle — a natural period at which price patterns tend to repeat. Most traders use fixed-period moving averages that ignore this rhythm entirely. Cipher Harmonic Veil detects the dominant cycle automatically and tunes itself to it in real-time.
+
+The second innovation is the **Hurst Exponent** — a fractal analysis technique from quantitative finance that determines whether the market is trending, mean-reverting, or in a random walk. This gives you a statistically grounded answer to the most important question in trading: **"Should I follow the trend or fade it?"**
+
+## Three Core Components
+
+### 1. Autocorrelation Cycle Detection
+The indicator scans price returns for repeating patterns using autocorrelation analysis:
+- **Peak detection**: The lag with the strongest positive correlation reveals the dominant cycle
+- **Auto-tuning**: The midline period automatically adjusts to half the dominant cycle (Nyquist-optimal filtering)
+- **Result**: A midline that is always in sync with the market's natural rhythm
+
+### 2. Hurst Exponent (Rescaled Range Analysis)
+A mathematical measure of long-term memory in time series:
+- **H > 0.55 (Persistent)**: Past trends tend to continue — momentum trading works
+- **H < 0.45 (Antipersistent)**: Past moves tend to reverse — mean-reversion trading works
+- **H ≈ 0.50 (Random)**: No statistical edge — market is efficient
+
+### 3. Regime-Adaptive Bands
+- **Persistent regime**: Tight bands (0.8×) — trend-following mode
+- **Antipersistent regime**: Wide bands (1.5×) — mean-reversion zones
+- **Random regime**: Standard bands (1.0×) — neutral positioning
+
+## How to Trade With It
+
+### Trend Following (Persistent Regime — Blue)
+1. When blue, enter in the direction of the midline slope
+2. Trail stop-loss to the opposite band
+3. Tight bands = high conviction trending
+
+### Mean Reversion (Antipersistent Regime — Amber)
+1. When amber, buy at lower band / sell at upper band
+2. Target the midline for take-profit
+3. Wide bands = strong reversal zones
+
+### Regime Change Trading
+1. Gray → Blue = new trend forming, enter breakout direction
+2. Blue → Amber = trend dying, prepare for reversals
+3. Gray = no edge, reduce size
+
+## Settings Guide
+- **Max Cycle Period** (50): Upper bound for cycle scan
+- **Hurst Window** (100): R/S analysis lookback
+- **ATR Period** (14): Volatility base for bands
+- **Band Width** (2.0): Base multiplier before regime adjustment
+- **Smoothing** (5): Cycle and Hurst estimate smoothing
+
+## Risk Warning
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 29,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "cipher_harmonic_veil",
+  iconName: "AudioWaveform",
+  codeTemplate: JSON.stringify({
+    type: "cipher_harmonic_veil",
+    displayType: "overlay",
+    description: "Self-tuning overlay with autocorrelation cycle detection and Hurst exponent regime analysis",
+  }),
+  defaultSettings: {
+    maxCyclePeriod: 50,
+    hurstPeriod: 100,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    smooth: 5,
+    color: "#3b82f6",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["fractal", "hurst", "cycle", "adaptive", "premium", "overlay", "regime", "autocorrelation", "mean-reversion", "trend"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1203,6 +1288,7 @@ const ALL_ITEMS = [
   VORTEX_DRIFT_CLOUD,
   ORION_MOMENTUM_SHIELD,
   NEBULA_PHASE_BANDS,
+  CIPHER_HARMONIC_VEIL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

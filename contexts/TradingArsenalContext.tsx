@@ -36,7 +36,8 @@ export type IndicatorType =
   | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands"
   | "vortex_drift_cloud"
   | "orion_momentum_shield"
-  | "nebula_phase_bands";
+  | "nebula_phase_bands"
+  | "cipher_harmonic_veil";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -471,6 +472,8 @@ const INDICATOR_TYPE_MAP: Record<
   "orion momentum shield": { type: "orion_momentum_shield", displayType: "overlay" },
   nebula_phase_bands: { type: "nebula_phase_bands", displayType: "overlay" },
   "nebula phase bands": { type: "nebula_phase_bands", displayType: "overlay" },
+  cipher_harmonic_veil: { type: "cipher_harmonic_veil", displayType: "overlay" },
+  "cipher harmonic veil": { type: "cipher_harmonic_veil", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -726,6 +729,13 @@ export function marketplaceItemToIndicator(
       params.atrPeriod = settings?.atrPeriod || 14;
       params.bandMultiplier = settings?.bandMultiplier || 2.0;
       params.phaseSmooth = settings?.phaseSmooth || 5;
+      break;
+    case "cipher_harmonic_veil":
+      params.maxCyclePeriod = settings?.maxCyclePeriod || 50;
+      params.hurstPeriod = settings?.hurstPeriod || 100;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.bandMultiplier = settings?.bandMultiplier || 2.0;
+      params.smooth = settings?.smooth || 5;
       break;
     default:
       // Generic period-based indicators

@@ -1273,6 +1273,121 @@ No indicator guarantees profits. The Nebula Phase Bands uses advanced mathematic
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
 
+const CIPHER_HARMONIC_VEIL: Partial<IMarketplaceItem> = {
+  name: "Cipher Harmonic Veil",
+  slug: "cipher-harmonic-veil",
+  shortDescription:
+    "Self-tuning overlay using autocorrelation cycle detection and Hurst exponent fractal analysis to adapt bands to the market's natural rhythm and regime.",
+  fullDescription: `# Cipher Harmonic Veil
+
+## Overview
+The **Cipher Harmonic Veil** is a premium on-chart overlay that listens to the market's hidden rhythm. Every market has a dominant cycle — a natural period at which price patterns tend to repeat. Most traders use fixed-period moving averages that ignore this rhythm entirely. Cipher Harmonic Veil detects the dominant cycle automatically and tunes itself to it in real-time.
+
+The second innovation is the **Hurst Exponent** — a fractal analysis technique from quantitative finance that determines whether the market is trending, mean-reverting, or in a random walk. This gives you a statistically grounded answer to the most important question in trading: **"Should I follow the trend or fade it?"**
+
+## Three Core Components
+
+### 1. Autocorrelation Cycle Detection
+The indicator scans price returns for repeating patterns using autocorrelation analysis:
+- **How it works**: Computes the correlation between returns and their lagged copies across multiple lag periods
+- **Peak detection**: The lag with the strongest positive correlation reveals the dominant cycle
+- **Auto-tuning**: The midline period automatically adjusts to half the dominant cycle (Nyquist-optimal filtering)
+- **Result**: A midline that is always in sync with the market's natural rhythm — never too fast, never too slow
+
+### 2. Hurst Exponent (Rescaled Range Analysis)
+A mathematical measure of long-term memory in time series:
+- **H > 0.55 (Persistent)**: Past trends tend to continue — momentum trading works
+- **H < 0.45 (Antipersistent)**: Past moves tend to reverse — mean-reversion trading works
+- **H ≈ 0.50 (Random)**: No statistical edge — market is efficient at this moment
+- **Calculation**: Uses R/S (Rescaled Range) analysis over a rolling window
+
+### 3. Regime-Adaptive Bands
+Band width and behavior change based on the detected Hurst regime:
+- **Persistent regime**: Tight bands (0.8× multiplier) — price is trending, bands trail closely
+- **Antipersistent regime**: Wide bands (1.5× multiplier) — price is bouncing, bands mark reversal zones
+- **Random regime**: Standard bands (1.0× multiplier) — no statistical edge, neutral positioning
+
+## How to Trade With It
+
+### Trend Following (Persistent Regime — Blue)
+1. When the Veil turns **blue**, the Hurst exponent confirms trending conditions
+2. Enter long when price is above the midline and bands are blue
+3. Enter short when price is below the midline and bands are blue
+4. **Tight bands = high conviction** — the market has strong serial correlation
+5. Trail stop-loss to the opposite band
+
+### Mean Reversion (Antipersistent Regime — Amber/Gold)
+1. When the Veil turns **amber/gold**, the market is mean-reverting
+2. Buy when price touches the lower band (expect snap-back to midline)
+3. Sell when price touches the upper band (expect pullback to midline)
+4. **Wide bands = reversal zones** — price is statistically likely to reverse
+5. Set take-profit at the midline
+
+### Regime Change Trading
+1. Watch for the Veil to transition from **gray (random)** to **blue (persistent)**
+2. This signals a new trending regime is forming — enter in the direction of the breakout
+3. Watch for **blue → amber** transitions — the trend is dying, prepare for reversals
+4. **Gray periods** = stay flat or reduce size — no statistical edge
+
+### Cycle-Aware Entries
+1. The detected cycle period appears in the indicator data
+2. After a pullback in a persistent regime, expect continuation near the half-cycle mark
+3. In antipersistent regime, expect reversal near the full cycle mark
+4. Use the cycle length to time your entries and set time-based stops
+
+## Settings Guide
+- **Max Cycle Period** (50): Upper bound for cycle detection scan — higher catches longer cycles
+- **Hurst Window** (100): Rolling window for R/S analysis — higher = more stable regime detection, lower = faster adaptation
+- **ATR Period** (14): Volatility lookback for base band width
+- **Band Width** (2.0): Base multiplier before regime adjustment
+- **Smoothing** (5): Smoothing applied to cycle and Hurst estimates — higher = fewer regime flips
+
+## What Makes It Different
+| Feature | Traditional Indicators | Cipher Harmonic Veil |
+|---------|----------------------|---------------------|
+| Period selection | Fixed (user-chosen) | Auto-tuned to dominant cycle |
+| Regime awareness | None | Hurst exponent classification |
+| Band behavior | Static multiplier | Regime-adaptive (0.8× to 1.5×) |
+| Theoretical basis | Simple math | Fractal analysis + signal processing |
+| Adaptation | Manual parameter tuning | Self-adjusting every bar |
+
+## Tips for Best Results
+- Works best on **15m–Daily** timeframes where cycles are most stable
+- Combine with **volume** — persistent regimes with rising volume are strongest
+- The **amber/gold phase** is your mean-reversion signal — don't chase trends when bands are gold
+- When Hurst hovers near **0.50** (gray), reduce position size — the market has no memory
+- Use on **major forex pairs and indices** for the most reliable cycle detection
+
+## Risk Warning
+No indicator guarantees profits. The Cipher Harmonic Veil provides statistically grounded regime analysis, but past persistence does not guarantee future persistence. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 29,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "cipher_harmonic_veil",
+  iconName: "AudioWaveform",
+  codeTemplate: JSON.stringify({
+    type: "cipher_harmonic_veil",
+    displayType: "overlay",
+    description: "Self-tuning overlay with autocorrelation cycle detection and Hurst exponent regime analysis",
+  }),
+  defaultSettings: {
+    maxCyclePeriod: 50,
+    hurstPeriod: 100,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    smooth: 5,
+    color: "#3b82f6",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["fractal", "hurst", "cycle", "adaptive", "premium", "overlay", "regime", "autocorrelation", "mean-reversion", "trend"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1281,6 +1396,7 @@ const ALL_ITEMS = [
   VORTEX_DRIFT_CLOUD,
   ORION_MOMENTUM_SHIELD,
   NEBULA_PHASE_BANDS,
+  CIPHER_HARMONIC_VEIL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -3825,3 +3825,187 @@ export function calculateNebulaPhaseBands(
 
   return result;
 }
+
+// ============================================================================
+// CIPHER HARMONIC VEIL - Autocorrelation cycle detection + Hurst exponent overlay
+// ============================================================================
+
+export interface CipherHarmonicVeilData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  hurst: number;    // 0–1 Hurst exponent
+  cycle: number;    // dominant cycle period (bars)
+  regime: "persistent" | "antipersistent" | "random";
+}
+
+export function calculateCipherHarmonicVeil(
+  data: OHLCData[],
+  maxCyclePeriod: number = 50,
+  hurstPeriod: number = 100,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  smooth: number = 5,
+): CipherHarmonicVeilData[] {
+  const minBars = Math.max(maxCyclePeriod + 10, hurstPeriod, atrPeriod) + smooth + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Log returns ---
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    logReturns[i] = closes[i - 1] > 0 ? Math.log(closes[i] / closes[i - 1]) : 0;
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Dominant cycle via autocorrelation peak detection ---
+  // For each bar, compute autocorrelation of returns over lags 5..maxCyclePeriod
+  // The lag with the highest positive autocorrelation is the dominant cycle
+  const dominantCycle = new Array(len).fill(20); // default fallback
+  const minLag = 5;
+
+  for (let i = maxCyclePeriod + 10; i < len; i++) {
+    const window = maxCyclePeriod + 5;
+    let mean = 0;
+    for (let j = i - window; j <= i; j++) mean += logReturns[j];
+    mean /= (window + 1);
+
+    let variance = 0;
+    for (let j = i - window; j <= i; j++) {
+      const d = logReturns[j] - mean;
+      variance += d * d;
+    }
+    if (variance < 1e-20) continue;
+
+    let bestLag = 20;
+    let bestCorr = -2;
+    for (let lag = minLag; lag <= maxCyclePeriod; lag++) {
+      let corr = 0;
+      let count = 0;
+      for (let j = i - window + lag; j <= i; j++) {
+        corr += (logReturns[j] - mean) * (logReturns[j - lag] - mean);
+        count++;
+      }
+      corr /= variance;
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestLag = lag;
+      }
+    }
+    dominantCycle[i] = bestLag;
+  }
+
+  // Smooth the dominant cycle to avoid erratic flips
+  const smoothCycle = new Array(len).fill(20);
+  const cK = 2 / (smooth * 2 + 1);
+  for (let i = maxCyclePeriod + 10; i < len; i++) {
+    smoothCycle[i] = i === maxCyclePeriod + 10
+      ? dominantCycle[i]
+      : smoothCycle[i - 1] + (dominantCycle[i] - smoothCycle[i - 1]) * cK;
+  }
+
+  // --- Cycle-adaptive EMA midline (period = half dominant cycle, Nyquist) ---
+  const midline = new Array(len).fill(0);
+  midline[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const halfCycle = Math.max(3, Math.round(smoothCycle[i] / 2));
+    const alpha = 2 / (halfCycle + 1);
+    midline[i] = closes[i] * alpha + midline[i - 1] * (1 - alpha);
+  }
+
+  // --- Hurst Exponent via Rescaled Range (R/S) analysis ---
+  const hurst = new Array(len).fill(0.5);
+
+  for (let i = hurstPeriod; i < len; i++) {
+    const window = hurstPeriod;
+    const segment: number[] = [];
+    for (let j = i - window + 1; j <= i; j++) segment.push(logReturns[j]);
+
+    let mean = 0;
+    for (const v of segment) mean += v;
+    mean /= segment.length;
+
+    // Cumulative deviations from mean
+    const cumDev: number[] = [];
+    let cumSum = 0;
+    for (const v of segment) {
+      cumSum += (v - mean);
+      cumDev.push(cumSum);
+    }
+
+    const R = Math.max(...cumDev) - Math.min(...cumDev);
+    let S = 0;
+    for (const v of segment) S += (v - mean) * (v - mean);
+    S = Math.sqrt(S / segment.length);
+
+    if (S > 1e-15 && R > 0) {
+      const rs = R / S;
+      // H = log(R/S) / log(n)  — simplified single-scale estimator
+      hurst[i] = Math.log(rs) / Math.log(segment.length);
+      hurst[i] = Math.max(0, Math.min(1, hurst[i]));
+    }
+  }
+
+  // Smooth Hurst
+  const smoothHurst = new Array(len).fill(0.5);
+  const hK = 2 / (smooth + 1);
+  for (let i = hurstPeriod; i < len; i++) {
+    smoothHurst[i] = i === hurstPeriod
+      ? hurst[i]
+      : smoothHurst[i - 1] + (hurst[i] - smoothHurst[i - 1]) * hK;
+  }
+
+  // --- Build output ---
+  const result: CipherHarmonicVeilData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const mid = midline[i];
+    const h = smoothHurst[i];
+    const cyc = Math.round(smoothCycle[i]);
+
+    // Regime classification
+    let regime: "persistent" | "antipersistent" | "random";
+    if (h > 0.55) regime = "persistent";
+    else if (h < 0.45) regime = "antipersistent";
+    else regime = "random";
+
+    // Regime-adaptive band multiplier
+    let regimeScale: number;
+    switch (regime) {
+      case "persistent":     regimeScale = 0.8; break;  // tight trailing in trends
+      case "antipersistent": regimeScale = 1.5; break;  // wide for mean-reversion zones
+      default:               regimeScale = 1.0; break;  // neutral
+    }
+    const bandWidth = atr[i] * bandMultiplier * regimeScale;
+
+    result.push({
+      time: data[i].time,
+      upper: mid + bandWidth,
+      middle: mid,
+      lower: mid - bandWidth,
+      hurst: Math.round(h * 100) / 100,
+      cycle: cyc,
+      regime,
+    });
+  }
+
+  return result;
+}
