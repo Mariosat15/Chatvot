@@ -107,6 +107,7 @@ import {
   calculatePhantomDivergenceTracker,
   calculateChaosSentinel,
   calculateHelixPhaseEngine,
+  calculatePrismWaveletCascade,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2943,6 +2944,54 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Prism Wavelet Cascade: 4 rainbow frequency layers + alignment signals
+        } else if (indicator.type === "prism_wavelet_cascade") {
+          const pwcData = calculatePrismWaveletCascade(
+            transformedCandles,
+            indicator.parameters.waveletDepth || 3,
+            indicator.parameters.smoothPeriod || 8,
+            indicator.parameters.alignThreshold || 70,
+            indicator.parameters.splitThreshold || 30,
+          );
+
+          const prismColors = ["#00e5ff", "#2979ff", "#7c4dff", "#e040fb"];
+          const prismKeys = ["d1", "d2", "d3", "a3"] as const;
+          const prismNames = ["Fast", "Medium", "Slow", "Trend"];
+          const prismWidths = [1, 1, 2, 3];
+
+          const markers: any[] = [];
+          for (const d of pwcData) {
+            if (d.signal === "align") markers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e676", shape: "arrowUp" as const, text: "ALIGN", size: 2 });
+            else if (d.signal === "split") markers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff5252", shape: "arrowDown" as const, text: "SPLIT", size: 2 });
+          }
+
+          prismKeys.forEach((key, idx) => {
+            const series = chart.addLineSeries({
+              color: prismColors[idx],
+              lineWidth: prismWidths[idx] as any,
+              lineStyle: 0 as any,
+              title: idx === 3 ? (indicator.customLabel || "Prism Cascade") : `${indicator.customLabel || "PWC"} ${prismNames[idx]}`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: idx === 3,
+            });
+
+            if (idx === 3) {
+              series.setData(pwcData.map(d => ({
+                time: d.time as UTCTimestamp, value: d[key],
+                color: d.trendDir === "bull" ? "#00e676" : d.trendDir === "bear" ? "#f44336" : "#e040fb",
+              })));
+              const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { series.setMarkers(sorted); } catch {}
+            } else {
+              series.setData(pwcData.map(d => ({
+                time: d.time as UTCTimestamp, value: d[key],
+                color: hexToRgba(prismColors[idx], d.alignment > 60 ? 90 : d.alignment > 30 ? 60 : 35),
+              })));
+            }
+            indicatorSeriesRef.current.set(`${indicator.id}_${key}`, series);
+          });
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3471,6 +3520,32 @@ const LightweightTradingChart = ({
                     if (cS) cS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.phaseLine, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 100) })));
                     if (lS) lS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 40) })));
                   }
+                }
+              } else if (_ovlType === "prism_wavelet_cascade") {
+                const pwcData = calculatePrismWaveletCascade(
+                  tc, p.waveletDepth || 3, p.smoothPeriod || 8, p.alignThreshold || 70, p.splitThreshold || 30,
+                );
+                if (pwcData.length > 0) {
+                  const pwcKeys = ["d1", "d2", "d3", "a3"] as const;
+                  const pwcColors = ["#00e5ff", "#2979ff", "#7c4dff", "#e040fb"];
+                  pwcKeys.forEach((key, idx) => {
+                    const s = _ovlSeriesMap.get(`${_ovlId}_${key}`);
+                    if (!s) return;
+                    if (mode === "light") {
+                      const last = pwcData[pwcData.length - 1];
+                      const c = idx === 3
+                        ? (last.trendDir === "bull" ? "#00e676" : last.trendDir === "bear" ? "#f44336" : "#e040fb")
+                        : hexToRgba(pwcColors[idx], last.alignment > 60 ? 90 : last.alignment > 30 ? 60 : 35);
+                      s.update({ time: last.time as UTCTimestamp, value: last[key], color: c } as any);
+                    } else {
+                      s.setData(pwcData.map(d => {
+                        const c = idx === 3
+                          ? (d.trendDir === "bull" ? "#00e676" : d.trendDir === "bear" ? "#f44336" : "#e040fb")
+                          : hexToRgba(pwcColors[idx], d.alignment > 60 ? 90 : d.alignment > 30 ? 60 : 35);
+                        return { time: d.time as UTCTimestamp, value: d[key], color: c };
+                      }));
+                    }
+                  });
                 }
               }
               // Note: support_resistance is static (level detection) -- not updated in real-time

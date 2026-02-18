@@ -46,7 +46,8 @@ export type IndicatorType =
   | "apex_predator_signal"
   | "phantom_divergence_tracker"
   | "chaos_sentinel"
-  | "helix_phase_engine";
+  | "helix_phase_engine"
+  | "prism_wavelet_cascade";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -501,6 +502,8 @@ const INDICATOR_TYPE_MAP: Record<
   "chaos sentinel": { type: "chaos_sentinel", displayType: "overlay" },
   helix_phase_engine: { type: "helix_phase_engine", displayType: "overlay" },
   "helix phase engine": { type: "helix_phase_engine", displayType: "overlay" },
+  prism_wavelet_cascade: { type: "prism_wavelet_cascade", displayType: "overlay" },
+  "prism wavelet cascade": { type: "prism_wavelet_cascade", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator

@@ -407,6 +407,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { detrendPeriod: 20, hilbertLength: 7, ampMultiplier: 1.5, velocitySmooth: 5, leadSensitivity: 55 },
     paramLabels: { detrendPeriod: "Detrend Period", hilbertLength: "Hilbert Length", ampMultiplier: "Amplitude Multiplier", velocitySmooth: "Velocity Smooth", leadSensitivity: "Lead Sensitivity" },
   },
+  prism_wavelet_cascade: {
+    name: "Prism Wavelet Cascade",
+    shortName: "PWC",
+    displayType: "overlay" as const,
+    defaultParams: { waveletDepth: 3, smoothPeriod: 8, alignThreshold: 70, splitThreshold: 30 },
+    paramLabels: { waveletDepth: "Wavelet Depth", smoothPeriod: "Smooth Period", alignThreshold: "Align Threshold", splitThreshold: "Split Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

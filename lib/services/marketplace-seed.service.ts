@@ -2173,6 +2173,66 @@ No indicator guarantees profits. The Helix Phase Engine works best on instrument
   riskLevel: "medium",
 };
 
+const PRISM_WAVELET_CASCADE: Partial<IMarketplaceItem> = {
+  name: "Prism Wavelet Cascade",
+  slug: "prism-wavelet-cascade",
+  shortDescription:
+    "Multi-resolution wavelet decomposition that splits price into 4 frequency layers. A stunning rainbow cascade shows when all market timeframes align or diverge.",
+  fullDescription: `# Prism Wavelet Cascade
+
+## Overview
+**Prism Wavelet Cascade** uses **Haar Wavelet Decomposition** — a technique from signal processing and quantum physics — to separate price data into distinct frequency layers. Each layer captures a different "speed" of the market, from fast intrabar noise to the slow underlying trend.
+
+## How It Works
+
+### Haar Wavelet Transform
+The Haar wavelet is the simplest and most computationally efficient wavelet. It decomposes price into:
+- **Layer 1 (Cyan)**: Fastest frequency — captures 2–4 bar micro-movements
+- **Layer 2 (Blue)**: Fast — captures 4–8 bar short swings
+- **Layer 3 (Purple)**: Medium — captures 8–16 bar intermediate cycles
+- **Layer 4 (Magenta)**: Slowest — the underlying trend (approximation coefficients)
+
+### Spectral Alignment Score
+A proprietary metric measures how closely the 4 layers agree:
+- **High alignment (>70%)**: All frequencies moving in the same direction → strong, high-confidence trend
+- **Low alignment (<30%)**: Frequencies disagree → market is choppy/transitioning
+
+## How to Trade
+1. **ALIGN signal (all 4 layers converge)**: High-probability entry — all timeframes agree on direction
+2. **SPLIT signal (layers diverge)**: Exit or avoid — market structure is breaking down
+3. **Layer order matters**: When fast layers (cyan) cross above slow layers (magenta), bullish momentum is building
+4. **Convergence zones**: Where all 4 lines narrow into a tight band = coiled spring, expect breakout
+5. **Use with any asset**: Works on forex, crypto, stocks — anywhere price has cyclical behavior
+
+## Best Practices
+- Combine with volume confirmation for highest accuracy
+- In strong trends, ride the trade as long as layers stay aligned
+- Tighten stops when alignment score drops below 50%`,
+  category: "indicator",
+  subcategory: "premium",
+  pricingModel: "one_time",
+  price: 39.99,
+  currency: "USD",
+  indicatorType: "prism_wavelet_cascade",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "prism_wavelet_cascade",
+    displayType: "overlay",
+    description: "Haar wavelet decomposition into 4 frequency layers with spectral alignment scoring and convergence/divergence signals",
+  }),
+  defaultSettings: {
+    waveletDepth: 3,
+    smoothPeriod: 8,
+    alignThreshold: 70,
+    splitThreshold: 30,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["wavelet", "multi-resolution", "frequency", "premium", "overlay", "cascade", "alignment", "spectral", "trend", "rainbow"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2191,6 +2251,7 @@ const ALL_ITEMS = [
   PHANTOM_DIVERGENCE_TRACKER,
   CHAOS_SENTINEL,
   HELIX_PHASE_ENGINE,
+  PRISM_WAVELET_CASCADE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

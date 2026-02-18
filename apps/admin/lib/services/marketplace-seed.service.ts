@@ -1808,6 +1808,37 @@ No indicator guarantees profits. Always use proper risk management.`,
   riskLevel: "medium",
 };
 
+const PRISM_WAVELET_CASCADE: Partial<IMarketplaceItem> = {
+  name: "Prism Wavelet Cascade",
+  slug: "prism-wavelet-cascade",
+  shortDescription:
+    "Multi-resolution wavelet decomposition that splits price into 4 frequency layers with alignment scoring and convergence/divergence signals.",
+  fullDescription: `# Prism Wavelet Cascade\n\nHaar Wavelet Decomposition splits price into 4 distinct frequency layers — from fast noise to slow trend. A stunning rainbow cascade of lines shows when all market timeframes align (high-probability entry) or diverge (exit/avoid).\n\n## Layers\n- Layer 1 (Cyan): Fastest micro-movements\n- Layer 2 (Blue): Short swings\n- Layer 3 (Purple): Intermediate cycles\n- Layer 4 (Magenta): Underlying trend\n\n## Signals\n- ALIGN: All layers converge → strong trend entry\n- SPLIT: Layers diverge → exit or reduce size`,
+  category: "indicator",
+  subcategory: "premium",
+  pricingModel: "one_time",
+  price: 39.99,
+  currency: "USD",
+  indicatorType: "prism_wavelet_cascade",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "prism_wavelet_cascade",
+    displayType: "overlay",
+    description: "Haar wavelet decomposition into 4 frequency layers with spectral alignment scoring",
+  }),
+  defaultSettings: {
+    waveletDepth: 3,
+    smoothPeriod: 8,
+    alignThreshold: 70,
+    splitThreshold: 30,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["wavelet", "multi-resolution", "frequency", "premium", "overlay", "cascade", "alignment", "spectral"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1826,6 +1857,7 @@ const ALL_ITEMS = [
   PHANTOM_DIVERGENCE_TRACKER,
   CHAOS_SENTINEL,
   HELIX_PHASE_ENGINE,
+  PRISM_WAVELET_CASCADE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -5130,3 +5130,126 @@ export function calculateHelixPhaseEngine(
 
   return result;
 }
+
+// ============================================================================
+// PRISM WAVELET CASCADE
+// Haar Wavelet Decomposition → 4 frequency layers + spectral alignment scoring
+// ============================================================================
+
+export interface PrismWaveletCascadeData {
+  time: number;
+  d1: number;    // Detail level 1 (fastest, 2-bar cycles)
+  d2: number;    // Detail level 2 (4-bar cycles)
+  d3: number;    // Detail level 3 (8-bar cycles)
+  a3: number;    // Approximation level 3 (slow trend)
+  alignment: number; // 0-100 spectral alignment score
+  trendDir: "bull" | "bear" | "neutral";
+  signal: "align" | "split" | "none";
+}
+
+export function calculatePrismWaveletCascade(
+  data: OHLCData[],
+  waveletDepth: number = 3,
+  smoothPeriod: number = 8,
+  alignThreshold: number = 70,
+  splitThreshold: number = 30,
+): PrismWaveletCascadeData[] {
+  const minBars = (1 << waveletDepth) * 4 + smoothPeriod + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const blockSize = 1 << waveletDepth;
+  const d1Raw = new Array(len).fill(NaN);
+  const d2Raw = new Array(len).fill(NaN);
+  const d3Raw = new Array(len).fill(NaN);
+  const a3Raw = new Array(len).fill(NaN);
+
+  for (let i = blockSize - 1; i < len; i++) {
+    const block = closes.slice(i - blockSize + 1, i + 1);
+
+    const a1: number[] = [];
+    const detail1: number[] = [];
+    for (let j = 0; j < block.length; j += 2) {
+      a1.push((block[j] + block[j + 1]) / 2);
+      detail1.push((block[j] - block[j + 1]) / 2);
+    }
+
+    const a2: number[] = [];
+    const detail2: number[] = [];
+    for (let j = 0; j < a1.length; j += 2) {
+      a2.push((a1[j] + a1[j + 1]) / 2);
+      detail2.push((a1[j] - a1[j + 1]) / 2);
+    }
+
+    const a3Arr: number[] = [];
+    const detail3: number[] = [];
+    for (let j = 0; j < a2.length; j += 2) {
+      a3Arr.push((a2[j] + a2[j + 1]) / 2);
+      detail3.push((a2[j] - a2[j + 1]) / 2);
+    }
+
+    const d1Energy = detail1.reduce((s, v) => s + Math.abs(v), 0) / detail1.length;
+    const d2Energy = detail2.reduce((s, v) => s + Math.abs(v), 0) / detail2.length;
+    const d3Energy = detail3.reduce((s, v) => s + Math.abs(v), 0) / detail3.length;
+
+    d1Raw[i] = closes[i] - d1Energy * Math.sign(closes[i] - closes[i - 1]);
+    d2Raw[i] = closes[i] - d2Energy * 1.5 * Math.sign(closes[i] - (closes[i - 2] || closes[i - 1]));
+    d3Raw[i] = closes[i] - d3Energy * 2.5 * Math.sign(closes[i] - (closes[i - 4] || closes[i - 1]));
+    a3Raw[i] = a3Arr.length > 0 ? a3Arr[a3Arr.length - 1] : closes[i];
+  }
+
+  const emaSmooth = (raw: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const k = 2 / (period + 1);
+    let started = false;
+    for (let i2 = 0; i2 < len; i2++) {
+      if (isNaN(raw[i2])) continue;
+      if (!started) { out[i2] = raw[i2]; started = true; continue; }
+      out[i2] = raw[i2] * k + (out[i2 - 1] ?? raw[i2]) * (1 - k);
+    }
+    return out;
+  };
+
+  const d1S = emaSmooth(d1Raw, Math.max(2, Math.round(smoothPeriod * 0.5)));
+  const d2S = emaSmooth(d2Raw, smoothPeriod);
+  const d3S = emaSmooth(d3Raw, Math.round(smoothPeriod * 1.5));
+  const a3S = emaSmooth(a3Raw, smoothPeriod * 2);
+
+  const atrPeriod = 14;
+  const atrArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - data[i - 1].close), Math.abs(data[i].low - data[i - 1].close));
+    atrArr[i] = i < atrPeriod ? tr : atrArr[i - 1] + (tr - atrArr[i - 1]) / atrPeriod;
+  }
+
+  const result: PrismWaveletCascadeData[] = [];
+  let prevAlignment = 50;
+
+  const startIdx = blockSize + smoothPeriod;
+  for (let i = startIdx; i < len; i++) {
+    if (isNaN(d1S[i]) || isNaN(d2S[i]) || isNaN(d3S[i]) || isNaN(a3S[i])) continue;
+
+    const layers = [d1S[i], d2S[i], d3S[i], a3S[i]];
+    const spread = Math.max(...layers) - Math.min(...layers);
+    const atrVal = atrArr[i] || 1;
+    const rawAlign = 1 - Math.min(spread / (atrVal * 3), 1);
+    const alignment = Math.round(rawAlign * 100);
+
+    const avgDir = (d1S[i] + d2S[i] + d3S[i] + a3S[i]) / 4;
+    const trendDir: PrismWaveletCascadeData["trendDir"] =
+      avgDir > closes[i] * 1.0002 ? "bear" :
+      avgDir < closes[i] * 0.9998 ? "bull" : "neutral";
+
+    let signal: PrismWaveletCascadeData["signal"] = "none";
+    if (alignment >= alignThreshold && prevAlignment < alignThreshold) signal = "align";
+    else if (alignment <= splitThreshold && prevAlignment > splitThreshold) signal = "split";
+
+    prevAlignment = alignment;
+
+    result.push({ time: data[i].time, d1: d1S[i], d2: d2S[i], d3: d3S[i], a3: a3S[i], alignment, trendDir, signal });
+  }
+
+  return result;
+}
