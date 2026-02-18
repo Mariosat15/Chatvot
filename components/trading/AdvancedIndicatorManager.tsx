@@ -365,6 +365,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { mcgPeriod: 14, fdPeriod: 30, fdThreshold: 1.5, atrPeriod: 14, atrMultiplier: 1.8 },
     paramLabels: { mcgPeriod: "McGinley Period", fdPeriod: "Fractal Dim Period", fdThreshold: "FD Threshold", atrPeriod: "ATR Period", atrMultiplier: "ATR Multiplier" },
   },
+  wraith_convergence_engine: {
+    name: "Wraith Convergence Engine",
+    shortName: "WCE",
+    displayType: "overlay" as const,
+    defaultParams: { period: 20, kamaFast: 2, kamaSlow: 30, convergenceThreshold: 70 },
+    paramLabels: { period: "Period", kamaFast: "KAMA Fast", kamaSlow: "KAMA Slow", convergenceThreshold: "Conv. Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

@@ -4394,3 +4394,139 @@ export function calculateEclipseStealthTrail(
 
   return result;
 }
+
+// ============================================================================
+// WRAITH CONVERGENCE ENGINE - Multi-method consensus line with convergence signals
+// ============================================================================
+
+export interface WraithConvergenceData {
+  time: number;
+  consensus: number;
+  convergence: number;     // 0-100 how tightly the methods agree
+  direction: 1 | -1;
+  signal: "converge_bull" | "converge_bear" | "diverge" | "none";
+  methodValues: [number, number, number, number];
+}
+
+export function calculateWraithConvergenceEngine(
+  data: OHLCData[],
+  period: number = 20,
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  convergenceThreshold: number = 70,
+): WraithConvergenceData[] {
+  const minBars = period + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // Method 1: McGinley Dynamic
+  const mcg = new Array(len).fill(0);
+  mcg[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const ratio = closes[i] / mcg[i - 1];
+    const denom = period * Math.pow(ratio, 4);
+    mcg[i] = mcg[i - 1] + (closes[i] - mcg[i - 1]) / Math.max(denom, 1);
+  }
+
+  // Method 2: Ehlers 2-Pole Super Smoother
+  const ss = new Array(len).fill(0);
+  const freq = Math.sqrt(2) * Math.PI / period;
+  const a1ss = Math.exp(-freq);
+  const b1ss = 2 * a1ss * Math.cos(freq);
+  const c2ss = b1ss;
+  const c3ss = -(a1ss * a1ss);
+  const c1ss = 1 - c2ss - c3ss;
+  ss[0] = closes[0]; ss[1] = closes[1];
+  for (let i = 2; i < len; i++) {
+    ss[i] = c1ss * (closes[i] + closes[i - 1]) / 2 + c2ss * ss[i - 1] + c3ss * ss[i - 2];
+  }
+
+  // Method 3: KAMA
+  const kama = new Array(len).fill(0);
+  const fSC = 2 / (kamaFast + 1);
+  const sSC = 2 / (kamaSlow + 1);
+  kama[0] = closes[0];
+  for (let i = 1; i < period && i < len; i++) kama[i] = closes[i];
+  for (let i = period; i < len; i++) {
+    const dir = Math.abs(closes[i] - closes[i - period]);
+    let vol = 0;
+    for (let j = i - period + 1; j <= i; j++) vol += Math.abs(closes[j] - closes[j - 1]);
+    const er = vol > 0 ? dir / vol : 0;
+    const sc = er * (fSC - sSC) + sSC;
+    const alpha = sc * sc;
+    kama[i] = kama[i - 1] + alpha * (closes[i] - kama[i - 1]);
+  }
+
+  // Method 4: Hull MA (HMA)
+  const halfP = Math.max(Math.floor(period / 2), 1);
+  const sqrtP = Math.max(Math.floor(Math.sqrt(period)), 1);
+  const wmaFull = _wma(closes, period);
+  const wmaHalf = _wma(closes, halfP);
+  const hullRaw = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) hullRaw[i] = 2 * wmaHalf[i] - wmaFull[i];
+  const hull = _wma(hullRaw, sqrtP);
+
+  // ATR for normalization
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < period && i < len; i++) aSum += tr[i];
+  atr[period - 1] = aSum / period;
+  for (let i = period; i < len; i++) atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+
+  // Build consensus + convergence
+  const result: WraithConvergenceData[] = [];
+  let prevAllBull = false;
+  let prevAllBear = false;
+  let prevConverged = false;
+
+  for (let i = minBars; i < len; i++) {
+    const methods = [mcg[i], ss[i], kama[i], hull[i]] as [number, number, number, number];
+    const consensus = (mcg[i] + ss[i] + kama[i] + hull[i]) / 4;
+
+    const spread = Math.max(...methods) - Math.min(...methods);
+    const normATR = atr[i] > 0 ? atr[i] : 1;
+    const rawConv = 1 - Math.min(spread / (normATR * 2), 1);
+    const convergence = Math.round(rawConv * 100);
+
+    const bullCount = methods.filter((m) => closes[i] > m).length;
+    const direction: 1 | -1 = bullCount >= 3 ? 1 : -1;
+
+    const allBull = bullCount === 4;
+    const allBear = bullCount === 0;
+    const isConverged = convergence >= convergenceThreshold;
+
+    let signal: "converge_bull" | "converge_bear" | "diverge" | "none" = "none";
+    if (isConverged && allBull && !prevAllBull) signal = "converge_bull";
+    else if (isConverged && allBear && !prevAllBear) signal = "converge_bear";
+    else if (!isConverged && prevConverged) signal = "diverge";
+
+    prevAllBull = allBull;
+    prevAllBear = allBear;
+    prevConverged = isConverged;
+
+    result.push({ time: data[i].time, consensus, convergence, direction, signal, methodValues: methods });
+  }
+
+  return result;
+}
+
+function _wma(src: number[], period: number): number[] {
+  const len = src.length;
+  const out = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) {
+    if (i < period - 1) { out[i] = src[i]; continue; }
+    let num = 0, den = 0;
+    for (let j = 0; j < period; j++) { const w = period - j; num += src[i - j] * w; den += w; }
+    out[i] = den > 0 ? num / den : src[i];
+  }
+  return out;
+}

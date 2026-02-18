@@ -101,6 +101,7 @@ import {
   calculateTitanPulseSignal,
   calculateAuroraCascadeFlow,
   calculateEclipseStealthTrail,
+  calculateWraithConvergenceEngine,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2475,6 +2476,88 @@ const LightweightTradingChart = ({
             try { bearSeries.setMarkers(sorted); } catch {}
           }
 
+        // Wraith Convergence Engine: single consensus line + convergence markers
+        } else if (indicator.type === "wraith_convergence_engine") {
+          const wceData = calculateWraithConvergenceEngine(
+            transformedCandles,
+            indicator.parameters.period || 20,
+            indicator.parameters.kamaFast || 2,
+            indicator.parameters.kamaSlow || 30,
+            indicator.parameters.convergenceThreshold || 70,
+          );
+
+          const bullData: { time: number; value: number }[] = [];
+          const bearData: { time: number; value: number }[] = [];
+          const bullMarkers: any[] = [];
+          const bearMarkers: any[] = [];
+
+          for (const d of wceData) {
+            if (d.direction === 1) bullData.push({ time: d.time, value: d.consensus });
+            else bearData.push({ time: d.time, value: d.consensus });
+
+            if (d.signal === "converge_bull") {
+              bullMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "belowBar" as const,
+                color: "#22c55e",
+                shape: "arrowUp" as const,
+                text: "CONV ▲",
+                size: 2,
+              });
+            } else if (d.signal === "converge_bear") {
+              bearMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "aboveBar" as const,
+                color: "#ef4444",
+                shape: "arrowDown" as const,
+                text: "CONV ▼",
+                size: 2,
+              });
+            } else if (d.signal === "diverge") {
+              const m = d.direction === 1 ? bullMarkers : bearMarkers;
+              m.push({
+                time: d.time as UTCTimestamp,
+                position: d.direction === 1 ? ("belowBar" as const) : ("aboveBar" as const),
+                color: "#f59e0b",
+                shape: "circle" as const,
+                text: "DIV",
+                size: 1,
+              });
+            }
+          }
+
+          if (bullData.length > 0) {
+            const bullSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "WCE"} Bull`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
+            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted); } catch {}
+          }
+
+          if (bearData.length > 0) {
+            const bearSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "WCE"} Bear`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
+            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted); } catch {}
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2864,6 +2947,27 @@ const LightweightTradingChart = ({
                     if (bullS) bullS.setData(bullD);
                     if (bearS) bearS.setData(bearD);
                     if (shadowS) shadowS.setData(estData.map(d => ({ time: d.time as UTCTimestamp, value: d.shadow })));
+                  }
+                }
+              } else if (_ovlType === "wraith_convergence_engine") {
+                const wceData = calculateWraithConvergenceEngine(
+                  tc, p.period || 20, p.kamaFast || 2, p.kamaSlow || 30, p.convergenceThreshold || 70,
+                );
+                if (wceData.length > 0) {
+                  const bullS = _ovlSeriesMap.get(`${_ovlId}_bull`);
+                  const bearS = _ovlSeriesMap.get(`${_ovlId}_bear`);
+                  if (mode === "light") {
+                    const last = wceData[wceData.length - 1];
+                    if (last.direction === 1 && bullS) bullS.update({ time: last.time as UTCTimestamp, value: last.consensus });
+                    else if (bearS) bearS.update({ time: last.time as UTCTimestamp, value: last.consensus });
+                  } else {
+                    const bullD: any[] = []; const bearD: any[] = [];
+                    for (const d of wceData) {
+                      if (d.direction === 1) bullD.push({ time: d.time as UTCTimestamp, value: d.consensus });
+                      else bearD.push({ time: d.time as UTCTimestamp, value: d.consensus });
+                    }
+                    if (bullS) bullS.setData(bullD);
+                    if (bearS) bearS.setData(bearD);
                   }
                 }
               }

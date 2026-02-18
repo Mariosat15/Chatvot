@@ -1487,6 +1487,61 @@ No indicator guarantees profits. Always use proper position sizing and risk mana
   riskLevel: "medium",
 };
 
+const WRAITH_CONVERGENCE_ENGINE: Partial<IMarketplaceItem> = {
+  name: "Wraith Convergence Engine",
+  slug: "wraith-convergence-engine",
+  shortDescription:
+    "Multi-method consensus overlay that fuses McGinley Dynamic, Super Smoother, KAMA, and Hull MA into one intelligent trend line. Fires signals only when all 4 methods converge.",
+  fullDescription: `# Wraith Convergence Engine
+
+## Overview
+**Wraith Convergence Engine (WCE)** runs **4 different adaptive trend algorithms simultaneously** and fuses them into a single **consensus line**. It measures the agreement level between the methods and fires trade signals only when all converge.
+
+## The 4 Methods
+1. **McGinley Dynamic** — Self-adjusting MA
+2. **Ehlers 2-Pole Super Smoother** — DSP noise filter with minimal lag
+3. **Kaufman Adaptive MA (KAMA)** — Efficiency-ratio driven filter
+4. **Hull Moving Average (HMA)** — Ultra-responsive weighted MA
+
+## Signals
+- **CONV ▲**: All 4 methods bullish + high convergence
+- **CONV ▼**: All 4 methods bearish + high convergence
+- **DIV**: Methods were converged but started disagreeing
+
+## Settings
+- **Period** (20): Base lookback period
+- **KAMA Fast** (2): Fast smoothing constant
+- **KAMA Slow** (30): Slow smoothing constant
+- **Convergence Threshold** (70): Minimum score for CONV signals
+
+No indicator guarantees profits. Always use proper position sizing and risk management.`,
+  category: "indicator",
+  price: 38,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "wraith_convergence_engine",
+  iconName: "Ghost",
+  codeTemplate: JSON.stringify({
+    type: "wraith_convergence_engine",
+    displayType: "overlay",
+    description: "4-method consensus trend line with convergence scoring and signal filtering",
+  }),
+  defaultSettings: {
+    period: 20,
+    kamaFast: 2,
+    kamaSlow: 30,
+    convergenceThreshold: 70,
+    color: "#a855f7",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["convergence", "consensus", "multi-method", "premium", "overlay", "adaptive", "trend", "filter", "signal", "mcginley", "hull", "kama"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1499,6 +1554,7 @@ const ALL_ITEMS = [
   TITAN_PULSE_SIGNAL,
   AURORA_CASCADE_FLOW,
   ECLIPSE_STEALTH_TRAIL,
+  WRAITH_CONVERGENCE_ENGINE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

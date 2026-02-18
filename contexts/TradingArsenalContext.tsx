@@ -40,7 +40,8 @@ export type IndicatorType =
   | "cipher_harmonic_veil"
   | "titan_pulse_signal"
   | "aurora_cascade_flow"
-  | "eclipse_stealth_trail";
+  | "eclipse_stealth_trail"
+  | "wraith_convergence_engine";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -483,6 +484,8 @@ const INDICATOR_TYPE_MAP: Record<
   "aurora cascade flow": { type: "aurora_cascade_flow", displayType: "overlay" },
   eclipse_stealth_trail: { type: "eclipse_stealth_trail", displayType: "overlay" },
   "eclipse stealth trail": { type: "eclipse_stealth_trail", displayType: "overlay" },
+  wraith_convergence_engine: { type: "wraith_convergence_engine", displayType: "overlay" },
+  "wraith convergence engine": { type: "wraith_convergence_engine", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -768,6 +771,12 @@ export function marketplaceItemToIndicator(
       params.fdThreshold = settings?.fdThreshold || 1.5;
       params.atrPeriod = settings?.atrPeriod || 14;
       params.atrMultiplier = settings?.atrMultiplier || 1.8;
+      break;
+    case "wraith_convergence_engine":
+      params.period = settings?.period || 20;
+      params.kamaFast = settings?.kamaFast || 2;
+      params.kamaSlow = settings?.kamaSlow || 30;
+      params.convergenceThreshold = settings?.convergenceThreshold || 70;
       break;
     default:
       // Generic period-based indicators
