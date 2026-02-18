@@ -1357,6 +1357,65 @@ No indicator guarantees profits. Always use proper position sizing and risk mana
   riskLevel: "medium",
 };
 
+const AURORA_CASCADE_FLOW: Partial<IMarketplaceItem> = {
+  name: "Aurora Cascade Flow",
+  slug: "aurora-cascade-flow",
+  shortDescription:
+    "5-layer adaptive ribbon overlay using cascaded Kaufman filters. Layers fan out in trends and compress in chop, with alignment scoring for trend conviction.",
+  fullDescription: `# Aurora Cascade Flow
+
+## Overview
+**Aurora Cascade Flow** renders **5 adaptive KAMA layers** cascading from fast to slow. Each layer adapts via an efficiency ratio, creating a ribbon that expands during trends and contracts during consolidation.
+
+## How It Works
+- **Layer 1** (fastest): Leading edge, reacts first
+- **Layer 3** (core): Central reference midline
+- **Layer 5** (slowest): Anchor, turns only in firm trends
+- **Alignment score (0–5)**: Counts how many layers agree on direction
+- Fanned out = strong trend, compressed = squeeze/reversal zone
+
+## How to Trade
+1. **Trend entry**: All 5 layers aligned, price above/below all → enter
+2. **Compression breakout**: Layers compress → enter when they fan out
+3. **Layer bounce**: In trend, price pulls back to L2/L3 → continuation entry
+4. **Reversal**: L1 crosses L3 against trend → early reversal signal
+
+## Settings
+- **ER Period** (10): Efficiency ratio lookback
+- **Fast SC** (2): Fast smoothing constant
+- **Slow Min/Max** (10/40): Range for 5 layers
+- **Smooth Factor** (3): Extra noise reduction on faster layers
+
+## Risk Warning
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 27,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "aurora_cascade_flow",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "aurora_cascade_flow",
+    displayType: "overlay",
+    description: "5-layer adaptive KAMA cascade ribbon with directional alignment scoring",
+  }),
+  defaultSettings: {
+    erPeriod: 10,
+    fastSC: 2,
+    slowMin: 10,
+    slowMax: 40,
+    smoothFactor: 3,
+    color: "#8b5cf6",
+    lineWidth: 1,
+  },
+  supportedAssets: [],
+  tags: ["ribbon", "cascade", "adaptive", "premium", "overlay", "kama", "trend", "alignment", "multi-layer", "flow"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1367,6 +1426,7 @@ const ALL_ITEMS = [
   NEBULA_PHASE_BANDS,
   CIPHER_HARMONIC_VEIL,
   TITAN_PULSE_SIGNAL,
+  AURORA_CASCADE_FLOW,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

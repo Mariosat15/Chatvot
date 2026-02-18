@@ -4160,3 +4160,97 @@ export function calculateTitanPulseSignal(
 
   return result;
 }
+
+// ============================================================================
+// AURORA CASCADE FLOW - 5-layer adaptive KAMA cascade with directional stacking
+// ============================================================================
+
+export interface AuroraCascadeFlowData {
+  time: number;
+  l1: number;  // fastest layer
+  l2: number;
+  l3: number;  // core layer
+  l4: number;
+  l5: number;  // slowest layer
+  alignment: number;   // 0–5 how many layers agree on direction
+  direction: 1 | -1;  // majority direction
+}
+
+export function calculateAuroraCascadeFlow(
+  data: OHLCData[],
+  erPeriod: number = 10,
+  fastSC: number = 2,
+  slowRange: [number, number] = [10, 40],
+  smoothFactor: number = 3,
+): AuroraCascadeFlowData[] {
+  const minBars = erPeriod + smoothFactor + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+  const numLayers = 5;
+
+  // Generate 5 slow-SC values spread linearly across the range
+  const slowSCs: number[] = [];
+  for (let n = 0; n < numLayers; n++) {
+    const slowPeriod = slowRange[0] + (slowRange[1] - slowRange[0]) * (n / (numLayers - 1));
+    slowSCs.push(2 / (slowPeriod + 1));
+  }
+  const fastSCVal = 2 / (fastSC + 1);
+
+  // Calculate each KAMA layer
+  const layers: number[][] = [];
+  for (let n = 0; n < numLayers; n++) {
+    const kama = new Array(len).fill(0);
+    kama[0] = closes[0];
+    for (let i = 1; i < erPeriod; i++) kama[i] = closes[i];
+
+    for (let i = erPeriod; i < len; i++) {
+      const direction = Math.abs(closes[i] - closes[i - erPeriod]);
+      let vol = 0;
+      for (let j = i - erPeriod + 1; j <= i; j++) vol += Math.abs(closes[j] - closes[j - 1]);
+      const er = vol > 0 ? direction / vol : 0;
+      const sc = er * (fastSCVal - slowSCs[n]) + slowSCs[n];
+      const alpha = sc * sc;
+      kama[i] = kama[i - 1] + alpha * (closes[i] - kama[i - 1]);
+    }
+
+    // Apply additional EMA smoothing to reduce noise on faster layers
+    if (smoothFactor > 1 && n < 3) {
+      const smoothK = 2 / (smoothFactor + 1);
+      for (let i = erPeriod + 1; i < len; i++) {
+        kama[i] = kama[i - 1] + smoothK * (kama[i] - kama[i - 1]);
+      }
+    }
+
+    layers.push(kama);
+  }
+
+  // Build output
+  const result: AuroraCascadeFlowData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    // Count alignment: how many layers have positive slope
+    let bullCount = 0;
+    for (let n = 0; n < numLayers; n++) {
+      if (layers[n][i] > layers[n][i - 1]) bullCount++;
+    }
+    const bearCount = numLayers - bullCount;
+    const dir = bullCount >= bearCount ? 1 : -1;
+    const alignment = Math.max(bullCount, bearCount);
+
+    result.push({
+      time: data[i].time,
+      l1: layers[0][i],
+      l2: layers[1][i],
+      l3: layers[2][i],
+      l4: layers[3][i],
+      l5: layers[4][i],
+      alignment,
+      direction: dir as 1 | -1,
+    });
+  }
+
+  return result;
+}

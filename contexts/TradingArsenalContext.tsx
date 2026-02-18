@@ -38,7 +38,8 @@ export type IndicatorType =
   | "orion_momentum_shield"
   | "nebula_phase_bands"
   | "cipher_harmonic_veil"
-  | "titan_pulse_signal";
+  | "titan_pulse_signal"
+  | "aurora_cascade_flow";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -477,6 +478,8 @@ const INDICATOR_TYPE_MAP: Record<
   "cipher harmonic veil": { type: "cipher_harmonic_veil", displayType: "overlay" },
   titan_pulse_signal: { type: "titan_pulse_signal", displayType: "overlay" },
   "titan pulse signal": { type: "titan_pulse_signal", displayType: "overlay" },
+  aurora_cascade_flow: { type: "aurora_cascade_flow", displayType: "overlay" },
+  "aurora cascade flow": { type: "aurora_cascade_flow", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -748,6 +751,13 @@ export function marketplaceItemToIndicator(
       params.atrMultiplier = settings?.atrMultiplier || 1.5;
       params.squeezeLookback = settings?.squeezeLookback || 20;
       params.signalThreshold = settings?.signalThreshold || 40;
+      break;
+    case "aurora_cascade_flow":
+      params.erPeriod = settings?.erPeriod || 10;
+      params.fastSC = settings?.fastSC || 2;
+      params.slowMin = settings?.slowMin || 10;
+      params.slowMax = settings?.slowMax || 40;
+      params.smoothFactor = settings?.smoothFactor || 3;
       break;
     default:
       // Generic period-based indicators

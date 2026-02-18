@@ -1508,6 +1508,109 @@ No indicator guarantees profits. Titan Pulse Signal helps identify trend directi
   riskLevel: "medium",
 };
 
+const AURORA_CASCADE_FLOW: Partial<IMarketplaceItem> = {
+  name: "Aurora Cascade Flow",
+  slug: "aurora-cascade-flow",
+  shortDescription:
+    "5-layer adaptive ribbon overlay using cascaded Kaufman filters. Layers fan out in trends and compress in chop, with alignment scoring for trend conviction.",
+  fullDescription: `# Aurora Cascade Flow
+
+## Overview
+**Aurora Cascade Flow** is a premium on-chart ribbon overlay that renders **5 adaptive moving average layers** cascading from fast to slow. Unlike static ribbon indicators that use fixed-period EMAs, each layer is powered by a **Kaufman Adaptive Moving Average (KAMA)** with a different slow-smoothing constant, creating a living, breathing ribbon that expands during trends and contracts during consolidation.
+
+## How It Works
+
+### 5-Layer KAMA Cascade
+Each layer shares the same efficiency ratio but adapts at a different speed:
+- **Layer 1** (fastest): Reacts first to trend changes — the leading edge
+- **Layer 2**: Slightly slower confirmation
+- **Layer 3** (core): The central reference — acts like an intelligent midline
+- **Layer 4**: Momentum confirmation layer
+- **Layer 5** (slowest): The anchor — only turns when the trend is firmly established
+
+### Alignment Scoring (0–5)
+The indicator counts how many of the 5 layers agree on direction:
+- **5/5 alignment**: All layers moving same direction — maximum trend conviction
+- **4/5 alignment**: Strong trend, one layer lagging
+- **3/5 alignment**: Transitional — trend weakening or starting
+- **2/5 or less**: Choppy market — layers diverging, no clear direction
+
+### Visual States
+- **Fanned out + same direction**: Strong trend — green layers rising = bullish, red layers falling = bearish
+- **Compressed/interleaved**: Consolidation or reversal zone
+- **Layers crossing each other**: Transition — potential trend change forming
+
+## How to Trade With It
+
+### Trend Entry
+1. Wait for all 5 layers to align in one direction (alignment 5/5)
+2. Enter in the trend direction when price is above (bull) or below (bear) all layers
+3. The space between Layer 1 and Layer 5 shows trend strength
+
+### Compression Breakout
+1. Watch for layers to compress tightly together (all nearly overlapping)
+2. This signals a volatility squeeze — breakout imminent
+3. Enter when layers start to fan out in one direction
+4. Strong moves often follow maximum compression
+
+### Layer Bounce (Pullback Trading)
+1. In an established trend (4-5 layers aligned)
+2. Price pulls back to Layer 2 or Layer 3
+3. If price bounces off the layer, it's a continuation signal
+4. Stop-loss: below Layer 5 (for longs) or above Layer 5 (for shorts)
+
+### Reversal Detection
+1. Fastest layer (L1) crosses through L3 in the opposite direction
+2. If L2 follows shortly after, reversal is gaining momentum
+3. Full reversal confirmed when all 5 layers flip — but by then you're late
+4. Early traders watch L1–L3 crossovers for reversal entries
+
+## Settings Guide
+- **ER Period** (10): Efficiency ratio lookback — measures trend quality
+- **Fast SC** (2): Fast smoothing constant — lower = more reactive leading edge
+- **Slow Min** (10): Minimum slow period for fastest layer
+- **Slow Max** (40): Maximum slow period for slowest layer (anchor)
+- **Smooth Factor** (3): Extra smoothing on faster layers to reduce noise
+
+## What Makes It Different
+| Feature | Standard Ribbon | Aurora Cascade Flow |
+|---------|----------------|-------------------|
+| Layer type | Fixed-period EMAs | Adaptive KAMAs |
+| In trends | Same spacing always | Fans out dynamically |
+| In chop | Still spaced apart | Compresses automatically |
+| Speed adaptation | None | Efficiency-ratio driven |
+| Alignment score | Not available | Built-in 0–5 scoring |
+
+## Risk Warning
+No indicator guarantees profits. Aurora Cascade Flow visualizes trend structure and alignment, but all trading involves risk. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 27,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "aurora_cascade_flow",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "aurora_cascade_flow",
+    displayType: "overlay",
+    description: "5-layer adaptive KAMA cascade ribbon with directional alignment scoring",
+  }),
+  defaultSettings: {
+    erPeriod: 10,
+    fastSC: 2,
+    slowMin: 10,
+    slowMax: 40,
+    smoothFactor: 3,
+    color: "#8b5cf6",
+    lineWidth: 1,
+  },
+  supportedAssets: [],
+  tags: ["ribbon", "cascade", "adaptive", "premium", "overlay", "kama", "trend", "alignment", "multi-layer", "flow"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1518,6 +1621,7 @@ const ALL_ITEMS = [
   NEBULA_PHASE_BANDS,
   CIPHER_HARMONIC_VEIL,
   TITAN_PULSE_SIGNAL,
+  AURORA_CASCADE_FLOW,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

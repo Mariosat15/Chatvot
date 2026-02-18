@@ -99,6 +99,7 @@ import {
   calculateNebulaPhaseBands,
   calculateCipherHarmonicVeil,
   calculateTitanPulseSignal,
+  calculateAuroraCascadeFlow,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2291,16 +2292,18 @@ const LightweightTradingChart = ({
                 time: d.time as UTCTimestamp,
                 position: "belowBar" as const,
                 color: d.signal === "strong_buy" ? "#22c55e" : "#4ade80",
-                shape: d.signal === "strong_buy" ? "arrowUp" as const : "circle" as const,
-                text: d.signal === "strong_buy" ? "BUY" : "",
+                shape: "arrowUp" as const,
+                text: d.signal === "strong_buy" ? "BUY ▲" : "BUY",
+                size: d.signal === "strong_buy" ? 2 : 1,
               });
             } else if (d.signal === "strong_sell" || d.signal === "sell") {
               sellMarkers.push({
                 time: d.time as UTCTimestamp,
                 position: "aboveBar" as const,
                 color: d.signal === "strong_sell" ? "#ef4444" : "#f87171",
-                shape: d.signal === "strong_sell" ? "arrowDown" as const : "circle" as const,
-                text: d.signal === "strong_sell" ? "SELL" : "",
+                shape: "arrowDown" as const,
+                text: d.signal === "strong_sell" ? "SELL ▼" : "SELL",
+                size: d.signal === "strong_sell" ? 2 : 1,
               });
             }
           }
@@ -2317,6 +2320,8 @@ const LightweightTradingChart = ({
             });
             upSeries.setData(upData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_up`, upSeries);
+            const sortedBuy = buyMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { upSeries.setMarkers(sortedBuy); } catch {}
           }
 
           if (downData.length > 0) {
@@ -2331,14 +2336,46 @@ const LightweightTradingChart = ({
             });
             downSeries.setData(downData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_down`, downSeries);
+            const sortedSell = sellMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { downSeries.setMarkers(sortedSell); } catch {}
           }
 
-          // Place signal markers on the up series (or down if no up)
-          const markerSeries = indicatorSeriesRef.current.get(`${indicator.id}_up`) || indicatorSeriesRef.current.get(`${indicator.id}_down`);
-          if (markerSeries) {
-            const allMarkers = [...buyMarkers, ...sellMarkers].sort((a, b) => (a.time as number) - (b.time as number));
-            try { markerSeries.setMarkers(allMarkers); } catch {}
-          }
+        // Aurora Cascade Flow: 5 adaptive KAMA layers with directional coloring
+        } else if (indicator.type === "aurora_cascade_flow") {
+          const acfData = calculateAuroraCascadeFlow(
+            transformedCandles,
+            indicator.parameters.erPeriod || 10,
+            indicator.parameters.fastSC || 2,
+            [indicator.parameters.slowMin || 10, indicator.parameters.slowMax || 40],
+            indicator.parameters.smoothFactor || 3,
+          );
+
+          const layerKeys = ["l1","l2","l3","l4","l5"] as const;
+          const bullColors = ["#22d3ee","#06b6d4","#0891b2","#0e7490","#155e75"];
+          const bearColors = ["#f87171","#ef4444","#dc2626","#b91c1c","#991b1b"];
+          const neutralColor = "#64748b";
+
+          layerKeys.forEach((key, idx) => {
+            const series = chart.addLineSeries({
+              color: hexToRgba(bullColors[idx], indicator.opacity || (90 - idx * 10)),
+              lineWidth: ((indicator.lineWidth || 2) - (idx > 2 ? 1 : 0)) as any,
+              lineStyle: 0 as any,
+              title: idx === 2 ? (indicator.customLabel || "Aurora Cascade Flow") : `ACF L${idx + 1}`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: idx === 2,
+            });
+            series.setData(acfData.map((d) => {
+              const isBull = d.direction === 1;
+              const clr = d.alignment >= 4 ? (isBull ? bullColors[idx] : bearColors[idx]) : neutralColor;
+              return {
+                time: d.time as UTCTimestamp,
+                value: d[key],
+                color: hexToRgba(clr, indicator.opacity || (90 - idx * 10)),
+              };
+            }));
+            indicatorSeriesRef.current.set(`${indicator.id}_${key}`, series);
+          });
 
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
@@ -2684,6 +2721,26 @@ const LightweightTradingChart = ({
                     }
                     if (upS) upS.setData(upD);
                     if (dnS) dnS.setData(dnD);
+                  }
+                }
+              } else if (_ovlType === "aurora_cascade_flow") {
+                const acfData = calculateAuroraCascadeFlow(
+                  tc, p.erPeriod || 10, p.fastSC || 2,
+                  [p.slowMin || 10, p.slowMax || 40], p.smoothFactor || 3,
+                );
+                if (acfData.length > 0) {
+                  const lKeys = ["l1","l2","l3","l4","l5"] as const;
+                  if (mode === "light") {
+                    const last = acfData[acfData.length - 1];
+                    lKeys.forEach(k => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${k}`);
+                      if (s) s.update({ time: last.time as UTCTimestamp, value: last[k] });
+                    });
+                  } else {
+                    lKeys.forEach(k => {
+                      const s = _ovlSeriesMap.get(`${_ovlId}_${k}`);
+                      if (s) s.setData(acfData.map(d => ({ time: d.time as UTCTimestamp, value: d[k] })));
+                    });
                   }
                 }
               }

@@ -351,6 +351,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { kamaPeriod: 10, kamaFast: 2, kamaSlow: 30, atrPeriod: 14, atrMultiplier: 1.5, squeezeLookback: 20, signalThreshold: 40 },
     paramLabels: { kamaPeriod: "KAMA Period", kamaFast: "Fast SC", kamaSlow: "Slow SC", atrPeriod: "ATR Period", atrMultiplier: "ATR Multiplier", squeezeLookback: "Squeeze Lookback", signalThreshold: "Signal Threshold" },
   },
+  aurora_cascade_flow: {
+    name: "Aurora Cascade Flow",
+    shortName: "ACF",
+    displayType: "overlay" as const,
+    defaultParams: { erPeriod: 10, fastSC: 2, slowMin: 10, slowMax: 40, smoothFactor: 3 },
+    paramLabels: { erPeriod: "ER Period", fastSC: "Fast SC", slowMin: "Slow Min", slowMax: "Slow Max", smoothFactor: "Smooth Factor" },
+  },
 };
 
 const DEFAULT_COLORS = [
