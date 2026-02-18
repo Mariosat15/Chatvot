@@ -3056,6 +3056,7 @@ export interface PhantomFlowZonesData {
   demandZone: number;  // Demand (support) level, NaN when inactive
   supplyZone: number;  // Supply (resistance) level, NaN when inactive
   signalStrength: number; // 0-100 strength of the current zone signal
+  atr: number;         // ATR value for zone thickness rendering
 }
 
 export function calculatePhantomFlowZones(
@@ -3067,6 +3068,19 @@ export function calculatePhantomFlowZones(
   smoothPeriod: number = 10,
 ): PhantomFlowZonesData[] {
   if (data.length < period + 5) return [];
+
+  // --- Step 0: ATR for zone thickness ---
+  const atrPeriod = 14;
+  const pfzTr = new Array(data.length).fill(0);
+  pfzTr[0] = data[0].high - data[0].low;
+  for (let i = 1; i < data.length; i++) {
+    pfzTr[i] = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - data[i - 1].close), Math.abs(data[i].low - data[i - 1].close));
+  }
+  const pfzAtr = new Array(data.length).fill(0);
+  let pfzAtrSum = 0;
+  for (let i = 0; i < atrPeriod && i < data.length; i++) pfzAtrSum += pfzTr[i];
+  pfzAtr[atrPeriod - 1] = pfzAtrSum / atrPeriod;
+  for (let i = atrPeriod; i < data.length; i++) pfzAtr[i] = (pfzAtr[i - 1] * (atrPeriod - 1) + pfzTr[i]) / atrPeriod;
 
   // --- Step 1: Compute volume SMA for spike detection ---
   const volSma: number[] = new Array(data.length).fill(0);
@@ -3196,6 +3210,7 @@ export function calculatePhantomFlowZones(
       demandZone: demandLevel,
       supplyZone: supplyLevel,
       signalStrength: Math.round(Math.max(demandStrength, supplyStrength)),
+      atr: pfzAtr[i] || 0,
     });
   }
 

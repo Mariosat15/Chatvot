@@ -1793,7 +1793,7 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_${key}`, s);
           });
 
-        // Nexus Trend Matrix: 3 series (upper, core, lower) with trend-based coloring
+        // Nexus Trend Matrix: 3 series with per-bar trend coloring + signal markers
         } else if (indicator.type === "nexus_trend_matrix") {
           const ntmData = calculateNexusTrendMatrix(
             transformedCandles,
@@ -1805,64 +1805,79 @@ const LightweightTradingChart = ({
             indicator.parameters.trendSmoothPeriod || 10,
           );
 
-          // Determine colors based on trend score for each data point
-          const getColor = (score: number): string => {
-            if (score >= 30) return "#00e676";      // Strong uptrend - green
-            if (score >= 10) return "#66bb6a";       // Mild uptrend - light green
-            if (score <= -30) return "#f44336";      // Strong downtrend - red
-            if (score <= -10) return "#ef5350";      // Mild downtrend - light red
-            return "#9e9e9e";                        // Ranging - gray
+          const ntmColor = (score: number): string => {
+            if (score >= 30) return "#00e676";
+            if (score >= 10) return "#66bb6a";
+            if (score <= -30) return "#f44336";
+            if (score <= -10) return "#ef5350";
+            return "#9e9e9e";
           };
 
-          // Use the dominant trend color for the series
-          const avgScore = ntmData.length > 0
-            ? ntmData.reduce((sum, d) => sum + d.trendScore, 0) / ntmData.length
-            : 0;
-          const dominantColor = getColor(avgScore);
+          const markers: any[] = [];
+          let prevScore = 0;
+          for (let idx = 0; idx < ntmData.length; idx++) {
+            const d = ntmData[idx];
+            if (idx > 0 && prevScore <= 30 && d.trendScore > 30) {
+              markers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e676", shape: "arrowUp" as const, text: "BULL", size: 2 });
+            } else if (idx > 0 && prevScore >= -30 && d.trendScore < -30) {
+              markers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#f44336", shape: "arrowDown" as const, text: "BEAR", size: 2 });
+            }
+            prevScore = d.trendScore;
+          }
 
-          // Upper band
           if (indicator.visibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.upper || dominantColor, indicator.opacity || 60),
+              color: "#9e9e9e",
               lineWidth: 1 as any,
-              lineStyle: indicator.lineStyle as any,
+              lineStyle: 0 as any,
               title: `${indicator.customLabel || "NTM"} Upper`,
               priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
             });
-            upperSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.upper })));
+            upperSeries.setData(ntmData.map((d) => ({
+              time: d.time as UTCTimestamp, value: d.upper,
+              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 60),
+            })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          // Core adaptive line (KAMA)
           if (indicator.visibility?.middle !== false) {
             const coreSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#ffa726", indicator.opacity || 100),
-              lineWidth: (indicator.lineWidth || 2) as any,
+              color: "#06b6d4",
+              lineWidth: 3 as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Nexus Trend Matrix",
               priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
-            coreSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.core })));
+            coreSeries.setData(ntmData.map((d) => ({
+              time: d.time as UTCTimestamp, value: d.core,
+              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 100),
+            })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, coreSeries);
+            const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { coreSeries.setMarkers(sorted); } catch {}
           }
 
-          // Lower band
           if (indicator.visibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.lower || dominantColor, indicator.opacity || 60),
+              color: "#9e9e9e",
               lineWidth: 1 as any,
-              lineStyle: indicator.lineStyle as any,
+              lineStyle: 0 as any,
               title: `${indicator.customLabel || "NTM"} Lower`,
               priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
             });
-            lowerSeries.setData(ntmData.map((d) => ({ time: d.time as UTCTimestamp, value: d.lower })));
+            lowerSeries.setData(ntmData.map((d) => ({
+              time: d.time as UTCTimestamp, value: d.lower,
+              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 60),
+            })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
-        // Phantom Flow Zones: 3 series (supply zone, flow line, demand zone)
+        // Phantom Flow Zones: zone blocks + flow line + per-bar coloring + markers
         } else if (indicator.type === "phantom_flow_zones") {
           const pfzData = calculatePhantomFlowZones(
             transformedCandles,
@@ -1873,53 +1888,88 @@ const LightweightTradingChart = ({
             indicator.parameters.smoothPeriod || 10,
           );
 
-          // Supply zone line (magenta/pink)
-          if (indicator.visibility?.upper !== false) {
-            const validSupply = pfzData.filter((d) => !isNaN(d.supplyZone));
-            if (validSupply.length > 0) {
-              const supplySeries = chart.addLineSeries({
-                color: hexToRgba(indicator.colors?.upper || "#e040fb", indicator.opacity || 70),
-                lineWidth: 2 as any,
-                lineStyle: 2 as any,
-                title: `${indicator.customLabel || "PFZ"} Supply`,
-                priceScaleId: "right",
-                priceFormat: { type: "price", precision: indicator.precision || 5 },
-                lastValueVisible: false,
-              });
-              supplySeries.setData(validSupply.map((d) => ({ time: d.time as UTCTimestamp, value: d.supplyZone })));
-              indicatorSeriesRef.current.set(`${indicator.id}_supply`, supplySeries);
+          const pfzStrColor = (strength: number, baseColor: string): string => {
+            const alpha = strength > 60 ? 80 : strength > 30 ? 50 : 30;
+            return hexToRgba(baseColor, alpha);
+          };
+
+          const flowMarkers: any[] = [];
+          for (let idx = 1; idx < pfzData.length; idx++) {
+            const d = pfzData[idx]; const prev = pfzData[idx - 1];
+            if (!isNaN(d.demandZone) && isNaN(prev.demandZone)) {
+              flowMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e5ff", shape: "arrowUp" as const, text: "DEMAND", size: 2 });
+            } else if (!isNaN(d.supplyZone) && isNaN(prev.supplyZone)) {
+              flowMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#e040fb", shape: "arrowDown" as const, text: "SUPPLY", size: 2 });
             }
           }
 
-          // Center flow line (institutional bias)
-          if (indicator.visibility?.middle !== false) {
-            const flowSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#00bcd4", indicator.opacity || 100),
-              lineWidth: (indicator.lineWidth || 2) as any,
-              lineStyle: 0 as any,
-              title: indicator.customLabel || "Phantom Flow",
-              priceScaleId: "right",
-              priceFormat: { type: "price", precision: indicator.precision || 5 },
-            });
-            flowSeries.setData(pfzData.map((d) => ({ time: d.time as UTCTimestamp, value: d.flowLine })));
-            indicatorSeriesRef.current.set(`${indicator.id}_flow`, flowSeries);
+          if (indicator.visibility?.upper !== false) {
+            const validSupply = pfzData.filter((d) => !isNaN(d.supplyZone));
+            if (validSupply.length > 0) {
+              const supTopSeries = chart.addLineSeries({
+                color: "#e040fb", lineWidth: 2 as any, lineStyle: 0 as any,
+                title: `${indicator.customLabel || "PFZ"} Supply`, priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+              });
+              supTopSeries.setData(validSupply.map((d) => ({
+                time: d.time as UTCTimestamp, value: d.supplyZone,
+                color: pfzStrColor(d.signalStrength, "#e040fb"),
+              })));
+              indicatorSeriesRef.current.set(`${indicator.id}_supply`, supTopSeries);
+
+              const supBotSeries = chart.addLineSeries({
+                color: "#e040fb", lineWidth: 1 as any, lineStyle: 2 as any,
+                title: "", priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+              });
+              supBotSeries.setData(validSupply.map((d) => ({
+                time: d.time as UTCTimestamp, value: d.supplyZone - d.atr * 0.3,
+                color: pfzStrColor(d.signalStrength * 0.6, "#e040fb"),
+              })));
+              indicatorSeriesRef.current.set(`${indicator.id}_supply_bot`, supBotSeries);
+            }
           }
 
-          // Demand zone line (cyan/blue)
+          if (indicator.visibility?.middle !== false) {
+            const flowSeries = chart.addLineSeries({
+              color: "#00bcd4", lineWidth: (indicator.lineWidth || 2) as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Phantom Flow", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            flowSeries.setData(pfzData.map((d) => {
+              const close = transformedCandles.find(c => c.time === d.time)?.close ?? d.flowLine;
+              const isBull = close > d.flowLine;
+              return { time: d.time as UTCTimestamp, value: d.flowLine, color: isBull ? "#00e5ff" : "#e040fb" };
+            }));
+            indicatorSeriesRef.current.set(`${indicator.id}_flow`, flowSeries);
+            const sorted = flowMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { flowSeries.setMarkers(sorted); } catch {}
+          }
+
           if (indicator.visibility?.lower !== false) {
             const validDemand = pfzData.filter((d) => !isNaN(d.demandZone));
             if (validDemand.length > 0) {
-              const demandSeries = chart.addLineSeries({
-                color: hexToRgba(indicator.colors?.lower || "#00e5ff", indicator.opacity || 70),
-                lineWidth: 2 as any,
-                lineStyle: 2 as any,
-                title: `${indicator.customLabel || "PFZ"} Demand`,
-                priceScaleId: "right",
-                priceFormat: { type: "price", precision: indicator.precision || 5 },
-                lastValueVisible: false,
+              const demBotSeries = chart.addLineSeries({
+                color: "#00e5ff", lineWidth: 2 as any, lineStyle: 0 as any,
+                title: `${indicator.customLabel || "PFZ"} Demand`, priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
               });
-              demandSeries.setData(validDemand.map((d) => ({ time: d.time as UTCTimestamp, value: d.demandZone })));
-              indicatorSeriesRef.current.set(`${indicator.id}_demand`, demandSeries);
+              demBotSeries.setData(validDemand.map((d) => ({
+                time: d.time as UTCTimestamp, value: d.demandZone,
+                color: pfzStrColor(d.signalStrength, "#00e5ff"),
+              })));
+              indicatorSeriesRef.current.set(`${indicator.id}_demand`, demBotSeries);
+
+              const demTopSeries = chart.addLineSeries({
+                color: "#00e5ff", lineWidth: 1 as any, lineStyle: 2 as any,
+                title: "", priceScaleId: "right",
+                priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+              });
+              demTopSeries.setData(validDemand.map((d) => ({
+                time: d.time as UTCTimestamp, value: d.demandZone + d.atr * 0.3,
+                color: pfzStrColor(d.signalStrength * 0.6, "#00e5ff"),
+              })));
+              indicatorSeriesRef.current.set(`${indicator.id}_demand_top`, demTopSeries);
             }
           }
 
@@ -3012,18 +3062,20 @@ const LightweightTradingChart = ({
                   p.atrPeriod || 14, p.atrMultiplier || 2.0, p.trendSmoothPeriod || 10,
                 );
                 if (ntmData.length > 0) {
+                  const ntmC = (s: number) => s >= 30 ? "#00e676" : s >= 10 ? "#66bb6a" : s <= -30 ? "#f44336" : s <= -10 ? "#ef5350" : "#9e9e9e";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_core`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = ntmData[ntmData.length - 1];
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
-                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.core });
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                    const c = ntmC(last.trendScore);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 60) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.core, color: hexToRgba(c, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 60) } as any);
                   } else {
-                    if (uS) uS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
-                    if (cS) cS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.core })));
-                    if (lS) lS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                    if (uS) uS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(ntmC(d.trendScore), 60) })));
+                    if (cS) cS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.core, color: hexToRgba(ntmC(d.trendScore), 100) })));
+                    if (lS) lS.setData(ntmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(ntmC(d.trendScore), 60) })));
                   }
                 }
               } else if (_ovlType === "phantom_flow_zones") {
@@ -3032,18 +3084,33 @@ const LightweightTradingChart = ({
                   p.wickThreshold || 0.6, p.zoneLookback || 50, p.smoothPeriod || 10,
                 );
                 if (pfzData.length > 0) {
+                  const pfzSC = (str: number, base: string) => { const a = str > 60 ? 80 : str > 30 ? 50 : 30; return hexToRgba(base, a); };
                   const supS = _ovlSeriesMap.get(`${_ovlId}_supply`);
+                  const supBS = _ovlSeriesMap.get(`${_ovlId}_supply_bot`);
                   const flS = _ovlSeriesMap.get(`${_ovlId}_flow`);
                   const demS = _ovlSeriesMap.get(`${_ovlId}_demand`);
+                  const demTS = _ovlSeriesMap.get(`${_ovlId}_demand_top`);
+                  const validSup = pfzData.filter(d => !isNaN(d.supplyZone));
+                  const validDem = pfzData.filter(d => !isNaN(d.demandZone));
                   if (mode === "light") {
                     const last = pfzData[pfzData.length - 1];
-                    if (supS && !isNaN(last.supplyZone)) supS.update({ time: last.time as UTCTimestamp, value: last.supplyZone });
-                    if (flS) flS.update({ time: last.time as UTCTimestamp, value: last.flowLine });
-                    if (demS && !isNaN(last.demandZone)) demS.update({ time: last.time as UTCTimestamp, value: last.demandZone });
+                    if (supS && !isNaN(last.supplyZone)) supS.update({ time: last.time as UTCTimestamp, value: last.supplyZone, color: pfzSC(last.signalStrength, "#e040fb") } as any);
+                    if (supBS && !isNaN(last.supplyZone)) supBS.update({ time: last.time as UTCTimestamp, value: last.supplyZone - last.atr * 0.3, color: pfzSC(last.signalStrength * 0.6, "#e040fb") } as any);
+                    if (flS) {
+                      const cClose = tc.find(c => c.time === last.time)?.close ?? last.flowLine;
+                      flS.update({ time: last.time as UTCTimestamp, value: last.flowLine, color: cClose > last.flowLine ? "#00e5ff" : "#e040fb" } as any);
+                    }
+                    if (demS && !isNaN(last.demandZone)) demS.update({ time: last.time as UTCTimestamp, value: last.demandZone, color: pfzSC(last.signalStrength, "#00e5ff") } as any);
+                    if (demTS && !isNaN(last.demandZone)) demTS.update({ time: last.time as UTCTimestamp, value: last.demandZone + last.atr * 0.3, color: pfzSC(last.signalStrength * 0.6, "#00e5ff") } as any);
                   } else {
-                    if (supS) supS.setData(pfzData.filter(d => !isNaN(d.supplyZone)).map(d => ({ time: d.time as UTCTimestamp, value: d.supplyZone })));
-                    if (flS) flS.setData(pfzData.map(d => ({ time: d.time as UTCTimestamp, value: d.flowLine })));
-                    if (demS) demS.setData(pfzData.filter(d => !isNaN(d.demandZone)).map(d => ({ time: d.time as UTCTimestamp, value: d.demandZone })));
+                    if (supS) supS.setData(validSup.map(d => ({ time: d.time as UTCTimestamp, value: d.supplyZone, color: pfzSC(d.signalStrength, "#e040fb") })));
+                    if (supBS) supBS.setData(validSup.map(d => ({ time: d.time as UTCTimestamp, value: d.supplyZone - d.atr * 0.3, color: pfzSC(d.signalStrength * 0.6, "#e040fb") })));
+                    if (flS) flS.setData(pfzData.map(d => {
+                      const cClose = tc.find(c => c.time === d.time)?.close ?? d.flowLine;
+                      return { time: d.time as UTCTimestamp, value: d.flowLine, color: cClose > d.flowLine ? "#00e5ff" : "#e040fb" };
+                    }));
+                    if (demS) demS.setData(validDem.map(d => ({ time: d.time as UTCTimestamp, value: d.demandZone, color: pfzSC(d.signalStrength, "#00e5ff") })));
+                    if (demTS) demTS.setData(validDem.map(d => ({ time: d.time as UTCTimestamp, value: d.demandZone + d.atr * 0.3, color: pfzSC(d.signalStrength * 0.6, "#00e5ff") })));
                   }
                 }
               } else if (_ovlType === "fractal_pulse_grid") {
