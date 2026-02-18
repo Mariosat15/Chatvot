@@ -39,7 +39,8 @@ export type IndicatorType =
   | "nebula_phase_bands"
   | "cipher_harmonic_veil"
   | "titan_pulse_signal"
-  | "aurora_cascade_flow";
+  | "aurora_cascade_flow"
+  | "eclipse_stealth_trail";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -480,6 +481,8 @@ const INDICATOR_TYPE_MAP: Record<
   "titan pulse signal": { type: "titan_pulse_signal", displayType: "overlay" },
   aurora_cascade_flow: { type: "aurora_cascade_flow", displayType: "overlay" },
   "aurora cascade flow": { type: "aurora_cascade_flow", displayType: "overlay" },
+  eclipse_stealth_trail: { type: "eclipse_stealth_trail", displayType: "overlay" },
+  "eclipse stealth trail": { type: "eclipse_stealth_trail", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -758,6 +761,13 @@ export function marketplaceItemToIndicator(
       params.slowMin = settings?.slowMin || 10;
       params.slowMax = settings?.slowMax || 40;
       params.smoothFactor = settings?.smoothFactor || 3;
+      break;
+    case "eclipse_stealth_trail":
+      params.mcgPeriod = settings?.mcgPeriod || 14;
+      params.fdPeriod = settings?.fdPeriod || 30;
+      params.fdThreshold = settings?.fdThreshold || 1.5;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.atrMultiplier = settings?.atrMultiplier || 1.8;
       break;
     default:
       // Generic period-based indicators

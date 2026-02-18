@@ -358,6 +358,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { erPeriod: 10, fastSC: 2, slowMin: 10, slowMax: 40, smoothFactor: 3 },
     paramLabels: { erPeriod: "ER Period", fastSC: "Fast SC", slowMin: "Slow Min", slowMax: "Slow Max", smoothFactor: "Smooth Factor" },
   },
+  eclipse_stealth_trail: {
+    name: "Eclipse Stealth Trail",
+    shortName: "EST",
+    displayType: "overlay" as const,
+    defaultParams: { mcgPeriod: 14, fdPeriod: 30, fdThreshold: 1.5, atrPeriod: 14, atrMultiplier: 1.8 },
+    paramLabels: { mcgPeriod: "McGinley Period", fdPeriod: "Fractal Dim Period", fdThreshold: "FD Threshold", atrPeriod: "ATR Period", atrMultiplier: "ATR Multiplier" },
+  },
 };
 
 const DEFAULT_COLORS = [

@@ -1416,6 +1416,77 @@ No indicator guarantees profits. Always use stop-losses and proper position sizi
   riskLevel: "medium",
 };
 
+const ECLIPSE_STEALTH_TRAIL: Partial<IMarketplaceItem> = {
+  name: "Eclipse Stealth Trail",
+  slug: "eclipse-stealth-trail",
+  shortDescription:
+    "Adaptive stepping trend line that freezes during choppy markets and flows during trends, with a shadow trail for stop placement and signal markers.",
+  fullDescription: `# Eclipse Stealth Trail
+
+## Overview
+**Eclipse Stealth Trail** is a premium on-chart overlay that behaves unlike any moving average or trend line. It uses a **McGinley Dynamic** for ultra-smooth trend tracking combined with **Fractal Dimension analysis** to detect market regime. During choppy, range-bound markets the line **freezes flat** (steps), refusing to whipsaw. During trending conditions it **flows smoothly** with price. A dashed **shadow trail** shows the exact stop/invalidation level.
+
+## How It Works
+
+### Stepping Logic
+- **Fractal Dimension > Threshold** → Market is choppy → Line **holds flat** at its last value
+- **Fractal Dimension < Threshold** → Market is trending → Line **follows** the McGinley Dynamic smoothly
+
+### McGinley Dynamic Core
+Unlike standard MAs, the McGinley Dynamic self-adjusts its speed based on price-to-MA ratio. It accelerates when price moves away and decelerates when price is near.
+
+### Shadow Trail (Stop Level)
+- In **bullish** mode: shadow sits below the trail at ATR × multiplier distance
+- In **bearish** mode: shadow sits above the trail at ATR × multiplier distance
+
+### Signal Markers
+- **BULL** (green arrow): Direction flips from bearish to bullish
+- **BEAR** (red arrow): Direction flips from bullish to bearish
+- **BREAK** (yellow circle): Line unfreezes after a stepping period — potential breakout entry
+
+## How to Trade
+1. Wait for a **BULL** or **BEAR** flip signal, enter in signal direction
+2. Place stop-loss at the shadow trail level
+3. Watch for **BREAK** markers after flat periods for breakout entries
+4. Avoid trading when the trail is stepping (flat) — market is choppy
+
+## Settings
+- **McGinley Period** (14): Smoothing period for the core trend line
+- **FD Period** (30): Lookback for fractal dimension calculation
+- **FD Threshold** (1.5): Above = choppy (stepping), below = trending (flowing)
+- **ATR Period** (14): ATR lookback for shadow trail offset
+- **ATR Multiplier** (1.8): Distance of shadow from trail
+
+## Risk Warning
+No indicator guarantees profits. Always use proper position sizing and risk management.`,
+  category: "indicator",
+  price: 35,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "eclipse_stealth_trail",
+  iconName: "Eclipse",
+  codeTemplate: JSON.stringify({
+    type: "eclipse_stealth_trail",
+    displayType: "overlay",
+    description: "Adaptive stepping trend line with fractal dimension regime detection and shadow trail",
+  }),
+  defaultSettings: {
+    mcgPeriod: 14,
+    fdPeriod: 30,
+    fdThreshold: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 1.8,
+    color: "#a855f7",
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["stealth", "stepping", "adaptive", "premium", "overlay", "mcginley", "fractal", "trend", "trail", "stop-loss", "regime"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1427,6 +1498,7 @@ const ALL_ITEMS = [
   CIPHER_HARMONIC_VEIL,
   TITAN_PULSE_SIGNAL,
   AURORA_CASCADE_FLOW,
+  ECLIPSE_STEALTH_TRAIL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

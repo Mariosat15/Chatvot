@@ -100,6 +100,7 @@ import {
   calculateCipherHarmonicVeil,
   calculateTitanPulseSignal,
   calculateAuroraCascadeFlow,
+  calculateEclipseStealthTrail,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2377,6 +2378,103 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_${key}`, series);
           });
 
+        // Eclipse Stealth Trail: stepping trend line + shadow trail + signal markers
+        } else if (indicator.type === "eclipse_stealth_trail") {
+          const estData = calculateEclipseStealthTrail(
+            transformedCandles,
+            indicator.parameters.mcgPeriod || 14,
+            indicator.parameters.fdPeriod || 30,
+            indicator.parameters.fdThreshold || 1.5,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.atrMultiplier || 1.8,
+          );
+
+          const trailBullData: { time: number; value: number }[] = [];
+          const trailBearData: { time: number; value: number }[] = [];
+          const shadowData: { time: number; value: number }[] = [];
+          const bullMarkers: any[] = [];
+          const bearMarkers: any[] = [];
+
+          for (const d of estData) {
+            if (d.direction === 1) trailBullData.push({ time: d.time, value: d.trail });
+            else trailBearData.push({ time: d.time, value: d.trail });
+            shadowData.push({ time: d.time, value: d.shadow });
+
+            if (d.signal === "flip_bull") {
+              bullMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "belowBar" as const,
+                color: "#22c55e",
+                shape: "arrowUp" as const,
+                text: "BULL",
+                size: 2,
+              });
+            } else if (d.signal === "flip_bear") {
+              bearMarkers.push({
+                time: d.time as UTCTimestamp,
+                position: "aboveBar" as const,
+                color: "#ef4444",
+                shape: "arrowDown" as const,
+                text: "BEAR",
+                size: 2,
+              });
+            } else if (d.signal === "breakout") {
+              const m = d.direction === 1 ? bullMarkers : bearMarkers;
+              m.push({
+                time: d.time as UTCTimestamp,
+                position: d.direction === 1 ? ("belowBar" as const) : ("aboveBar" as const),
+                color: "#facc15",
+                shape: "circle" as const,
+                text: "BREAK",
+                size: 2,
+              });
+            }
+          }
+
+          const shadowSeries = chart.addLineSeries({
+            color: hexToRgba("#64748b", 40),
+            lineWidth: 1 as any,
+            lineStyle: 2 as any,
+            title: "",
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          shadowSeries.setData(shadowData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+          indicatorSeriesRef.current.set(`${indicator.id}_shadow`, shadowSeries);
+
+          if (trailBullData.length > 0) {
+            const bullSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "EST"} Bull`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bullSeries.setData(trailBullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
+            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted); } catch {}
+          }
+
+          if (trailBearData.length > 0) {
+            const bearSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 3) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "EST"} Bear`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            bearSeries.setData(trailBearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
+            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted); } catch {}
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2741,6 +2839,31 @@ const LightweightTradingChart = ({
                       const s = _ovlSeriesMap.get(`${_ovlId}_${k}`);
                       if (s) s.setData(acfData.map(d => ({ time: d.time as UTCTimestamp, value: d[k] })));
                     });
+                  }
+                }
+              } else if (_ovlType === "eclipse_stealth_trail") {
+                const estData = calculateEclipseStealthTrail(
+                  tc, p.mcgPeriod || 14, p.fdPeriod || 30,
+                  p.fdThreshold || 1.5, p.atrPeriod || 14, p.atrMultiplier || 1.8,
+                );
+                if (estData.length > 0) {
+                  const bullS = _ovlSeriesMap.get(`${_ovlId}_bull`);
+                  const bearS = _ovlSeriesMap.get(`${_ovlId}_bear`);
+                  const shadowS = _ovlSeriesMap.get(`${_ovlId}_shadow`);
+                  if (mode === "light") {
+                    const last = estData[estData.length - 1];
+                    if (last.direction === 1 && bullS) bullS.update({ time: last.time as UTCTimestamp, value: last.trail });
+                    else if (bearS) bearS.update({ time: last.time as UTCTimestamp, value: last.trail });
+                    if (shadowS) shadowS.update({ time: last.time as UTCTimestamp, value: last.shadow });
+                  } else {
+                    const bullD: any[] = []; const bearD: any[] = [];
+                    for (const d of estData) {
+                      if (d.direction === 1) bullD.push({ time: d.time as UTCTimestamp, value: d.trail });
+                      else bearD.push({ time: d.time as UTCTimestamp, value: d.trail });
+                    }
+                    if (bullS) bullS.setData(bullD);
+                    if (bearS) bearS.setData(bearD);
+                    if (shadowS) shadowS.setData(estData.map(d => ({ time: d.time as UTCTimestamp, value: d.shadow })));
                   }
                 }
               }

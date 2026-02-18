@@ -4254,3 +4254,143 @@ export function calculateAuroraCascadeFlow(
 
   return result;
 }
+
+// ============================================================================
+// ECLIPSE STEALTH TRAIL - Stepping adaptive trend with fractal dimension regime
+// ============================================================================
+
+export interface EclipseStealthTrailData {
+  time: number;
+  trail: number;
+  shadow: number;
+  direction: 1 | -1;
+  regime: "stepping" | "trailing";
+  signal: "breakout" | "flip_bull" | "flip_bear" | "none";
+  fractalDim: number;
+}
+
+export function calculateEclipseStealthTrail(
+  data: OHLCData[],
+  mcgPeriod: number = 14,
+  fdPeriod: number = 30,
+  fdThreshold: number = 1.5,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 1.8,
+): EclipseStealthTrailData[] {
+  const minBars = Math.max(mcgPeriod, fdPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const len = data.length;
+
+  // --- McGinley Dynamic ---
+  const mcg = new Array(len).fill(0);
+  mcg[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const ratio = closes[i] / mcg[i - 1];
+    const denom = mcgPeriod * Math.pow(ratio, 4);
+    mcg[i] = mcg[i - 1] + (closes[i] - mcg[i - 1]) / Math.max(denom, 1);
+  }
+
+  // --- Fractal Dimension (path complexity method) ---
+  const fd = new Array(len).fill(1.5);
+  for (let i = fdPeriod; i < len; i++) {
+    const window = closes.slice(i - fdPeriod, i);
+    const n = window.length;
+
+    const rangeHL = Math.max(...highs.slice(i - fdPeriod, i)) - Math.min(...lows.slice(i - fdPeriod, i));
+    if (rangeHL <= 0) { fd[i] = 1.5; continue; }
+
+    let pathLength = 0;
+    for (let k = 1; k < n; k++) pathLength += Math.abs(window[k] - window[k - 1]);
+
+    const straightLine = Math.abs(window[n - 1] - window[0]);
+    const complexity = straightLine > 0 ? pathLength / straightLine : fdPeriod;
+    fd[i] = 1 + Math.log(complexity) / Math.log(fdPeriod);
+    fd[i] = Math.max(1.0, Math.min(2.0, fd[i]));
+  }
+
+  // --- ATR ---
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1]),
+    );
+  }
+  const atr = new Array(len).fill(0);
+  let atrSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) atrSum += tr[i];
+  atr[atrPeriod - 1] = atrSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) {
+    atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+  }
+
+  // --- Stealth Trail (stepping logic) ---
+  const trail = new Array(len).fill(0);
+  const shadow = new Array(len).fill(0);
+  const dir = new Array(len).fill(1);
+  const regimeArr: string[] = new Array(len).fill("trailing");
+
+  trail[minBars - 1] = mcg[minBars - 1];
+  dir[minBars - 1] = closes[minBars - 1] >= mcg[minBars - 1] ? 1 : -1;
+  shadow[minBars - 1] = dir[minBars - 1] === 1
+    ? trail[minBars - 1] - atr[minBars - 1] * atrMultiplier
+    : trail[minBars - 1] + atr[minBars - 1] * atrMultiplier;
+
+  const result: EclipseStealthTrailData[] = [];
+
+  for (let i = minBars; i < len; i++) {
+    const isStepping = fd[i] >= fdThreshold;
+    regimeArr[i] = isStepping ? "stepping" : "trailing";
+
+    if (isStepping) {
+      trail[i] = trail[i - 1];
+    } else {
+      trail[i] = mcg[i];
+    }
+
+    const prevDir = dir[i - 1];
+    if (closes[i] > trail[i] + atr[i] * atrMultiplier * 0.5) {
+      dir[i] = 1;
+    } else if (closes[i] < trail[i] - atr[i] * atrMultiplier * 0.5) {
+      dir[i] = -1;
+    } else {
+      dir[i] = prevDir;
+    }
+
+    if (dir[i] === 1) {
+      trail[i] = Math.max(trail[i], trail[i - 1]);
+      shadow[i] = trail[i] - atr[i] * atrMultiplier;
+    } else {
+      trail[i] = Math.min(trail[i], trail[i - 1]);
+      shadow[i] = trail[i] + atr[i] * atrMultiplier;
+    }
+
+    let signal: "breakout" | "flip_bull" | "flip_bear" | "none" = "none";
+    if (regimeArr[i - 1] === "stepping" && regimeArr[i] === "trailing") {
+      signal = "breakout";
+    }
+    if (prevDir === -1 && dir[i] === 1) {
+      signal = "flip_bull";
+    } else if (prevDir === 1 && dir[i] === -1) {
+      signal = "flip_bear";
+    }
+
+    result.push({
+      time: data[i].time,
+      trail: trail[i],
+      shadow: shadow[i],
+      direction: dir[i] as 1 | -1,
+      regime: regimeArr[i] as "stepping" | "trailing",
+      signal,
+      fractalDim: fd[i],
+    });
+  }
+
+  return result;
+}
