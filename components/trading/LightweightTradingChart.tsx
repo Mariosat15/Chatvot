@@ -96,6 +96,7 @@ import {
   calculateFractalPulseGrid,
   calculateVortexDriftCloud,
   calculateOrionMomentumShield,
+  calculateNebulaPhaseBands,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2118,6 +2119,79 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
 
+        // Nebula Phase Bands: 3 series (upper, midline, lower) with entropy-driven phase coloring
+        } else if (indicator.type === "nebula_phase_bands") {
+          const npbData = calculateNebulaPhaseBands(
+            transformedCandles,
+            indicator.parameters.kalmanGain || 0.05,
+            indicator.parameters.entropyPeriod || 20,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.bandMultiplier || 2.0,
+            indicator.parameters.phaseSmooth || 5,
+          );
+
+          const phaseColor = (phase: string, direction: "up" | "down" | "mid") => {
+            switch (phase) {
+              case "plasma": return direction === "down" ? "#ef4444" : "#f59e0b";
+              case "gaseous": return "#a855f7";
+              case "crystalline": return "#38bdf8";
+              default: return direction === "up" ? "#22d3ee" : direction === "down" ? "#818cf8" : "#67e8f9";
+            }
+          };
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || "#67e8f9", indicator.opacity || 60),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "NPB"} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            upperSeries.setData(npbData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.upper,
+              color: hexToRgba(phaseColor(d.phase, "up"), indicator.opacity || 60),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const midSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#06b6d4", indicator.opacity || 90),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Nebula Phase Bands",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            midSeries.setData(npbData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.middle,
+              color: hexToRgba(phaseColor(d.phase, "mid"), indicator.opacity || 90),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || "#818cf8", indicator.opacity || 60),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "NPB"} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            lowerSeries.setData(npbData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.lower,
+              color: hexToRgba(phaseColor(d.phase, "down"), indicator.opacity || 60),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2399,6 +2473,26 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
                     if (mS) mS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
                     if (lS) lS.setData(omsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
+                  }
+                }
+              } else if (_ovlType === "nebula_phase_bands") {
+                const npbData = calculateNebulaPhaseBands(
+                  tc, p.kalmanGain || 0.05, p.entropyPeriod || 20, p.atrPeriod || 14,
+                  p.bandMultiplier || 2.0, p.phaseSmooth || 5,
+                );
+                if (npbData.length > 0) {
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const mS = _ovlSeriesMap.get(`${_ovlId}_middle`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = npbData[npbData.length - 1];
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
+                    if (mS) mS.update({ time: last.time as UTCTimestamp, value: last.middle });
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                  } else {
+                    if (uS) uS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+                    if (mS) mS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+                    if (lS) lS.setData(npbData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
                   }
                 }
               }

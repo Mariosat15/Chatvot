@@ -3658,3 +3658,170 @@ export function calculateOrionMomentumShield(
 
   return result;
 }
+
+// ============================================================================
+// NEBULA PHASE BANDS - Kalman-filtered overlay with Shannon entropy phase detection
+// ============================================================================
+
+export interface NebulaPhaseData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  entropy: number;   // 0–1 normalized Shannon entropy
+  phase: "plasma" | "liquid" | "gaseous" | "crystalline";
+}
+
+export function calculateNebulaPhaseBands(
+  data: OHLCData[],
+  kalmanGain: number = 0.05,
+  entropyPeriod: number = 20,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  phaseSmooth: number = 5,
+): NebulaPhaseData[] {
+  const minBars = Math.max(entropyPeriod, atrPeriod, phaseSmooth) + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Kalman Filter ---
+  // State: estimated price. Adapts measurement noise from local variance.
+  const kalman = new Array(len).fill(0);
+  let kState = closes[0];
+  let kVariance = 1;
+  const processNoise = kalmanGain * kalmanGain;
+
+  for (let i = 0; i < len; i++) {
+    const measurement = closes[i];
+    const localWindow = Math.min(i, 10);
+    let localVar = 0;
+    if (localWindow > 1) {
+      let sum = 0;
+      let sumSq = 0;
+      for (let j = i - localWindow; j <= i; j++) {
+        sum += closes[j];
+        sumSq += closes[j] * closes[j];
+      }
+      const mean = sum / (localWindow + 1);
+      localVar = sumSq / (localWindow + 1) - mean * mean;
+    }
+    const measurementNoise = Math.max(localVar, 1e-10);
+
+    kVariance += processNoise;
+    const kGain = kVariance / (kVariance + measurementNoise);
+    kState = kState + kGain * (measurement - kState);
+    kVariance = (1 - kGain) * kVariance;
+    kalman[i] = kState;
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Shannon Entropy of price returns ---
+  // Bin returns into buckets and compute -Σ p·log2(p)
+  const numBins = 8;
+  const entropy: number[] = new Array(len).fill(0);
+
+  for (let i = entropyPeriod; i < len; i++) {
+    const returns: number[] = [];
+    for (let j = i - entropyPeriod + 1; j <= i; j++) {
+      if (closes[j - 1] !== 0) {
+        returns.push((closes[j] - closes[j - 1]) / closes[j - 1]);
+      }
+    }
+    if (returns.length < 2) continue;
+
+    let rMin = returns[0];
+    let rMax = returns[0];
+    for (const r of returns) {
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+    }
+    const range = rMax - rMin;
+    if (range === 0) { entropy[i] = 0; continue; }
+
+    const bins = new Array(numBins).fill(0);
+    for (const r of returns) {
+      let bin = Math.floor(((r - rMin) / range) * numBins);
+      if (bin >= numBins) bin = numBins - 1;
+      bins[bin]++;
+    }
+
+    let h = 0;
+    const total = returns.length;
+    for (const count of bins) {
+      if (count > 0) {
+        const p = count / total;
+        h -= p * Math.log2(p);
+      }
+    }
+    entropy[i] = h / Math.log2(numBins);
+  }
+
+  // --- Smooth entropy ---
+  const smoothedEntropy = new Array(len).fill(0);
+  const eK = 2 / (phaseSmooth + 1);
+  for (let i = entropyPeriod; i < len; i++) {
+    smoothedEntropy[i] = i === entropyPeriod
+      ? entropy[i]
+      : smoothedEntropy[i - 1] + (entropy[i] - smoothedEntropy[i - 1]) * eK;
+  }
+
+  // --- Phase detection + output ---
+  const result: NebulaPhaseData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const midline = kalman[i];
+    const ent = Math.max(0, Math.min(1, smoothedEntropy[i]));
+    const displacement = atr[i] > 0 ? Math.abs(closes[i] - midline) / atr[i] : 0;
+    const momentum = i >= 5 ? Math.abs(kalman[i] - kalman[i - 5]) / atr[i] : 0;
+
+    // Phase classification
+    let phase: "plasma" | "liquid" | "gaseous" | "crystalline";
+    if (ent < 0.45 && displacement > 1.2 && momentum > 0.4) {
+      phase = "plasma";       // aggressive trend: ordered + displaced + fast
+    } else if (ent >= 0.7 && displacement > 0.5) {
+      phase = "gaseous";      // chaotic: disordered + volatile
+    } else if (ent < 0.55 && displacement < 0.6 && momentum < 0.25) {
+      phase = "crystalline";  // consolidation: ordered + tight + slow
+    } else {
+      phase = "liquid";       // normal trending
+    }
+
+    // Phase-adaptive band width
+    let phaseMultiplier: number;
+    switch (phase) {
+      case "plasma":      phaseMultiplier = 1.3; break;
+      case "gaseous":     phaseMultiplier = 1.8; break;
+      case "crystalline": phaseMultiplier = 0.6; break;
+      default:            phaseMultiplier = 1.0; break;
+    }
+    const bandWidth = atr[i] * bandMultiplier * phaseMultiplier;
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      entropy: Math.round(ent * 100) / 100,
+      phase,
+    });
+  }
+
+  return result;
+}

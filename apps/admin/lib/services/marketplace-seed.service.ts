@@ -1099,6 +1099,98 @@ No indicator guarantees profits. Always use stop-losses and proper position sizi
   riskLevel: "medium",
 };
 
+const NEBULA_PHASE_BANDS: Partial<IMarketplaceItem> = {
+  name: "Nebula Phase Bands",
+  slug: "nebula-phase-bands",
+  shortDescription:
+    "Kalman-filtered overlay with Shannon entropy phase detection — adaptive bands that morph through four market states: Plasma, Liquid, Gaseous, and Crystalline.",
+  fullDescription: `# Nebula Phase Bands
+
+## Overview
+The **Nebula Phase Bands** is a premium on-chart overlay that brings aerospace-grade **Kalman Filtering** and information-theoretic **Shannon Entropy** to trading. While every other indicator uses some form of moving average for its core line, Nebula uses an optimal state estimator — the same mathematics used in missile guidance and spacecraft navigation — to track the "true" underlying price.
+
+The second innovation is **Shannon Entropy** applied to price returns. This measures the actual information content (randomness vs order) in market movements, letting the indicator classify the market into four distinct phases with scientifically grounded precision.
+
+## Four Core Components
+
+### 1. Kalman Filter Midline
+The midline uses a recursive Kalman filter instead of any moving average:
+- **Process**: Predicts the next price state, then corrects based on actual observation
+- **Adaptive noise model**: Automatically estimates measurement noise from local price variance
+- **Result**: A line that is smooth in ranging markets but tracks aggressively during trends
+- **Advantage**: Responds to true price changes without the lag penalty of traditional smoothing
+
+### 2. Shannon Entropy Measurement
+Returns are binned into a probability distribution over a rolling window:
+- **Formula**: H = -Σ p(x) × log₂(p(x)), normalized to 0–1
+- **Entropy = 0**: All returns fall in one bin (perfectly ordered/trending)
+- **Entropy = 1**: Returns equally distributed across all bins (maximum randomness)
+
+### 3. Four-Phase Detection System
+- **🟣 Plasma** (Aggressive Trend): Low entropy + high displacement + fast momentum
+- **🔵 Liquid** (Smooth Trending): Moderate conditions — price flowing directionally
+- **🟠 Gaseous** (Chaotic): High entropy + volatile — disordered, unpredictable
+- **⚪ Crystalline** (Consolidation): Low entropy + tight range + slow — energy building
+
+### 4. Phase-Adaptive Bands
+- **Plasma**: Tight (1.3×) — trailing the strong trend
+- **Liquid**: Normal (1.0×) — standard behavior
+- **Gaseous**: Wide (1.8×) — accommodating chaos
+- **Crystalline**: Compressed (0.6×) — reflecting consolidation
+
+## How to Trade With It
+
+### Phase Transition Trading
+1. Watch for **Crystalline → Plasma** transition (consolidation → aggressive trend)
+2. Enter in the direction of the Plasma breakout
+3. Set stop-loss at the opposite band
+
+### Entropy Divergence
+1. Price making new highs but entropy rising = move becoming chaotic
+2. Tighten stops or take partial profits
+
+### Crystalline Breakout Preparation
+1. Crystalline phase = compressed bands = market coiling
+2. Place bracket orders above and below compressed bands
+3. Longer Crystalline phases produce larger subsequent moves
+
+## Settings Guide
+- **Kalman Gain** (0.05): Process noise — lower = smoother, higher = responsive
+- **Entropy Period** (20): Window for Shannon entropy calculation
+- **ATR Period** (14): Volatility lookback for base band width
+- **Band Width** (2.0): Base multiplier before phase adjustment
+- **Phase Smooth** (5): Entropy smoothing — higher = fewer phase transitions
+
+## Risk Warning
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 25,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "nebula_phase_bands",
+  iconName: "Sparkles",
+  codeTemplate: JSON.stringify({
+    type: "nebula_phase_bands",
+    displayType: "overlay",
+    description: "Kalman-filtered overlay with Shannon entropy phase detection and adaptive bands",
+  }),
+  defaultSettings: {
+    kalmanGain: 0.05,
+    entropyPeriod: 20,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    phaseSmooth: 5,
+    color: "#c084fc",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kalman", "entropy", "adaptive", "premium", "overlay", "bands", "phase", "consolidation", "breakout", "information-theory"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -1110,6 +1202,7 @@ const ALL_ITEMS = [
   FRACTAL_PULSE_GRID,
   VORTEX_DRIFT_CLOUD,
   ORION_MOMENTUM_SHIELD,
+  NEBULA_PHASE_BANDS,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

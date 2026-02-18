@@ -1137,6 +1137,138 @@ No indicator guarantees profits. The Orion Momentum Shield helps visualize momen
   riskLevel: "medium",
 };
 
+const NEBULA_PHASE_BANDS: Partial<IMarketplaceItem> = {
+  name: "Nebula Phase Bands",
+  slug: "nebula-phase-bands",
+  shortDescription:
+    "Kalman-filtered overlay with Shannon entropy phase detection — adaptive bands that morph through four market states: Plasma, Liquid, Gaseous, and Crystalline.",
+  fullDescription: `# Nebula Phase Bands
+
+## Overview
+The **Nebula Phase Bands** is a premium on-chart overlay that brings aerospace-grade **Kalman Filtering** and information-theoretic **Shannon Entropy** to trading. While every other indicator uses some form of moving average for its core line, Nebula uses an optimal state estimator — the same mathematics used in missile guidance and spacecraft navigation — to track the "true" underlying price.
+
+The second innovation is **Shannon Entropy** applied to price returns. This measures the actual information content (randomness vs order) in market movements, letting the indicator classify the market into four distinct phases with scientifically grounded precision.
+
+## Four Core Components
+
+### 1. Kalman Filter Midline
+The midline uses a recursive Kalman filter instead of any moving average:
+- **Process**: Predicts the next price state, then corrects based on actual observation
+- **Adaptive noise model**: Automatically estimates measurement noise from local price variance
+- **Result**: A line that is smooth in ranging markets but tracks aggressively during trends
+- **Advantage**: Responds to true price changes without the lag penalty of traditional smoothing
+
+Unlike an EMA that applies the same weight regardless of conditions, the Kalman filter dynamically balances between trusting its prediction and trusting the new price observation.
+
+### 2. Shannon Entropy Measurement
+Returns are binned into a probability distribution over a rolling window:
+- **Formula**: H = -Σ p(x) × log₂(p(x)), normalized to 0–1
+- **Entropy = 0**: All returns fall in one bin (perfectly ordered/trending)
+- **Entropy = 1**: Returns equally distributed across all bins (maximum randomness)
+- **Smoothed via EMA** to prevent noisy phase flips
+
+This gives you a scientifically rigorous answer to "how random is this market right now?"
+
+### 3. Four-Phase Detection System
+Based on entropy, displacement from midline, and momentum:
+- **🟣 Plasma** (Aggressive Trend): Low entropy + high displacement + fast momentum — the market has locked into a powerful directional move
+- **🔵 Liquid** (Smooth Trending): Moderate conditions — price is flowing in a direction with normal volatility
+- **🟠 Gaseous** (Chaotic): High entropy + volatile — the market is disordered, moves are unpredictable
+- **⚪ Crystalline** (Consolidation): Low entropy + tight range + slow — the market has frozen, building energy for the next move
+
+### 4. Phase-Adaptive Bands
+Unlike fixed-multiplier bands, width changes per phase:
+- **Plasma**: Bands tighten (1.3× multiplier) — trailing closely to the strong trend
+- **Liquid**: Normal width (1.0×) — standard band behavior
+- **Gaseous**: Bands expand (1.8×) — accommodating chaotic price swings
+- **Crystalline**: Bands compress (0.6×) — reflecting the tight consolidation
+
+This means band width directly reflects market behavior, not just volatility.
+
+## How to Trade With It
+
+### Phase Transition Trading (Primary Strategy)
+1. Watch for **Crystalline → Plasma** transition (consolidation → aggressive trend)
+2. Enter in the direction of the Plasma breakout (price above/below midline)
+3. This is the highest-probability setup — stored energy releasing into a trend
+4. Set stop-loss at the opposite band
+
+### Entropy Divergence
+1. Price making new highs but entropy is rising (phase shifting to Gaseous)
+2. This means the move is becoming chaotic — divergence signals potential reversal
+3. Tighten stops or take partial profits when Plasma degrades to Gaseous
+
+### Gaseous Phase Avoidance
+1. When phase is **Gaseous** (orange), reduce position sizes
+2. The market is disordered — random moves dominate
+3. Wait for entropy to drop (transition to Liquid or Crystalline) before re-engaging
+
+### Crystalline Breakout Preparation
+1. Crystalline phase = compressed bands = the market is coiling
+2. Place bracket orders above and below the compressed bands
+3. When phase shifts, the direction of breakout tells you which side to take
+4. Crystalline phases that last longer produce larger subsequent moves
+
+### Midline Mean Reversion
+1. During **Liquid** phase, price tends to orbit the Kalman midline
+2. Enter long when price touches the lower band in Liquid phase
+3. Enter short when price touches the upper band in Liquid phase
+4. Target the midline, stop beyond the touched band
+
+## Settings Guide
+- **Kalman Gain** (0.05): Process noise — lower = smoother midline, higher = more responsive
+- **Entropy Period** (20): Window for Shannon entropy calculation — lower = faster phase detection
+- **ATR Period** (14): Volatility lookback for base band width
+- **Band Width** (2.0): Base multiplier before phase adjustment
+- **Phase Smooth** (5): Entropy smoothing — higher = fewer phase transitions
+
+## What Makes It Different
+| Feature | Traditional Indicators | Nebula Phase Bands |
+|---------|----------------------|-------------------|
+| Core filter | Moving averages | Kalman filter (optimal state estimation) |
+| Randomness measure | None | Shannon entropy |
+| Market classification | Manual | Automatic 4-phase detection |
+| Band adaptation | Volatility only | Phase + volatility |
+| Theoretical basis | Statistical | Information theory + control theory |
+| Consolidation detection | Poor | Crystalline phase with compressed bands |
+
+## Tips for Best Results
+- The **Crystalline → Plasma** transition is the highest-value signal
+- Use on **15m–Daily** timeframes for best entropy calculation stability
+- Combine with **volume** — Plasma phases with high volume have stronger follow-through
+- When entropy rises rapidly, the market is becoming unpredictable — reduce exposure
+- The Kalman midline acts as dynamic support/resistance across all phases
+
+## Risk Warning
+No indicator guarantees profits. The Nebula Phase Bands uses advanced mathematics to classify market states, but all models have limitations. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 25,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "nebula_phase_bands",
+  iconName: "Sparkles",
+  codeTemplate: JSON.stringify({
+    type: "nebula_phase_bands",
+    displayType: "overlay",
+    description: "Kalman-filtered overlay with Shannon entropy phase detection and adaptive bands",
+  }),
+  defaultSettings: {
+    kalmanGain: 0.05,
+    entropyPeriod: 20,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    phaseSmooth: 5,
+    color: "#c084fc",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kalman", "entropy", "adaptive", "premium", "overlay", "bands", "phase", "consolidation", "breakout", "information-theory"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -1148,6 +1280,7 @@ const ALL_ITEMS = [
   FRACTAL_PULSE_GRID,
   VORTEX_DRIFT_CLOUD,
   ORION_MOMENTUM_SHIELD,
+  NEBULA_PHASE_BANDS,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

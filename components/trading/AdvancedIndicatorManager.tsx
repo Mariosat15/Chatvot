@@ -330,6 +330,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { hmaPeriod: 16, atrPeriod: 14, bandMultiplier: 1.8, momentumPeriod: 12, surgeThreshold: 40, fadeSmooth: 5 },
     paramLabels: { hmaPeriod: "EHMA Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", momentumPeriod: "Momentum Period", surgeThreshold: "Surge Threshold", fadeSmooth: "Fade Smoothing" },
   },
+  nebula_phase_bands: {
+    name: "Nebula Phase Bands",
+    shortName: "NPB",
+    displayType: "overlay" as const,
+    defaultParams: { kalmanGain: 0.05, entropyPeriod: 20, atrPeriod: 14, bandMultiplier: 2.0, phaseSmooth: 5 },
+    paramLabels: { kalmanGain: "Kalman Gain", entropyPeriod: "Entropy Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", phaseSmooth: "Phase Smoothing" },
+  },
 };
 
 const DEFAULT_COLORS = [

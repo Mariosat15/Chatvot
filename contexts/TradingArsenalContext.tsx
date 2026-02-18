@@ -35,7 +35,8 @@ export type IndicatorType =
   | "adaptive_rsi" | "mean_reversion_band" | "trend_ribbon" | "relative_vigor"
   | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands"
   | "vortex_drift_cloud"
-  | "orion_momentum_shield";
+  | "orion_momentum_shield"
+  | "nebula_phase_bands";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -468,6 +469,8 @@ const INDICATOR_TYPE_MAP: Record<
   "vortex drift cloud": { type: "vortex_drift_cloud", displayType: "overlay" },
   orion_momentum_shield: { type: "orion_momentum_shield", displayType: "overlay" },
   "orion momentum shield": { type: "orion_momentum_shield", displayType: "overlay" },
+  nebula_phase_bands: { type: "nebula_phase_bands", displayType: "overlay" },
+  "nebula phase bands": { type: "nebula_phase_bands", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -716,6 +719,13 @@ export function marketplaceItemToIndicator(
       params.momentumPeriod = settings?.momentumPeriod || 12;
       params.surgeThreshold = settings?.surgeThreshold || 40;
       params.fadeSmooth = settings?.fadeSmooth || 5;
+      break;
+    case "nebula_phase_bands":
+      params.kalmanGain = settings?.kalmanGain || 0.05;
+      params.entropyPeriod = settings?.entropyPeriod || 20;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.bandMultiplier = settings?.bandMultiplier || 2.0;
+      params.phaseSmooth = settings?.phaseSmooth || 5;
       break;
     default:
       // Generic period-based indicators
