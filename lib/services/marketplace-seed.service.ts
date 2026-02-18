@@ -1967,6 +1967,68 @@ No indicator guarantees profits. Apex Predator Signal filters for high-probabili
   riskLevel: "medium",
 };
 
+const PHANTOM_DIVERGENCE_TRACKER: Partial<IMarketplaceItem> = {
+  name: "Phantom Divergence Tracker",
+  slug: "phantom-divergence-tracker",
+  shortDescription:
+    "Dual-line overlay comparing smoothed price vs volume-adjusted price. Divergence between lines reveals hidden reversals; convergence confirms trends.",
+  fullDescription: `# Phantom Divergence Tracker
+
+## Overview
+**Phantom Divergence Tracker** renders **two independent lines** on the chart that represent fundamentally different market perspectives:
+- **Price Line**: Ehlers Super Smoother of actual close price — shows where price IS
+- **Volume Line**: Volume-weighted adaptive price — shows where price SHOULD BE based on participation
+
+When the two lines agree (converge), the trend has genuine volume backing. When they disagree (diverge), something is wrong — price is moving without conviction, signaling a potential reversal.
+
+## How It Works
+1. **Price Line** uses a 2-pole Super Smoother filter for ultra-clean trend extraction
+2. **Volume Line** adjusts price by volume participation ratio before smoothing
+3. **Divergence Score** (0–100) measures the normalized gap between lines
+4. When divergence exceeds threshold → reversal warning
+5. When lines converge after divergence → trend confirmation
+
+## How to Trade
+1. **Divergence Warning**: Lines spread apart → price moving on thin volume → expect reversal
+2. **Convergence Confirmation**: Lines come together → volume backs the move → enter with trend
+3. **DIV markers**: Critical divergence detected → prepare for reversal
+4. **CONV markers**: Lines re-converge → trend resuming with conviction
+
+## Settings
+- **Smooth Period** (21): Smoothing period for both lines
+- **Vol Period** (20): Volume average lookback
+- **ATR Period** (14): Normalization period
+- **Div Threshold** (60): Divergence level to trigger signals (0-100)
+
+## Risk Warning
+No indicator guarantees profits. Always use proper risk management.`,
+  category: "indicator",
+  price: 33,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "phantom_divergence_tracker",
+  iconName: "GitBranchPlus",
+  codeTemplate: JSON.stringify({
+    type: "phantom_divergence_tracker",
+    displayType: "overlay",
+    description: "Dual-line price vs volume-adjusted divergence tracker with convergence signals",
+  }),
+  defaultSettings: {
+    smoothPeriod: 21,
+    volPeriod: 20,
+    atrPeriod: 14,
+    divThreshold: 60,
+    color: "#a78bfa",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["divergence", "volume", "dual-line", "premium", "overlay", "convergence", "reversal", "confirmation"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1982,6 +2044,7 @@ const ALL_ITEMS = [
   WRAITH_CONVERGENCE_ENGINE,
   FLUX_MOMENTUM_TRAIL,
   APEX_PREDATOR_SIGNAL,
+  PHANTOM_DIVERGENCE_TRACKER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

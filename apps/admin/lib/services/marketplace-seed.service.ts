@@ -1653,6 +1653,53 @@ No indicator guarantees profits. Always use stop-losses and proper position sizi
   riskLevel: "medium",
 };
 
+const PHANTOM_DIVERGENCE_TRACKER: Partial<IMarketplaceItem> = {
+  name: "Phantom Divergence Tracker",
+  slug: "phantom-divergence-tracker",
+  shortDescription:
+    "Dual-line overlay comparing smoothed price vs volume-adjusted price. Divergence reveals hidden reversals; convergence confirms trends.",
+  fullDescription: `# Phantom Divergence Tracker
+
+## Overview
+Two independent lines: **Price Line** (smoothed close) vs **Volume Line** (volume-adjusted price). Divergence = price moving without conviction. Convergence = volume-backed trend.
+
+## How to Trade
+1. **Lines spread apart** → reversal warning (price on thin volume)
+2. **Lines converge** → trend confirmation (volume backs the move)
+3. **DIV markers** → critical divergence, prepare for reversal
+4. **CONV markers** → re-convergence, trend resuming
+
+## Settings
+- **Smooth Period** (21), **Vol Period** (20), **ATR Period** (14), **Div Threshold** (60)
+
+No indicator guarantees profits. Always use proper risk management.`,
+  category: "indicator",
+  price: 33,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "phantom_divergence_tracker",
+  iconName: "GitBranchPlus",
+  codeTemplate: JSON.stringify({
+    type: "phantom_divergence_tracker",
+    displayType: "overlay",
+    description: "Dual-line price vs volume-adjusted divergence tracker",
+  }),
+  defaultSettings: {
+    smoothPeriod: 21,
+    volPeriod: 20,
+    atrPeriod: 14,
+    divThreshold: 60,
+    color: "#a78bfa",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["divergence", "volume", "dual-line", "premium", "overlay", "convergence", "reversal"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1668,6 +1715,7 @@ const ALL_ITEMS = [
   WRAITH_CONVERGENCE_ENGINE,
   FLUX_MOMENTUM_TRAIL,
   APEX_PREDATOR_SIGNAL,
+  PHANTOM_DIVERGENCE_TRACKER,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

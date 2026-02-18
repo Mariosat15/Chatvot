@@ -386,6 +386,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { zlemaPeriod: 21, rocPeriod: 12, atrPeriod: 14, volPeriod: 20, minConfluence: 2 },
     paramLabels: { zlemaPeriod: "ZLEMA Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", volPeriod: "Volume Period", minConfluence: "Min Confluence" },
   },
+  phantom_divergence_tracker: {
+    name: "Phantom Divergence Tracker",
+    shortName: "PDT",
+    displayType: "overlay" as const,
+    defaultParams: { smoothPeriod: 21, volPeriod: 20, atrPeriod: 14, divergenceThreshold: 60 },
+    paramLabels: { smoothPeriod: "Smooth Period", volPeriod: "Vol. Period", atrPeriod: "ATR Period", divergenceThreshold: "Div. Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

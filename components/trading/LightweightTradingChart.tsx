@@ -104,6 +104,7 @@ import {
   calculateWraithConvergenceEngine,
   calculateFluxMomentumTrail,
   calculateApexPredatorSignal,
+  calculatePhantomDivergenceTracker,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2698,6 +2699,57 @@ const LightweightTradingChart = ({
             try { bearSeries.setMarkers(sorted2); } catch {}
           }
 
+        // Phantom Divergence Tracker: dual-line price vs volume-adjusted divergence
+        } else if (indicator.type === "phantom_divergence_tracker") {
+          const pdtData = calculatePhantomDivergenceTracker(
+            transformedCandles,
+            indicator.parameters.smoothPeriod || 21,
+            indicator.parameters.volPeriod || 20,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.divergenceThreshold || 60,
+          );
+
+          const priceLineData = pdtData.map((d) => ({ time: d.time as UTCTimestamp, value: d.priceLine }));
+          const momLineData = pdtData.map((d) => ({ time: d.time as UTCTimestamp, value: d.momentumLine }));
+          const markers: any[] = [];
+
+          for (const d of pdtData) {
+            if (d.signal === "div_bull") {
+              markers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#22c55e", shape: "arrowUp" as const, text: "DIV ▲", size: 2 });
+            } else if (d.signal === "div_bear") {
+              markers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ef4444", shape: "arrowDown" as const, text: "DIV ▼", size: 2 });
+            } else if (d.signal === "converge") {
+              markers.push({ time: d.time as UTCTimestamp, position: d.direction === 1 ? ("belowBar" as const) : ("aboveBar" as const), color: "#a78bfa", shape: "circle" as const, text: "SYNC", size: 1 });
+            }
+          }
+
+          const pSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.colors?.positive || "#06b6d4", indicator.opacity || 100),
+            lineWidth: (indicator.lineWidth || 2) as any,
+            lineStyle: 0 as any,
+            title: `${indicator.customLabel || "PDT"} Price`,
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: true,
+          });
+          pSeries.setData(priceLineData);
+          indicatorSeriesRef.current.set(`${indicator.id}_price`, pSeries);
+
+          const mSeries = chart.addLineSeries({
+            color: hexToRgba(indicator.colors?.negative || "#a78bfa", indicator.opacity || 80),
+            lineWidth: (indicator.lineWidth || 2) as any,
+            lineStyle: 2 as any,
+            title: `${indicator.customLabel || "PDT"} Volume`,
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          mSeries.setData(momLineData);
+          indicatorSeriesRef.current.set(`${indicator.id}_mom`, mSeries);
+
+          const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+          try { pSeries.setMarkers(sorted); } catch {}
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3146,6 +3198,22 @@ const LightweightTradingChart = ({
                     }
                     if (bullS) bullS.setData(bullD);
                     if (bearS) bearS.setData(bearD);
+                  }
+                }
+              } else if (_ovlType === "phantom_divergence_tracker") {
+                const pdtData = calculatePhantomDivergenceTracker(
+                  tc, p.smoothPeriod || 21, p.volPeriod || 20, p.atrPeriod || 14, p.divergenceThreshold || 60,
+                );
+                if (pdtData.length > 0) {
+                  const priceS = _ovlSeriesMap.get(`${_ovlId}_price`);
+                  const momS = _ovlSeriesMap.get(`${_ovlId}_mom`);
+                  if (mode === "light") {
+                    const last = pdtData[pdtData.length - 1];
+                    if (priceS) priceS.update({ time: last.time as UTCTimestamp, value: last.priceLine });
+                    if (momS) momS.update({ time: last.time as UTCTimestamp, value: last.momentumLine });
+                  } else {
+                    if (priceS) priceS.setData(pdtData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceLine })));
+                    if (momS) momS.setData(pdtData.map(d => ({ time: d.time as UTCTimestamp, value: d.momentumLine })));
                   }
                 }
               }

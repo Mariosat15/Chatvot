@@ -4771,3 +4771,118 @@ export function calculateApexPredatorSignal(
 
   return result;
 }
+
+// ============================================================================
+// PHANTOM DIVERGENCE TRACKER - Dual-line price vs volume-adjusted divergence
+// ============================================================================
+
+export interface PhantomDivergenceData {
+  time: number;
+  priceLine: number;
+  momentumLine: number;
+  divergence: number;
+  direction: 1 | -1;
+  signal: "div_bull" | "div_bear" | "converge" | "none";
+}
+
+export function calculatePhantomDivergenceTracker(
+  data: OHLCData[],
+  smoothPeriod: number = 21,
+  volPeriod: number = 20,
+  atrPeriod: number = 14,
+  divergenceThreshold: number = 60,
+): PhantomDivergenceData[] {
+  const minBars = Math.max(smoothPeriod * 2, volPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const volumes = data.map((d) => d.volume || 1);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const len = data.length;
+
+  const k = 2 / (smoothPeriod + 1);
+  const ema1 = new Array(len).fill(0);
+  const ema2 = new Array(len).fill(0);
+  ema1[0] = closes[0]; ema2[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    ema1[i] = closes[i] * k + ema1[i - 1] * (1 - k);
+    ema2[i] = ema1[i] * k + ema2[i - 1] * (1 - k);
+  }
+  const priceLine = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) priceLine[i] = 2 * ema1[i] - ema2[i];
+
+  const volAvg = new Array(len).fill(0);
+  let vSum = 0;
+  for (let i = 0; i < volPeriod && i < len; i++) vSum += volumes[i];
+  volAvg[volPeriod - 1] = vSum / volPeriod;
+  for (let i = volPeriod; i < len; i++) {
+    volAvg[i] = volAvg[i - 1] + (volumes[i] - volumes[i - volPeriod]) / volPeriod;
+  }
+
+  const momLine = new Array(len).fill(0);
+  momLine[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const vRatio = volAvg[i] > 0 ? volumes[i] / volAvg[i] : 1;
+    const cappedRatio = Math.min(Math.max(vRatio, 0.2), 3.0);
+    const priceChange = closes[i] - closes[i - 1];
+    momLine[i] = momLine[i - 1] + priceChange * cappedRatio;
+  }
+  const mEma1 = new Array(len).fill(0);
+  const mEma2 = new Array(len).fill(0);
+  mEma1[0] = momLine[0]; mEma2[0] = momLine[0];
+  for (let i = 1; i < len; i++) {
+    mEma1[i] = momLine[i] * k + mEma1[i - 1] * (1 - k);
+    mEma2[i] = mEma1[i] * k + mEma2[i - 1] * (1 - k);
+  }
+  const smoothMom = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) smoothMom[i] = 2 * mEma1[i] - mEma2[i];
+
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) aSum += tr[i];
+  atr[atrPeriod - 1] = aSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+
+  const result: PhantomDivergenceData[] = [];
+  let prevDivScore = 0;
+  let prevBearDiv = false;
+  let prevBullDiv = false;
+
+  for (let i = minBars; i < len; i++) {
+    const gap = priceLine[i] - smoothMom[i];
+    const normATR = atr[i] > 0 ? atr[i] : 1;
+    const rawDiv = Math.abs(gap) / (normATR * 2);
+    const divScore = Math.round(Math.min(rawDiv, 1) * 100);
+
+    const direction: 1 | -1 = closes[i] > priceLine[i] ? 1 : -1;
+    const isBearDiv = gap > 0 && divScore >= divergenceThreshold;
+    const isBullDiv = gap < 0 && divScore >= divergenceThreshold;
+    const isConverging = prevDivScore >= divergenceThreshold && divScore < divergenceThreshold * 0.6;
+
+    let signal: PhantomDivergenceData["signal"] = "none";
+    if (isBearDiv && !prevBearDiv) signal = "div_bear";
+    else if (isBullDiv && !prevBullDiv) signal = "div_bull";
+    else if (isConverging) signal = "converge";
+
+    prevDivScore = divScore;
+    prevBearDiv = isBearDiv;
+    prevBullDiv = isBullDiv;
+
+    result.push({
+      time: data[i].time,
+      priceLine: priceLine[i],
+      momentumLine: smoothMom[i],
+      divergence: divScore,
+      direction,
+      signal,
+    });
+  }
+
+  return result;
+}
