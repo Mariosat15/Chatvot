@@ -910,6 +910,114 @@ No indicator guarantees profits. Fractal Pulse Grid is a tool to support your an
   riskLevel: "medium",
 };
 
+const VORTEX_DRIFT_CLOUD: Partial<IMarketplaceItem> = {
+  name: "Vortex Drift Cloud",
+  slug: "vortex-drift-cloud",
+  shortDescription:
+    "Adaptive trend-following channel with zero-lag Super Smoother midline, ADX-weighted volatility bands, and per-bar momentum coloring.",
+  fullDescription: `# Vortex Drift Cloud
+
+## Overview
+The **Vortex Drift Cloud** is a premium on-chart indicator that wraps price in an intelligent, adaptive channel. It combines a near-zero-lag midline with volatility bands that respond to trend strength — giving you a complete visual picture of trend direction, momentum, and volatility regime in one overlay.
+
+Unlike traditional channels (Bollinger Bands, Keltner), the Vortex Drift Cloud uses an **Ehlers Super Smoother** filter for the midline — a digital signal processing technique that removes market noise with virtually no lag. The bands then adapt their width based on both volatility (ATR) and trend strength (ADX), so they widen during strong directional moves and compress during consolidation.
+
+## Three Core Components
+
+### 1. Super Smoother Midline (Center Line)
+The midline uses the **Ehlers 2-pole Super Smoother** filter, a digital signal processing technique from aerospace engineering applied to trading:
+- **Near-zero lag** — reacts to price changes almost instantly compared to traditional moving averages
+- **Exceptional noise filtering** — removes random price fluctuations while preserving the true trend signal
+- Acts as **dynamic support** in uptrends and **dynamic resistance** in downtrends
+
+### 2. ADX-Weighted Adaptive Bands
+The upper and lower bands are not fixed-width like Bollinger Bands. Instead, they adapt to both volatility AND trend strength:
+- **Band width** = ATR × Multiplier × ADX Weight Factor
+- In **strong trends** (high ADX): bands widen to accommodate momentum
+- In **ranging markets** (low ADX): bands compress, signaling consolidation
+- **Compression → Expansion** patterns signal potential breakouts
+
+### 3. Per-Bar Momentum Coloring
+Every bar's channel color shifts based on real-time trend classification:
+- **Cyan/Teal** = Bullish momentum — midline rising AND price above midline
+- **Orange** = Bearish pressure — midline falling AND price below midline
+- **Gray** = Indecision/Neutral — mixed signals, no clear direction
+
+The color changes happen bar-by-bar, giving you instant visual feedback on trend transitions.
+
+## How to Trade With It
+
+### Trend Following (Primary Strategy)
+1. Wait for the cloud to turn **cyan** (bullish)
+2. Enter long when price pulls back to the **midline** or **lower band**
+3. Set stop-loss below the **lower band** (adaptive to volatility)
+4. Hold as long as the cloud stays **cyan**
+5. Exit when the cloud turns **gray** or **orange**
+
+### Band Bounce Trading
+1. In a **cyan cloud**: buy when price touches the **lower band** (support bounce)
+2. In an **orange cloud**: sell when price touches the **upper band** (resistance rejection)
+3. **Avoid trading bounces** in a gray cloud (no directional conviction)
+
+### Breakout Anticipation
+1. Watch for **band compression** (narrow channel + gray color)
+2. This signals the market is coiling for a move
+3. Enter in the direction of the **first colored band expansion**:
+   - Cyan expansion = Long breakout
+   - Orange expansion = Short breakout
+4. The wider the preceding compression, the stronger the potential breakout
+
+### Trend Reversal Detection
+1. Watch for color transitions: **cyan → gray → orange** (bearish reversal)
+2. Or: **orange → gray → cyan** (bullish reversal)
+3. The **gray transition zone** acts as an early warning
+4. Confirm reversal when price closes beyond the midline in the new direction
+
+## Settings Guide
+- **Smoother Period** (21): Super Smoother filter length — higher = smoother but slower, lower = more responsive
+- **ATR Period** (14): Volatility lookback for band width calculation
+- **Band Width** (2.0): Multiplier for band distance from midline — higher = wider bands
+- **ADX Period** (14): Trend strength measurement lookback
+- **Trend Threshold** (25): ADX level that distinguishes trending from ranging
+- **Momentum Lookback** (10): Bars to compare for trend direction coloring
+
+## Tips for Best Results
+- Works on **all timeframes** — from 1-minute scalping to daily swing trading
+- Best performance on **trending assets** (Forex majors, indices, trending crypto)
+- Combine with **volume** for confirmation: high volume + color change = strong signal
+- Use band width as a **position sizing guide**: wider bands = more volatile = smaller position
+
+## Risk Warning
+No indicator guarantees profits. The Vortex Drift Cloud is a decision-support tool, not a signal service. Always use proper risk management, set stop-losses, and never risk more than you can afford to lose.`,
+  category: "indicator",
+  price: 15,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "vortex_drift_cloud",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "vortex_drift_cloud",
+    displayType: "overlay",
+    description: "Adaptive trend channel with Super Smoother midline and ADX-weighted volatility bands",
+  }),
+  defaultSettings: {
+    smoothPeriod: 21,
+    atrPeriod: 14,
+    bandMultiplier: 2.0,
+    adxPeriod: 14,
+    adxThreshold: 25,
+    momentumLookback: 10,
+    color: "#22d3ee",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["trend", "channel", "volatility", "adaptive", "premium", "overlay", "momentum", "adx", "super-smoother"],
+  riskLevel: "medium",
+};
+
 // ============================================================================
 // ALL ITEMS - Indicators, Cosmetics, and Game Master Packages
 // ============================================================================
@@ -919,6 +1027,7 @@ const ALL_ITEMS = [
   NEXUS_TREND_MATRIX,
   PHANTOM_FLOW_ZONES,
   FRACTAL_PULSE_GRID,
+  VORTEX_DRIFT_CLOUD,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -3403,3 +3403,129 @@ export function calculateFractalPulseGrid(
 
   return result;
 }
+
+// ============================================================================
+// VORTEX DRIFT CLOUD - Adaptive trend channel with momentum coloring
+// ============================================================================
+
+export interface VortexDriftCloudData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  trend: "bullish" | "bearish" | "neutral";
+  strength: number; // 0-100
+}
+
+export function calculateVortexDriftCloud(
+  data: OHLCData[],
+  smoothPeriod: number = 21,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  adxPeriod: number = 14,
+  adxThreshold: number = 25,
+  momentumLookback: number = 10,
+): VortexDriftCloudData[] {
+  if (data.length < Math.max(smoothPeriod, atrPeriod, adxPeriod) + 10) return [];
+
+  const result: VortexDriftCloudData[] = [];
+  const closes = data.map((d) => d.close);
+
+  // Ehlers 2-pole Super Smoother filter (near-zero lag)
+  const angle = (Math.PI * Math.SQRT2) / smoothPeriod;
+  const a1 = Math.exp(-angle);
+  const coeff2 = 2 * a1 * Math.cos(angle);
+  const coeff3 = -(a1 * a1);
+  const coeff1 = 1 - coeff2 - coeff3;
+  const ss: number[] = new Array(data.length).fill(0);
+  ss[0] = closes[0];
+  ss[1] = closes.length > 1 ? closes[1] : closes[0];
+  for (let i = 2; i < data.length; i++) {
+    ss[i] = coeff1 * (closes[i] + closes[i - 1]) / 2 + coeff2 * ss[i - 1] + coeff3 * ss[i - 2];
+  }
+
+  // ATR (exponential smoothing)
+  const atr: number[] = new Array(data.length).fill(0);
+  for (let i = 1; i < data.length; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    if (i < atrPeriod) {
+      atr[i] = atr[i - 1] + (tr - atr[i - 1]) / i;
+    } else {
+      atr[i] = atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+    }
+  }
+
+  // ADX (Wilder smoothing)
+  const adx: number[] = new Array(data.length).fill(0);
+  let sPlusDM = 0;
+  let sMinusDM = 0;
+  let sTR = 0;
+  let adxEma = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const upMove = data[i].high - data[i - 1].high;
+    const downMove = data[i - 1].low - data[i].low;
+    const plusDM = upMove > downMove && upMove > 0 ? upMove : 0;
+    const minusDM = downMove > upMove && downMove > 0 ? downMove : 0;
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+
+    if (i <= adxPeriod) {
+      sPlusDM += plusDM;
+      sMinusDM += minusDM;
+      sTR += tr;
+      if (i === adxPeriod) {
+        sPlusDM /= adxPeriod;
+        sMinusDM /= adxPeriod;
+        sTR /= adxPeriod;
+      }
+    } else {
+      sPlusDM = sPlusDM - sPlusDM / adxPeriod + plusDM;
+      sMinusDM = sMinusDM - sMinusDM / adxPeriod + minusDM;
+      sTR = sTR - sTR / adxPeriod + tr;
+    }
+
+    if (i >= adxPeriod && sTR > 0) {
+      const plusDI = (sPlusDM / sTR) * 100;
+      const minusDI = (sMinusDM / sTR) * 100;
+      const diSum = plusDI + minusDI;
+      const dx = diSum > 0 ? (Math.abs(plusDI - minusDI) / diSum) * 100 : 0;
+      adxEma = adxEma === 0 ? dx : adxEma + (dx - adxEma) * (2 / (adxPeriod + 1));
+      adx[i] = adxEma;
+    }
+  }
+
+  // Build output: midline, adaptive bands, trend classification
+  const startIdx = Math.max(smoothPeriod, atrPeriod, adxPeriod) + 2;
+  for (let i = startIdx; i < data.length; i++) {
+    const midline = ss[i];
+    const adxWeight = 0.5 + 0.5 * Math.min(adx[i] / 50, 1);
+    const bandWidth = atr[i] * bandMultiplier * adxWeight;
+
+    const lookbackIdx = Math.max(0, i - momentumLookback);
+    const midlineRising = midline > ss[lookbackIdx];
+    const midlineFalling = midline < ss[lookbackIdx];
+
+    let trend: "bullish" | "bearish" | "neutral" = "neutral";
+    if (midlineRising && closes[i] > midline) trend = "bullish";
+    else if (midlineFalling && closes[i] < midline) trend = "bearish";
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      trend,
+      strength: Math.round(Math.min(100, Math.max(0, (adx[i] / 50) * 100))),
+    });
+  }
+
+  return result;
+}

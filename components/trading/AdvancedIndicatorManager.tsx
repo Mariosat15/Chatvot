@@ -316,6 +316,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 20, atrPeriod: 14, baseLookback: 3, maxAge: 100, smoothPeriod: 8, breakTolerance: 0.25 },
     paramLabels: { period: "Volatility Period", atrPeriod: "ATR Period", baseLookback: "Base Lookback", maxAge: "Max Level Age", smoothPeriod: "Pulse Smooth", breakTolerance: "Break Tolerance" },
   },
+  vortex_drift_cloud: {
+    name: "Vortex Drift Cloud",
+    shortName: "VDC",
+    displayType: "overlay" as const,
+    defaultParams: { smoothPeriod: 21, atrPeriod: 14, bandMultiplier: 2.0, adxPeriod: 14, adxThreshold: 25, momentumLookback: 10 },
+    paramLabels: { smoothPeriod: "Smoother Period", atrPeriod: "ATR Period", bandMultiplier: "Band Width", adxPeriod: "ADX Period", adxThreshold: "Trend Threshold", momentumLookback: "Momentum Lookback" },
+  },
 };
 
 const DEFAULT_COLORS = [

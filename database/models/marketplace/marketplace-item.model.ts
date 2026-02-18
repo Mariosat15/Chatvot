@@ -44,7 +44,8 @@ export type IndicatorType =
   // Premium overlays
   | "nexus_trend_matrix"
   | "phantom_flow_zones"
-  | "fractal_pulse_grid";
+  | "fractal_pulse_grid"
+  | "vortex_drift_cloud";
 
 // Strategy Condition Operators
 export type ConditionOperator =

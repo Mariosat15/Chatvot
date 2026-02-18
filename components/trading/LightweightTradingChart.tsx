@@ -94,6 +94,7 @@ import {
   calculateNexusTrendMatrix,
   calculatePhantomFlowZones,
   calculateFractalPulseGrid,
+  calculateVortexDriftCloud,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -1973,6 +1974,78 @@ const LightweightTradingChart = ({
             }
           }
 
+        // Vortex Drift Cloud: 3 series (upper, midline, lower) with per-bar trend coloring
+        } else if (indicator.type === "vortex_drift_cloud") {
+          const vdcData = calculateVortexDriftCloud(
+            transformedCandles,
+            indicator.parameters.smoothPeriod || 21,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.bandMultiplier || 2.0,
+            indicator.parameters.adxPeriod || 14,
+            indicator.parameters.adxThreshold || 25,
+            indicator.parameters.momentumLookback || 10,
+          );
+
+          const trendColor = (t: string) =>
+            t === "bullish"
+              ? indicator.colors?.upper || "#22d3ee"
+              : t === "bearish"
+                ? indicator.colors?.lower || "#f97316"
+                : "#6b7280";
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.upper || "#22d3ee", indicator.opacity || 70),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "VDC"} Upper`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            upperSeries.setData(vdcData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.upper,
+              color: hexToRgba(trendColor(d.trend), indicator.opacity || 70),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const midSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.middle || indicator.color || "#22d3ee", (indicator.opacity || 70) * 0.6),
+              lineWidth: 1 as any,
+              lineStyle: 2 as any,
+              title: indicator.customLabel || "Vortex Drift Cloud",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            midSeries.setData(vdcData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.middle,
+              color: hexToRgba(trendColor(d.trend), (indicator.opacity || 70) * 0.6),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: hexToRgba(indicator.colors?.lower || "#f97316", indicator.opacity || 70),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: indicator.lineStyle as any,
+              title: `${indicator.customLabel || "VDC"} Lower`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            lowerSeries.setData(vdcData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.lower,
+              color: hexToRgba(trendColor(d.trend), indicator.opacity || 70),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2214,6 +2287,26 @@ const LightweightTradingChart = ({
                     if (resS) resS.setData(fpgData.filter(d => !isNaN(d.resistance)).map(d => ({ time: d.time as UTCTimestamp, value: d.resistance })));
                     if (pulS) pulS.setData(fpgData.map(d => ({ time: d.time as UTCTimestamp, value: d.pulseLine })));
                     if (supS) supS.setData(fpgData.filter(d => !isNaN(d.support)).map(d => ({ time: d.time as UTCTimestamp, value: d.support })));
+                  }
+                }
+              } else if (_ovlType === "vortex_drift_cloud") {
+                const vdcData = calculateVortexDriftCloud(
+                  tc, p.smoothPeriod || 21, p.atrPeriod || 14, p.bandMultiplier || 2.0,
+                  p.adxPeriod || 14, p.adxThreshold || 25, p.momentumLookback || 10,
+                );
+                if (vdcData.length > 0) {
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const mS = _ovlSeriesMap.get(`${_ovlId}_middle`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = vdcData[vdcData.length - 1];
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper });
+                    if (mS) mS.update({ time: last.time as UTCTimestamp, value: last.middle });
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower });
+                  } else {
+                    if (uS) uS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper })));
+                    if (mS) mS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.middle })));
+                    if (lS) lS.setData(vdcData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower })));
                   }
                 }
               }

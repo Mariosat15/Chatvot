@@ -33,7 +33,8 @@ export type IndicatorType =
   | "alpha_momentum" | "efficiency_ratio" | "trend_persistence" | "mtf_momentum"
   | "momentum_wave" | "gap_momentum" | "heikin_ashi_trend" | "cycle_detector"
   | "adaptive_rsi" | "mean_reversion_band" | "trend_ribbon" | "relative_vigor"
-  | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands";
+  | "dynamic_pivots" | "price_action_score" | "ergodic_volume" | "anchored_vwap_bands"
+  | "vortex_drift_cloud";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -462,6 +463,8 @@ const INDICATOR_TYPE_MAP: Record<
   "phantom flow zones": { type: "phantom_flow_zones", displayType: "overlay" },
   fractal_pulse_grid: { type: "fractal_pulse_grid", displayType: "overlay" },
   "fractal pulse grid": { type: "fractal_pulse_grid", displayType: "overlay" },
+  vortex_drift_cloud: { type: "vortex_drift_cloud", displayType: "overlay" },
+  "vortex drift cloud": { type: "vortex_drift_cloud", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -694,6 +697,14 @@ export function marketplaceItemToIndicator(
       params.maxAge = settings?.maxAge || 100;
       params.smoothPeriod = settings?.smoothPeriod || 8;
       params.breakTolerance = settings?.breakTolerance || 0.25;
+      break;
+    case "vortex_drift_cloud":
+      params.smoothPeriod = settings?.smoothPeriod || 21;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.bandMultiplier = settings?.bandMultiplier || 2.0;
+      params.adxPeriod = settings?.adxPeriod || 14;
+      params.adxThreshold = settings?.adxThreshold || 25;
+      params.momentumLookback = settings?.momentumLookback || 10;
       break;
     default:
       // Generic period-based indicators
