@@ -400,6 +400,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { attractorPeriod: 21, lyapunovPeriod: 14, smoothing: 5, chaosThreshold: 50 },
     paramLabels: { attractorPeriod: "Attractor Period", lyapunovPeriod: "Lyapunov Period", smoothing: "Smoothing", chaosThreshold: "Chaos Threshold" },
   },
+  helix_phase_engine: {
+    name: "Helix Phase Engine",
+    shortName: "HPE",
+    displayType: "overlay" as const,
+    defaultParams: { detrendPeriod: 20, hilbertLength: 7, ampMultiplier: 1.5, velocitySmooth: 5, leadSensitivity: 55 },
+    paramLabels: { detrendPeriod: "Detrend Period", hilbertLength: "Hilbert Length", ampMultiplier: "Amplitude Multiplier", velocitySmooth: "Velocity Smooth", leadSensitivity: "Lead Sensitivity" },
+  },
 };
 
 const DEFAULT_COLORS = [

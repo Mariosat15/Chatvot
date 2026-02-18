@@ -106,6 +106,7 @@ import {
   calculateApexPredatorSignal,
   calculatePhantomDivergenceTracker,
   calculateChaosSentinel,
+  calculateHelixPhaseEngine,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2873,6 +2874,75 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_trans`, tSeries);
           }
 
+        // Helix Phase Engine: phase-adaptive lead line + amplitude envelope + per-bar velocity coloring
+        } else if (indicator.type === "helix_phase_engine") {
+          const hpeData = calculateHelixPhaseEngine(
+            transformedCandles,
+            indicator.parameters.detrendPeriod || 20,
+            indicator.parameters.hilbertLength || 7,
+            indicator.parameters.ampMultiplier || 1.5,
+            indicator.parameters.velocitySmooth || 5,
+            indicator.parameters.leadSensitivity || 60,
+          );
+
+          const hpeColor = (vel: number, regime: string): string => {
+            if (regime === "trending") return vel > 75 ? "#00e5ff" : "#26c6da";
+            if (regime === "reversal") return "#e040fb";
+            return "#78909c";
+          };
+
+          const hpeMarkers: any[] = [];
+          for (const d of hpeData) {
+            if (d.signal === "lead_bull") {
+              hpeMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e5ff", shape: "arrowUp" as const, text: "LEAD ▲", size: 2 });
+            } else if (d.signal === "lead_bear") {
+              hpeMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#e040fb", shape: "arrowDown" as const, text: "LEAD ▼", size: 2 });
+            } else if (d.signal === "sync") {
+              hpeMarkers.push({ time: d.time as UTCTimestamp, position: "inBar" as const, color: "#ffd740", shape: "circle" as const, text: "SYNC", size: 1 });
+            }
+          }
+
+          if (indicator.visibility?.upper !== false) {
+            const upperSeries = chart.addLineSeries({
+              color: "#78909c", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "HPE"} Upper`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            upperSeries.setData(hpeData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.upper,
+              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), 40),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
+          }
+
+          if (indicator.visibility?.middle !== false) {
+            const coreSeries = chart.addLineSeries({
+              color: "#00e5ff", lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Helix Phase Engine", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            coreSeries.setData(hpeData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.phaseLine,
+              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), indicator.opacity || 100),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_core`, coreSeries);
+            const sorted = hpeMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { coreSeries.setMarkers(sorted); } catch {}
+          }
+
+          if (indicator.visibility?.lower !== false) {
+            const lowerSeries = chart.addLineSeries({
+              color: "#78909c", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "HPE"} Lower`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            lowerSeries.setData(hpeData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.lower,
+              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), 40),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3379,6 +3449,27 @@ const LightweightTradingChart = ({
                     if (orderS) orderS.setData(oD);
                     if (chaosS) chaosS.setData(cD);
                     if (transS) transS.setData(tD);
+                  }
+                }
+              } else if (_ovlType === "helix_phase_engine") {
+                const hpeData = calculateHelixPhaseEngine(
+                  tc, p.detrendPeriod || 20, p.hilbertLength || 7, p.ampMultiplier || 1.5, p.velocitySmooth || 5, p.leadSensitivity || 60,
+                );
+                if (hpeData.length > 0) {
+                  const hpeC = (v: number, r: string) => r === "trending" ? (v > 75 ? "#00e5ff" : "#26c6da") : r === "reversal" ? "#e040fb" : "#78909c";
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const cS = _ovlSeriesMap.get(`${_ovlId}_core`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  if (mode === "light") {
+                    const last = hpeData[hpeData.length - 1];
+                    const c = hpeC(last.phaseVelocity, last.regime);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 40) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.phaseLine, color: hexToRgba(c, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 40) } as any);
+                  } else {
+                    if (uS) uS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 40) })));
+                    if (cS) cS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.phaseLine, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 100) })));
+                    if (lS) lS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 40) })));
                   }
                 }
               }

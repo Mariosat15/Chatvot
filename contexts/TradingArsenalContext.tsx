@@ -45,7 +45,8 @@ export type IndicatorType =
   | "flux_momentum_trail"
   | "apex_predator_signal"
   | "phantom_divergence_tracker"
-  | "chaos_sentinel";
+  | "chaos_sentinel"
+  | "helix_phase_engine";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -498,6 +499,8 @@ const INDICATOR_TYPE_MAP: Record<
   "phantom divergence tracker": { type: "phantom_divergence_tracker", displayType: "overlay" },
   chaos_sentinel: { type: "chaos_sentinel", displayType: "overlay" },
   "chaos sentinel": { type: "chaos_sentinel", displayType: "overlay" },
+  helix_phase_engine: { type: "helix_phase_engine", displayType: "overlay" },
+  "helix phase engine": { type: "helix_phase_engine", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -815,6 +818,13 @@ export function marketplaceItemToIndicator(
       params.lyapunovPeriod = settings?.lyapunovPeriod || 14;
       params.smoothing = settings?.smoothing || 5;
       params.chaosThreshold = settings?.chaosThreshold || 50;
+      break;
+    case "helix_phase_engine":
+      params.detrendPeriod = settings?.detrendPeriod || 20;
+      params.hilbertLength = settings?.hilbertLength || 7;
+      params.ampMultiplier = settings?.ampMultiplier || 1.5;
+      params.velocitySmooth = settings?.velocitySmooth || 5;
+      params.leadSensitivity = settings?.leadSensitivity || 55;
       break;
     default:
       // Generic period-based indicators

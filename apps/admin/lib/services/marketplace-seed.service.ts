@@ -1753,6 +1753,61 @@ No indicator guarantees profits. Always use proper risk management.`,
   riskLevel: "medium",
 };
 
+const HELIX_PHASE_ENGINE: Partial<IMarketplaceItem> = {
+  name: "Helix Phase Engine",
+  slug: "helix-phase-engine",
+  shortDescription:
+    "Hilbert Transform-based phase analysis overlay with adaptive lead line, amplitude envelope, and velocity regime coloring.",
+  fullDescription: `# Helix Phase Engine
+
+## Overview
+**Helix Phase Engine** uses the **Hilbert Transform** from signal processing to extract instantaneous phase and amplitude from price cycles, creating a leading adaptive line.
+
+## How It Works
+- **Hilbert Transform**: Extracts analytic signal → instantaneous amplitude and phase
+- **Phase-Adaptive Lead Line**: MA length adapts to detected cycle, naturally leading price at turns
+- **Phase Velocity Regimes**: Trending (cyan), Consolidation (gray), Reversal (magenta)
+
+## Signals
+- **LEAD ▲ / ▼**: Phase line anticipates a turn with high velocity
+- **SYNC**: Cycle compression — expect breakout
+
+## Settings
+- **Detrend Period** (20): DEMA period for cycle extraction
+- **Hilbert Length** (7): FIR filter length
+- **Amplitude Multiplier** (1.5): Envelope width
+- **Velocity Smooth** (5): Phase velocity smoothing
+- **Lead Sensitivity** (55): Regime threshold (0-100)
+
+No indicator guarantees profits. Always use proper risk management.`,
+  category: "indicator",
+  price: 55,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "helix_phase_engine",
+  iconName: "Orbit",
+  codeTemplate: JSON.stringify({
+    type: "helix_phase_engine",
+    displayType: "overlay",
+    description: "Hilbert Transform phase analysis with adaptive lead line and velocity regime coloring",
+  }),
+  defaultSettings: {
+    detrendPeriod: 20,
+    hilbertLength: 7,
+    ampMultiplier: 1.5,
+    velocitySmooth: 5,
+    leadSensitivity: 55,
+    color: "#06b6d4",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["hilbert", "phase", "signal-processing", "premium", "overlay", "adaptive", "leading", "cycle"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1770,6 +1825,7 @@ const ALL_ITEMS = [
   APEX_PREDATOR_SIGNAL,
   PHANTOM_DIVERGENCE_TRACKER,
   CHAOS_SENTINEL,
+  HELIX_PHASE_ENGINE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

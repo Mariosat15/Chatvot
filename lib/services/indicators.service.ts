@@ -4990,3 +4990,143 @@ export function calculateChaosSentinel(
 
   return result;
 }
+
+// ─── Helix Phase Engine ──────────────────────────────────────────────────────
+export interface HelixPhaseEngineData {
+  time: number;
+  phaseLine: number;
+  upper: number;
+  lower: number;
+  phaseVelocity: number;
+  regime: "trending" | "consolidation" | "reversal";
+  signal: "lead_bull" | "lead_bear" | "sync" | "none";
+}
+
+export function calculateHelixPhaseEngine(
+  data: OHLCData[],
+  detrendPeriod: number = 20,
+  hilbertLength: number = 7,
+  ampMultiplier: number = 1.5,
+  velocitySmooth: number = 5,
+  leadSensitivity: number = 60,
+): HelixPhaseEngineData[] {
+  const minBars = detrendPeriod + hilbertLength * 2 + velocitySmooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const demaK = 2 / (detrendPeriod + 1);
+  const ema1 = new Array(len).fill(0);
+  const ema2 = new Array(len).fill(0);
+  ema1[0] = closes[0]; ema2[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    ema1[i] = ema1[i - 1] + demaK * (closes[i] - ema1[i - 1]);
+    ema2[i] = ema2[i - 1] + demaK * (ema1[i] - ema2[i - 1]);
+  }
+  const dema = ema1.map((v, i) => 2 * v - ema2[i]);
+  const cycle = closes.map((c, i) => c - dema[i]);
+
+  const hLen = hilbertLength;
+  const kernel: number[] = [];
+  for (let k = -hLen; k <= hLen; k++) {
+    kernel.push(k % 2 !== 0 ? 2 / (Math.PI * k) : 0);
+  }
+  const hilbert = new Array(len).fill(0);
+  for (let i = hLen; i < len - hLen; i++) {
+    let sum = 0;
+    for (let k = -hLen; k <= hLen; k++) {
+      sum += kernel[k + hLen] * cycle[i - k];
+    }
+    hilbert[i] = sum;
+  }
+
+  const amplitude = new Array(len).fill(0);
+  const phase = new Array(len).fill(0);
+  for (let i = hLen; i < len; i++) {
+    amplitude[i] = Math.sqrt(cycle[i] * cycle[i] + hilbert[i] * hilbert[i]);
+    phase[i] = Math.atan2(hilbert[i], cycle[i]);
+  }
+
+  const unwrapped = new Array(len).fill(0);
+  unwrapped[hLen] = phase[hLen];
+  for (let i = hLen + 1; i < len; i++) {
+    let diff = phase[i] - phase[i - 1];
+    if (diff > Math.PI) diff -= 2 * Math.PI;
+    else if (diff < -Math.PI) diff += 2 * Math.PI;
+    unwrapped[i] = unwrapped[i - 1] + diff;
+  }
+
+  const rawVelocity = new Array(len).fill(0);
+  const instPeriod = new Array(len).fill(detrendPeriod);
+  for (let i = hLen + 1; i < len; i++) {
+    rawVelocity[i] = Math.abs(unwrapped[i] - unwrapped[i - 1]);
+    if (rawVelocity[i] > 0.001) {
+      instPeriod[i] = Math.min(Math.max(2 * Math.PI / rawVelocity[i], 4), detrendPeriod * 4);
+    }
+  }
+
+  const smoothedVel = [...rawVelocity];
+  const vK = 2 / (velocitySmooth + 1);
+  for (let i = hLen + 2; i < len; i++) {
+    smoothedVel[i] = smoothedVel[i - 1] + vK * (rawVelocity[i] - smoothedVel[i - 1]);
+  }
+  const normWindow = detrendPeriod * 3;
+  const normVel = new Array(len).fill(50);
+  for (let i = normWindow + hLen; i < len; i++) {
+    let mn = Infinity, mx = -Infinity;
+    for (let j = i - normWindow; j <= i; j++) {
+      if (smoothedVel[j] < mn) mn = smoothedVel[j];
+      if (smoothedVel[j] > mx) mx = smoothedVel[j];
+    }
+    normVel[i] = mx > mn ? ((smoothedVel[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  const phaseLine = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) {
+    const adaptK = 2 / (Math.max(instPeriod[i], 2) + 1);
+    phaseLine[i] = phaseLine[i - 1] + adaptK * (closes[i] - phaseLine[i - 1]);
+  }
+
+  const smoothAmp = [...amplitude];
+  for (let i = hLen + 1; i < len; i++) {
+    smoothAmp[i] = smoothAmp[i - 1] + vK * (amplitude[i] - smoothAmp[i - 1]);
+  }
+
+  const startIdx = normWindow + hLen + 2;
+  const result: HelixPhaseEngineData[] = [];
+  let prevRegime: HelixPhaseEngineData["regime"] = "consolidation";
+  let prevPhaseLine = phaseLine[startIdx - 1];
+  let prevClose = closes[startIdx - 1];
+
+  for (let i = startIdx; i < len; i++) {
+    const vel = normVel[i];
+    const regime: HelixPhaseEngineData["regime"] =
+      vel >= leadSensitivity + 10 ? "trending" :
+      vel <= leadSensitivity - 20 ? "consolidation" : "reversal";
+
+    let signal: HelixPhaseEngineData["signal"] = "none";
+    const plCrossUp = prevPhaseLine < prevClose && phaseLine[i] >= closes[i];
+    const plCrossDown = prevPhaseLine > prevClose && phaseLine[i] <= closes[i];
+    if (plCrossUp && vel > leadSensitivity) signal = "lead_bear";
+    else if (plCrossDown && vel > leadSensitivity) signal = "lead_bull";
+    else if (regime === "consolidation" && prevRegime !== "consolidation") signal = "sync";
+
+    const envWidth = smoothAmp[i] * ampMultiplier;
+    result.push({
+      time: data[i].time,
+      phaseLine: phaseLine[i],
+      upper: phaseLine[i] + envWidth,
+      lower: phaseLine[i] - envWidth,
+      phaseVelocity: vel,
+      regime,
+      signal,
+    });
+
+    prevRegime = regime;
+    prevPhaseLine = phaseLine[i];
+    prevClose = closes[i];
+  }
+
+  return result;
+}
