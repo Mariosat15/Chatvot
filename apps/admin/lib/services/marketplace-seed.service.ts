@@ -1819,6 +1819,8 @@ const PRISM_WAVELET_CASCADE: Partial<IMarketplaceItem> = {
   pricingModel: "one_time",
   price: 39.99,
   currency: "USD",
+  status: "active",
+  isPublished: true,
   indicatorType: "prism_wavelet_cascade",
   iconName: "Layers",
   codeTemplate: JSON.stringify({
@@ -1845,12 +1847,13 @@ const MIRAGE_DEPTH_SCANNER: Partial<IMarketplaceItem> = {
   shortDescription:
     "Singular Spectrum Analysis overlay — extracts true trend via eigendecomposition, pulsating depth corridor, emerge/submerge regime signals.",
   fullDescription: "# Mirage Depth Scanner\n\nUses **Singular Spectrum Analysis (SSA)** to decompose price into trend, oscillatory, and noise components via eigendecomposition. The **Depth Line** shows the true extracted trend (gold/emerald for bull, crimson/violet for bear). The **Signal Corridor** visualizes oscillatory cycle amplitude. **EMERGE** signals when trend surfaces from noise; **SUBMERGE** when it weakens.\n\n## How to Trade\n1. Follow Depth Line direction when depth score is high\n2. EMERGE = strong entry, SUBMERGE = exit/reduce\n3. Corridor width indicates oscillation strength\n4. Avoid trading in surface regime (noise dominates)",
-  category: "indicators",
+  category: "indicator",
   subcategory: "premium",
   price: 69.99,
   currency: "USD",
-  status: "published",
-  featured: true,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
   indicatorType: "mirage_depth_scanner",
   iconName: "Layers",
   codeTemplate: JSON.stringify({
@@ -1880,7 +1883,8 @@ const QUANTUM_DRIFT_MAPPER: Partial<IMarketplaceItem> = {
   category: "indicator",
   subcategory: "premium",
   price: 49.99,
-  status: "published",
+  status: "active",
+  isPublished: true,
   indicatorType: "quantum_drift_mapper",
   iconName: "Zap",
   codeTemplate: JSON.stringify({

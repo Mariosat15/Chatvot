@@ -2213,6 +2213,9 @@ A proprietary metric measures how closely the 4 layers agree:
   pricingModel: "one_time",
   price: 39.99,
   currency: "USD",
+  status: "active",
+  isPublished: true,
+  isFeatured: false,
   indicatorType: "prism_wavelet_cascade",
   iconName: "Layers",
   codeTemplate: JSON.stringify({
@@ -2279,12 +2282,13 @@ The oscillatory component creates a dynamic corridor (upper/lower bands) around 
 - **Corridor Multiplier** (default 1.5): Scales oscillatory bands
 - **Depth Smooth** (default 5): EMA smoothing on depth score
 - **Signal Threshold** (default 65): Depth level for emerge/submerge signals`,
-  category: "indicators",
+  category: "indicator",
   subcategory: "premium",
   price: 69.99,
   currency: "USD",
-  status: "published",
-  featured: true,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
   indicatorType: "mirage_depth_scanner",
   iconName: "Layers",
   codeTemplate: JSON.stringify({
@@ -2347,7 +2351,9 @@ Dynamic upper/lower bands that reflect market regime:
   category: "indicator",
   subcategory: "premium",
   price: 49.99,
-  status: "published",
+  status: "active",
+  isPublished: true,
+  isFeatured: false,
   indicatorType: "quantum_drift_mapper",
   iconName: "Zap",
   codeTemplate: JSON.stringify({

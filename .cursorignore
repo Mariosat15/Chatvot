@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+.next
+coverage
+logs
+
+*.log
+*.csv
+*.parquet
+*.map
+*.zip
+*.tar
