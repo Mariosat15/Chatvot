@@ -3270,7 +3270,7 @@ const LightweightTradingChart = ({
           }
 
           // SAR dots — plotted as a thin scatter line (single points per bar)
-          if (indicator.visibility?.sar !== false) {
+          if ((indicator.visibility as any)?.sar !== false) {
             const steSarSeries = chart.addLineSeries({
               color: "#ce93d8", lineWidth: 1 as any, lineStyle: 0 as any,
               title: `${indicator.customLabel || "STE"} SAR`, priceScaleId: "right",
