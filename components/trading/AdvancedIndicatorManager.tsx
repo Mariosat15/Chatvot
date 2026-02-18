@@ -372,6 +372,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 20, kamaFast: 2, kamaSlow: 30, convergenceThreshold: 70 },
     paramLabels: { period: "Period", kamaFast: "KAMA Fast", kamaSlow: "KAMA Slow", convergenceThreshold: "Conv. Threshold" },
   },
+  flux_momentum_trail: {
+    name: "Flux Momentum Trail",
+    shortName: "FMT",
+    displayType: "overlay" as const,
+    defaultParams: { fastPeriod: 8, slowPeriod: 21, rocPeriod: 12, atrPeriod: 14, surgeThreshold: 70 },
+    paramLabels: { fastPeriod: "Fast Period", slowPeriod: "Slow Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", surgeThreshold: "Surge Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

@@ -1789,6 +1789,111 @@ No indicator guarantees profits. WCE provides high-confidence signals by requiri
   riskLevel: "medium",
 };
 
+const FLUX_MOMENTUM_TRAIL: Partial<IMarketplaceItem> = {
+  name: "Flux Momentum Trail",
+  slug: "flux-momentum-trail",
+  shortDescription:
+    "Per-bar gradient-colored momentum line. A single DEMA trail that shifts through a color spectrum from deep green to deep red based on real-time momentum strength.",
+  fullDescription: `# Flux Momentum Trail
+
+## Overview
+**Flux Momentum Trail** is a premium on-chart overlay that renders a **single continuous line with per-bar dynamic color grading**. Unlike traditional indicators that use one or two colors, every single bar of this line has its own color drawn from a momentum spectrum — making trend strength and direction instantly visible at a glance.
+
+## How It Works
+
+### Adaptive Trail (DEMA)
+The trail line uses a **Double Exponential Moving Average** for responsive yet smooth price tracking. It reacts faster than a standard EMA while filtering out noise.
+
+### Composite Momentum Score (-100 to +100)
+Three factors combine into a single momentum reading:
+- **Trend Component**: Distance between fast DEMA and slow EMA, normalized by ATR
+- **Rate of Change**: Price velocity over the ROC period
+- **Volume Boost**: When volume exceeds its average, momentum scores are amplified in the trend direction
+
+### Color Spectrum
+Each bar gets its own color based on momentum strength:
+- **Deep Green** (#15803d): Extreme bullish momentum (80-100)
+- **Bright Green** (#22c55e): Strong bullish (60-80)
+- **Light Green** (#4ade80): Moderate bullish (40-60)
+- **Teal** (#06b6d4): Mild bullish (20-40)
+- **Gray** (#94a3b8): Neutral / no momentum (0-20)
+- **Orange** (#f97316): Mild bearish (-20 to -40)
+- **Light Red** (#f87171): Moderate bearish (-40 to -60)
+- **Bright Red** (#ef4444): Strong bearish (-60 to -80)
+- **Deep Red** (#b91c1c): Extreme bearish (-80 to -100)
+
+### Signal Markers
+- **SURGE** (green arrow up): Momentum crosses above surge threshold — explosive bullish move
+- **SURGE** (red arrow down): Momentum crosses below negative threshold — explosive bearish move
+- **FADE** (yellow circle): Momentum collapses back to neutral — trend exhaustion warning
+
+## How to Trade With It
+
+### Trend Following
+1. Enter long when the trail turns bright/deep green (momentum > 60)
+2. Enter short when the trail turns bright/deep red (momentum < -60)
+3. The color gradient shows conviction — deeper color = stronger trend
+
+### Momentum Surge Entry
+1. Wait for a SURGE marker (momentum breakout)
+2. Enter in the surge direction — these mark the start of explosive moves
+3. Stop-loss below/above the trail line
+
+### Fade / Exit Signal
+1. FADE markers warn that momentum is dying
+2. Tighten stops or take profits when FADE appears
+3. Don't re-enter until a new SURGE fires
+
+### Color Transition Reading
+1. Watch the color shift in real-time: green→teal→gray = bullish momentum fading
+2. Gray→orange→red = bearish momentum building
+3. Quick color flips (green→red) = sharp reversal — be cautious
+
+## Settings Guide
+- **Fast Period** (8): DEMA trail responsiveness — lower = faster
+- **Slow Period** (21): Momentum reference EMA — the baseline for trend measurement
+- **ROC Period** (12): Rate of change lookback — measures price velocity
+- **ATR Period** (14): Normalization period — adapts to volatility
+- **Surge Threshold** (70): Minimum momentum score for SURGE signals (0-100)
+
+## What Makes It Different
+| Feature | Standard MA | Flux Momentum Trail |
+|---------|-----------|-------------------|
+| Coloring | Single color | Per-bar gradient spectrum |
+| Information | Direction only | Direction + strength + acceleration |
+| Signals | None | SURGE + FADE markers |
+| Momentum | Not shown | Built into color (-100 to +100) |
+| Volume | Ignored | Amplifies momentum readings |
+
+## Risk Warning
+No indicator guarantees profits. Flux Momentum Trail visualizes momentum strength, but all trading involves risk. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 30,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "flux_momentum_trail",
+  iconName: "Flame",
+  codeTemplate: JSON.stringify({
+    type: "flux_momentum_trail",
+    displayType: "overlay",
+    description: "Per-bar gradient-colored momentum line with SURGE/FADE signals",
+  }),
+  defaultSettings: {
+    fastPeriod: 8,
+    slowPeriod: 21,
+    rocPeriod: 12,
+    atrPeriod: 14,
+    surgeThreshold: 70,
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["momentum", "gradient", "color", "trail", "premium", "overlay", "dema", "volume", "surge", "fade", "spectrum"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1802,6 +1907,7 @@ const ALL_ITEMS = [
   AURORA_CASCADE_FLOW,
   ECLIPSE_STEALTH_TRAIL,
   WRAITH_CONVERGENCE_ENGINE,
+  FLUX_MOMENTUM_TRAIL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

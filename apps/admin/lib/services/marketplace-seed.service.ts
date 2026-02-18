@@ -1542,6 +1542,65 @@ No indicator guarantees profits. Always use proper position sizing and risk mana
   riskLevel: "medium",
 };
 
+const FLUX_MOMENTUM_TRAIL: Partial<IMarketplaceItem> = {
+  name: "Flux Momentum Trail",
+  slug: "flux-momentum-trail",
+  shortDescription:
+    "Per-bar gradient-colored momentum line. A single DEMA trail that shifts through a color spectrum from deep green to deep red based on real-time momentum strength.",
+  fullDescription: `# Flux Momentum Trail
+
+## Overview
+**Flux Momentum Trail** renders a single continuous line with **per-bar dynamic color grading** based on a composite momentum score (-100 to +100). Every bar gets its own color from a spectrum — making trend strength instantly visible.
+
+## How It Works
+- **DEMA trail** for responsive, smooth price tracking
+- **Composite momentum** from trend distance + ROC + volume boost
+- **9-color spectrum**: deep green → bright green → teal → gray → orange → light red → bright red → deep red
+- **SURGE markers** when momentum breaks the threshold — explosive move starting
+- **FADE markers** when momentum collapses — trend exhaustion warning
+
+## How to Trade
+1. **Trend follow**: Enter when trail turns bright/deep green (long) or red (short)
+2. **SURGE entry**: Enter on SURGE markers — marks start of explosive moves
+3. **FADE exit**: Tighten stops on FADE — momentum dying
+4. **Color reading**: Watch gradient shifts in real-time for early warnings
+
+## Settings
+- **Fast Period** (8): DEMA responsiveness
+- **Slow Period** (21): Momentum reference baseline
+- **ROC Period** (12): Price velocity lookback
+- **ATR Period** (14): Volatility normalization
+- **Surge Threshold** (70): Minimum for SURGE signals
+
+## Risk Warning
+No indicator guarantees profits. Always use stop-losses and proper position sizing.`,
+  category: "indicator",
+  price: 30,
+  isFree: false,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  version: "1.0.0",
+  indicatorType: "flux_momentum_trail",
+  iconName: "Flame",
+  codeTemplate: JSON.stringify({
+    type: "flux_momentum_trail",
+    displayType: "overlay",
+    description: "Per-bar gradient-colored momentum line with SURGE/FADE signals",
+  }),
+  defaultSettings: {
+    fastPeriod: 8,
+    slowPeriod: 21,
+    rocPeriod: 12,
+    atrPeriod: 14,
+    surgeThreshold: 70,
+    lineWidth: 3,
+  },
+  supportedAssets: [],
+  tags: ["momentum", "gradient", "color", "trail", "premium", "overlay", "dema", "volume", "surge", "fade", "spectrum"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1555,6 +1614,7 @@ const ALL_ITEMS = [
   AURORA_CASCADE_FLOW,
   ECLIPSE_STEALTH_TRAIL,
   WRAITH_CONVERGENCE_ENGINE,
+  FLUX_MOMENTUM_TRAIL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

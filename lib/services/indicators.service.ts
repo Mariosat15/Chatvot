@@ -4530,3 +4530,127 @@ function _wma(src: number[], period: number): number[] {
   }
   return out;
 }
+
+// ============================================================================
+// FLUX MOMENTUM TRAIL - Per-bar gradient-colored momentum line
+// ============================================================================
+
+export interface FluxMomentumTrailData {
+  time: number;
+  trail: number;
+  momentum: number;  // -100 to 100
+  color: string;
+  signal: "surge_bull" | "surge_bear" | "fade" | "none";
+}
+
+export function calculateFluxMomentumTrail(
+  data: OHLCData[],
+  fastPeriod: number = 8,
+  slowPeriod: number = 21,
+  rocPeriod: number = 12,
+  atrPeriod: number = 14,
+  surgeThreshold: number = 70,
+): FluxMomentumTrailData[] {
+  const minBars = Math.max(slowPeriod * 2, rocPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const volumes = data.map((d) => d.volume || 0);
+  const len = data.length;
+
+  // DEMA (Double EMA) for the trail line
+  const emaFast1 = _emaArr(closes, fastPeriod);
+  const emaFast2 = _emaArr(emaFast1, fastPeriod);
+  const dema = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) dema[i] = 2 * emaFast1[i] - emaFast2[i];
+
+  // Slow EMA for momentum reference
+  const emaSlow = _emaArr(closes, slowPeriod);
+
+  // Rate of Change
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) {
+    roc[i] = closes[i - rocPeriod] > 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  }
+
+  // ATR for normalization
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = _emaArr(tr, atrPeriod);
+
+  // Volume ratio (current vs average)
+  const volAvg = _emaArr(volumes, slowPeriod);
+
+  // Composite momentum score (-100 to 100)
+  const momentum = new Array(len).fill(0);
+  for (let i = minBars; i < len; i++) {
+    const trendComponent = atr[i] > 0 ? ((dema[i] - emaSlow[i]) / atr[i]) * 25 : 0;
+    const rocComponent = Math.max(-50, Math.min(50, roc[i] * 5));
+    const volRatio = volAvg[i] > 0 ? volumes[i] / volAvg[i] : 1;
+    const volBoost = Math.min(volRatio - 1, 1) * 25 * Math.sign(trendComponent);
+    momentum[i] = Math.max(-100, Math.min(100, trendComponent + rocComponent + volBoost));
+  }
+
+  // Smooth momentum
+  const smoothMom = _emaArr(momentum, 3);
+
+  // Map momentum to color
+  const result: FluxMomentumTrailData[] = [];
+  let prevMomAbs = 0;
+
+  for (let i = minBars; i < len; i++) {
+    const m = smoothMom[i];
+    const absM = Math.abs(m);
+    const color = _momentumToColor(m);
+
+    let signal: "surge_bull" | "surge_bear" | "fade" | "none" = "none";
+    if (absM >= surgeThreshold && prevMomAbs < surgeThreshold) {
+      signal = m > 0 ? "surge_bull" : "surge_bear";
+    } else if (absM < surgeThreshold * 0.4 && prevMomAbs >= surgeThreshold * 0.4) {
+      signal = "fade";
+    }
+
+    prevMomAbs = absM;
+
+    result.push({
+      time: data[i].time,
+      trail: dema[i],
+      momentum: Math.round(m),
+      color,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+function _emaArr(src: number[], period: number): number[] {
+  const len = src.length;
+  const out = new Array(len).fill(0);
+  const k = 2 / (period + 1);
+  out[0] = src[0];
+  for (let i = 1; i < len; i++) out[i] = src[i] * k + out[i - 1] * (1 - k);
+  return out;
+}
+
+function _momentumToColor(m: number): string {
+  const abs = Math.abs(m);
+  if (m > 0) {
+    if (abs >= 80) return "#15803d";
+    if (abs >= 60) return "#22c55e";
+    if (abs >= 40) return "#4ade80";
+    if (abs >= 20) return "#06b6d4";
+    return "#94a3b8";
+  } else {
+    if (abs >= 80) return "#b91c1c";
+    if (abs >= 60) return "#ef4444";
+    if (abs >= 40) return "#f87171";
+    if (abs >= 20) return "#f97316";
+    return "#94a3b8";
+  }
+}

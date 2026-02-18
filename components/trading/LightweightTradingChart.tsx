@@ -102,6 +102,7 @@ import {
   calculateAuroraCascadeFlow,
   calculateEclipseStealthTrail,
   calculateWraithConvergenceEngine,
+  calculateFluxMomentumTrail,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -2558,6 +2559,69 @@ const LightweightTradingChart = ({
             try { bearSeries.setMarkers(sorted); } catch {}
           }
 
+        // Flux Momentum Trail: single line with per-bar gradient coloring + surge markers
+        } else if (indicator.type === "flux_momentum_trail") {
+          const fmtData = calculateFluxMomentumTrail(
+            transformedCandles,
+            indicator.parameters.fastPeriod || 8,
+            indicator.parameters.slowPeriod || 21,
+            indicator.parameters.rocPeriod || 12,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.surgeThreshold || 70,
+          );
+
+          const trailSeries = chart.addLineSeries({
+            color: "#94a3b8",
+            lineWidth: (indicator.lineWidth || 3) as any,
+            lineStyle: 0 as any,
+            title: indicator.customLabel || "Flux Momentum Trail",
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: true,
+          });
+
+          const coloredData = fmtData.map((d) => ({
+            time: d.time as UTCTimestamp,
+            value: d.trail,
+            color: d.color,
+          }));
+          trailSeries.setData(coloredData);
+          indicatorSeriesRef.current.set(`${indicator.id}_trail`, trailSeries);
+
+          const markers: any[] = [];
+          for (const d of fmtData) {
+            if (d.signal === "surge_bull") {
+              markers.push({
+                time: d.time as UTCTimestamp,
+                position: "belowBar" as const,
+                color: "#22c55e",
+                shape: "arrowUp" as const,
+                text: "SURGE",
+                size: 2,
+              });
+            } else if (d.signal === "surge_bear") {
+              markers.push({
+                time: d.time as UTCTimestamp,
+                position: "aboveBar" as const,
+                color: "#ef4444",
+                shape: "arrowDown" as const,
+                text: "SURGE",
+                size: 2,
+              });
+            } else if (d.signal === "fade") {
+              markers.push({
+                time: d.time as UTCTimestamp,
+                position: d.momentum >= 0 ? ("belowBar" as const) : ("aboveBar" as const),
+                color: "#f59e0b",
+                shape: "circle" as const,
+                text: "FADE",
+                size: 1,
+              });
+            }
+          }
+          const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+          try { trailSeries.setMarkers(sorted); } catch {}
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -2968,6 +3032,22 @@ const LightweightTradingChart = ({
                     }
                     if (bullS) bullS.setData(bullD);
                     if (bearS) bearS.setData(bearD);
+                  }
+                }
+              } else if (_ovlType === "flux_momentum_trail") {
+                const fmtData = calculateFluxMomentumTrail(
+                  tc, p.fastPeriod || 8, p.slowPeriod || 21, p.rocPeriod || 12,
+                  p.atrPeriod || 14, p.surgeThreshold || 70,
+                );
+                if (fmtData.length > 0) {
+                  const trailS = _ovlSeriesMap.get(`${_ovlId}_trail`);
+                  if (trailS) {
+                    if (mode === "light") {
+                      const last = fmtData[fmtData.length - 1];
+                      trailS.update({ time: last.time as UTCTimestamp, value: last.trail, color: last.color } as any);
+                    } else {
+                      trailS.setData(fmtData.map(d => ({ time: d.time as UTCTimestamp, value: d.trail, color: d.color })));
+                    }
                   }
                 }
               }

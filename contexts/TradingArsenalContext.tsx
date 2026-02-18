@@ -41,7 +41,8 @@ export type IndicatorType =
   | "titan_pulse_signal"
   | "aurora_cascade_flow"
   | "eclipse_stealth_trail"
-  | "wraith_convergence_engine";
+  | "wraith_convergence_engine"
+  | "flux_momentum_trail";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -486,6 +487,8 @@ const INDICATOR_TYPE_MAP: Record<
   "eclipse stealth trail": { type: "eclipse_stealth_trail", displayType: "overlay" },
   wraith_convergence_engine: { type: "wraith_convergence_engine", displayType: "overlay" },
   "wraith convergence engine": { type: "wraith_convergence_engine", displayType: "overlay" },
+  flux_momentum_trail: { type: "flux_momentum_trail", displayType: "overlay" },
+  "flux momentum trail": { type: "flux_momentum_trail", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -777,6 +780,13 @@ export function marketplaceItemToIndicator(
       params.kamaFast = settings?.kamaFast || 2;
       params.kamaSlow = settings?.kamaSlow || 30;
       params.convergenceThreshold = settings?.convergenceThreshold || 70;
+      break;
+    case "flux_momentum_trail":
+      params.fastPeriod = settings?.fastPeriod || 8;
+      params.slowPeriod = settings?.slowPeriod || 21;
+      params.rocPeriod = settings?.rocPeriod || 12;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.surgeThreshold = settings?.surgeThreshold || 70;
       break;
     default:
       // Generic period-based indicators
