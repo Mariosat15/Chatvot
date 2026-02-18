@@ -111,6 +111,7 @@ import {
   calculateMirageDepthScanner,
   calculateQuantumDriftMapper,
   calculateSovereignGravityArc,
+  calculateSolarisTrendEngine,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3196,6 +3197,92 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, sgaLowerSeries);
           }
 
+        } else if (indicator.type === "solaris_trend_engine") {
+          const steData = calculateSolarisTrendEngine(
+            transformedCandles,
+            indicator.parameters.kamaFast || 2,
+            indicator.parameters.kamaSlow || 30,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.supertrendMult || 3.0,
+            indicator.parameters.adxPeriod || 14,
+            indicator.parameters.adxThreshold || 25,
+          );
+
+          // Color: bull+strong=gold, bear+strong=crimson, neutral/weak=slate silver
+          const steColor = (trend: string, adx: number, threshold: number): string => {
+            if (trend === "bull") return adx >= threshold * 1.5 ? "#ffd700" : adx >= threshold ? "#ffb300" : "#78909c";
+            if (trend === "bear") return adx >= threshold * 1.5 ? "#ff1744" : adx >= threshold ? "#f44336" : "#78909c";
+            return "#78909c";
+          };
+
+          const steMarkers: any[] = [];
+          const adxThr = indicator.parameters.adxThreshold || 25;
+          for (const d of steData) {
+            if (d.signal === "fusion_bull") {
+              steMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#ffd700", shape: "arrowUp" as const, text: "⭐ FUSION ▲", size: 2 });
+            } else if (d.signal === "fusion_bear") {
+              steMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff1744", shape: "arrowDown" as const, text: "⭐ FUSION ▼", size: 2 });
+            }
+          }
+
+          // Solar Core (KAMA adaptive spine) — main dynamic line
+          if (indicator.visibility?.middle !== false) {
+            const steCoreSeries = chart.addLineSeries({
+              color: "#ffd700", lineWidth: 2 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Solaris Trend Engine", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            steCoreSeries.setData(steData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.solarCore,
+              color: steColor(d.trend, d.adxStrength, adxThr),
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_core`, steCoreSeries);
+            const sortedSte = steMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { steCoreSeries.setMarkers(sortedSte); } catch {}
+          }
+
+          // Upper Supertrend band — dashed
+          if (indicator.visibility?.upper !== false) {
+            const steUpperSeries = chart.addLineSeries({
+              color: "#ef5350", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "STE"} Upper`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            steUpperSeries.setData(steData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.upperBand,
+              color: d.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)",
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_upper`, steUpperSeries);
+          }
+
+          // Lower Supertrend band — dashed
+          if (indicator.visibility?.lower !== false) {
+            const steLowerSeries = chart.addLineSeries({
+              color: "#26a69a", lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "STE"} Lower`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            steLowerSeries.setData(steData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.lowerBand,
+              color: d.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)",
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_lower`, steLowerSeries);
+          }
+
+          // SAR dots — plotted as a thin scatter line (single points per bar)
+          if (indicator.visibility?.sar !== false) {
+            const steSarSeries = chart.addLineSeries({
+              color: "#ce93d8", lineWidth: 1 as any, lineStyle: 0 as any,
+              title: `${indicator.customLabel || "STE"} SAR`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            steSarSeries.setData(steData.map(d => ({
+              time: d.time as UTCTimestamp, value: d.sarDot,
+              color: d.sarDot > d.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)",
+            })));
+            indicatorSeriesRef.current.set(`${indicator.id}_sar`, steSarSeries);
+          }
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3797,7 +3884,7 @@ const LightweightTradingChart = ({
                 const sgaData = calculateSovereignGravityArc(
                   tc, p.gravityWindow || 30, p.orbitalRadius || 2.0, p.velocitySmooth || 5, p.escapeMultiplier || 1.8,
                 );
-                if (sgaData.length > 0) {
+                  if (sgaData.length > 0) {
                   const sgaC = (v: number, s: string) => (s === "escape_up" || s === "escape_down") ? (v > 0.85 ? "#ffffff" : v > 0.7 ? "#f3e5f5" : "#e040fb") : s === "capturing" ? "#00e5ff" : v > 0.5 ? "#ce93d8" : "#9c27b0";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_center`);
@@ -3812,6 +3899,31 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
                     if (cS) cS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.center, color: hexToRgba(sgaC(d.velocityNorm, d.state), 100) })));
                     if (lS) lS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
+                  }
+                }
+              } else if (_ovlType === "solaris_trend_engine") {
+                const steData = calculateSolarisTrendEngine(
+                  tc, p.kamaFast || 2, p.kamaSlow || 30, p.atrPeriod || 14, p.supertrendMult || 3.0, p.adxPeriod || 14, p.adxThreshold || 25,
+                );
+                if (steData.length > 0) {
+                  const thr = p.adxThreshold || 25;
+                  const steC = (trend: string, adx: number) => trend === "bull" ? (adx >= thr * 1.5 ? "#ffd700" : adx >= thr ? "#ffb300" : "#78909c") : trend === "bear" ? (adx >= thr * 1.5 ? "#ff1744" : adx >= thr ? "#f44336" : "#78909c") : "#78909c";
+                  const corS = _ovlSeriesMap.get(`${_ovlId}_core`);
+                  const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
+                  const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
+                  const sarS = _ovlSeriesMap.get(`${_ovlId}_sar`);
+                  if (mode === "light") {
+                    const last = steData[steData.length - 1];
+                    const c = steC(last.trend, last.adxStrength);
+                    if (corS) corS.update({ time: last.time as UTCTimestamp, value: last.solarCore, color: c } as any);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upperBand, color: last.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)" } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lowerBand, color: last.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)" } as any);
+                    if (sarS) sarS.update({ time: last.time as UTCTimestamp, value: last.sarDot, color: last.sarDot > last.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)" } as any);
+                  } else {
+                    if (corS) corS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.solarCore, color: steC(d.trend, d.adxStrength) })));
+                    if (uS) uS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperBand, color: d.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)" })));
+                    if (lS) lS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerBand, color: d.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)" })));
+                    if (sarS) sarS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.sarDot, color: d.sarDot > d.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)" })));
                   }
                 }
               }

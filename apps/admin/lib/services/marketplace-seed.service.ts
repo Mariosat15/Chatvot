@@ -1938,6 +1938,40 @@ const SOVEREIGN_GRAVITY_ARC: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const SOLARIS_TREND_ENGINE: Partial<IMarketplaceItem> = {
+  name: "Solaris Trend Engine",
+  slug: "solaris-trend-engine",
+  shortDescription:
+    "Hybrid composite overlay fusing KAMA + Supertrend + ADX + Parabolic SAR + EMA Cross into a single adaptive trend system with FUSION signals and SAR acceleration dots.",
+  fullDescription: `# Solaris Trend Engine\n\n## Overview\n**Solaris Trend Engine** fuses five institutional-grade trend systems into one beautiful overlay: KAMA adaptive spine, Supertrend bands, ADX strength gating, Parabolic SAR dots, and EMA cross confirmation.\n\n## Signal Types\n- **FUSION BULL ▲**: All components aligned bullish + ADX confirmed — enter long\n- **FUSION BEAR ▼**: All components aligned bearish + ADX confirmed — enter short\n\n## Visual Guide\n- 🟡 Gold Solar Core → Strong bull trend\n- 🔴 Crimson Solar Core → Strong bear trend\n- ⚪ Silver Solar Core → Neutral/choppy\n- SAR dots above price → deceleration/exit warning\n- SAR dots below price → acceleration/hold signal\n\n## How to Trade\n1. Enter on FUSION signal, stop beyond Supertrend band\n2. Trail stops with SAR dot migration\n3. Ignore signals when Solar Core is silver (ADX < threshold)`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 59.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "solaris_trend_engine",
+  iconName: "Sun",
+  codeTemplate: JSON.stringify({
+    type: "solaris_trend_engine",
+    displayType: "overlay",
+    description: "Hybrid composite: KAMA + Supertrend + ADX + Parabolic SAR + EMA cross — five fusion engines in one chart overlay",
+  }),
+  defaultSettings: {
+    kamaFast: 2,
+    kamaSlow: 30,
+    atrPeriod: 14,
+    supertrendMult: 3.0,
+    adxPeriod: 14,
+    adxThreshold: 25,
+    color: "#ffd700",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kama", "supertrend", "adx", "parabolic-sar", "ema-cross", "hybrid", "composite", "trend", "premium", "overlay", "fusion", "adaptive"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1960,6 +1994,7 @@ const ALL_ITEMS = [
   MIRAGE_DEPTH_SCANNER,
   QUANTUM_DRIFT_MAPPER,
   SOVEREIGN_GRAVITY_ARC,
+  SOLARIS_TREND_ENGINE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

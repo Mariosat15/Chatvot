@@ -2442,6 +2442,84 @@ Measures how fast price is accelerating away from the gravity center, normalized
   riskLevel: "medium",
 };
 
+const SOLARIS_TREND_ENGINE = {
+  name: "Solaris Trend Engine",
+  slug: "solaris-trend-engine",
+  description: `## Solaris Trend Engine
+
+The **Solaris Trend Engine** is a state-of-the-art hybrid composite indicator that fuses five institutional-grade trend systems into a single, beautifully integrated on-chart overlay. It combines **KAMA** (Kaufman Adaptive Moving Average), **Supertrend**, **ADX** strength gating, **Parabolic SAR** acceleration dots, and **EMA cross confirmation** — all working in concert to produce high-conviction trend signals.
+
+### The Five Fusion Engines
+
+**1. KAMA — Solar Core Line**
+The adaptive spine of the indicator. KAMA's efficiency ratio dynamically adjusts smoothing speed: fast during trends, slow during chop. The result is a clean, noise-resistant trend line that tracks only meaningful price movement.
+
+**2. Supertrend — Band Boundaries**
+ATR-based upper/lower bands define the trend direction and act as dynamic support/resistance. The active band flips sides when price crosses the boundary — giving clear visual context for trend reversals.
+
+**3. ADX — Strength Gating**
+The FUSION signal only fires when ADX exceeds the configured threshold (default 25). This filters out false trend flips in choppy markets, ensuring signals only appear in genuinely trending conditions.
+
+**4. Parabolic SAR — Acceleration Dots**
+A stream of SAR dots plotted above/below price. As the trend accelerates, SAR dots converge toward price — a classic acceleration warning system that complements the main line beautifully.
+
+**5. EMA Cross — Momentum Confirmation**
+A fast EMA vs slow EMA cross provides the final confirmation layer. All three directional components (Supertrend + KAMA slope + EMA cross) must agree for a trend classification.
+
+### Signal Types
+
+- **FUSION BULL ▲** (gold arrow below bar): All 5 components aligned bullish + ADX confirmed — highest conviction buy signal
+- **FUSION BEAR ▼** (crimson arrow above bar): All 5 components aligned bearish + ADX confirmed — highest conviction sell signal
+
+### Visual System
+
+| Visual Element | Meaning |
+|---|---|
+| 🟡 Gold Solar Core | Strong bull trend (ADX high) |
+| 🔴 Crimson Solar Core | Strong bear trend (ADX high) |
+| ⚪ Silver/slate Solar Core | Neutral / choppy market |
+| Dashed upper/lower bands | Supertrend boundaries |
+| Dots above price | SAR bearish dots (deceleration warning) |
+| Dots below price | SAR bullish dots (acceleration) |
+| ⭐ FUSION ▲ marker | All systems go — bull entry |
+| ⭐ FUSION ▼ marker | All systems go — bear entry |
+
+## How to Trade
+
+1. **FUSION BULL ▲**: Enter long on the next open. Place stop below the lower Supertrend band. Trail with SAR dots.
+2. **FUSION BEAR ▼**: Enter short on the next open. Place stop above the upper Supertrend band. Trail with SAR dots.
+3. **Gold Solar Core rising**: Trend is accelerating — add to winning long positions.
+4. **SAR dots crossing to opposite side**: Trend deceleration — reduce position or tighten stop.
+5. **Silver/slate Solar Core**: Market in consolidation — avoid new entries, wait for next FUSION signal.
+6. **ADX Threshold**: Increase for fewer but higher-quality signals; decrease for more frequent entries.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 59.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "solaris_trend_engine",
+  iconName: "Sun",
+  codeTemplate: JSON.stringify({
+    type: "solaris_trend_engine",
+    displayType: "overlay",
+    description: "Hybrid composite: KAMA + Supertrend + ADX + Parabolic SAR + EMA cross — five fusion engines in one chart overlay",
+  }),
+  defaultSettings: {
+    kamaFast: 2,
+    kamaSlow: 30,
+    atrPeriod: 14,
+    supertrendMult: 3.0,
+    adxPeriod: 14,
+    adxThreshold: 25,
+    color: "#ffd700",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kama", "supertrend", "adx", "parabolic-sar", "ema-cross", "hybrid", "composite", "trend", "premium", "overlay", "fusion", "adaptive"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2464,6 +2542,7 @@ const ALL_ITEMS = [
   MIRAGE_DEPTH_SCANNER,
   QUANTUM_DRIFT_MAPPER,
   SOVEREIGN_GRAVITY_ARC,
+  SOLARIS_TREND_ENGINE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

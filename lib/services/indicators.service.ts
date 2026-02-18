@@ -5626,3 +5626,200 @@ export function calculateSovereignGravityArc(
 
   return result;
 }
+
+// ============================================================================
+// SOLARIS TREND ENGINE — Hybrid: KAMA + Supertrend + ADX + Parabolic SAR + EMA Cross
+// ============================================================================
+
+export interface SolarisTrendEngineData {
+  time: number;
+  solarCore: number;     // KAMA adaptive spine (main line)
+  upperBand: number;     // Supertrend upper boundary
+  lowerBand: number;     // Supertrend lower boundary
+  sarDot: number;        // Parabolic SAR acceleration dot
+  adxStrength: number;   // ADX trend strength 0–100
+  trend: "bull" | "bear" | "neutral";
+  signal: "fusion_bull" | "fusion_bear" | "none";
+}
+
+export function calculateSolarisTrendEngine(
+  data: OHLCData[],
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  atrPeriod: number = 14,
+  supertrendMult: number = 3.0,
+  adxPeriod: number = 14,
+  adxThreshold: number = 25,
+): SolarisTrendEngineData[] {
+  const minBars = Math.max(kamaSlow, atrPeriod, adxPeriod) * 2 + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. KAMA (Solar Core) ────────────────────────────────────────────────
+  const kamaFastK = 2 / (kamaFast + 1);
+  const kamaSlowK = 2 / (kamaSlow + 1);
+  const kama = new Array(len).fill(closes[0]);
+  for (let i = kamaSlow; i < len; i++) {
+    let direction = Math.abs(closes[i] - closes[i - kamaSlow]);
+    let volatility = 0;
+    for (let j = i - kamaSlow + 1; j <= i; j++) {
+      volatility += Math.abs(closes[j] - closes[j - 1]);
+    }
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = Math.pow(er * (kamaFastK - kamaSlowK) + kamaSlowK, 2);
+    kama[i] = kama[i - 1] + sc * (closes[i] - kama[i - 1]);
+  }
+
+  // ── 2. ATR ──────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1]),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 3. Supertrend ───────────────────────────────────────────────────────
+  const upperBands = new Array(len).fill(0);
+  const lowerBands = new Array(len).fill(0);
+  const stDir = new Array(len).fill(1); // 1=bull, -1=bear
+  for (let i = atrPeriod; i < len; i++) {
+    const hl2 = (highs[i] + lows[i]) / 2;
+    const basicUpper = hl2 + supertrendMult * atr[i];
+    const basicLower = hl2 - supertrendMult * atr[i];
+
+    upperBands[i] = (basicUpper < upperBands[i - 1] || closes[i - 1] > upperBands[i - 1])
+      ? basicUpper : upperBands[i - 1];
+    lowerBands[i] = (basicLower > lowerBands[i - 1] || closes[i - 1] < lowerBands[i - 1])
+      ? basicLower : lowerBands[i - 1];
+
+    if (closes[i] > upperBands[i - 1]) stDir[i] = 1;
+    else if (closes[i] < lowerBands[i - 1]) stDir[i] = -1;
+    else stDir[i] = stDir[i - 1];
+  }
+
+  // ── 4. ADX ──────────────────────────────────────────────────────────────
+  const pdm = new Array(len).fill(0);
+  const ndm = new Array(len).fill(0);
+  const trArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const upMove = highs[i] - highs[i - 1];
+    const downMove = lows[i - 1] - lows[i];
+    pdm[i] = upMove > downMove && upMove > 0 ? upMove : 0;
+    ndm[i] = downMove > upMove && downMove > 0 ? downMove : 0;
+    trArr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const spdm = new Array(len).fill(0);
+  const sndm = new Array(len).fill(0);
+  const satr = new Array(len).fill(0);
+  const k = 2 / (adxPeriod + 1);
+  spdm[adxPeriod] = pdm.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  sndm[adxPeriod] = ndm.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  satr[adxPeriod] = trArr.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  for (let i = adxPeriod + 1; i < len; i++) {
+    spdm[i] = spdm[i - 1] + k * (pdm[i] - spdm[i - 1]);
+    sndm[i] = sndm[i - 1] + k * (ndm[i] - sndm[i - 1]);
+    satr[i] = satr[i - 1] + k * (trArr[i] - satr[i - 1]);
+  }
+  const dx = new Array(len).fill(0);
+  const adx = new Array(len).fill(0);
+  for (let i = adxPeriod; i < len; i++) {
+    const pdi = satr[i] > 0 ? 100 * spdm[i] / satr[i] : 0;
+    const ndi = satr[i] > 0 ? 100 * sndm[i] / satr[i] : 0;
+    dx[i] = pdi + ndi > 0 ? 100 * Math.abs(pdi - ndi) / (pdi + ndi) : 0;
+    adx[i] = i === adxPeriod ? dx[i] : adx[i - 1] + k * (dx[i] - adx[i - 1]);
+  }
+
+  // ── 5. Parabolic SAR ────────────────────────────────────────────────────
+  const sarStep = 0.02;
+  const sarMax = 0.2;
+  const sar = new Array(len).fill(closes[0]);
+  let sarBull = true;
+  let sarEP = lows[0];
+  let sarAF = sarStep;
+  for (let i = 1; i < len; i++) {
+    const prevSar = sar[i - 1];
+    let newSar = prevSar + sarAF * (sarEP - prevSar);
+    if (sarBull) {
+      newSar = Math.min(newSar, lows[i - 1], i >= 2 ? lows[i - 2] : lows[i - 1]);
+      if (lows[i] < newSar) {
+        sarBull = false; sarAF = sarStep; sarEP = highs[i]; newSar = sarEP;
+      } else {
+        if (highs[i] > sarEP) { sarEP = highs[i]; sarAF = Math.min(sarAF + sarStep, sarMax); }
+      }
+    } else {
+      newSar = Math.max(newSar, highs[i - 1], i >= 2 ? highs[i - 2] : highs[i - 1]);
+      if (highs[i] > newSar) {
+        sarBull = true; sarAF = sarStep; sarEP = lows[i]; newSar = sarEP;
+      } else {
+        if (lows[i] < sarEP) { sarEP = lows[i]; sarAF = Math.min(sarAF + sarStep, sarMax); }
+      }
+    }
+    sar[i] = newSar;
+  }
+
+  // ── 6. Fast/Slow EMA cross ──────────────────────────────────────────────
+  const emaFastP = Math.max(2, Math.round(kamaSlow / 4));
+  const emaSlowP = kamaSlow;
+  const emaFast = new Array(len).fill(closes[0]);
+  const emaSlow = new Array(len).fill(closes[0]);
+  const ef = 2 / (emaFastP + 1);
+  const es = 2 / (emaSlowP + 1);
+  for (let i = 1; i < len; i++) {
+    emaFast[i] = emaFast[i - 1] + ef * (closes[i] - emaFast[i - 1]);
+    emaSlow[i] = emaSlow[i - 1] + es * (closes[i] - emaSlow[i - 1]);
+  }
+
+  // ── 7. Composite classification + output ────────────────────────────────
+  const result: SolarisTrendEngineData[] = [];
+  let prevTrend: SolarisTrendEngineData["trend"] = "neutral";
+
+  for (let i = minBars; i < len; i++) {
+    const adxVal = Math.min(100, Math.max(0, adx[i]));
+    const stBull = stDir[i] === 1;
+    const kamaBull = kama[i] > kama[i - 1];
+    const emaCross = emaFast[i] > emaSlow[i];
+
+    let trend: SolarisTrendEngineData["trend"];
+    if (stBull && kamaBull && emaCross) {
+      trend = "bull";
+    } else if (!stBull && !kamaBull && !emaCross) {
+      trend = "bear";
+    } else {
+      trend = "neutral";
+    }
+
+    let signal: SolarisTrendEngineData["signal"] = "none";
+    if (trend === "bull" && prevTrend !== "bull" && adxVal >= adxThreshold) {
+      signal = "fusion_bull";
+    } else if (trend === "bear" && prevTrend !== "bear" && adxVal >= adxThreshold) {
+      signal = "fusion_bear";
+    }
+
+    // Bands: use supertrend's active boundary
+    const activeBand = stBull ? lowerBands[i] : upperBands[i];
+    const bandOther = stBull ? upperBands[i] : lowerBands[i];
+
+    prevTrend = trend;
+    result.push({
+      time: data[i].time,
+      solarCore: kama[i],
+      upperBand: Math.max(activeBand, bandOther),
+      lowerBand: Math.min(activeBand, bandOther),
+      sarDot: sar[i],
+      adxStrength: adxVal,
+      trend,
+      signal,
+    });
+  }
+
+  return result;
+}

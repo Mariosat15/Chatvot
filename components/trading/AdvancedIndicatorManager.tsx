@@ -435,6 +435,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { gravityWindow: 30, orbitalRadius: 2.0, velocitySmooth: 5, escapeMultiplier: 1.8 },
     paramLabels: { gravityWindow: "Gravity Window", orbitalRadius: "Orbital Radius", velocitySmooth: "Velocity Smooth", escapeMultiplier: "Escape Multiplier" },
   },
+  solaris_trend_engine: {
+    name: "Solaris Trend Engine",
+    shortName: "STE",
+    displayType: "overlay" as const,
+    defaultParams: { kamaFast: 2, kamaSlow: 30, atrPeriod: 14, supertrendMult: 3.0, adxPeriod: 14, adxThreshold: 25 },
+    paramLabels: { kamaFast: "KAMA Fast", kamaSlow: "KAMA Slow", atrPeriod: "ATR Period", supertrendMult: "Supertrend Mult", adxPeriod: "ADX Period", adxThreshold: "ADX Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

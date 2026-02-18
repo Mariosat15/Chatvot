@@ -50,7 +50,8 @@ export type IndicatorType =
   | "prism_wavelet_cascade"
   | "mirage_depth_scanner"
   | "quantum_drift_mapper"
-  | "sovereign_gravity_arc";
+  | "sovereign_gravity_arc"
+  | "solaris_trend_engine";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -513,6 +514,8 @@ const INDICATOR_TYPE_MAP: Record<
   "quantum drift mapper": { type: "quantum_drift_mapper", displayType: "overlay" },
   sovereign_gravity_arc: { type: "sovereign_gravity_arc", displayType: "overlay" },
   "sovereign gravity arc": { type: "sovereign_gravity_arc", displayType: "overlay" },
+  solaris_trend_engine: { type: "solaris_trend_engine", displayType: "overlay" },
+  "solaris trend engine": { type: "solaris_trend_engine", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -862,6 +865,14 @@ export function marketplaceItemToIndicator(
       params.orbitalRadius = settings?.orbitalRadius || 2.0;
       params.velocitySmooth = settings?.velocitySmooth || 5;
       params.escapeMultiplier = settings?.escapeMultiplier || 1.8;
+      break;
+    case "solaris_trend_engine":
+      params.kamaFast = settings?.kamaFast || 2;
+      params.kamaSlow = settings?.kamaSlow || 30;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.supertrendMult = settings?.supertrendMult || 3.0;
+      params.adxPeriod = settings?.adxPeriod || 14;
+      params.adxThreshold = settings?.adxThreshold || 25;
       break;
     default:
       // Generic period-based indicators
