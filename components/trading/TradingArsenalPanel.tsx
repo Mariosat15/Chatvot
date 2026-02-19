@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   LineChart,
   Loader2,
   Sparkles,
@@ -385,8 +386,96 @@ export default function TradingArsenalPanel({
                   : "Enable strategies to see buy/sell signals"}
               </p>
 
+              {/* Strategy Detail Inline View */}
+              {activeTab === "strategies" && selectedStrategy && (
+                <div className="space-y-3">
+                  {/* Back header */}
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-800/50">
+                    <button
+                      onClick={() => setSelectedStrategy(null)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800/60 hover:bg-gray-700/60 text-gray-300 hover:text-white text-xs font-medium transition-colors"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Back
+                    </button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
+                        <Target className="h-3.5 w-3.5 text-orange-400" />
+                      </div>
+                      <span className="font-semibold text-white text-sm truncate">
+                        {selectedStrategy.item.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    {selectedStrategy.item.shortDescription}
+                  </p>
+
+                  {/* Rules */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Settings className="h-3.5 w-3.5 text-orange-400" />
+                      Strategy Rules
+                    </h4>
+                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 custom-scrollbar">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {selectedStrategy.item.strategyConfig?.rules?.map((rule: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-xl bg-gray-800/50 border border-gray-700/50"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className={cn(
+                                "px-2 py-0.5 rounded text-xs font-semibold",
+                                rule.signal?.includes("buy")
+                                  ? "bg-green-500/20 text-green-400"
+                                  : "bg-red-500/20 text-red-400",
+                              )}
+                            >
+                              {rule.signal?.replace("_", " ").toUpperCase() || "Signal"}
+                            </span>
+                            <span className="text-xs text-gray-500">{rule.name || `Rule ${idx + 1}`}</span>
+                          </div>
+                          <div className="space-y-1">
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            {rule.conditions?.map((cond: any, cidx: number) => (
+                              <div key={cidx} className="text-xs text-gray-400 flex items-start gap-1.5">
+                                <span className="text-gray-600 flex-shrink-0 mt-0.5">
+                                  {cidx > 0 ? rule.logic || "AND" : "•"}
+                                </span>
+                                <span>
+                                  <span className="text-gray-300">{cond.indicator?.toUpperCase()}</span>{" "}
+                                  <span className="text-orange-400">{cond.operator?.replace(/_/g, " ")}</span>{" "}
+                                  {cond.compareWith === "value"
+                                    ? <span className="text-amber-300">{cond.compareValue}</span>
+                                    : <span className="text-gray-300">{cond.compareIndicator?.toUpperCase()}</span>}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Enable toggle in detail view */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-800/50">
+                    <span className="text-xs text-gray-400">Strategy Active</span>
+                    <Switch
+                      checked={selectedStrategy.isEnabled}
+                      onCheckedChange={() => handleToggle(selectedStrategy)}
+                      disabled={actionLoading === selectedStrategy.purchaseId}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Item List */}
-              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+              <div className={cn("space-y-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar", activeTab === "strategies" && selectedStrategy ? "hidden" : "")}>
                 {activeTab === "indicators" ? (
                   indicators.length === 0 ? (
                     <div className="text-center py-6 text-gray-500 text-sm">
@@ -529,7 +618,7 @@ export default function TradingArsenalPanel({
               </div>
 
               {/* Footer Actions */}
-              <div className="flex gap-2 pt-3 border-t border-gray-800/50">
+              <div className={cn("flex gap-2 pt-3 border-t border-gray-800/50", activeTab === "strategies" && selectedStrategy ? "hidden" : "")}>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -578,181 +667,6 @@ export default function TradingArsenalPanel({
         }
       `}</style>
 
-      {/* Strategy Details Modal */}
-      {selectedStrategy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Target className="h-5 w-5 text-orange-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white">
-                    {selectedStrategy.item.name}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    Strategy Configuration
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedStrategy(null)}
-                className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
-              {/* Description */}
-              <div>
-                <p className="text-sm text-gray-400">
-                  {selectedStrategy.item.shortDescription}
-                </p>
-              </div>
-
-              {/* Rules */}
-              <div>
-                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-orange-400" />
-                  Strategy Rules
-                </h4>
-                <div className="space-y-3">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {selectedStrategy.item.strategyConfig?.rules?.map(
-                    (rule: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-xl bg-gray-800/50 border border-gray-700/50"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded text-xs font-semibold",
-                              rule.signal?.includes("buy")
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-red-500/20 text-red-400",
-                            )}
-                          >
-                            {rule.signal?.replace("_", " ").toUpperCase() ||
-                              "Signal"}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {rule.name || `Rule ${idx + 1}`}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                          {rule.conditions?.map((cond: any, cidx: number) => (
-                            <div
-                              key={cidx}
-                              className="text-xs text-gray-400 flex items-center gap-2"
-                            >
-                              <span className="text-gray-600">
-                                {cidx > 0 ? rule.logic || "AND" : "•"}
-                              </span>
-                              <span>
-                                {cond.indicator?.toUpperCase() || "Indicator"}{" "}
-                                <span className="text-orange-400">
-                                  {cond.operator?.replace("_", " ")}
-                                </span>{" "}
-                                {cond.compareWith === "value"
-                                  ? cond.compareValue
-                                  : cond.compareIndicator?.toUpperCase()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              {/* Settings */}
-              {selectedStrategy.item.defaultSettings &&
-                Object.keys(selectedStrategy.item.defaultSettings).length >
-                  0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-white mb-3">
-                      Default Settings
-                    </h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(
-                        selectedStrategy.item.defaultSettings,
-                      ).map(([key, value]) => (
-                        <div
-                          key={key}
-                          className="p-2 rounded-lg bg-gray-800/30 border border-gray-700/30"
-                        >
-                          <div className="text-xs text-gray-500 capitalize">
-                            {key.replace(/([A-Z])/g, " $1").trim()}
-                          </div>
-                          <div className="text-sm text-white font-medium">
-                            {String(value)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Signal Display Settings */}
-              {selectedStrategy.item.strategyConfig?.signalDisplay && (
-                <div>
-                  <h4 className="text-sm font-medium text-white mb-3">
-                    Signal Display
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedStrategy.item.strategyConfig.signalDisplay
-                      .showOnChart && (
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs">
-                        Shows on Chart
-                      </span>
-                    )}
-                    {selectedStrategy.item.strategyConfig.signalDisplay
-                      .showArrows && (
-                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs">
-                        Arrow Markers
-                      </span>
-                    )}
-                    {selectedStrategy.item.strategyConfig.signalDisplay
-                      .showLabels && (
-                      <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 text-xs">
-                        Labels
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-700 flex justify-between items-center">
-              <div className="text-xs text-gray-500">
-                {selectedStrategy.isEnabled ? (
-                  <span className="flex items-center gap-1 text-green-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                    Currently Active
-                  </span>
-                ) : (
-                  <span>Currently Disabled</span>
-                )}
-              </div>
-              <Button
-                size="sm"
-                onClick={() => setSelectedStrategy(null)}
-                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

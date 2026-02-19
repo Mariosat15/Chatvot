@@ -2947,63 +2947,58 @@ const APEX_CONFLUENCE_ENGINE: Partial<IMarketplaceItem> = {
   name: "Apex Confluence Engine",
   slug: "apex-confluence-engine",
   shortDescription:
-    "Five-layer precision strategy using EMA trend structure, MACD momentum gates, RSI pressure zones and BB equilibrium for high-confidence STRONG BUY/SELL signals.",
-  fullDescription: `# Apex Confluence Engine (ACE)
+    "High-frequency competition strategy: 6 signal tiers using EMA trend bias, MACD crosses and RSI momentum pulses — built for fast-paced trading events.",
+  fullDescription: `# Apex Confluence Engine (ACE) — Competition Edition
 
 ## Overview
-**Apex Confluence Engine** is a multi-layer signal strategy that requires up to five independent technical conditions to align simultaneously before firing a signal — eliminating low-quality trades and delivering only the highest-confidence entries.
+**Apex Confluence Engine** is built for speed. Designed specifically for competitions and challenges, it fires clear buy/sell signals continuously across all market conditions using EMA trend structure, MACD crossover momentum, and RSI pressure pulses.
 
-The engine runs four signal tiers:
-1. **ACE BULL LOCK** — 5-layer strong buy (highest confidence)
-2. **SNIPER LONG** — 3-layer pullback buy (high confidence)
-3. **ACE BEAR LOCK** — 5-layer strong sell (highest confidence)
-4. **SNIPER SHORT** — 3-layer pullback sell (high confidence)
+Six signal tiers ensure you never miss a move:
+1. **ACE BULL** — Trend + momentum aligned long
+2. **ACE BEAR** — Trend + momentum aligned short
+3. **MACD SURGE ▲** — MACD bullish cross (fires frequently)
+4. **MACD COLLAPSE ▼** — MACD bearish cross (fires frequently)
+5. **MOMENTUM PULSE ▲** — RSI recovers + price above EMA
+6. **MOMENTUM PULSE ▼** — RSI rejects + price below EMA
 
 ## Signal Logic
 
-### 🟢 ACE BULL LOCK (STRONG BUY — strength 5)
-All 5 conditions must align simultaneously:
-1. EMA(20) crosses above EMA(50) — trend structure turns bullish
-2. MACD Line crosses above Signal Line — momentum confirms the shift
-3. RSI(14) above 50 — pressure is positive, bulls in control
-4. Price above Bollinger Middle Band — above fair value equilibrium
-5. Price above EMA(200) — macro trend filter confirms long bias
+### 🟢 ACE BULL (BUY — strength 3)
+EMA(9) above EMA(21) **AND** MACD Histogram above 0
 
-### 🟩 SNIPER LONG (BUY — strength 3)
-Precision pullback entry inside an established uptrend:
-1. Price above EMA(200) — macro trend is bullish
-2. RSI(14) crosses above 35 — oversold exhaustion complete
-3. MACD Histogram above 0 — momentum turning positive
+### 🔴 ACE BEAR (SELL — strength 3)
+EMA(9) below EMA(21) **AND** MACD Histogram below 0
 
-### 🔴 ACE BEAR LOCK (STRONG SELL — strength 5)
-All 5 conditions must align simultaneously:
-1. EMA(20) crosses below EMA(50) — trend structure turns bearish
-2. MACD Line crosses below Signal Line — momentum confirms the shift
-3. RSI(14) below 50 — pressure is negative, bears in control
-4. Price below Bollinger Middle Band — below fair value equilibrium
-5. Price below EMA(200) — macro trend filter confirms short bias
+### 🟢 MACD SURGE ▲ (STRONG BUY — strength 4)
+MACD Line crosses above Signal Line — fires on every bullish MACD cross
 
-### 🟥 SNIPER SHORT (SELL — strength 3)
-Precision pullback entry inside an established downtrend:
-1. Price below EMA(200) — macro trend is bearish
-2. RSI(14) crosses below 65 — overbought exhaustion complete
-3. MACD Histogram below 0 — momentum turning negative
+### 🔴 MACD COLLAPSE ▼ (STRONG SELL — strength 4)
+MACD Line crosses below Signal Line — fires on every bearish MACD cross
+
+### 🟩 MOMENTUM PULSE ▲ (BUY — strength 2)
+RSI(14) crosses above 45 **AND** Price above EMA(20)
+
+### 🟥 MOMENTUM PULSE ▼ (SELL — strength 2)
+RSI(14) crosses below 55 **AND** Price below EMA(20)
+
+## Why It Works for Competitions
+- MACD crosses happen multiple times per session — guaranteeing action
+- Short EMA(9/21) reacts faster than traditional 20/50 pairs
+- RSI 45/55 thresholds sit in the active momentum zone, not extreme OB/OS
+- 2-condition rules eliminate noise while keeping signal frequency high
 
 ## Visual Guide
-- **🟢 Large arrows** (strength 5): ACE BULL/BEAR LOCK — act immediately
-- **🟩 Medium arrows** (strength 3): SNIPER entries — secondary precision setups
-- Labels display "STRONG BUY", "BUY", "STRONG SELL", "SELL" on each bar
+- 🔺 **Large green arrows** (strength 4): MACD SURGE — aggressive momentum entries
+- 🔻 **Large red arrows** (strength 4): MACD COLLAPSE — aggressive momentum exits
+- ▲ **Medium green arrows** (strength 3): ACE BULL — trend-confirmed longs
+- ▼ **Medium red arrows** (strength 3): ACE BEAR — trend-confirmed shorts
+- Small arrows (strength 2): MOMENTUM PULSE — quick momentum reversals
 
-## Recommended Chart Setup
-Add these alongside ACE for visual confirmation:
-- EMA 20 + EMA 50 (trend structure)
-- EMA 200 (macro filter)
-- MACD (12/26/9)
-- RSI (14)
-- Bollinger Bands (20, 2)
+## Recommended Setup
+EMA 9 + EMA 21 + MACD (12/26/9) + RSI (14)
 
 ## Risk Warning
-No indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+No strategy guarantees profits. Competition environments are high-risk. Always use proper position sizing and never risk more than you can afford to lose.`,
   category: "strategy",
   price: 89.99,
   status: "active",
@@ -3013,7 +3008,7 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
   codeTemplate: JSON.stringify({
     type: "strategy",
     displayType: "signals",
-    description: "Five-layer trend/momentum/volatility confluence strategy firing only when EMA structure, MACD, RSI and Bollinger Bands all align",
+    description: "Competition-speed EMA/MACD/RSI confluence engine with 6 signal tiers for non-stop market action",
   }),
   defaultSettings: {
     color: "#00e5ff",
@@ -3021,82 +3016,25 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
   },
   strategyConfig: {
     rules: [
+      // ── Rule 1: ACE BULL ─────────────────────────────────────────────────
       {
-        id: "ace_bull_lock",
-        name: "ACE BULL LOCK",
-        logic: "AND",
-        signal: "strong_buy",
-        signalStrength: 5,
-        conditions: [
-          {
-            id: "c1_ema_cross_bull",
-            indicator: "ema",
-            indicatorParams: { period: 20 },
-            operator: "crosses_above",
-            compareWith: "indicator",
-            compareIndicator: "ema",
-            compareIndicatorParams: { period: 50 },
-          },
-          {
-            id: "c2_macd_cross_bull",
-            indicator: "macd_line",
-            indicatorParams: { fast: 12, slow: 26, signal: 9 },
-            operator: "crosses_above",
-            compareWith: "indicator",
-            compareIndicator: "macd_signal",
-            compareIndicatorParams: { fast: 12, slow: 26, signal: 9 },
-          },
-          {
-            id: "c3_rsi_positive",
-            indicator: "rsi",
-            indicatorParams: { period: 14 },
-            operator: "above",
-            compareWith: "value",
-            compareValue: 50,
-          },
-          {
-            id: "c4_above_bb_mid",
-            indicator: "price",
-            operator: "above",
-            compareWith: "indicator",
-            compareIndicator: "bb_middle",
-            compareIndicatorParams: { period: 20, stdDev: 2 },
-          },
-          {
-            id: "c5_macro_bull",
-            indicator: "price",
-            operator: "above",
-            compareWith: "indicator",
-            compareIndicator: "ema",
-            compareIndicatorParams: { period: 200 },
-          },
-        ],
-      },
-      {
-        id: "sniper_long",
-        name: "SNIPER LONG",
+        id: "ace_bull",
+        name: "ACE BULL",
         logic: "AND",
         signal: "buy",
         signalStrength: 3,
         conditions: [
           {
-            id: "c6_macro_bull_long",
-            indicator: "price",
+            id: "r1c1_ema9_above_21",
+            indicator: "ema",
+            indicatorParams: { period: 9 },
             operator: "above",
             compareWith: "indicator",
             compareIndicator: "ema",
-            compareIndicatorParams: { period: 200 },
+            compareIndicatorParams: { period: 21 },
           },
           {
-            id: "c7_rsi_recover",
-            indicator: "rsi",
-            indicatorParams: { period: 14 },
-            operator: "crosses_above",
-            compareWith: "value",
-            compareValue: 35,
-          },
-          {
-            id: "c8_macd_hist_pos",
+            id: "r1c2_macd_hist_pos",
             indicator: "macd_histogram",
             indicatorParams: { fast: 12, slow: 26, signal: 9 },
             operator: "above",
@@ -3105,24 +3043,62 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
           },
         ],
       },
+      // ── Rule 2: ACE BEAR ─────────────────────────────────────────────────
       {
-        id: "ace_bear_lock",
-        name: "ACE BEAR LOCK",
+        id: "ace_bear",
+        name: "ACE BEAR",
         logic: "AND",
-        signal: "strong_sell",
-        signalStrength: 5,
+        signal: "sell",
+        signalStrength: 3,
         conditions: [
           {
-            id: "c9_ema_cross_bear",
+            id: "r2c1_ema9_below_21",
             indicator: "ema",
-            indicatorParams: { period: 20 },
-            operator: "crosses_below",
+            indicatorParams: { period: 9 },
+            operator: "below",
             compareWith: "indicator",
             compareIndicator: "ema",
-            compareIndicatorParams: { period: 50 },
+            compareIndicatorParams: { period: 21 },
           },
           {
-            id: "c10_macd_cross_bear",
+            id: "r2c2_macd_hist_neg",
+            indicator: "macd_histogram",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      // ── Rule 3: MACD SURGE ▲ ─────────────────────────────────────────────
+      {
+        id: "macd_surge",
+        name: "MACD SURGE ▲",
+        logic: "AND",
+        signal: "strong_buy",
+        signalStrength: 4,
+        conditions: [
+          {
+            id: "r3c1_macd_cross_up",
+            indicator: "macd_line",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "macd_signal",
+            compareIndicatorParams: { fast: 12, slow: 26, signal: 9 },
+          },
+        ],
+      },
+      // ── Rule 4: MACD COLLAPSE ▼ ───────────────────────────────────────────
+      {
+        id: "macd_collapse",
+        name: "MACD COLLAPSE ▼",
+        logic: "AND",
+        signal: "strong_sell",
+        signalStrength: 4,
+        conditions: [
+          {
+            id: "r4c1_macd_cross_down",
             indicator: "macd_line",
             indicatorParams: { fast: 12, slow: 26, signal: 9 },
             operator: "crosses_below",
@@ -3130,76 +3106,71 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
             compareIndicator: "macd_signal",
             compareIndicatorParams: { fast: 12, slow: 26, signal: 9 },
           },
+        ],
+      },
+      // ── Rule 5: MOMENTUM PULSE ▲ ─────────────────────────────────────────
+      {
+        id: "momentum_pulse_up",
+        name: "MOMENTUM PULSE ▲",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 2,
+        conditions: [
           {
-            id: "c11_rsi_negative",
+            id: "r5c1_rsi_cross_45",
             indicator: "rsi",
             indicatorParams: { period: 14 },
-            operator: "below",
+            operator: "crosses_above",
             compareWith: "value",
-            compareValue: 50,
+            compareValue: 45,
           },
           {
-            id: "c12_below_bb_mid",
+            id: "r5c2_price_above_ema20",
             indicator: "price",
-            operator: "below",
-            compareWith: "indicator",
-            compareIndicator: "bb_middle",
-            compareIndicatorParams: { period: 20, stdDev: 2 },
-          },
-          {
-            id: "c13_macro_bear",
-            indicator: "price",
-            operator: "below",
+            operator: "above",
             compareWith: "indicator",
             compareIndicator: "ema",
-            compareIndicatorParams: { period: 200 },
+            compareIndicatorParams: { period: 20 },
           },
         ],
       },
+      // ── Rule 6: MOMENTUM PULSE ▼ ─────────────────────────────────────────
       {
-        id: "sniper_short",
-        name: "SNIPER SHORT",
+        id: "momentum_pulse_down",
+        name: "MOMENTUM PULSE ▼",
         logic: "AND",
         signal: "sell",
-        signalStrength: 3,
+        signalStrength: 2,
         conditions: [
           {
-            id: "c14_macro_bear_short",
-            indicator: "price",
-            operator: "below",
-            compareWith: "indicator",
-            compareIndicator: "ema",
-            compareIndicatorParams: { period: 200 },
-          },
-          {
-            id: "c15_rsi_reject",
+            id: "r6c1_rsi_cross_55",
             indicator: "rsi",
             indicatorParams: { period: 14 },
             operator: "crosses_below",
             compareWith: "value",
-            compareValue: 65,
+            compareValue: 55,
           },
           {
-            id: "c16_macd_hist_neg",
-            indicator: "macd_histogram",
-            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            id: "r6c2_price_below_ema20",
+            indicator: "price",
             operator: "below",
-            compareWith: "value",
-            compareValue: 0,
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 20 },
           },
         ],
       },
     ],
-    defaultIndicators: ["ema", "macd", "rsi", "bb"],
+    defaultIndicators: ["ema", "macd", "rsi"],
     signalDisplay: {
       showOnChart: true,
       showArrows: true,
       showLabels: true,
-      arrowSize: "large",
+      arrowSize: "medium",
     },
   },
   supportedAssets: [],
-  tags: ["strategy", "ema", "macd", "rsi", "bollinger", "confluence", "trend", "momentum", "multi-layer", "signals", "premium"],
+  tags: ["strategy", "ema", "macd", "rsi", "confluence", "trend", "momentum", "competition", "fast-signals", "premium"],
   riskLevel: "medium",
 };
 
