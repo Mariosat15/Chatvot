@@ -66,6 +66,10 @@ export interface CustomIndicator {
     middle?: boolean;
     lower?: boolean;
   };
+  // Per-component color overrides (key → hex color string)
+  componentColors?: Record<string, string>;
+  // Per-component visibility overrides (key → boolean)
+  componentVisibility?: Record<string, boolean>;
 }
 
 export const INDICATOR_TEMPLATES = {
@@ -465,6 +469,356 @@ export const INDICATOR_TEMPLATES = {
   },
 };
 
+// ─── Per-indicator component style/visibility configuration ───────────────────
+// Each entry lists the styleable color components and hideable series components
+// for that indicator type. Used by IndicatorSettingsPanel to render dynamic controls.
+export const INDICATOR_COMPONENT_CONFIG: Record<string, {
+  colors: Array<{ key: string; label: string; default: string }>;
+  visibility: Array<{ key: string; label: string }>;
+}> = {
+  // ── Built-in channel indicators ────────────────────────────────────────────
+  bb: {
+    colors: [
+      { key: "upper", label: "Upper Band", default: "#f23645" },
+      { key: "middle", label: "Middle Band", default: "#2962ff" },
+      { key: "lower", label: "Lower Band", default: "#00e676" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Band" },
+      { key: "middle", label: "Middle Band" },
+      { key: "lower", label: "Lower Band" },
+    ],
+  },
+  keltner: {
+    colors: [
+      { key: "upper", label: "Upper Band", default: "#f23645" },
+      { key: "middle", label: "Middle Band", default: "#2962ff" },
+      { key: "lower", label: "Lower Band", default: "#00e676" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Band" },
+      { key: "middle", label: "Middle Band" },
+      { key: "lower", label: "Lower Band" },
+    ],
+  },
+  macd: {
+    colors: [
+      { key: "macdLine", label: "MACD Line", default: "#2962ff" },
+      { key: "signalLine", label: "Signal Line", default: "#f23645" },
+      { key: "histPositive", label: "Histogram Positive", default: "#26a69a" },
+      { key: "histNegative", label: "Histogram Negative", default: "#ef5350" },
+    ],
+    visibility: [
+      { key: "macdLine", label: "MACD Line" },
+      { key: "signalLine", label: "Signal Line" },
+      { key: "histogram", label: "Histogram" },
+    ],
+  },
+  // ── Premium band indicators ────────────────────────────────────────────────
+  vortex_drift_cloud: {
+    colors: [
+      { key: "upper", label: "Upper Band", default: "#22d3ee" },
+      { key: "middle", label: "Core Line", default: "#22d3ee" },
+      { key: "lower", label: "Lower Band", default: "#f97316" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Band" },
+      { key: "middle", label: "Core Line" },
+      { key: "lower", label: "Lower Band" },
+    ],
+  },
+  orion_momentum_shield: {
+    colors: [
+      { key: "upper", label: "Upper Shield", default: "#34d399" },
+      { key: "middle", label: "Core Line", default: "#a78bfa" },
+      { key: "lower", label: "Lower Shield", default: "#fb923c" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Shield" },
+      { key: "middle", label: "Core Line" },
+      { key: "lower", label: "Lower Shield" },
+    ],
+  },
+  nebula_phase_bands: {
+    colors: [
+      { key: "upper", label: "Upper Band", default: "#67e8f9" },
+      { key: "middle", label: "Core Phase Line", default: "#06b6d4" },
+      { key: "lower", label: "Lower Band", default: "#818cf8" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Band" },
+      { key: "middle", label: "Core Phase Line" },
+      { key: "lower", label: "Lower Band" },
+    ],
+  },
+  cipher_harmonic_veil: {
+    colors: [
+      { key: "upper", label: "Upper Veil", default: "#60a5fa" },
+      { key: "middle", label: "Core Harmonic", default: "#3b82f6" },
+      { key: "lower", label: "Lower Veil", default: "#f97316" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Veil" },
+      { key: "middle", label: "Core Harmonic" },
+      { key: "lower", label: "Lower Veil" },
+    ],
+  },
+  fractal_pulse_grid: {
+    colors: [
+      { key: "upper", label: "Resistance", default: "#f44336" },
+      { key: "middle", label: "Pulse Line", default: "#ffc107" },
+      { key: "lower", label: "Support", default: "#4caf50" },
+    ],
+    visibility: [
+      { key: "upper", label: "Resistance" },
+      { key: "middle", label: "Pulse Line" },
+      { key: "lower", label: "Support" },
+    ],
+  },
+  nexus_trend_matrix: {
+    colors: [
+      { key: "upper", label: "Upper Channel", default: "#9e9e9e" },
+      { key: "core", label: "Core Trend Line", default: "#06b6d4" },
+      { key: "lower", label: "Lower Channel", default: "#9e9e9e" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Channel" },
+      { key: "core", label: "Core Trend Line" },
+      { key: "lower", label: "Lower Channel" },
+      { key: "signals", label: "BULL/BEAR Signals" },
+    ],
+  },
+  phantom_flow_zones: {
+    colors: [
+      { key: "supply", label: "Supply Zone", default: "#e040fb" },
+      { key: "flow", label: "Flow Line", default: "#00bcd4" },
+      { key: "demand", label: "Demand Zone", default: "#00e5ff" },
+    ],
+    visibility: [
+      { key: "upper", label: "Supply Zone" },
+      { key: "middle", label: "Flow Line" },
+      { key: "lower", label: "Demand Zone" },
+      { key: "signals", label: "SUPPLY/DEMAND Signals" },
+    ],
+  },
+  // ── Premium signal indicators ──────────────────────────────────────────────
+  titan_pulse_signal: {
+    colors: [
+      { key: "bull", label: "Bullish Line", default: "#22c55e" },
+      { key: "bear", label: "Bearish Line", default: "#ef4444" },
+    ],
+    visibility: [
+      { key: "bull", label: "Bullish Line" },
+      { key: "bear", label: "Bearish Line" },
+      { key: "signals", label: "BUY/SELL Signals" },
+    ],
+  },
+  aurora_cascade_flow: {
+    colors: [
+      { key: "l1", label: "Layer 1 — Fastest", default: "#22d3ee" },
+      { key: "l2", label: "Layer 2", default: "#06b6d4" },
+      { key: "l3", label: "Layer 3 — Core", default: "#0891b2" },
+      { key: "l4", label: "Layer 4", default: "#0e7490" },
+      { key: "l5", label: "Layer 5 — Slowest", default: "#155e75" },
+    ],
+    visibility: [
+      { key: "l1", label: "Layer 1 (Fastest)" },
+      { key: "l2", label: "Layer 2" },
+      { key: "l3", label: "Layer 3 (Core)" },
+      { key: "l4", label: "Layer 4" },
+      { key: "l5", label: "Layer 5 (Slowest)" },
+    ],
+  },
+  eclipse_stealth_trail: {
+    colors: [
+      { key: "shadow", label: "Shadow Trail", default: "#64748b" },
+      { key: "bull", label: "Bull Trail", default: "#22c55e" },
+      { key: "bear", label: "Bear Trail", default: "#ef4444" },
+    ],
+    visibility: [
+      { key: "shadow", label: "Shadow Trail" },
+      { key: "bull", label: "Bull Trail" },
+      { key: "bear", label: "Bear Trail" },
+      { key: "signals", label: "Flip/Breakout Signals" },
+    ],
+  },
+  wraith_convergence_engine: {
+    colors: [
+      { key: "bull", label: "Bull Consensus", default: "#22c55e" },
+      { key: "bear", label: "Bear Consensus", default: "#ef4444" },
+    ],
+    visibility: [
+      { key: "bull", label: "Bull Consensus" },
+      { key: "bear", label: "Bear Consensus" },
+      { key: "signals", label: "CONV/DIV Signals" },
+    ],
+  },
+  flux_momentum_trail: {
+    colors: [
+      { key: "trail", label: "Momentum Trail", default: "#94a3b8" },
+    ],
+    visibility: [
+      { key: "trail", label: "Momentum Trail" },
+      { key: "signals", label: "SURGE/FADE Signals" },
+    ],
+  },
+  apex_predator_signal: {
+    colors: [
+      { key: "bull", label: "Bull Line", default: "#22c55e" },
+      { key: "bear", label: "Bear Line", default: "#ef4444" },
+    ],
+    visibility: [
+      { key: "bull", label: "Bull Line" },
+      { key: "bear", label: "Bear Line" },
+      { key: "signals", label: "APEX/STALK Signals" },
+    ],
+  },
+  phantom_divergence_tracker: {
+    colors: [
+      { key: "price", label: "Price Line", default: "#06b6d4" },
+      { key: "momentum", label: "Momentum Line", default: "#a78bfa" },
+    ],
+    visibility: [
+      { key: "price", label: "Price Line" },
+      { key: "momentum", label: "Momentum Line" },
+      { key: "signals", label: "DIV/SYNC Signals" },
+    ],
+  },
+  chaos_sentinel: {
+    colors: [
+      { key: "order", label: "Order Phase", default: "#3b82f6" },
+      { key: "chaos", label: "Chaos Phase", default: "#ef4444" },
+      { key: "transition", label: "Transition Phase", default: "#94a3b8" },
+    ],
+    visibility: [
+      { key: "order", label: "Order Phase" },
+      { key: "chaos", label: "Chaos Phase" },
+      { key: "transition", label: "Transition Phase" },
+      { key: "signals", label: "ORDER/CHAOS Signals" },
+    ],
+  },
+  helix_phase_engine: {
+    colors: [
+      { key: "envelope", label: "Amplitude Envelope", default: "#78909c" },
+      { key: "core", label: "Phase Lead Line", default: "#00e5ff" },
+    ],
+    visibility: [
+      { key: "envelope", label: "Amplitude Envelope" },
+      { key: "core", label: "Phase Lead Line" },
+      { key: "signals", label: "LEAD/SYNC Signals" },
+    ],
+  },
+  prism_wavelet_cascade: {
+    colors: [
+      { key: "d1", label: "Fast Layer (D1)", default: "#00e5ff" },
+      { key: "d2", label: "Medium Layer (D2)", default: "#2979ff" },
+      { key: "d3", label: "Slow Layer (D3)", default: "#7c4dff" },
+      { key: "a3", label: "Trend Layer (A3)", default: "#e040fb" },
+    ],
+    visibility: [
+      { key: "d1", label: "Fast Layer (D1)" },
+      { key: "d2", label: "Medium Layer (D2)" },
+      { key: "d3", label: "Slow Layer (D3)" },
+      { key: "a3", label: "Trend Layer (A3)" },
+      { key: "signals", label: "ALIGN/SPLIT Signals" },
+    ],
+  },
+  mirage_depth_scanner: {
+    colors: [
+      { key: "corridor", label: "Depth Corridor", default: "#9e9e9e" },
+      { key: "trend", label: "Trend Depth Line", default: "#ffd740" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Corridor" },
+      { key: "trend", label: "Trend Line" },
+      { key: "lower", label: "Lower Corridor" },
+      { key: "signals", label: "EMERGE/SUBMERGE Signals" },
+    ],
+  },
+  quantum_drift_mapper: {
+    colors: [
+      { key: "corridor", label: "Drift Corridor", default: "#b0bec5" },
+      { key: "drift", label: "Drift Line", default: "#00e5ff" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Corridor" },
+      { key: "drift", label: "Drift Line" },
+      { key: "lower", label: "Lower Corridor" },
+      { key: "signals", label: "DRIFT/SNAP Signals" },
+    ],
+  },
+  sovereign_gravity_arc: {
+    colors: [
+      { key: "arcs", label: "Orbital Arcs", default: "#7b1fa2" },
+      { key: "center", label: "Gravity Center", default: "#9c27b0" },
+    ],
+    visibility: [
+      { key: "upper", label: "Upper Arc" },
+      { key: "center", label: "Gravity Arc" },
+      { key: "lower", label: "Lower Arc" },
+      { key: "signals", label: "ESCAPE/ORBIT Signals" },
+    ],
+  },
+  solaris_trend_engine: {
+    colors: [
+      { key: "core", label: "Solar Core (KAMA)", default: "#ffd700" },
+      { key: "upperBand", label: "Upper Supertrend", default: "#ef5350" },
+      { key: "lowerBand", label: "Lower Supertrend", default: "#26a69a" },
+      { key: "sar", label: "SAR Dots", default: "#ce93d8" },
+    ],
+    visibility: [
+      { key: "core", label: "Solar Core Line" },
+      { key: "upper", label: "Upper Band" },
+      { key: "lower", label: "Lower Band" },
+      { key: "sar", label: "SAR Dots" },
+      { key: "signals", label: "FUSION Signals" },
+    ],
+  },
+  stellar_confluence_ribbon: {
+    colors: [
+      { key: "outerArc", label: "Outer Arcs", default: "#90a4ae" },
+      { key: "innerRibbon", label: "Inner Ribbon", default: "#00f0ff" },
+      { key: "core", label: "Core Blend Line", default: "#00f0ff" },
+    ],
+    visibility: [
+      { key: "outerArcs", label: "Outer Arcs" },
+      { key: "innerRibbon", label: "Inner Ribbon" },
+      { key: "core", label: "Core Blend Line" },
+      { key: "signals", label: "STELLAR/NODE Signals" },
+    ],
+  },
+  kinetic_pressure_zones: {
+    colors: [
+      { key: "spine", label: "Kinetic Spine", default: "#00e5ff" },
+      { key: "supply1", label: "Supply Zone 1", default: "#7c4dff" },
+      { key: "supply2", label: "Supply Zone 2", default: "#b388ff" },
+      { key: "demand1", label: "Demand Zone 1", default: "#00e5ff" },
+      { key: "demand2", label: "Demand Zone 2", default: "#00bcd4" },
+    ],
+    visibility: [
+      { key: "spine", label: "Kinetic Spine" },
+      { key: "supply1", label: "Supply Zone 1" },
+      { key: "supply2", label: "Supply Zone 2" },
+      { key: "demand1", label: "Demand Zone 1" },
+      { key: "demand2", label: "Demand Zone 2" },
+      { key: "signals", label: "KINETIC Signals" },
+    ],
+  },
+  nova_resonance_field: {
+    colors: [
+      { key: "priceRef", label: "Price Reference", default: "#546e7a" },
+      { key: "signalLine", label: "Signal Line", default: "#78909c" },
+      { key: "echoLine", label: "Echo Line", default: "#ff9800" },
+    ],
+    visibility: [
+      { key: "priceRef", label: "Price Reference" },
+      { key: "signalLine", label: "Signal Line" },
+      { key: "echoLine", label: "Echo Line" },
+      { key: "signals", label: "NOVA/ECHO/DIV Signals" },
+    ],
+  },
+};
+
 const DEFAULT_COLORS = [
   "#2962ff",
   "#f23645",
@@ -631,6 +985,18 @@ export default function AdvancedIndicatorManager({
         middle: true,
         lower: true,
       },
+      // Initialize per-component colors from INDICATOR_COMPONENT_CONFIG defaults
+      componentColors: (() => {
+        const cfg = INDICATOR_COMPONENT_CONFIG[type];
+        if (!cfg) return {};
+        return Object.fromEntries(cfg.colors.map((c) => [c.key, c.default]));
+      })(),
+      // Initialize per-component visibility — all visible by default
+      componentVisibility: (() => {
+        const cfg = INDICATOR_COMPONENT_CONFIG[type];
+        if (!cfg) return {};
+        return Object.fromEntries(cfg.visibility.map((v) => [v.key, true]));
+      })(),
     };
 
     onIndicatorsChange([...indicators, newIndicator]);
@@ -1044,25 +1410,7 @@ function IndicatorSettingsPanel({
           value="style"
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
-          {/* Main Color */}
-          <div className="space-y-1.5">
-            <Label className="text-[12px] text-[#787B86]">Color</Label>
-            <div className="flex gap-2">
-              <input
-                type="color"
-                value={indicator.color}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-                className="w-10 h-8 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
-              />
-              <Input
-                value={indicator.color}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-                className="h-8 bg-[#131722] border-[#363a45] text-white flex-1"
-              />
-            </div>
-          </div>
-
-          {/* Line Width */}
+          {/* Global: Line Width */}
           <div className="space-y-1.5">
             <Label className="text-[12px] text-[#787B86]">
               Line Width: {indicator.lineWidth}
@@ -1076,7 +1424,7 @@ function IndicatorSettingsPanel({
             />
           </div>
 
-          {/* Opacity */}
+          {/* Global: Opacity */}
           <div className="space-y-1.5">
             <Label className="text-[12px] text-[#787B86]">
               Opacity: {indicator.opacity || 100}%
@@ -1090,92 +1438,88 @@ function IndicatorSettingsPanel({
             />
           </div>
 
-          {/* Multi-color for bands */}
-          {(indicator.type === "bb" || indicator.type === "keltner") && (
-            <div className="space-y-3 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">Band Colors</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {["upper", "middle", "lower"].map((band) => (
-                  <div key={band} className="space-y-1">
-                    <span className="text-[10px] text-[#787B86] capitalize">
-                      {band}
-                    </span>
+          {/* Per-component color pickers — dynamic from INDICATOR_COMPONENT_CONFIG */}
+          {(() => {
+            const cfg = INDICATOR_COMPONENT_CONFIG[indicator.type];
+            if (!cfg || cfg.colors.length === 0) {
+              // Fallback: single color picker for simple indicators
+              return (
+                <div className="space-y-1.5 pt-2 border-t border-[#363a45]">
+                  <Label className="text-[12px] text-[#787B86]">Color</Label>
+                  <div className="flex gap-2">
                     <input
                       type="color"
-                      value={
-                        indicator.colors?.[
-                          band as keyof typeof indicator.colors
-                        ] || indicator.color
-                      }
-                      onChange={(e) =>
-                        onUpdate({
-                          colors: {
-                            ...indicator.colors,
-                            [band]: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
+                      value={indicator.color}
+                      onChange={(e) => onUpdate({ color: e.target.value })}
+                      className="w-10 h-8 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
+                    />
+                    <Input
+                      value={indicator.color}
+                      onChange={(e) => onUpdate({ color: e.target.value })}
+                      className="h-8 bg-[#131722] border-[#363a45] text-white flex-1"
                     />
                   </div>
-                ))}
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-3 pt-2 border-t border-[#363a45]">
+                <Label className="text-[12px] text-[#787B86] uppercase tracking-wider">Component Colors</Label>
+                {cfg.colors.map((comp) => {
+                  const currentColor =
+                    indicator.componentColors?.[comp.key] ?? comp.default;
+                  return (
+                    <div key={comp.key} className="space-y-1">
+                      <span className="text-[11px] text-[#787B86]">{comp.label}</span>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={currentColor}
+                          onChange={(e) =>
+                            onUpdate({
+                              componentColors: {
+                                ...indicator.componentColors,
+                                [comp.key]: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-9 h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer flex-shrink-0"
+                        />
+                        <Input
+                          value={currentColor}
+                          onChange={(e) =>
+                            onUpdate({
+                              componentColors: {
+                                ...indicator.componentColors,
+                                [comp.key]: e.target.value,
+                              },
+                            })
+                          }
+                          className="h-7 bg-[#131722] border-[#363a45] text-white text-[11px] flex-1"
+                        />
+                        {currentColor !== comp.default && (
+                          <button
+                            onClick={() =>
+                              onUpdate({
+                                componentColors: {
+                                  ...indicator.componentColors,
+                                  [comp.key]: comp.default,
+                                },
+                              })
+                            }
+                            className="text-[10px] text-[#787B86] hover:text-white px-1 flex-shrink-0"
+                            title="Reset to default"
+                          >
+                            ↺
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          )}
-
-          {/* MACD Colors */}
-          {indicator.type === "macd" && (
-            <div className="space-y-3 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">MACD Colors</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-[#787B86]">Signal</span>
-                  <input
-                    type="color"
-                    value={indicator.colors?.signal || "#f23645"}
-                    onChange={(e) =>
-                      onUpdate({
-                        colors: { ...indicator.colors, signal: e.target.value },
-                      })
-                    }
-                    className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-[#787B86]">Positive</span>
-                  <input
-                    type="color"
-                    value={indicator.colors?.positive || "#26a69a"}
-                    onChange={(e) =>
-                      onUpdate({
-                        colors: {
-                          ...indicator.colors,
-                          positive: e.target.value,
-                        },
-                      })
-                    }
-                    className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-[#787B86]">Negative</span>
-                  <input
-                    type="color"
-                    value={indicator.colors?.negative || "#ef5350"}
-                    onChange={(e) =>
-                      onUpdate({
-                        colors: {
-                          ...indicator.colors,
-                          negative: e.target.value,
-                        },
-                      })
-                    }
-                    className="w-full h-7 rounded border border-[#363a45] bg-[#131722] cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </TabsContent>
 
         {/* Visibility Tab */}
@@ -1183,142 +1527,83 @@ function IndicatorSettingsPanel({
           value="visibility"
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
+          {/* Global: Show Indicator */}
           <div className="flex items-center justify-between">
             <Label className="text-[13px] text-[#d1d4dc]">Show Indicator</Label>
             <button
               onClick={() => onUpdate({ enabled: !indicator.enabled })}
               className={cn(
-                "w-10 h-5 rounded-full transition-colors",
+                "w-10 h-5 rounded-full transition-colors relative",
                 indicator.enabled ? "bg-[#2962FF]" : "bg-[#363a45]",
               )}
             >
               <div
                 className={cn(
-                  "w-4 h-4 rounded-full bg-white transition-transform",
-                  indicator.enabled ? "translate-x-5" : "translate-x-0.5",
+                  "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                  indicator.enabled ? "left-5" : "left-0.5",
                 )}
               />
             </button>
           </div>
 
+          {/* Global: Show Label */}
           <div className="flex items-center justify-between">
             <Label className="text-[13px] text-[#d1d4dc]">Show Label</Label>
             <button
               onClick={() => onUpdate({ showLabel: !indicator.showLabel })}
               className={cn(
-                "w-10 h-5 rounded-full transition-colors",
+                "w-10 h-5 rounded-full transition-colors relative",
                 indicator.showLabel !== false ? "bg-[#2962FF]" : "bg-[#363a45]",
               )}
             >
               <div
                 className={cn(
-                  "w-4 h-4 rounded-full bg-white transition-transform",
-                  indicator.showLabel !== false
-                    ? "translate-x-5"
-                    : "translate-x-0.5",
+                  "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                  indicator.showLabel !== false ? "left-5" : "left-0.5",
                 )}
               />
             </button>
           </div>
 
-          {/* Component visibility for multi-component indicators */}
-          {(indicator.type === "bb" || indicator.type === "keltner") && (
-            <div className="space-y-2 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">
-                Band Visibility
-              </Label>
-              {["upper", "middle", "lower"].map((band) => (
-                <div key={band} className="flex items-center justify-between">
-                  <span className="text-[13px] text-[#d1d4dc] capitalize">
-                    {band} Band
-                  </span>
-                  <button
-                    onClick={() =>
-                      onUpdate({
-                        visibility: {
-                          ...indicator.visibility,
-                          [band]: !(
-                            indicator.visibility?.[
-                              band as keyof typeof indicator.visibility
-                            ] !== false
-                          ),
-                        },
-                      })
-                    }
-                    className={cn(
-                      "w-10 h-5 rounded-full transition-colors",
-                      indicator.visibility?.[
-                        band as keyof typeof indicator.visibility
-                      ] !== false
-                        ? "bg-[#2962FF]"
-                        : "bg-[#363a45]",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "w-4 h-4 rounded-full bg-white transition-transform",
-                        indicator.visibility?.[
-                          band as keyof typeof indicator.visibility
-                        ] !== false
-                          ? "translate-x-5"
-                          : "translate-x-0.5",
-                      )}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {indicator.type === "macd" && (
-            <div className="space-y-2 pt-2 border-t border-[#363a45]">
-              <Label className="text-[12px] text-[#787B86]">
-                Component Visibility
-              </Label>
-              {[
-                { key: "main", label: "MACD Line" },
-                { key: "signal", label: "Signal Line" },
-                { key: "histogram", label: "Histogram" },
-              ].map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-[13px] text-[#d1d4dc]">{label}</span>
-                  <button
-                    onClick={() =>
-                      onUpdate({
-                        visibility: {
-                          ...indicator.visibility,
-                          [key]: !(
-                            indicator.visibility?.[
-                              key as keyof typeof indicator.visibility
-                            ] !== false
-                          ),
-                        },
-                      })
-                    }
-                    className={cn(
-                      "w-10 h-5 rounded-full transition-colors",
-                      indicator.visibility?.[
-                        key as keyof typeof indicator.visibility
-                      ] !== false
-                        ? "bg-[#2962FF]"
-                        : "bg-[#363a45]",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "w-4 h-4 rounded-full bg-white transition-transform",
-                        indicator.visibility?.[
-                          key as keyof typeof indicator.visibility
-                        ] !== false
-                          ? "translate-x-5"
-                          : "translate-x-0.5",
-                      )}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Per-component visibility toggles — dynamic from INDICATOR_COMPONENT_CONFIG */}
+          {(() => {
+            const cfg = INDICATOR_COMPONENT_CONFIG[indicator.type];
+            if (!cfg || cfg.visibility.length === 0) return null;
+            return (
+              <div className="space-y-2 pt-2 border-t border-[#363a45]">
+                <Label className="text-[12px] text-[#787B86] uppercase tracking-wider">Component Visibility</Label>
+                {cfg.visibility.map(({ key, label }) => {
+                  const isVisible = indicator.componentVisibility?.[key] !== false;
+                  return (
+                    <div key={key} className="flex items-center justify-between py-0.5">
+                      <span className="text-[13px] text-[#d1d4dc]">{label}</span>
+                      <button
+                        onClick={() =>
+                          onUpdate({
+                            componentVisibility: {
+                              ...indicator.componentVisibility,
+                              [key]: !isVisible,
+                            },
+                          })
+                        }
+                        className={cn(
+                          "w-10 h-5 rounded-full transition-colors relative flex-shrink-0",
+                          isVisible ? "bg-[#2962FF]" : "bg-[#363a45]",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                            isVisible ? "left-5" : "left-0.5",
+                          )}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>

@@ -1834,9 +1834,13 @@ const LightweightTradingChart = ({
             prevScore = d.trendScore;
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const ntmUpperColor = indicator.componentColors?.upper ?? "#9e9e9e";
+          const ntmCoreColor = indicator.componentColors?.core ?? "#06b6d4";
+          const ntmLowerColor = indicator.componentColors?.lower ?? "#9e9e9e";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: "#9e9e9e",
+              color: hexToRgba(ntmUpperColor, indicator.opacity || 60),
               lineWidth: 1 as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "NTM"} Upper`,
@@ -1846,14 +1850,14 @@ const LightweightTradingChart = ({
             });
             upperSeries.setData(ntmData.map((d) => ({
               time: d.time as UTCTimestamp, value: d.upper,
-              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 60),
+              color: hexToRgba(ntmUpperColor, indicator.opacity || 60),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.core !== false) {
             const coreSeries = chart.addLineSeries({
-              color: "#06b6d4",
+              color: ntmCoreColor,
               lineWidth: 3 as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Nexus Trend Matrix",
@@ -1862,16 +1866,18 @@ const LightweightTradingChart = ({
             });
             coreSeries.setData(ntmData.map((d) => ({
               time: d.time as UTCTimestamp, value: d.core,
-              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 100),
+              color: hexToRgba(ntmCoreColor, indicator.opacity || 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, coreSeries);
-            const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { coreSeries.setMarkers(sorted); } catch {}
+            const ntmSorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            if (indicator.componentVisibility?.signals !== false) {
+              try { coreSeries.setMarkers(ntmSorted); } catch {}
+            }
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: "#9e9e9e",
+              color: hexToRgba(ntmLowerColor, indicator.opacity || 60),
               lineWidth: 1 as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "NTM"} Lower`,
@@ -1881,7 +1887,7 @@ const LightweightTradingChart = ({
             });
             lowerSeries.setData(ntmData.map((d) => ({
               time: d.time as UTCTimestamp, value: d.lower,
-              color: hexToRgba(ntmColor(d.trendScore), indicator.opacity || 60),
+              color: hexToRgba(ntmLowerColor, indicator.opacity || 60),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
@@ -1912,71 +1918,77 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const pfzSupplyColor = indicator.componentColors?.supply ?? "#e040fb";
+          const pfzFlowColor = indicator.componentColors?.flow ?? "#00bcd4";
+          const pfzDemandColor = indicator.componentColors?.demand ?? "#00e5ff";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const validSupply = pfzData.filter((d) => !isNaN(d.supplyZone));
             if (validSupply.length > 0) {
               const supTopSeries = chart.addLineSeries({
-                color: "#e040fb", lineWidth: 2 as any, lineStyle: 0 as any,
+                color: pfzSupplyColor, lineWidth: 2 as any, lineStyle: 0 as any,
                 title: `${indicator.customLabel || "PFZ"} Supply`, priceScaleId: "right",
                 priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
               });
               supTopSeries.setData(validSupply.map((d) => ({
                 time: d.time as UTCTimestamp, value: d.supplyZone,
-                color: pfzStrColor(d.signalStrength, "#e040fb"),
+                color: pfzStrColor(d.signalStrength, pfzSupplyColor),
               })));
               indicatorSeriesRef.current.set(`${indicator.id}_supply`, supTopSeries);
 
               const supBotSeries = chart.addLineSeries({
-                color: "#e040fb", lineWidth: 1 as any, lineStyle: 2 as any,
+                color: pfzSupplyColor, lineWidth: 1 as any, lineStyle: 2 as any,
                 title: "", priceScaleId: "right",
                 priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
               });
               supBotSeries.setData(validSupply.map((d) => ({
                 time: d.time as UTCTimestamp, value: d.supplyZone - d.atr * 0.3,
-                color: pfzStrColor(d.signalStrength * 0.6, "#e040fb"),
+                color: pfzStrColor(d.signalStrength * 0.6, pfzSupplyColor),
               })));
               indicatorSeriesRef.current.set(`${indicator.id}_supply_bot`, supBotSeries);
             }
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const flowSeries = chart.addLineSeries({
-              color: "#00bcd4", lineWidth: (indicator.lineWidth || 2) as any, lineStyle: 0 as any,
+              color: pfzFlowColor, lineWidth: (indicator.lineWidth || 2) as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Phantom Flow", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
             flowSeries.setData(pfzData.map((d) => {
               const close = transformedCandles.find(c => c.time === d.time)?.close ?? d.flowLine;
               const isBull = close > d.flowLine;
-              return { time: d.time as UTCTimestamp, value: d.flowLine, color: isBull ? "#00e5ff" : "#e040fb" };
+              return { time: d.time as UTCTimestamp, value: d.flowLine, color: isBull ? pfzDemandColor : pfzSupplyColor };
             }));
             indicatorSeriesRef.current.set(`${indicator.id}_flow`, flowSeries);
-            const sorted = flowMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { flowSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = flowMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { flowSeries.setMarkers(sorted); } catch {}
+            }
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const validDemand = pfzData.filter((d) => !isNaN(d.demandZone));
             if (validDemand.length > 0) {
               const demBotSeries = chart.addLineSeries({
-                color: "#00e5ff", lineWidth: 2 as any, lineStyle: 0 as any,
+                color: pfzDemandColor, lineWidth: 2 as any, lineStyle: 0 as any,
                 title: `${indicator.customLabel || "PFZ"} Demand`, priceScaleId: "right",
                 priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
               });
               demBotSeries.setData(validDemand.map((d) => ({
                 time: d.time as UTCTimestamp, value: d.demandZone,
-                color: pfzStrColor(d.signalStrength, "#00e5ff"),
+                color: pfzStrColor(d.signalStrength, pfzDemandColor),
               })));
               indicatorSeriesRef.current.set(`${indicator.id}_demand`, demBotSeries);
 
               const demTopSeries = chart.addLineSeries({
-                color: "#00e5ff", lineWidth: 1 as any, lineStyle: 2 as any,
+                color: pfzDemandColor, lineWidth: 1 as any, lineStyle: 2 as any,
                 title: "", priceScaleId: "right",
                 priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
               });
               demTopSeries.setData(validDemand.map((d) => ({
                 time: d.time as UTCTimestamp, value: d.demandZone + d.atr * 0.3,
-                color: pfzStrColor(d.signalStrength * 0.6, "#00e5ff"),
+                color: pfzStrColor(d.signalStrength * 0.6, pfzDemandColor),
               })));
               indicatorSeriesRef.current.set(`${indicator.id}_demand_top`, demTopSeries);
             }
@@ -1994,12 +2006,16 @@ const LightweightTradingChart = ({
             indicator.parameters.breakTolerance || 0.25,
           );
 
+          const fpgResColor = indicator.componentColors?.upper ?? indicator.colors?.upper ?? "#f44336";
+          const fpgPulseColor = indicator.componentColors?.middle ?? indicator.colors?.middle ?? indicator.color ?? "#ffc107";
+          const fpgSupColor = indicator.componentColors?.lower ?? indicator.colors?.lower ?? "#4caf50";
+
           // Resistance line (red, dashed)
-          if (indicator.visibility?.upper !== false) {
+          if (indicator.componentVisibility?.upper !== false) {
             const validRes = fpgData.filter((d) => !isNaN(d.resistance));
             if (validRes.length > 0) {
               const resSeries = chart.addLineSeries({
-                color: hexToRgba(indicator.colors?.upper || "#f44336", indicator.opacity || 80),
+                color: hexToRgba(fpgResColor, indicator.opacity || 80),
                 lineWidth: 2 as any,
                 lineStyle: 2 as any,
                 title: `${indicator.customLabel || "FPG"} Resistance`,
@@ -2013,9 +2029,9 @@ const LightweightTradingChart = ({
           }
 
           // Pulse line (golden, solid)
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const pulseSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#ffc107", indicator.opacity || 100),
+              color: hexToRgba(fpgPulseColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Fractal Pulse Grid",
@@ -2027,11 +2043,11 @@ const LightweightTradingChart = ({
           }
 
           // Support line (green, dashed)
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const validSup = fpgData.filter((d) => !isNaN(d.support));
             if (validSup.length > 0) {
               const supSeries = chart.addLineSeries({
-                color: hexToRgba(indicator.colors?.lower || "#4caf50", indicator.opacity || 80),
+                color: hexToRgba(fpgSupColor, indicator.opacity || 80),
                 lineWidth: 2 as any,
                 lineStyle: 2 as any,
                 title: `${indicator.customLabel || "FPG"} Support`,
@@ -2056,16 +2072,16 @@ const LightweightTradingChart = ({
             indicator.parameters.momentumLookback || 10,
           );
 
-          const trendColor = (t: string) =>
-            t === "bullish"
-              ? indicator.colors?.upper || "#22d3ee"
-              : t === "bearish"
-                ? indicator.colors?.lower || "#f97316"
-                : "#6b7280";
+          const vdcUpperColor = indicator.componentColors?.upper ?? indicator.colors?.upper ?? "#22d3ee";
+          const vdcMiddleColor = indicator.componentColors?.middle ?? indicator.colors?.middle ?? indicator.color ?? "#22d3ee";
+          const vdcLowerColor = indicator.componentColors?.lower ?? indicator.colors?.lower ?? "#f97316";
 
-          if (indicator.visibility?.upper !== false) {
+          const trendColor = (t: string) =>
+            t === "bullish" ? vdcUpperColor : t === "bearish" ? vdcLowerColor : "#6b7280";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.upper || "#22d3ee", indicator.opacity || 70),
+              color: hexToRgba(vdcUpperColor, indicator.opacity || 70),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "VDC"} Upper`,
@@ -2081,9 +2097,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const midSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#22d3ee", (indicator.opacity || 70) * 0.6),
+              color: hexToRgba(vdcMiddleColor, (indicator.opacity || 70) * 0.6),
               lineWidth: 1 as any,
               lineStyle: 2 as any,
               title: indicator.customLabel || "Vortex Drift Cloud",
@@ -2098,9 +2114,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.lower || "#f97316", indicator.opacity || 70),
+              color: hexToRgba(vdcLowerColor, indicator.opacity || 70),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "VDC"} Lower`,
@@ -2128,15 +2144,19 @@ const LightweightTradingChart = ({
             indicator.parameters.fadeSmooth || 5,
           );
 
+          const omsUpperColor = indicator.componentColors?.upper ?? indicator.colors?.upper ?? "#34d399";
+          const omsMiddleColor = indicator.componentColors?.middle ?? indicator.colors?.middle ?? indicator.color ?? "#a78bfa";
+          const omsLowerColor = indicator.componentColors?.lower ?? indicator.colors?.lower ?? "#fb923c";
+
           const phaseColor = (vnm: number, phase: string) => {
             if (phase === "surge") return vnm > 0 ? "#22c55e" : "#ef4444";
             if (phase === "fade") return "#6b7280";
-            return vnm > 0 ? (indicator.colors?.upper || "#34d399") : (indicator.colors?.lower || "#fb923c");
+            return vnm > 0 ? omsUpperColor : omsLowerColor;
           };
 
-          if (indicator.visibility?.upper !== false) {
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.upper || "#34d399", indicator.opacity || 65),
+              color: hexToRgba(omsUpperColor, indicator.opacity || 65),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "OMS"} Upper`,
@@ -2152,9 +2172,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const midSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#a78bfa", indicator.opacity || 90),
+              color: hexToRgba(omsMiddleColor, indicator.opacity || 90),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Orion Momentum Shield",
@@ -2169,9 +2189,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.lower || "#fb923c", indicator.opacity || 65),
+              color: hexToRgba(omsLowerColor, indicator.opacity || 65),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "OMS"} Lower`,
@@ -2207,9 +2227,13 @@ const LightweightTradingChart = ({
             }
           };
 
-          if (indicator.visibility?.upper !== false) {
+          const npbUpperColor = indicator.componentColors?.upper ?? indicator.colors?.upper ?? "#67e8f9";
+          const npbMiddleColor = indicator.componentColors?.middle ?? indicator.colors?.middle ?? indicator.color ?? "#06b6d4";
+          const npbLowerColor = indicator.componentColors?.lower ?? indicator.colors?.lower ?? "#818cf8";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.upper || "#67e8f9", indicator.opacity || 60),
+              color: hexToRgba(npbUpperColor, indicator.opacity || 60),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "NPB"} Upper`,
@@ -2225,9 +2249,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const midSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#06b6d4", indicator.opacity || 90),
+              color: hexToRgba(npbMiddleColor, indicator.opacity || 90),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Nebula Phase Bands",
@@ -2242,9 +2266,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.lower || "#818cf8", indicator.opacity || 60),
+              color: hexToRgba(npbLowerColor, indicator.opacity || 60),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "NPB"} Lower`,
@@ -2277,9 +2301,13 @@ const LightweightTradingChart = ({
             return "#94a3b8";
           };
 
-          if (indicator.visibility?.upper !== false) {
+          const chvUpperColor = indicator.componentColors?.upper ?? indicator.colors?.upper ?? "#60a5fa";
+          const chvMiddleColor = indicator.componentColors?.middle ?? indicator.colors?.middle ?? indicator.color ?? "#3b82f6";
+          const chvLowerColor = indicator.componentColors?.lower ?? indicator.colors?.lower ?? "#f97316";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.upper || "#60a5fa", indicator.opacity || 55),
+              color: hexToRgba(chvUpperColor, indicator.opacity || 55),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "CHV"} Upper`,
@@ -2295,9 +2323,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.middle !== false) {
             const midSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.middle || indicator.color || "#3b82f6", indicator.opacity || 90),
+              color: hexToRgba(chvMiddleColor, indicator.opacity || 90),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: indicator.customLabel || "Cipher Harmonic Veil",
@@ -2312,9 +2340,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_middle`, midSeries);
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.lower || "#f97316", indicator.opacity || 55),
+              color: hexToRgba(chvLowerColor, indicator.opacity || 55),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: indicator.lineStyle as any,
               title: `${indicator.customLabel || "CHV"} Lower`,
@@ -2373,9 +2401,12 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (upData.length > 0) {
+          const tpsBullColor = indicator.componentColors?.bull ?? indicator.colors?.positive ?? "#22c55e";
+          const tpsBearColor = indicator.componentColors?.bear ?? indicator.colors?.negative ?? "#ef4444";
+
+          if (upData.length > 0 && indicator.componentVisibility?.bull !== false) {
             const upSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              color: hexToRgba(tpsBullColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "TPS"} Bull`,
@@ -2385,13 +2416,15 @@ const LightweightTradingChart = ({
             });
             upSeries.setData(upData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_up`, upSeries);
-            const sortedBuy = buyMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { upSeries.setMarkers(sortedBuy); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sortedBuy = buyMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { upSeries.setMarkers(sortedBuy); } catch {}
+            }
           }
 
-          if (downData.length > 0) {
+          if (downData.length > 0 && indicator.componentVisibility?.bear !== false) {
             const downSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              color: hexToRgba(tpsBearColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "TPS"} Bear`,
@@ -2401,8 +2434,10 @@ const LightweightTradingChart = ({
             });
             downSeries.setData(downData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_down`, downSeries);
-            const sortedSell = sellMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { downSeries.setMarkers(sortedSell); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sortedSell = sellMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { downSeries.setMarkers(sortedSell); } catch {}
+            }
           }
 
         // Aurora Cascade Flow: 5 adaptive KAMA layers with directional coloring
@@ -2416,13 +2451,19 @@ const LightweightTradingChart = ({
           );
 
           const layerKeys = ["l1","l2","l3","l4","l5"] as const;
-          const bullColors = ["#22d3ee","#06b6d4","#0891b2","#0e7490","#155e75"];
-          const bearColors = ["#f87171","#ef4444","#dc2626","#b91c1c","#991b1b"];
+          const acfDefaultBull = ["#22d3ee","#06b6d4","#0891b2","#0e7490","#155e75"];
+          const acfDefaultBear = ["#f87171","#ef4444","#dc2626","#b91c1c","#991b1b"];
+          const acfBullColors = layerKeys.map((k, i) => indicator.componentColors?.[k] ?? acfDefaultBull[i]);
+          const acfBearColors = layerKeys.map((k, i) => {
+            // Derive bear color: shift hue relative to user choice (use default bears if default bull)
+            return indicator.componentColors?.[k] ? indicator.componentColors[k] : acfDefaultBear[i];
+          });
           const neutralColor = "#64748b";
 
           layerKeys.forEach((key, idx) => {
+            if (indicator.componentVisibility?.[key] === false) return;
             const series = chart.addLineSeries({
-              color: hexToRgba(bullColors[idx], indicator.opacity || (90 - idx * 10)),
+              color: hexToRgba(acfBullColors[idx], indicator.opacity || (90 - idx * 10)),
               lineWidth: ((indicator.lineWidth || 2) - (idx > 2 ? 1 : 0)) as any,
               lineStyle: 0 as any,
               title: idx === 2 ? (indicator.customLabel || "Aurora Cascade Flow") : `ACF L${idx + 1}`,
@@ -2432,7 +2473,7 @@ const LightweightTradingChart = ({
             });
             series.setData(acfData.map((d) => {
               const isBull = d.direction === 1;
-              const clr = d.alignment >= 4 ? (isBull ? bullColors[idx] : bearColors[idx]) : neutralColor;
+              const clr = d.alignment >= 4 ? (isBull ? acfBullColors[idx] : acfBearColors[idx]) : neutralColor;
               return {
                 time: d.time as UTCTimestamp,
                 value: d[key],
@@ -2495,21 +2536,27 @@ const LightweightTradingChart = ({
             }
           }
 
-          const shadowSeries = chart.addLineSeries({
-            color: hexToRgba("#64748b", 40),
-            lineWidth: 1 as any,
-            lineStyle: 2 as any,
-            title: "",
-            priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: false,
-          });
-          shadowSeries.setData(shadowData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
-          indicatorSeriesRef.current.set(`${indicator.id}_shadow`, shadowSeries);
+          const estShadowColor = indicator.componentColors?.shadow ?? "#64748b";
+          const estBullColor = indicator.componentColors?.bull ?? indicator.colors?.positive ?? "#22c55e";
+          const estBearColor = indicator.componentColors?.bear ?? indicator.colors?.negative ?? "#ef4444";
 
-          if (trailBullData.length > 0) {
+          if (indicator.componentVisibility?.shadow !== false) {
+            const shadowSeries = chart.addLineSeries({
+              color: hexToRgba(estShadowColor, 40),
+              lineWidth: 1 as any,
+              lineStyle: 2 as any,
+              title: "",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            shadowSeries.setData(shadowData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+            indicatorSeriesRef.current.set(`${indicator.id}_shadow`, shadowSeries);
+          }
+
+          if (trailBullData.length > 0 && indicator.componentVisibility?.bull !== false) {
             const bullSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              color: hexToRgba(estBullColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "EST"} Bull`,
@@ -2519,13 +2566,15 @@ const LightweightTradingChart = ({
             });
             bullSeries.setData(trailBullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
-            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bullSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bullSeries.setMarkers(sorted); } catch {}
+            }
           }
 
-          if (trailBearData.length > 0) {
+          if (trailBearData.length > 0 && indicator.componentVisibility?.bear !== false) {
             const bearSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              color: hexToRgba(estBearColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "EST"} Bear`,
@@ -2535,8 +2584,10 @@ const LightweightTradingChart = ({
             });
             bearSeries.setData(trailBearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
-            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bearSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bearSeries.setMarkers(sorted); } catch {}
+            }
           }
 
         // Wraith Convergence Engine: single consensus line + convergence markers
@@ -2589,9 +2640,12 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (bullData.length > 0) {
+          const wceBullColor = indicator.componentColors?.bull ?? indicator.colors?.positive ?? "#22c55e";
+          const wceBearColor = indicator.componentColors?.bear ?? indicator.colors?.negative ?? "#ef4444";
+
+          if (bullData.length > 0 && indicator.componentVisibility?.bull !== false) {
             const bullSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              color: hexToRgba(wceBullColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "WCE"} Bull`,
@@ -2601,13 +2655,15 @@ const LightweightTradingChart = ({
             });
             bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
-            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bullSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bullSeries.setMarkers(sorted); } catch {}
+            }
           }
 
-          if (bearData.length > 0) {
+          if (bearData.length > 0 && indicator.componentVisibility?.bear !== false) {
             const bearSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              color: hexToRgba(wceBearColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "WCE"} Bear`,
@@ -2617,8 +2673,10 @@ const LightweightTradingChart = ({
             });
             bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
-            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bearSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bearSeries.setMarkers(sorted); } catch {}
+            }
           }
 
         // Flux Momentum Trail: single line with per-bar gradient coloring + surge markers
@@ -2632,57 +2690,42 @@ const LightweightTradingChart = ({
             indicator.parameters.surgeThreshold || 70,
           );
 
-          const trailSeries = chart.addLineSeries({
-            color: "#94a3b8",
-            lineWidth: (indicator.lineWidth || 3) as any,
-            lineStyle: 0 as any,
-            title: indicator.customLabel || "Flux Momentum Trail",
-            priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: true,
-          });
+          const fmtTrailColor = indicator.componentColors?.trail ?? "#94a3b8";
 
-          const coloredData = fmtData.map((d) => ({
-            time: d.time as UTCTimestamp,
-            value: d.trail,
-            color: d.color,
-          }));
-          trailSeries.setData(coloredData);
-          indicatorSeriesRef.current.set(`${indicator.id}_trail`, trailSeries);
+          if (indicator.componentVisibility?.trail !== false) {
+            const trailSeries = chart.addLineSeries({
+              color: fmtTrailColor,
+              lineWidth: (indicator.lineWidth || 3) as any,
+              lineStyle: 0 as any,
+              title: indicator.customLabel || "Flux Momentum Trail",
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: true,
+            });
 
-          const markers: any[] = [];
-          for (const d of fmtData) {
-            if (d.signal === "surge_bull") {
-              markers.push({
-                time: d.time as UTCTimestamp,
-                position: "belowBar" as const,
-                color: "#22c55e",
-                shape: "arrowUp" as const,
-                text: "SURGE",
-                size: 2,
-              });
-            } else if (d.signal === "surge_bear") {
-              markers.push({
-                time: d.time as UTCTimestamp,
-                position: "aboveBar" as const,
-                color: "#ef4444",
-                shape: "arrowDown" as const,
-                text: "SURGE",
-                size: 2,
-              });
-            } else if (d.signal === "fade") {
-              markers.push({
-                time: d.time as UTCTimestamp,
-                position: d.momentum >= 0 ? ("belowBar" as const) : ("aboveBar" as const),
-                color: "#f59e0b",
-                shape: "circle" as const,
-                text: "FADE",
-                size: 1,
-              });
+            const coloredData = fmtData.map((d) => ({
+              time: d.time as UTCTimestamp,
+              value: d.trail,
+              color: d.color,
+            }));
+            trailSeries.setData(coloredData);
+            indicatorSeriesRef.current.set(`${indicator.id}_trail`, trailSeries);
+
+            if (indicator.componentVisibility?.signals !== false) {
+              const fmtMarkers: any[] = [];
+              for (const d of fmtData) {
+                if (d.signal === "surge_bull") {
+                  fmtMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#22c55e", shape: "arrowUp" as const, text: "SURGE", size: 2 });
+                } else if (d.signal === "surge_bear") {
+                  fmtMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ef4444", shape: "arrowDown" as const, text: "SURGE", size: 2 });
+                } else if (d.signal === "fade") {
+                  fmtMarkers.push({ time: d.time as UTCTimestamp, position: d.momentum >= 0 ? ("belowBar" as const) : ("aboveBar" as const), color: "#f59e0b", shape: "circle" as const, text: "FADE", size: 1 });
+                }
+              }
+              const fmtSorted = fmtMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { trailSeries.setMarkers(fmtSorted); } catch {}
             }
           }
-          const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-          try { trailSeries.setMarkers(sorted); } catch {}
 
         // Apex Predator Signal: ZLEMA reference line + multi-factor confluence markers
         } else if (indicator.type === "apex_predator_signal") {
@@ -2727,9 +2770,12 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (bullData.length > 0) {
+          const apsBullColor = indicator.componentColors?.bull ?? indicator.colors?.positive ?? "#22c55e";
+          const apsBearColor = indicator.componentColors?.bear ?? indicator.colors?.negative ?? "#ef4444";
+
+          if (bullData.length > 0 && indicator.componentVisibility?.bull !== false) {
             const bullSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.positive || "#22c55e", indicator.opacity || 100),
+              color: hexToRgba(apsBullColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "APS"} Bull`,
@@ -2739,13 +2785,15 @@ const LightweightTradingChart = ({
             });
             bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
-            const sorted2 = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bullSeries.setMarkers(sorted2); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted2 = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bullSeries.setMarkers(sorted2); } catch {}
+            }
           }
 
-          if (bearData.length > 0) {
+          if (bearData.length > 0 && indicator.componentVisibility?.bear !== false) {
             const bearSeries = chart.addLineSeries({
-              color: hexToRgba(indicator.colors?.negative || "#ef4444", indicator.opacity || 100),
+              color: hexToRgba(apsBearColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 2) as any,
               lineStyle: 0 as any,
               title: `${indicator.customLabel || "APS"} Bear`,
@@ -2755,8 +2803,10 @@ const LightweightTradingChart = ({
             });
             bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
-            const sorted2 = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { bearSeries.setMarkers(sorted2); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted2 = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { bearSeries.setMarkers(sorted2); } catch {}
+            }
           }
 
         // Phantom Divergence Tracker: dual-line price vs volume-adjusted divergence
@@ -2783,32 +2833,40 @@ const LightweightTradingChart = ({
             }
           }
 
-          const pSeries = chart.addLineSeries({
-            color: hexToRgba(indicator.colors?.positive || "#06b6d4", indicator.opacity || 100),
-            lineWidth: (indicator.lineWidth || 2) as any,
-            lineStyle: 0 as any,
-            title: `${indicator.customLabel || "PDT"} Price`,
-            priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: true,
-          });
-          pSeries.setData(priceLineData);
-          indicatorSeriesRef.current.set(`${indicator.id}_price`, pSeries);
+          const pdtPriceColor = indicator.componentColors?.price ?? indicator.colors?.positive ?? "#06b6d4";
+          const pdtMomColor = indicator.componentColors?.momentum ?? indicator.colors?.negative ?? "#a78bfa";
 
-          const mSeries = chart.addLineSeries({
-            color: hexToRgba(indicator.colors?.negative || "#a78bfa", indicator.opacity || 80),
-            lineWidth: (indicator.lineWidth || 2) as any,
-            lineStyle: 2 as any,
-            title: `${indicator.customLabel || "PDT"} Volume`,
-            priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: false,
-          });
-          mSeries.setData(momLineData);
-          indicatorSeriesRef.current.set(`${indicator.id}_mom`, mSeries);
+          if (indicator.componentVisibility?.price !== false) {
+            const pSeries = chart.addLineSeries({
+              color: hexToRgba(pdtPriceColor, indicator.opacity || 100),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 0 as any,
+              title: `${indicator.customLabel || "PDT"} Price`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: true,
+            });
+            pSeries.setData(priceLineData);
+            indicatorSeriesRef.current.set(`${indicator.id}_price`, pSeries);
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { pSeries.setMarkers(sorted); } catch {}
+            }
+          }
 
-          const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-          try { pSeries.setMarkers(sorted); } catch {}
+          if (indicator.componentVisibility?.momentum !== false) {
+            const mSeries = chart.addLineSeries({
+              color: hexToRgba(pdtMomColor, indicator.opacity || 80),
+              lineWidth: (indicator.lineWidth || 2) as any,
+              lineStyle: 2 as any,
+              title: `${indicator.customLabel || "PDT"} Volume`,
+              priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            mSeries.setData(momLineData);
+            indicatorSeriesRef.current.set(`${indicator.id}_mom`, mSeries);
+          }
 
         // Chaos Sentinel: attractor line + order/chaos regime coloring + transition markers
         } else if (indicator.type === "chaos_sentinel") {
@@ -2844,36 +2902,44 @@ const LightweightTradingChart = ({
             }
           }
 
-          // Order segments (blue)
-          if (orderData.length > 0) {
+          const csOrderColor = indicator.componentColors?.order ?? "#3b82f6";
+          const csChaosColor = indicator.componentColors?.chaos ?? "#ef4444";
+          const csTransColor = indicator.componentColors?.transition ?? "#94a3b8";
+
+          // Order segments
+          if (orderData.length > 0 && indicator.componentVisibility?.order !== false) {
             const oSeries = chart.addLineSeries({
-              color: hexToRgba("#3b82f6", indicator.opacity || 100),
+              color: hexToRgba(csOrderColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
               title: `${indicator.customLabel || "CS"} Order`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             oSeries.setData(orderData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_order`, oSeries);
-            try { oSeries.setMarkers(orderMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              try { oSeries.setMarkers(orderMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            }
           }
 
-          // Chaos segments (red)
-          if (chaosData.length > 0) {
+          // Chaos segments
+          if (chaosData.length > 0 && indicator.componentVisibility?.chaos !== false) {
             const cSeries = chart.addLineSeries({
-              color: hexToRgba("#ef4444", indicator.opacity || 100),
+              color: hexToRgba(csChaosColor, indicator.opacity || 100),
               lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
               title: `${indicator.customLabel || "CS"} Chaos`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             cSeries.setData(chaosData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_chaos`, cSeries);
-            try { cSeries.setMarkers(chaosMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              try { cSeries.setMarkers(chaosMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            }
           }
 
-          // Transition segments (gray)
-          if (transData.length > 0) {
+          // Transition segments
+          if (transData.length > 0 && indicator.componentVisibility?.transition !== false) {
             const tSeries = chart.addLineSeries({
-              color: hexToRgba("#94a3b8", 60),
+              color: hexToRgba(csTransColor, 60),
               lineWidth: 1 as any, lineStyle: 2 as any,
               title: "", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
@@ -2910,22 +2976,25 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const hpeEnvColor = indicator.componentColors?.envelope ?? "#78909c";
+          const hpeCoreColor = indicator.componentColors?.core ?? "#00e5ff";
+
+          if (indicator.componentVisibility?.envelope !== false) {
             const upperSeries = chart.addLineSeries({
-              color: "#78909c", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: hexToRgba(hpeEnvColor, 40), lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "HPE"} Upper`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             upperSeries.setData(hpeData.map(d => ({
               time: d.time as UTCTimestamp, value: d.upper,
-              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), 40),
+              color: hexToRgba(hpeEnvColor, 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.core !== false) {
             const coreSeries = chart.addLineSeries({
-              color: "#00e5ff", lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
+              color: hpeCoreColor, lineWidth: (indicator.lineWidth || 3) as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Helix Phase Engine", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
@@ -2938,15 +3007,15 @@ const LightweightTradingChart = ({
             try { coreSeries.setMarkers(sorted); } catch {}
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: "#78909c", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: hexToRgba(hpeEnvColor, 40), lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "HPE"} Lower`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             lowerSeries.setData(hpeData.map(d => ({
               time: d.time as UTCTimestamp, value: d.lower,
-              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), 40),
+              color: hexToRgba(hpeEnvColor, 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
@@ -2961,18 +3030,21 @@ const LightweightTradingChart = ({
             indicator.parameters.splitThreshold || 30,
           );
 
-          const prismColors = ["#00e5ff", "#2979ff", "#7c4dff", "#e040fb"];
+          const prismColorDefaults = ["#00e5ff", "#2979ff", "#7c4dff", "#e040fb"];
+          const prismColorKeys = ["d1", "d2", "d3", "a3"] as const;
+          const prismColors = prismColorKeys.map((k, i) => indicator.componentColors?.[k] ?? prismColorDefaults[i]);
           const prismKeys = ["d1", "d2", "d3", "a3"] as const;
           const prismNames = ["Fast", "Medium", "Slow", "Trend"];
           const prismWidths = [1, 1, 2, 3];
 
-          const markers: any[] = [];
+          const pwcMarkers: any[] = [];
           for (const d of pwcData) {
-            if (d.signal === "align") markers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e676", shape: "arrowUp" as const, text: "ALIGN", size: 2 });
-            else if (d.signal === "split") markers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff5252", shape: "arrowDown" as const, text: "SPLIT", size: 2 });
+            if (d.signal === "align") pwcMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e676", shape: "arrowUp" as const, text: "ALIGN", size: 2 });
+            else if (d.signal === "split") pwcMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff5252", shape: "arrowDown" as const, text: "SPLIT", size: 2 });
           }
 
           prismKeys.forEach((key, idx) => {
+            if (indicator.componentVisibility?.[key] === false) return;
             const series = chart.addLineSeries({
               color: prismColors[idx],
               lineWidth: prismWidths[idx] as any,
@@ -2986,10 +3058,12 @@ const LightweightTradingChart = ({
             if (idx === 3) {
               series.setData(pwcData.map(d => ({
                 time: d.time as UTCTimestamp, value: d[key],
-                color: d.trendDir === "bull" ? "#00e676" : d.trendDir === "bear" ? "#f44336" : "#e040fb",
+                color: d.trendDir === "bull" ? "#00e676" : d.trendDir === "bear" ? "#f44336" : prismColors[idx],
               })));
-              const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { series.setMarkers(sorted); } catch {}
+              if (indicator.componentVisibility?.signals !== false) {
+                const sorted = pwcMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+                try { series.setMarkers(sorted); } catch {}
+              }
             } else {
               series.setData(pwcData.map(d => ({
                 time: d.time as UTCTimestamp, value: d[key],
@@ -3024,22 +3098,25 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const mdsCorrColor = indicator.componentColors?.corridor ?? "#9e9e9e";
+          const mdsTrendColor = indicator.componentColors?.trend ?? "#ffd740";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: "#9e9e9e", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: mdsCorrColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "MDS"} Upper`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             upperSeries.setData(mdsData.map(d => ({
               time: d.time as UTCTimestamp, value: d.upper,
-              color: hexToRgba(mdsColor(d.depthScore, d.regime), 35),
+              color: hexToRgba(mdsCorrColor, 35),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.trend !== false) {
             const trendSeries = chart.addLineSeries({
-              color: "#ffd740", lineWidth: 3 as any, lineStyle: 0 as any,
+              color: mdsTrendColor, lineWidth: 3 as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Mirage Depth Scanner", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
@@ -3048,19 +3125,21 @@ const LightweightTradingChart = ({
               color: hexToRgba(mdsColor(d.depthScore, d.regime), 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_trend`, trendSeries);
-            const sorted = mdsMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { trendSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = mdsMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { trendSeries.setMarkers(sorted); } catch {}
+            }
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: "#9e9e9e", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: mdsCorrColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "MDS"} Lower`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             lowerSeries.setData(mdsData.map(d => ({
               time: d.time as UTCTimestamp, value: d.lower,
-              color: hexToRgba(mdsColor(d.depthScore, d.regime), 35),
+              color: hexToRgba(mdsCorrColor, 35),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
@@ -3087,22 +3166,25 @@ const LightweightTradingChart = ({
             else if (d.signal === "snap_start") qdmMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff6d00", shape: "arrowDown" as const, text: "SNAP", size: 2 });
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const qdmCorrColor = indicator.componentColors?.corridor ?? "#b0bec5";
+          const qdmDriftColor = indicator.componentColors?.drift ?? "#00e5ff";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const upperSeries = chart.addLineSeries({
-              color: "#b0bec5", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: qdmCorrColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "QDM"} Upper`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             upperSeries.setData(qdmData.map(d => ({
               time: d.time as UTCTimestamp, value: d.upper,
-              color: hexToRgba(qdmColor(d.alpha, d.regime), 40),
+              color: hexToRgba(qdmCorrColor, 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, upperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.drift !== false) {
             const driftSeries = chart.addLineSeries({
-              color: "#00e5ff", lineWidth: 3 as any, lineStyle: 0 as any,
+              color: qdmDriftColor, lineWidth: 3 as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Quantum Drift Mapper", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
@@ -3111,19 +3193,21 @@ const LightweightTradingChart = ({
               color: hexToRgba(qdmColor(d.alpha, d.regime), 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_drift`, driftSeries);
-            const sorted = qdmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { driftSeries.setMarkers(sorted); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sorted = qdmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { driftSeries.setMarkers(sorted); } catch {}
+            }
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const lowerSeries = chart.addLineSeries({
-              color: "#b0bec5", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: qdmCorrColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "QDM"} Lower`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             lowerSeries.setData(qdmData.map(d => ({
               time: d.time as UTCTimestamp, value: d.lower,
-              color: hexToRgba(qdmColor(d.alpha, d.regime), 40),
+              color: hexToRgba(qdmCorrColor, 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, lowerSeries);
           }
@@ -3159,9 +3243,12 @@ const LightweightTradingChart = ({
             }
           }
 
-          if (indicator.visibility?.upper !== false) {
+          const sgaArcsColor = indicator.componentColors?.arcs ?? "#7b1fa2";
+          const sgaCenterColor = indicator.componentColors?.center ?? "#9c27b0";
+
+          if (indicator.componentVisibility?.upper !== false) {
             const sgaUpperSeries = chart.addLineSeries({
-              color: "#7b1fa2", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: sgaArcsColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "SGA"} Upper`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
@@ -3172,9 +3259,9 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, sgaUpperSeries);
           }
 
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.center !== false) {
             const sgaCenterSeries = chart.addLineSeries({
-              color: "#9c27b0", lineWidth: 2 as any, lineStyle: 0 as any,
+              color: sgaCenterColor, lineWidth: 2 as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Sovereign Gravity Arc", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
@@ -3183,13 +3270,15 @@ const LightweightTradingChart = ({
               color: hexToRgba(sgaColor(d.velocityNorm, d.state), 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_center`, sgaCenterSeries);
-            const sortedSga = sgaMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { sgaCenterSeries.setMarkers(sortedSga); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sortedSga = sgaMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { sgaCenterSeries.setMarkers(sortedSga); } catch {}
+            }
           }
 
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const sgaLowerSeries = chart.addLineSeries({
-              color: "#7b1fa2", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: sgaArcsColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "SGA"} Lower`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
@@ -3228,10 +3317,15 @@ const LightweightTradingChart = ({
             }
           }
 
+          const steCoreColor = indicator.componentColors?.core ?? "#ffd700";
+          const steUpperColor = indicator.componentColors?.upperBand ?? "#ef5350";
+          const steLowerColor = indicator.componentColors?.lowerBand ?? "#26a69a";
+          const steSarColor = indicator.componentColors?.sar ?? "#ce93d8";
+
           // Solar Core (KAMA adaptive spine) — main dynamic line
-          if (indicator.visibility?.middle !== false) {
+          if (indicator.componentVisibility?.core !== false) {
             const steCoreSeries = chart.addLineSeries({
-              color: "#ffd700", lineWidth: 2 as any, lineStyle: 0 as any,
+              color: steCoreColor, lineWidth: 2 as any, lineStyle: 0 as any,
               title: indicator.customLabel || "Solaris Trend Engine", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
@@ -3240,48 +3334,50 @@ const LightweightTradingChart = ({
               color: steColor(d.trend, d.adxStrength, adxThr),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, steCoreSeries);
-            const sortedSte = steMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-            try { steCoreSeries.setMarkers(sortedSte); } catch {}
+            if (indicator.componentVisibility?.signals !== false) {
+              const sortedSte = steMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { steCoreSeries.setMarkers(sortedSte); } catch {}
+            }
           }
 
           // Upper Supertrend band — dashed
-          if (indicator.visibility?.upper !== false) {
+          if (indicator.componentVisibility?.upper !== false) {
             const steUpperSeries = chart.addLineSeries({
-              color: "#ef5350", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: steUpperColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "STE"} Upper`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             steUpperSeries.setData(steData.map(d => ({
               time: d.time as UTCTimestamp, value: d.upperBand,
-              color: d.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)",
+              color: d.trend === "bull" ? hexToRgba(steUpperColor, 35) : hexToRgba(steUpperColor, 65),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, steUpperSeries);
           }
 
           // Lower Supertrend band — dashed
-          if (indicator.visibility?.lower !== false) {
+          if (indicator.componentVisibility?.lower !== false) {
             const steLowerSeries = chart.addLineSeries({
-              color: "#26a69a", lineWidth: 1 as any, lineStyle: 2 as any,
+              color: steLowerColor, lineWidth: 1 as any, lineStyle: 2 as any,
               title: `${indicator.customLabel || "STE"} Lower`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             steLowerSeries.setData(steData.map(d => ({
               time: d.time as UTCTimestamp, value: d.lowerBand,
-              color: d.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)",
+              color: d.trend === "bear" ? hexToRgba(steLowerColor, 35) : hexToRgba(steLowerColor, 65),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, steLowerSeries);
           }
 
           // SAR dots — plotted as a thin scatter line (single points per bar)
-          if ((indicator.visibility as any)?.sar !== false) {
+          if (indicator.componentVisibility?.sar !== false) {
             const steSarSeries = chart.addLineSeries({
-              color: "#ce93d8", lineWidth: 1 as any, lineStyle: 0 as any,
+              color: steSarColor, lineWidth: 1 as any, lineStyle: 0 as any,
               title: `${indicator.customLabel || "STE"} SAR`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
             steSarSeries.setData(steData.map(d => ({
               time: d.time as UTCTimestamp, value: d.sarDot,
-              color: d.sarDot > d.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)",
+              color: d.sarDot > d.solarCore ? hexToRgba(steUpperColor, 70) : hexToRgba(steLowerColor, 70),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_sar`, steSarSeries);
           }
@@ -3317,52 +3413,68 @@ const LightweightTradingChart = ({
             }
           }
 
+          const scrOuterArcColor = indicator.componentColors?.outerArc ?? "#90a4ae";
+          const scrInnerRibbonColor = indicator.componentColors?.innerRibbon ?? "#00f0ff";
+          const scrCoreLineColor = indicator.componentColors?.core ?? "#00f0ff";
+
           // ── Outer Upper Arc (faint dashed) ────────────────────────────
-          const scrOuterUp = chart.addLineSeries({
-            color: "rgba(144,164,174,0.25)", lineWidth: 1 as any, lineStyle: 3 as any,
-            title: `${indicator.customLabel || "SCR"} OA+`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
-          });
-          scrOuterUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: d.trend === "bull" ? "rgba(0,240,255,0.18)" : d.trend === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)" })));
-          indicatorSeriesRef.current.set(`${indicator.id}_outerUp`, scrOuterUp);
+          if (indicator.componentVisibility?.outerArcs !== false) {
+            const scrOuterUp = chart.addLineSeries({
+              color: hexToRgba(scrOuterArcColor, 25), lineWidth: 1 as any, lineStyle: 3 as any,
+              title: `${indicator.customLabel || "SCR"} OA+`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            scrOuterUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 18) : d.trend === "bear" ? "rgba(255,45,109,0.18)" : hexToRgba(scrOuterArcColor, 15) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_outerUp`, scrOuterUp);
+          }
 
           // ── Inner Upper Ribbon ─────────────────────────────────────────
-          const scrInnerUp = chart.addLineSeries({
-            color: "rgba(0,240,255,0.5)", lineWidth: 1 as any, lineStyle: 0 as any,
-            title: `${indicator.customLabel || "SCR"} R+`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
-          });
-          scrInnerUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: d.trend === "bull" ? "rgba(0,240,255,0.6)" : d.trend === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)" })));
-          indicatorSeriesRef.current.set(`${indicator.id}_innerUp`, scrInnerUp);
+          if (indicator.componentVisibility?.innerRibbon !== false) {
+            const scrInnerUp = chart.addLineSeries({
+              color: hexToRgba(scrInnerRibbonColor, 50), lineWidth: 1 as any, lineStyle: 0 as any,
+              title: `${indicator.customLabel || "SCR"} R+`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            scrInnerUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 60) : d.trend === "bear" ? "rgba(255,45,109,0.6)" : hexToRgba(scrOuterArcColor, 35) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_innerUp`, scrInnerUp);
+          }
 
           // ── Core Blend Line (main, thick, glowing) ────────────────────
-          const scrCoreSeries = chart.addLineSeries({
-            color: "#00f0ff", lineWidth: 3 as any, lineStyle: 0 as any,
-            title: indicator.customLabel || "Stellar Confluence Ribbon", priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-          });
-          scrCoreSeries.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrCoreColor(d.trend, d.confluenceScore, thr) })));
-          indicatorSeriesRef.current.set(`${indicator.id}_core`, scrCoreSeries);
-          const sortedScr = scrMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-          try { scrCoreSeries.setMarkers(sortedScr); } catch {}
+          if (indicator.componentVisibility?.core !== false) {
+            const scrCoreSeries = chart.addLineSeries({
+              color: scrCoreLineColor, lineWidth: 3 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Stellar Confluence Ribbon", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            scrCoreSeries.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrCoreColor(d.trend, d.confluenceScore, thr) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_core`, scrCoreSeries);
+            if (indicator.componentVisibility?.signals !== false) {
+              const sortedScr = scrMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+              try { scrCoreSeries.setMarkers(sortedScr); } catch {}
+            }
+          }
 
           // ── Inner Lower Ribbon ─────────────────────────────────────────
-          const scrInnerLo = chart.addLineSeries({
-            color: "rgba(0,240,255,0.5)", lineWidth: 1 as any, lineStyle: 0 as any,
-            title: `${indicator.customLabel || "SCR"} R-`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
-          });
-          scrInnerLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: d.trend === "bull" ? "rgba(0,240,255,0.6)" : d.trend === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)" })));
-          indicatorSeriesRef.current.set(`${indicator.id}_innerLo`, scrInnerLo);
+          if (indicator.componentVisibility?.innerRibbon !== false) {
+            const scrInnerLo = chart.addLineSeries({
+              color: hexToRgba(scrInnerRibbonColor, 50), lineWidth: 1 as any, lineStyle: 0 as any,
+              title: `${indicator.customLabel || "SCR"} R-`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            scrInnerLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 60) : d.trend === "bear" ? "rgba(255,45,109,0.6)" : hexToRgba(scrOuterArcColor, 35) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_innerLo`, scrInnerLo);
+          }
 
           // ── Outer Lower Arc (faint dashed) ─────────────────────────────
-          const scrOuterLo = chart.addLineSeries({
-            color: "rgba(144,164,174,0.25)", lineWidth: 1 as any, lineStyle: 3 as any,
-            title: `${indicator.customLabel || "SCR"} OA-`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
-          });
-          scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: d.trend === "bull" ? "rgba(0,240,255,0.18)" : d.trend === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)" })));
-          indicatorSeriesRef.current.set(`${indicator.id}_outerLo`, scrOuterLo);
+          if (indicator.componentVisibility?.outerArcs !== false) {
+            const scrOuterLo = chart.addLineSeries({
+              color: hexToRgba(scrOuterArcColor, 25), lineWidth: 1 as any, lineStyle: 3 as any,
+              title: `${indicator.customLabel || "SCR"} OA-`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+            });
+            scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 18) : d.trend === "bear" ? "rgba(255,45,109,0.18)" : hexToRgba(scrOuterArcColor, 15) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_outerLo`, scrOuterLo);
+          }
 
         } else if (indicator.type === "kinetic_pressure_zones") {
           const p = indicator.parameters;
@@ -3388,60 +3500,78 @@ const LightweightTradingChart = ({
             else if (d.signal === "kinetic_bear") kpzMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#7c4dff", shape: "arrowDown" as const, text: "⚡ KINETIC", size: 2 });
           }
 
+          const kpzSpineColor2 = indicator.componentColors?.spine ?? "#00e5ff";
+          const kpzSup1Color = indicator.componentColors?.supply1 ?? "#7c4dff";
+          const kpzSup2Color = indicator.componentColors?.supply2 ?? "#b388ff";
+          const kpzDem1Color = indicator.componentColors?.demand1 ?? "#00e5ff";
+          const kpzDem2Color = indicator.componentColors?.demand2 ?? "#00bcd4";
+
           // ── Kinetic Spine ────────────────────────────────────────────────
-          const kpzSpine = chart.addLineSeries({
-            color: "#00e5ff", lineWidth: 2 as any, lineStyle: 0 as any,
-            title: indicator.customLabel || "Kinetic Pressure Zones", priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-          });
-          kpzSpine.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSpineColor(d.regime) })));
-          indicatorSeriesRef.current.set(`${indicator.id}_spine`, kpzSpine);
-          try { kpzSpine.setMarkers(kpzMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+          if (indicator.componentVisibility?.spine !== false) {
+            const kpzSpine = chart.addLineSeries({
+              color: kpzSpineColor2, lineWidth: 2 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Kinetic Pressure Zones", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            kpzSpine.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSpineColor(d.regime) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_spine`, kpzSpine);
+            if (indicator.componentVisibility?.signals !== false) {
+              try { kpzSpine.setMarkers(kpzMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            }
+          }
 
           // Helper: only emit data points where zone is active (avoids NaN flatlines)
           const zoneData = (arr: typeof kpzData, valFn: (d: typeof kpzData[0]) => number, activeFn: (d: typeof kpzData[0]) => boolean) =>
             arr.filter(activeFn).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d) }));
 
           // ── Supply Zone 1 ────────────────────────────────────────────────
-          const kpzSup1Hi = chart.addLineSeries({ color: "rgba(124,77,255,0.7)", lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          const kpzSup1Lo = chart.addLineSeries({ color: "rgba(124,77,255,0.35)", lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          kpzSup1Hi.setData(zoneData(kpzData, d => d.sup1High, d => d.sup1Active));
-          kpzSup1Lo.setData(zoneData(kpzData, d => d.sup1Low, d => d.sup1Active));
-          indicatorSeriesRef.current.set(`${indicator.id}_sup1hi`, kpzSup1Hi);
-          indicatorSeriesRef.current.set(`${indicator.id}_sup1lo`, kpzSup1Lo);
-          // Strength label on first bar of each zone
-          const sup1FirstBar = kpzData.find(d => d.sup1Active);
-          if (sup1FirstBar) {
-            try { kpzSup1Hi.setMarkers([{ time: sup1FirstBar.time as UTCTimestamp, position: "aboveBar" as const, color: "#ce93d8", shape: "square" as const, text: `${sup1FirstBar.sup1Strength}%`, size: 0 }]); } catch {}
+          if (indicator.componentVisibility?.supply1 !== false) {
+            const kpzSup1Hi = chart.addLineSeries({ color: hexToRgba(kpzSup1Color, 70), lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            const kpzSup1Lo = chart.addLineSeries({ color: hexToRgba(kpzSup1Color, 35), lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            kpzSup1Hi.setData(zoneData(kpzData, d => d.sup1High, d => d.sup1Active));
+            kpzSup1Lo.setData(zoneData(kpzData, d => d.sup1Low, d => d.sup1Active));
+            indicatorSeriesRef.current.set(`${indicator.id}_sup1hi`, kpzSup1Hi);
+            indicatorSeriesRef.current.set(`${indicator.id}_sup1lo`, kpzSup1Lo);
+            // Strength label on first bar of each zone
+            const sup1FirstBar = kpzData.find(d => d.sup1Active);
+            if (sup1FirstBar) {
+              try { kpzSup1Hi.setMarkers([{ time: sup1FirstBar.time as UTCTimestamp, position: "aboveBar" as const, color: hexToRgba(kpzSup1Color, 90), shape: "square" as const, text: `${sup1FirstBar.sup1Strength}%`, size: 0 }]); } catch {}
+            }
           }
 
           // ── Supply Zone 2 ────────────────────────────────────────────────
-          const kpzSup2Hi = chart.addLineSeries({ color: "rgba(179,136,255,0.5)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          const kpzSup2Lo = chart.addLineSeries({ color: "rgba(179,136,255,0.25)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          kpzSup2Hi.setData(zoneData(kpzData, d => d.sup2High, d => d.sup2Active));
-          kpzSup2Lo.setData(zoneData(kpzData, d => d.sup2Low, d => d.sup2Active));
-          indicatorSeriesRef.current.set(`${indicator.id}_sup2hi`, kpzSup2Hi);
-          indicatorSeriesRef.current.set(`${indicator.id}_sup2lo`, kpzSup2Lo);
+          if (indicator.componentVisibility?.supply2 !== false) {
+            const kpzSup2Hi = chart.addLineSeries({ color: hexToRgba(kpzSup2Color, 50), lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            const kpzSup2Lo = chart.addLineSeries({ color: hexToRgba(kpzSup2Color, 25), lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            kpzSup2Hi.setData(zoneData(kpzData, d => d.sup2High, d => d.sup2Active));
+            kpzSup2Lo.setData(zoneData(kpzData, d => d.sup2Low, d => d.sup2Active));
+            indicatorSeriesRef.current.set(`${indicator.id}_sup2hi`, kpzSup2Hi);
+            indicatorSeriesRef.current.set(`${indicator.id}_sup2lo`, kpzSup2Lo);
+          }
 
           // ── Demand Zone 1 ────────────────────────────────────────────────
-          const kpzDem1Hi = chart.addLineSeries({ color: "rgba(0,229,255,0.35)", lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          const kpzDem1Lo = chart.addLineSeries({ color: "rgba(0,229,255,0.7)", lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          kpzDem1Hi.setData(zoneData(kpzData, d => d.dem1High, d => d.dem1Active));
-          kpzDem1Lo.setData(zoneData(kpzData, d => d.dem1Low, d => d.dem1Active));
-          indicatorSeriesRef.current.set(`${indicator.id}_dem1hi`, kpzDem1Hi);
-          indicatorSeriesRef.current.set(`${indicator.id}_dem1lo`, kpzDem1Lo);
-          const dem1FirstBar = kpzData.find(d => d.dem1Active);
-          if (dem1FirstBar) {
-            try { kpzDem1Lo.setMarkers([{ time: dem1FirstBar.time as UTCTimestamp, position: "belowBar" as const, color: "#80deea", shape: "square" as const, text: `${dem1FirstBar.dem1Strength}%`, size: 0 }]); } catch {}
+          if (indicator.componentVisibility?.demand1 !== false) {
+            const kpzDem1Hi = chart.addLineSeries({ color: hexToRgba(kpzDem1Color, 35), lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            const kpzDem1Lo = chart.addLineSeries({ color: hexToRgba(kpzDem1Color, 70), lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            kpzDem1Hi.setData(zoneData(kpzData, d => d.dem1High, d => d.dem1Active));
+            kpzDem1Lo.setData(zoneData(kpzData, d => d.dem1Low, d => d.dem1Active));
+            indicatorSeriesRef.current.set(`${indicator.id}_dem1hi`, kpzDem1Hi);
+            indicatorSeriesRef.current.set(`${indicator.id}_dem1lo`, kpzDem1Lo);
+            const dem1FirstBar = kpzData.find(d => d.dem1Active);
+            if (dem1FirstBar) {
+              try { kpzDem1Lo.setMarkers([{ time: dem1FirstBar.time as UTCTimestamp, position: "belowBar" as const, color: hexToRgba(kpzDem1Color, 90), shape: "square" as const, text: `${dem1FirstBar.dem1Strength}%`, size: 0 }]); } catch {}
+            }
           }
 
           // ── Demand Zone 2 ────────────────────────────────────────────────
-          const kpzDem2Hi = chart.addLineSeries({ color: "rgba(0,188,212,0.25)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          const kpzDem2Lo = chart.addLineSeries({ color: "rgba(0,188,212,0.5)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
-          kpzDem2Hi.setData(zoneData(kpzData, d => d.dem2High, d => d.dem2Active));
-          kpzDem2Lo.setData(zoneData(kpzData, d => d.dem2Low, d => d.dem2Active));
-          indicatorSeriesRef.current.set(`${indicator.id}_dem2hi`, kpzDem2Hi);
-          indicatorSeriesRef.current.set(`${indicator.id}_dem2lo`, kpzDem2Lo);
+          if (indicator.componentVisibility?.demand2 !== false) {
+            const kpzDem2Hi = chart.addLineSeries({ color: hexToRgba(kpzDem2Color, 25), lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            const kpzDem2Lo = chart.addLineSeries({ color: hexToRgba(kpzDem2Color, 50), lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+            kpzDem2Hi.setData(zoneData(kpzData, d => d.dem2High, d => d.dem2Active));
+            kpzDem2Lo.setData(zoneData(kpzData, d => d.dem2Low, d => d.dem2Active));
+            indicatorSeriesRef.current.set(`${indicator.id}_dem2hi`, kpzDem2Hi);
+            indicatorSeriesRef.current.set(`${indicator.id}_dem2lo`, kpzDem2Lo);
+          }
 
         } else if (indicator.type === "nova_resonance_field") {
           const p = indicator.parameters;
@@ -3472,35 +3602,47 @@ const LightweightTradingChart = ({
           }
           const nrfSorted = nrfMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
 
+          const nrfRefColor = indicator.componentColors?.priceRef ?? "#546e7a";
+          const nrfSigColor = indicator.componentColors?.signalLine ?? "#78909c";
+          const nrfEchoLineColor = indicator.componentColors?.echoLine ?? "#ff9800";
+
           // ── Price Reference (thin dashed silver baseline) ─────────────────
-          const nrfRefSeries = chart.addLineSeries({
-            color: "#546e7a", lineWidth: 1 as any, lineStyle: 2 as any,
-            title: `${indicator.customLabel || "NRF"} Ref`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: false,
-          });
-          nrfRefSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
-          indicatorSeriesRef.current.set(`${indicator.id}_ref`, nrfRefSeries);
+          if (indicator.componentVisibility?.priceRef !== false) {
+            const nrfRefSeries = chart.addLineSeries({
+              color: nrfRefColor, lineWidth: 1 as any, lineStyle: 2 as any,
+              title: `${indicator.customLabel || "NRF"} Ref`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            nrfRefSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
+            indicatorSeriesRef.current.set(`${indicator.id}_ref`, nrfRefSeries);
+          }
 
           // ── Signal Line (thin dotted EMA of echo) ────────────────────────
-          const nrfSigSeries = chart.addLineSeries({
-            color: "#78909c", lineWidth: 1 as any, lineStyle: 1 as any,
-            title: `${indicator.customLabel || "NRF"} Sig`, priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-            lastValueVisible: false,
-          });
-          nrfSigSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
-          indicatorSeriesRef.current.set(`${indicator.id}_sig`, nrfSigSeries);
+          if (indicator.componentVisibility?.signalLine !== false) {
+            const nrfSigSeries = chart.addLineSeries({
+              color: nrfSigColor, lineWidth: 1 as any, lineStyle: 1 as any,
+              title: `${indicator.customLabel || "NRF"} Sig`, priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+              lastValueVisible: false,
+            });
+            nrfSigSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
+            indicatorSeriesRef.current.set(`${indicator.id}_sig`, nrfSigSeries);
+          }
 
           // ── Echo Line (main thick colored resonance line) ─────────────────
-          const nrfEchoSeries = chart.addLineSeries({
-            color: "#ff9800", lineWidth: 2 as any, lineStyle: 0 as any,
-            title: indicator.customLabel || "Nova Resonance Field", priceScaleId: "right",
-            priceFormat: { type: "price", precision: indicator.precision || 5 },
-          });
-          nrfEchoSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfEchoColor(d) })));
-          indicatorSeriesRef.current.set(`${indicator.id}_echo`, nrfEchoSeries);
-          try { nrfEchoSeries.setMarkers(nrfSorted); } catch {}
+          if (indicator.componentVisibility?.echoLine !== false) {
+            const nrfEchoSeries = chart.addLineSeries({
+              color: nrfEchoLineColor, lineWidth: 2 as any, lineStyle: 0 as any,
+              title: indicator.customLabel || "Nova Resonance Field", priceScaleId: "right",
+              priceFormat: { type: "price", precision: indicator.precision || 5 },
+            });
+            nrfEchoSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfEchoColor(d) })));
+            indicatorSeriesRef.current.set(`${indicator.id}_echo`, nrfEchoSeries);
+            if (indicator.componentVisibility?.signals !== false) {
+              try { nrfEchoSeries.setMarkers(nrfSorted); } catch {}
+            }
+          }
 
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
