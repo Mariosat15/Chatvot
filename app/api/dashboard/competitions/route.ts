@@ -1,161 +1,164 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import PriceSnapshot from "@/database/models/trading/price-snapshot.model";
 import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/dashboard/competitions
- * PUBLIC endpoint for the competition dashboard HTML display.
+ * PUBLIC endpoint for the competition arena display.
  * Returns live competitions, challenges, participants, open positions, and winners.
  * No authentication required — display-only data.
  */
 export async function GET() {
   try {
     await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) {
-      return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
-    }
 
     const now = new Date();
     const windowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-    // ── 1. Fetch competitions ──────────────────────────────────────────────
-    const competitions = await db
-      .collection("competitions")
-      .find({
-        status: { $in: ["active", "upcoming", "completed", "finalizing", "emergency_ended"] },
-        startTime: { $gte: windowStart },
-      })
+    // ── 1. Fetch competitions using Mongoose model (correct collection name) ──
+    const competitions = await Competition.find({
+      $or: [
+        { status: { $in: ["active", "upcoming"] } },
+        {
+          status: { $in: ["completed", "finalizing", "emergency_ended"] },
+          startTime: { $gte: windowStart },
+        },
+      ],
+    })
       .sort({ startTime: -1 })
       .limit(50)
-      .toArray();
+      .lean();
 
-    // ── 2. Fetch challenges ────────────────────────────────────────────────
-    const challenges = await db
-      .collection("challenges")
-      .find({
-        status: { $in: ["active", "upcoming", "completed", "pending"] },
-        startTime: { $gte: windowStart },
-      })
-      .sort({ startTime: -1 })
+    // ── 2. Fetch challenges ────────────────────────────────────────────────────
+    const challenges = await Challenge.find({
+      $or: [
+        { status: { $in: ["active", "pending", "accepted"] } },
+        {
+          status: { $in: ["completed", "finalizing"] },
+          $or: [
+            { startTime: { $gte: windowStart } },
+            { startTime: { $exists: false } },
+          ],
+        },
+      ],
+    })
+      .sort({ createdAt: -1 })
       .limit(30)
-      .toArray();
+      .lean();
 
-    // ── 3. Collect all competitionIds + challengeIds ───────────────────────
+    // ── 3. IDs for participant/position queries ────────────────────────────────
     const activeCompIds = competitions
-      .filter((c) => c.status === "active")
-      .map((c) => c._id.toString());
-
-    const activeChallengeIds = challenges
-      .filter((c) => c.status === "active")
-      .map((c) => c._id.toString());
+      .filter((c: any) => c.status === "active")
+      .map((c: any) => c._id.toString());
 
     const completedCompIds = competitions
-      .filter((c) => ["completed", "finalizing", "emergency_ended"].includes(c.status as string))
-      .map((c) => c._id.toString());
+      .filter((c: any) =>
+        ["completed", "finalizing", "emergency_ended"].includes(c.status as string),
+      )
+      .map((c: any) => c._id.toString());
 
-    // ── 4. Fetch competition participants (all statuses) ───────────────────
-    const allParticipants = activeCompIds.length
-      ? await db
-          .collection("competitionparticipants")
-          .find({ competitionId: { $in: [...activeCompIds, ...completedCompIds] } })
-          .project({
-            competitionId: 1, userId: 1, username: 1,
-            currentCapital: 1, availableCapital: 1, usedMargin: 1,
-            unrealizedPnl: 1, realizedPnl: 1, pnl: 1, pnlPercentage: 1,
-            totalTrades: 1, winningTrades: 1, losingTrades: 1, winRate: 1,
-            averageWin: 1, averageLoss: 1, largestWin: 1, largestLoss: 1,
-            currentOpenPositions: 1, maxDrawdown: 1, maxDrawdownPercentage: 1,
-            status: 1, currentRank: 1, highestRank: 1, enteredAt: 1, lastTradeAt: 1,
-          })
-          .toArray()
+    const activeChallengeIds = challenges
+      .filter((c: any) => c.status === "active")
+      .map((c: any) => c._id.toString());
+
+    // ── 4. Competition participants ────────────────────────────────────────────
+    const allParticipants = [...activeCompIds, ...completedCompIds].length
+      ? await CompetitionParticipant.find({
+          competitionId: {
+            $in: [...activeCompIds, ...completedCompIds],
+          },
+        })
+          .select(
+            "competitionId userId username currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status currentRank highestRank enteredAt lastTradeAt",
+          )
+          .lean()
       : [];
 
-    // ── 5. Fetch challenge participants ────────────────────────────────────
+    // ── 5. Challenge participants ──────────────────────────────────────────────
     const challengeParticipants = activeChallengeIds.length
-      ? await db
-          .collection("challengeparticipants")
-          .find({ challengeId: { $in: activeChallengeIds } })
-          .project({
-            challengeId: 1, userId: 1, username: 1, role: 1,
-            currentCapital: 1, availableCapital: 1, usedMargin: 1,
-            unrealizedPnl: 1, realizedPnl: 1, pnl: 1, pnlPercentage: 1,
-            totalTrades: 1, winningTrades: 1, losingTrades: 1, winRate: 1,
-            averageWin: 1, averageLoss: 1, largestWin: 1, largestLoss: 1,
-            currentOpenPositions: 1, maxDrawdown: 1, maxDrawdownPercentage: 1,
-            status: 1, isWinner: 1, prizeReceived: 1, joinedAt: 1, lastTradeAt: 1,
-          })
-          .toArray()
+      ? await ChallengeParticipant.find({
+          challengeId: { $in: activeChallengeIds },
+        })
+          .select(
+            "challengeId userId username role currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status isWinner prizeReceived joinedAt lastTradeAt",
+          )
+          .lean()
       : [];
 
-    // ── 6. Fetch open positions for live competitions ─────────────────────
-    const openPositions =
-      activeCompIds.length
-        ? await db
-            .collection("tradingpositions")
-            .find({
-              competitionId: { $in: activeCompIds },
-              status: "open",
-            })
-            .project({
-              competitionId: 1, userId: 1,
-              symbol: 1, side: 1, quantity: 1,
-              entryPrice: 1, currentPrice: 1,
-              unrealizedPnl: 1, unrealizedPnlPercentage: 1,
-              leverage: 1, marginUsed: 1,
-              stopLoss: 1, takeProfit: 1,
-              openedAt: 1,
-            })
-            .sort({ openedAt: -1 })
-            .limit(200)
-            .toArray()
-        : [];
+    // ── 6. Open positions ──────────────────────────────────────────────────────
+    const openPositions = activeCompIds.length
+      ? await TradingPosition.find({
+          competitionId: { $in: activeCompIds },
+          status: "open",
+        })
+          .select(
+            "competitionId userId symbol side quantity entryPrice currentPrice unrealizedPnl unrealizedPnlPercentage leverage marginUsed stopLoss takeProfit openedAt",
+          )
+          .sort({ openedAt: -1 })
+          .limit(200)
+          .lean()
+      : [];
 
-    // ── 7. Batch-fetch user avatars ────────────────────────────────────────
+    // ── 7. Batch-fetch user avatars ────────────────────────────────────────────
     const allUserIds = [
       ...new Set([
-        ...allParticipants.map((p) => p.userId),
-        ...challengeParticipants.map((p) => p.userId),
+        ...(allParticipants as any[]).map((p) => p.userId),
+        ...(challengeParticipants as any[]).map((p) => p.userId),
       ]),
     ];
 
     const userAvatarMap: Record<string, string | null> = {};
     if (allUserIds.length > 0) {
-      const users = await db
-        .collection("user")
-        .find({ id: { $in: allUserIds } })
-        .project({ id: 1, profileImage: 1, image: 1 })
-        .toArray();
-      for (const u of users) {
-        userAvatarMap[u.id] = u.profileImage || u.image || null;
+      const db = mongoose.connection.db;
+      if (db) {
+        const users = await db
+          .collection("user")
+          .find({ id: { $in: allUserIds } })
+          .project({ id: 1, profileImage: 1, image: 1 })
+          .toArray();
+        for (const u of users) {
+          userAvatarMap[u.id] = u.profileImage || u.image || null;
+        }
       }
     }
 
-    // ── 8. Build live unrealized PnL from open positions (more accurate than stale field) ──
+    // ── 8. Live unrealized PnL from open positions ────────────────────────────
     const liveUnrealizedByUser: Record<string, number> = {};
-    for (const pos of openPositions) {
+    for (const pos of openPositions as any[]) {
       const uid = pos.userId as string;
-      liveUnrealizedByUser[uid] = (liveUnrealizedByUser[uid] || 0) + ((pos.unrealizedPnl as number) || 0);
+      liveUnrealizedByUser[uid] =
+        (liveUnrealizedByUser[uid] || 0) + ((pos.unrealizedPnl as number) || 0);
     }
 
-    // ── Helper: build participant enriched object ───────────────────────
+    // ── Helper: enrich participant ─────────────────────────────────────────────
     function enrichParticipant(
       p: Record<string, unknown>,
       startingCapital: number,
       rankingMethod: string,
     ) {
-      // Use sum of open-position unrealizedPnl (live) instead of the stale participant field
-      const realUnrealized = liveUnrealizedByUser[p.userId as string] ?? (p.unrealizedPnl as number || 0);
+      const realUnrealized =
+        liveUnrealizedByUser[p.userId as string] ??
+        ((p.unrealizedPnl as number) || 0);
       const liveEquity = ((p.currentCapital as number) || 0) + realUnrealized;
       const livePnl = liveEquity - startingCapital;
-      const liveRoi = startingCapital > 0 ? (livePnl / startingCapital) * 100 : 0;
+      const liveRoi =
+        startingCapital > 0 ? (livePnl / startingCapital) * 100 : 0;
       const winRate =
         (p.totalTrades as number) > 0
-          ? (((p.winningTrades as number) || 0) / (p.totalTrades as number)) * 100
-          : (p.winRate as number) || 0;
-      const isDisqualified = ["liquidated", "disqualified"].includes(p.status as string);
+          ? (((p.winningTrades as number) || 0) / (p.totalTrades as number)) *
+            100
+          : ((p.winRate as number) || 0);
+      const isDisqualified = ["liquidated", "disqualified"].includes(
+        p.status as string,
+      );
 
       let rankValue = livePnl;
       if (rankingMethod === "roi") rankValue = liveRoi;
@@ -176,20 +179,20 @@ export async function GET() {
         liveEquity: +liveEquity.toFixed(2),
         livePnl: +livePnl.toFixed(2),
         liveRoi: +liveRoi.toFixed(2),
-        realizedPnl: +(p.realizedPnl as number || 0).toFixed(2),
-        unrealizedPnl: +(p.unrealizedPnl as number || 0).toFixed(2),
-        currentCapital: +(p.currentCapital as number || 0).toFixed(2),
-        availableCapital: +(p.availableCapital as number || 0).toFixed(2),
-        usedMargin: +(p.usedMargin as number || 0).toFixed(2),
+        realizedPnl: +((p.realizedPnl as number) || 0).toFixed(2),
+        unrealizedPnl: +((p.unrealizedPnl as number) || 0).toFixed(2),
+        currentCapital: +((p.currentCapital as number) || 0).toFixed(2),
+        availableCapital: +((p.availableCapital as number) || 0).toFixed(2),
+        usedMargin: +((p.usedMargin as number) || 0).toFixed(2),
         totalTrades: (p.totalTrades as number) || 0,
         winningTrades: (p.winningTrades as number) || 0,
         losingTrades: (p.losingTrades as number) || 0,
         winRate: +winRate.toFixed(1),
-        averageWin: +(p.averageWin as number || 0).toFixed(2),
-        averageLoss: +(p.averageLoss as number || 0).toFixed(2),
-        largestWin: +(p.largestWin as number || 0).toFixed(2),
-        largestLoss: +(p.largestLoss as number || 0).toFixed(2),
-        maxDrawdownPercentage: +(p.maxDrawdownPercentage as number || 0).toFixed(2),
+        averageWin: +((p.averageWin as number) || 0).toFixed(2),
+        averageLoss: +((p.averageLoss as number) || 0).toFixed(2),
+        largestWin: +((p.largestWin as number) || 0).toFixed(2),
+        largestLoss: +((p.largestLoss as number) || 0).toFixed(2),
+        maxDrawdownPercentage: +((p.maxDrawdownPercentage as number) || 0).toFixed(2),
         currentOpenPositions: (p.currentOpenPositions as number) || 0,
         highestRank: (p.highestRank as number) || 0,
         status: p.status,
@@ -197,18 +200,18 @@ export async function GET() {
         rankValue,
         profitFactor: +profitFactor.toFixed(2),
         lastTradeAt: p.lastTradeAt || null,
-        enteredAt: p.enteredAt || p.joinedAt || null,
+        enteredAt: p.enteredAt || (p as any).joinedAt || null,
       };
     }
 
-    // ── 9. Build position map ──────────────────────────────────────────────
+    // ── 9. Build position map per competition ──────────────────────────────────
     const positionsByComp: Record<string, unknown[]> = {};
     const usernameMap: Record<string, string> = {};
-    for (const p of allParticipants) {
+    for (const p of allParticipants as any[]) {
       usernameMap[p.userId] = p.username;
     }
-    for (const pos of openPositions) {
-      const cid = pos.competitionId;
+    for (const pos of openPositions as any[]) {
+      const cid = pos.competitionId?.toString?.() || pos.competitionId;
       if (!positionsByComp[cid]) positionsByComp[cid] = [];
       (positionsByComp[cid] as unknown[]).push({
         userId: pos.userId,
@@ -217,35 +220,48 @@ export async function GET() {
         symbol: pos.symbol,
         side: pos.side,
         quantity: pos.quantity,
-        entryPrice: +(pos.entryPrice as number).toFixed(5),
-        currentPrice: +(pos.currentPrice as number).toFixed(5),
-        unrealizedPnl: +(pos.unrealizedPnl as number || 0).toFixed(2),
-        unrealizedPnlPercentage: +(pos.unrealizedPnlPercentage as number || 0).toFixed(2),
+        entryPrice: +((pos.entryPrice as number) || 0).toFixed(5),
+        currentPrice: +((pos.currentPrice as number) || 0).toFixed(5),
+        unrealizedPnl: +((pos.unrealizedPnl as number) || 0).toFixed(2),
+        unrealizedPnlPercentage: +(
+          (pos.unrealizedPnlPercentage as number) || 0
+        ).toFixed(2),
         leverage: pos.leverage || 1,
-        marginUsed: +(pos.marginUsed as number || 0).toFixed(2),
-        stopLoss: pos.stopLoss ? +(pos.stopLoss as number).toFixed(5) : null,
-        takeProfit: pos.takeProfit ? +(pos.takeProfit as number).toFixed(5) : null,
+        marginUsed: +((pos.marginUsed as number) || 0).toFixed(2),
+        stopLoss: pos.stopLoss
+          ? +((pos.stopLoss as number) || 0).toFixed(5)
+          : null,
+        takeProfit: pos.takeProfit
+          ? +((pos.takeProfit as number) || 0).toFixed(5)
+          : null,
         openedAt: pos.openedAt,
       });
     }
 
-    // ── 10. Build formatted competitions ──────────────────────────────────
-    const formattedCompetitions = competitions.map((c) => {
+    // ── 10. Format competitions ────────────────────────────────────────────────
+    const formattedCompetitions = (competitions as any[]).map((c) => {
       const cid = c._id.toString();
       const isActive = c.status === "active";
-      const isCompleted = ["completed", "finalizing", "emergency_ended"].includes(c.status as string);
+      const isCompleted = ["completed", "finalizing", "emergency_ended"].includes(
+        c.status as string,
+      );
       const fee = (c.platformFeePercentage as number) || 0;
-      const netPrizePool = Math.floor(((c.prizePool as number) || 0) * (1 - fee / 100));
+      const netPrizePool = Math.floor(
+        ((c.prizePool as number) || 0) * (1 - fee / 100),
+      );
       const startingCapital = (c.startingCapital as number) || 10000;
-      const rankingMethod = ((c.rules as Record<string, string>)?.rankingMethod) || "pnl";
+      const rankingMethod = c.rules?.rankingMethod || "pnl";
 
       let participants: unknown[] = [];
       if (isActive || isCompleted) {
-        const raw = allParticipants
-          .filter((p) => p.competitionId === cid) as Array<Record<string, unknown>>;
-        const enriched = raw.map((p) => enrichParticipant(p, startingCapital, rankingMethod));
+        const raw = (allParticipants as any[]).filter(
+          (p) => p.competitionId?.toString?.() === cid || p.competitionId === cid,
+        );
+        const enriched = raw.map((p) =>
+          enrichParticipant(p as Record<string, unknown>, startingCapital, rankingMethod),
+        );
 
-        // Sort: active-with-trades first (by rankValue desc) → no-trade users → disqualified last
+        // Sort: active-with-trades → no-trade users → disqualified
         enriched.sort((a, b) => {
           if (a.isDisqualified && !b.isDisqualified) return 1;
           if (!a.isDisqualified && b.isDisqualified) return -1;
@@ -256,28 +272,20 @@ export async function GET() {
           return b.rankValue - a.rankValue;
         });
 
-        // Assign sequential ranks — no-trade users get a rank but are visually separated
         let rank = 1;
         participants = enriched.map((p, i) => {
-          if (i > 0) {
-            const prev = enriched[i - 1];
-            // Keep consecutive ranks for no-trade group
-            const sameGroup = p.isDisqualified === prev.isDisqualified &&
-                              (p.totalTrades > 0) === (prev.totalTrades > 0);
-            if (!sameGroup || Math.abs(p.rankValue - prev.rankValue) > 0.01) rank = i + 1;
-          }
+          if (i > 0) rank = i + 1;
           return { ...p, rank };
         });
       }
 
-      // Winners for completed events
       const winners = isCompleted
         ? (participants as Array<Record<string, unknown>>)
             .filter((p) => !p.isDisqualified)
             .slice(0, 3)
         : null;
 
-      const prizeDistribution = (c.prizeDistribution as Array<{ rank: number; percentage: number }>) || [];
+      const prizeDistribution = c.prizeDistribution || [];
 
       return {
         id: cid,
@@ -292,7 +300,8 @@ export async function GET() {
         entryFee: c.entryFee || 0,
         prizePool: netPrizePool,
         startingCapital,
-        currentParticipants: c.currentParticipants || participants.length || 0,
+        currentParticipants:
+          c.currentParticipants || participants.length || 0,
         maxParticipants: c.maxParticipants || 0,
         rankingMethod,
         assetClasses: c.assetClasses || [],
@@ -304,8 +313,8 @@ export async function GET() {
       };
     });
 
-    // ── 11. Build formatted challenges ────────────────────────────────────
-    const formattedChallenges = challenges.map((c) => {
+    // ── 11. Format challenges ──────────────────────────────────────────────────
+    const formattedChallenges = (challenges as any[]).map((c) => {
       const cid = c._id.toString();
       const startingCapital = (c.startingCapital as number) || 10000;
       const isActive = c.status === "active";
@@ -313,10 +322,15 @@ export async function GET() {
 
       let participants: unknown[] = [];
       if (isActive || isCompleted) {
-        const raw = challengeParticipants
-          .filter((p) => p.challengeId === cid) as Array<Record<string, unknown>>;
+        const raw = (challengeParticipants as any[]).filter(
+          (p) => p.challengeId?.toString?.() === cid || p.challengeId === cid,
+        );
         participants = raw.map((p) => {
-          const enriched = enrichParticipant(p, startingCapital, "pnl");
+          const enriched = enrichParticipant(
+            p as Record<string, unknown>,
+            startingCapital,
+            "pnl",
+          );
           return { ...enriched, role: p.role, isWinner: p.isWinner || false };
         });
         participants.sort((a: unknown, b: unknown) => {
@@ -324,31 +338,44 @@ export async function GET() {
           const bp = b as Record<string, unknown>;
           if (ap.isDisqualified && !bp.isDisqualified) return 1;
           if (!ap.isDisqualified && bp.isDisqualified) return -1;
-          const aHasTrades = (ap.totalTrades as number || 0) > 0;
-          const bHasTrades = (bp.totalTrades as number || 0) > 0;
+          const aHasTrades = ((ap.totalTrades as number) || 0) > 0;
+          const bHasTrades = ((bp.totalTrades as number) || 0) > 0;
           if (aHasTrades && !bHasTrades) return -1;
           if (!aHasTrades && bHasTrades) return 1;
-          return (bp.rankValue as number) - (ap.rankValue as number);
+          return (
+            ((bp.rankValue as number) || 0) - ((ap.rankValue as number) || 0)
+          );
         });
-        participants = participants.map((p, i) => ({ ...(p as object), rank: i + 1 }));
+        participants = participants.map((p, i) => ({
+          ...(p as object),
+          rank: i + 1,
+        }));
       }
 
       const winners = isCompleted
-        ? (participants as Array<Record<string, unknown>>).filter((p) => p.isWinner).slice(0, 1)
+        ? (participants as Array<Record<string, unknown>>)
+            .filter((p) => p.isWinner)
+            .slice(0, 1)
         : null;
+
+      // Build challenge name from participants
+      const challengeName =
+        c.name ||
+        [c.challengerName, c.challengedName].filter(Boolean).join(" vs ") ||
+        "1v1 Challenge";
 
       return {
         id: cid,
         type: "challenge",
-        name: c.name,
-        description: c.description,
+        name: challengeName,
+        description: c.description || `${c.duration || 60}-minute challenge`,
         status: c.status as string,
-        startTime: c.startTime,
+        startTime: c.startTime || c.createdAt,
         endTime: c.endTime,
         entryFee: c.entryFee || 0,
-        prizePool: c.prizePool || 0,
+        prizePool: c.winnerPrize || c.prizePool || 0,
         startingCapital,
-        currentParticipants: participants.length || (c.currentParticipants as number) || 0,
+        currentParticipants: participants.length || 2,
         maxParticipants: 2,
         rankingMethod: "pnl",
         participants: participants.slice(0, 2),
@@ -358,20 +385,21 @@ export async function GET() {
       };
     });
 
-    // ── 12. Latest price snapshot ──────────────────────────────────────────
-    let latestPrices: Record<string, { bid: number; ask: number; mid: number }> = {};
+    // ── 12. Latest price snapshot ──────────────────────────────────────────────
+    let latestPrices: Record<
+      string,
+      { bid: number; ask: number; mid: number }
+    > = {};
     try {
-      const snapshot = await db
-        .collection("pricesnapshots")
-        .findOne({}, { sort: { timestamp: -1 } });
-      if (snapshot && Array.isArray(snapshot.prices)) {
-        for (const entry of snapshot.prices as Array<{
-          symbol: string;
-          bid: number;
-          ask: number;
-          mid: number;
-          isValid: boolean;
-        }>) {
+      const snapshot = await PriceSnapshot.findOne()
+        .sort({ timestamp: -1 })
+        .lean();
+      if (snapshot) {
+        const snapshotAny = snapshot as any;
+        const priceList: any[] = Array.isArray(snapshotAny.prices)
+          ? snapshotAny.prices
+          : [];
+        for (const entry of priceList) {
           if (entry.isValid && entry.symbol) {
             latestPrices[entry.symbol] = {
               bid: entry.bid,
@@ -382,18 +410,23 @@ export async function GET() {
         }
       }
     } catch {
-      // prices are optional — don't fail the whole request
+      // Prices are optional — don't fail the whole request
     }
 
-    // ── 13. Aggregate stats ────────────────────────────────────────────────
+    // ── 13. Aggregate stats ────────────────────────────────────────────────────
     const allEvents = [...formattedCompetitions, ...formattedChallenges];
     const liveCount = allEvents.filter((e) => e.status === "active").length;
-    const upcomingCount = allEvents.filter((e) => e.status === "upcoming").length;
-    const totalPrizePool = allEvents.reduce((s, e) => s + (e.prizePool || 0), 0);
+    const upcomingCount = allEvents.filter(
+      (e) => e.status === "upcoming" || e.status === "pending",
+    ).length;
+    const totalPrizePool = allEvents.reduce(
+      (s, e) => s + ((e.prizePool as number) || 0),
+      0,
+    );
     const liveParticipantCount = allEvents
       .filter((e) => e.status === "active")
-      .reduce((s, e) => s + (e.currentParticipants || 0), 0);
-    const totalOpenPositions = openPositions.length;
+      .reduce((s, e) => s + ((e.currentParticipants as number) || 0), 0);
+    const totalOpenPositions = (openPositions as any[]).length;
 
     return NextResponse.json(
       {
@@ -411,13 +444,19 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=5, stale-while-revalidate=10",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
           "Access-Control-Allow-Origin": "*",
         },
       },
     );
   } catch (error) {
     console.error("[Dashboard API] Error:", error);
-    return NextResponse.json({ error: "Failed to fetch dashboard data" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch dashboard data", detail: String(error) },
+      {
+        status: 500,
+        headers: { "Access-Control-Allow-Origin": "*" },
+      },
+    );
   }
 }

@@ -650,11 +650,13 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
   const tl = ev.status === 'active' ? 'Remaining' : ev.status === 'upcoming' ? 'Starts In' : 'Duration';
   const parts = ev.participants || [];
   const winner = ev.status === 'completed' && ev.winners?.[0];
-  const canClick = ev.status === 'active' || ev.status === 'completed';
-  const statusColor = ev.status === 'active' ? CV.red : ev.status === 'upcoming' ? CV.blue : CV.gray;
-  const topLine = ev.status === 'active'
+  const isLiveEv = ev.status === 'active';
+  const isUpcomingEv = ['upcoming', 'pending', 'accepted'].includes(ev.status);
+  const canClick = isLiveEv || ev.status === 'completed';
+  const statusColor = isLiveEv ? CV.red : isUpcomingEv ? CV.blue : CV.gray;
+  const topLine = isLiveEv
     ? `linear-gradient(90deg,${CV.red},${CV.oran})`
-    : ev.status === 'upcoming'
+    : isUpcomingEv
       ? isComp ? `linear-gradient(90deg,${CV.purp},${CV.blue})` : `linear-gradient(90deg,${CV.gold},${CV.oran})`
       : `linear-gradient(90deg,${CV.bd2},${CV.bg3})`;
 
@@ -686,10 +688,10 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
 
           {/* Status */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'Rajdhani',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1, color: statusColor }}>
-            {ev.status === 'active' && (
+            {isLiveEv && (
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: CV.red, boxShadow: `0 0 6px ${CV.red}`, animation: 'blink 1s infinite' }} />
             )}
-            {ev.status === 'active' ? 'LIVE' : ev.status === 'upcoming' ? 'UPCOMING' : 'ENDED'}
+            {isLiveEv ? 'LIVE' : isUpcomingEv ? 'UPCOMING' : 'ENDED'}
           </div>
         </div>
 
@@ -804,6 +806,7 @@ export default function ArenaPage() {
   const [clock,      setClock]      = useState('--:--:--');
   const [timer,      setTimer]      = useState('—');
   const [loading,    setLoading]    = useState(true);
+  const [apiError,   setApiError]   = useState<string | null>(null);
   const [selTrader,  setSelTrader]  = useState<{ p: Participant; ev: AEvent } | null>(null);
   const [showPodium, setShowPodium] = useState(false);
 
@@ -873,14 +876,28 @@ export default function ArenaPage() {
   // ── Data fetch ──
   const fetchD = useCallback(async () => {
     try {
-      const r = await fetch('/api/dashboard/competitions', { cache: 'no-store' });
-      if (!r.ok) return;
-      const d: DashData = await r.json();
+      const r = await fetch('/api/dashboard/competitions', {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => `HTTP ${r.status}`);
+        setApiError(`API returned ${r.status}: ${txt.slice(0, 200)}`);
+        setLoading(false);
+        return;
+      }
+      const d: DashData & { error?: string } = await r.json();
+      if (d.error) {
+        setApiError(`API error: ${d.error}`);
+        setLoading(false);
+        return;
+      }
+      setApiError(null);
       const all: AEvent[] = [
         ...(d.competitions || []).map(c => ({ ...c, _et: 'competition' as string })),
         ...(d.challenges   || []).map(c => ({ ...c, _et: 'challenge'   as string })),
       ].sort((a, b) => {
-        const o: Record<string, number> = { active: 0, upcoming: 1, completed: 2 };
+        const o: Record<string, number> = { active: 0, pending: 1, upcoming: 1, accepted: 1, completed: 2 };
         const as = o[a.status] ?? 3, bs = o[b.status] ?? 3;
         return as !== bs ? as - bs : new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
       });
@@ -890,7 +907,10 @@ export default function ArenaPage() {
       const cur = curEvRef.current;
       if (cur) { const up = all.find(e => e.id === cur.id); if (up) setCurEv(up); }
       setLoading(false);
-    } catch { /* silent — keep existing data */ }
+    } catch (err) {
+      setApiError(`Connection error: ${String(err)}`);
+      setLoading(false);
+    }
   }, []);
 
   // ── Polling ──
@@ -1079,16 +1099,30 @@ export default function ArenaPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', fontFamily: "'Rajdhani',sans-serif", fontSize: 13, color: CV.bd3, letterSpacing: 2 }}>
               Loading competitions…
             </div>
+          ) : apiError ? (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <div style={{ fontSize: 40, opacity: .45 }}>⚠️</div>
+              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.oran, letterSpacing: 3, marginTop: 14 }}>Connection Error</div>
+              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3, marginTop: 8, letterSpacing: 1, maxWidth: 480, margin: '8px auto 0', wordBreak: 'break-all' }}>{apiError}</div>
+              <button
+                onClick={() => { setLoading(true); setApiError(null); fetchD(); }}
+                style={{ marginTop: 18, fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', padding: '7px 20px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${CV.teal}44`, background: `rgba(15,237,190,.08)`, color: CV.teal }}
+              >Retry</button>
+            </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <div style={{ fontSize: 42, opacity: .35 }}>🏁</div>
               <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3, marginTop: 14 }}>No Events Found</div>
               <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3, marginTop: 6, letterSpacing: 1 }}>Try changing the filter or check back later</div>
+              <button
+                onClick={() => { setLoading(true); fetchD(); }}
+                style={{ marginTop: 14, fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', padding: '5px 16px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${CV.bd2}`, background: 'none', color: CV.bd3 }}
+              >Refresh</button>
             </div>
           ) : (
             Object.entries({
-              active:    filtered.filter(e => e.status === 'active'),
-              upcoming:  filtered.filter(e => e.status === 'upcoming'),
+              active:    filtered.filter(e => ['active'].includes(e.status)),
+              upcoming:  filtered.filter(e => ['upcoming', 'pending', 'accepted'].includes(e.status)),
               completed: filtered.filter(e => e.status === 'completed'),
             }).filter(([, items]) => items.length > 0).map(([st, items]) => (
               <div key={st}>
