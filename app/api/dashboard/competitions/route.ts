@@ -133,14 +133,22 @@ export async function GET() {
       }
     }
 
-    // ── 8. Helper: build participant enriched object ───────────────────────
+    // ── 8. Build live unrealized PnL from open positions (more accurate than stale field) ──
+    const liveUnrealizedByUser: Record<string, number> = {};
+    for (const pos of openPositions) {
+      const uid = pos.userId as string;
+      liveUnrealizedByUser[uid] = (liveUnrealizedByUser[uid] || 0) + ((pos.unrealizedPnl as number) || 0);
+    }
+
+    // ── Helper: build participant enriched object ───────────────────────
     function enrichParticipant(
       p: Record<string, unknown>,
       startingCapital: number,
       rankingMethod: string,
     ) {
-      const liveEquity =
-        ((p.currentCapital as number) || 0) + ((p.unrealizedPnl as number) || 0);
+      // Use sum of open-position unrealizedPnl (live) instead of the stale participant field
+      const realUnrealized = liveUnrealizedByUser[p.userId as string] ?? (p.unrealizedPnl as number || 0);
+      const liveEquity = ((p.currentCapital as number) || 0) + realUnrealized;
       const livePnl = liveEquity - startingCapital;
       const liveRoi = startingCapital > 0 ? (livePnl / startingCapital) * 100 : 0;
       const winRate =
@@ -237,18 +245,28 @@ export async function GET() {
           .filter((p) => p.competitionId === cid) as Array<Record<string, unknown>>;
         const enriched = raw.map((p) => enrichParticipant(p, startingCapital, rankingMethod));
 
-        // Sort: disqualified last → by rankValue desc
+        // Sort: active-with-trades first (by rankValue desc) → no-trade users → disqualified last
         enriched.sort((a, b) => {
           if (a.isDisqualified && !b.isDisqualified) return 1;
           if (!a.isDisqualified && b.isDisqualified) return -1;
+          const aHasTrades = a.totalTrades > 0;
+          const bHasTrades = b.totalTrades > 0;
+          if (aHasTrades && !bHasTrades) return -1;
+          if (!aHasTrades && bHasTrades) return 1;
           return b.rankValue - a.rankValue;
         });
 
-        // Assign ranks
+        // Assign sequential ranks — no-trade users get a rank but are visually separated
         let rank = 1;
         participants = enriched.map((p, i) => {
-          if (i > 0 && Math.abs(p.rankValue - enriched[i - 1].rankValue) > 0.01) rank = i + 1;
-          return { ...p, rank: p.isDisqualified ? enriched.length + 1 : rank };
+          if (i > 0) {
+            const prev = enriched[i - 1];
+            // Keep consecutive ranks for no-trade group
+            const sameGroup = p.isDisqualified === prev.isDisqualified &&
+                              (p.totalTrades > 0) === (prev.totalTrades > 0);
+            if (!sameGroup || Math.abs(p.rankValue - prev.rankValue) > 0.01) rank = i + 1;
+          }
+          return { ...p, rank };
         });
       }
 
@@ -301,10 +319,17 @@ export async function GET() {
           const enriched = enrichParticipant(p, startingCapital, "pnl");
           return { ...enriched, role: p.role, isWinner: p.isWinner || false };
         });
-        participants.sort(
-          (a: unknown, b: unknown) =>
-            (b as Record<string, number>).rankValue - (a as Record<string, number>).rankValue,
-        );
+        participants.sort((a: unknown, b: unknown) => {
+          const ap = a as Record<string, unknown>;
+          const bp = b as Record<string, unknown>;
+          if (ap.isDisqualified && !bp.isDisqualified) return 1;
+          if (!ap.isDisqualified && bp.isDisqualified) return -1;
+          const aHasTrades = (ap.totalTrades as number || 0) > 0;
+          const bHasTrades = (bp.totalTrades as number || 0) > 0;
+          if (aHasTrades && !bHasTrades) return -1;
+          if (!aHasTrades && bHasTrades) return 1;
+          return (bp.rankValue as number) - (ap.rankValue as number);
+        });
         participants = participants.map((p, i) => ({ ...(p as object), rank: i + 1 }));
       }
 

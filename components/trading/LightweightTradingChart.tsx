@@ -536,15 +536,15 @@ const LightweightTradingChart = ({
           ? Object.fromEntries(cfg.visibility.map((v) => [v.key, true]))
           : {};
         return {
-          id: ai.id,
-          type: ai.type,
-          name: ai.itemName,
-          displayType: ai.displayType,
-          enabled: ai.enabled,
-          color: ai.color || "#3b82f6",
-          lineWidth: ai.lineWidth || 2,
-          lineStyle: 0,
-          parameters: ai.parameters || { period: 20 },
+        id: ai.id,
+        type: ai.type,
+        name: ai.itemName,
+        displayType: ai.displayType,
+        enabled: ai.enabled,
+        color: ai.color || "#3b82f6",
+        lineWidth: ai.lineWidth || 2,
+        lineStyle: 0,
+        parameters: ai.parameters || { period: 20 },
           componentColors,
           componentVisibility,
         };
@@ -1981,8 +1981,8 @@ const LightweightTradingChart = ({
             }));
             indicatorSeriesRef.current.set(`${indicator.id}_flow`, flowSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = flowMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { flowSeries.setMarkers(sorted); } catch {}
+            const sorted = flowMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { flowSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -2436,8 +2436,8 @@ const LightweightTradingChart = ({
             upSeries.setData(upData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_up`, upSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sortedBuy = buyMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { upSeries.setMarkers(sortedBuy); } catch {}
+            const sortedBuy = buyMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { upSeries.setMarkers(sortedBuy); } catch {}
             }
           }
 
@@ -2454,8 +2454,8 @@ const LightweightTradingChart = ({
             downSeries.setData(downData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_down`, downSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sortedSell = sellMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { downSeries.setMarkers(sortedSell); } catch {}
+            const sortedSell = sellMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { downSeries.setMarkers(sortedSell); } catch {}
             }
           }
 
@@ -2560,17 +2560,17 @@ const LightweightTradingChart = ({
           const estBearColor = indicator.componentColors?.bear ?? indicator.colors?.negative ?? "#ef4444";
 
           if (indicator.componentVisibility?.shadow !== false) {
-            const shadowSeries = chart.addLineSeries({
+          const shadowSeries = chart.addLineSeries({
               color: hexToRgba(estShadowColor, 40),
-              lineWidth: 1 as any,
-              lineStyle: 2 as any,
-              title: "",
-              priceScaleId: "right",
-              priceFormat: { type: "price", precision: indicator.precision || 5 },
-              lastValueVisible: false,
-            });
-            shadowSeries.setData(shadowData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
-            indicatorSeriesRef.current.set(`${indicator.id}_shadow`, shadowSeries);
+            lineWidth: 1 as any,
+            lineStyle: 2 as any,
+            title: "",
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          shadowSeries.setData(shadowData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+          indicatorSeriesRef.current.set(`${indicator.id}_shadow`, shadowSeries);
           }
 
           if (trailBullData.length > 0 && indicator.componentVisibility?.bull !== false) {
@@ -2586,8 +2586,8 @@ const LightweightTradingChart = ({
             bullSeries.setData(trailBullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bullSeries.setMarkers(sorted); } catch {}
+            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -2604,8 +2604,8 @@ const LightweightTradingChart = ({
             bearSeries.setData(trailBearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bearSeries.setMarkers(sorted); } catch {}
+            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -2675,8 +2675,8 @@ const LightweightTradingChart = ({
             bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bullSeries.setMarkers(sorted); } catch {}
+            const sorted = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -2693,8 +2693,8 @@ const LightweightTradingChart = ({
             bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bearSeries.setMarkers(sorted); } catch {}
+            const sorted = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -2712,32 +2712,32 @@ const LightweightTradingChart = ({
           const fmtTrailColor = indicator.componentColors?.trail ?? "#94a3b8";
 
           if (indicator.componentVisibility?.trail !== false) {
-            const trailSeries = chart.addLineSeries({
+          const trailSeries = chart.addLineSeries({
               color: fmtTrailColor,
-              lineWidth: (indicator.lineWidth || 3) as any,
-              lineStyle: 0 as any,
-              title: indicator.customLabel || "Flux Momentum Trail",
-              priceScaleId: "right",
-              priceFormat: { type: "price", precision: indicator.precision || 5 },
-              lastValueVisible: true,
-            });
+            lineWidth: (indicator.lineWidth || 3) as any,
+            lineStyle: 0 as any,
+            title: indicator.customLabel || "Flux Momentum Trail",
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: true,
+          });
 
-            const coloredData = fmtData.map((d) => ({
-              time: d.time as UTCTimestamp,
-              value: d.trail,
-              color: d.color,
-            }));
-            trailSeries.setData(coloredData);
-            indicatorSeriesRef.current.set(`${indicator.id}_trail`, trailSeries);
+          const coloredData = fmtData.map((d) => ({
+            time: d.time as UTCTimestamp,
+            value: d.trail,
+            color: d.color,
+          }));
+          trailSeries.setData(coloredData);
+          indicatorSeriesRef.current.set(`${indicator.id}_trail`, trailSeries);
 
             if (indicator.componentVisibility?.signals !== false) {
               const fmtMarkers: any[] = [];
-              for (const d of fmtData) {
-                if (d.signal === "surge_bull") {
+          for (const d of fmtData) {
+            if (d.signal === "surge_bull") {
                   fmtMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#22c55e", shape: "arrowUp" as const, text: "SURGE", size: 2 });
-                } else if (d.signal === "surge_bear") {
+            } else if (d.signal === "surge_bear") {
                   fmtMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ef4444", shape: "arrowDown" as const, text: "SURGE", size: 2 });
-                } else if (d.signal === "fade") {
+            } else if (d.signal === "fade") {
                   fmtMarkers.push({ time: d.time as UTCTimestamp, position: d.momentum >= 0 ? ("belowBar" as const) : ("aboveBar" as const), color: "#f59e0b", shape: "circle" as const, text: "FADE", size: 1 });
                 }
               }
@@ -2805,8 +2805,8 @@ const LightweightTradingChart = ({
             bullSeries.setData(bullData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bull`, bullSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted2 = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bullSeries.setMarkers(sorted2); } catch {}
+            const sorted2 = bullMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bullSeries.setMarkers(sorted2); } catch {}
             }
           }
 
@@ -2823,8 +2823,8 @@ const LightweightTradingChart = ({
             bearSeries.setData(bearData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_bear`, bearSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted2 = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { bearSeries.setMarkers(sorted2); } catch {}
+            const sorted2 = bearMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { bearSeries.setMarkers(sorted2); } catch {}
             }
           }
 
@@ -2856,17 +2856,17 @@ const LightweightTradingChart = ({
           const pdtMomColor = indicator.componentColors?.momentum ?? indicator.colors?.negative ?? "#a78bfa";
 
           if (indicator.componentVisibility?.price !== false) {
-            const pSeries = chart.addLineSeries({
+          const pSeries = chart.addLineSeries({
               color: hexToRgba(pdtPriceColor, indicator.opacity || 100),
-              lineWidth: (indicator.lineWidth || 2) as any,
-              lineStyle: 0 as any,
-              title: `${indicator.customLabel || "PDT"} Price`,
-              priceScaleId: "right",
-              priceFormat: { type: "price", precision: indicator.precision || 5 },
-              lastValueVisible: true,
-            });
-            pSeries.setData(priceLineData);
-            indicatorSeriesRef.current.set(`${indicator.id}_price`, pSeries);
+            lineWidth: (indicator.lineWidth || 2) as any,
+            lineStyle: 0 as any,
+            title: `${indicator.customLabel || "PDT"} Price`,
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: true,
+          });
+          pSeries.setData(priceLineData);
+          indicatorSeriesRef.current.set(`${indicator.id}_price`, pSeries);
             if (indicator.componentVisibility?.signals !== false) {
               const sorted = markers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
               try { pSeries.setMarkers(sorted); } catch {}
@@ -2874,17 +2874,17 @@ const LightweightTradingChart = ({
           }
 
           if (indicator.componentVisibility?.momentum !== false) {
-            const mSeries = chart.addLineSeries({
+          const mSeries = chart.addLineSeries({
               color: hexToRgba(pdtMomColor, indicator.opacity || 80),
-              lineWidth: (indicator.lineWidth || 2) as any,
-              lineStyle: 2 as any,
-              title: `${indicator.customLabel || "PDT"} Volume`,
-              priceScaleId: "right",
-              priceFormat: { type: "price", precision: indicator.precision || 5 },
-              lastValueVisible: false,
-            });
-            mSeries.setData(momLineData);
-            indicatorSeriesRef.current.set(`${indicator.id}_mom`, mSeries);
+            lineWidth: (indicator.lineWidth || 2) as any,
+            lineStyle: 2 as any,
+            title: `${indicator.customLabel || "PDT"} Volume`,
+            priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          mSeries.setData(momLineData);
+          indicatorSeriesRef.current.set(`${indicator.id}_mom`, mSeries);
           }
 
         // Chaos Sentinel: attractor line + order/chaos regime coloring + transition markers
@@ -2936,7 +2936,7 @@ const LightweightTradingChart = ({
             oSeries.setData(orderData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_order`, oSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              try { oSeries.setMarkers(orderMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            try { oSeries.setMarkers(orderMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
             }
           }
 
@@ -2951,7 +2951,7 @@ const LightweightTradingChart = ({
             cSeries.setData(chaosData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
             indicatorSeriesRef.current.set(`${indicator.id}_chaos`, cSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              try { cSeries.setMarkers(chaosMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+            try { cSeries.setMarkers(chaosMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
             }
           }
 
@@ -3081,7 +3081,7 @@ const LightweightTradingChart = ({
               })));
               if (indicator.componentVisibility?.signals !== false) {
                 const sorted = pwcMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-                try { series.setMarkers(sorted); } catch {}
+              try { series.setMarkers(sorted); } catch {}
               }
             } else {
               series.setData(pwcData.map(d => ({
@@ -3145,8 +3145,8 @@ const LightweightTradingChart = ({
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_trend`, trendSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = mdsMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { trendSeries.setMarkers(sorted); } catch {}
+            const sorted = mdsMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { trendSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -3213,8 +3213,8 @@ const LightweightTradingChart = ({
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_drift`, driftSeries);
             if (indicator.componentVisibility?.signals !== false) {
-              const sorted = qdmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
-              try { driftSeries.setMarkers(sorted); } catch {}
+            const sorted = qdmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+            try { driftSeries.setMarkers(sorted); } catch {}
             }
           }
 
@@ -3254,7 +3254,7 @@ const LightweightTradingChart = ({
             if (d.signal === "escape") {
               if (d.state === "escape_up") {
                 sgaMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#e040fb", shape: "arrowUp" as const, text: "ESCAPE ↑", size: 2 });
-              } else {
+        } else {
                 sgaMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#e040fb", shape: "arrowDown" as const, text: "ESCAPE ↓", size: 2 });
               }
             } else if (d.signal === "capture") {

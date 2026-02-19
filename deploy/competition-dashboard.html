@@ -839,9 +839,10 @@ function renderRace(ev){
     return fmtPnl(p.livePnl); // default pnl
   }
 
-  // Try to update existing rows in-place (smooth animation)
+  // On first render (no existing rows yet) clear any placeholder/loading state
   const existingRows={};
   track.querySelectorAll('[data-uid]').forEach(r=>{ existingRows[r.dataset.uid]=r; });
+  if(!Object.keys(existingRows).length) track.innerHTML=''; // clear initial loading placeholder
   const newUids=new Set(sorted.map(p=>p.userId));
 
   // Remove rows no longer in list
