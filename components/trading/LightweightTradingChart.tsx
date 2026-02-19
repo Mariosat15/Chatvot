@@ -342,6 +342,9 @@ const LightweightTradingChart = ({
     return false;
   });
   const [indicators, setIndicators] = useState<CustomIndicator[]>([]);
+  // Always-fresh ref so updateIndicators never reads a stale closure value
+  const indicatorsRef = useRef<CustomIndicator[]>([]);
+  indicatorsRef.current = indicators;
   // Drawing system using new primitive-based architecture
   const chartDrawings = useChartDrawings({
     storageKey: `chart-drawings-${competitionId}`,
@@ -857,6 +860,10 @@ const LightweightTradingChart = ({
     chart: IChartApi,
     mainSeries: ISeriesApi<any>,
   ) => {
+    // Shadow the closure var with the always-fresh ref value so stale
+    // closure captures can never cause a missed update.
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    const indicators = indicatorsRef.current;
     log("🔄 updateIndicators called with", indicators.length, "indicators");
     log(
       "📊 Enabled indicators:",
@@ -3000,7 +3007,7 @@ const LightweightTradingChart = ({
             });
             coreSeries.setData(hpeData.map(d => ({
               time: d.time as UTCTimestamp, value: d.phaseLine,
-              color: hexToRgba(hpeColor(d.phaseVelocity, d.regime), indicator.opacity || 100),
+              color: hexToRgba(hpeCoreColor, indicator.opacity || 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, coreSeries);
             const sorted = hpeMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
@@ -3122,7 +3129,7 @@ const LightweightTradingChart = ({
             });
             trendSeries.setData(mdsData.map(d => ({
               time: d.time as UTCTimestamp, value: d.trendLine,
-              color: hexToRgba(mdsColor(d.depthScore, d.regime), 100),
+              color: hexToRgba(mdsTrendColor, 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_trend`, trendSeries);
             if (indicator.componentVisibility?.signals !== false) {
@@ -3190,7 +3197,7 @@ const LightweightTradingChart = ({
             });
             driftSeries.setData(qdmData.map(d => ({
               time: d.time as UTCTimestamp, value: d.driftLine,
-              color: hexToRgba(qdmColor(d.alpha, d.regime), 100),
+              color: hexToRgba(qdmDriftColor, 100),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_drift`, driftSeries);
             if (indicator.componentVisibility?.signals !== false) {
@@ -3254,7 +3261,7 @@ const LightweightTradingChart = ({
             });
             sgaUpperSeries.setData(sgaData.map(d => ({
               time: d.time as UTCTimestamp, value: d.upper,
-              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 50),
+              color: hexToRgba(sgaArcsColor, d.velocityNorm > 0.7 ? 65 : 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_upper`, sgaUpperSeries);
           }
@@ -3267,7 +3274,7 @@ const LightweightTradingChart = ({
             });
             sgaCenterSeries.setData(sgaData.map(d => ({
               time: d.time as UTCTimestamp, value: d.center,
-              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 100),
+              color: hexToRgba(sgaCenterColor, d.velocityNorm > 0.7 ? 100 : d.velocityNorm > 0.4 ? 80 : 60),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_center`, sgaCenterSeries);
             if (indicator.componentVisibility?.signals !== false) {
@@ -3284,7 +3291,7 @@ const LightweightTradingChart = ({
             });
             sgaLowerSeries.setData(sgaData.map(d => ({
               time: d.time as UTCTimestamp, value: d.lower,
-              color: hexToRgba(sgaColor(d.velocityNorm, d.state), 50),
+              color: hexToRgba(sgaArcsColor, d.velocityNorm > 0.7 ? 65 : 40),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_lower`, sgaLowerSeries);
           }
@@ -3331,7 +3338,7 @@ const LightweightTradingChart = ({
             });
             steCoreSeries.setData(steData.map(d => ({
               time: d.time as UTCTimestamp, value: d.solarCore,
-              color: steColor(d.trend, d.adxStrength, adxThr),
+              color: hexToRgba(steCoreColor, d.adxStrength >= adxThr * 1.5 ? 100 : d.adxStrength >= adxThr ? 80 : 55),
             })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, steCoreSeries);
             if (indicator.componentVisibility?.signals !== false) {
@@ -3424,7 +3431,7 @@ const LightweightTradingChart = ({
               title: `${indicator.customLabel || "SCR"} OA+`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
-            scrOuterUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 18) : d.trend === "bear" ? "rgba(255,45,109,0.18)" : hexToRgba(scrOuterArcColor, 15) })));
+            scrOuterUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: hexToRgba(scrOuterArcColor, d.trend !== "neutral" ? 18 : 12) })));
             indicatorSeriesRef.current.set(`${indicator.id}_outerUp`, scrOuterUp);
           }
 
@@ -3435,7 +3442,7 @@ const LightweightTradingChart = ({
               title: `${indicator.customLabel || "SCR"} R+`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
-            scrInnerUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 60) : d.trend === "bear" ? "rgba(255,45,109,0.6)" : hexToRgba(scrOuterArcColor, 35) })));
+            scrInnerUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: hexToRgba(scrInnerRibbonColor, d.trend !== "neutral" ? 60 : 35) })));
             indicatorSeriesRef.current.set(`${indicator.id}_innerUp`, scrInnerUp);
           }
 
@@ -3446,7 +3453,7 @@ const LightweightTradingChart = ({
               title: indicator.customLabel || "Stellar Confluence Ribbon", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
-            scrCoreSeries.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrCoreColor(d.trend, d.confluenceScore, thr) })));
+            scrCoreSeries.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: hexToRgba(scrCoreLineColor, d.confluenceScore >= thr * 1.1 ? 100 : d.confluenceScore >= thr ? 75 : 45) })));
             indicatorSeriesRef.current.set(`${indicator.id}_core`, scrCoreSeries);
             if (indicator.componentVisibility?.signals !== false) {
               const sortedScr = scrMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
@@ -3461,7 +3468,7 @@ const LightweightTradingChart = ({
               title: `${indicator.customLabel || "SCR"} R-`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
-            scrInnerLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 60) : d.trend === "bear" ? "rgba(255,45,109,0.6)" : hexToRgba(scrOuterArcColor, 35) })));
+            scrInnerLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: hexToRgba(scrInnerRibbonColor, d.trend !== "neutral" ? 60 : 35) })));
             indicatorSeriesRef.current.set(`${indicator.id}_innerLo`, scrInnerLo);
           }
 
@@ -3472,7 +3479,7 @@ const LightweightTradingChart = ({
               title: `${indicator.customLabel || "SCR"} OA-`, priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
             });
-            scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: d.trend === "bull" ? hexToRgba(scrInnerRibbonColor, 18) : d.trend === "bear" ? "rgba(255,45,109,0.18)" : hexToRgba(scrOuterArcColor, 15) })));
+            scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: hexToRgba(scrOuterArcColor, d.trend !== "neutral" ? 18 : 12) })));
             indicatorSeriesRef.current.set(`${indicator.id}_outerLo`, scrOuterLo);
           }
 
@@ -3513,7 +3520,7 @@ const LightweightTradingChart = ({
               title: indicator.customLabel || "Kinetic Pressure Zones", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
-            kpzSpine.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSpineColor(d.regime) })));
+            kpzSpine.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: hexToRgba(kpzSpineColor2, d.regime === "overbought" || d.regime === "bullish" ? 95 : d.regime === "oversold" || d.regime === "bearish" ? 80 : 60) })));
             indicatorSeriesRef.current.set(`${indicator.id}_spine`, kpzSpine);
             if (indicator.componentVisibility?.signals !== false) {
               try { kpzSpine.setMarkers(kpzMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
@@ -3637,7 +3644,7 @@ const LightweightTradingChart = ({
               title: indicator.customLabel || "Nova Resonance Field", priceScaleId: "right",
               priceFormat: { type: "price", precision: indicator.precision || 5 },
             });
-            nrfEchoSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfEchoColor(d) })));
+            nrfEchoSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: hexToRgba(nrfEchoLineColor, d.divergence !== "none" ? 100 : d.state === "nova_bull" || d.state === "nova_bear" ? 95 : d.state === "echo_bull" || d.state === "echo_bear" ? 80 : 55) })));
             indicatorSeriesRef.current.set(`${indicator.id}_echo`, nrfEchoSeries);
             if (indicator.componentVisibility?.signals !== false) {
               try { nrfEchoSeries.setMarkers(nrfSorted); } catch {}
@@ -3658,6 +3665,8 @@ const LightweightTradingChart = ({
         const _ovlOffset = indicator.offset || 0;
         const _ovlId = indicator.id;
         const _ovlVisibility = indicator.visibility ? { ...indicator.visibility } : {};
+        // Capture component colors so refresh closures always use user-chosen colors
+        const _ovlColors = { ...(indicator.componentColors ?? {}) };
 
         // Collect series refs that belong to this overlay (just stored in indicatorSeriesRef)
         const _ovlSeriesMap = new Map<string, ISeriesApi<any>>();
@@ -4157,20 +4166,20 @@ const LightweightTradingChart = ({
                   tc, p.detrendPeriod || 20, p.hilbertLength || 7, p.ampMultiplier || 1.5, p.velocitySmooth || 5, p.leadSensitivity || 60,
                 );
                 if (hpeData.length > 0) {
-                  const hpeC = (v: number, r: string) => r === "trending" ? (v > 75 ? "#00e5ff" : "#26c6da") : r === "reversal" ? "#e040fb" : "#78909c";
+                  const _hpeCoreC = _ovlColors.core ?? "#00e5ff";
+                  const _hpeEnvC  = _ovlColors.envelope ?? "#00e5ff";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_core`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = hpeData[hpeData.length - 1];
-                    const c = hpeC(last.phaseVelocity, last.regime);
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 40) } as any);
-                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.phaseLine, color: hexToRgba(c, 100) } as any);
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 40) } as any);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_hpeEnvC, 40) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.phaseLine, color: hexToRgba(_hpeCoreC, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_hpeEnvC, 40) } as any);
                   } else {
-                    if (uS) uS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 40) })));
-                    if (cS) cS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.phaseLine, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 100) })));
-                    if (lS) lS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(hpeC(d.phaseVelocity, d.regime), 40) })));
+                    if (uS) uS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(_hpeEnvC, 40) })));
+                    if (cS) cS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.phaseLine, color: hexToRgba(_hpeCoreC, 100) })));
+                    if (lS) lS.setData(hpeData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(_hpeEnvC, 40) })));
                   }
                 }
               } else if (_ovlType === "prism_wavelet_cascade") {
@@ -4204,20 +4213,20 @@ const LightweightTradingChart = ({
                   tc, p.windowLength || 30, p.corridorMultiplier || 1.5, p.depthSmooth || 5, p.signalThreshold || 65,
                 );
                 if (mdsData.length > 0) {
-                  const mdsC = (d: number, r: string) => r === "deep" ? (d > 80 ? "#00e676" : "#66bb6a") : r === "surface" ? (d < 40 ? "#f44336" : "#ef5350") : "#ffd740";
+                  const _mdsTrendC = _ovlColors.trend ?? "#ffd740";
+                  const _mdsCorrC  = _ovlColors.corridor ?? "#7c4dff";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_trend`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = mdsData[mdsData.length - 1];
-                    const c = mdsC(last.depthScore, last.regime);
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 35) } as any);
-                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.trendLine, color: hexToRgba(c, 100) } as any);
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 35) } as any);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_mdsCorrC, 35) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.trendLine, color: hexToRgba(_mdsTrendC, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_mdsCorrC, 35) } as any);
                   } else {
-                    if (uS) uS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
-                    if (cS) cS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.trendLine, color: hexToRgba(mdsC(d.depthScore, d.regime), 100) })));
-                    if (lS) lS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(mdsC(d.depthScore, d.regime), 35) })));
+                    if (uS) uS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(_mdsCorrC, 35) })));
+                    if (cS) cS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.trendLine, color: hexToRgba(_mdsTrendC, 100) })));
+                    if (lS) lS.setData(mdsData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(_mdsCorrC, 35) })));
                   }
                 }
               } else if (_ovlType === "quantum_drift_mapper") {
@@ -4225,20 +4234,20 @@ const LightweightTradingChart = ({
                   tc, p.dfaWindow || 40, p.corridorMultiplier || 1.5, p.smooth || 5, p.persistenceThreshold || 0.6,
                 );
                 if (qdmData.length > 0) {
-                  const qdmC = (a: number, r: string) => r === "persistent" ? (a > 0.7 ? "#e0f7fa" : "#00e5ff") : r === "antipersistent" ? (a < 0.35 ? "#ff6d00" : "#ffd740") : "#b0bec5";
+                  const _qdmDriftC = _ovlColors.drift ?? "#00e5ff";
+                  const _qdmCorrC  = _ovlColors.corridor ?? "#7c4dff";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_drift`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = qdmData[qdmData.length - 1];
-                    const c = qdmC(last.alpha, last.regime);
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 40) } as any);
-                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.driftLine, color: hexToRgba(c, 100) } as any);
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 40) } as any);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_qdmCorrC, 40) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.driftLine, color: hexToRgba(_qdmDriftC, 100) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_qdmCorrC, 40) } as any);
                   } else {
-                    if (uS) uS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
-                    if (cS) cS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.driftLine, color: hexToRgba(qdmC(d.alpha, d.regime), 100) })));
-                    if (lS) lS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(qdmC(d.alpha, d.regime), 40) })));
+                    if (uS) uS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(_qdmCorrC, 40) })));
+                    if (cS) cS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.driftLine, color: hexToRgba(_qdmDriftC, 100) })));
+                    if (lS) lS.setData(qdmData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(_qdmCorrC, 40) })));
                   }
                 }
               } else if (_ovlType === "sovereign_gravity_arc") {
@@ -4246,20 +4255,21 @@ const LightweightTradingChart = ({
                   tc, p.gravityWindow || 30, p.orbitalRadius || 2.0, p.velocitySmooth || 5, p.escapeMultiplier || 1.8,
                 );
                   if (sgaData.length > 0) {
-                  const sgaC = (v: number, s: string) => (s === "escape_up" || s === "escape_down") ? (v > 0.85 ? "#ffffff" : v > 0.7 ? "#f3e5f5" : "#e040fb") : s === "capturing" ? "#00e5ff" : v > 0.5 ? "#ce93d8" : "#9c27b0";
+                  const _sgaCenterC = _ovlColors.center ?? "#9c27b0";
+                  const _sgaArcsC   = _ovlColors.arcs   ?? "#7b1fa2";
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const cS = _ovlSeriesMap.get(`${_ovlId}_center`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = sgaData[sgaData.length - 1];
-                    const c = sgaC(last.velocityNorm, last.state);
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(c, 50) } as any);
-                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.center, color: hexToRgba(c, 100) } as any);
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(c, 50) } as any);
+                    const vOp = last.velocityNorm > 0.7 ? 100 : last.velocityNorm > 0.4 ? 80 : 60;
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_sgaArcsC, last.velocityNorm > 0.7 ? 65 : 40) } as any);
+                    if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.center, color: hexToRgba(_sgaCenterC, vOp) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_sgaArcsC, last.velocityNorm > 0.7 ? 65 : 40) } as any);
                   } else {
-                    if (uS) uS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
-                    if (cS) cS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.center, color: hexToRgba(sgaC(d.velocityNorm, d.state), 100) })));
-                    if (lS) lS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(sgaC(d.velocityNorm, d.state), 50) })));
+                    if (uS) uS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.upper, color: hexToRgba(_sgaArcsC, d.velocityNorm > 0.7 ? 65 : 40) })));
+                    if (cS) cS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.center, color: hexToRgba(_sgaCenterC, d.velocityNorm > 0.7 ? 100 : d.velocityNorm > 0.4 ? 80 : 60) })));
+                    if (lS) lS.setData(sgaData.map(d => ({ time: d.time as UTCTimestamp, value: d.lower, color: hexToRgba(_sgaArcsC, d.velocityNorm > 0.7 ? 65 : 40) })));
                   }
                 }
               } else if (_ovlType === "solaris_trend_engine") {
@@ -4268,23 +4278,26 @@ const LightweightTradingChart = ({
                 );
                 if (steData.length > 0) {
                   const thr = p.adxThreshold || 25;
-                  const steC = (trend: string, adx: number) => trend === "bull" ? (adx >= thr * 1.5 ? "#ffd700" : adx >= thr ? "#ffb300" : "#78909c") : trend === "bear" ? (adx >= thr * 1.5 ? "#ff1744" : adx >= thr ? "#f44336" : "#78909c") : "#78909c";
+                  const _steCoreC  = _ovlColors.core  ?? "#ffd700";
+                  const _steUpperC = _ovlColors.upper ?? "#ef5350";
+                  const _steLowerC = _ovlColors.lower ?? "#26a69a";
+                  const _steSarC   = _ovlColors.sar   ?? "#ffb300";
                   const corS = _ovlSeriesMap.get(`${_ovlId}_core`);
                   const uS = _ovlSeriesMap.get(`${_ovlId}_upper`);
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   const sarS = _ovlSeriesMap.get(`${_ovlId}_sar`);
                   if (mode === "light") {
                     const last = steData[steData.length - 1];
-                    const c = steC(last.trend, last.adxStrength);
-                    if (corS) corS.update({ time: last.time as UTCTimestamp, value: last.solarCore, color: c } as any);
-                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upperBand, color: last.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)" } as any);
-                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lowerBand, color: last.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)" } as any);
-                    if (sarS) sarS.update({ time: last.time as UTCTimestamp, value: last.sarDot, color: last.sarDot > last.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)" } as any);
+                    const cOp = last.adxStrength >= thr * 1.5 ? 100 : last.adxStrength >= thr ? 80 : 55;
+                    if (corS) corS.update({ time: last.time as UTCTimestamp, value: last.solarCore, color: hexToRgba(_steCoreC, cOp) } as any);
+                    if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upperBand, color: hexToRgba(_steUpperC, last.trend === "bull" ? 35 : 65) } as any);
+                    if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lowerBand, color: hexToRgba(_steLowerC, last.trend === "bear" ? 35 : 65) } as any);
+                    if (sarS) sarS.update({ time: last.time as UTCTimestamp, value: last.sarDot, color: hexToRgba(_steSarC, last.sarDot > last.solarCore ? 70 : 50) } as any);
                   } else {
-                    if (corS) corS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.solarCore, color: steC(d.trend, d.adxStrength) })));
-                    if (uS) uS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperBand, color: d.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)" })));
-                    if (lS) lS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerBand, color: d.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)" })));
-                    if (sarS) sarS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.sarDot, color: d.sarDot > d.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)" })));
+                    if (corS) corS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.solarCore, color: hexToRgba(_steCoreC, d.adxStrength >= thr * 1.5 ? 100 : d.adxStrength >= thr ? 80 : 55) })));
+                    if (uS) uS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperBand, color: hexToRgba(_steUpperC, d.trend === "bull" ? 35 : 65) })));
+                    if (lS) lS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerBand, color: hexToRgba(_steLowerC, d.trend === "bear" ? 35 : 65) })));
+                    if (sarS) sarS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.sarDot, color: hexToRgba(_steSarC, d.sarDot > d.solarCore ? 70 : 50) })));
                   }
                 }
               } else if (_ovlType === "stellar_confluence_ribbon") {
@@ -4293,9 +4306,9 @@ const LightweightTradingChart = ({
                 );
                 if (scrData.length > 0) {
                   const thr2 = p.confluenceThreshold || 70;
-                  const scrC = (trend: string, score: number) => trend === "bull" ? (score >= thr2 * 1.1 ? "#00f0ff" : score >= thr2 ? "#40c4ff" : "#78909c") : trend === "bear" ? (score >= thr2 * 1.1 ? "#ff2d6d" : score >= thr2 ? "#ff6e7f" : "#78909c") : "#90a4ae";
-                  const bandBullC = (t: string) => t === "bull" ? "rgba(0,240,255,0.6)" : t === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)";
-                  const outerC = (t: string) => t === "bull" ? "rgba(0,240,255,0.18)" : t === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)";
+                  const _scrCoreC  = _ovlColors.core        ?? "#00f0ff";
+                  const _scrInnerC = _ovlColors.innerRibbon ?? "#00f0ff";
+                  const _scrOuterC = _ovlColors.outerArc    ?? "#7c4dff";
                   const coreS = _ovlSeriesMap.get(`${_ovlId}_core`);
                   const iuS = _ovlSeriesMap.get(`${_ovlId}_innerUp`);
                   const ilS = _ovlSeriesMap.get(`${_ovlId}_innerLo`);
@@ -4303,17 +4316,18 @@ const LightweightTradingChart = ({
                   const olS = _ovlSeriesMap.get(`${_ovlId}_outerLo`);
                   if (mode === "light") {
                     const last = scrData[scrData.length - 1];
-                    if (coreS) coreS.update({ time: last.time as UTCTimestamp, value: last.coreBlend, color: scrC(last.trend, last.confluenceScore) } as any);
-                    if (iuS) iuS.update({ time: last.time as UTCTimestamp, value: last.upperRibbon, color: bandBullC(last.trend) } as any);
-                    if (ilS) ilS.update({ time: last.time as UTCTimestamp, value: last.lowerRibbon, color: bandBullC(last.trend) } as any);
-                    if (ouS) ouS.update({ time: last.time as UTCTimestamp, value: last.outerUpper, color: outerC(last.trend) } as any);
-                    if (olS) olS.update({ time: last.time as UTCTimestamp, value: last.outerLower, color: outerC(last.trend) } as any);
+                    const cOp = last.confluenceScore >= thr2 * 1.1 ? 100 : last.confluenceScore >= thr2 ? 75 : 45;
+                    if (coreS) coreS.update({ time: last.time as UTCTimestamp, value: last.coreBlend, color: hexToRgba(_scrCoreC, cOp) } as any);
+                    if (iuS) iuS.update({ time: last.time as UTCTimestamp, value: last.upperRibbon, color: hexToRgba(_scrInnerC, last.trend !== "neutral" ? 60 : 35) } as any);
+                    if (ilS) ilS.update({ time: last.time as UTCTimestamp, value: last.lowerRibbon, color: hexToRgba(_scrInnerC, last.trend !== "neutral" ? 60 : 35) } as any);
+                    if (ouS) ouS.update({ time: last.time as UTCTimestamp, value: last.outerUpper, color: hexToRgba(_scrOuterC, last.trend !== "neutral" ? 18 : 12) } as any);
+                    if (olS) olS.update({ time: last.time as UTCTimestamp, value: last.outerLower, color: hexToRgba(_scrOuterC, last.trend !== "neutral" ? 18 : 12) } as any);
                   } else {
-                    if (coreS) coreS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrC(d.trend, d.confluenceScore) })));
-                    if (iuS) iuS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: bandBullC(d.trend) })));
-                    if (ilS) ilS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: bandBullC(d.trend) })));
-                    if (ouS) ouS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: outerC(d.trend) })));
-                    if (olS) olS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: outerC(d.trend) })));
+                    if (coreS) coreS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: hexToRgba(_scrCoreC, d.confluenceScore >= thr2 * 1.1 ? 100 : d.confluenceScore >= thr2 ? 75 : 45) })));
+                    if (iuS) iuS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: hexToRgba(_scrInnerC, d.trend !== "neutral" ? 60 : 35) })));
+                    if (ilS) ilS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: hexToRgba(_scrInnerC, d.trend !== "neutral" ? 60 : 35) })));
+                    if (ouS) ouS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: hexToRgba(_scrOuterC, d.trend !== "neutral" ? 18 : 12) })));
+                    if (olS) olS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: hexToRgba(_scrOuterC, d.trend !== "neutral" ? 18 : 12) })));
                   }
                 }
               } else if (_ovlType === "nova_resonance_field") {
@@ -4322,24 +4336,20 @@ const LightweightTradingChart = ({
                   p.novaThreshold || 70, p.divergenceLookback || 20,
                 );
                 if (nrfData.length > 0) {
-                  const nrfC = (d: typeof nrfData[0]) => {
-                    if (d.divergence !== "none") return "#aa00ff";
-                    if (d.state === "nova_bull") return "#ff9800";
-                    if (d.state === "echo_bull") return "#00e676";
-                    if (d.state === "nova_bear") return "#ff1744";
-                    if (d.state === "echo_bear") return "#ff6d00";
-                    return "#90a4ae";
-                  };
+                  const _nrfEchoC = _ovlColors.echoLine  ?? "#ff9800";
+                  const _nrfRefC  = _ovlColors.priceRef  ?? "#546e7a";
+                  const _nrfSigC  = _ovlColors.signalLine ?? "#e040fb";
+                  const nrfOp = (d: typeof nrfData[0]) => d.divergence !== "none" ? 100 : d.state === "nova_bull" || d.state === "nova_bear" ? 95 : d.state === "echo_bull" || d.state === "echo_bear" ? 80 : 55;
                   const echoS = _ovlSeriesMap.get(`${_ovlId}_echo`);
                   const refS = _ovlSeriesMap.get(`${_ovlId}_ref`);
                   const sigS = _ovlSeriesMap.get(`${_ovlId}_sig`);
                   if (mode === "light") {
                     const last = nrfData[nrfData.length - 1];
-                    if (echoS) echoS.update({ time: last.time as UTCTimestamp, value: last.echoLine, color: nrfC(last) } as any);
+                    if (echoS) echoS.update({ time: last.time as UTCTimestamp, value: last.echoLine, color: hexToRgba(_nrfEchoC, nrfOp(last)) } as any);
                     if (refS) refS.update({ time: last.time as UTCTimestamp, value: last.priceRef } as any);
                     if (sigS) sigS.update({ time: last.time as UTCTimestamp, value: last.signalLine } as any);
                   } else {
-                    if (echoS) echoS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfC(d) })));
+                    if (echoS) echoS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: hexToRgba(_nrfEchoC, nrfOp(d)) })));
                     if (refS) refS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
                     if (sigS) sigS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
                   }
@@ -4350,7 +4360,8 @@ const LightweightTradingChart = ({
                   p.zoneWidthMult || 1.2, p.oversoldLevel || 30, p.overboughtLevel || 70,
                 );
                 if (kpzData.length > 0) {
-                  const kpzSC = (r: string) => r === "overbought" ? "#00e5ff" : r === "bullish" ? "#00c853" : r === "oversold" ? "#d50000" : r === "bearish" ? "#ff6d00" : "#90a4ae";
+                  const _kpzSpineC = _ovlColors.spine   ?? "#00e5ff";
+                  const kpzSOp = (r: string) => r === "overbought" || r === "bullish" ? 95 : r === "oversold" || r === "bearish" ? 80 : 60;
                   const zFilt = (valFn: (d: typeof kpzData[0]) => number, actFn: (d: typeof kpzData[0]) => boolean) => kpzData.filter(actFn).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d) }));
                   const spineS = _ovlSeriesMap.get(`${_ovlId}_spine`);
                   const s1hS = _ovlSeriesMap.get(`${_ovlId}_sup1hi`); const s1lS = _ovlSeriesMap.get(`${_ovlId}_sup1lo`);
@@ -4359,13 +4370,13 @@ const LightweightTradingChart = ({
                   const d2hS = _ovlSeriesMap.get(`${_ovlId}_dem2hi`); const d2lS = _ovlSeriesMap.get(`${_ovlId}_dem2lo`);
                   if (mode === "light") {
                     const last = kpzData[kpzData.length - 1];
-                    if (spineS) spineS.update({ time: last.time as UTCTimestamp, value: last.kineticSpine, color: kpzSC(last.regime) } as any);
+                    if (spineS) spineS.update({ time: last.time as UTCTimestamp, value: last.kineticSpine, color: hexToRgba(_kpzSpineC, kpzSOp(last.regime)) } as any);
                     if (last.sup1Active) { if (s1hS) s1hS.update({ time: last.time as UTCTimestamp, value: last.sup1High } as any); if (s1lS) s1lS.update({ time: last.time as UTCTimestamp, value: last.sup1Low } as any); }
                     if (last.sup2Active) { if (s2hS) s2hS.update({ time: last.time as UTCTimestamp, value: last.sup2High } as any); if (s2lS) s2lS.update({ time: last.time as UTCTimestamp, value: last.sup2Low } as any); }
                     if (last.dem1Active) { if (d1hS) d1hS.update({ time: last.time as UTCTimestamp, value: last.dem1High } as any); if (d1lS) d1lS.update({ time: last.time as UTCTimestamp, value: last.dem1Low } as any); }
                     if (last.dem2Active) { if (d2hS) d2hS.update({ time: last.time as UTCTimestamp, value: last.dem2High } as any); if (d2lS) d2lS.update({ time: last.time as UTCTimestamp, value: last.dem2Low } as any); }
                   } else {
-                    if (spineS) spineS.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSC(d.regime) })));
+                    if (spineS) spineS.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: hexToRgba(_kpzSpineC, kpzSOp(d.regime)) })));
                     if (s1hS) s1hS.setData(zFilt(d => d.sup1High, d => d.sup1Active));
                     if (s1lS) s1lS.setData(zFilt(d => d.sup1Low, d => d.sup1Active));
                     if (s2hS) s2hS.setData(zFilt(d => d.sup2High, d => d.sup2Active));
