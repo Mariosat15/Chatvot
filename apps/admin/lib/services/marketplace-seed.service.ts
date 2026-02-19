@@ -2073,6 +2073,38 @@ const NOVA_RESONANCE_FIELD: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const SPECTRE_LIQUIDITY_MATRIX: Partial<IMarketplaceItem> = {
+  name: "Spectre Liquidity Matrix",
+  slug: "spectre-liquidity-matrix",
+  shortDescription:
+    "Institutional Smart Money indicator combining Order Block detection, Fair Value Gap mapping, BOS/CHoCH structural signals, Liquidity Pool levels and a Volume-Weighted Bias Line — all directly on your chart.",
+  fullDescription: `# Spectre Liquidity Matrix (SLM)\n\n## Overview\n**Spectre Liquidity Matrix** maps Order Blocks, FVGs, BOS/CHoCH structural signals and Liquidity Pools directly onto your price chart using Smart Money Concepts.\n\n## Components\n- **📦 Order Blocks**: Last opposing candle before an institutional impulse move (cyan = bullish OB, magenta = bearish OB)\n- **⬛ Fair Value Gaps**: 3-candle price imbalance zones that markets tend to revisit and fill\n- **🔴 BOS/CHoCH**: Break of Structure (trend continuation) and Change of Character (trend reversal) labels at structural levels\n- **💧 Liquidity Pools**: Gold dashed lines at un-swept swing highs/lows where stop-losses cluster\n- **📊 Volume-Weighted Bias Line**: VWAP-EMA hybrid line colored cyan (bullish) or magenta (bearish)\n\n## How to Trade\n1. Enter at unmitigated Order Blocks in the direction of the Bias Line\n2. Use FVG zones as pullback entry targets\n3. CHoCH signals mark early trend reversals — enter after BOS confirmation\n4. Trade liquidity sweeps: when price spikes through a gold line and reverses, that is an institutional stop hunt\n\n## Risk Warning\nNo indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 179.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "spectre_liquidity_matrix",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "spectre_liquidity_matrix",
+    displayType: "overlay",
+    description: "Smart Money: Order Blocks, FVGs, BOS/CHoCH, Liquidity Pools, Volume-Weighted Bias Line",
+  }),
+  defaultSettings: {
+    swingLookback: 5,
+    obStrength: 1.5,
+    period: 20,
+    maxFVGAge: 50,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["order-blocks", "fair-value-gap", "fvg", "bos", "choch", "liquidity", "smart-money", "institutional", "smc", "market-structure", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2099,6 +2131,7 @@ const ALL_ITEMS = [
   STELLAR_CONFLUENCE_RIBBON,
   KINETIC_PRESSURE_ZONES,
   NOVA_RESONANCE_FIELD,
+  SPECTRE_LIQUIDITY_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

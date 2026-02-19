@@ -467,6 +467,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 14, sensitivity: 2.0, signalPeriod: 9, novaThreshold: 70, divergenceLookback: 20 },
     paramLabels: { period: "Period", sensitivity: "Echo Sensitivity", signalPeriod: "Signal Period", novaThreshold: "Nova Threshold", divergenceLookback: "Divergence Lookback" },
   },
+  spectre_liquidity_matrix: {
+    name: "Spectre Liquidity Matrix",
+    shortName: "SLM",
+    displayType: "overlay" as const,
+    defaultParams: { swingLookback: 5, obStrength: 1.5, period: 20, maxFVGAge: 50 },
+    paramLabels: { swingLookback: "Swing Lookback", obStrength: "OB Strength (ATR×)", period: "Bias Period", maxFVGAge: "Max FVG Age (bars)" },
+  },
 };
 
 // ─── Per-indicator component style/visibility configuration ───────────────────
@@ -815,6 +822,26 @@ export const INDICATOR_COMPONENT_CONFIG: Record<string, {
       { key: "signalLine", label: "Signal Line" },
       { key: "echoLine", label: "Echo Line" },
       { key: "signals", label: "NOVA/ECHO/DIV Signals" },
+    ],
+  },
+  spectre_liquidity_matrix: {
+    colors: [
+      { key: "bias",      label: "Bias Line",          default: "#00e5ff" },
+      { key: "bullOB",    label: "Bullish Order Block", default: "#00bcd4" },
+      { key: "bearOB",    label: "Bearish Order Block", default: "#e040fb" },
+      { key: "bullFVG",   label: "Bullish FVG Zone",   default: "#26c6da" },
+      { key: "bearFVG",   label: "Bearish FVG Zone",   default: "#f48fb1" },
+      { key: "liquidity", label: "Liquidity Pools",    default: "#ffd600" },
+      { key: "signal",    label: "BOS/CHoCH Signals",  default: "#ffffff" },
+    ],
+    visibility: [
+      { key: "bias",      label: "Bias Line" },
+      { key: "bullOB",    label: "Bullish Order Blocks" },
+      { key: "bearOB",    label: "Bearish Order Blocks" },
+      { key: "bullFVG",   label: "Bullish FVG Zones" },
+      { key: "bearFVG",   label: "Bearish FVG Zones" },
+      { key: "liquidity", label: "Liquidity Pool Lines" },
+      { key: "signals",   label: "BOS / CHoCH Signals" },
     ],
   },
 };

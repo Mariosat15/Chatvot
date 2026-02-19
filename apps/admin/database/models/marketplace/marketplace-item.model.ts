@@ -60,7 +60,13 @@ export type IndicatorType =
   | "helix_phase_engine"
   | "prism_wavelet_cascade"
   | "mirage_depth_scanner"
-  | "quantum_drift_mapper";
+  | "quantum_drift_mapper"
+  | "sovereign_gravity_arc"
+  | "solaris_trend_engine"
+  | "stellar_confluence_ribbon"
+  | "kinetic_pressure_zones"
+  | "nova_resonance_field"
+  | "spectre_liquidity_matrix";
 
 // Strategy Condition Operators
 export type ConditionOperator =

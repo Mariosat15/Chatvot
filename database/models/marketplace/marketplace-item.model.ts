@@ -65,7 +65,8 @@ export type IndicatorType =
   | "solaris_trend_engine"
   | "stellar_confluence_ribbon"
   | "kinetic_pressure_zones"
-  | "nova_resonance_field";
+  | "nova_resonance_field"
+  | "spectre_liquidity_matrix";
 
 // Strategy Condition Operators
 export type ConditionOperator =

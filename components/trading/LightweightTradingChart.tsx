@@ -116,6 +116,7 @@ import {
   calculateStellarConfluenceRibbon,
   calculateKineticPressureZones,
   calculateNovaResonanceField,
+  calculateSpectreLiquidityMatrix,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3663,6 +3664,142 @@ const LightweightTradingChart = ({
 
         }
 
+        // ─── SPECTRE LIQUIDITY MATRIX ──────────────────────────────────────────
+        if (indicator.type === "spectre_liquidity_matrix") {
+          const slmData = calculateSpectreLiquidityMatrix(
+            candles,
+            indicator.parameters?.swingLookback || 5,
+            indicator.parameters?.obStrength    || 1.5,
+            indicator.parameters?.period        || 20,
+            indicator.parameters?.maxFVGAge     || 50,
+          );
+          if (slmData.length > 0) {
+            const prec = indicator.precision || 5;
+            const slmId = indicator.id;
+
+            // Colors from componentColors
+            const biasC    = indicator.componentColors?.bias        ?? "#00e5ff";
+            const bullOBC  = indicator.componentColors?.bullOB       ?? "#00bcd4";
+            const bearOBC  = indicator.componentColors?.bearOB       ?? "#e040fb";
+            const bullFVGC = indicator.componentColors?.bullFVG      ?? "#26c6da";
+            const bearFVGC = indicator.componentColors?.bearFVG      ?? "#f48fb1";
+            const liqC     = indicator.componentColors?.liquidity    ?? "#ffd600";
+            const sigC     = indicator.componentColors?.signal       ?? "#ffffff";
+
+            // Helpers: filter active per-candle zone data
+            const zoneArr = (valFn: (d: typeof slmData[0]) => number | null) =>
+              slmData.filter(d => valFn(d) !== null).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d)! }));
+
+            // ── Bias Line ──────────────────────────────────────────────────────
+            if (indicator.componentVisibility?.bias !== false) {
+              const slmBiasSeries = chart.addLineSeries({
+                color: biasC, lineWidth: 2 as any, lineStyle: 0,
+                title: indicator.customLabel || "Spectre Bias",
+                priceScaleId: "right",
+                priceFormat: { type: "price", precision: prec },
+                lastValueVisible: true,
+              });
+              slmBiasSeries.setData(slmData.map(d => ({
+                time: d.time as UTCTimestamp,
+                value: d.biasLine,
+                color: hexToRgba(d.biasState === "bullish" ? bullOBC : d.biasState === "bearish" ? bearOBC : biasC, 90),
+              })));
+              indicatorSeriesRef.current.set(`${slmId}_bias`, slmBiasSeries);
+            }
+
+            // ── Bullish OB 1 ───────────────────────────────────────────────────
+            if (indicator.componentVisibility?.bullOB !== false) {
+              const b1h = chart.addLineSeries({ color: bullOBC, lineWidth: 2 as any, lineStyle: 0, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const b1l = chart.addLineSeries({ color: bullOBC, lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              b1h.setData(zoneArr(d => d.bullOB1High));
+              b1l.setData(zoneArr(d => d.bullOB1Low));
+              indicatorSeriesRef.current.set(`${slmId}_b1h`, b1h);
+              indicatorSeriesRef.current.set(`${slmId}_b1l`, b1l);
+
+              // Bullish OB 2 (slightly lighter)
+              const b2h = chart.addLineSeries({ color: hexToRgba(bullOBC, 60), lineWidth: 2 as any, lineStyle: 0, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const b2l = chart.addLineSeries({ color: hexToRgba(bullOBC, 60), lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              b2h.setData(zoneArr(d => d.bullOB2High));
+              b2l.setData(zoneArr(d => d.bullOB2Low));
+              indicatorSeriesRef.current.set(`${slmId}_b2h`, b2h);
+              indicatorSeriesRef.current.set(`${slmId}_b2l`, b2l);
+            }
+
+            // ── Bearish OB 1 ───────────────────────────────────────────────────
+            if (indicator.componentVisibility?.bearOB !== false) {
+              const r1h = chart.addLineSeries({ color: bearOBC, lineWidth: 2 as any, lineStyle: 0, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const r1l = chart.addLineSeries({ color: bearOBC, lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              r1h.setData(zoneArr(d => d.bearOB1High));
+              r1l.setData(zoneArr(d => d.bearOB1Low));
+              indicatorSeriesRef.current.set(`${slmId}_r1h`, r1h);
+              indicatorSeriesRef.current.set(`${slmId}_r1l`, r1l);
+
+              // Bearish OB 2
+              const r2h = chart.addLineSeries({ color: hexToRgba(bearOBC, 60), lineWidth: 2 as any, lineStyle: 0, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const r2l = chart.addLineSeries({ color: hexToRgba(bearOBC, 60), lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              r2h.setData(zoneArr(d => d.bearOB2High));
+              r2l.setData(zoneArr(d => d.bearOB2Low));
+              indicatorSeriesRef.current.set(`${slmId}_r2h`, r2h);
+              indicatorSeriesRef.current.set(`${slmId}_r2l`, r2l);
+            }
+
+            // ── Bullish FVG ────────────────────────────────────────────────────
+            if (indicator.componentVisibility?.bullFVG !== false) {
+              const bft = chart.addLineSeries({ color: bullFVGC, lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const bfb = chart.addLineSeries({ color: bullFVGC, lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              bft.setData(zoneArr(d => d.bullFVGTop));
+              bfb.setData(zoneArr(d => d.bullFVGBot));
+              indicatorSeriesRef.current.set(`${slmId}_bft`, bft);
+              indicatorSeriesRef.current.set(`${slmId}_bfb`, bfb);
+            }
+
+            // ── Bearish FVG ────────────────────────────────────────────────────
+            if (indicator.componentVisibility?.bearFVG !== false) {
+              const rft = chart.addLineSeries({ color: bearFVGC, lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const rfb = chart.addLineSeries({ color: bearFVGC, lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              rft.setData(zoneArr(d => d.bearFVGTop));
+              rfb.setData(zoneArr(d => d.bearFVGBot));
+              indicatorSeriesRef.current.set(`${slmId}_rft`, rft);
+              indicatorSeriesRef.current.set(`${slmId}_rfb`, rfb);
+            }
+
+            // ── Liquidity Pool High / Low lines ────────────────────────────────
+            if (indicator.componentVisibility?.liquidity !== false) {
+              const liqHiS = chart.addLineSeries({ color: liqC, lineWidth: 1 as any, lineStyle: 1, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const liqLoS = chart.addLineSeries({ color: liqC, lineWidth: 1 as any, lineStyle: 1, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              liqHiS.setData(zoneArr(d => d.liquidityHigh));
+              liqLoS.setData(zoneArr(d => d.liquidityLow));
+              indicatorSeriesRef.current.set(`${slmId}_liqhi`, liqHiS);
+              indicatorSeriesRef.current.set(`${slmId}_liqlo`, liqLoS);
+            }
+
+            // ── BOS / CHoCH Signal Markers ──────────────────────────────────────
+            if (indicator.componentVisibility?.signals !== false) {
+              const slmMarkers: any[] = [];
+              slmData.forEach(d => {
+                if (d.signal === "none") return;
+                const isBull = d.signal === "bos_bull" || d.signal === "choch_bull";
+                const isCHoCH = d.signal === "choch_bull" || d.signal === "choch_bear";
+                slmMarkers.push({
+                  time: d.time as UTCTimestamp,
+                  position: isBull ? "belowBar" : "aboveBar",
+                  color: isCHoCH ? (isBull ? "#69f0ae" : "#ff5252") : sigC,
+                  shape: isBull ? "arrowUp" : "arrowDown",
+                  text: isCHoCH
+                    ? (isBull ? "CHoCH ▲" : "CHoCH ▼")
+                    : (isBull ? "BOS ▲" : "BOS ▼"),
+                  size: isCHoCH ? 2 : 1,
+                });
+              });
+              // Attach markers to bias series if it exists, else create a hidden series
+              const biasSer = indicatorSeriesRef.current.get(`${slmId}_bias`);
+              if (biasSer && slmMarkers.length > 0) {
+                try { biasSer.setMarkers(slmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+              }
+            }
+          }
+        }
+
         // === OVERLAY REFRESH CLOSURE (two-tier: light/full) ===
         // Captures indicator config at creation time. Looks up series from indicatorSeriesRef.
         // "light" = tail-slice 100 candles + series.update() on last point (fast, preserves zoom)
@@ -4368,6 +4505,53 @@ const LightweightTradingChart = ({
                     if (echoS) echoS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: hexToRgba(_nrfEchoC, nrfOp(d)) })));
                     if (refS) refS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
                     if (sigS) sigS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
+                  }
+                }
+              } else if (_ovlType === "spectre_liquidity_matrix") {
+                const slmData = calculateSpectreLiquidityMatrix(
+                  tc,
+                  p.swingLookback || 5, p.obStrength || 1.5,
+                  p.period || 20, p.maxFVGAge || 50,
+                );
+                if (slmData.length > 0) {
+                  const _slmBiasC  = _ovlColors.bias      ?? "#00e5ff";
+                  const _slmBullC  = _ovlColors.bullOB    ?? "#00bcd4";
+                  const _slmBearC  = _ovlColors.bearOB    ?? "#e040fb";
+                  const zArr = (valFn: (d: typeof slmData[0]) => number | null) =>
+                    slmData.filter(d => valFn(d) !== null).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d)! }));
+
+                  const biasS = _ovlSeriesMap.get(`${_ovlId}_bias`);
+                  const b1h = _ovlSeriesMap.get(`${_ovlId}_b1h`); const b1l = _ovlSeriesMap.get(`${_ovlId}_b1l`);
+                  const b2h = _ovlSeriesMap.get(`${_ovlId}_b2h`); const b2l = _ovlSeriesMap.get(`${_ovlId}_b2l`);
+                  const r1h = _ovlSeriesMap.get(`${_ovlId}_r1h`); const r1l = _ovlSeriesMap.get(`${_ovlId}_r1l`);
+                  const r2h = _ovlSeriesMap.get(`${_ovlId}_r2h`); const r2l = _ovlSeriesMap.get(`${_ovlId}_r2l`);
+                  const bft = _ovlSeriesMap.get(`${_ovlId}_bft`); const bfb = _ovlSeriesMap.get(`${_ovlId}_bfb`);
+                  const rft = _ovlSeriesMap.get(`${_ovlId}_rft`); const rfb = _ovlSeriesMap.get(`${_ovlId}_rfb`);
+                  const liqHiS = _ovlSeriesMap.get(`${_ovlId}_liqhi`); const liqLoS = _ovlSeriesMap.get(`${_ovlId}_liqlo`);
+
+                  if (mode === "light") {
+                    const last = slmData[slmData.length - 1];
+                    if (!last) return;
+                    const bCol = hexToRgba(last.biasState === "bullish" ? _slmBullC : last.biasState === "bearish" ? _slmBearC : _slmBiasC, 90);
+                    if (biasS) biasS.update({ time: last.time as UTCTimestamp, value: last.biasLine, color: bCol } as any);
+                    if (last.bullOB1High !== null) { if (b1h) b1h.update({ time: last.time as UTCTimestamp, value: last.bullOB1High } as any); if (b1l) b1l.update({ time: last.time as UTCTimestamp, value: last.bullOB1Low! } as any); }
+                    if (last.bullOB2High !== null) { if (b2h) b2h.update({ time: last.time as UTCTimestamp, value: last.bullOB2High } as any); if (b2l) b2l.update({ time: last.time as UTCTimestamp, value: last.bullOB2Low! } as any); }
+                    if (last.bearOB1High !== null) { if (r1h) r1h.update({ time: last.time as UTCTimestamp, value: last.bearOB1High } as any); if (r1l) r1l.update({ time: last.time as UTCTimestamp, value: last.bearOB1Low! } as any); }
+                    if (last.bearOB2High !== null) { if (r2h) r2h.update({ time: last.time as UTCTimestamp, value: last.bearOB2High } as any); if (r2l) r2l.update({ time: last.time as UTCTimestamp, value: last.bearOB2Low! } as any); }
+                    if (last.bullFVGTop !== null) { if (bft) bft.update({ time: last.time as UTCTimestamp, value: last.bullFVGTop } as any); if (bfb) bfb.update({ time: last.time as UTCTimestamp, value: last.bullFVGBot! } as any); }
+                    if (last.bearFVGTop !== null) { if (rft) rft.update({ time: last.time as UTCTimestamp, value: last.bearFVGTop } as any); if (rfb) rfb.update({ time: last.time as UTCTimestamp, value: last.bearFVGBot! } as any); }
+                    if (last.liquidityHigh !== null && liqHiS) liqHiS.update({ time: last.time as UTCTimestamp, value: last.liquidityHigh } as any);
+                    if (last.liquidityLow  !== null && liqLoS) liqLoS.update({ time: last.time as UTCTimestamp, value: last.liquidityLow }  as any);
+                  } else {
+                    if (biasS) biasS.setData(slmData.map(d => ({ time: d.time as UTCTimestamp, value: d.biasLine, color: hexToRgba(d.biasState === "bullish" ? _slmBullC : d.biasState === "bearish" ? _slmBearC : _slmBiasC, 90) })));
+                    if (b1h) b1h.setData(zArr(d => d.bullOB1High)); if (b1l) b1l.setData(zArr(d => d.bullOB1Low));
+                    if (b2h) b2h.setData(zArr(d => d.bullOB2High)); if (b2l) b2l.setData(zArr(d => d.bullOB2Low));
+                    if (r1h) r1h.setData(zArr(d => d.bearOB1High)); if (r1l) r1l.setData(zArr(d => d.bearOB1Low));
+                    if (r2h) r2h.setData(zArr(d => d.bearOB2High)); if (r2l) r2l.setData(zArr(d => d.bearOB2Low));
+                    if (bft) bft.setData(zArr(d => d.bullFVGTop));  if (bfb) bfb.setData(zArr(d => d.bullFVGBot));
+                    if (rft) rft.setData(zArr(d => d.bearFVGTop));  if (rfb) rfb.setData(zArr(d => d.bearFVGBot));
+                    if (liqHiS) liqHiS.setData(zArr(d => d.liquidityHigh));
+                    if (liqLoS) liqLoS.setData(zArr(d => d.liquidityLow));
                   }
                 }
               } else if (_ovlType === "kinetic_pressure_zones") {

@@ -6359,3 +6359,226 @@ export function calculateNovaResonanceField(
 
   return result;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPECTRE LIQUIDITY MATRIX
+// Hybrid Institutional / Smart Money Indicator
+// Combines: Order Block Detection + Fair Value Gap (FVG) mapping +
+//           Break of Structure (BOS) / Change of Character (CHoCH) +
+//           Liquidity Pool Lines + Volume-Weighted Bias Line
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SpectreLiquidityMatrixData {
+  time: number;
+  biasLine:    number;
+  biasState:   "bullish" | "bearish" | "neutral";
+  bullOB1High: number | null;
+  bullOB1Low:  number | null;
+  bullOB2High: number | null;
+  bullOB2Low:  number | null;
+  bearOB1High: number | null;
+  bearOB1Low:  number | null;
+  bearOB2High: number | null;
+  bearOB2Low:  number | null;
+  bullFVGTop:  number | null;
+  bullFVGBot:  number | null;
+  bearFVGTop:  number | null;
+  bearFVGBot:  number | null;
+  liquidityHigh: number | null;
+  liquidityLow:  number | null;
+  signal:      "bos_bull" | "bos_bear" | "choch_bull" | "choch_bear" | "none";
+  signalPrice: number;
+}
+
+export function calculateSpectreLiquidityMatrix(
+  data: OHLCData[],
+  swingLookback = 5,
+  obStrength    = 1.5,
+  period        = 20,
+  maxFVGAge     = 50,
+): SpectreLiquidityMatrixData[] {
+  const len = data.length;
+  if (len < swingLookback * 2 + 10) return [];
+
+  const highs   = data.map(d => d.high);
+  const lows    = data.map(d => d.low);
+  const closes  = data.map(d => d.close);
+  const opens   = data.map(d => d.open);
+  const volumes = data.map(d => d.volume ?? 1);
+  const N = swingLookback;
+
+  // ── 1. ATR (14-period Wilder) ──────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i < 14 ? tr : (atr[i - 1] * 13 + tr) / 14;
+  }
+
+  // ── 2. Volume-Weighted Bias Line ───────────────────────────────────────────
+  const bias  = new Array(len).fill(0);
+  let cumPV = 0, cumV = 0;
+  const alpha = 2 / (period + 1);
+  for (let i = 0; i < len; i++) {
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    cumPV += tp * volumes[i];
+    cumV  += volumes[i];
+    const vwap = cumPV / cumV;
+    bias[i] = i === 0 ? vwap : bias[i - 1] + alpha * (vwap - bias[i - 1]);
+  }
+
+  // ── 3. Swing High / Low Detection ─────────────────────────────────────────
+  const shSet = new Set<number>();
+  const slSet = new Set<number>();
+  for (let i = N; i < len - N; i++) {
+    let isSH = true, isSL = true;
+    for (let j = i - N; j <= i + N; j++) {
+      if (j === i) continue;
+      if (highs[j] >= highs[i]) isSH = false;
+      if (lows[j]  <= lows[i])  isSL = false;
+      if (!isSH && !isSL) break;
+    }
+    if (isSH) shSet.add(i);
+    if (isSL) slSet.add(i);
+  }
+
+  // ── 4. Order Block Detection ───────────────────────────────────────────────
+  interface OBRec { idx: number; high: number; low: number; type: "bullish"|"bearish"; mitigatedAt: number|null; }
+  const allOBs: OBRec[] = [];
+
+  for (const idx of slSet) {                             // Bullish OB at swing low
+    for (let k = idx - 1; k >= Math.max(0, idx - N * 3); k--) {
+      if (closes[k] < opens[k]) {
+        if ((highs[idx] - lows[idx]) > atr[idx] * obStrength)
+          allOBs.push({ idx: k, high: opens[k], low: lows[k], type: "bullish", mitigatedAt: null });
+        break;
+      }
+    }
+  }
+  for (const idx of shSet) {                             // Bearish OB at swing high
+    for (let k = idx - 1; k >= Math.max(0, idx - N * 3); k--) {
+      if (closes[k] > opens[k]) {
+        if ((highs[idx] - lows[idx]) > atr[idx] * obStrength)
+          allOBs.push({ idx: k, high: highs[k], low: opens[k], type: "bearish", mitigatedAt: null });
+        break;
+      }
+    }
+  }
+  for (const ob of allOBs) {
+    for (let j = ob.idx + 1; j < len; j++) {
+      if (ob.type === "bullish" && lows[j]  <= ob.high) { ob.mitigatedAt = j; break; }
+      if (ob.type === "bearish" && highs[j] >= ob.low)  { ob.mitigatedAt = j; break; }
+    }
+  }
+
+  // ── 5. Fair Value Gap Detection ────────────────────────────────────────────
+  interface FVGRec { startIdx: number; top: number; bottom: number; type: "bullish"|"bearish"; mitigatedAt: number|null; }
+  const allFVGs: FVGRec[] = [];
+
+  for (let i = 2; i < len; i++) {
+    const bullGap = lows[i] - highs[i - 2];
+    const bearGap = lows[i - 2] - highs[i];
+    if (bullGap > atr[i] * 0.2) allFVGs.push({ startIdx: i - 1, top: lows[i], bottom: highs[i - 2], type: "bullish", mitigatedAt: null });
+    if (bearGap > atr[i] * 0.2) allFVGs.push({ startIdx: i - 1, top: lows[i - 2], bottom: highs[i], type: "bearish", mitigatedAt: null });
+  }
+  for (const fvg of allFVGs) {
+    for (let j = fvg.startIdx + 1; j < len; j++) {
+      if (fvg.type === "bullish" && lows[j]  <= fvg.top)    { fvg.mitigatedAt = j; break; }
+      if (fvg.type === "bearish" && highs[j] >= fvg.bottom) { fvg.mitigatedAt = j; break; }
+    }
+  }
+
+  // ── 6. BOS / CHoCH Detection ──────────────────────────────────────────────
+  const sigMap   = new Map<number, SpectreLiquidityMatrixData["signal"]>();
+  const sigPrMap = new Map<number, number>();
+  let structure: "bullish"|"bearish"|"undefined" = "undefined";
+  let runSHPrice = -Infinity;
+  let runSLPrice =  Infinity;
+
+  for (let i = N; i < len; i++) {
+    const pivIdx = i - N;
+    if (shSet.has(pivIdx)) runSHPrice = highs[pivIdx];
+    if (slSet.has(pivIdx)) runSLPrice = lows[pivIdx];
+
+    if (runSHPrice > -Infinity && closes[i] > runSHPrice) {
+      const sig: SpectreLiquidityMatrixData["signal"] = structure === "bearish" ? "choch_bull" : "bos_bull";
+      if (!sigMap.has(i)) { sigMap.set(i, sig); sigPrMap.set(i, runSHPrice); }
+      structure = "bullish"; runSHPrice = -Infinity;
+    }
+    if (runSLPrice < Infinity && closes[i] < runSLPrice) {
+      const sig: SpectreLiquidityMatrixData["signal"] = structure === "bullish" ? "choch_bear" : "bos_bear";
+      if (!sigMap.has(i)) { sigMap.set(i, sig); sigPrMap.set(i, runSLPrice); }
+      structure = "bearish"; runSLPrice = Infinity;
+    }
+    if (structure === "undefined") {
+      if (shSet.has(i)) structure = "bearish";
+      if (slSet.has(i)) structure = "bullish";
+    }
+  }
+
+  // ── 7. Build output ────────────────────────────────────────────────────────
+  const result: SpectreLiquidityMatrixData[] = [];
+
+  for (let i = N + 1; i < len; i++) {
+    const activeBull: OBRec[] = [];
+    const activeBear: OBRec[] = [];
+    for (const ob of allOBs) {
+      if (ob.idx >= i) continue;
+      const mit = ob.mitigatedAt !== null && ob.mitigatedAt <= i;
+      if (!mit) (ob.type === "bullish" ? activeBull : activeBear).push(ob);
+    }
+    activeBull.sort((a, b) => b.idx - a.idx);
+    activeBear.sort((a, b) => b.idx - a.idx);
+
+    let bullFVG: FVGRec | null = null, bearFVG: FVGRec | null = null;
+    for (const fvg of allFVGs) {
+      if (fvg.startIdx >= i || i - fvg.startIdx > maxFVGAge) continue;
+      if (fvg.mitigatedAt !== null && fvg.mitigatedAt <= i) continue;
+      if (!bullFVG && fvg.type === "bullish") bullFVG = fvg;
+      if (!bearFVG && fvg.type === "bearish") bearFVG = fvg;
+      if (bullFVG && bearFVG) break;
+    }
+
+    let liqHigh: number | null = null, liqLow: number | null = null;
+    for (let j = i - 1; j >= Math.max(0, i - 80) && (liqHigh === null || liqLow === null); j--) {
+      if (liqHigh === null && shSet.has(j)) {
+        let swept = false;
+        for (let k = j + 1; k <= i; k++) { if (highs[k] > highs[j]) { swept = true; break; } }
+        if (!swept) liqHigh = highs[j];
+      }
+      if (liqLow === null && slSet.has(j)) {
+        let swept = false;
+        for (let k = j + 1; k <= i; k++) { if (lows[k] < lows[j]) { swept = true; break; } }
+        if (!swept) liqLow = lows[j];
+      }
+    }
+
+    const biasState: SpectreLiquidityMatrixData["biasState"] =
+      closes[i] > bias[i] * 1.0005 ? "bullish" :
+      closes[i] < bias[i] * 0.9995 ? "bearish" : "neutral";
+
+    result.push({
+      time: data[i].time,
+      biasLine:    bias[i],
+      biasState,
+      bullOB1High: activeBull[0]?.high ?? null,
+      bullOB1Low:  activeBull[0]?.low  ?? null,
+      bullOB2High: activeBull[1]?.high ?? null,
+      bullOB2Low:  activeBull[1]?.low  ?? null,
+      bearOB1High: activeBear[0]?.high ?? null,
+      bearOB1Low:  activeBear[0]?.low  ?? null,
+      bearOB2High: activeBear[1]?.high ?? null,
+      bearOB2Low:  activeBear[1]?.low  ?? null,
+      bullFVGTop:  bullFVG?.top    ?? null,
+      bullFVGBot:  bullFVG?.bottom ?? null,
+      bearFVGTop:  bearFVG?.top    ?? null,
+      bearFVGBot:  bearFVG?.bottom ?? null,
+      liquidityHigh: liqHigh,
+      liquidityLow:  liqLow,
+      signal:      sigMap.get(i)   ?? "none",
+      signalPrice: sigPrMap.get(i) ?? closes[i],
+    });
+  }
+
+  return result;
+}

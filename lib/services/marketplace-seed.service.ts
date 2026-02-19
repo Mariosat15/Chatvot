@@ -2784,6 +2784,96 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
   riskLevel: "medium",
 };
 
+const SPECTRE_LIQUIDITY_MATRIX = {
+  name: "Spectre Liquidity Matrix",
+  slug: "spectre-liquidity-matrix",
+  shortDescription:
+    "Institutional Smart Money indicator combining Order Block detection, Fair Value Gap mapping, BOS/CHoCH structural signals, Liquidity Pool levels and a Volume-Weighted Bias Line — all directly on your chart.",
+  fullDescription: `# Spectre Liquidity Matrix (SLM)
+
+## Overview
+**Spectre Liquidity Matrix** is a state-of-the-art institutional trading indicator that brings professional Smart Money Concept (SMC) analysis directly onto your price chart. It simultaneously maps **Order Blocks**, **Fair Value Gaps**, **Market Structure Breaks** and **Liquidity Pools** — giving you the exact playbook that institutional traders use.
+
+## Core Components
+
+### 📦 Order Block Detection
+Automatically identifies the precise **Bullish Order Blocks** (teal zones) and **Bearish Order Blocks** (magenta zones) where institutional buyers and sellers have placed their orders. An Order Block is the last opposing candle before a strong impulsive move — this is where institutions loaded their positions.
+
+- **Bullish OB** (cyan/teal): Last bearish candle before a powerful up-impulse. Price tends to revisit and bounce from these zones.
+- **Bearish OB** (magenta/purple): Last bullish candle before a powerful down-impulse. Price tends to revisit and reject from these zones.
+- Zones are displayed from formation until **mitigated** (when price re-enters them), so you always see only active, unmitigated blocks.
+
+### ⬛ Fair Value Gap (FVG) Mapping
+Detects **imbalance zones** created by explosive 3-candle institutional moves. These price gaps represent inefficiencies that markets consistently return to fill.
+
+- **Bullish FVG**: Gap between candle[i-2].high and candle[i].low — a bullish imbalance zone
+- **Bearish FVG**: Gap between candle[i-2].low and candle[i].high — a bearish imbalance zone
+- FVGs are highlighted with dashed boundary lines and remain active until the gap is filled (mitigated)
+
+### 🔴 Break of Structure (BOS) & Change of Character (CHoCH)
+Real-time detection of the two most important structural events in Smart Money trading:
+
+| Signal | Meaning |
+|---|---|
+| **BOS ▲** | Price breaks above a previous swing high — bullish trend continuation |
+| **BOS ▼** | Price breaks below a previous swing low — bearish trend continuation |
+| **CHoCH ▲** | Price breaks structure to the upside in a downtrend — potential bullish reversal |
+| **CHoCH ▼** | Price breaks structure to the downside in an uptrend — potential bearish reversal |
+
+### 💧 Liquidity Pool Lines
+Maps the most recent **un-swept swing highs and swing lows** — the price levels where retail stop losses cluster. Displayed as gold dashed horizontal lines. Smart money routinely engineered moves to these levels before reversing. When price sweeps a liquidity pool, watch for sharp reversal signals.
+
+### 📊 Volume-Weighted Bias Line
+A proprietary **Volume-Weighted VWAP-EMA hybrid** bias line that reveals the institutional price bias in real time. The line dynamically colors based on whether price is trading above (cyan — bullish) or below (magenta — bearish) the fair value anchor.
+
+## How to Trade
+
+1. **Order Block bounces**: When price returns to an unmitigated Order Block, look for candlestick confirmation (pin bar, engulfing) and enter in the OB direction. Place stop beyond the OB boundary.
+
+2. **FVG fills**: Price often retraces into FVG zones before continuing the trend. Use FVGs as entry targets in pullback strategies.
+
+3. **CHoCH reversals**: A CHoCH signal is the earliest structural indication of a trend change. Enter after confirmation (a subsequent BOS in the new direction).
+
+4. **BOS continuations**: Trade in the direction of BOS signals for trend-following setups. BOS confirms the existing trend and gives you high-probability continuation entries.
+
+5. **Liquidity sweeps**: When price spikes through a gold liquidity line and quickly reverses, this is a classic institutional stop-hunt. Enter the reversal with a tight stop above/below the sweep wick.
+
+6. **Bias Line confluence**: Only trade long setups when the Bias Line is cyan (bullish bias). Only trade short setups when the Bias Line is magenta (bearish bias).
+
+## Parameters
+- **Swing Lookback** (default: 5): Number of candles on each side to confirm a swing high/low pivot
+- **OB Strength** (default: 1.5×ATR): Minimum impulse size to qualify a candle as an Order Block
+- **Bias Period** (default: 20): EMA smoothing period for the Volume-Weighted Bias Line
+- **Max FVG Age** (default: 50 bars): Maximum bars an unmitigated FVG stays visible
+
+## Risk Warning
+No indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 179.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "spectre_liquidity_matrix",
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "spectre_liquidity_matrix",
+    displayType: "overlay",
+    description: "Smart Money indicator: Order Blocks, FVGs, BOS/CHoCH, Liquidity Pools and Volume-Weighted Bias Line",
+  }),
+  defaultSettings: {
+    swingLookback: 5,
+    obStrength: 1.5,
+    period: 20,
+    maxFVGAge: 50,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["order-blocks", "fair-value-gap", "fvg", "bos", "choch", "liquidity", "smart-money", "institutional", "smc", "market-structure", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2810,6 +2900,7 @@ const ALL_ITEMS = [
   STELLAR_CONFLUENCE_RIBBON,
   KINETIC_PRESSURE_ZONES,
   NOVA_RESONANCE_FIELD,
+  SPECTRE_LIQUIDITY_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
