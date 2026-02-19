@@ -70,6 +70,15 @@ const BAR_FILLS   = [
 ];
 const WR_COLORS = ['#ffd700', '#c0c0c0', '#cd7f32', '#00f5ff', '#2979ff', '#e040fb', '#00e676'];
 
+// ─── Rank Tier Config (Pokémon card style) ────────────────────────────────────
+const TIER_CFG = {
+  champion: { border: '#ffd700', header: 'linear-gradient(135deg,#2a1a00 0%,rgba(255,215,0,.28) 100%)', tag: 'rgba(255,215,0,.15)', tagColor: '#ffd700', tagLabel: 'Champion', glow: 'rgba(255,215,0,.28)' },
+  elite:    { border: '#a78bfa', header: 'linear-gradient(135deg,#1a0a2e 0%,rgba(167,139,250,.28) 100%)', tag: 'rgba(167,139,250,.15)', tagColor: '#a78bfa', tagLabel: 'Elite',    glow: 'rgba(167,139,250,.22)' },
+  veteran:  { border: '#64b5f6', header: 'linear-gradient(135deg,#0c1445 0%,rgba(100,181,246,.28) 100%)', tag: 'rgba(100,181,246,.15)', tagColor: '#64b5f6', tagLabel: 'Veteran',  glow: 'rgba(100,181,246,.18)' },
+  trader:   { border: '#44485a', header: 'linear-gradient(135deg,#0d0d22 0%,#1a1a2e 100%)',              tag: 'rgba(68,72,90,.15)',    tagColor: '#8892a4', tagLabel: 'Trader',   glow: 'rgba(0,0,0,0)' },
+};
+const getTier = (rank: number) => rank <= 3 ? TIER_CFG.champion : rank <= 10 ? TIER_CFG.elite : rank <= 50 ? TIER_CFG.veteran : TIER_CFG.trader;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const avColor = (u: string) => {
@@ -256,141 +265,179 @@ function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: nu
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <div style={{
-          fontFamily: "'Orbitron',sans-serif", fontSize: 15, fontWeight: 700,
-          color: noTrades ? '#44485a' : pnlColor,
-          textShadow: (!noTrades && p.livePnl !== 0) ? `0 0 14px ${pnlColor}55` : 'none',
-        }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+        {/* Primary: Live Equity */}
+        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, fontWeight: 700, color: noTrades ? '#2a2a45' : '#00f5ff', textShadow: !noTrades ? '0 0 10px rgba(0,245,255,.35)' : 'none' }}>
+          {noTrades ? '—' : fmtC(p.liveEquity)}
+        </div>
+        {/* Secondary: PnL */}
+        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: noTrades ? '#2a2a45' : pnlColor, textShadow: (!noTrades && p.livePnl !== 0) ? `0 0 10px ${pnlColor}44` : 'none' }}>
           {noTrades ? '—' : fmtPnl(p.livePnl)}
         </div>
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: '#8892a4', fontWeight: 600 }}>
-          {noTrades ? 'No trades yet'
-            : `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(1)}% · ${p.winRate.toFixed(0)}% WR`}
+        {/* Tertiary: ROI · WR */}
+        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: noTrades ? '#1e1e35' : '#8892a4', fontWeight: 600 }}>
+          {noTrades ? 'No trades yet' : `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(1)}% · ${p.winRate.toFixed(0)}% WR`}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Trader Modal ─────────────────────────────────────────────────────────────
+// ─── Trader Modal (Pokémon Card Style) ───────────────────────────────────────
 
 function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: () => void }) {
   const myPos = ev.openPositions.filter(pos => pos.userId === p.userId);
-  const Cell = ({ v, l, c }: { v: string; l: string; c?: string }) => (
-    <div style={{
-      background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.05)',
-      borderRadius: 9, padding: '10px 12px', textAlign: 'center',
-    }}>
-      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 15, fontWeight: 700, color: c || '#eef0f6', marginBottom: 3 }}>{v}</div>
-      <div style={{ fontSize: 8, color: '#44485a', letterSpacing: 2, textTransform: 'uppercase' }}>{l}</div>
+  const tier   = getTier(p.rank);
+  const winProb = calcWinProb(p, ev);
+
+  const SCell = ({ v, l, c }: { v: string; l: string; c?: string }) => (
+    <div style={{ flex: 1, padding: '9px 4px', textAlign: 'center' }}>
+      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, fontWeight: 700, color: c || '#eef0f6', marginBottom: 2 }}>{v}</div>
+      <div style={{ fontSize: 7, color: '#44485a', letterSpacing: 2, textTransform: 'uppercase' }}>{l}</div>
     </div>
   );
 
+  const AttRow = ({ icon, label, color, children }: { icon: string; label: string; color: string; children: React.ReactNode }) => (
+    <div style={{ margin: '0 12px 8px', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: 'rgba(255,255,255,.035)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+        <span style={{ fontSize: 12 }}>{icon}</span>
+        <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, color, letterSpacing: 3, textTransform: 'uppercase' }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex' }}>{children}</div>
+    </div>
+  );
+
+  const Sep = () => <div style={{ width: 1, background: 'rgba(255,255,255,.06)', flexShrink: 0 }} />;
+
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)', zIndex: 500,
-        backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.88)', zIndex: 500, backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '24px 16px 40px' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        background: '#0d0d22', border: '1px solid rgba(0,245,255,.18)', borderRadius: 16,
-        width: 520, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto', scrollbarWidth: 'none',
-        boxShadow: '0 0 60px rgba(0,245,255,.1),0 20px 80px rgba(0,0,0,.75)',
-        animation: 'mopen .3s cubic-bezier(.34,1.56,.64,1)',
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '18px 18px 14px' }}>
-          <Av u={p.username} img={p.profileImage} sz={64}
-            ring={p.rank <= 3 ? RANK_COLORS[p.rank - 1] : 'rgba(0,245,255,.4)'} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 22, fontWeight: 700 }}>{p.username}</div>
+      <div style={{ width: '100%', maxWidth: 380, animation: 'pokemonReveal .38s cubic-bezier(.34,1.56,.64,1)', perspective: '1000px' }}>
+
+        {/* ── Card ── */}
+        <div style={{
+          border: `6px solid ${tier.border}`, borderRadius: 20, overflow: 'hidden',
+          background: 'linear-gradient(135deg,#1a1d2e 0%,#131722 100%)',
+          boxShadow: `0 0 55px ${tier.glow}, 0 0 0 1px rgba(255,255,255,.04), 0 28px 80px rgba(0,0,0,.85)`,
+          position: 'relative',
+        }}>
+
+          {/* Holographic shimmer (rank ≤ 10) */}
+          {p.rank <= 10 && (
             <div style={{
-              fontFamily: "'Orbitron',sans-serif", fontSize: 10, letterSpacing: 2, marginTop: 2,
-              color: p.rank === 1 ? '#ffd700' : p.rank === 2 ? '#c0c0c0' : p.rank === 3 ? '#cd7f32' : '#00f5ff',
-            }}>
-              {p.rank === 1 ? '🥇 1ST PLACE' : p.rank === 2 ? '🥈 2ND PLACE' : p.rank === 3 ? '🥉 3RD PLACE' : `RANK #${p.rank}`}
+              position: 'absolute', inset: 0, zIndex: 20, pointerEvents: 'none',
+              background: 'linear-gradient(105deg,transparent 35%,rgba(255,255,255,.11) 42%,rgba(255,255,255,.06) 46%,transparent 52%)',
+              backgroundSize: '200% 200%', animation: 'holoShim 2.8s linear infinite',
+            }} />
+          )}
+
+          {/* Close */}
+          <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 30, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,.55)', border: '1px solid rgba(255,255,255,.1)', cursor: 'pointer', color: '#8892a4', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+
+          {/* ── Top bar: tier + username + rank ── */}
+          <div style={{ padding: '12px 14px 6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+              <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '2px 9px', borderRadius: 4, background: tier.tag, color: tier.tagColor, border: `1px solid ${tier.border}44` }}>{tier.tagLabel}</span>
+              {p.isDisqualified && <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#ff1744', letterSpacing: 1 }}>⚡ LIQUIDATED</span>}
+              {!p.isDisqualified && p.totalTrades > 0 && (
+                <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '2px 7px', borderRadius: 4, color: '#00e676', background: 'rgba(0,230,118,.1)', border: '1px solid rgba(0,230,118,.2)' }}>ACTIVE</span>
+              )}
             </div>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6,
-              fontFamily: "'Rajdhani',sans-serif", fontSize: 9, fontWeight: 700,
-              letterSpacing: 2, textTransform: 'uppercase', padding: '2px 9px', borderRadius: 4,
-              color: p.isDisqualified ? '#ff1744' : '#00e676',
-              background: p.isDisqualified ? 'rgba(255,23,68,.1)' : 'rgba(0,230,118,.1)',
-              border: `1px solid ${p.isDisqualified ? 'rgba(255,23,68,.2)' : 'rgba(0,230,118,.2)'}`,
-            }}>
-              {p.isDisqualified ? 'LIQUIDATED' : 'ACTIVE'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 24, fontWeight: 700, color: '#eef0f6', lineHeight: 1 }}>{p.username}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 2 }}>
+                <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 9, color: '#44485a', letterSpacing: 1 }}>RANK</span>
+                <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 22, fontWeight: 900, color: tier.tagColor, textShadow: `0 0 16px ${tier.border}66`, lineHeight: 1 }}>#{p.rank}</span>
+                {p.rank === 1 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥇</span>}
+                {p.rank === 2 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥈</span>}
+                {p.rank === 3 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥉</span>}
+              </div>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: '1px solid rgba(255,255,255,.1)', color: '#44485a',
-              width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 14,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >✕</button>
-        </div>
 
-        {/* Color bar */}
-        <div style={{ height: 3, background: p.livePnl >= 0 ? 'linear-gradient(90deg,#00e676,#00f5ff)' : 'linear-gradient(90deg,#ff1744,#ff6d00)', marginBottom: 14 }} />
-
-        {/* Primary stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 18px 14px' }}>
-          <Cell v={p.totalTrades > 0 ? fmtPnl(p.livePnl) : '—'} l="Live PnL" c={p.livePnl >= 0 ? '#00e676' : '#ff1744'} />
-          <Cell v={fmtC(p.liveEquity)} l="Live Equity" c="#00f5ff" />
-          <Cell v={p.totalTrades > 0 ? `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(2)}%` : '—'} l="ROI" c={p.liveRoi >= 0 ? '#00e676' : '#ff1744'} />
-          <Cell v={p.totalTrades > 0 ? `${p.winRate.toFixed(1)}%` : '—'} l="Win Rate" c="#e040fb" />
-        </div>
-
-        {/* Secondary stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 18px 14px' }}>
-          <Cell v={String(p.totalTrades)} l="Total Trades" />
-          <Cell v={String(p.winningTrades)} l="Wins" c="#00e676" />
-          <Cell v={String(p.losingTrades)} l="Losses" c="#ff1744" />
-          <Cell v={p.averageWin > 0 ? fmtC(p.averageWin) : '—'} l="Avg Win" c="#00e676" />
-          <Cell v={p.averageLoss > 0 ? fmtC(p.averageLoss) : '—'} l="Avg Loss" c="#ff1744" />
-          <Cell v={p.profitFactor > 0 ? p.profitFactor.toFixed(2) : '—'} l="Profit Factor" c="#ffd700" />
-          <Cell v={p.largestWin > 0 ? fmtC(p.largestWin) : '—'} l="Largest Win" c="#00e676" />
-          <Cell v={p.largestLoss > 0 ? fmtC(p.largestLoss) : '—'} l="Largest Loss" c="#ff1744" />
-          <Cell v={`${p.maxDrawdownPercentage.toFixed(1)}%`} l="Max Drawdown" c="#ff6d00" />
-        </div>
-
-        {/* Open positions */}
-        {myPos.length > 0 && (
-          <>
-            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 600, color: '#44485a', letterSpacing: 3, textTransform: 'uppercase', padding: '0 18px 8px' }}>
-              Open Positions ({myPos.length})
+          {/* ── Avatar frame with gradient header ── */}
+          <div style={{ margin: '0 12px 0', border: `2px solid ${tier.border}`, borderRadius: 12, background: tier.header, overflow: 'hidden', position: 'relative' }}>
+            {/* Dot pattern overlay */}
+            <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', opacity: .13, backgroundImage: 'radial-gradient(circle,rgba(255,255,255,.9) 1.5px,transparent 1.5px)', backgroundSize: '18px 18px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '22px 0 18px', position: 'relative', zIndex: 2 }}>
+              <Av u={p.username} img={p.profileImage} sz={96} ring={tier.border} />
             </div>
-            <div style={{ padding: '0 18px', marginBottom: 16 }}>
-              {myPos.map((pos, i) => {
-                const isL = pos.side === 'long';
-                const dec = (pos.symbol || '').includes('JPY') || (pos.symbol || '').includes('XAU') ? 2 : 4;
-                return (
-                  <div key={i} style={{
-                    display: 'grid', gridTemplateColumns: '70px 50px 85px 80px 1fr',
-                    gap: 6, alignItems: 'center', padding: '6px 8px',
-                    borderBottom: '1px solid rgba(255,255,255,.03)',
-                  }}>
-                    <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: '#00f5ff' }}>{(pos.symbol || '').replace('/', '')}</div>
-                    <span style={{
-                      fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700,
-                      padding: '2px 6px', borderRadius: 3, letterSpacing: 1,
-                      color: isL ? '#00e676' : '#ff1744',
-                      background: isL ? 'rgba(0,230,118,.1)' : 'rgba(255,23,68,.1)',
-                      border: `1px solid ${isL ? 'rgba(0,230,118,.2)' : 'rgba(255,23,68,.2)'}`,
-                    }}>{isL ? 'BUY' : 'SELL'}</span>
-                    <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: '#44485a' }}>{pos.entryPrice.toFixed(dec)}</div>
-                    <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? '#00e676' : '#ff1744' }}>{fmtPnl(pos.unrealizedPnl)}</div>
-                    <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: '#44485a' }}>{tAgo(pos.openedAt)}</div>
-                  </div>
-                );
-              })}
+          </div>
+
+          {/* ── Color bar ── */}
+          <div style={{ height: 3, margin: '10px 12px 8px', borderRadius: 2, background: p.livePnl >= 0 ? 'linear-gradient(90deg,#00e676,#00f5ff)' : 'linear-gradient(90deg,#ff1744,#ff6d00)' }} />
+
+          {/* ── Attack section 1: Live Trading Stats ── */}
+          <AttRow icon="📊" label="Live Trading Stats" color="#00f5ff">
+            <SCell v={p.totalTrades > 0 ? fmtPnl(p.livePnl) : '—'} l="Live PnL" c={p.livePnl >= 0 ? '#00e676' : '#ff1744'} />
+            <Sep />
+            <SCell v={fmtC(p.liveEquity)} l="Live Equity" c="#00f5ff" />
+            <Sep />
+            <SCell v={p.totalTrades > 0 ? `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(2)}%` : '—'} l="ROI" c={p.liveRoi >= 0 ? '#00e676' : '#ff1744'} />
+          </AttRow>
+
+          {/* ── Attack section 2: Battle Record ── */}
+          <AttRow icon="⚔️" label="Battle Record" color="#ffd700">
+            <SCell v={p.totalTrades > 0 ? `${p.winRate.toFixed(1)}%` : '—'} l="Win Rate" c="#e040fb" />
+            <Sep />
+            <SCell v={`${p.winningTrades}/${p.totalTrades}`} l="W / Trades" c="#00e676" />
+            <Sep />
+            <SCell v={p.profitFactor > 0 ? p.profitFactor.toFixed(2) : '—'} l="Prof. Factor" c="#ffd700" />
+          </AttRow>
+
+          {/* ── Attack section 3: Risk Metrics ── */}
+          <AttRow icon="🛡️" label="Risk Metrics" color="#ff6d00">
+            <SCell v={`${p.maxDrawdownPercentage.toFixed(1)}%`} l="Max DD" c="#ff6d00" />
+            <Sep />
+            <SCell v={String(p.currentOpenPositions || 0)} l="Open Pos" c="#00f5ff" />
+            <Sep />
+            <SCell v={`${winProb}%`} l="Win Prob" c={winProb >= 60 ? '#00e676' : winProb >= 40 ? '#ffd700' : '#ff6d00'} />
+          </AttRow>
+
+          {/* ── Open Positions ── */}
+          {myPos.length > 0 && (
+            <div style={{ margin: '0 12px 8px' }}>
+              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#44485a', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, padding: '0 2px' }}>Open Positions ({myPos.length})</div>
+              <div style={{ background: 'rgba(255,255,255,.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,.05)', overflow: 'hidden' }}>
+                {myPos.map((pos, i) => {
+                  const isL = pos.side === 'long';
+                  const dec = (pos.symbol || '').includes('JPY') || (pos.symbol || '').includes('XAU') ? 2 : 4;
+                  return (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '68px 44px 80px 72px 1fr', gap: 5, alignItems: 'center', padding: '7px 10px', borderBottom: i < myPos.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: '#00f5ff' }}>{(pos.symbol || '').replace('/', '')}</div>
+                      <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, padding: '2px 5px', borderRadius: 3, letterSpacing: 1, textAlign: 'center', color: isL ? '#00e676' : '#ff1744', background: isL ? 'rgba(0,230,118,.1)' : 'rgba(255,23,68,.1)', border: `1px solid ${isL ? 'rgba(0,230,118,.25)' : 'rgba(255,23,68,.25)'}` }}>{isL ? 'BUY' : 'SELL'}</span>
+                      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: '#44485a' }}>{pos.entryPrice.toFixed(dec)}</div>
+                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? '#00e676' : '#ff1744' }}>{fmtC(Math.abs(pos.unrealizedPnl))}</div>
+                      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: '#44485a' }}>{tAgo(pos.openedAt)}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+          {/* ── Bottom stats bar ── */}
+          <div style={{ display: 'flex', margin: '0 12px 10px', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, overflow: 'hidden', textAlign: 'center' }}>
+            {([
+              [String(p.totalTrades), 'Trades', '#ffd700'],
+              [`$${p.averageWin > 0 ? p.averageWin.toFixed(0) : '—'}`, 'Avg Win', '#00e676'],
+              [`$${p.averageLoss > 0 ? p.averageLoss.toFixed(0) : '—'}`, 'Avg Loss', '#ff1744'],
+            ] as [string, string, string][]).map(([v, l, c], i, arr) => (
+              <div key={l} style={{ flex: 1, padding: '8px 4px', borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
+                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: c }}>{v}</div>
+                <div style={{ fontSize: 7, color: '#44485a', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Card footer ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px 9px' }}>
+            <span style={{ fontSize: 7, color: '#1e2030', fontFamily: "'Rajdhani',sans-serif" }}>Chartvolt Trader Card</span>
+            <span style={{ fontSize: 7, color: '#1e2030', fontFamily: 'monospace' }}>{(p.userId || '').slice(-8) || 'cv-arena'}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -637,12 +684,15 @@ export default function ArenaPage() {
     el.id = 'cv-arena-css';
     el.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-      @keyframes blink  { 0%,100%{opacity:1}50%{opacity:.3} }
-      @keyframes shim   { 0%{transform:translateX(-200%)}100%{transform:translateX(200%)} }
-      @keyframes tickS  { 0%{transform:translateX(0)}100%{transform:translateX(-50%)} }
-      @keyframes fadeIn { from{opacity:0}to{opacity:1} }
-      @keyframes mopen  { from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)} }
-      @keyframes fall   { 0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+      @keyframes blink         { 0%,100%{opacity:1}50%{opacity:.3} }
+      @keyframes shim          { 0%{transform:translateX(-200%)}100%{transform:translateX(200%)} }
+      @keyframes tickS         { 0%{transform:translateX(0)}100%{transform:translateX(-50%)} }
+      @keyframes fadeIn        { from{opacity:0}to{opacity:1} }
+      @keyframes mopen         { from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)} }
+      @keyframes fall          { 0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+      @keyframes pokemonReveal { 0%{opacity:0;transform:scale(.72) rotateY(-18deg) translateY(20px)}60%{transform:scale(1.04) rotateY(3deg) translateY(-4px)}100%{opacity:1;transform:scale(1) rotateY(0deg) translateY(0)} }
+      @keyframes holoShim      { 0%{background-position:200% 50%}100%{background-position:-200% 50%} }
+      @keyframes pulseGlow     { 0%,100%{box-shadow:0 0 12px currentColor}50%{box-shadow:0 0 28px currentColor,0 0 8px currentColor} }
       .rcrow:hover      { transform:translateX(2px); }
       .ev-card:hover    { transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 22px rgba(0,245,255,.07)!important;border-color:rgba(0,245,255,.14)!important; }
       .tab-on           { color:#00f5ff!important;background:rgba(0,245,255,.1)!important;border-color:rgba(0,245,255,.2)!important; }
@@ -739,6 +789,11 @@ export default function ArenaPage() {
       .sort((a, b) => b.prob - a.prob)
       .slice(0, 7);
   }, [curEv]);
+
+  // Race participants: only those with trades (no-trade users in separate waiting list)
+  const racers  = useMemo(() => (curEv?.participants || []).filter(p => p.totalTrades > 0 && !p.isDisqualified), [curEv]);
+  const waiting = useMemo(() => (curEv?.participants || []).filter(p => p.totalTrades === 0 && !p.isDisqualified), [curEv]);
+  const disqualified = useMemo(() => (curEv?.participants || []).filter(p => p.isDisqualified), [curEv]);
 
   function enterEv(id: string) {
     const ev = events.find(e => e.id === id);
@@ -931,9 +986,41 @@ export default function ArenaPage() {
                       <div style={{ fontSize: 40, opacity: .4 }}>👥</div>
                       <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: '#8892a4', letterSpacing: 3 }}>No Participants Yet</div>
                     </div>
-                  ) : curEv.participants.map((p, i) => (
-                    <RacerRow key={p.userId} p={p} ev={curEv} idx={i} onClick={() => setSelTrader({ p, ev: curEv })} />
-                  ))}
+                  ) : (
+                    <>
+                      {/* Active traders with trades — shown in race */}
+                      {racers.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '28px 0', fontFamily: "'Orbitron',sans-serif", fontSize: 12, color: '#2a2a45', letterSpacing: 2 }}>Waiting for first trades…</div>
+                      ) : racers.map((p, i) => (
+                        <RacerRow key={p.userId} p={p} ev={curEv} idx={i} onClick={() => setSelTrader({ p, ev: curEv })} />
+                      ))}
+
+                      {/* Waiting for first trade */}
+                      {waiting.length > 0 && (
+                        <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,.04)', paddingTop: 10 }}>
+                          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#22223a', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 7 }}>
+                            Awaiting First Trade ({waiting.length})
+                          </div>
+                          {waiting.map(p => (
+                            <div key={p.userId} onClick={() => setSelTrader({ p, ev: curEv })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px', opacity: .35, cursor: 'pointer', borderRadius: 8 }}>
+                              <Av u={p.username} img={p.profileImage} sz={26} />
+                              <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: '#2a2a45', fontWeight: 600 }}>{p.username}</span>
+                              <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#1e1e35', marginLeft: 'auto' }}>NO TRADES</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Disqualified / liquidated — always last */}
+                      {disqualified.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          {disqualified.map(p => (
+                            <RacerRow key={p.userId} p={p} ev={curEv} idx={99} onClick={() => setSelTrader({ p, ev: curEv })} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
@@ -945,7 +1032,7 @@ export default function ArenaPage() {
                       <div key={h} style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 600, color: '#44485a', letterSpacing: 2, textTransform: 'uppercase', textAlign: hi === 0 ? 'center' : hi === 1 ? 'left' : 'right' }}>{h}</div>
                     ))}
                   </div>
-                  {curEv.participants.map((p, i) => {
+                  {curEv.participants.filter(p => p.totalTrades > 0 || p.isDisqualified).map((p, i) => {
                     const noT = p.totalTrades === 0 && !p.isDisqualified;
                     const rkColor = i < 3 ? RANK_COLORS[i] : '#44485a';
                     return (
@@ -1077,7 +1164,7 @@ export default function ArenaPage() {
 
       {/* Footer */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 26, background: 'rgba(5,5,15,.97)', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px', fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: '#44485a', zIndex: 100 }}>
-        <span>CHARTVOLT TRADING ARENA · Equity refreshes every 5s · No-trade participants shown at bottom</span>
+        <span>CHARTVOLT TRADING ARENA · Live equity refreshes every 5s · No-trade participants excluded from race</span>
         <span>chartvolt.com/arena · {new Date().getFullYear()}</span>
       </div>
     </div>
