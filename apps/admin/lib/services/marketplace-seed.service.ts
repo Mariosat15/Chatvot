@@ -2370,6 +2370,263 @@ No strategy guarantees profits. Competition environments are high-risk. Always u
   riskLevel: "medium",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY: CATALYST SURGE PROTOCOL
+// ─────────────────────────────────────────────────────────────────────────────
+const CATALYST_SURGE_PROTOCOL: Partial<IMarketplaceItem> = {
+  name: "Catalyst Surge Protocol",
+  slug: "catalyst-surge-protocol",
+  shortDescription:
+    "Competition-speed strategy: 6 signal tiers using KAMA adaptive trend crosses, Supertrend flips and Stochastic surges for continuous market action.",
+  fullDescription: `# Catalyst Surge Protocol (CSP) — Competition Edition
+
+## Overview
+**Catalyst Surge Protocol** is an aggressive competition strategy built on three independent signal pillars — Adaptive Trend (KAMA), Volatility Trend (Supertrend), and Momentum (Stochastic + CCI). Each pillar fires signals independently, creating a continuous cascade of buy/sell opportunities tuned for sub-one-hour competition formats.
+
+Unlike single-indicator strategies, CSP layers three fundamentally different technical approaches so that *at least one* pillar is always active in any market condition — ranging, trending, or transitioning.
+
+## Three Signal Pillars
+
+### 🔷 Pillar 1 — Adaptive Trend (KAMA)
+KAMA(10) is a Kaufman Adaptive Moving Average that speeds up during trends and slows during chop. When price **crosses** KAMA, it signals a meaningful trend shift rather than random noise. CCI(10) acts as a momentum gate to confirm the cross is real.
+
+### 🔶 Pillar 2 — Volatility Trend (Supertrend)
+Supertrend(7, 2) uses ATR-based bands to define the trend channel. A **cross** of price through the Supertrend line is one of the cleanest trend-reversal signals available. Stochastic(5) filters for momentum agreement.
+
+### 🔵 Pillar 3 — Momentum Pulse (Stochastic)
+Stochastic with a period of 5 is extremely reactive. When it crosses out of the 25 oversold or 75 overbought zones, momentum is reversing. KAMA acts as the trend filter to keep you on the right side.
+
+## Signal Logic
+
+### 🟢 CSP ALPHA LONG (STRONG BUY — strength 4)
+Price crosses **above** KAMA(10) **AND** CCI(10) > 0
+
+### 🔴 CSP ALPHA SHORT (STRONG SELL — strength 4)
+Price crosses **below** KAMA(10) **AND** CCI(10) < 0
+
+### 🟢 SUPERTREND IGNITE (BUY — strength 3)
+Price crosses **above** Supertrend(7, 2) **AND** Stochastic(5) > 40
+
+### 🔴 SUPERTREND COLLAPSE (SELL — strength 3)
+Price crosses **below** Supertrend(7, 2) **AND** Stochastic(5) < 60
+
+### 🟩 STOCH ROCKET (BUY — strength 2)
+Stochastic(5) crosses **above** 25 (oversold exit) **AND** Price > KAMA(10)
+
+### 🟥 STOCH CRASH (SELL — strength 2)
+Stochastic(5) crosses **below** 75 (overbought exit) **AND** Price < KAMA(10)
+
+## Why It Dominates in Competitions
+- **KAMA(10)** is adaptive — accelerates during trends, producing natural rapid crosses
+- **Supertrend(7,2)** low multiplier = fast flips, catching reversals before the crowd
+- **Stochastic period 5** is the fastest standard oscillator — fires on every micro-swing
+- **CCI zero-cross** is one of the most frequent, high-accuracy momentum filters
+- No lagging 200-period conditions. No 5-condition locks. Pure competitive-speed design.
+
+## Visual Guide
+- 🔺 **Large arrows** (strength 4): CSP ALPHA LONG/SHORT — adaptive trend shift entries
+- ▲ **Medium arrows** (strength 3): SUPERTREND IGNITE/COLLAPSE — volatility trend flips
+- ● **Small arrows** (strength 2): STOCH ROCKET/CRASH — momentum recovery pulses
+
+## Recommended Chart Setup
+Add these alongside CSP for full visual context:
+- KAMA (period 10)
+- Supertrend (7, 2)
+- Stochastic (5, 3)
+- CCI (10)
+
+## Risk Warning
+No strategy guarantees profits. This strategy is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "strategy",
+  price: 79.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  iconName: "Flame",
+  codeTemplate: JSON.stringify({
+    type: "strategy",
+    displayType: "signals",
+    description: "Competition-speed KAMA/Supertrend/Stochastic/CCI catalyst strategy with 6 signal tiers across 3 independent pillars",
+  }),
+  defaultSettings: {
+    color: "#ff6d00",
+    lineWidth: 2,
+  },
+  strategyConfig: {
+    rules: [
+      // ── Rule 1: CSP ALPHA LONG ────────────────────────────────────────────
+      {
+        id: "csp_alpha_long",
+        name: "CSP ALPHA LONG",
+        logic: "AND",
+        signal: "strong_buy",
+        signalStrength: 4,
+        conditions: [
+          {
+            id: "csp_al_kama_cross_up",
+            indicator: "price",
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "kama",
+            compareIndicatorParams: { period: 10, fast: 2, slow: 30 },
+          },
+          {
+            id: "csp_al_cci_pos",
+            indicator: "cci",
+            indicatorParams: { period: 10 },
+            operator: "above",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      // ── Rule 2: CSP ALPHA SHORT ───────────────────────────────────────────
+      {
+        id: "csp_alpha_short",
+        name: "CSP ALPHA SHORT",
+        logic: "AND",
+        signal: "strong_sell",
+        signalStrength: 4,
+        conditions: [
+          {
+            id: "csp_as_kama_cross_down",
+            indicator: "price",
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "kama",
+            compareIndicatorParams: { period: 10, fast: 2, slow: 30 },
+          },
+          {
+            id: "csp_as_cci_neg",
+            indicator: "cci",
+            indicatorParams: { period: 10 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      // ── Rule 3: SUPERTREND IGNITE ─────────────────────────────────────────
+      {
+        id: "st_ignite",
+        name: "SUPERTREND IGNITE",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 3,
+        conditions: [
+          {
+            id: "st_ign_cross_up",
+            indicator: "price",
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "supertrend_line",
+            compareIndicatorParams: { period: 7, multiplier: 2 },
+          },
+          {
+            id: "st_ign_stoch_above",
+            indicator: "stoch",
+            indicatorParams: { period: 5 },
+            operator: "above",
+            compareWith: "value",
+            compareValue: 40,
+          },
+        ],
+      },
+      // ── Rule 4: SUPERTREND COLLAPSE ───────────────────────────────────────
+      {
+        id: "st_collapse",
+        name: "SUPERTREND COLLAPSE",
+        logic: "AND",
+        signal: "sell",
+        signalStrength: 3,
+        conditions: [
+          {
+            id: "st_col_cross_down",
+            indicator: "price",
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "supertrend_line",
+            compareIndicatorParams: { period: 7, multiplier: 2 },
+          },
+          {
+            id: "st_col_stoch_below",
+            indicator: "stoch",
+            indicatorParams: { period: 5 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 60,
+          },
+        ],
+      },
+      // ── Rule 5: STOCH ROCKET ─────────────────────────────────────────────
+      {
+        id: "stoch_rocket",
+        name: "STOCH ROCKET",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 2,
+        conditions: [
+          {
+            id: "srocket_stoch_cross_25",
+            indicator: "stoch",
+            indicatorParams: { period: 5 },
+            operator: "crosses_above",
+            compareWith: "value",
+            compareValue: 25,
+          },
+          {
+            id: "srocket_price_above_kama",
+            indicator: "price",
+            operator: "above",
+            compareWith: "indicator",
+            compareIndicator: "kama",
+            compareIndicatorParams: { period: 10, fast: 2, slow: 30 },
+          },
+        ],
+      },
+      // ── Rule 6: STOCH CRASH ──────────────────────────────────────────────
+      {
+        id: "stoch_crash",
+        name: "STOCH CRASH",
+        logic: "AND",
+        signal: "sell",
+        signalStrength: 2,
+        conditions: [
+          {
+            id: "scrash_stoch_cross_75",
+            indicator: "stoch",
+            indicatorParams: { period: 5 },
+            operator: "crosses_below",
+            compareWith: "value",
+            compareValue: 75,
+          },
+          {
+            id: "scrash_price_below_kama",
+            indicator: "price",
+            operator: "below",
+            compareWith: "indicator",
+            compareIndicator: "kama",
+            compareIndicatorParams: { period: 10, fast: 2, slow: 30 },
+          },
+        ],
+      },
+    ],
+    defaultIndicators: ["kama", "supertrend", "stoch", "cci"],
+    signalDisplay: {
+      showOnChart: true,
+      showArrows: true,
+      showLabels: true,
+      arrowSize: "medium",
+    },
+  },
+  supportedAssets: [],
+  tags: [
+    "strategy", "kama", "supertrend", "stochastic", "cci",
+    "adaptive", "volatility", "momentum", "competition", "fast-signals", "premium",
+  ],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2400,6 +2657,7 @@ const ALL_ITEMS = [
   RADIANT_FIBONACCI_MATRIX,
   // Strategies
   APEX_CONFLUENCE_ENGINE,
+  CATALYST_SURGE_PROTOCOL,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
