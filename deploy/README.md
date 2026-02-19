@@ -117,12 +117,19 @@ git clone https://github.com/YOUR_GITHUB_USER/YOUR_REPO.git .
 
 ### Step 3: Configure Environment
 
+Create `.env` from the provided example and fill in your values:
+
 ```bash
-cp env_minimal_example.txt .env
+cp deploy/env.example .env
 nano .env
 ```
 
-Fill in these required values:
+Generate random secrets with:
+```bash
+openssl rand -hex 32
+```
+
+**Required variables** (app will not start without these):
 
 ```env
 NODE_ENV=production
@@ -130,21 +137,50 @@ NEXT_PUBLIC_BASE_URL=https://yourdomain.com
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 ADMIN_URL=https://admin.yourdomain.com
 MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname
-BETTER_AUTH_SECRET=your-secret-key-min-32-chars
+BETTER_AUTH_SECRET=<openssl rand -hex 32>
 BETTER_AUTH_URL=https://yourdomain.com
 ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=your-secure-password
-ADMIN_JWT_SECRET=your-admin-jwt-secret-min-32-chars
+ADMIN_JWT_SECRET=<openssl rand -hex 32>
+INTERNAL_API_SECRET=<openssl rand -hex 32>
+INTERNAL_API_KEY=<openssl rand -hex 32>
 API_PORT=4000
 WEBSOCKET_PORT=3003
 NEXT_PUBLIC_WEBSOCKET_URL=wss://yourdomain.com/ws
 WEBSOCKET_INTERNAL_URL=http://localhost:3003
+SERVER_ID=<auto: uuid or hostname>
+IS_PRIMARY=true
 ```
 
-Generate random secrets with:
-```bash
-openssl rand -hex 32
+**Key integrations** (comment out if not using, set here OR in Admin Panel):
+
+```env
+# Trading data — https://massive.com
+MASSIVE_API_KEY=
+NEXT_PUBLIC_MASSIVE_API_KEY=
+
+# Email
+NODEMAILER_EMAIL=noreply@yourdomain.com
+NODEMAILER_PASSWORD=your-gmail-app-password
+
+# KYC — https://portal.veriff.com  [MUST MATCH across all servers]
+VERIFF_API_KEY=
+VERIFF_API_SECRET=
+VERIFF_BASE_URL=https://stationapi.veriff.com
+VERIFF_CALLBACK_URL=https://yourdomain.com/kyc/callback
+
+# AI
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_ENABLED=true
+
+# Payments (choose one)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
+
+> See `deploy/env.example` for the complete list of all 50+ variables with descriptions.
 
 Create `.env` symlink for admin app:
 ```bash
@@ -506,7 +542,15 @@ Without this, users won't receive welcome emails, password resets, or notificati
 
 > After uploading branding images, they are automatically persisted in the database for durability across deployments.
 
-### Step 7: Payment Provider (IF accepting payments)
+### Step 7: KYC — Veriff (IF using identity verification)
+
+> ⚠️ **Multi-server warning:** `VERIFF_API_SECRET` must be the same on every server — or managed only via Admin Panel (leave blank in `.env`). Mixing a blank `.env` on one server with a value in `.env` on another causes `Signature does not match` errors.
+
+1. Get keys at [portal.veriff.com](https://portal.veriff.com)
+2. In admin panel: **Settings > KYC** — enter API key and secret
+3. **Do NOT also set them in `.env` unless you ensure all servers have the same values**
+
+### Step 8: Payment Provider (IF accepting payments)
 
 Only needed if the client will sell marketplace items, Game Master subscriptions, etc.
 
@@ -518,21 +562,23 @@ Only needed if the client will sell marketplace items, Game Master subscriptions
 
 **Stripe Webhook Setup:**
 1. Go to [Stripe Dashboard > Webhooks](https://dashboard.stripe.com/webhooks)
-2. Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
+2. Add endpoint: `https://yourdomain.com/api/stripe/webhook`
 3. Select events: `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.payment_failed`
 4. Copy the webhook signing secret to admin panel
 
-### Step 8: Optional Configuration
+### Step 9: Optional Configuration
 
 These are nice-to-have but not required for the app to function:
 
 | Setting | Where | Purpose |
 |---------|-------|---------|
-| OpenAI API Key | Settings > Environment Variables | AI-powered email personalization |
-| Inngest Keys | Settings > Environment Variables | Event-driven email delivery (cloud mode) |
+| OpenAI API Key | Settings > Environment Variables | AI-powered email personalization, strategy builder |
+| Inngest Keys | Settings > Environment Variables | Event-driven background job delivery (cloud mode) |
 | Competition Settings | Settings > Competitions | Default rules, durations, prize structures |
 | Risk Management | Settings > Trading | Max leverage, margin requirements |
 | Currency Settings | Settings > General | Display currency (EUR, USD, etc.) |
+
+> See `deploy/env.example` for the full reference of all 50+ environment variables with descriptions, warnings, and defaults.
 
 ### Step 9: Final Verification
 
@@ -685,6 +731,31 @@ free -m            # Memory usage
 
 ---
 
+---
+
+## Environment Variable Reference
+
+See **`deploy/env.example`** for the complete, annotated reference of every environment variable the application uses.
+
+Quick summary of the most important ones:
+
+| Variable | Required | Multi-server | Purpose |
+|---|---|---|---|
+| `MONGODB_URI` | ✅ | Match | Database connection |
+| `BETTER_AUTH_SECRET` | ✅ | Match | User session JWT signing |
+| `ADMIN_JWT_SECRET` | ✅ | Match | Admin panel JWT signing |
+| `INTERNAL_API_SECRET` | ✅ | Match | Internal service calls |
+| `INTERNAL_API_KEY` | ✅ | Match | Internal admin API protection |
+| `NEXT_PUBLIC_BASE_URL` | ✅ | Per-domain | App public URL |
+| `WEBSOCKET_INTERNAL_URL` | ✅ | Per-server | WS server internal URL |
+| `MASSIVE_API_KEY` | ⚠️ | Same | Trading data (charts) |
+| `NODEMAILER_EMAIL` | ⚠️ | Same | Outbound email |
+| `VERIFF_API_SECRET` | ⚠️ | **Match** | KYC webhook verification |
+| `STRIPE_WEBHOOK_SECRET` | ⚠️ | **Match** | Payment webhook verification |
+| `OPENAI_API_KEY` | Optional | Same | AI features |
+
+---
+
 ## Troubleshooting
 
 ### App Not Starting
@@ -741,6 +812,40 @@ sudo certbot certificates              # Check certificate status
 sudo certbot renew --dry-run           # Test auto-renewal
 sudo certbot --nginx -d yourdomain.com # Re-run certbot if needed
 ```
+
+### KYC / Veriff: "Signature does not match" (error 1819)
+
+This happens when the `VERIFF_API_SECRET` used to sign/verify requests doesn't match what Veriff expects.
+
+```bash
+# Check what value the running app is using:
+grep VERIFF /var/www/chartvolt/.env
+
+# If blank, the app reads from MongoDB (Admin Panel setting) — this is fine.
+# If set, it OVERRIDES the Admin Panel. Make sure it matches exactly (no trailing space/newline).
+
+# Verify the secret is loaded correctly:
+node -e "require('dotenv').config(); console.log('SECRET:', JSON.stringify(process.env.VERIFF_API_SECRET))"
+
+# After editing .env, you MUST rebuild (not just restart):
+npm run build
+pm2 restart chartvolt-web
+```
+
+**Root causes:**
+- `.env` on Server 2 has a wrong/blank override that doesn't match what Veriff registered
+- Trailing whitespace or newline in the secret value
+- Secret in `.env` doesn't match the secret configured in Veriff portal
+
+**Fix:** Either set the correct secret in `.env` on ALL servers, or remove it from `.env` on all servers and manage it only via Admin Panel > Settings > KYC.
+
+### Internal API calls returning 401/403
+
+Check `INTERNAL_API_SECRET` and `INTERNAL_API_KEY` are identical across all servers:
+```bash
+grep -E "INTERNAL_API" /var/www/chartvolt/.env
+```
+These are auto-generated per server by `setup-new-customer.sh`. On secondary servers, copy the primary's values.
 
 ### WebSocket Not Connecting
 
@@ -838,25 +943,42 @@ The script will ask for: domain, MongoDB URI, admin credentials, and the primary
 
 **Step 3b: Copy Shared Secrets from Primary (CRITICAL)**
 
-Both servers **MUST** share the same JWT secrets. Otherwise, users logged in via one server will get authentication errors when Cloudflare routes them to the other server (because each server signs tokens with its own secret, and the other server can't verify them).
+The following variables **MUST be identical on every server** in your fleet. If they differ, you will see authentication failures, KYC signature errors, internal API rejections, and other hard-to-debug issues.
 
-On the **primary server**, get the secrets:
+On the **primary server**, print all shared secrets:
 
 ```bash
-grep -E "AUTH_SECRET|ADMIN_JWT_SECRET" /var/www/chartvolt/.env
+grep -E "BETTER_AUTH_SECRET|ADMIN_JWT_SECRET|INTERNAL_API_SECRET|INTERNAL_API_KEY|MONGODB_URI|VERIFF_API_KEY|VERIFF_API_SECRET|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|NUVEI_MERCHANT_ID|NUVEI_SECRET_KEY|PADDLE_API_KEY" /var/www/chartvolt/.env
 ```
 
-On the **secondary server**, replace the auto-generated values with the primary's:
+On the **secondary server**, open `.env` and paste the values from above:
 
 ```bash
 nano /var/www/chartvolt/.env
-# Replace AUTH_SECRET=... with the primary's value
-# Replace ADMIN_JWT_SECRET=... with the primary's value
-# Save and restart:
+# Replace each value with the primary's matching value.
+# Then rebuild and restart:
+npm run build && npm run build:admin
 pm2 restart all
 ```
 
-> **Why?** When a user logs in on Server A, their browser gets a JWT signed with Server A's secret. If the next request goes to Server B (via Cloudflare), Server B must use the SAME secret to verify that token. Different secrets = `ERR_JWS_SIGNATURE_VERIFICATION_FAILED` = user appears logged out.
+**Why each one must match:**
+
+| Variable | Why it must match |
+|---|---|
+| `BETTER_AUTH_SECRET` | JWT signing key — sessions from Server A verified on Server B |
+| `ADMIN_JWT_SECRET` | Admin panel auth — same reason |
+| `INTERNAL_API_SECRET` | Service-to-service calls between apps |
+| `INTERNAL_API_KEY` | Same — internal admin/worker API calls |
+| `MONGODB_URI` | Must point to the same Atlas cluster |
+| `VERIFF_API_SECRET` | Webhook HMAC — Veriff sends ONE secret, all servers must verify with the same value |
+| `VERIFF_API_KEY` | Session creation — must use same key |
+| `STRIPE_SECRET_KEY` | Payment processing consistency |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification |
+| `NUVEI_SECRET_KEY` | Same for Nuvei |
+
+> **Real example:** After deploying a second server, if `VERIFF_API_SECRET` in .env is blank on Server 2, the code falls back to the DB value — which is fine. But if it's set to a **different** value, it overrides the DB and signatures will never match → `Signature does not match the HMAC-SHA256` error (code 1819).
+
+> **Rule of thumb:** Any secret shared with a third-party (Veriff, Stripe, etc.) that is stored in `.env` must be the same on every server. Safest approach: store these only in Admin Panel DB settings and leave them blank in `.env` on all servers.
 
 **Step 4: Install Cloudflare Origin SSL Certificate**
 

@@ -194,6 +194,8 @@ fi
 # Generate secrets
 BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 ADMIN_JWT_SECRET=$(openssl rand -hex 32)
+INTERNAL_API_SECRET=$(openssl rand -hex 32)
+INTERNAL_API_KEY=$(openssl rand -hex 32)
 
 # ============================================
 # STEP 1: SERVER SETUP
@@ -359,12 +361,19 @@ cat > /var/www/chartvolt/.env << ENVEOF
 # Generated: $(date)
 # Domain: ${DOMAIN}
 # Server Role: $(if [ "$IS_SECONDARY" = true ]; then echo "SECONDARY"; else echo "PRIMARY"; fi)
+#
+# IMPORTANT FOR MULTI-SERVER DEPLOYMENTS:
+# Variables marked [MUST MATCH PRIMARY] must be
+# identical on every server in your fleet.
+# Copy them from the primary server's .env.
 # ============================================
 
-# Node Environment
+# ─────────────────────────────────────────────
+# CORE (required for the app to start)
+# ─────────────────────────────────────────────
 NODE_ENV=production
 
-# Server Identity (for fleet management)
+# Server Identity
 SERVER_ID=${SERVER_ID}
 IS_PRIMARY=${SERVER_ROLE}
 
@@ -373,25 +382,130 @@ NEXT_PUBLIC_BASE_URL=https://${DOMAIN}
 NEXT_PUBLIC_APP_URL=https://${DOMAIN}
 ADMIN_URL=https://${ADMIN_DOMAIN}
 
-# MongoDB
+# MongoDB  [MUST MATCH PRIMARY]
 MONGODB_URI=${MONGODB_URI}
 
-# Authentication
+# Authentication  [MUST MATCH PRIMARY]
 BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
 BETTER_AUTH_URL=https://${DOMAIN}
 
-# Admin Panel
+# Admin Panel  [MUST MATCH PRIMARY]
 ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
 
-# API Server
-API_PORT=4000
+# Internal service-to-service security  [MUST MATCH PRIMARY]
+INTERNAL_API_SECRET=${INTERNAL_API_SECRET}
+INTERNAL_API_KEY=${INTERNAL_API_KEY}
 
-# WebSocket Server
+# Ports
+API_PORT=4000
 WEBSOCKET_PORT=3003
 NEXT_PUBLIC_WEBSOCKET_URL=wss://${DOMAIN}/ws
 WEBSOCKET_INTERNAL_URL=http://localhost:3003
+
+# ─────────────────────────────────────────────
+# REDIS
+# Primary server: Redis runs locally — leave defaults.
+# Secondary server: fill in primary server's values.
+# ─────────────────────────────────────────────
+REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+REDIS_PORT=${REDIS_PORT:-6379}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+# REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-127.0.0.1}:${REDIS_PORT:-6379}
+
+# ─────────────────────────────────────────────
+# TRADING DATA — Massive.com API
+# Get keys at https://massive.com
+# Set here OR in Admin Panel > Settings > Environment Variables
+# If set here, takes priority over admin panel value.
+# ─────────────────────────────────────────────
+# MASSIVE_API_KEY=                    # Server-side key (historical data, candles)
+# NEXT_PUBLIC_MASSIVE_API_KEY=        # Client-side key (WebSocket price streaming)
+
+# ─────────────────────────────────────────────
+# EMAIL — Nodemailer
+# Use a Gmail address + App Password (not regular password).
+# Get App Password: myaccount.google.com > Security > App Passwords
+# Set here OR in Admin Panel > Settings > Environment Variables
+# ─────────────────────────────────────────────
+# NODEMAILER_EMAIL=noreply@yourdomain.com
+# NODEMAILER_PASSWORD=your-gmail-app-password
+
+# ─────────────────────────────────────────────
+# KYC — Veriff  [MUST MATCH PRIMARY]
+# Get keys at https://portal.veriff.com
+# Set here OR in Admin Panel > Settings > KYC
+# WARNING: If set here, this value OVERRIDES the admin panel.
+# On multi-server setups, all servers MUST have the same value.
+# ─────────────────────────────────────────────
+# VERIFF_API_KEY=
+# VERIFF_API_SECRET=
+# VERIFF_BASE_URL=https://stationapi.veriff.com
+# VERIFF_CALLBACK_URL=https://${DOMAIN}/kyc/callback
+
+# ─────────────────────────────────────────────
+# AI — OpenAI
+# Set here OR in Admin Panel > Settings > Environment Variables
+# ─────────────────────────────────────────────
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini
+# OPENAI_ENABLED=true
+# OPENAI_FOR_EMAILS=false
+
+# ─────────────────────────────────────────────
+# PAYMENTS — Stripe  [MUST MATCH PRIMARY]
+# Get keys at https://dashboard.stripe.com
+# Set here OR in Admin Panel > Settings > Payment Providers
+# ─────────────────────────────────────────────
+# STRIPE_SECRET_KEY=sk_live_...
+# STRIPE_PUBLISHABLE_KEY=pk_live_...
+# STRIPE_WEBHOOK_SECRET=whsec_...
+
+# ─────────────────────────────────────────────
+# PAYMENTS — Nuvei  [MUST MATCH PRIMARY]
+# ─────────────────────────────────────────────
+# NUVEI_MERCHANT_ID=
+# NUVEI_SITE_ID=
+# NUVEI_SECRET_KEY=
+# NUVEI_TEST_MODE=false
+# NUVEI_DMN_URL=https://${DOMAIN}/api/nuvei/webhook
+# NUVEI_SUCCESS_URL=https://${DOMAIN}/payment/success
+# NUVEI_PENDING_URL=https://${DOMAIN}/payment/pending
+# NUVEI_BACK_URL=https://${DOMAIN}/payment
+# NUVEI_FAILURE_URL=https://${DOMAIN}/payment/failed
+
+# ─────────────────────────────────────────────
+# PAYMENTS — Paddle (alternative)  [MUST MATCH PRIMARY]
+# ─────────────────────────────────────────────
+# PADDLE_VENDOR_ID=
+# PADDLE_API_KEY=
+# PADDLE_PUBLIC_KEY=
+# PADDLE_WEBHOOK_SECRET=
+# PADDLE_ENVIRONMENT=production
+# PADDLE_PRODUCT_ID=
+
+# ─────────────────────────────────────────────
+# BACKGROUND JOBS — Inngest (optional)
+# Leave blank to run jobs locally (in-process).
+# Set keys to use Inngest Cloud for reliable delivery.
+# ─────────────────────────────────────────────
+# INNGEST_EVENT_KEY=
+# INNGEST_SIGNING_KEY=
+
+# ─────────────────────────────────────────────
+# PERFORMANCE TUNING (optional)
+# ─────────────────────────────────────────────
+# WEB_INSTANCES=1           # Number of web app instances (cluster mode)
+# ADMIN_HEAP_MB=512         # Admin app Node.js heap size in MB
+# PM2_ADMIN_APP_NAME=chartvolt-admin
+# MONGODB_STORAGE_LIMIT_MB= # Alert threshold for MongoDB storage
+
+# ─────────────────────────────────────────────
+# SIMULATOR (development/testing only)
+# ─────────────────────────────────────────────
+# ENABLE_SIMULATOR=false
+# SIMULATOR_TEST_PASSWORD=SimTest123!
 ENVEOF
 
 print_success ".env file generated"
@@ -585,12 +699,14 @@ echo "  Redis Host:      ${REDIS_HOST:-127.0.0.1}"
 echo "  Redis Port:      ${REDIS_PORT:-6379}"
 echo "  Redis Password:  ${REDIS_PASSWORD}"
 echo ""
-echo "  Auth Secret:     ${BETTER_AUTH_SECRET}"
-echo "  Admin JWT:       ${ADMIN_JWT_SECRET}"
-echo ""
-echo "============================================================"
-echo ""
-echo "NEXT STEPS:"
+  echo "  Auth Secret:     ${BETTER_AUTH_SECRET}"
+  echo "  Admin JWT:       ${ADMIN_JWT_SECRET}"
+  echo "  Internal Secret: ${INTERNAL_API_SECRET}"
+  echo "  Internal Key:    ${INTERNAL_API_KEY}"
+  echo ""
+  echo "============================================================"
+  echo ""
+  echo "NEXT STEPS:"
 echo ""
 if [ "$IS_SECONDARY" = true ]; then
 echo "  1. Add this server's IP to Cloudflare origin pool"
