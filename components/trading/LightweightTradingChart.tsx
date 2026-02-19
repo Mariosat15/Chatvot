@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import AdvancedIndicatorManager, {
   CustomIndicator,
+  INDICATOR_COMPONENT_CONFIG,
 } from "./AdvancedIndicatorManager";
 import ChartToolbar from "./ChartToolbar";
 import { useChartDrawings } from "@/hooks/useChartDrawings";
@@ -525,17 +526,30 @@ const LightweightTradingChart = ({
     // Convert arsenal indicators to chart CustomIndicator format
     const chartIndicators: CustomIndicator[] = arsenalIndicators
       .filter((ai) => ai.enabled)
-      .map((ai) => ({
-        id: ai.id,
-        type: ai.type,
-        name: ai.itemName,
-        displayType: ai.displayType,
-        enabled: ai.enabled,
-        color: ai.color || "#3b82f6",
-        lineWidth: ai.lineWidth || 2,
-        lineStyle: 0,
-        parameters: ai.parameters || { period: 20 },
-      }));
+      .map((ai) => {
+        // Initialize per-component colors and visibility from config defaults
+        // so that color/style changes in the settings panel are reflected on the chart
+        const cfg = INDICATOR_COMPONENT_CONFIG[ai.type];
+        const componentColors = cfg
+          ? Object.fromEntries(cfg.colors.map((c) => [c.key, c.default]))
+          : {};
+        const componentVisibility = cfg
+          ? Object.fromEntries(cfg.visibility.map((v) => [v.key, true]))
+          : {};
+        return {
+          id: ai.id,
+          type: ai.type,
+          name: ai.itemName,
+          displayType: ai.displayType,
+          enabled: ai.enabled,
+          color: ai.color || "#3b82f6",
+          lineWidth: ai.lineWidth || 2,
+          lineStyle: 0,
+          parameters: ai.parameters || { period: 20 },
+          componentColors,
+          componentVisibility,
+        };
+      });
 
     // Merge with existing indicators (keep user-added ones, replace arsenal ones)
     setIndicators((prev) => {
@@ -778,14 +792,12 @@ const LightweightTradingChart = ({
   // Helper function to convert hex color to rgba with opacity
   const hexToRgba = (hex: string, opacity: number = 100): string => {
     // Handle cases where hex might not start with #
-    const cleanHex = hex.startsWith("#") ? hex : `#${hex}`;
-    const r = parseInt(cleanHex.slice(1, 3), 16);
-    const g = parseInt(cleanHex.slice(3, 5), 16);
-    const b = parseInt(cleanHex.slice(5, 7), 16);
-    const alpha = opacity / 100;
-    const result = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    log(`🎨 hexToRgba: ${hex} @ ${opacity}% → ${result}`);
-    return result;
+    const cleanHex = hex && hex.startsWith("#") ? hex : `#${hex || "3b82f6"}`;
+    const r = parseInt(cleanHex.slice(1, 3), 16) || 0;
+    const g = parseInt(cleanHex.slice(3, 5), 16) || 0;
+    const b = parseInt(cleanHex.slice(5, 7), 16) || 0;
+    const alpha = Math.max(0, Math.min(1, opacity / 100));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
   // Helper function to apply offset to data
@@ -908,6 +920,7 @@ const LightweightTradingChart = ({
     log("✅ Processing", enabledIndicators.length, "enabled indicators");
 
     enabledIndicators.forEach((indicator) => {
+      try {
       log(`📈 Adding indicator: ${indicator.type} - ${indicator.name}`);
       log("   Settings:", {
         priceSource: indicator.priceSource || "close",
@@ -4173,6 +4186,7 @@ const LightweightTradingChart = ({
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = hpeData[hpeData.length - 1];
+                    if (!last) return;
                     if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_hpeEnvC, 40) } as any);
                     if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.phaseLine, color: hexToRgba(_hpeCoreC, 100) } as any);
                     if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_hpeEnvC, 40) } as any);
@@ -4194,6 +4208,7 @@ const LightweightTradingChart = ({
                     if (!s) return;
                     if (mode === "light") {
                       const last = pwcData[pwcData.length - 1];
+                      if (!last) return;
                       const c = idx === 3
                         ? (last.trendDir === "bull" ? "#00e676" : last.trendDir === "bear" ? "#f44336" : "#e040fb")
                         : hexToRgba(pwcColors[idx], last.alignment > 60 ? 90 : last.alignment > 30 ? 60 : 35);
@@ -4220,6 +4235,7 @@ const LightweightTradingChart = ({
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = mdsData[mdsData.length - 1];
+                    if (!last) return;
                     if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_mdsCorrC, 35) } as any);
                     if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.trendLine, color: hexToRgba(_mdsTrendC, 100) } as any);
                     if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_mdsCorrC, 35) } as any);
@@ -4241,6 +4257,7 @@ const LightweightTradingChart = ({
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = qdmData[qdmData.length - 1];
+                    if (!last) return;
                     if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_qdmCorrC, 40) } as any);
                     if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.driftLine, color: hexToRgba(_qdmDriftC, 100) } as any);
                     if (lS) lS.update({ time: last.time as UTCTimestamp, value: last.lower, color: hexToRgba(_qdmCorrC, 40) } as any);
@@ -4262,6 +4279,7 @@ const LightweightTradingChart = ({
                   const lS = _ovlSeriesMap.get(`${_ovlId}_lower`);
                   if (mode === "light") {
                     const last = sgaData[sgaData.length - 1];
+                    if (!last) return;
                     const vOp = last.velocityNorm > 0.7 ? 100 : last.velocityNorm > 0.4 ? 80 : 60;
                     if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upper, color: hexToRgba(_sgaArcsC, last.velocityNorm > 0.7 ? 65 : 40) } as any);
                     if (cS) cS.update({ time: last.time as UTCTimestamp, value: last.center, color: hexToRgba(_sgaCenterC, vOp) } as any);
@@ -4288,6 +4306,7 @@ const LightweightTradingChart = ({
                   const sarS = _ovlSeriesMap.get(`${_ovlId}_sar`);
                   if (mode === "light") {
                     const last = steData[steData.length - 1];
+                    if (!last) return;
                     const cOp = last.adxStrength >= thr * 1.5 ? 100 : last.adxStrength >= thr ? 80 : 55;
                     if (corS) corS.update({ time: last.time as UTCTimestamp, value: last.solarCore, color: hexToRgba(_steCoreC, cOp) } as any);
                     if (uS) uS.update({ time: last.time as UTCTimestamp, value: last.upperBand, color: hexToRgba(_steUpperC, last.trend === "bull" ? 35 : 65) } as any);
@@ -4316,6 +4335,7 @@ const LightweightTradingChart = ({
                   const olS = _ovlSeriesMap.get(`${_ovlId}_outerLo`);
                   if (mode === "light") {
                     const last = scrData[scrData.length - 1];
+                    if (!last) return;
                     const cOp = last.confluenceScore >= thr2 * 1.1 ? 100 : last.confluenceScore >= thr2 ? 75 : 45;
                     if (coreS) coreS.update({ time: last.time as UTCTimestamp, value: last.coreBlend, color: hexToRgba(_scrCoreC, cOp) } as any);
                     if (iuS) iuS.update({ time: last.time as UTCTimestamp, value: last.upperRibbon, color: hexToRgba(_scrInnerC, last.trend !== "neutral" ? 60 : 35) } as any);
@@ -4345,6 +4365,7 @@ const LightweightTradingChart = ({
                   const sigS = _ovlSeriesMap.get(`${_ovlId}_sig`);
                   if (mode === "light") {
                     const last = nrfData[nrfData.length - 1];
+                    if (!last) return;
                     if (echoS) echoS.update({ time: last.time as UTCTimestamp, value: last.echoLine, color: hexToRgba(_nrfEchoC, nrfOp(last)) } as any);
                     if (refS) refS.update({ time: last.time as UTCTimestamp, value: last.priceRef } as any);
                     if (sigS) sigS.update({ time: last.time as UTCTimestamp, value: last.signalLine } as any);
@@ -4370,6 +4391,7 @@ const LightweightTradingChart = ({
                   const d2hS = _ovlSeriesMap.get(`${_ovlId}_dem2hi`); const d2lS = _ovlSeriesMap.get(`${_ovlId}_dem2lo`);
                   if (mode === "light") {
                     const last = kpzData[kpzData.length - 1];
+                    if (!last) return;
                     if (spineS) spineS.update({ time: last.time as UTCTimestamp, value: last.kineticSpine, color: hexToRgba(_kpzSpineC, kpzSOp(last.regime)) } as any);
                     if (last.sup1Active) { if (s1hS) s1hS.update({ time: last.time as UTCTimestamp, value: last.sup1High } as any); if (s1lS) s1lS.update({ time: last.time as UTCTimestamp, value: last.sup1Low } as any); }
                     if (last.sup2Active) { if (s2hS) s2hS.update({ time: last.time as UTCTimestamp, value: last.sup2High } as any); if (s2lS) s2lS.update({ time: last.time as UTCTimestamp, value: last.sup2Low } as any); }
@@ -5195,6 +5217,9 @@ const LightweightTradingChart = ({
         if (isNewChart) {
           oscChart.timeScale().fitContent();
         }
+      }
+      } catch (indicatorErr) {
+        console.warn(`[updateIndicators] Error rendering indicator "${indicator.type}" (${indicator.id}):`, indicatorErr);
       }
     });
 
