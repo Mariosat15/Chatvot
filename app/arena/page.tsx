@@ -163,120 +163,156 @@ function Av({ u, img, sz = 36, ring }: { u: string; img: string | null; sz?: num
 
 // ─── Racer Row ────────────────────────────────────────────────────────────────
 
+const MEDAL = ['🥇', '🥈', '🥉'];
+const RANK_BG = [
+  'linear-gradient(180deg,rgba(255,215,0,.22) 0%,rgba(180,140,0,.12) 100%)',
+  'linear-gradient(180deg,rgba(192,192,192,.16) 0%,rgba(130,130,130,.08) 100%)',
+  'linear-gradient(180deg,rgba(205,127,50,.16) 0%,rgba(140,80,20,.08) 100%)',
+];
+const ROW_BG = [
+  'linear-gradient(100deg,rgba(255,215,0,.09) 0%,rgba(255,215,0,.03) 35%,rgba(6,6,18,.98) 100%)',
+  'linear-gradient(100deg,rgba(192,192,192,.06) 0%,rgba(192,192,192,.02) 35%,rgba(6,6,18,.98) 100%)',
+  'linear-gradient(100deg,rgba(205,127,50,.06) 0%,rgba(205,127,50,.02) 35%,rgba(6,6,18,.98) 100%)',
+];
+
 function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: number; onClick: () => void }) {
   const rm       = ev.rankingMethod || 'pnl';
   const prog     = calcRaceProgress(p, rm, ev.participants);
-  const noTrades = p.totalTrades === 0 && !p.isDisqualified;
-  const isLeader = idx === 0 && !noTrades && !p.isDisqualified;
-  const rkColor  = idx < 3 ? RANK_COLORS[idx] : '#44485a';
-  const barFill  = noTrades ? 'rgba(255,255,255,.04)' : (BAR_FILLS[idx] || BAR_FILLS[BAR_FILLS.length - 1]);
-  const pnlColor = p.livePnl >= 0 ? '#00e676' : '#ff1744';
+  const isLeader = idx === 0;
+  const rkColor  = idx < 3 ? RANK_COLORS[idx] : (idx < 7 ? '#00f5ff' : '#44485a');
+  const barFill  = BAR_FILLS[idx] || BAR_FILLS[BAR_FILLS.length - 1];
+  const pnlPos   = p.livePnl >= 0;
 
   return (
     <div
       onClick={onClick}
       className="rcrow"
       style={{
-        display: 'grid', gridTemplateColumns: '38px 195px 1fr 145px',
-        alignItems: 'center', gap: 10, height: 66, borderRadius: 11, padding: '0 14px',
-        background: noTrades ? 'rgba(5,5,15,.4)'
-          : idx === 0 ? 'linear-gradient(90deg,rgba(255,215,0,.07),rgba(6,6,18,0) 60%)'
-          : idx === 1 ? 'linear-gradient(90deg,rgba(192,192,192,.04),rgba(6,6,18,0) 60%)'
-          : idx === 2 ? 'linear-gradient(90deg,rgba(205,127,50,.04),rgba(6,6,18,0) 60%)'
-          : 'rgba(10,10,28,.7)',
-        border: `1px solid ${idx < 3 ? RANK_COLORS[idx] + '2a' : 'rgba(255,255,255,.05)'}`,
-        boxShadow: isLeader ? `0 0 32px ${RANK_GLOW[0]}, inset 0 1px 0 rgba(255,215,0,.07)`
-          : idx < 3 ? `0 0 16px ${RANK_GLOW[idx]}` : 'none',
-        opacity: p.isDisqualified ? 0.28 : noTrades ? 0.55 : 1,
-        cursor: 'pointer', transition: 'transform .15s ease', position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'stretch', height: 84, borderRadius: 12, overflow: 'hidden',
+        background: idx < 3 ? ROW_BG[idx] : idx < 7 ? 'linear-gradient(100deg,rgba(0,245,255,.04),rgba(6,6,18,.98) 50%)' : 'rgba(8,8,22,.85)',
+        border: `1px solid ${idx < 3 ? RANK_COLORS[idx] + '40' : idx < 7 ? 'rgba(0,245,255,.12)' : 'rgba(255,255,255,.05)'}`,
+        boxShadow: isLeader ? `0 4px 40px ${RANK_GLOW[0]}, 0 0 0 1px rgba(255,215,0,.1), inset 0 1px 0 rgba(255,215,0,.1)`
+          : idx < 3 ? `0 2px 20px ${RANK_GLOW[idx]}`
+          : idx < 7 ? '0 1px 8px rgba(0,245,255,.05)' : 'none',
+        cursor: 'pointer', transition: 'transform .15s ease, box-shadow .15s ease',
+        position: 'relative',
       }}
     >
-      {/* Rank */}
-      <div style={{
-        fontFamily: "'Orbitron',sans-serif", fontSize: 17, fontWeight: 900, textAlign: 'center',
-        color: rkColor, textShadow: idx < 3 ? `0 0 18px ${RANK_COLORS[idx]}99` : 'none',
-      }}>{p.rank}</div>
+      {/* Leader glow sweep */}
+      {isLeader && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+          background: 'linear-gradient(100deg,transparent 30%,rgba(255,215,0,.04) 60%,transparent 90%)',
+          animation: 'shim 3.2s linear infinite',
+        }} />
+      )}
 
-      {/* Avatar + name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+      {/* ── Rank badge column ── */}
+      <div style={{
+        width: 58, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 3,
+        background: idx < 3 ? RANK_BG[idx] : 'rgba(255,255,255,.015)',
+        borderRight: `1px solid ${idx < 3 ? RANK_COLORS[idx] + '30' : 'rgba(255,255,255,.04)'}`,
+        position: 'relative', zIndex: 1,
+      }}>
+        {idx < 3 ? (
+          <>
+            <div style={{ fontSize: 20, filter: `drop-shadow(0 0 8px ${RANK_COLORS[idx]})` }}>{MEDAL[idx]}</div>
+            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700, color: RANK_COLORS[idx], letterSpacing: 1 }}>#{p.rank}</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 18, fontWeight: 900, color: rkColor, textShadow: idx < 7 ? '0 0 12px rgba(0,245,255,.4)' : 'none', lineHeight: 1 }}>{p.rank}</div>
+            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 6, fontWeight: 600, color: '#2a2a45', letterSpacing: 2, textTransform: 'uppercase' }}>RANK</div>
+          </>
+        )}
+      </div>
+
+      {/* ── Avatar + name column ── */}
+      <div style={{
+        width: 200, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+        padding: '0 12px', overflow: 'hidden', position: 'relative', zIndex: 1,
+      }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           {isLeader && (
-            <div style={{
-              position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)',
-              fontSize: 13, filter: 'drop-shadow(0 0 5px gold)', zIndex: 10,
-            }}>👑</div>
+            <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', fontSize: 14, filter: 'drop-shadow(0 0 6px gold)', zIndex: 5 }}>👑</div>
           )}
-          <Av u={p.username} img={p.profileImage} sz={42} ring={idx < 3 ? RANK_COLORS[idx] : undefined} />
+          <Av u={p.username} img={p.profileImage} sz={46} ring={idx < 3 ? RANK_COLORS[idx] : idx < 7 ? '#00f5ff55' : undefined} />
+          {(p.currentOpenPositions || 0) > 0 && (
+            <div style={{
+              position: 'absolute', bottom: -2, right: -2, width: 14, height: 14, borderRadius: '50%',
+              background: '#ff6d00', border: '2px solid #060612', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 900, color: '#fff',
+            }}>{p.currentOpenPositions}</div>
+          )}
         </div>
         <div style={{ overflow: 'hidden' }}>
           <div style={{
-            fontFamily: "'Rajdhani',sans-serif", fontSize: 15, fontWeight: 700,
-            color: noTrades ? '#3a3a55' : '#eef0f6',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            fontFamily: "'Rajdhani',sans-serif", fontSize: 14, fontWeight: 700, color: '#eef0f6',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2,
           }}>{p.username}</div>
           <div style={{
-            fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2,
-            color: p.isDisqualified ? '#ff1744aa' : noTrades ? '#2a2a45' : '#44485a',
+            fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 3,
+            color: '#44485a', display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            {p.isDisqualified ? '⚡ LIQUIDATED'
-              : noTrades ? '── AWAITING FIRST TRADE'
-              : `${p.totalTrades} trade${p.totalTrades !== 1 ? 's' : ''}${p.currentOpenPositions > 0 ? ` · ${p.currentOpenPositions} open` : ''}`}
+            <span style={{ color: isLeader ? '#ffd700aa' : '#2a2a45' }}>●</span>
+            {p.totalTrades} trade{p.totalTrades !== 1 ? 's' : ''}
+            {p.currentOpenPositions > 0 && <span style={{ color: '#ff6d00aa' }}>· {p.currentOpenPositions} OPEN</span>}
           </div>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div style={{
-        position: 'relative', height: 30,
-        background: 'rgba(255,255,255,.025)', borderRadius: 15, overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,.035)',
-      }}>
-        <div style={{
-          position: 'absolute', top: 1, bottom: 1, left: 1, borderRadius: 14,
-          width: `${prog}%`, background: barFill, minWidth: 36,
-          transition: 'width 1.8s cubic-bezier(.4,0,.2,1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 36,
-        }}>
-          {!noTrades && (
+      {/* ── Progress bar column ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 14px', position: 'relative', zIndex: 1 }}>
+        <div style={{ flex: 1, position: 'relative', height: 36, background: 'rgba(255,255,255,.022)', borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,.04)' }}>
+          <div style={{
+            position: 'absolute', top: 1.5, bottom: 1.5, left: 1.5, borderRadius: 16,
+            width: `calc(${prog}% - 3px)`, background: barFill, minWidth: 40,
+            transition: 'width 2s cubic-bezier(.4,0,.2,1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 38,
+          }}>
             <span style={{
               fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700,
-              color: 'rgba(255,255,255,.88)', textShadow: '0 1px 4px rgba(0,0,0,.95)',
+              color: 'rgba(255,255,255,.9)', textShadow: '0 1px 4px rgba(0,0,0,.95)',
               whiteSpace: 'nowrap', position: 'relative', zIndex: 3,
             }}>{raceLabel(p, rm)}</span>
-          )}
-          {!noTrades && (
             <div style={{
               position: 'absolute', right: -1, top: '50%', transform: 'translateY(-50%)',
-              width: 28, height: 28, borderRadius: '50%', overflow: 'hidden',
-              border: '2px solid rgba(255,255,255,.22)', boxShadow: '0 0 8px rgba(0,0,0,.7)', zIndex: 4,
+              width: 30, height: 30, borderRadius: '50%', overflow: 'hidden',
+              border: '2px solid rgba(255,255,255,.25)', boxShadow: '0 0 10px rgba(0,0,0,.8)', zIndex: 4,
             }}>
-              <Av u={p.username} img={p.profileImage} sz={28} />
+              <Av u={p.username} img={p.profileImage} sz={30} />
             </div>
+          </div>
+          {/* Shimmer on leader bar */}
+          {isLeader && (
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,transparent 30%,rgba(255,215,0,.1) 55%,transparent 80%)', animation: 'shim 2.4s linear infinite', pointerEvents: 'none', zIndex: 2 }} />
           )}
         </div>
-        {/* Leader shimmer */}
-        {isLeader && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(90deg,transparent 20%,rgba(255,215,0,.07) 50%,transparent 80%)',
-            animation: 'shim 2.6s linear infinite', pointerEvents: 'none', zIndex: 2,
-          }} />
-        )}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-        {/* Primary: Live Equity */}
-        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, fontWeight: 700, color: noTrades ? '#2a2a45' : '#00f5ff', textShadow: !noTrades ? '0 0 10px rgba(0,245,255,.35)' : 'none' }}>
-          {noTrades ? '—' : fmtC(p.liveEquity)}
-        </div>
-        {/* Secondary: PnL */}
-        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: noTrades ? '#2a2a45' : pnlColor, textShadow: (!noTrades && p.livePnl !== 0) ? `0 0 10px ${pnlColor}44` : 'none' }}>
-          {noTrades ? '—' : fmtPnl(p.livePnl)}
-        </div>
-        {/* Tertiary: ROI · WR */}
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: noTrades ? '#1e1e35' : '#8892a4', fontWeight: 600 }}>
-          {noTrades ? 'No trades yet' : `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(1)}% · ${p.winRate.toFixed(0)}% WR`}
+      {/* ── Stats column ── */}
+      <div style={{
+        width: 155, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px', gap: 2,
+        borderLeft: '1px solid rgba(255,255,255,.04)', position: 'relative', zIndex: 1,
+      }}>
+        {/* Equity */}
+        <div style={{
+          fontFamily: "'Orbitron',sans-serif", fontSize: 15, fontWeight: 700,
+          color: '#00f5ff', textShadow: '0 0 14px rgba(0,245,255,.4)', letterSpacing: .5,
+        }}>{fmtC(p.liveEquity)}</div>
+        {/* PnL */}
+        <div style={{
+          fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700,
+          color: pnlPos ? '#00e676' : '#ff1744',
+          textShadow: `0 0 10px ${pnlPos ? 'rgba(0,230,118,.4)' : 'rgba(255,23,68,.4)'}`,
+        }}>{fmtPnl(p.livePnl)}</div>
+        {/* ROI + WR */}
+        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: '#44485a', fontWeight: 600, letterSpacing: .5 }}>
+          {p.liveRoi >= 0 ? '+' : ''}{p.liveRoi.toFixed(1)}%
+          <span style={{ color: '#2a2a3a', margin: '0 3px' }}>·</span>
+          {p.winRate.toFixed(0)}% WR
         </div>
       </div>
     </div>
@@ -995,30 +1031,26 @@ export default function ArenaPage() {
                         <RacerRow key={p.userId} p={p} ev={curEv} idx={i} onClick={() => setSelTrader({ p, ev: curEv })} />
                       ))}
 
-                      {/* Waiting for first trade */}
+                      {/* Waiting for first trade — minimal, below main race */}
                       {waiting.length > 0 && (
-                        <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,.04)', paddingTop: 10 }}>
-                          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#22223a', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 7 }}>
-                            Awaiting First Trade ({waiting.length})
+                        <div style={{ marginTop: 16, borderTop: '1px dashed rgba(255,255,255,.04)', paddingTop: 8 }}>
+                          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#1e1e2e', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span>Awaiting Entry</span>
+                            <span style={{ background: 'rgba(255,255,255,.04)', borderRadius: 10, padding: '1px 7px', color: '#2a2a45' }}>{waiting.length}</span>
                           </div>
-                          {waiting.map(p => (
-                            <div key={p.userId} onClick={() => setSelTrader({ p, ev: curEv })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px', opacity: .35, cursor: 'pointer', borderRadius: 8 }}>
-                              <Av u={p.username} img={p.profileImage} sz={26} />
-                              <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: '#2a2a45', fontWeight: 600 }}>{p.username}</span>
-                              <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: '#1e1e35', marginLeft: 'auto' }}>NO TRADES</span>
-                            </div>
-                          ))}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {waiting.map(p => (
+                              <div key={p.userId} onClick={() => setSelTrader({ p, ev: curEv })}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', opacity: .28, cursor: 'pointer', borderRadius: 20, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.03)' }}>
+                                <Av u={p.username} img={p.profileImage} sz={20} />
+                                <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: '#2a2a45', fontWeight: 600 }}>{p.username}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
-                      {/* Disqualified / liquidated — always last */}
-                      {disqualified.length > 0 && (
-                        <div style={{ marginTop: 8 }}>
-                          {disqualified.map(p => (
-                            <RacerRow key={p.userId} p={p} ev={curEv} idx={99} onClick={() => setSelTrader({ p, ev: curEv })} />
-                          ))}
-                        </div>
-                      )}
+                      {/* Disqualified / liquidated — not shown in race track */}
                     </>
                   )}
                 </div>
