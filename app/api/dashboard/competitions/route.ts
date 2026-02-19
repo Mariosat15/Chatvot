@@ -525,7 +525,8 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          // 4-second CDN cache: concurrent viewers share one DB query per cycle
+          "Cache-Control": "public, s-maxage=4, stale-while-revalidate=1",
           "Access-Control-Allow-Origin": "*",
         },
       },

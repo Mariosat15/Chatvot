@@ -913,13 +913,26 @@ export default function ArenaPage() {
     }
   }, []);
 
-  // ── Polling ──
+  // ── Polling — always 5 s, paused when tab is hidden ──
   useEffect(() => {
     fetchD();
-    const ms = view === 'live' ? 5000 : 10000;
-    const iv = setInterval(fetchD, ms);
-    return () => clearInterval(iv);
-  }, [view, fetchD]);
+    let iv: ReturnType<typeof setInterval> | null = setInterval(fetchD, 5000);
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (iv) { clearInterval(iv); iv = null; }
+      } else {
+        fetchD(); // immediate refresh on tab focus
+        iv = setInterval(fetchD, 5000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (iv) clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [fetchD]);
 
   // ── Derived ──
   const filtered = useMemo(() => {
