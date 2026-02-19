@@ -2040,6 +2040,39 @@ const KINETIC_PRESSURE_ZONES: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const NOVA_RESONANCE_FIELD: Partial<IMarketplaceItem> = {
+  name: "Nova Resonance Field",
+  slug: "nova-resonance-field",
+  shortDescription:
+    "Six momentum oscillators (RSI, Stoch, CCI, Williams %R, Momentum, ROC) fused into a composite score that maps back to price space as a glowing echo line, with on-chart divergence detection.",
+  fullDescription: `# Nova Resonance Field (NRF)\n\n## Overview\n**Nova Resonance Field** maps six momentum oscillators back into price space as a **Resonance Echo Line** — floats above price in bullish momentum surges, below in bearish collapses.\n\n## The Echo Formula\nEcho = EMA(close) + ((ResonanceScore − 50) / 50) × ATR × Sensitivity\n\n## Signals\n- **🌟 NOVA BULL ▲**: All 6 engines crossing nova threshold → enter long\n- **🌟 NOVA BEAR ▼**: All 6 engines collapsing → enter short\n- **⚡ ECHO CROSS ▲/▼**: Echo Line crosses Signal Line → momentum acceleration\n- **💜 BULL DIV ◆**: Price at new low but momentum higher — hidden strength\n- **🟣 BEAR DIV ◆**: Price at new high but momentum lower — hidden weakness\n\n## Visual Guide\n- 🌟 Amber Echo: NOVA BULL (score ≥ 70)\n- 🟢 Green Echo: Building bull\n- 🔴 Crimson Echo: NOVA BEAR (score ≤ 30)\n- 🟠 Orange Echo: Building bear\n- ⚪ Silver Echo: Neutral\n- 💜 Violet Echo: Divergence detected\n\n## Risk Warning\nNo indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 62.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "nova_resonance_field",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "nova_resonance_field",
+    displayType: "overlay",
+    description: "Six-oscillator momentum composite mapped to price space as a resonance echo line with divergence detection",
+  }),
+  defaultSettings: {
+    period: 14,
+    sensitivity: 2.0,
+    signalPeriod: 9,
+    novaThreshold: 70,
+    divergenceLookback: 20,
+    color: "#ff9800",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["rsi", "stochastic", "cci", "williams", "momentum", "roc", "echo", "divergence", "resonance", "hybrid", "composite", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2065,6 +2098,7 @@ const ALL_ITEMS = [
   SOLARIS_TREND_ENGINE,
   STELLAR_CONFLUENCE_RIBBON,
   KINETIC_PRESSURE_ZONES,
+  NOVA_RESONANCE_FIELD,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -53,7 +53,8 @@ export type IndicatorType =
   | "sovereign_gravity_arc"
   | "solaris_trend_engine"
   | "stellar_confluence_ribbon"
-  | "kinetic_pressure_zones";
+  | "kinetic_pressure_zones"
+  | "nova_resonance_field";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -522,6 +523,8 @@ const INDICATOR_TYPE_MAP: Record<
   "stellar confluence ribbon": { type: "stellar_confluence_ribbon", displayType: "overlay" },
   kinetic_pressure_zones: { type: "kinetic_pressure_zones", displayType: "overlay" },
   "kinetic pressure zones": { type: "kinetic_pressure_zones", displayType: "overlay" },
+  nova_resonance_field: { type: "nova_resonance_field", displayType: "overlay" },
+  "nova resonance field": { type: "nova_resonance_field", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -895,6 +898,13 @@ export function marketplaceItemToIndicator(
       params.zoneWidthMult = settings?.zoneWidthMult || 1.2;
       params.oversoldLevel = settings?.oversoldLevel || 30;
       params.overboughtLevel = settings?.overboughtLevel || 70;
+      break;
+    case "nova_resonance_field":
+      params.period = settings?.period || 14;
+      params.sensitivity = settings?.sensitivity || 2.0;
+      params.signalPeriod = settings?.signalPeriod || 9;
+      params.novaThreshold = settings?.novaThreshold || 70;
+      params.divergenceLookback = settings?.divergenceLookback || 20;
       break;
     default:
       // Generic period-based indicators

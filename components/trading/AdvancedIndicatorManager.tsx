@@ -456,6 +456,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { period: 14, rocPeriod: 10, atrPeriod: 14, zoneWidthMult: 1.2, oversoldLevel: 30, overboughtLevel: 70 },
     paramLabels: { period: "MA Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", zoneWidthMult: "Zone Width Mult", oversoldLevel: "Oversold Level", overboughtLevel: "Overbought Level" },
   },
+  nova_resonance_field: {
+    name: "Nova Resonance Field",
+    shortName: "NRF",
+    displayType: "overlay" as const,
+    defaultParams: { period: 14, sensitivity: 2.0, signalPeriod: 9, novaThreshold: 70, divergenceLookback: 20 },
+    paramLabels: { period: "Period", sensitivity: "Echo Sensitivity", signalPeriod: "Signal Period", novaThreshold: "Nova Threshold", divergenceLookback: "Divergence Lookback" },
+  },
 };
 
 const DEFAULT_COLORS = [

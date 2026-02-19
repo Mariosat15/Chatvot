@@ -114,6 +114,7 @@ import {
   calculateSolarisTrendEngine,
   calculateStellarConfluenceRibbon,
   calculateKineticPressureZones,
+  calculateNovaResonanceField,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3442,6 +3443,65 @@ const LightweightTradingChart = ({
           indicatorSeriesRef.current.set(`${indicator.id}_dem2hi`, kpzDem2Hi);
           indicatorSeriesRef.current.set(`${indicator.id}_dem2lo`, kpzDem2Lo);
 
+        } else if (indicator.type === "nova_resonance_field") {
+          const p = indicator.parameters;
+          const nrfData = calculateNovaResonanceField(
+            transformedCandles,
+            p.period || 14, p.sensitivity || 2.0, p.signalPeriod || 9,
+            p.novaThreshold || 70, p.divergenceLookback || 20,
+          );
+
+          const nrfEchoColor = (d: typeof nrfData[0]): string => {
+            if (d.divergence !== "none") return "#aa00ff";
+            if (d.state === "nova_bull") return "#ff9800";
+            if (d.state === "echo_bull") return "#00e676";
+            if (d.state === "nova_bear") return "#ff1744";
+            if (d.state === "echo_bear") return "#ff6d00";
+            return "#90a4ae";
+          };
+
+          // Signal markers on the echo line
+          const nrfMarkers: any[] = [];
+          for (const d of nrfData) {
+            if (d.signal === "nova_bull") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#ff9800", shape: "arrowUp" as const, text: "🌟 NOVA BULL", size: 2 });
+            else if (d.signal === "nova_bear") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff1744", shape: "arrowDown" as const, text: "🌟 NOVA BEAR", size: 2 });
+            else if (d.signal === "echo_cross_up") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e5ff", shape: "arrowUp" as const, text: "⚡ ECHO ▲", size: 1 });
+            else if (d.signal === "echo_cross_down") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff6d00", shape: "arrowDown" as const, text: "⚡ ECHO ▼", size: 1 });
+            if (d.divergence === "bull_div") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#aa00ff", shape: "circle" as const, text: "💜 BULL DIV", size: 1 });
+            else if (d.divergence === "bear_div") nrfMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#7c4dff", shape: "circle" as const, text: "🟣 BEAR DIV", size: 1 });
+          }
+          const nrfSorted = nrfMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+
+          // ── Price Reference (thin dashed silver baseline) ─────────────────
+          const nrfRefSeries = chart.addLineSeries({
+            color: "#546e7a", lineWidth: 1 as any, lineStyle: 2 as any,
+            title: `${indicator.customLabel || "NRF"} Ref`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          nrfRefSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
+          indicatorSeriesRef.current.set(`${indicator.id}_ref`, nrfRefSeries);
+
+          // ── Signal Line (thin dotted EMA of echo) ────────────────────────
+          const nrfSigSeries = chart.addLineSeries({
+            color: "#78909c", lineWidth: 1 as any, lineStyle: 1 as any,
+            title: `${indicator.customLabel || "NRF"} Sig`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+            lastValueVisible: false,
+          });
+          nrfSigSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
+          indicatorSeriesRef.current.set(`${indicator.id}_sig`, nrfSigSeries);
+
+          // ── Echo Line (main thick colored resonance line) ─────────────────
+          const nrfEchoSeries = chart.addLineSeries({
+            color: "#ff9800", lineWidth: 2 as any, lineStyle: 0 as any,
+            title: indicator.customLabel || "Nova Resonance Field", priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+          });
+          nrfEchoSeries.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfEchoColor(d) })));
+          indicatorSeriesRef.current.set(`${indicator.id}_echo`, nrfEchoSeries);
+          try { nrfEchoSeries.setMarkers(nrfSorted); } catch {}
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -4112,6 +4172,34 @@ const LightweightTradingChart = ({
                     if (ilS) ilS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: bandBullC(d.trend) })));
                     if (ouS) ouS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: outerC(d.trend) })));
                     if (olS) olS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: outerC(d.trend) })));
+                  }
+                }
+              } else if (_ovlType === "nova_resonance_field") {
+                const nrfData = calculateNovaResonanceField(
+                  tc, p.period || 14, p.sensitivity || 2.0, p.signalPeriod || 9,
+                  p.novaThreshold || 70, p.divergenceLookback || 20,
+                );
+                if (nrfData.length > 0) {
+                  const nrfC = (d: typeof nrfData[0]) => {
+                    if (d.divergence !== "none") return "#aa00ff";
+                    if (d.state === "nova_bull") return "#ff9800";
+                    if (d.state === "echo_bull") return "#00e676";
+                    if (d.state === "nova_bear") return "#ff1744";
+                    if (d.state === "echo_bear") return "#ff6d00";
+                    return "#90a4ae";
+                  };
+                  const echoS = _ovlSeriesMap.get(`${_ovlId}_echo`);
+                  const refS = _ovlSeriesMap.get(`${_ovlId}_ref`);
+                  const sigS = _ovlSeriesMap.get(`${_ovlId}_sig`);
+                  if (mode === "light") {
+                    const last = nrfData[nrfData.length - 1];
+                    if (echoS) echoS.update({ time: last.time as UTCTimestamp, value: last.echoLine, color: nrfC(last) } as any);
+                    if (refS) refS.update({ time: last.time as UTCTimestamp, value: last.priceRef } as any);
+                    if (sigS) sigS.update({ time: last.time as UTCTimestamp, value: last.signalLine } as any);
+                  } else {
+                    if (echoS) echoS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: nrfC(d) })));
+                    if (refS) refS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
+                    if (sigS) sigS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
                   }
                 }
               } else if (_ovlType === "kinetic_pressure_zones") {

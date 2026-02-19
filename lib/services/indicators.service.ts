@@ -6158,3 +6158,204 @@ export function calculateKineticPressureZones(
 
   return result;
 }
+
+// ============================================================================
+// NOVA RESONANCE FIELD — 6-Oscillator Composite Momentum Echo in Price Space
+// RSI + Stoch + CCI + Williams %R + Momentum + ROC → echo line + divergence
+// ============================================================================
+
+export interface NovaResonanceFieldData {
+  time: number;
+  resonanceScore: number;  // 0-100 composite
+  echoLine: number;        // Momentum mapped back to price (floats above/below priceRef)
+  priceRef: number;        // EMA reference baseline
+  signalLine: number;      // EMA of echoLine (for cross signals)
+  fieldStrength: number;   // 0-1: distance between echo and priceRef / ATR
+  state: "nova_bull" | "nova_bear" | "echo_bull" | "echo_bear" | "neutral";
+  signal: "nova_bull" | "nova_bear" | "echo_cross_up" | "echo_cross_down" | "none";
+  divergence: "bull_div" | "bear_div" | "none";
+}
+
+export function calculateNovaResonanceField(
+  data: OHLCData[],
+  period: number = 14,
+  sensitivity: number = 2.0,
+  signalPeriod: number = 9,
+  novaThreshold: number = 70,
+  divergenceLookback: number = 20,
+): NovaResonanceFieldData[] {
+  const minBars = period * 3 + divergenceLookback + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. RSI ────────────────────────────────────────────────────────────────
+  const rsi = new Array(len).fill(50);
+  let avgG = 0, avgL = 0;
+  for (let i = 1; i <= period; i++) { const c = closes[i] - closes[i - 1]; if (c > 0) avgG += c; else avgL += -c; }
+  avgG /= period; avgL /= period;
+  rsi[period] = avgL > 0 ? 100 - 100 / (1 + avgG / avgL) : 100;
+  for (let i = period + 1; i < len; i++) {
+    const c = closes[i] - closes[i - 1];
+    avgG = (avgG * (period - 1) + Math.max(0, c)) / period;
+    avgL = (avgL * (period - 1) + Math.max(0, -c)) / period;
+    rsi[i] = avgL > 0 ? 100 - 100 / (1 + avgG / avgL) : 100;
+  }
+
+  // ── 2. Stochastic %K (3-bar smooth) ──────────────────────────────────────
+  const stochK = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    stochK[i] = hMax > lMin ? ((closes[i] - lMin) / (hMax - lMin)) * 100 : 50;
+  }
+  const stochS = [...stochK];
+  for (let i = 2; i < len; i++) stochS[i] = (stochK[i] + stochK[i - 1] + stochK[i - 2]) / 3;
+
+  // ── 3. CCI → 0-100 ───────────────────────────────────────────────────────
+  const cciN = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let sumTp = 0;
+    for (let j = i - period + 1; j <= i; j++) sumTp += (highs[j] + lows[j] + closes[j]) / 3;
+    const mean = sumTp / period;
+    let md = 0;
+    for (let j = i - period + 1; j <= i; j++) md += Math.abs((highs[j] + lows[j] + closes[j]) / 3 - mean);
+    md /= period;
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    const raw = md > 0 ? (tp - mean) / (0.015 * md) : 0;
+    cciN[i] = Math.max(0, Math.min(100, (Math.max(-200, Math.min(200, raw)) + 200) / 4));
+  }
+
+  // ── 4. Williams %R → 0-100 ───────────────────────────────────────────────
+  const willN = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    const wR = hMax > lMin ? ((hMax - closes[i]) / (hMax - lMin)) * -100 : -50;
+    willN[i] = wR + 100; // -100→0, 0→100
+  }
+
+  // ── 5. Momentum Indicator → 0-100 (rolling percentile) ───────────────────
+  const momRaw = new Array(len).fill(0);
+  for (let i = period; i < len; i++) momRaw[i] = closes[i] - closes[i - period];
+  const momN = new Array(len).fill(50);
+  const momWin = period * 2;
+  for (let i = momWin; i < len; i++) {
+    let mn = momRaw[i], mx = momRaw[i];
+    for (let j = i - momWin + 1; j <= i; j++) { if (momRaw[j] < mn) mn = momRaw[j]; if (momRaw[j] > mx) mx = momRaw[j]; }
+    momN[i] = mx > mn ? ((momRaw[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 6. ROC → 0-100 (rolling percentile) ──────────────────────────────────
+  const roc = new Array(len).fill(0);
+  for (let i = period; i < len; i++) roc[i] = closes[i - period] > 0 ? ((closes[i] - closes[i - period]) / closes[i - period]) * 100 : 0;
+  const rocN = new Array(len).fill(50);
+  const rocWin = period * 2;
+  for (let i = rocWin; i < len; i++) {
+    let mn = roc[i], mx = roc[i];
+    for (let j = i - rocWin + 1; j <= i; j++) { if (roc[j] < mn) mn = roc[j]; if (roc[j] > mx) mx = roc[j]; }
+    rocN[i] = mx > mn ? ((roc[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 7. ATR ────────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= 14 ? atr[i - 1] + (tr - atr[i - 1]) / i : atr[i - 1] + (2 / 15) * (tr - atr[i - 1]);
+  }
+
+  // ── 8. EMA Price Reference & Composite Score ─────────────────────────────
+  const emaK = 2 / (period + 1);
+  const priceRef = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) priceRef[i] = closes[i] * emaK + priceRef[i - 1] * (1 - emaK);
+
+  const startC = Math.max(period, momWin, rocWin);
+  const composite = new Array(len).fill(50);
+  for (let i = startC; i < len; i++) {
+    composite[i] = rsi[i] * 0.25 + stochS[i] * 0.20 + cciN[i] * 0.20 + willN[i] * 0.15 + momN[i] * 0.10 + rocN[i] * 0.10;
+  }
+  // 3-bar smooth
+  const compS = [...composite];
+  for (let i = 2; i < len; i++) compS[i] = (composite[i] + composite[i - 1] + composite[i - 2]) / 3;
+
+  // ── 9. Echo Line & Signal Line ────────────────────────────────────────────
+  // echoLine floats above priceRef when bullish, below when bearish
+  const echoLine = new Array(len).fill(closes[0]);
+  for (let i = startC; i < len; i++) {
+    const offset = ((compS[i] - 50) / 50) * atr[i] * sensitivity;
+    echoLine[i] = priceRef[i] + offset;
+  }
+  const sigK2 = 2 / (signalPeriod + 1);
+  const sigLine = [...echoLine];
+  for (let i = 1; i < len; i++) sigLine[i] = echoLine[i] * sigK2 + sigLine[i - 1] * (1 - sigK2);
+
+  // ── 10. Divergence: price position vs momentum position in rolling window ─
+  const novaLow = 100 - novaThreshold;
+  const divArr = new Array(len).fill("none");
+  for (let i = startC + divergenceLookback; i < len; i++) {
+    const win = Math.min(divergenceLookback, i - startC);
+    let priceMin = closes[i], priceMax = closes[i];
+    let scoreMin = compS[i], scoreMax = compS[i];
+    for (let j = i - win + 1; j <= i; j++) {
+      if (closes[j] < priceMin) priceMin = closes[j];
+      if (closes[j] > priceMax) priceMax = closes[j];
+      if (compS[j] < scoreMin) scoreMin = compS[j];
+      if (compS[j] > scoreMax) scoreMax = compS[j];
+    }
+    const priceRange = priceMax - priceMin + 1e-9;
+    const scoreRange = scoreMax - scoreMin + 1e-9;
+    const pricePct = (closes[i] - priceMin) / priceRange;  // 0=low, 1=high
+    const scorePct = (compS[i] - scoreMin) / scoreRange;
+    // Bull div: price near bottom of range, momentum NOT near bottom
+    if (pricePct < 0.20 && scorePct > 0.45) divArr[i] = "bull_div";
+    // Bear div: price near top of range, momentum NOT near top
+    else if (pricePct > 0.80 && scorePct < 0.55) divArr[i] = "bear_div";
+  }
+
+  // ── 11. Build output ──────────────────────────────────────────────────────
+  const result: NovaResonanceFieldData[] = [];
+  const startOut = startC + divergenceLookback;
+  let prevScore = compS[startOut - 1];
+  let prevEcho = echoLine[startOut - 1];
+  let prevRef = priceRef[startOut - 1];
+  let prevSig = sigLine[startOut - 1];
+
+  for (let i = startOut; i < len; i++) {
+    const score = compS[i];
+    const echo = echoLine[i];
+    const ref = priceRef[i];
+    const sig = sigLine[i];
+    const fieldStrength = Math.min(1, Math.abs(echo - ref) / (atr[i] * sensitivity + 1e-9));
+
+    let state: NovaResonanceFieldData["state"] = "neutral";
+    if (score >= novaThreshold && echo > ref) state = "nova_bull";
+    else if (score <= novaLow && echo < ref) state = "nova_bear";
+    else if (score > 55 && echo > ref) state = "echo_bull";
+    else if (score < 45 && echo < ref) state = "echo_bear";
+
+    let signal: NovaResonanceFieldData["signal"] = "none";
+    if (prevScore < novaThreshold && score >= novaThreshold) signal = "nova_bull";
+    else if (prevScore > novaLow && score <= novaLow) signal = "nova_bear";
+    else if (prevEcho < prevSig && echo >= sig) signal = "echo_cross_up";
+    else if (prevEcho > prevSig && echo <= sig) signal = "echo_cross_down";
+
+    prevScore = score; prevEcho = echo; prevRef = ref; prevSig = sig;
+
+    result.push({
+      time: data[i].time,
+      resonanceScore: score,
+      echoLine: echo,
+      priceRef: ref,
+      signalLine: sig,
+      fieldStrength,
+      state,
+      signal,
+      divergence: divArr[i] as "bull_div" | "bear_div" | "none",
+    });
+  }
+
+  return result;
+}

@@ -2684,6 +2684,106 @@ A fast EMA line runs through the chart, color-coded by the current Kinetic Score
   riskLevel: "medium",
 };
 
+const NOVA_RESONANCE_FIELD = {
+  name: "Nova Resonance Field",
+  slug: "nova-resonance-field",
+  shortDescription:
+    "Six momentum oscillators (RSI, Stoch, CCI, Williams %R, Momentum, ROC) fused into a composite score that maps back to price space as a glowing echo line, with on-chart divergence detection.",
+  fullDescription: `# Nova Resonance Field (NRF)
+
+## Overview
+**Nova Resonance Field** is a groundbreaking hybrid indicator that solves a fundamental problem: momentum oscillators live in their own panel, disconnected from price action. NRF **eliminates this disconnect** by mapping six elite momentum oscillators directly back into price space as a single glowing **Resonance Echo Line** — giving you a momentum-derived ghost of price that floats above when bullish energy is surging, and below when bearish pressure dominates.
+
+## The Six Resonance Engines
+
+| Engine | Weight | Role |
+|---|---|---|
+| **RSI** (14) | 25% | Mean-reversion anchor |
+| **Stochastic %K** | 20% | Speed within recent range |
+| **CCI** | 20% | Statistical deviation |
+| **Williams %R** | 15% | Proximity to highs/lows |
+| **Momentum** | 10% | Raw price velocity |
+| **Rate of Change** | 10% | Velocity as percentage |
+
+All six are normalized to a 0–100 scale and blended into a single **Resonance Score**.
+
+## The Echo Principle
+The Echo Line is calculated as:
+
+**Echo = EMA(close) + ((ResonanceScore − 50) ÷ 50) × ATR × Sensitivity**
+
+This means:
+- When all 6 oscillators are bullish (score near 100): Echo floats **above** the price reference line
+- When all 6 are bearish (score near 0): Echo drops **below** the price reference line
+- When neutral (score = 50): Echo **aligns** with the price reference line
+
+The **distance** between Echo and Reference (the Field Strength) tells you how intense the momentum consensus is.
+
+## Signal Types
+
+| Signal | Meaning |
+|---|---|
+| **🌟 NOVA BULL ▲** | Resonance Score crosses above the nova threshold (default 70%) — all engines surging bullish |
+| **🌟 NOVA BEAR ▼** | Resonance Score crosses below the nova floor (default 30%) — all engines in bearish collapse |
+| **⚡ ECHO CROSS ▲** | Echo Line crosses above Signal Line — fresh bullish momentum acceleration |
+| **⚡ ECHO CROSS ▼** | Echo Line crosses below Signal Line — fresh bearish momentum deceleration |
+| **💜 BULL DIV ◆** | Price near recent low while momentum is NOT at its corresponding low — hidden bullish strength |
+| **🟣 BEAR DIV ◆** | Price near recent high while momentum is NOT at its corresponding high — hidden bearish weakness |
+
+## Visual Guide
+
+| State | Echo Line Color |
+|---|---|
+| NOVA BULL (score ≥ threshold) | 🌟 Bright Amber/Gold \`#ff9800\` |
+| Building Bull (55-70) | 🟢 Spring Green \`#00e676\` |
+| NOVA BEAR (score ≤ floor) | 🔴 Hot Crimson \`#ff1744\` |
+| Building Bear (30-45) | 🟠 Deep Orange \`#ff6d00\` |
+| Neutral (45-55) | ⚪ Steel Silver \`#90a4ae\` |
+| **Divergence bars** | 💜 Violet \`#aa00ff\` (overrides state) |
+
+- **Price Reference** (dashed silver line): The EMA baseline — when Echo is above, bulls control; below, bears control
+- **Signal Line** (thin dotted): EMA of Echo — crosses with Echo generate ECHO CROSS signals
+- **Divergence diamonds** ◆: Appear directly on the chart at price bars where momentum and price disagree
+
+## How to Trade
+
+1. **NOVA BULL 🌟 entry**: When all 6 oscillators surge into nova territory simultaneously, enter long on the next bar open. Stop below the nearest support. Target: wait for NOVA BEAR or Echo crossing below Signal Line.
+2. **NOVA BEAR 🌟 entry**: Same logic inverted — short entry, stop above nearest resistance.
+3. **ECHO CROSS signals**: Faster, more frequent. Use as re-entry or trailing signals within an established NOVA trend. Best when Echo is already well above/below the Reference line.
+4. **Bull Divergence ◆**: Price making a new local low while momentum is actually higher than at the previous low — this is hidden strength. Look for ECHO CROSS UP confirmation before entering.
+5. **Bear Divergence ◆**: Price at new high but momentum not confirming — look for ECHO CROSS DOWN before shorting.
+6. **Field Strength**: The further Echo is from the Price Reference line, the stronger the momentum. Extreme distance signals potential exhaustion (approaching reversal). Moderate distance = sustainable trend.
+7. **Alignment rule**: Only trade NOVA signals when the Echo Line is on the correct side of the Price Reference (above for bulls, below for bears).
+
+## Risk Warning
+No indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 62.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "nova_resonance_field",
+  iconName: "Waves",
+  codeTemplate: JSON.stringify({
+    type: "nova_resonance_field",
+    displayType: "overlay",
+    description: "Six-oscillator momentum composite mapped to price space as a resonance echo line with divergence detection",
+  }),
+  defaultSettings: {
+    period: 14,
+    sensitivity: 2.0,
+    signalPeriod: 9,
+    novaThreshold: 70,
+    divergenceLookback: 20,
+    color: "#ff9800",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["rsi", "stochastic", "cci", "williams", "momentum", "roc", "echo", "divergence", "resonance", "hybrid", "composite", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2709,6 +2809,7 @@ const ALL_ITEMS = [
   SOLARIS_TREND_ENGINE,
   STELLAR_CONFLUENCE_RIBBON,
   KINETIC_PRESSURE_ZONES,
+  NOVA_RESONANCE_FIELD,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
