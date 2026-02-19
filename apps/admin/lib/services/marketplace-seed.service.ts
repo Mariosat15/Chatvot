@@ -2006,6 +2006,40 @@ const STELLAR_CONFLUENCE_RIBBON: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const KINETIC_PRESSURE_ZONES: Partial<IMarketplaceItem> = {
+  name: "Kinetic Pressure Zones",
+  slug: "kinetic-pressure-zones",
+  shortDescription:
+    "Five momentum oscillators (RSI, Stochastic, CCI, Williams %R, ROC) fused into a composite score that paints institutional-grade demand and supply zone bands directly on the chart.",
+  fullDescription: `# Kinetic Pressure Zones (KPZ)\n\n## Overview\n**Kinetic Pressure Zones** translates five elite momentum oscillators into a single on-chart zone-band overlay. It fuses RSI, Stochastic %K, CCI, Williams %R, and Rate of Change into a single Kinetic Momentum Score (0–100), then maps that score to horizontal price zone bands — demand zones (cyan/teal) where momentum was exhausted bearishly, and supply zones (violet/purple) where momentum was exhausted bullishly.\n\n## Zone Formation\n- **Demand Zones** (teal): Form when Kinetic Score drops below oversold — price level becomes a demand band\n- **Supply Zones** (violet): Form when Kinetic Score rises above overbought — price level becomes a supply band\n- **Zone Strength %**: How extreme the momentum reading was at zone creation\n\n## KINETIC Signals\n- **⚡ KINETIC BULL ▲**: Score crosses midline upward after oversold → enter long\n- **⚡ KINETIC BEAR ▼**: Score crosses midline downward after overbought → enter short\n\n## How to Trade\n1. Zone bounce + KINETIC BULL → long, stop below zone lower\n2. Zone resistance + KINETIC BEAR → short, stop above zone upper\n3. Zone break with no reversal → zone flip\n4. Prioritize zones with strength % > 60`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 59.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "kinetic_pressure_zones",
+  iconName: "Zap",
+  codeTemplate: JSON.stringify({
+    type: "kinetic_pressure_zones",
+    displayType: "overlay",
+    description: "RSI + Stoch + CCI + Williams %R + ROC fusion mapped to on-chart demand/supply zone bands",
+  }),
+  defaultSettings: {
+    period: 14,
+    rocPeriod: 10,
+    atrPeriod: 14,
+    zoneWidthMult: 1.2,
+    oversoldLevel: 30,
+    overboughtLevel: 70,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["rsi", "stochastic", "cci", "williams", "roc", "momentum", "zones", "demand", "supply", "hybrid", "composite", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2030,6 +2064,7 @@ const ALL_ITEMS = [
   SOVEREIGN_GRAVITY_ARC,
   SOLARIS_TREND_ENGINE,
   STELLAR_CONFLUENCE_RIBBON,
+  KINETIC_PRESSURE_ZONES,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

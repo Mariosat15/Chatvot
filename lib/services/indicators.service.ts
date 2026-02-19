@@ -5969,3 +5969,192 @@ export function calculateStellarConfluenceRibbon(
 
   return result;
 }
+
+// ============================================================================
+// KINETIC PRESSURE ZONES — RSI + Stoch + CCI + Williams %R + ROC Fusion
+// Momentum oscillators mapped to on-chart horizontal zone bands
+// ============================================================================
+
+export interface KineticPressureZonesData {
+  time: number;
+  momentumScore: number;         // 0-100 composite momentum (>70=overbought, <30=oversold)
+  kineticSpine: number;          // EMA of close, color-coded by momentum regime
+  regime: "overbought" | "oversold" | "bullish" | "bearish" | "neutral";
+  signal: "kinetic_bull" | "kinetic_bear" | "none";
+  // Supply zones (resistance — from past overbought readings)
+  sup1High: number; sup1Low: number; sup1Strength: number; sup1Active: boolean;
+  sup2High: number; sup2Low: number; sup2Strength: number; sup2Active: boolean;
+  // Demand zones (support — from past oversold readings)
+  dem1High: number; dem1Low: number; dem1Strength: number; dem1Active: boolean;
+  dem2High: number; dem2Low: number; dem2Strength: number; dem2Active: boolean;
+}
+
+export function calculateKineticPressureZones(
+  data: OHLCData[],
+  period: number = 14,
+  rocPeriod: number = 10,
+  atrPeriod: number = 14,
+  zoneWidthMult: number = 1.2,
+  oversoldLevel: number = 30,
+  overboughtLevel: number = 70,
+): KineticPressureZonesData[] {
+  const minBars = period * 3 + rocPeriod + atrPeriod;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. RSI ───────────────────────────────────────────────────────────────
+  const rsi = new Array(len).fill(50);
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const c = closes[i] - closes[i - 1];
+    if (c > 0) avgGain += c; else avgLoss += -c;
+  }
+  avgGain /= period; avgLoss /= period;
+  rsi[period] = avgLoss > 0 ? 100 - 100 / (1 + avgGain / avgLoss) : 100;
+  for (let i = period + 1; i < len; i++) {
+    const c = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + Math.max(0, c)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(0, -c)) / period;
+    rsi[i] = avgLoss > 0 ? 100 - 100 / (1 + avgGain / avgLoss) : 100;
+  }
+
+  // ── 2. Stochastic %K ─────────────────────────────────────────────────────
+  const stochK = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    stochK[i] = hMax > lMin ? ((closes[i] - lMin) / (hMax - lMin)) * 100 : 50;
+  }
+  // Smooth stochK (3-bar SMA = %K fast)
+  const stochSmooth = [...stochK];
+  for (let i = 2; i < len; i++) stochSmooth[i] = (stochK[i] + stochK[i - 1] + stochK[i - 2]) / 3;
+
+  // ── 3. CCI → normalized 0-100 ────────────────────────────────────────────
+  const cciNorm = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let sumTp = 0;
+    for (let j = i - period + 1; j <= i; j++) sumTp += (highs[j] + lows[j] + closes[j]) / 3;
+    const meanTp = sumTp / period;
+    let md = 0;
+    for (let j = i - period + 1; j <= i; j++) md += Math.abs((highs[j] + lows[j] + closes[j]) / 3 - meanTp);
+    md /= period;
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    const rawCci = md > 0 ? (tp - meanTp) / (0.015 * md) : 0;
+    cciNorm[i] = Math.max(0, Math.min(100, (Math.max(-200, Math.min(200, rawCci)) + 200) / 4));
+  }
+
+  // ── 4. Williams %R → normalized 0-100 ────────────────────────────────────
+  const willNorm = new Array(len).fill(50);
+  // Convention: willR = -100 (oversold) → norm = 0, willR = 0 (overbought) → norm = 100
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    const willR = hMax > lMin ? ((hMax - closes[i]) / (hMax - lMin)) * -100 : -50;
+    willNorm[i] = (willR + 100); // -100 → 0, 0 → 100
+  }
+
+  // ── 5. ROC → normalized 0-100 (rolling percentile window) ────────────────
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) roc[i] = closes[i - rocPeriod] > 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  const rocNorm = new Array(len).fill(50);
+  const rocWin = Math.max(period * 2, rocPeriod * 3);
+  for (let i = rocWin; i < len; i++) {
+    let mn = roc[i], mx = roc[i];
+    for (let j = i - rocWin + 1; j <= i; j++) { if (roc[j] < mn) mn = roc[j]; if (roc[j] > mx) mx = roc[j]; }
+    rocNorm[i] = mx > mn ? ((roc[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 6. ATR ────────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= atrPeriod ? atr[i - 1] + (tr - atr[i - 1]) / i : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 7. EMA spine ─────────────────────────────────────────────────────────
+  const emaK = 2 / (period + 1);
+  const spine = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) spine[i] = closes[i] * emaK + spine[i - 1] * (1 - emaK);
+
+  // ── 8. Composite Momentum Score ───────────────────────────────────────────
+  const composite = new Array(len).fill(50);
+  const startC = Math.max(period, rocWin);
+  for (let i = startC; i < len; i++) {
+    composite[i] = rsi[i] * 0.25 + stochSmooth[i] * 0.20 + cciNorm[i] * 0.20 + willNorm[i] * 0.20 + rocNorm[i] * 0.15;
+  }
+  // Light smoothing for zone detection only
+  const compSmooth = [...composite];
+  for (let i = 3; i < len; i++) compSmooth[i] = (composite[i] + composite[i - 1] + composite[i - 2]) / 3;
+
+  // ── 9. Build output with rolling zone detection ───────────────────────────
+  const result: KineticPressureZonesData[] = [];
+  const startI = startC + 5;
+
+  // Zone state (mutable — updated as new zones form)
+  let sup1H = 0, sup1L = 0, sup1S = 0, sup1A = false;
+  let sup2H = 0, sup2L = 0, sup2S = 0, sup2A = false;
+  let dem1H = 0, dem1L = 0, dem1S = 0, dem1A = false;
+  let dem2H = 0, dem2L = 0, dem2S = 0, dem2A = false;
+
+  let prevComp = compSmooth[startI - 1];
+  let wasOverbought = compSmooth[startI - 1] >= overboughtLevel;
+  let wasOversold = compSmooth[startI - 1] <= oversoldLevel;
+
+  for (let i = startI; i < len; i++) {
+    const score = compSmooth[i];
+    const atrV = atr[i];
+    const halfW = atrV * zoneWidthMult * 0.5;
+
+    // Detect new SUPPLY zone: overbought → cooling (score crossing back below overbought)
+    if (wasOverbought && score < overboughtLevel) {
+      let pivotH = highs[i];
+      for (let j = Math.max(0, i - 4); j <= i; j++) if (highs[j] > pivotH) pivotH = highs[j];
+      const str = Math.min(100, Math.round(((prevComp - overboughtLevel) / (100 - overboughtLevel)) * 100));
+      sup2H = sup1H; sup2L = sup1L; sup2S = sup1S; sup2A = sup1A;
+      sup1H = pivotH + halfW * 0.4; sup1L = pivotH - halfW; sup1S = str; sup1A = true;
+    }
+
+    // Detect new DEMAND zone: oversold → recovering (score crossing back above oversold)
+    if (wasOversold && score > oversoldLevel) {
+      let pivotL = lows[i];
+      for (let j = Math.max(0, i - 4); j <= i; j++) if (lows[j] < pivotL) pivotL = lows[j];
+      const str = Math.min(100, Math.round(((oversoldLevel - prevComp) / oversoldLevel) * 100));
+      dem2H = dem1H; dem2L = dem1L; dem2S = dem1S; dem2A = dem1A;
+      dem1H = pivotL + halfW; dem1L = pivotL - halfW * 0.4; dem1S = str; dem1A = true;
+    }
+
+    // Signal: momentum crosses midline after extreme
+    let signal: KineticPressureZonesData["signal"] = "none";
+    if (prevComp < 50 && score >= 50 && score - prevComp > 3) signal = "kinetic_bull";
+    else if (prevComp > 50 && score <= 50 && prevComp - score > 3) signal = "kinetic_bear";
+
+    // Regime
+    let regime: KineticPressureZonesData["regime"] = "neutral";
+    if (score >= overboughtLevel) regime = "overbought";
+    else if (score <= oversoldLevel) regime = "oversold";
+    else if (score > 55) regime = "bullish";
+    else if (score < 45) regime = "bearish";
+
+    wasOverbought = score >= overboughtLevel;
+    wasOversold = score <= oversoldLevel;
+    prevComp = score;
+
+    result.push({
+      time: data[i].time,
+      momentumScore: score,
+      kineticSpine: spine[i],
+      regime,
+      signal,
+      sup1High: sup1H, sup1Low: sup1L, sup1Strength: sup1S, sup1Active: sup1A,
+      sup2High: sup2H, sup2Low: sup2L, sup2Strength: sup2S, sup2Active: sup2A,
+      dem1High: dem1H, dem1Low: dem1L, dem1Strength: dem1S, dem1Active: dem1A,
+      dem2High: dem2H, dem2Low: dem2L, dem2Strength: dem2S, dem2Active: dem2A,
+    });
+  }
+
+  return result;
+}

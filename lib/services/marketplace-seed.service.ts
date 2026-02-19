@@ -2607,6 +2607,83 @@ When the confluence score hits a **local peak ≥ 80**, a glowing **node dot** a
   riskLevel: "medium",
 };
 
+const KINETIC_PRESSURE_ZONES = {
+  name: "Kinetic Pressure Zones",
+  slug: "kinetic-pressure-zones",
+  shortDescription:
+    "Five momentum oscillators (RSI, Stochastic, CCI, Williams %R, ROC) fused into a composite score that paints institutional-grade demand and supply zone bands directly on the chart.",
+  fullDescription: `# Kinetic Pressure Zones (KPZ)
+
+## Overview
+**Kinetic Pressure Zones** translates five elite momentum oscillators into a single **on-chart zone-band overlay**. Instead of cluttering your chart with five separate sub-panels, KPZ fuses RSI, Stochastic %K, CCI, Williams %R, and Rate of Change into a single **Kinetic Momentum Score** (0–100), then maps that score to horizontal price zone bands — demand zones (cyan/teal) where momentum was exhausted bearishly, and supply zones (violet/purple) where momentum was exhausted bullishly.
+
+## The Five Engines
+
+| Engine | Weight | Role |
+|---|---|---|
+| **RSI** (14) | 25% | Classic overbought/oversold baseline |
+| **Stochastic %K** | 20% | Speed of recent close within range |
+| **CCI** | 20% | Deviation from statistical mean |
+| **Williams %R** | 20% | Proximity to recent high/low extreme |
+| **Rate of Change** | 15% | Momentum velocity vs recent history |
+
+## Zone Formation
+- **Demand Zones** (teal/cyan): Form when the Kinetic Score drops below the oversold threshold — all 5 oscillators confirm exhaustion. The price level at that exact reversal becomes a **demand zone** (support band). These zones persist forward in time.
+- **Supply Zones** (violet/purple): Form when the Kinetic Score rises above the overbought threshold — all 5 oscillators confirm euphoria. The price level becomes a **supply zone** (resistance band). These zones persist forward in time.
+- **Zone Width**: Proportional to ATR × zone width multiplier (adapts to volatility).
+- **Zone Strength**: Percentage showing how extreme the momentum reading was at zone creation (higher % = more confluent oscillators = stronger zone).
+- Up to **2 demand zones** and **2 supply zones** remain active simultaneously, ordered by recency.
+
+## Kinetic Spine
+A fast EMA line runs through the chart, color-coded by the current Kinetic Score:
+- 💎 **Cyan**: Score > overbought (all systems surging bullish)
+- 🟢 **Green**: Score 55–70 (bullish momentum building)
+- 🔴 **Red**: Score 30–45 (bearish momentum building)
+- 🔴 **Crimson**: Score < oversold (all systems deeply bearish)
+- ⚪ **Silver**: Score 45–55 (neutral)
+
+## KINETIC Signals
+- **⚡ KINETIC BULL ▲**: Composite score crosses the midline upward after being oversold — momentum is recovering → potential entry long
+- **⚡ KINETIC BEAR ▼**: Composite score crosses the midline downward after being overbought — momentum is failing → potential entry short
+
+## How to Trade
+
+1. **Zone Bounces**: When price pulls back to a demand zone, look for a KINETIC BULL signal → enter long, stop below the zone lower boundary.
+2. **Zone Resistance**: When price rallies into a supply zone, look for a KINETIC BEAR signal → enter short, stop above the zone upper boundary.
+3. **Zone Breaks**: If price cleanly closes beyond a zone without a reversal signal, the zone is invalidated — it becomes a potential flip zone.
+4. **Zone Strength %**: Prioritize zones with higher strength percentages (>60%) — these formed under stronger momentum consensus across all 5 oscillators.
+5. **Kinetic Spine**: Use the spine color as a real-time trend filter. Only take bullish trades when the spine is cyan or green. Only take bearish trades when red or crimson.
+6. **Confluence**: The most powerful setups occur when price reaches a zone AND the Kinetic Score simultaneously hits an extreme (both zone + oscillator confirmation).
+
+**Note**: KPZ is not an oscillator — it lives entirely on your price chart. It is designed to work alongside your existing chart analysis and replace the need to monitor 5 separate momentum oscillators.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 59.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "kinetic_pressure_zones",
+  iconName: "Zap",
+  codeTemplate: JSON.stringify({
+    type: "kinetic_pressure_zones",
+    displayType: "overlay",
+    description: "RSI + Stoch + CCI + Williams %R + ROC fusion mapped to on-chart demand/supply zone bands",
+  }),
+  defaultSettings: {
+    period: 14,
+    rocPeriod: 10,
+    atrPeriod: 14,
+    zoneWidthMult: 1.2,
+    oversoldLevel: 30,
+    overboughtLevel: 70,
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["rsi", "stochastic", "cci", "williams", "roc", "momentum", "zones", "demand", "supply", "hybrid", "composite", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2631,6 +2708,7 @@ const ALL_ITEMS = [
   SOVEREIGN_GRAVITY_ARC,
   SOLARIS_TREND_ENGINE,
   STELLAR_CONFLUENCE_RIBBON,
+  KINETIC_PRESSURE_ZONES,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

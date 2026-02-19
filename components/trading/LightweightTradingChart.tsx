@@ -113,6 +113,7 @@ import {
   calculateSovereignGravityArc,
   calculateSolarisTrendEngine,
   calculateStellarConfluenceRibbon,
+  calculateKineticPressureZones,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3362,6 +3363,85 @@ const LightweightTradingChart = ({
           scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: d.trend === "bull" ? "rgba(0,240,255,0.18)" : d.trend === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)" })));
           indicatorSeriesRef.current.set(`${indicator.id}_outerLo`, scrOuterLo);
 
+        } else if (indicator.type === "kinetic_pressure_zones") {
+          const p = indicator.parameters;
+          const kpzData = calculateKineticPressureZones(
+            transformedCandles,
+            p.period || 14, p.rocPeriod || 10, p.atrPeriod || 14,
+            p.zoneWidthMult || 1.2, p.oversoldLevel || 30, p.overboughtLevel || 70,
+          );
+
+          // Spine color helper
+          const kpzSpineColor = (regime: string): string => {
+            if (regime === "overbought") return "#00e5ff";
+            if (regime === "bullish") return "#00c853";
+            if (regime === "oversold") return "#d50000";
+            if (regime === "bearish") return "#ff6d00";
+            return "#90a4ae";
+          };
+
+          // Build signal + strength label markers on the spine
+          const kpzMarkers: any[] = [];
+          for (const d of kpzData) {
+            if (d.signal === "kinetic_bull") kpzMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00e5ff", shape: "arrowUp" as const, text: "⚡ KINETIC", size: 2 });
+            else if (d.signal === "kinetic_bear") kpzMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#7c4dff", shape: "arrowDown" as const, text: "⚡ KINETIC", size: 2 });
+          }
+
+          // ── Kinetic Spine ────────────────────────────────────────────────
+          const kpzSpine = chart.addLineSeries({
+            color: "#00e5ff", lineWidth: 2 as any, lineStyle: 0 as any,
+            title: indicator.customLabel || "Kinetic Pressure Zones", priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+          });
+          kpzSpine.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSpineColor(d.regime) })));
+          indicatorSeriesRef.current.set(`${indicator.id}_spine`, kpzSpine);
+          try { kpzSpine.setMarkers(kpzMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+
+          // Helper: only emit data points where zone is active (avoids NaN flatlines)
+          const zoneData = (arr: typeof kpzData, valFn: (d: typeof kpzData[0]) => number, activeFn: (d: typeof kpzData[0]) => boolean) =>
+            arr.filter(activeFn).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d) }));
+
+          // ── Supply Zone 1 ────────────────────────────────────────────────
+          const kpzSup1Hi = chart.addLineSeries({ color: "rgba(124,77,255,0.7)", lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          const kpzSup1Lo = chart.addLineSeries({ color: "rgba(124,77,255,0.35)", lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} S1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          kpzSup1Hi.setData(zoneData(kpzData, d => d.sup1High, d => d.sup1Active));
+          kpzSup1Lo.setData(zoneData(kpzData, d => d.sup1Low, d => d.sup1Active));
+          indicatorSeriesRef.current.set(`${indicator.id}_sup1hi`, kpzSup1Hi);
+          indicatorSeriesRef.current.set(`${indicator.id}_sup1lo`, kpzSup1Lo);
+          // Strength label on first bar of each zone
+          const sup1FirstBar = kpzData.find(d => d.sup1Active);
+          if (sup1FirstBar) {
+            try { kpzSup1Hi.setMarkers([{ time: sup1FirstBar.time as UTCTimestamp, position: "aboveBar" as const, color: "#ce93d8", shape: "square" as const, text: `${sup1FirstBar.sup1Strength}%`, size: 0 }]); } catch {}
+          }
+
+          // ── Supply Zone 2 ────────────────────────────────────────────────
+          const kpzSup2Hi = chart.addLineSeries({ color: "rgba(179,136,255,0.5)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          const kpzSup2Lo = chart.addLineSeries({ color: "rgba(179,136,255,0.25)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} S2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          kpzSup2Hi.setData(zoneData(kpzData, d => d.sup2High, d => d.sup2Active));
+          kpzSup2Lo.setData(zoneData(kpzData, d => d.sup2Low, d => d.sup2Active));
+          indicatorSeriesRef.current.set(`${indicator.id}_sup2hi`, kpzSup2Hi);
+          indicatorSeriesRef.current.set(`${indicator.id}_sup2lo`, kpzSup2Lo);
+
+          // ── Demand Zone 1 ────────────────────────────────────────────────
+          const kpzDem1Hi = chart.addLineSeries({ color: "rgba(0,229,255,0.35)", lineWidth: 1 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          const kpzDem1Lo = chart.addLineSeries({ color: "rgba(0,229,255,0.7)", lineWidth: 2 as any, lineStyle: 0 as any, title: `${indicator.customLabel || "KPZ"} D1↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          kpzDem1Hi.setData(zoneData(kpzData, d => d.dem1High, d => d.dem1Active));
+          kpzDem1Lo.setData(zoneData(kpzData, d => d.dem1Low, d => d.dem1Active));
+          indicatorSeriesRef.current.set(`${indicator.id}_dem1hi`, kpzDem1Hi);
+          indicatorSeriesRef.current.set(`${indicator.id}_dem1lo`, kpzDem1Lo);
+          const dem1FirstBar = kpzData.find(d => d.dem1Active);
+          if (dem1FirstBar) {
+            try { kpzDem1Lo.setMarkers([{ time: dem1FirstBar.time as UTCTimestamp, position: "belowBar" as const, color: "#80deea", shape: "square" as const, text: `${dem1FirstBar.dem1Strength}%`, size: 0 }]); } catch {}
+          }
+
+          // ── Demand Zone 2 ────────────────────────────────────────────────
+          const kpzDem2Hi = chart.addLineSeries({ color: "rgba(0,188,212,0.25)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↑`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          const kpzDem2Lo = chart.addLineSeries({ color: "rgba(0,188,212,0.5)", lineWidth: 1 as any, lineStyle: 2 as any, title: `${indicator.customLabel || "KPZ"} D2↓`, priceScaleId: "right", priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false });
+          kpzDem2Hi.setData(zoneData(kpzData, d => d.dem2High, d => d.dem2Active));
+          kpzDem2Lo.setData(zoneData(kpzData, d => d.dem2Low, d => d.dem2Active));
+          indicatorSeriesRef.current.set(`${indicator.id}_dem2hi`, kpzDem2Hi);
+          indicatorSeriesRef.current.set(`${indicator.id}_dem2lo`, kpzDem2Lo);
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -4032,6 +4112,38 @@ const LightweightTradingChart = ({
                     if (ilS) ilS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: bandBullC(d.trend) })));
                     if (ouS) ouS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: outerC(d.trend) })));
                     if (olS) olS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: outerC(d.trend) })));
+                  }
+                }
+              } else if (_ovlType === "kinetic_pressure_zones") {
+                const kpzData = calculateKineticPressureZones(
+                  tc, p.period || 14, p.rocPeriod || 10, p.atrPeriod || 14,
+                  p.zoneWidthMult || 1.2, p.oversoldLevel || 30, p.overboughtLevel || 70,
+                );
+                if (kpzData.length > 0) {
+                  const kpzSC = (r: string) => r === "overbought" ? "#00e5ff" : r === "bullish" ? "#00c853" : r === "oversold" ? "#d50000" : r === "bearish" ? "#ff6d00" : "#90a4ae";
+                  const zFilt = (valFn: (d: typeof kpzData[0]) => number, actFn: (d: typeof kpzData[0]) => boolean) => kpzData.filter(actFn).map(d => ({ time: d.time as UTCTimestamp, value: valFn(d) }));
+                  const spineS = _ovlSeriesMap.get(`${_ovlId}_spine`);
+                  const s1hS = _ovlSeriesMap.get(`${_ovlId}_sup1hi`); const s1lS = _ovlSeriesMap.get(`${_ovlId}_sup1lo`);
+                  const s2hS = _ovlSeriesMap.get(`${_ovlId}_sup2hi`); const s2lS = _ovlSeriesMap.get(`${_ovlId}_sup2lo`);
+                  const d1hS = _ovlSeriesMap.get(`${_ovlId}_dem1hi`); const d1lS = _ovlSeriesMap.get(`${_ovlId}_dem1lo`);
+                  const d2hS = _ovlSeriesMap.get(`${_ovlId}_dem2hi`); const d2lS = _ovlSeriesMap.get(`${_ovlId}_dem2lo`);
+                  if (mode === "light") {
+                    const last = kpzData[kpzData.length - 1];
+                    if (spineS) spineS.update({ time: last.time as UTCTimestamp, value: last.kineticSpine, color: kpzSC(last.regime) } as any);
+                    if (last.sup1Active) { if (s1hS) s1hS.update({ time: last.time as UTCTimestamp, value: last.sup1High } as any); if (s1lS) s1lS.update({ time: last.time as UTCTimestamp, value: last.sup1Low } as any); }
+                    if (last.sup2Active) { if (s2hS) s2hS.update({ time: last.time as UTCTimestamp, value: last.sup2High } as any); if (s2lS) s2lS.update({ time: last.time as UTCTimestamp, value: last.sup2Low } as any); }
+                    if (last.dem1Active) { if (d1hS) d1hS.update({ time: last.time as UTCTimestamp, value: last.dem1High } as any); if (d1lS) d1lS.update({ time: last.time as UTCTimestamp, value: last.dem1Low } as any); }
+                    if (last.dem2Active) { if (d2hS) d2hS.update({ time: last.time as UTCTimestamp, value: last.dem2High } as any); if (d2lS) d2lS.update({ time: last.time as UTCTimestamp, value: last.dem2Low } as any); }
+                  } else {
+                    if (spineS) spineS.setData(kpzData.map(d => ({ time: d.time as UTCTimestamp, value: d.kineticSpine, color: kpzSC(d.regime) })));
+                    if (s1hS) s1hS.setData(zFilt(d => d.sup1High, d => d.sup1Active));
+                    if (s1lS) s1lS.setData(zFilt(d => d.sup1Low, d => d.sup1Active));
+                    if (s2hS) s2hS.setData(zFilt(d => d.sup2High, d => d.sup2Active));
+                    if (s2lS) s2lS.setData(zFilt(d => d.sup2Low, d => d.sup2Active));
+                    if (d1hS) d1hS.setData(zFilt(d => d.dem1High, d => d.dem1Active));
+                    if (d1lS) d1lS.setData(zFilt(d => d.dem1Low, d => d.dem1Active));
+                    if (d2hS) d2hS.setData(zFilt(d => d.dem2High, d => d.dem2Active));
+                    if (d2lS) d2lS.setData(zFilt(d => d.dem2Low, d => d.dem2Active));
                   }
                 }
               }

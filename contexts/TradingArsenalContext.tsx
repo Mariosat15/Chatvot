@@ -52,7 +52,8 @@ export type IndicatorType =
   | "quantum_drift_mapper"
   | "sovereign_gravity_arc"
   | "solaris_trend_engine"
-  | "stellar_confluence_ribbon";
+  | "stellar_confluence_ribbon"
+  | "kinetic_pressure_zones";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -519,6 +520,8 @@ const INDICATOR_TYPE_MAP: Record<
   "solaris trend engine": { type: "solaris_trend_engine", displayType: "overlay" },
   stellar_confluence_ribbon: { type: "stellar_confluence_ribbon", displayType: "overlay" },
   "stellar confluence ribbon": { type: "stellar_confluence_ribbon", displayType: "overlay" },
+  kinetic_pressure_zones: { type: "kinetic_pressure_zones", displayType: "overlay" },
+  "kinetic pressure zones": { type: "kinetic_pressure_zones", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -884,6 +887,14 @@ export function marketplaceItemToIndicator(
       params.outerMult = settings?.outerMult || 2.8;
       params.confluenceThreshold = settings?.confluenceThreshold || 70;
       params.nodeThreshold = settings?.nodeThreshold || 80;
+      break;
+    case "kinetic_pressure_zones":
+      params.period = settings?.period || 14;
+      params.rocPeriod = settings?.rocPeriod || 10;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.zoneWidthMult = settings?.zoneWidthMult || 1.2;
+      params.oversoldLevel = settings?.oversoldLevel || 30;
+      params.overboughtLevel = settings?.overboughtLevel || 70;
       break;
     default:
       // Generic period-based indicators

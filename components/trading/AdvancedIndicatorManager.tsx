@@ -449,6 +449,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { blendPeriod: 21, atrPeriod: 14, innerMult: 1.5, outerMult: 2.8, confluenceThreshold: 70, nodeThreshold: 80 },
     paramLabels: { blendPeriod: "Blend Period", atrPeriod: "ATR Period", innerMult: "Inner ATR Mult", outerMult: "Outer ATR Mult", confluenceThreshold: "Confluence Threshold", nodeThreshold: "Node Threshold" },
   },
+  kinetic_pressure_zones: {
+    name: "Kinetic Pressure Zones",
+    shortName: "KPZ",
+    displayType: "overlay" as const,
+    defaultParams: { period: 14, rocPeriod: 10, atrPeriod: 14, zoneWidthMult: 1.2, oversoldLevel: 30, overboughtLevel: 70 },
+    paramLabels: { period: "MA Period", rocPeriod: "ROC Period", atrPeriod: "ATR Period", zoneWidthMult: "Zone Width Mult", oversoldLevel: "Oversold Level", overboughtLevel: "Overbought Level" },
+  },
 };
 
 const DEFAULT_COLORS = [
