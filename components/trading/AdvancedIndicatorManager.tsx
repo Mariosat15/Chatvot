@@ -1000,8 +1000,8 @@ export default function AdvancedIndicatorManager({
     };
 
     onIndicatorsChange([...indicators, newIndicator]);
-    setSelectedIndicator(newIndicator.id);
-    setActiveTab("active");
+    // Stay in the current list view so the user can continue adding more indicators.
+    // The newly added indicator gets a checkmark. They can click "My Indicators" to manage settings.
   };
 
   const removeIndicator = (id: string) => {
@@ -1091,7 +1091,13 @@ export default function AdvancedIndicatorManager({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#787B86]" />
               <Input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (e.target.value) {
+                    setActiveTab("indicators");
+                    setSelectedIndicator(null);
+                  }
+                }}
                 placeholder="Search"
                 className="w-full h-9 pl-9 bg-[#131722] border-[#363a45] text-white placeholder:text-[#787B86] focus:border-[#2962FF] rounded"
               />
@@ -1113,6 +1119,8 @@ export default function AdvancedIndicatorManager({
                     onClick={() => {
                       setSelectedCategory(cat.id);
                       setSearchQuery("");
+                      setActiveTab("indicators");
+                      setSelectedIndicator(null);
                     }}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors",
@@ -1134,10 +1142,13 @@ export default function AdvancedIndicatorManager({
                     Active ({indicators.length})
                   </div>
                   <button
-                    onClick={() => setActiveTab("active")}
+                    onClick={() => {
+                      setActiveTab("active");
+                      setSelectedIndicator(null);
+                    }}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors",
-                      activeTab === "active"
+                      activeTab === "active" && !selectedIndicator
                         ? "bg-[#2962FF]/20 text-white"
                         : "text-[#d1d4dc] hover:bg-[#2a2e39]",
                     )}
