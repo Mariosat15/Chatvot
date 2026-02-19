@@ -788,7 +788,6 @@ export default function ArenaPage() {
 
         {/* Nav */}
         <div style={{ display: 'flex', gap: 4, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-          {(['lobby', 'Browse Events'] as const), (['live', 'Live View'] as const)}
           {([['lobby', 'Browse Events'], ['live', 'Live View']] as [string, string][]).map(([v, l]) => (
             <button
               key={v}
