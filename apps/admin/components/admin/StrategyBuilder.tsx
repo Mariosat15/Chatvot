@@ -120,6 +120,14 @@ const SIGNAL_TYPES = [
   },
 ];
 
+// ── Marker shape options ─────────────────────────────────────────────────────
+const MARKER_SHAPES = [
+  { value: "arrowUp",   label: "Arrow Up ▲",   glyph: "▲" },
+  { value: "arrowDown", label: "Arrow Down ▼", glyph: "▼" },
+  { value: "circle",    label: "Circle ●",     glyph: "●" },
+  { value: "square",    label: "Square ■",     glyph: "■" },
+] as const;
+
 interface StrategyCondition {
   id: string;
   indicator: string;
@@ -138,6 +146,10 @@ interface StrategyRule {
   logic: "AND" | "OR";
   signal: string;
   signalStrength: number;
+  // Per-rule marker styling
+  markerShape?: "arrowUp" | "arrowDown" | "circle" | "square";
+  markerColor?: string;
+  markerSize?: number;
 }
 
 interface StrategyConfig {
@@ -652,51 +664,143 @@ export default function StrategyBuilder({
           </div>
 
           {/* Add Condition & Signal Settings */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-700">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => addCondition(rule.id)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Condition
-            </Button>
+          <div className="pt-2 border-t border-gray-700 space-y-3">
+            {/* Row 1: Add Condition + Signal + Strength */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => addCondition(rule.id)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Condition
+              </Button>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-gray-400">Signal:</Label>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-gray-400">Signal:</Label>
+                  <Select
+                    value={rule.signal}
+                    onValueChange={(v) => updateRule(rule.id, { signal: v })}
+                  >
+                    <SelectTrigger className="h-8 w-32 bg-gray-900 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIGNAL_TYPES.map((signal) => (
+                        <SelectItem key={signal.value} value={signal.value}>
+                          <div className="flex items-center gap-2">
+                            <signal.icon className="h-4 w-4" />
+                            {signal.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-gray-400">Strength:</Label>
+                  <Select
+                    value={String(rule.signalStrength)}
+                    onValueChange={(v) =>
+                      updateRule(rule.id, { signalStrength: Number(v) })
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-16 bg-gray-900 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Marker Style Controls */}
+            <div className="flex flex-wrap items-center gap-3 bg-gray-900/40 rounded-lg p-2">
+              <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+                Marker Style:
+              </span>
+
+              {/* Shape picker */}
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs text-gray-400">Shape</Label>
                 <Select
-                  value={rule.signal}
-                  onValueChange={(v) => updateRule(rule.id, { signal: v })}
+                  value={rule.markerShape ?? "auto"}
+                  onValueChange={(v) =>
+                    updateRule(rule.id, {
+                      markerShape:
+                        v === "auto"
+                          ? undefined
+                          : (v as StrategyRule["markerShape"]),
+                    })
+                  }
                 >
-                  <SelectTrigger className="h-8 w-32 bg-gray-900 border-gray-700">
+                  <SelectTrigger className="h-7 w-32 bg-gray-800 border-gray-700 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SIGNAL_TYPES.map((signal) => (
-                      <SelectItem key={signal.value} value={signal.value}>
-                        <div className="flex items-center gap-2">
-                          <signal.icon className="h-4 w-4" />
-                          {signal.label}
-                        </div>
+                    <SelectItem value="auto">
+                      Auto (signal type)
+                    </SelectItem>
+                    {MARKER_SHAPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-gray-400">Strength:</Label>
+              {/* Color picker */}
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs text-gray-400">Color</Label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="color"
+                    value={rule.markerColor ?? "#ffffff"}
+                    onChange={(e) =>
+                      updateRule(rule.id, { markerColor: e.target.value })
+                    }
+                    className="h-7 w-10 rounded border border-gray-700 bg-gray-800 cursor-pointer p-0.5"
+                    title="Marker color (overrides signal default)"
+                  />
+                  {rule.markerColor && (
+                    <button
+                      onClick={() =>
+                        updateRule(rule.id, { markerColor: undefined })
+                      }
+                      className="text-xs text-gray-500 hover:text-gray-300"
+                      title="Reset to default"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Size override */}
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs text-gray-400">Size</Label>
                 <Select
-                  value={String(rule.signalStrength)}
+                  value={rule.markerSize !== undefined ? String(rule.markerSize) : "auto"}
                   onValueChange={(v) =>
-                    updateRule(rule.id, { signalStrength: Number(v) })
+                    updateRule(rule.id, {
+                      markerSize: v === "auto" ? undefined : Number(v),
+                    })
                   }
                 >
-                  <SelectTrigger className="h-8 w-16 bg-gray-900 border-gray-700">
+                  <SelectTrigger className="h-7 w-20 bg-gray-800 border-gray-700 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         {n}
@@ -704,6 +808,17 @@ export default function StrategyBuilder({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Live preview glyph */}
+              <div className="flex items-center gap-1 ml-auto">
+                <span className="text-xs text-gray-500">Preview:</span>
+                <span
+                  style={{ color: rule.markerColor ?? "#6b7280", fontSize: "16px", lineHeight: 1 }}
+                  title="Marker preview (approximate)"
+                >
+                  {MARKER_SHAPES.find((s) => s.value === (rule.markerShape ?? "circle"))?.glyph ?? "●"}
+                </span>
               </div>
             </div>
           </div>
@@ -880,6 +995,23 @@ export default function StrategyBuilder({
                     >
                       {signalInfo?.label}
                     </Badge>
+                    {/* Marker style preview */}
+                    {(rule.markerShape || rule.markerColor || rule.markerSize) && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        [
+                        {rule.markerShape && <span> {MARKER_SHAPES.find(s => s.value === rule.markerShape)?.glyph}</span>}
+                        {rule.markerColor && (
+                          <span
+                            style={{ color: rule.markerColor }}
+                            className="mx-0.5"
+                          >
+                            ■
+                          </span>
+                        )}
+                        {rule.markerSize !== undefined && <span> sz:{rule.markerSize}</span>}
+                        ]
+                      </span>
+                    )}
                   </div>
                 );
               })}

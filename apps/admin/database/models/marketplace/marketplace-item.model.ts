@@ -98,6 +98,9 @@ export interface IStrategyCondition {
   compareIndicatorParams?: Record<string, number>;
 }
 
+// Marker shape options for strategy signals on the chart
+export type MarkerShape = "arrowUp" | "arrowDown" | "circle" | "square";
+
 // Strategy Rule - combines conditions with AND/OR logic
 export interface IStrategyRule {
   id: string;
@@ -105,7 +108,11 @@ export interface IStrategyRule {
   conditions: IStrategyCondition[];
   logic: "AND" | "OR"; // How to combine conditions
   signal: SignalType;
-  signalStrength: number; // 1-5, used for arrow size
+  signalStrength: number; // 1-5, used for arrow size when markerSize not set
+  // ── Per-rule marker styling ──────────────────────────────────────────────
+  markerShape?: MarkerShape;  // defaults: buy→arrowUp, sell→arrowDown, neutral→circle
+  markerColor?: string;       // hex color; defaults to signal-type color when omitted
+  markerSize?: number;        // 1-5; defaults to signalStrength-derived value when omitted
 }
 
 // Full Strategy Configuration
@@ -236,6 +243,13 @@ const StrategyRuleSchema = new Schema(
       enum: ["buy", "sell", "strong_buy", "strong_sell", "neutral"],
     },
     signalStrength: { type: Number, min: 1, max: 5, default: 3 },
+    // Per-rule marker styling (all optional — fall back to defaults when absent)
+    markerShape: {
+      type: String,
+      enum: ["arrowUp", "arrowDown", "circle", "square"],
+    },
+    markerColor: { type: String },  // hex color string, e.g. "#00ff88"
+    markerSize:  { type: Number, min: 1, max: 5 },
   },
   { _id: false },
 );

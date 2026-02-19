@@ -5684,17 +5684,39 @@ const LightweightTradingChart = ({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const markers: any[] = allSignals.map((signal) => {
             const isBuy = signal.type === "buy" || signal.type === "strong_buy";
-            const color = getSignalColor(signal.type);
+            const isNeutral = signal.type === "neutral";
+
+            // ── Color: per-rule override → signal-type default ─────────────
+            const color = signal.markerColor ?? getSignalColor(signal.type);
+
+            // ── Size: per-rule override → strength-derived default ─────────
             const size =
-              signal.strength >= 4 ? 3 : signal.strength >= 2 ? 2 : 1;
+              signal.markerSize ??
+              (signal.strength >= 4 ? 3 : signal.strength >= 2 ? 2 : 1);
+
+            // ── Shape: per-rule override → direction-based default ─────────
+            // Default shapes: buy→arrowUp, sell→arrowDown, neutral→circle
+            const defaultShape = isBuy
+              ? "arrowUp"
+              : isNeutral
+              ? "circle"
+              : "arrowDown";
+            const shape = signal.markerShape ?? defaultShape;
+
+            // ── Position: always driven by signal direction (buy=below, sell=above) ──
+            const position = isBuy
+              ? "belowBar"
+              : isNeutral
+              ? "inBar"
+              : "aboveBar";
 
             return {
               time: signal.time,
-              position: isBuy ? "belowBar" : "aboveBar",
-              color: color,
-              shape: isBuy ? "arrowUp" : "arrowDown",
-              text: signal.type.replace("_", " ").toUpperCase(),
-              size: size,
+              position,
+              color,
+              shape,
+              text: signal.type.replace(/_/g, " ").toUpperCase(),
+              size,
             };
           });
 

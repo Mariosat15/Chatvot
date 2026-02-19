@@ -11,13 +11,17 @@ import {
   SignalType,
 } from "@/database/models/marketplace/marketplace-item.model";
 
-// Signal result
+// Signal result — carries per-rule marker style for chart rendering
 export interface StrategySignal {
   time: number;
   type: SignalType;
   strength: number;
   ruleName: string;
   ruleId: string;
+  // ── Per-rule marker overrides (undefined = use chart renderer defaults) ──
+  markerShape?: string;   // "arrowUp" | "arrowDown" | "circle" | "square"
+  markerColor?: string;   // hex color
+  markerSize?: number;    // 1-5
 }
 
 // Candle data for calculations
@@ -709,6 +713,10 @@ export function generateStrategySignals(
           strength: rule.signalStrength,
           ruleName: rule.name,
           ruleId: rule.id,
+          // Forward per-rule marker overrides (undefined when not set by admin)
+          markerShape: rule.markerShape,
+          markerColor: rule.markerColor,
+          markerSize: rule.markerSize,
         });
       }
     }
