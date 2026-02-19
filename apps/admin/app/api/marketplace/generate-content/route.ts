@@ -396,76 +396,178 @@ Respond in JSON format:
 }`;
 }
 
+// ── Strategy preview builder ─────────────────────────────────────────────────
+// Converts strategyConfig into a human-readable preview identical to the
+// Strategy Preview panel in the StrategyBuilder UI. This is injected verbatim
+// into the AI prompt so the model understands every rule and signal type.
+function buildStrategyPreview(config: Record<string, unknown>): string {
+  const rules = (config.rules as Array<Record<string, unknown>>) || [];
+  if (rules.length === 0) return "No rules defined.";
+
+  const SIGNAL_LABELS: Record<string, string> = {
+    strong_buy:  "STRONG BUY  🟢",
+    buy:         "BUY  🟩",
+    neutral:     "NEUTRAL  ⬜",
+    sell:        "SELL  🟥",
+    strong_sell: "STRONG SELL  🔴",
+  };
+
+  const SHAPE_LABELS: Record<string, string> = {
+    arrowUp:   "Arrow Up ▲",
+    arrowDown: "Arrow Down ▼",
+    circle:    "Circle ●",
+    square:    "Square ■",
+  };
+
+  const lines: string[] = [];
+
+  rules.forEach((rule, idx) => {
+    const name        = (rule.name as string) || `Rule ${idx + 1}`;
+    const signal      = (rule.signal as string) || "buy";
+    const strength    = (rule.signalStrength as number) ?? 3;
+    const logic       = (rule.logic as string) || "AND";
+    const shape       = rule.markerShape
+      ? SHAPE_LABELS[rule.markerShape as string] ?? String(rule.markerShape)
+      : "Auto (by signal type)";
+    const color       = (rule.markerColor as string) || "Default signal color";
+    const size        = rule.markerSize !== undefined ? String(rule.markerSize) : "Auto";
+    const showLabel   = rule.showLabel !== false ? "Yes" : "No";
+    const conditions  = (rule.conditions as Array<Record<string, unknown>>) || [];
+
+    lines.push(`\nRule ${idx + 1}: "${name}"`);
+    lines.push(`  → Signal:   ${SIGNAL_LABELS[signal] ?? signal.toUpperCase()}`);
+    lines.push(`  → Strength: ${strength} / 5`);
+    lines.push(`  → Marker:   Shape=${shape}  Color=${color}  Size=${size}  Show label=${showLabel}`);
+
+    if (conditions.length === 0) {
+      lines.push(`  → Conditions: (none)`);
+    } else {
+      lines.push(`  → Conditions (combined with ${logic}):`);
+      conditions.forEach((c, ci) => {
+        const ind     = c.indicator as string;
+        const params  = c.indicatorParams
+          ? ` (${Object.entries(c.indicatorParams as Record<string, number>).map(([k, v]) => `${k}=${v}`).join(", ")})`
+          : "";
+        const op      = (c.operator as string)?.replace(/_/g, " ") ?? "?";
+        const compare =
+          c.compareWith === "value"
+            ? `value ${c.compareValue ?? 0}`
+            : `${c.compareIndicator ?? "indicator"}${
+                c.compareIndicatorParams
+                  ? ` (${Object.entries(c.compareIndicatorParams as Record<string, number>).map(([k, v]) => `${k}=${v}`).join(", ")})`
+                  : ""
+              }`;
+        lines.push(`     ${ci + 1}. ${ind}${params}  ${op}  ${compare}`);
+      });
+    }
+  });
+
+  // Signal display settings
+  const display = config.signalDisplay as Record<string, unknown> | undefined;
+  if (display) {
+    lines.push(`\nDisplay settings:`);
+    lines.push(`  Show on chart: ${display.showOnChart !== false ? "Yes" : "No"}`);
+    lines.push(`  Show arrows:   ${display.showArrows !== false ? "Yes" : "No"}`);
+    lines.push(`  Show labels:   ${display.showLabels !== false ? "Yes" : "No"}`);
+    lines.push(`  Arrow size:    ${display.arrowSize ?? "medium"}`);
+  }
+
+  // Default indicators
+  const defaultInds = (config.defaultIndicators as string[]) || [];
+  if (defaultInds.length > 0) {
+    lines.push(`\nDefault indicators enabled: ${defaultInds.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
+
 // Prompt for trading strategies
 function getStrategyPrompt(strategyConfig?: Record<string, unknown>): string {
+  const config = strategyConfig || {};
+  const preview = buildStrategyPreview(config);
+  const rulesCount = ((config.rules as unknown[]) || []).length;
+
+  // Derive signal summary for the prompt context
+  const rules = (config.rules as Array<Record<string, unknown>>) || [];
+  const signalSummary = rules
+    .map((r) => {
+      const signal = (r.signal as string) || "buy";
+      const name   = (r.name as string) || "Rule";
+      const shape  = r.markerShape ? `shown as ${r.markerShape}` : "shown as arrow";
+      const color  = r.markerColor ? ` in color ${r.markerColor}` : "";
+      const label  = r.showLabel !== false ? " with label" : " without label";
+      return `  • "${name}" → ${signal.replace(/_/g, " ").toUpperCase()} (strength ${r.signalStrength ?? 3}, ${shape}${color}${label})`;
+    })
+    .join("\n");
+
   return `You are a professional trading platform content writer. Create compelling marketplace content for an automated trading strategy.
 
-Strategy configuration: ${JSON.stringify(strategyConfig || {}, null, 2)}
+═══════════════════════════════════════════════════════════
+STRATEGY PREVIEW (${rulesCount} signal rule${rulesCount !== 1 ? "s" : ""})
+═══════════════════════════════════════════════════════════
+${preview}
+═══════════════════════════════════════════════════════════
+
+SIGNAL TYPES PRODUCED BY THIS STRATEGY:
+${signalSummary || "  (none defined yet)"}
+
+Raw configuration (for reference): ${JSON.stringify(config, null, 2)}
 
 Create content that:
-1. Explains the strategy logic clearly
-2. Highlights when and why it generates signals
-3. Mentions risk level and ideal market conditions
-4. Includes clear, beginner-friendly instructions on how to activate and use the strategy on the platform
-5. Is professional and builds confidence
+1. Explains each rule's logic in plain English — name the signal type it generates (Strong Buy, Buy, Sell, Strong Sell, Neutral)
+2. Describes what the visual markers look like on the chart for each signal (arrow up/down, circle, square; the color and size if set)
+3. Explains whether labels appear on markers or not
+4. Highlights when and why the strategy generates each signal type
+5. Mentions risk level and ideal market conditions
+6. Includes clear, beginner-friendly instructions on how to activate and use the strategy on the platform
+7. Is professional and builds confidence
+8. References the actual rule names and signal types from the preview above
 
 Your task is to create:
 
-1. **Name** (2-4 words max) - Professional, memorable strategy name.
+1. **Name** (2-4 words max) - Professional, memorable strategy name inspired by the actual rules.
 
-2. **Short Description** (max 120 characters) - One-liner explaining the strategy's approach.
+2. **Short Description** (max 120 characters) - One-liner explaining the strategy's approach and signal types.
 
 3. **Full Description** - Use this EXACT format:
 
 # [Strategy Name]
 
 ## Overview
-[1-2 paragraphs explaining the strategy philosophy and what makes it effective]
+[1-2 paragraphs explaining the strategy philosophy. Reference the actual signal tiers — e.g. "This strategy produces ${rulesCount} signal types..."]
 
-## Buy Signal (When to Enter Long)
-[Clear explanation of buy conditions]
-- [Condition 1]
-- [Condition 2]
-
-## Sell Signal (When to Exit/Short)
-[Clear explanation of sell conditions]
-- [Condition 1]
-- [Condition 2]
-
-## How It Works
-[Step-by-step explanation of the strategy logic]
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
+## Signal Rules
+[For EACH rule in the strategy preview above, write a clear paragraph or bullet block:]
+### [Rule Name] → [SIGNAL TYPE]
+- Triggers when: [natural-language description of the conditions]
+- Chart marker: [describe the shape, color, size, whether label shows]
+- Strength: [strength value / 5]
 
 ## How to Use
-[Step-by-step instructions for using this strategy on the platform]
 1. After purchasing, go to the **Trading Chart** page.
 2. Open the **Trading Arsenal** panel (the rocket icon on the left sidebar).
 3. Find this strategy under your **Purchased Strategies** section.
 4. Toggle it **ON** to activate it on your chart.
-5. The strategy will display **Buy** and **Sell** signals directly on your chart as visual markers.
-6. [Explain what the visual signals look like -- e.g., "Green arrows appear below candles for Buy signals, red arrows above candles for Sell signals"]
-7. Review each signal before placing a trade -- use it as guidance, not as a guarantee.
+5. [Describe what each signal type looks like visually — reference the actual shapes and colors from the rules]
+6. [Explain how to interpret each signal type for trade decisions]
+7. Review each signal before placing a trade — use it as guidance, not a guarantee.
 8. You can combine this strategy with other indicators from your Trading Arsenal for extra confirmation.
 
-**Important:** This strategy provides signals for educational purposes. Always apply your own risk management (stop-loss, position sizing) before entering any trade.
-
 ## Best Used For
-[Ideal market conditions and trading styles]
+[Ideal market conditions and trading styles based on the actual signal logic]
 - [Use case 1]
 - [Use case 2]
 
-## Risk Level
-[Assessment of risk with brief explanation]
+## Risk Warning
+No strategy guarantees profits. This strategy is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.
 
-*"[A memorable trading wisdom quote related to the strategy]"*
+*"[A memorable trading wisdom quote related to this specific strategy's approach]"*
 
 Respond in JSON format:
 {
   "name": "Strategy Name",
   "shortDescription": "Short description under 120 chars",
-  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n## How to Use\\n1. [steps]\\n\\n..."
+  "fullDescription": "# Title\\n\\n## Overview\\n[content]\\n\\n## Signal Rules\\n### Rule Name\\n- [details]\\n\\n## How to Use\\n1. [steps]\\n\\n## Risk Warning\\n..."
 }`;
 }
 
