@@ -1972,6 +1972,40 @@ const SOLARIS_TREND_ENGINE: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const STELLAR_CONFLUENCE_RIBBON: Partial<IMarketplaceItem> = {
+  name: "Stellar Confluence Ribbon",
+  slug: "stellar-confluence-ribbon",
+  shortDescription:
+    "Hybrid overlay blending KAMA, Hull MA and McGinley Dynamic into one glowing adaptive ribbon with ATR bands, confluence scoring, node markers and STELLAR fusion signals.",
+  fullDescription: `# Stellar Confluence Ribbon (SCR)\n\n## Overview\n**Stellar Confluence Ribbon** weaves KAMA, Hull MA, and McGinley Dynamic into a single inverse-distance weighted core line, surrounded by inner (1.5 ATR) and outer (2.8 ATR) adaptive arcs. A real-time Confluence Score (0–100) measures how aligned all three MAs are with price direction, and glowing node markers appear at peak agreement moments.\n\n## Signal Types\n- **✦ STELLAR BULL**: All 3 MAs aligned bullish + Confluence Score ≥ threshold → enter long\n- **✦ STELLAR BEAR**: All 3 MAs aligned bearish + Confluence Score ≥ threshold → enter short\n\n## Visual Guide\n- 💎 Neon Cyan core → strong bull trend\n- 🔴 Hot Crimson core → strong bear trend\n- ⚪ Silver core → neutral/wait\n- Node dots → peak confluence, best add-to-position moments\n- Inner ribbon → active trend zone\n- Outer arc → extended / extreme zone\n\n## How to Trade\n1. Enter on STELLAR signal, stop beyond outer arc\n2. Trail stop to inner ribbon as profit builds\n3. Add on node dot appearances during trend\n4. Avoid new entries when core line is silver`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 64.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "stellar_confluence_ribbon",
+  iconName: "Sparkles",
+  codeTemplate: JSON.stringify({
+    type: "stellar_confluence_ribbon",
+    displayType: "overlay",
+    description: "Hybrid: KAMA + Hull MA + McGinley Dynamic with ATR ribbon, confluence scoring, node markers and STELLAR signals",
+  }),
+  defaultSettings: {
+    blendPeriod: 21,
+    atrPeriod: 14,
+    innerMult: 1.5,
+    outerMult: 2.8,
+    confluenceThreshold: 70,
+    nodeThreshold: 80,
+    color: "#00f0ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kama", "hull-ma", "mcginley", "hybrid", "composite", "trend", "ribbon", "premium", "overlay", "adaptive", "confluence", "multi-ma", "node"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -1995,6 +2029,7 @@ const ALL_ITEMS = [
   QUANTUM_DRIFT_MAPPER,
   SOVEREIGN_GRAVITY_ARC,
   SOLARIS_TREND_ENGINE,
+  STELLAR_CONFLUENCE_RIBBON,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -51,7 +51,8 @@ export type IndicatorType =
   | "mirage_depth_scanner"
   | "quantum_drift_mapper"
   | "sovereign_gravity_arc"
-  | "solaris_trend_engine";
+  | "solaris_trend_engine"
+  | "stellar_confluence_ribbon";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -516,6 +517,8 @@ const INDICATOR_TYPE_MAP: Record<
   "sovereign gravity arc": { type: "sovereign_gravity_arc", displayType: "overlay" },
   solaris_trend_engine: { type: "solaris_trend_engine", displayType: "overlay" },
   "solaris trend engine": { type: "solaris_trend_engine", displayType: "overlay" },
+  stellar_confluence_ribbon: { type: "stellar_confluence_ribbon", displayType: "overlay" },
+  "stellar confluence ribbon": { type: "stellar_confluence_ribbon", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -873,6 +876,14 @@ export function marketplaceItemToIndicator(
       params.supertrendMult = settings?.supertrendMult || 3.0;
       params.adxPeriod = settings?.adxPeriod || 14;
       params.adxThreshold = settings?.adxThreshold || 25;
+      break;
+    case "stellar_confluence_ribbon":
+      params.blendPeriod = settings?.blendPeriod || 21;
+      params.atrPeriod = settings?.atrPeriod || 14;
+      params.innerMult = settings?.innerMult || 1.5;
+      params.outerMult = settings?.outerMult || 2.8;
+      params.confluenceThreshold = settings?.confluenceThreshold || 70;
+      params.nodeThreshold = settings?.nodeThreshold || 80;
       break;
     default:
       // Generic period-based indicators

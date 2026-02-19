@@ -112,6 +112,7 @@ import {
   calculateQuantumDriftMapper,
   calculateSovereignGravityArc,
   calculateSolarisTrendEngine,
+  calculateStellarConfluenceRibbon,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3283,6 +3284,84 @@ const LightweightTradingChart = ({
             indicatorSeriesRef.current.set(`${indicator.id}_sar`, steSarSeries);
           }
 
+        } else if (indicator.type === "stellar_confluence_ribbon") {
+          const scrData = calculateStellarConfluenceRibbon(
+            transformedCandles,
+            indicator.parameters.blendPeriod || 21,
+            indicator.parameters.atrPeriod || 14,
+            indicator.parameters.innerMult || 1.5,
+            indicator.parameters.outerMult || 2.8,
+            indicator.parameters.confluenceThreshold || 70,
+            indicator.parameters.nodeThreshold || 80,
+          );
+
+          // Color helper — neon cyan bull, crimson bear, silver neutral
+          const scrCoreColor = (trend: string, score: number, threshold: number): string => {
+            if (trend === "bull") return score >= threshold * 1.1 ? "#00f0ff" : score >= threshold ? "#40c4ff" : "#78909c";
+            if (trend === "bear") return score >= threshold * 1.1 ? "#ff2d6d" : score >= threshold ? "#ff6e7f" : "#78909c";
+            return "#90a4ae";
+          };
+
+          // Build node + signal markers together on the core series
+          const scrMarkers: any[] = [];
+          const thr = indicator.parameters.confluenceThreshold || 70;
+          for (const d of scrData) {
+            if (d.signal === "stellar_bull") {
+              scrMarkers.push({ time: d.time as UTCTimestamp, position: "belowBar" as const, color: "#00f0ff", shape: "arrowUp" as const, text: "✦ STELLAR", size: 2 });
+            } else if (d.signal === "stellar_bear") {
+              scrMarkers.push({ time: d.time as UTCTimestamp, position: "aboveBar" as const, color: "#ff2d6d", shape: "arrowDown" as const, text: "✦ STELLAR", size: 2 });
+            } else if (d.nodePoint) {
+              scrMarkers.push({ time: d.time as UTCTimestamp, position: "inBar" as const, color: d.trend === "bull" ? "#00f0ff" : "#ff2d6d", shape: "circle" as const, text: "", size: 1 });
+            }
+          }
+
+          // ── Outer Upper Arc (faint dashed) ────────────────────────────
+          const scrOuterUp = chart.addLineSeries({
+            color: "rgba(144,164,174,0.25)", lineWidth: 1 as any, lineStyle: 3 as any,
+            title: `${indicator.customLabel || "SCR"} OA+`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+          });
+          scrOuterUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: d.trend === "bull" ? "rgba(0,240,255,0.18)" : d.trend === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)" })));
+          indicatorSeriesRef.current.set(`${indicator.id}_outerUp`, scrOuterUp);
+
+          // ── Inner Upper Ribbon ─────────────────────────────────────────
+          const scrInnerUp = chart.addLineSeries({
+            color: "rgba(0,240,255,0.5)", lineWidth: 1 as any, lineStyle: 0 as any,
+            title: `${indicator.customLabel || "SCR"} R+`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+          });
+          scrInnerUp.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: d.trend === "bull" ? "rgba(0,240,255,0.6)" : d.trend === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)" })));
+          indicatorSeriesRef.current.set(`${indicator.id}_innerUp`, scrInnerUp);
+
+          // ── Core Blend Line (main, thick, glowing) ────────────────────
+          const scrCoreSeries = chart.addLineSeries({
+            color: "#00f0ff", lineWidth: 3 as any, lineStyle: 0 as any,
+            title: indicator.customLabel || "Stellar Confluence Ribbon", priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 },
+          });
+          scrCoreSeries.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrCoreColor(d.trend, d.confluenceScore, thr) })));
+          indicatorSeriesRef.current.set(`${indicator.id}_core`, scrCoreSeries);
+          const sortedScr = scrMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number));
+          try { scrCoreSeries.setMarkers(sortedScr); } catch {}
+
+          // ── Inner Lower Ribbon ─────────────────────────────────────────
+          const scrInnerLo = chart.addLineSeries({
+            color: "rgba(0,240,255,0.5)", lineWidth: 1 as any, lineStyle: 0 as any,
+            title: `${indicator.customLabel || "SCR"} R-`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+          });
+          scrInnerLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: d.trend === "bull" ? "rgba(0,240,255,0.6)" : d.trend === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)" })));
+          indicatorSeriesRef.current.set(`${indicator.id}_innerLo`, scrInnerLo);
+
+          // ── Outer Lower Arc (faint dashed) ─────────────────────────────
+          const scrOuterLo = chart.addLineSeries({
+            color: "rgba(144,164,174,0.25)", lineWidth: 1 as any, lineStyle: 3 as any,
+            title: `${indicator.customLabel || "SCR"} OA-`, priceScaleId: "right",
+            priceFormat: { type: "price", precision: indicator.precision || 5 }, lastValueVisible: false,
+          });
+          scrOuterLo.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: d.trend === "bull" ? "rgba(0,240,255,0.18)" : d.trend === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)" })));
+          indicatorSeriesRef.current.set(`${indicator.id}_outerLo`, scrOuterLo);
+
         } else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
@@ -3924,6 +4003,35 @@ const LightweightTradingChart = ({
                     if (uS) uS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperBand, color: d.trend === "bull" ? "rgba(239,83,80,0.35)" : "rgba(239,83,80,0.65)" })));
                     if (lS) lS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerBand, color: d.trend === "bear" ? "rgba(38,166,154,0.35)" : "rgba(38,166,154,0.65)" })));
                     if (sarS) sarS.setData(steData.map(d => ({ time: d.time as UTCTimestamp, value: d.sarDot, color: d.sarDot > d.solarCore ? "rgba(239,83,80,0.7)" : "rgba(38,166,154,0.7)" })));
+                  }
+                }
+              } else if (_ovlType === "stellar_confluence_ribbon") {
+                const scrData = calculateStellarConfluenceRibbon(
+                  tc, p.blendPeriod || 21, p.atrPeriod || 14, p.innerMult || 1.5, p.outerMult || 2.8, p.confluenceThreshold || 70, p.nodeThreshold || 80,
+                );
+                if (scrData.length > 0) {
+                  const thr2 = p.confluenceThreshold || 70;
+                  const scrC = (trend: string, score: number) => trend === "bull" ? (score >= thr2 * 1.1 ? "#00f0ff" : score >= thr2 ? "#40c4ff" : "#78909c") : trend === "bear" ? (score >= thr2 * 1.1 ? "#ff2d6d" : score >= thr2 ? "#ff6e7f" : "#78909c") : "#90a4ae";
+                  const bandBullC = (t: string) => t === "bull" ? "rgba(0,240,255,0.6)" : t === "bear" ? "rgba(255,45,109,0.6)" : "rgba(144,164,174,0.35)";
+                  const outerC = (t: string) => t === "bull" ? "rgba(0,240,255,0.18)" : t === "bear" ? "rgba(255,45,109,0.18)" : "rgba(144,164,174,0.15)";
+                  const coreS = _ovlSeriesMap.get(`${_ovlId}_core`);
+                  const iuS = _ovlSeriesMap.get(`${_ovlId}_innerUp`);
+                  const ilS = _ovlSeriesMap.get(`${_ovlId}_innerLo`);
+                  const ouS = _ovlSeriesMap.get(`${_ovlId}_outerUp`);
+                  const olS = _ovlSeriesMap.get(`${_ovlId}_outerLo`);
+                  if (mode === "light") {
+                    const last = scrData[scrData.length - 1];
+                    if (coreS) coreS.update({ time: last.time as UTCTimestamp, value: last.coreBlend, color: scrC(last.trend, last.confluenceScore) } as any);
+                    if (iuS) iuS.update({ time: last.time as UTCTimestamp, value: last.upperRibbon, color: bandBullC(last.trend) } as any);
+                    if (ilS) ilS.update({ time: last.time as UTCTimestamp, value: last.lowerRibbon, color: bandBullC(last.trend) } as any);
+                    if (ouS) ouS.update({ time: last.time as UTCTimestamp, value: last.outerUpper, color: outerC(last.trend) } as any);
+                    if (olS) olS.update({ time: last.time as UTCTimestamp, value: last.outerLower, color: outerC(last.trend) } as any);
+                  } else {
+                    if (coreS) coreS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.coreBlend, color: scrC(d.trend, d.confluenceScore) })));
+                    if (iuS) iuS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.upperRibbon, color: bandBullC(d.trend) })));
+                    if (ilS) ilS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.lowerRibbon, color: bandBullC(d.trend) })));
+                    if (ouS) ouS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerUpper, color: outerC(d.trend) })));
+                    if (olS) olS.setData(scrData.map(d => ({ time: d.time as UTCTimestamp, value: d.outerLower, color: outerC(d.trend) })));
                   }
                 }
               }

@@ -442,6 +442,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { kamaFast: 2, kamaSlow: 30, atrPeriod: 14, supertrendMult: 3.0, adxPeriod: 14, adxThreshold: 25 },
     paramLabels: { kamaFast: "KAMA Fast", kamaSlow: "KAMA Slow", atrPeriod: "ATR Period", supertrendMult: "Supertrend Mult", adxPeriod: "ADX Period", adxThreshold: "ADX Threshold" },
   },
+  stellar_confluence_ribbon: {
+    name: "Stellar Confluence Ribbon",
+    shortName: "SCR",
+    displayType: "overlay" as const,
+    defaultParams: { blendPeriod: 21, atrPeriod: 14, innerMult: 1.5, outerMult: 2.8, confluenceThreshold: 70, nodeThreshold: 80 },
+    paramLabels: { blendPeriod: "Blend Period", atrPeriod: "ATR Period", innerMult: "Inner ATR Mult", outerMult: "Outer ATR Mult", confluenceThreshold: "Confluence Threshold", nodeThreshold: "Node Threshold" },
+  },
 };
 
 const DEFAULT_COLORS = [

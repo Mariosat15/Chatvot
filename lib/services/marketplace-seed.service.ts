@@ -2520,6 +2520,93 @@ A fast EMA vs slow EMA cross provides the final confirmation layer. All three di
   riskLevel: "medium",
 };
 
+const STELLAR_CONFLUENCE_RIBBON = {
+  name: "Stellar Confluence Ribbon",
+  slug: "stellar-confluence-ribbon",
+  description: `## Stellar Confluence Ribbon
+
+**Stellar Confluence Ribbon** is a cutting-edge hybrid composite indicator that weaves together three of the most adaptive moving averages ever designed — **KAMA**, **Hull MA**, and **McGinley Dynamic** — into a single intelligent, glowing trend ribbon. Inspired by multi-dimensional trend analysis, it produces a visually stunning on-chart overlay that traders can read at a glance.
+
+### The Three Intelligence Engines
+
+**1. KAMA — Kaufman Adaptive Moving Average**
+KAMA is the cornerstone of the blend. It adapts its smoothing coefficient using the **Efficiency Ratio** — a measure of how directional price movement is versus total noise. In trending markets KAMA accelerates; in choppy markets it slows to near-flat.
+
+**2. Hull MA (HMA)**
+The fastest reliable moving average. HMA uses a clever weighted-moving-average construction to reduce lag to near-zero while remaining smooth. It gives the ribbon its leading edge — often turning before traditional MAs even react.
+
+**3. McGinley Dynamic**
+A self-adjusting MA that corrects for speed variations in the market. It tracks slower in rallies and faster in declines, providing asymmetric adaptation that standard EMAs cannot match.
+
+### Inverse-Distance Blend
+All three MAs are combined using an **inverse-distance weighting** — the MA that is closest to current price gets the highest weight in the blend. This creates a dynamically responsive core line that self-prioritizes the most relevant indicator for current market conditions.
+
+### The Ribbon Structure
+
+| Layer | Description |
+|---|---|
+| **Core Blend Line** | The glowing adaptive spine — thick, color-coded |
+| **Inner Ribbon** (±1.5 ATR) | First boundary — active trend zone |
+| **Outer Arc** (±2.8 ATR) | Second boundary — extreme extension zone |
+
+### Confluence Score
+A real-time 0–100 score measuring how aligned all three MAs are with price direction over the last N bars. Higher score = stronger, more reliable trend.
+
+### Node Points
+When the confluence score hits a **local peak ≥ 80**, a glowing **node dot** appears on the core line — exactly like the neural network nodes in the indicator image. These mark moments of maximum multi-MA agreement.
+
+### Signals
+- **✦ STELLAR BULL** (cyan arrow below bar): All three MAs aligned bullish + Confluence Score ≥ threshold + fresh trend flip → enter long
+- **✦ STELLAR BEAR** (rose arrow above bar): All three MAs aligned bearish + Confluence Score ≥ threshold + fresh trend flip → enter short
+
+### Visual Color System
+
+| State | Core Line Color |
+|---|---|
+| Bull trend, high confluence | 💎 Neon Cyan \`#00f0ff\` |
+| Bull trend, building | 🔵 Sky Blue \`#40c4ff\` |
+| Bear trend, high confluence | 🔴 Hot Crimson \`#ff2d6d\` |
+| Bear trend, building | 🟠 Amber Rose \`#ff6e7f\` |
+| Neutral / transition | ⚪ Silver \`#90a4ae\` |
+
+## How to Trade
+
+1. **STELLAR BULL ✦** arrow: Enter long. Set stop below the outer lower arc (−2.8 ATR). Trail stop to inner lower ribbon (−1.5 ATR) as profit builds.
+2. **STELLAR BEAR ✦** arrow: Enter short. Set stop above the outer upper arc (+2.8 ATR). Trail stop to inner upper ribbon as profit builds.
+3. **Node dots on core line**: Maximum confluence — best time to add to winning positions.
+4. **Cyan core line**: Active bull trend. Hold longs while price stays above the inner ribbon.
+5. **Crimson core line**: Active bear trend. Hold shorts while price stays below the inner ribbon.
+6. **Silver core line**: Consolidation. Wait for next STELLAR signal. No new entries.
+7. **Price touching inner ribbon**: Potential pullback entry in the trend direction — lower risk re-entry point.
+8. **Price reaching outer arc**: Extended move — consider partial profit-taking.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 64.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "stellar_confluence_ribbon",
+  iconName: "Sparkles",
+  codeTemplate: JSON.stringify({
+    type: "stellar_confluence_ribbon",
+    displayType: "overlay",
+    description: "Hybrid: KAMA + Hull MA + McGinley Dynamic inverse-distance blend with ATR ribbon, confluence scoring, node markers and STELLAR signals",
+  }),
+  defaultSettings: {
+    blendPeriod: 21,
+    atrPeriod: 14,
+    innerMult: 1.5,
+    outerMult: 2.8,
+    confluenceThreshold: 70,
+    nodeThreshold: 80,
+    color: "#00f0ff",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["kama", "hull-ma", "mcginley", "hybrid", "composite", "trend", "ribbon", "premium", "overlay", "adaptive", "confluence", "multi-ma", "node"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2543,6 +2630,7 @@ const ALL_ITEMS = [
   QUANTUM_DRIFT_MAPPER,
   SOVEREIGN_GRAVITY_ARC,
   SOLARIS_TREND_ENGINE,
+  STELLAR_CONFLUENCE_RIBBON,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

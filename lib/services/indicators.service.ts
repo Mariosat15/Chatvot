@@ -5823,3 +5823,149 @@ export function calculateSolarisTrendEngine(
 
   return result;
 }
+
+// ============================================================================
+// STELLAR CONFLUENCE RIBBON — KAMA + Hull MA + McGinley Adaptive Blend
+// Multi-dimensional ribbon with confluence scoring & node markers
+// ============================================================================
+
+export interface StellarConfluenceRibbonData {
+  time: number;
+  coreBlend: number;       // Weighted adaptive blend (KAMA + HMA + McGinley)
+  upperRibbon: number;     // Core + ATR × innerMult (inner band)
+  lowerRibbon: number;     // Core - ATR × innerMult
+  outerUpper: number;      // Core + ATR × outerMult (outer boundary)
+  outerLower: number;      // Core - ATR × outerMult
+  confluenceScore: number; // 0-100: MA agreement strength
+  trend: "bull" | "bear" | "neutral";
+  signal: "stellar_bull" | "stellar_bear" | "none";
+  nodePoint: boolean;      // True at local confluence peak ≥ nodeThreshold
+}
+
+export function calculateStellarConfluenceRibbon(
+  data: OHLCData[],
+  blendPeriod: number = 21,
+  atrPeriod: number = 14,
+  innerMult: number = 1.5,
+  outerMult: number = 2.8,
+  confluenceThreshold: number = 70,
+  nodeThreshold: number = 80,
+): StellarConfluenceRibbonData[] {
+  const minBars = blendPeriod * 2 + atrPeriod + 5;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. KAMA ─────────────────────────────────────────────────────────────
+  const kamaFastK = 2 / (2 + 1);
+  const kamaSlowK = 2 / (blendPeriod + 1);
+  const kama = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod; i < len; i++) {
+    const direction = Math.abs(closes[i] - closes[i - blendPeriod]);
+    let volatility = 0;
+    for (let j = i - blendPeriod + 1; j <= i; j++) volatility += Math.abs(closes[j] - closes[j - 1]);
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = Math.pow(er * (kamaFastK - kamaSlowK) + kamaSlowK, 2);
+    kama[i] = kama[i - 1] + sc * (closes[i] - kama[i - 1]);
+  }
+
+  // ── 2. Hull MA (HMA) ─────────────────────────────────────────────────────
+  const wma = (arr: number[], n: number, end: number): number => {
+    if (end < n - 1) return arr[Math.max(0, end)];
+    let num = 0, den = 0;
+    for (let j = 0; j < n; j++) { num += (j + 1) * arr[end - n + 1 + j]; den += j + 1; }
+    return den > 0 ? num / den : arr[end];
+  };
+  const halfP = Math.max(2, Math.floor(blendPeriod / 2));
+  const sqrtP = Math.max(2, Math.round(Math.sqrt(blendPeriod)));
+  const hmaInner = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod - 1; i < len; i++) {
+    hmaInner[i] = 2 * wma(closes, halfP, i) - wma(closes, blendPeriod, i);
+  }
+  const hma = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod - 1 + sqrtP - 1; i < len; i++) {
+    hma[i] = wma(hmaInner, sqrtP, i);
+  }
+
+  // ── 3. McGinley Dynamic ──────────────────────────────────────────────────
+  const mcg = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) {
+    const ratio = mcg[i - 1] > 0 ? closes[i] / mcg[i - 1] : 1;
+    const denom = blendPeriod * Math.pow(ratio, 4);
+    mcg[i] = denom > 0 ? mcg[i - 1] + (closes[i] - mcg[i - 1]) / denom : mcg[i - 1];
+  }
+
+  // ── 4. Inverse-distance Weighted Blend (closest MA to price gets highest weight) ──
+  const blend = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod; i < len; i++) {
+    const dKama = Math.abs(closes[i] - kama[i]) + 1e-9;
+    const dHma = Math.abs(closes[i] - hma[i]) + 1e-9;
+    const dMcg = Math.abs(closes[i] - mcg[i]) + 1e-9;
+    const wKama = 1 / dKama; const wHma = 1 / dHma; const wMcg = 1 / dMcg;
+    const wSum = wKama + wHma + wMcg;
+    blend[i] = (kama[i] * wKama + hma[i] * wHma + mcg[i] * wMcg) / wSum;
+  }
+
+  // ── 5. ATR ───────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 6. Confluence Score: % of last blendPeriod bars all 3 MAs agree ─────
+  const confScore = new Array(len).fill(50);
+  for (let i = blendPeriod; i < len; i++) {
+    let agree = 0;
+    for (let j = i - blendPeriod + 1; j <= i; j++) {
+      const b = closes[j] > kama[j] && closes[j] > hma[j] && closes[j] > mcg[j];
+      const be = closes[j] < kama[j] && closes[j] < hma[j] && closes[j] < mcg[j];
+      if (b || be) agree++;
+    }
+    confScore[i] = (agree / blendPeriod) * 100;
+  }
+
+  // ── 7. Build Output ──────────────────────────────────────────────────────
+  const result: StellarConfluenceRibbonData[] = [];
+  let prevTrend2: StellarConfluenceRibbonData["trend"] = "neutral";
+  let prevConf = 50;
+
+  for (let i = minBars; i < len; i++) {
+    const core = blend[i];
+    const atrVal = atr[i];
+    const score = confScore[i];
+
+    const allBull = kama[i] > kama[i - 1] && hma[i] > hma[i - 1] && mcg[i] > mcg[i - 1] && closes[i] > core;
+    const allBear = kama[i] < kama[i - 1] && hma[i] < hma[i - 1] && mcg[i] < mcg[i - 1] && closes[i] < core;
+    const trend2: StellarConfluenceRibbonData["trend"] = allBull ? "bull" : allBear ? "bear" : "neutral";
+
+    let signal2: StellarConfluenceRibbonData["signal"] = "none";
+    if (trend2 === "bull" && prevTrend2 !== "bull" && score >= confluenceThreshold) signal2 = "stellar_bull";
+    else if (trend2 === "bear" && prevTrend2 !== "bear" && score >= confluenceThreshold) signal2 = "stellar_bear";
+
+    const nodePoint = score >= nodeThreshold && score >= prevConf && trend2 !== "neutral";
+
+    prevTrend2 = trend2;
+    prevConf = score;
+
+    result.push({
+      time: data[i].time,
+      coreBlend: core,
+      upperRibbon: core + atrVal * innerMult,
+      lowerRibbon: core - atrVal * innerMult,
+      outerUpper: core + atrVal * outerMult,
+      outerLower: core - atrVal * outerMult,
+      confluenceScore: score,
+      trend: trend2,
+      signal: signal2,
+      nodePoint,
+    });
+  }
+
+  return result;
+}
