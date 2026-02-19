@@ -93,10 +93,11 @@ export async function GET() {
           .lean()
       : [];
 
-    // ── 6. Open positions ──────────────────────────────────────────────────────
-    const openPositions = activeCompIds.length
+    // ── 6. Open positions (competitions AND challenges both store under competitionId) ──
+    const allEventIds = [...activeCompIds, ...activeChallengeIds];
+    const openPositions = allEventIds.length
       ? await TradingPosition.find({
-          competitionId: { $in: activeCompIds },
+          competitionId: { $in: allEventIds },
           status: "open",
         })
           .select(
@@ -130,12 +131,60 @@ export async function GET() {
       }
     }
 
-    // ── 8. Live unrealized PnL from open positions ────────────────────────────
+    // ── 8. Latest price snapshot (needed for live PnL recalculation) ─────────
+    let latestPrices: Record<string, { bid: number; ask: number; mid: number }> = {};
+    try {
+      const snapshot = await PriceSnapshot.findOne()
+        .sort({ timestamp: -1 })
+        .lean();
+      if (snapshot) {
+        const priceList: any[] = Array.isArray((snapshot as any).prices)
+          ? (snapshot as any).prices
+          : [];
+        for (const entry of priceList) {
+          if (entry.isValid && entry.symbol) {
+            latestPrices[entry.symbol] = {
+              bid: entry.bid,
+              ask: entry.ask,
+              mid: entry.mid,
+            };
+          }
+        }
+      }
+    } catch {
+      // Prices are optional — don't fail the whole request
+    }
+
+    // ── 9. Live unrealized PnL — recalculated from live prices ───────────────
+    // PnL formula (matches trading engine exactly):
+    //   Long:  (livePrice - entryPrice) × lots × contractSize
+    //   Short: (entryPrice - livePrice) × lots × contractSize
+    // All supported pairs use contractSize = 100,000
     const liveUnrealizedByUser: Record<string, number> = {};
     for (const pos of openPositions as any[]) {
       const uid = pos.userId as string;
-      liveUnrealizedByUser[uid] =
-        (liveUnrealizedByUser[uid] || 0) + ((pos.unrealizedPnl as number) || 0);
+
+      // Normalise symbol: "EUR/USD" → "EURUSD" to match snapshot keys
+      const sym = ((pos.symbol as string) || "").replace("/", "");
+      const priceData = latestPrices[sym];
+      let posLivePnl: number;
+
+      if (priceData && (pos.entryPrice as number) && (pos.quantity as number)) {
+        const marketPrice =
+          pos.side === "long" ? priceData.bid : priceData.ask;
+        const priceChange =
+          pos.side === "long"
+            ? marketPrice - (pos.entryPrice as number)
+            : (pos.entryPrice as number) - marketPrice;
+        posLivePnl = Number(
+          (priceChange * (pos.quantity as number) * 100000).toFixed(2),
+        );
+      } else {
+        // Fall back to stored value if no live price available
+        posLivePnl = (pos.unrealizedPnl as number) || 0;
+      }
+
+      liveUnrealizedByUser[uid] = (liveUnrealizedByUser[uid] || 0) + posLivePnl;
     }
 
     // ── Helper: enrich participant ─────────────────────────────────────────────
@@ -204,7 +253,7 @@ export async function GET() {
       };
     }
 
-    // ── 9. Build position map per competition ──────────────────────────────────
+    // ── 10. Build position map per competition ─────────────────────────────────
     const positionsByComp: Record<string, unknown[]> = {};
     const usernameMap: Record<string, string> = {};
     for (const p of allParticipants as any[]) {
@@ -238,7 +287,7 @@ export async function GET() {
       });
     }
 
-    // ── 10. Format competitions ────────────────────────────────────────────────
+    // ── 11. Format competitions ────────────────────────────────────────────────
     const formattedCompetitions = (competitions as any[]).map((c) => {
       const cid = c._id.toString();
       const isActive = c.status === "active";
@@ -313,7 +362,7 @@ export async function GET() {
       };
     });
 
-    // ── 11. Format challenges ──────────────────────────────────────────────────
+    // ── 12. Format challenges ──────────────────────────────────────────────────
     const formattedChallenges = (challenges as any[]).map((c) => {
       const cid = c._id.toString();
       const startingCapital = (c.startingCapital as number) || 10000;
@@ -384,34 +433,6 @@ export async function GET() {
         prizeDistribution: [],
       };
     });
-
-    // ── 12. Latest price snapshot ──────────────────────────────────────────────
-    let latestPrices: Record<
-      string,
-      { bid: number; ask: number; mid: number }
-    > = {};
-    try {
-      const snapshot = await PriceSnapshot.findOne()
-        .sort({ timestamp: -1 })
-        .lean();
-      if (snapshot) {
-        const snapshotAny = snapshot as any;
-        const priceList: any[] = Array.isArray(snapshotAny.prices)
-          ? snapshotAny.prices
-          : [];
-        for (const entry of priceList) {
-          if (entry.isValid && entry.symbol) {
-            latestPrices[entry.symbol] = {
-              bid: entry.bid,
-              ask: entry.ask,
-              mid: entry.mid,
-            };
-          }
-        }
-      }
-    } catch {
-      // Prices are optional — don't fail the whole request
-    }
 
     // ── 13. Aggregate stats ────────────────────────────────────────────────────
     const allEvents = [...formattedCompetitions, ...formattedChallenges];

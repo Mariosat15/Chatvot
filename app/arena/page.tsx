@@ -212,7 +212,7 @@ function Av({ u, img, sz = 36, ring }: { u: string; img: string | null; sz?: num
   const base: React.CSSProperties = {
     width: sz, height: sz, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: Math.round(sz * 0.38), fontWeight: 700, fontFamily: "'Rajdhani',sans-serif",
+    fontSize: Math.round(sz * 0.38), fontWeight: 700, fontFamily: "var(--font-geist-sans),sans-serif",
     ...(ring ? { outline: `2px solid ${ring}`, outlineOffset: 2, boxShadow: `0 0 10px ${ring}66` } : {}),
   };
   if (img && !err) {
@@ -284,12 +284,12 @@ function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: nu
         {idx < 3 ? (
           <>
             <div style={{ fontSize: 18, filter: `drop-shadow(0 0 7px ${RANK_COLORS[idx]})` }}>{MEDAL[idx]}</div>
-            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, color: RANK_COLORS[idx], letterSpacing: 1 }}>#{p.rank}</div>
+            <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 700, color: RANK_COLORS[idx], letterSpacing: 1 }}>#{p.rank}</div>
           </>
         ) : (
           <>
-            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 17, fontWeight: 900, color: rkColor, textShadow: idx < 7 ? `0 0 10px ${CV.blue}88` : 'none', lineHeight: 1 }}>{p.rank}</div>
-            <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 6, fontWeight: 600, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase' }}>RANK</div>
+            <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 17, fontWeight: 900, color: rkColor, textShadow: idx < 7 ? `0 0 10px ${CV.blue}88` : 'none', lineHeight: 1 }}>{p.rank}</div>
+            <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 6, fontWeight: 600, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase' }}>RANK</div>
           </>
         )}
       </div>
@@ -309,13 +309,13 @@ function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: nu
               position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: '50%',
               background: CV.oran, border: `2px solid ${CV.bg1}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 900, color: '#fff',
+              fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 900, color: '#fff',
             }}>{p.currentOpenPositions}</div>
           )}
         </div>
         <div style={{ overflow: 'hidden' }}>
           <div style={{
-            fontFamily: "'Rajdhani',sans-serif", fontSize: 13, fontWeight: 700, color: CV.lgt,
+            fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 13, fontWeight: 700, color: CV.lgt,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2,
           }}>{p.username}</div>
           <div style={{
@@ -342,7 +342,7 @@ function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: nu
             display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 36,
           }}>
             <span style={{
-              fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700,
+              fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 8, fontWeight: 700,
               color: 'rgba(255,255,255,.88)', textShadow: '0 1px 4px rgba(0,0,0,.9)',
               whiteSpace: 'nowrap', position: 'relative', zIndex: 3,
             }}>{raceLabel(p, rm)}</span>
@@ -371,14 +371,14 @@ function RacerRow({ p, ev, idx, onClick }: { p: Participant; ev: AEvent; idx: nu
         borderLeft: `1px solid ${CV.bd0}`, position: 'relative', zIndex: 1,
       }}>
         <div style={{
-          fontFamily: "'Orbitron',sans-serif", fontSize: 14, fontWeight: 700,
+          fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 14, fontWeight: 700,
           color: CV.teal, textShadow: `0 0 12px ${CV.teal}50`, letterSpacing: .5,
         }}>{fmtC(p.liveEquity)}</div>
         <div style={{
-          fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700,
+          fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 700,
           color: pnlPos ? CV.grn : CV.red, textShadow: `0 0 8px ${pnlPos ? CV.grn : CV.red}40`,
         }}>{fmtPnl(p.livePnl)}</div>
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: CV.bd3, fontWeight: 600, letterSpacing: .5 }}>
+        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 9, color: CV.bd3, fontWeight: 600, letterSpacing: .5 }}>
           {p.liveRoi >= 0 ? '+' : ''}{p.liveRoi.toFixed(1)}%
           <span style={{ color: CV.bd2, margin: '0 3px' }}>·</span>
           {p.winRate.toFixed(0)}% WR
@@ -397,7 +397,7 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
 
   const SCell = ({ v, l, c }: { v: string; l: string; c?: string }) => (
     <div style={{ flex: 1, padding: '9px 4px', textAlign: 'center' }}>
-      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700, color: c || CV.lgt, marginBottom: 2 }}>{v}</div>
+      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 700, color: c || CV.lgt, marginBottom: 2 }}>{v}</div>
       <div style={{ fontSize: 7, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase' }}>{l}</div>
     </div>
   );
@@ -406,7 +406,7 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
     <div style={{ margin: '0 12px 8px', background: CV.bg3, border: `1px solid ${CV.bd1}`, borderRadius: 10, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: CV.bg4, borderBottom: `1px solid ${CV.bd0}` }}>
         <span style={{ fontSize: 11 }}>{icon}</span>
-        <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, color, letterSpacing: 3, textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 700, color, letterSpacing: 3, textTransform: 'uppercase' }}>{label}</span>
       </div>
       <div style={{ display: 'flex' }}>{children}</div>
     </div>
@@ -455,26 +455,26 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
           <div style={{ padding: '12px 14px 6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
               <span style={{
-                fontFamily: "'Orbitron',sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2,
+                fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2,
                 padding: '2px 9px', borderRadius: 4,
                 background: tier.tag, color: tier.tagColor, border: `1px solid ${tier.border}44`,
               }}>{tier.tagLabel}</span>
               {p.isDisqualified && (
-                <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: CV.red, letterSpacing: 1 }}>⚡ LIQUIDATED</span>
+                <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, color: CV.red, letterSpacing: 1 }}>⚡ LIQUIDATED</span>
               )}
               {!p.isDisqualified && p.totalTrades > 0 && (
                 <span style={{
-                  fontFamily: "'Rajdhani',sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2,
+                  fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2,
                   padding: '2px 7px', borderRadius: 4, color: CV.grn,
                   background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.22)',
                 }}>ACTIVE</span>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 24, fontWeight: 700, color: CV.lgt, lineHeight: 1 }}>{p.username}</div>
+              <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 24, fontWeight: 700, color: CV.lgt, lineHeight: 1 }}>{p.username}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 2 }}>
-                <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 9, color: CV.bd3, letterSpacing: 1 }}>RANK</span>
-                <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 22, fontWeight: 900, color: tier.tagColor, textShadow: `0 0 16px ${tier.border}66`, lineHeight: 1 }}>#{p.rank}</span>
+                <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 9, color: CV.bd3, letterSpacing: 1 }}>RANK</span>
+                <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 22, fontWeight: 900, color: tier.tagColor, textShadow: `0 0 16px ${tier.border}66`, lineHeight: 1 }}>#{p.rank}</span>
                 {p.rank === 1 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥇</span>}
                 {p.rank === 2 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥈</span>}
                 {p.rank === 3 && <span style={{ fontSize: 18, lineHeight: 1 }}>🥉</span>}
@@ -520,18 +520,18 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
           {/* Open Positions */}
           {myPos.length > 0 && (
             <div style={{ margin: '0 12px 8px' }}>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, padding: '0 2px' }}>Open Positions ({myPos.length})</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, padding: '0 2px' }}>Open Positions ({myPos.length})</div>
               <div style={{ background: CV.bg3, borderRadius: 8, border: `1px solid ${CV.bd1}`, overflow: 'hidden' }}>
                 {myPos.map((pos, i) => {
                   const isL = pos.side === 'long';
                   const dec = (pos.symbol || '').includes('JPY') || (pos.symbol || '').includes('XAU') ? 2 : 4;
                   return (
                     <div key={i} style={{ display: 'grid', gridTemplateColumns: '68px 44px 80px 72px 1fr', gap: 5, alignItems: 'center', padding: '7px 10px', borderBottom: i < myPos.length - 1 ? `1px solid ${CV.bd0}` : 'none' }}>
-                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: CV.teal }}>{(pos.symbol || '').replace('/', '')}</div>
-                      <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, padding: '2px 5px', borderRadius: 3, letterSpacing: 1, textAlign: 'center', color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.12)' : 'rgba(255,73,91,.1)', border: `1px solid ${isL ? 'rgba(34,197,94,.25)' : 'rgba(255,73,91,.25)'}` }}>{isL ? 'BUY' : 'SELL'}</span>
-                      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: CV.bd3 }}>{pos.entryPrice.toFixed(dec)}</div>
-                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? CV.grn : CV.red }}>{fmtC(Math.abs(pos.unrealizedPnl))}</div>
-                      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: CV.bd3 }}>{tAgo(pos.openedAt)}</div>
+                      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 10, fontWeight: 700, color: CV.teal }}>{(pos.symbol || '').replace('/', '')}</div>
+                      <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 700, padding: '2px 5px', borderRadius: 3, letterSpacing: 1, textAlign: 'center', color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.12)' : 'rgba(255,73,91,.1)', border: `1px solid ${isL ? 'rgba(34,197,94,.25)' : 'rgba(255,73,91,.25)'}` }}>{isL ? 'BUY' : 'SELL'}</span>
+                      <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, color: CV.bd3 }}>{pos.entryPrice.toFixed(dec)}</div>
+                      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 10, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? CV.grn : CV.red }}>{fmtC(Math.abs(pos.unrealizedPnl))}</div>
+                      <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 9, color: CV.bd3 }}>{tAgo(pos.openedAt)}</div>
                     </div>
                   );
                 })}
@@ -547,7 +547,7 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
               [`$${p.averageLoss > 0 ? p.averageLoss.toFixed(0) : '—'}`, 'Avg Loss', CV.red],
             ] as [string, string, string][]).map(([v, l, c], i, arr) => (
               <div key={l} style={{ flex: 1, padding: '8px 4px', borderRight: i < arr.length - 1 ? `1px solid ${CV.bd1}` : 'none' }}>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: c }}>{v}</div>
+                <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 10, fontWeight: 700, color: c }}>{v}</div>
                 <div style={{ fontSize: 7, color: CV.bd3, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>{l}</div>
               </div>
             ))}
@@ -555,7 +555,7 @@ function TraderModal({ p, ev, onClose }: { p: Participant; ev: AEvent; onClose: 
 
           {/* Footer */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px 9px' }}>
-            <span style={{ fontSize: 7, color: CV.bd1, fontFamily: "'Rajdhani',sans-serif" }}>Chartvolt Trader Card</span>
+            <span style={{ fontSize: 7, color: CV.bd1, fontFamily: "var(--font-geist-sans),sans-serif" }}>Chartvolt Trader Card</span>
             <span style={{ fontSize: 7, color: CV.bd1, fontFamily: 'monospace' }}>{(p.userId || '').slice(-8) || 'cv-arena'}</span>
           </div>
         </div>
@@ -591,12 +591,12 @@ function Podium({ ev, onClose }: { ev: AEvent; onClose: () => void }) {
       </div>
 
       <div style={{
-        fontFamily: "'Orbitron',sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: 6,
+        fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: 6,
         background: `linear-gradient(90deg,${CV.gold},${CV.oran},${CV.gold})`,
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
         marginBottom: 6,
       }}>🏆 FINAL RESULTS</div>
-      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 2, marginBottom: 40 }}>{ev.name}</div>
+      <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 2, marginBottom: 40 }}>{ev.name}</div>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, marginBottom: 32 }}>
         {order.map((wi, si) => {
@@ -609,16 +609,16 @@ function Podium({ ev, onClose }: { ev: AEvent; onClose: () => void }) {
             <div key={wi} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <div style={{ fontSize: 22 }}>{medals[si]}</div>
               <Av u={winner.username} img={winner.profileImage} sz={si === 1 ? 80 : 60} ring={col} />
-              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 14, fontWeight: 700, color: CV.lgt }}>{winner.username}</div>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, fontWeight: 700, color: winner.livePnl >= 0 ? CV.grn : CV.red }}>{fmtPnl(winner.livePnl)}</div>
-              {prizeAmt > 0 && <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: col, fontWeight: 600 }}>Prize: {fmtPrize(prizeAmt)}</div>}
+              <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 14, fontWeight: 700, color: CV.lgt }}>{winner.username}</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, fontWeight: 700, color: winner.livePnl >= 0 ? CV.grn : CV.red }}>{fmtPnl(winner.livePnl)}</div>
+              {prizeAmt > 0 && <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: col, fontWeight: 600 }}>Prize: {fmtPrize(prizeAmt)}</div>}
               <div style={{
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
                 width: si === 1 ? 100 : 80, height: heights[si],
                 background: `linear-gradient(180deg,${col}22,${col}08)`,
                 border: `1px solid ${col}30`, borderRadius: '8px 8px 0 0',
               }}>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: si === 1 ? 28 : 20, fontWeight: 900, color: col, paddingBottom: 8, textShadow: `0 0 18px ${col}` }}>
+                <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: si === 1 ? 28 : 20, fontWeight: 900, color: col, paddingBottom: 8, textShadow: `0 0 18px ${col}` }}>
                   {wi === 0 ? '1st' : wi === 1 ? '2nd' : '3rd'}
                 </div>
               </div>
@@ -630,7 +630,7 @@ function Podium({ ev, onClose }: { ev: AEvent; onClose: () => void }) {
       <button
         onClick={onClose}
         style={{
-          fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2,
+          fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2,
           textTransform: 'uppercase', padding: '8px 24px', borderRadius: 8, cursor: 'pointer',
           border: `1px solid ${CV.bd2}`, background: CV.bg3, color: CV.gray,
         }}
@@ -679,7 +679,7 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
           {/* Type badge */}
           <span style={{
-            fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, letterSpacing: 2,
+            fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 700, letterSpacing: 2,
             textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
             color: isComp ? CV.teal : CV.gold,
             background: isComp ? `rgba(15,237,190,.07)` : `rgba(253,212,88,.07)`,
@@ -687,7 +687,7 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
           }}>{isComp ? 'Competition' : 'Challenge'}</span>
 
           {/* Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'Rajdhani',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1, color: statusColor }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1, color: statusColor }}>
             {isLiveEv && (
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: CV.red, boxShadow: `0 0 6px ${CV.red}`, animation: 'blink 1s infinite' }} />
             )}
@@ -695,7 +695,7 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
           </div>
         </div>
 
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 17, fontWeight: 700, color: CV.lgt, marginBottom: 4, lineHeight: 1.2 }}>{ev.name}</div>
+        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 17, fontWeight: 700, color: CV.lgt, marginBottom: 4, lineHeight: 1.2 }}>{ev.name}</div>
         <div style={{ fontSize: 10, color: CV.bd3, lineHeight: 1.45, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineClamp: 2 }}>{ev.description}</div>
 
         {/* Stats grid */}
@@ -706,7 +706,7 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
             [td, tl, ev.status === 'active' ? CV.red : CV.gray],
           ] as [string, string, string][]).map(([v, l, c]) => (
             <div key={l} style={{ textAlign: 'center', padding: '6px 3px', background: CV.bg3, borderRadius: 6, border: `1px solid ${CV.bd0}` }}>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700, color: c, marginBottom: 1 }}>{v}</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 700, color: c, marginBottom: 1 }}>{v}</div>
               <div style={{ fontSize: 7, color: CV.bd3, letterSpacing: 1, textTransform: 'uppercase' }}>{l}</div>
             </div>
           ))}
@@ -721,7 +721,7 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
               </div>
             ))}
             {(ev.currentParticipants || 0) > 4 && (
-              <div style={{ width: 24, height: 24, borderRadius: '50%', marginLeft: -5, background: CV.bg4, border: `1px solid ${CV.bd2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Rajdhani',sans-serif", fontSize: 8, fontWeight: 700, color: CV.gray }}>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', marginLeft: -5, background: CV.bg4, border: `1px solid ${CV.bd2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 8, fontWeight: 700, color: CV.gray }}>
                 +{ev.currentParticipants - 4}
               </div>
             )}
@@ -730,15 +730,15 @@ function EventCard({ ev, onEnter }: { ev: AEvent; onEnter: (id: string) => void 
             <button
               onClick={e => { e.stopPropagation(); onEnter(ev.id); }}
               className="ebtn"
-              style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', padding: '5px 14px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${CV.teal}44`, background: `rgba(15,237,190,.08)`, color: CV.teal, transition: 'all .2s' }}
+              style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', padding: '5px 14px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${CV.teal}44`, background: `rgba(15,237,190,.08)`, color: CV.teal, transition: 'all .2s' }}
             >Watch Live</button>
           ) : winner ? (
-            <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: CV.gold }}>🏆 {winner.username}</span>
+            <span style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, color: CV.gold }}>🏆 {winner.username}</span>
           ) : null}
         </div>
 
         {winner && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: `rgba(253,212,88,.04)`, borderTop: `1px solid rgba(253,212,88,.1)`, marginTop: 10, fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.gold }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: `rgba(253,212,88,.04)`, borderTop: `1px solid rgba(253,212,88,.1)`, marginTop: 10, fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: CV.gold }}>
             🏆 Winner: <strong>{winner.username}</strong> · {fmtPnl(winner.livePnl)}
           </div>
         )}
@@ -779,14 +779,14 @@ function Ticker({ prices, events }: { prices: Record<string, { bid: number; ask:
 
   if (!chunks.length) {
     return (
-      <div style={{ background: `rgba(15,237,190,.02)`, borderBottom: `1px solid ${CV.bd0}`, padding: '5px 16px', fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3, letterSpacing: 1, flexShrink: 0 }}>
+      <div style={{ background: `rgba(15,237,190,.02)`, borderBottom: `1px solid ${CV.bd0}`, padding: '5px 16px', fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: CV.bd3, letterSpacing: 1, flexShrink: 0 }}>
         CHARTVOLT ARENA — Market data initialising…
       </div>
     );
   }
   return (
     <div style={{ background: `rgba(15,237,190,.02)`, borderBottom: `1px solid ${CV.bd0}`, padding: '4px 0', overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ display: 'inline-flex', gap: 38, animation: 'tickS 38s linear infinite', fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 500, color: CV.gray, paddingLeft: 20 }}>
+      <div style={{ display: 'inline-flex', gap: 38, animation: 'tickS 38s linear infinite', fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 500, color: CV.gray, paddingLeft: 20 }}>
         {[...chunks, ...chunks]}
       </div>
     </div>
@@ -818,7 +818,7 @@ export default function ArenaPage() {
     const el = document.createElement('style');
     el.id = 'cv-arena-css';
     el.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+      /* Geist Sans + Geist Mono loaded by Next.js layout — no external font import needed */
 
       * { box-sizing: border-box; }
 
@@ -964,21 +964,21 @@ export default function ArenaPage() {
 
   // ── Button helpers ──
   const navBtn = (v: string, active: boolean, disabled: boolean): React.CSSProperties => ({
-    fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2,
+    fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2,
     textTransform: 'uppercase', padding: '5px 16px', borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
     border: `1px solid transparent`, background: 'none',
     color: active ? CV.teal : disabled ? CV.bd2 : CV.gray,
     opacity: disabled ? 0.4 : 1, transition: 'all .2s',
   });
   const tabBtn = (active: boolean): React.CSSProperties => ({
-    fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2,
+    fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2,
     textTransform: 'uppercase', padding: '5px 14px', borderRadius: 6, cursor: 'pointer',
     border: `1px solid ${active ? CV.teal + '33' : 'transparent'}`,
     background: active ? `rgba(15,237,190,.1)` : 'none',
     color: active ? CV.teal : CV.bd3, transition: 'all .2s',
   });
   const chipBtn = (f: string): React.CSSProperties => ({
-    fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1,
+    fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1,
     textTransform: 'uppercase', padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
     border: `1px solid ${filter === f ? CV.teal + '44' : CV.bd1}`,
     background: filter === f ? `rgba(15,237,190,.07)` : 'none',
@@ -1008,16 +1008,16 @@ export default function ArenaPage() {
             width: 36, height: 36, borderRadius: 8,
             background: `linear-gradient(135deg,${CV.teal},${CV.blue})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: "'Orbitron',sans-serif", fontSize: 14, fontWeight: 900, color: '#fff',
+            fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 14, fontWeight: 900, color: '#fff',
             boxShadow: `0 0 22px ${CV.teal}44`,
           }}>CV</div>
           <div>
             <div style={{
-              fontFamily: "'Orbitron',sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 3,
+              fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 3,
               background: `linear-gradient(90deg,${CV.teal},${CV.lgt} 60%)`,
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
             }}>CHARTVOLT</div>
-            <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: CV.blue, letterSpacing: 5, textTransform: 'uppercase', marginTop: -1 }}>Trading Arena</div>
+            <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 9, color: CV.blue, letterSpacing: 5, textTransform: 'uppercase', marginTop: -1 }}>Trading Arena</div>
           </div>
         </div>
 
@@ -1035,10 +1035,10 @@ export default function ArenaPage() {
 
         {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, color: CV.gray, letterSpacing: 1 }}>{clock}</span>
+          <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 11, color: CV.gray, letterSpacing: 1 }}>{clock}</span>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 700, color: CV.red,
+            fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 700, color: CV.red,
             letterSpacing: 2, textTransform: 'uppercase', padding: '4px 11px', borderRadius: 20,
             border: `1px solid ${CV.red}40`, background: `rgba(255,73,91,.07)`,
           }}>
@@ -1055,12 +1055,12 @@ export default function ArenaPage() {
           {/* Hero */}
           <div style={{ textAlign: 'center', padding: '28px 0 20px' }}>
             <h1 style={{
-              fontFamily: "'Orbitron',sans-serif", fontSize: 28, fontWeight: 800, letterSpacing: 4,
+              fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 28, fontWeight: 800, letterSpacing: 4,
               background: `linear-gradient(90deg,${CV.teal},${CV.blue},${CV.purp})`,
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
               marginBottom: 8,
             }}>Trading Arena</h1>
-            <p style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 1 }}>
+            <p style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 1 }}>
               Live competitions — real traders, real equity, live signals.
             </p>
           </div>
@@ -1080,7 +1080,7 @@ export default function ArenaPage() {
                   background: CV.bg2, border: `1px solid ${CV.bd1}`,
                   borderRadius: 10, minWidth: 88,
                 }}>
-                  <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
+                  <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
                   <div style={{ fontSize: 8, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase', marginTop: 3 }}>{l}</div>
                 </div>
               ))}
@@ -1096,27 +1096,27 @@ export default function ArenaPage() {
 
           {/* Events grid */}
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', fontFamily: "'Rajdhani',sans-serif", fontSize: 13, color: CV.bd3, letterSpacing: 2 }}>
+            <div style={{ textAlign: 'center', padding: '60px 0', fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 13, color: CV.bd3, letterSpacing: 2 }}>
               Loading competitions…
             </div>
           ) : apiError ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <div style={{ fontSize: 40, opacity: .45 }}>⚠️</div>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.oran, letterSpacing: 3, marginTop: 14 }}>Connection Error</div>
-              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3, marginTop: 8, letterSpacing: 1, maxWidth: 480, margin: '8px auto 0', wordBreak: 'break-all' }}>{apiError}</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, color: CV.oran, letterSpacing: 3, marginTop: 14 }}>Connection Error</div>
+              <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: CV.bd3, marginTop: 8, letterSpacing: 1, maxWidth: 480, margin: '8px auto 0', wordBreak: 'break-all' }}>{apiError}</div>
               <button
                 onClick={() => { setLoading(true); setApiError(null); fetchD(); }}
-                style={{ marginTop: 18, fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', padding: '7px 20px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${CV.teal}44`, background: `rgba(15,237,190,.08)`, color: CV.teal }}
+                style={{ marginTop: 18, fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', padding: '7px 20px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${CV.teal}44`, background: `rgba(15,237,190,.08)`, color: CV.teal }}
               >Retry</button>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <div style={{ fontSize: 42, opacity: .35 }}>🏁</div>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3, marginTop: 14 }}>No Events Found</div>
-              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3, marginTop: 6, letterSpacing: 1 }}>Try changing the filter or check back later</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3, marginTop: 14 }}>No Events Found</div>
+              <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: CV.bd3, marginTop: 6, letterSpacing: 1 }}>Try changing the filter or check back later</div>
               <button
                 onClick={() => { setLoading(true); fetchD(); }}
-                style={{ marginTop: 14, fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', padding: '5px 16px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${CV.bd2}`, background: 'none', color: CV.bd3 }}
+                style={{ marginTop: 14, fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', padding: '5px 16px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${CV.bd2}`, background: 'none', color: CV.bd3 }}
               >Refresh</button>
             </div>
           ) : (
@@ -1128,7 +1128,7 @@ export default function ArenaPage() {
               <div key={st}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '22px 0 10px' }}>
                   <div style={{
-                    fontFamily: "'Orbitron',sans-serif", fontSize: 9, fontWeight: 600,
+                    fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 9, fontWeight: 600,
                     color: st === 'active' ? CV.red : st === 'upcoming' ? CV.blue : CV.gray,
                     letterSpacing: 4, textTransform: 'uppercase',
                     display: 'flex', alignItems: 'center', gap: 7,
@@ -1136,7 +1136,7 @@ export default function ArenaPage() {
                     {st === 'active' && <div style={{ width: 6, height: 6, borderRadius: '50%', background: CV.red, boxShadow: `0 0 6px ${CV.red}`, animation: 'blink 1s infinite' }} />}
                     {st === 'active' ? 'Live Now' : st === 'upcoming' ? 'Starting Soon' : 'Completed'}
                   </div>
-                  <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, color: CV.bd3 }}>{items.length} event{items.length > 1 ? 's' : ''}</div>
+                  <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, color: CV.bd3 }}>{items.length} event{items.length > 1 ? 's' : ''}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(310px,1fr))', gap: 12 }}>
                   {items.map(ev => <EventCard key={ev.id} ev={ev} onEnter={enterEv} />)}
@@ -1160,26 +1160,26 @@ export default function ArenaPage() {
           }}>
             <button
               onClick={() => { setView('lobby'); setCurEv(null); setShowPodium(false); }}
-              style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 1, color: CV.gray, cursor: 'pointer', background: 'none', border: 'none', padding: '4px 10px', borderRadius: 6 }}
+              style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 12, fontWeight: 600, letterSpacing: 1, color: CV.gray, cursor: 'pointer', background: 'none', border: 'none', padding: '4px 10px', borderRadius: 6 }}
             >← Lobby</button>
 
             <div style={{
-              fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700, color: CV.gold,
+              fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 700, color: CV.gold,
               letterSpacing: 2, maxWidth: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               textShadow: `0 0 18px ${CV.gold}44`,
             }}>🏆 {curEv.name.toUpperCase()}</div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {curEv.status === 'active' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'Rajdhani',sans-serif", fontSize: 10, fontWeight: 700, color: CV.red, letterSpacing: 2, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, border: `1px solid ${CV.red}33`, background: `rgba(255,73,91,.07)` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, fontWeight: 700, color: CV.red, letterSpacing: 2, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, border: `1px solid ${CV.red}33`, background: `rgba(255,73,91,.07)` }}>
                   <div style={{ width: 5, height: 5, borderRadius: '50%', background: CV.red, boxShadow: `0 0 6px ${CV.red}`, animation: 'blink 1s infinite' }} />LIVE
                 </div>
               )}
               <div style={{ padding: '3px 12px', borderRadius: 6, textAlign: 'center', background: `rgba(253,212,88,.06)`, border: `1px solid ${CV.gold}30` }}>
                 <div style={{ fontSize: 6, color: CV.gol2, letterSpacing: 2, textTransform: 'uppercase' }}>Prize Pool</div>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 14, fontWeight: 700, color: CV.gold, textShadow: `0 0 12px ${CV.gold}40` }}>{fmtPrize(curEv.prizePool)}</div>
+                <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 14, fontWeight: 700, color: CV.gold, textShadow: `0 0 12px ${CV.gold}40` }}>{fmtPrize(curEv.prizePool)}</div>
               </div>
-              <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 20, fontWeight: 700, color: CV.teal, textShadow: `0 0 16px ${CV.teal}44`, letterSpacing: 2, minWidth: 80, textAlign: 'right' }}>{timer}</div>
+              <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 20, fontWeight: 700, color: CV.teal, textShadow: `0 0 16px ${CV.teal}44`, letterSpacing: 2, minWidth: 80, textAlign: 'right' }}>{timer}</div>
             </div>
           </div>
 
@@ -1191,9 +1191,9 @@ export default function ArenaPage() {
             background: `rgba(15,237,190,.02)`, borderBottom: `1px solid ${CV.bd0}`,
             padding: '3px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
           }}>
-            <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase' }}>Ranking by</span>
-            <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 700, color: CV.teal, letterSpacing: 1 }}>{rmLabel(curEv.rankingMethod || 'pnl')}</span>
-            <span style={{ marginLeft: 'auto', fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: CV.bd2, letterSpacing: 2 }}>
+            <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase' }}>Ranking by</span>
+            <span style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 700, color: CV.teal, letterSpacing: 1 }}>{rmLabel(curEv.rankingMethod || 'pnl')}</span>
+            <span style={{ marginLeft: 'auto', fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, color: CV.bd2, letterSpacing: 2 }}>
               {curEv.participants.length} TRADERS · {curEv.openPositions.length} OPEN POS
             </span>
           </div>
@@ -1220,12 +1220,12 @@ export default function ArenaPage() {
                   {curEv.participants.length === 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
                       <div style={{ fontSize: 40, opacity: .35 }}>👥</div>
-                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Participants Yet</div>
+                      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Participants Yet</div>
                     </div>
                   ) : (
                     <>
                       {racers.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '28px 0', fontFamily: "'Orbitron',sans-serif", fontSize: 12, color: CV.bd3, letterSpacing: 2 }}>Waiting for first trades…</div>
+                        <div style={{ textAlign: 'center', padding: '28px 0', fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, color: CV.bd3, letterSpacing: 2 }}>Waiting for first trades…</div>
                       ) : racers.map((p, i) => (
                         <RacerRow key={p.userId} p={p} ev={curEv} idx={i} onClick={() => setSelTrader({ p, ev: curEv })} />
                       ))}
@@ -1233,7 +1233,7 @@ export default function ArenaPage() {
                       {/* Awaiting first trade */}
                       {waiting.length > 0 && (
                         <div style={{ marginTop: 16, borderTop: `1px dashed ${CV.bd1}`, paddingTop: 8 }}>
-                          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, color: CV.bd2, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, color: CV.bd2, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span>Awaiting Entry</span>
                             <span style={{ background: CV.bg3, borderRadius: 10, padding: '1px 7px', color: CV.bd3 }}>{waiting.length}</span>
                           </div>
@@ -1245,7 +1245,7 @@ export default function ArenaPage() {
                                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', opacity: .28, cursor: 'pointer', borderRadius: 20, background: CV.bg3, border: `1px solid ${CV.bd0}` }}
                               >
                                 <Av u={p.username} img={p.profileImage} sz={20} />
-                                <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, color: CV.bd3, fontWeight: 600 }}>{p.username}</span>
+                                <span style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, color: CV.bd3, fontWeight: 600 }}>{p.username}</span>
                               </div>
                             ))}
                           </div>
@@ -1262,7 +1262,7 @@ export default function ArenaPage() {
                   {/* Header */}
                   <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 90px 80px 70px 70px', gap: 8, padding: '6px 10px', marginBottom: 4 }}>
                     {['#', 'Trader', 'Equity', 'PnL', 'ROI', 'WR'].map((h, hi) => (
-                      <div key={h} style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase', textAlign: hi === 0 ? 'center' : hi === 1 ? 'left' : 'right' }}>{h}</div>
+                      <div key={h} style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 2, textTransform: 'uppercase', textAlign: hi === 0 ? 'center' : hi === 1 ? 'left' : 'right' }}>{h}</div>
                     ))}
                   </div>
                   {curEv.participants.filter(p => p.totalTrades > 0 || p.isDisqualified).map((p, i) => {
@@ -1282,15 +1282,15 @@ export default function ArenaPage() {
                           transition: 'background .15s',
                         }}
                       >
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 800, color: rkColor, textAlign: 'center', textShadow: i < 3 ? `0 0 10px ${rkColor}88` : 'none' }}>{p.rank}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 800, color: rkColor, textAlign: 'center', textShadow: i < 3 ? `0 0 10px ${rkColor}88` : 'none' }}>{p.rank}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <Av u={p.username} img={p.profileImage} sz={28} ring={i < 3 ? RANK_COLORS[i] : undefined} />
-                          <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 13, fontWeight: 600, color: noT ? CV.bd3 : CV.lgt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</span>
+                          <span style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 13, fontWeight: 600, color: noT ? CV.bd3 : CV.lgt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</span>
                         </div>
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: CV.teal, textAlign: 'right' }}>{fmtC(p.liveEquity)}</div>
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: p.livePnl >= 0 ? CV.grn : CV.red, textAlign: 'right' }}>{noT ? '—' : fmtPnl(p.livePnl)}</div>
-                        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 600, color: p.liveRoi >= 0 ? CV.grn : CV.red, textAlign: 'right' }}>{noT ? '—' : `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(1)}%`}</div>
-                        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 11, fontWeight: 600, color: CV.purp, textAlign: 'right' }}>{noT ? '—' : `${p.winRate.toFixed(0)}%`}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 11, fontWeight: 700, color: CV.teal, textAlign: 'right' }}>{fmtC(p.liveEquity)}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 11, fontWeight: 700, color: p.livePnl >= 0 ? CV.grn : CV.red, textAlign: 'right' }}>{noT ? '—' : fmtPnl(p.livePnl)}</div>
+                        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 600, color: p.liveRoi >= 0 ? CV.grn : CV.red, textAlign: 'right' }}>{noT ? '—' : `${p.liveRoi >= 0 ? '+' : ''}${p.liveRoi.toFixed(1)}%`}</div>
+                        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 11, fontWeight: 600, color: CV.purp, textAlign: 'right' }}>{noT ? '—' : `${p.winRate.toFixed(0)}%`}</div>
                       </div>
                     );
                   })}
@@ -1303,7 +1303,7 @@ export default function ArenaPage() {
                   {curEv.openPositions.length === 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
                       <div style={{ fontSize: 40, opacity: .35 }}>📭</div>
-                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Open Trades</div>
+                      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Open Trades</div>
                     </div>
                   ) : curEv.openPositions.map((t, i) => {
                     const isL = t.side === 'long';
@@ -1315,15 +1315,15 @@ export default function ArenaPage() {
                         border: `1px solid ${CV.bd1}`, borderRadius: 8, marginBottom: 4,
                       }}>
                         <Av u={t.username} img={t.profileImage} sz={28} />
-                        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 12, fontWeight: 600, color: CV.gray, minWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.username}</div>
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 12, fontWeight: 700, color: CV.teal, minWidth: 66 }}>{(t.symbol || '').replace('/', '')}</div>
-                        <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3, letterSpacing: 1, color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.1)' : 'rgba(255,73,91,.1)', border: `1px solid ${isL ? 'rgba(34,197,94,.2)' : 'rgba(255,73,91,.2)'}` }}>{isL ? 'BUY' : 'SELL'}</span>
+                        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 12, fontWeight: 600, color: CV.gray, minWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.username}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 12, fontWeight: 700, color: CV.teal, minWidth: 66 }}>{(t.symbol || '').replace('/', '')}</div>
+                        <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3, letterSpacing: 1, color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.1)' : 'rgba(255,73,91,.1)', border: `1px solid ${isL ? 'rgba(34,197,94,.2)' : 'rgba(255,73,91,.2)'}` }}>{isL ? 'BUY' : 'SELL'}</span>
                         <div style={{ fontSize: 9, color: CV.bd3, flex: 1 }}>
                           <div>Entry: {t.entryPrice.toFixed(dec)}</div>
                           <div>Now:&nbsp; {t.currentPrice.toFixed(dec)}</div>
                         </div>
                         {t.leverage > 1 && <div style={{ fontSize: 9, color: CV.bd3, minWidth: 24 }}>{t.leverage}x</div>}
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700, color: t.unrealizedPnl >= 0 ? CV.grn : CV.red, textAlign: 'right', minWidth: 64 }}>{fmtC(Math.abs(t.unrealizedPnl))}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 11, fontWeight: 700, color: t.unrealizedPnl >= 0 ? CV.grn : CV.red, textAlign: 'right', minWidth: 64 }}>{fmtC(Math.abs(t.unrealizedPnl))}</div>
                         <div style={{ fontSize: 9, color: CV.bd3, minWidth: 28 }}>{tAgo(t.openedAt)}</div>
                       </div>
                     );
@@ -1338,7 +1338,7 @@ export default function ArenaPage() {
               {/* Arena stats */}
               {sideStats && curEv && (
                 <div style={{ padding: '10px 12px', borderBottom: `1px solid ${CV.bd0}` }}>
-                  <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Arena Stats</div>
+                  <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Arena Stats</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
                     {([
                       [sideStats.total || '—', 'Trades',    CV.teal],
@@ -1349,7 +1349,7 @@ export default function ArenaPage() {
                       [sideStats.maxDD.toFixed(1) + '%', 'Max DD',   CV.red],
                     ] as [string | number, string, string][]).map(([v, l, c]) => (
                       <div key={l} style={{ background: CV.bg2, border: `1px solid ${CV.bd1}`, borderRadius: 7, padding: '8px', textAlign: 'center' }}>
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, fontWeight: 700, color: c, marginBottom: 1 }}>{v}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 13, fontWeight: 700, color: c, marginBottom: 1 }}>{v}</div>
                         <div style={{ fontSize: 7, color: CV.bd3, letterSpacing: 1, textTransform: 'uppercase' }}>{l}</div>
                       </div>
                     ))}
@@ -1359,37 +1359,37 @@ export default function ArenaPage() {
 
               {/* Win Probability */}
               <div style={{ padding: '10px 12px', borderBottom: `1px solid ${CV.bd0}` }}>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Win Probability ⚡</div>
+                <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Win Probability ⚡</div>
                 {winProbs.length === 0 ? (
                   <div style={{ fontSize: 9, color: CV.bd2 }}>No active traders</div>
                 ) : winProbs.map((p, i) => (
                   <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
                     <Av u={p.username} img={p.profileImage} sz={22} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 10, fontWeight: 600, color: CV.lgt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
+                      <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 10, fontWeight: 600, color: CV.lgt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
                       <div style={{ height: 3, background: CV.bd0, borderRadius: 2, marginTop: 3, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${p.prob}%`, background: i === 0 ? `linear-gradient(90deg,${CV.teal},${CV.blue})` : `linear-gradient(90deg,${CV.blue},${CV.purp})`, borderRadius: 2, transition: 'width 1.5s ease' }} />
                       </div>
                     </div>
-                    <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 10, fontWeight: 700, color: i === 0 ? CV.teal : CV.blue, minWidth: 28, textAlign: 'right' }}>{p.prob}%</div>
+                    <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 10, fontWeight: 700, color: i === 0 ? CV.teal : CV.blue, minWidth: 28, textAlign: 'right' }}>{p.prob}%</div>
                   </div>
                 ))}
               </div>
 
               {/* Recent activity */}
               <div style={{ padding: '10px 12px', flex: 1 }}>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Recent Activity ⚡</div>
+                <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 600, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 9 }}>Recent Activity ⚡</div>
                 {(curEv.openPositions || []).slice(0, 8).map((pos, i) => {
                   const isL = pos.side === 'long';
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '5px 7px', background: CV.bg2, borderRadius: 7, border: `1px solid ${CV.bd0}` }}>
                       <Av u={pos.username} img={pos.profileImage} sz={20} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 9, color: CV.gray, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pos.username}</div>
-                        <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 9, fontWeight: 700, color: CV.teal }}>{(pos.symbol || '').replace('/', '')}</div>
+                        <div style={{ fontFamily: "var(--font-geist-sans),sans-serif", fontSize: 9, color: CV.gray, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pos.username}</div>
+                        <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 9, fontWeight: 700, color: CV.teal }}>{(pos.symbol || '').replace('/', '')}</div>
                       </div>
-                      <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 7, fontWeight: 700, padding: '1px 5px', borderRadius: 3, color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.1)' : 'rgba(255,73,91,.1)' }}>{isL ? 'BUY' : 'SELL'}</span>
-                      <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 9, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? CV.grn : CV.red }}>{fmtC(Math.abs(pos.unrealizedPnl))}</div>
+                      <span style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 7, fontWeight: 700, padding: '1px 5px', borderRadius: 3, color: isL ? CV.grn : CV.red, background: isL ? 'rgba(34,197,94,.1)' : 'rgba(255,73,91,.1)' }}>{isL ? 'BUY' : 'SELL'}</span>
+                      <div style={{ fontFamily: "var(--font-geist-mono),sans-serif", fontSize: 9, fontWeight: 700, color: pos.unrealizedPnl >= 0 ? CV.grn : CV.red }}>{fmtC(Math.abs(pos.unrealizedPnl))}</div>
                     </div>
                   );
                 })}
