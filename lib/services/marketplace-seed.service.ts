@@ -3431,6 +3431,290 @@ No strategy guarantees profits. This strategy is a decision-support tool. Always
   riskLevel: "medium",
 };
 
+// ============================================================================
+// STRATEGY 3: PRISM SURGE MATRIX
+// ============================================================================
+const PRISM_SURGE_MATRIX: Partial<IMarketplaceItem> = {
+  name: "Prism Surge Matrix",
+  slug: "prism-surge-matrix",
+  shortDescription:
+    "3-pillar competition strategy: BB breakouts, VWAP trend surges & Williams %R recovery pulses — 6 distinct signal tiers.",
+  fullDescription: `# Prism Surge Matrix (PSM) — Competition Edition
+
+## Overview
+**Prism Surge Matrix** fires across three independent signal pillars using completely different market forces — volatility expansion, trend bias, and momentum recovery. Each pillar operates independently so the strategy generates continuous action across all market conditions without waiting for every indicator to align.
+
+Six distinct signal tiers mean you always have context: the shape, color, and size of each marker instantly tells you which pillar fired and how strong the move is.
+
+---
+
+## Signal Tiers
+
+### 🟢 BB BURST ▲ — STRONG BUY (Strength 5)
+**Large green circle below the candle**
+- Bollinger Band(15) upper band breakout confirmed by positive ROC(5)
+- Price has broken out of the volatility range with positive momentum behind it
+- Highest conviction buy signal — rare but reliable
+
+### 🔴 BB BURST ▼ — STRONG SELL (Strength 5)
+**Large red circle above the candle**
+- Bollinger Band(15) lower band breakdown confirmed by negative ROC(5)
+- Price has broken out downward with negative momentum confirming the move
+- Highest conviction sell signal
+
+### 🔵 VWAP SURGE ▲ — BUY (Strength 3)
+**Medium cyan arrow below the candle**
+- Price crosses above the rolling VWAP(10) while HMA(7) is above WMA(14)
+- Both price structure AND trend alignment confirm the bullish bias
+- Fires multiple times per session — the main trading signal
+
+### 🟠 VWAP DROP ▼ — SELL (Strength 3)
+**Medium orange arrow above the candle**
+- Price crosses below the rolling VWAP(10) while HMA(7) is below WMA(14)
+- Price structure AND trend confirm bearish bias
+- Mirror signal of VWAP SURGE
+
+### 🟡 WR PULSE ▲ — BUY (Strength 2) *(no label)*
+**Small yellow square below the candle**
+- Williams %R(8) exits the oversold zone (crosses below 80)
+- Price is recovering upward from an extreme low reading
+- Fires frequently — use as quick entry or confirmation
+
+### 🟡 WR PULSE ▼ — SELL (Strength 2) *(no label)*
+**Small yellow square above the candle**
+- Williams %R(8) exits the overbought zone (crosses above 20)
+- Price is turning down from an extreme high reading
+- Mirror of WR PULSE ▲
+
+---
+
+## How to Use
+
+1. After purchasing, go to the **Trading Chart** page.
+2. Open the **Trading Arsenal** panel (the rocket icon on the left sidebar).
+3. Find **Prism Surge Matrix** under your **Purchased Strategies** and toggle it **ON**.
+4. The strategy plots 6 types of markers directly on your candles — each unique in shape, color, and position.
+5. **Large circles (● green/red)** = BB Burst — high-confidence breakout entry. Act on these quickly.
+6. **Medium arrows (▲▼ cyan/orange)** = VWAP Surge/Drop — trend-confirmed entries. Best used as primary signals.
+7. **Small squares (■ yellow, no label)** = WR Pulse — momentum recovery ticks. Use to time entries within a trend or as quick scalps.
+8. Combine BB BURST with a VWAP SURGE in the same direction for the strongest entries.
+9. Use WR PULSE squares as fine-tuning layers when the larger signals have already told you the direction.
+10. Review each signal before placing a trade — the strategy guides, not guarantees.
+
+## Recommended Setup
+BB(15,2) + VWAP(10) + HMA(7) + WMA(14) + Williams %R(8)
+
+## Best Used For
+- Crypto and forex competitions (sub-1-hour duration)
+- High-frequency scalping sessions
+- Markets with regular intraday volatility
+- Traders who want visual differentiation between signal types
+
+## Why Different Shapes & Colors Matter
+With 6 signal tiers, identical arrows would be unreadable. The shape system lets your eye immediately identify what fired:
+- Big circles = breakout energy → act fast
+- Arrows = trend momentum → follow with confidence
+- Squares = pulse ticks → context and fine-tuning
+
+## Risk Warning
+No strategy guarantees profits. This strategy is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose. Competition trading carries high risk — never over-leverage.`,
+  category: "strategy",
+  price: 74.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: false,
+  iconName: "Layers",
+  codeTemplate: JSON.stringify({
+    type: "strategy",
+    displayType: "signals",
+    description: "3-pillar BB/VWAP/Williams%R strategy with 6 visually distinct signal tiers for competition-speed trading",
+  }),
+  defaultSettings: {
+    color: "#a78bfa",
+    lineWidth: 2,
+  },
+  strategyConfig: {
+    rules: [
+      // ── PILLAR 1A: BB Burst Bull ─────────────────────────────────────────
+      {
+        id: "psm_bb_burst_bull",
+        name: "BB BURST ▲",
+        logic: "AND",
+        signal: "strong_buy",
+        signalStrength: 5,
+        markerShape: "circle",
+        markerColor: "#00ff88",
+        markerSize: 4,
+        showLabel: true,
+        conditions: [
+          {
+            id: "psm_bb_bull_c1",
+            indicator: "price",
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "bb_upper",
+            compareIndicatorParams: { period: 15, stdDev: 2 },
+          },
+          {
+            id: "psm_bb_bull_c2",
+            indicator: "roc",
+            indicatorParams: { period: 5 },
+            operator: "above",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      // ── PILLAR 1B: BB Burst Bear ─────────────────────────────────────────
+      {
+        id: "psm_bb_burst_bear",
+        name: "BB BURST ▼",
+        logic: "AND",
+        signal: "strong_sell",
+        signalStrength: 5,
+        markerShape: "circle",
+        markerColor: "#ff1744",
+        markerSize: 4,
+        showLabel: true,
+        conditions: [
+          {
+            id: "psm_bb_bear_c1",
+            indicator: "price",
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "bb_lower",
+            compareIndicatorParams: { period: 15, stdDev: 2 },
+          },
+          {
+            id: "psm_bb_bear_c2",
+            indicator: "roc",
+            indicatorParams: { period: 5 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      // ── PILLAR 2A: VWAP Surge Bull ───────────────────────────────────────
+      {
+        id: "psm_vwap_surge_bull",
+        name: "VWAP SURGE ▲",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 3,
+        markerShape: "arrowUp",
+        markerColor: "#00e5ff",
+        markerSize: 2,
+        showLabel: true,
+        conditions: [
+          {
+            id: "psm_vwap_bull_c1",
+            indicator: "price",
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "vwap",
+            compareIndicatorParams: { period: 10 },
+          },
+          {
+            id: "psm_vwap_bull_c2",
+            indicator: "hma",
+            indicatorParams: { period: 7 },
+            operator: "above",
+            compareWith: "indicator",
+            compareIndicator: "wma",
+            compareIndicatorParams: { period: 14 },
+          },
+        ],
+      },
+      // ── PILLAR 2B: VWAP Drop Bear ────────────────────────────────────────
+      {
+        id: "psm_vwap_drop_bear",
+        name: "VWAP DROP ▼",
+        logic: "AND",
+        signal: "sell",
+        signalStrength: 3,
+        markerShape: "arrowDown",
+        markerColor: "#ff9100",
+        markerSize: 2,
+        showLabel: true,
+        conditions: [
+          {
+            id: "psm_vwap_bear_c1",
+            indicator: "price",
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "vwap",
+            compareIndicatorParams: { period: 10 },
+          },
+          {
+            id: "psm_vwap_bear_c2",
+            indicator: "hma",
+            indicatorParams: { period: 7 },
+            operator: "below",
+            compareWith: "indicator",
+            compareIndicator: "wma",
+            compareIndicatorParams: { period: 14 },
+          },
+        ],
+      },
+      // ── PILLAR 3A: Williams %R Recovery Pulse Bull ───────────────────────
+      {
+        id: "psm_wr_pulse_bull",
+        name: "WR PULSE ▲",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 2,
+        markerShape: "square",
+        markerColor: "#ffd600",
+        markerSize: 1,
+        showLabel: false,
+        conditions: [
+          {
+            id: "psm_wr_bull_c1",
+            indicator: "williams_r",
+            indicatorParams: { period: 8 },
+            operator: "crosses_below",
+            compareWith: "value",
+            compareValue: 80,
+          },
+        ],
+      },
+      // ── PILLAR 3B: Williams %R Recovery Pulse Bear ───────────────────────
+      {
+        id: "psm_wr_pulse_bear",
+        name: "WR PULSE ▼",
+        logic: "AND",
+        signal: "sell",
+        signalStrength: 2,
+        markerShape: "square",
+        markerColor: "#ffd600",
+        markerSize: 1,
+        showLabel: false,
+        conditions: [
+          {
+            id: "psm_wr_bear_c1",
+            indicator: "williams_r",
+            indicatorParams: { period: 8 },
+            operator: "crosses_above",
+            compareWith: "value",
+            compareValue: 20,
+          },
+        ],
+      },
+    ],
+    defaultIndicators: ["bb", "vwap", "hma", "wma"],
+    signalDisplay: {
+      showOnChart: true,
+      showArrows: true,
+      showLabels: true,
+      arrowSize: "medium",
+    },
+  },
+  supportedAssets: [],
+  tags: ["strategy", "bollinger", "vwap", "hma", "wma", "williams-r", "roc", "breakout", "volatility", "competition", "fast-signals", "premium"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -3462,6 +3746,7 @@ const ALL_ITEMS = [
   // Strategies
   APEX_CONFLUENCE_ENGINE,
   CATALYST_SURGE_PROTOCOL,
+  PRISM_SURGE_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
