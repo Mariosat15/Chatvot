@@ -108,6 +108,10 @@ export async function GET() {
           .lean()
       : [];
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:109',message:'H-B: positions query result',hypothesisId:'H-B',data:{allEventIds,positionsFound:(openPositions as any[]).length,samplePositions:(openPositions as any[]).slice(0,3).map((p:any)=>({competitionId:p.competitionId,userId:p.userId,symbol:p.symbol,side:p.side,entryPrice:p.entryPrice,currentPrice:p.currentPrice,unrealizedPnl:p.unrealizedPnl,quantity:p.quantity}))},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     // ── 7. Batch-fetch user avatars ────────────────────────────────────────────
     const allUserIds = [
       ...new Set([
@@ -155,6 +159,10 @@ export async function GET() {
       // Prices are optional — don't fail the whole request
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:156',message:'H-C: price snapshot result',hypothesisId:'H-C',data:{priceKeys:Object.keys(latestPrices).slice(0,10),priceCount:Object.keys(latestPrices).length,samplePrice:latestPrices['EURUSD']||latestPrices['EUR/USD']||latestPrices['EURUSD ']||null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     // ── 9. Live unrealized PnL — recalculated from live prices ───────────────
     // PnL formula (matches trading engine exactly):
     //   Long:  (livePrice - entryPrice) × lots × contractSize
@@ -184,6 +192,10 @@ export async function GET() {
         posLivePnl = (pos.unrealizedPnl as number) || 0;
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:195',message:'H-A: per-position PnL recalc',hypothesisId:'H-A',data:{sym,rawSymbol:pos.symbol,priceDataFound:!!priceData,priceData,entryPrice:pos.entryPrice,currentPrice:pos.currentPrice,side:pos.side,quantity:pos.quantity,storedUnrealizedPnl:pos.unrealizedPnl,recalcPnl:posLivePnl,uid},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
       liveUnrealizedByUser[uid] = (liveUnrealizedByUser[uid] || 0) + posLivePnl;
     }
 
@@ -198,6 +210,10 @@ export async function GET() {
         ((p.unrealizedPnl as number) || 0);
       const liveEquity = ((p.currentCapital as number) || 0) + realUnrealized;
       const livePnl = liveEquity - startingCapital;
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:218',message:'H-D: enrichParticipant values',hypothesisId:'H-D',data:{userId:p.userId,username:p.username,currentCapital:p.currentCapital,startingCapital,storedUnrealizedPnl:p.unrealizedPnl,liveUnrealizedFromPositions:liveUnrealizedByUser[p.userId as string],realUnrealized,liveEquity,livePnl},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const liveRoi =
         startingCapital > 0 ? (livePnl / startingCapital) * 100 : 0;
       const winRate =
