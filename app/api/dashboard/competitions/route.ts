@@ -180,8 +180,8 @@ export async function GET() {
     for (const pos of openPositions) {
       const uid = pos.userId as string;
 
-      // Normalise: "EUR/USD" → "EURUSD" (snapshot stores without slash)
-      const sym = ((pos.symbol as string) || "").replace("/", "");
+      // Symbol format matches snapshot keys exactly: "EUR/USD" (with slash)
+      const sym = (pos.symbol as string) || "";
       const priceData = latestPrices[sym];
       let posLivePnl: number;
 
@@ -202,7 +202,7 @@ export async function GET() {
       _dbgPositionDetails.push({
         userId: uid,
         symbol: pos.symbol,
-        symNorm: sym,
+        symUsedForLookup: sym,
         side: pos.side,
         qty: pos.quantity,
         entry: pos.entryPrice,
