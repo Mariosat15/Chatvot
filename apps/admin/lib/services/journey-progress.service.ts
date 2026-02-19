@@ -39,7 +39,6 @@ export async function initializeUserJourney(
   // Check if progress already exists
   const existing = await UserJourneyProgress.findOne({ userId, mapId });
   if (existing) {
-    console.log(`ℹ️ [JOURNEY] User ${userId} already has journey progress`);
     return existing;
   }
 
@@ -167,7 +166,6 @@ export async function quickSyncUnlocks(
 
   if (hasChanges) {
     await progress.save();
-    console.log(`✅ [JOURNEY] Quick sync completed for user ${userId} - current: ${progress.currentMilestone}`);
   }
 }
 
@@ -842,7 +840,6 @@ export async function checkAndUnlockMilestones(
 ): Promise<{
   newlyUnlocked: string[];
 }> {
-  console.log(`🔓 [JOURNEY] Checking unlock conditions for user ${userId}`);
   await connectToDatabase();
 
   const newlyUnlocked: string[] = [];
@@ -937,7 +934,6 @@ export async function checkAndCompleteMilestones(
   unlocked: string[];
   totalXPEarned: number;
 }> {
-  console.log(`🔄 [JOURNEY] Checking milestones for user ${userId}`);
   await connectToDatabase();
 
   const completed: string[] = [];
@@ -990,8 +986,6 @@ export async function checkAndCompleteMilestones(
       if (result.success && result.rewards) {
         completed.push(milestone.id);
         totalXPEarned += result.rewards.xp;
-        console.log(`✅ [JOURNEY] Completed milestone (parallel): ${milestone.name}`);
-        
         // Cascade: check for new unlocks
         await checkAndUnlockMilestones(userId, mapId);
       }

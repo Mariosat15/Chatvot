@@ -192,15 +192,6 @@ export async function getBadgesFromDB() {
       badges = await BadgeConfig.find({ isActive: true }).lean();
     }
 
-    // #region agent log
-    const constantBadgeIds = new Set(BADGES.map(b => b.id));
-    const dbBadgeIds = new Set(badges.map((b: any) => b.id));
-    const missingFromDB = BADGES.filter(b => !dbBadgeIds.has(b.id)).map(b => b.id);
-    const extraInDB = badges.filter((b: any) => !constantBadgeIds.has(b.id)).map((b: any) => b.id);
-    if (missingFromDB.length > 0 || extraInDB.length > 0) {
-      console.log(`🔍 [BADGE-DEBUG] DB SYNC ISSUE: dbCount=${badges.length} constantsCount=${BADGES.length} missingFromDB=${JSON.stringify(missingFromDB)} extraInDB=${JSON.stringify(extraInDB)}`);
-    }
-    // #endregion
 
     // Convert to plain objects, removing MongoDB-specific fields
     return badges.map((badge: any) => ({

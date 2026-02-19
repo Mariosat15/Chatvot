@@ -2222,9 +2222,9 @@ async function startRedisPriceRelay(): Promise<void> {
 
       relayedCount++;
       const now = Date.now();
-      if (now - lastRelayLog > 60000) {
+      if (now - lastRelayLog > 300000) {
         console.log(
-          `📡 [Redis Relay] Relayed ${relayedCount} price broadcasts in last 60s`,
+          `📡 [Redis Relay] Relayed ${relayedCount} price broadcasts in last 5min`,
         );
         relayedCount = 0;
         lastRelayLog = now;

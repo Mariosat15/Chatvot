@@ -146,16 +146,8 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
       ? allBadges.filter((b) => categories.includes(b.category))
       : allBadges;
 
-    // #region agent log
-    console.log(`🔍 [BADGE-DEBUG] evaluateUserBadges userId=${userId} categories=${JSON.stringify(categories)} allBadgesCount=${allBadges.length} filteredBadgesCount=${badges.length} allCategories=${JSON.stringify([...new Set(allBadges.map((b:any)=>b.category))])}`);
-    // #endregion
-
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
-
-    // #region agent log
-    console.log(`🔍 [BADGE-DEBUG] Stats for ${userId}: totalTrades=${stats.totalTrades} winningTrades=${stats.winningTrades} winRate=${stats.winRate?.toFixed(1)} totalPnl=${stats.totalPnl?.toFixed(2)} depositCount=${stats.depositCount} totalDeposited=${stats.totalDeposited} compsEntered=${stats.competitionsEntered} completedComps=${stats.completedCompetitions} completedCompsWithTrades=${stats.completedCompetitionsWithTrades} level=${stats.currentLevel} maxWinStreak=${stats.maxWinStreak} alwaysSL=${stats.alwaysUsesSL} alwaysTP=${stats.alwaysUsesTP}`);
-    // #endregion
 
     // 2. Get currently earned badges
     const existingBadges = await UserBadge.find({ userId }).lean();
@@ -192,14 +184,6 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
 
       // Check if badge condition is met
       const earned = await checkBadgeCondition(badge as Badge, stats);
-
-      // #region agent log
-      const debugBadgeIds = ['profit_5_wins','profit_10_wins','social_first_deposit','social_funded_trader','social_first_comp','social_first_trade','social_depositor','trade_25','profit_positive','profit_win_streak_5','risk_survivor','comp_5_entries'];
-      if (debugBadgeIds.includes(badge.id)) {
-        const bCond = badge.condition as any;
-        console.log(`🔍 [BADGE-DEBUG] Badge ${badge.id}: earned=${earned} condType=${bCond?.type} condValue=${bCond?.value} minTrades=${bCond?.minTrades} rarity=${badge.rarity} userLevel=${userCurrentLevel}`);
-      }
-      // #endregion
 
       if (earned) {
         // Award the badge
@@ -286,9 +270,6 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   // Check cache first
   const cached = _statsCache.get(userId);
   if (cached && Date.now() < cached.expiresAt) {
-    // #region agent log
-    console.log(`🔍 [BADGE-DEBUG] CACHE HIT for ${userId} - age=${Math.round((Date.now()-(cached.expiresAt-5*60*1000))/1000)}s totalTrades=${cached.stats.totalTrades} winningTrades=${cached.stats.winningTrades}`);
-    // #endregion
     return cached.stats;
   }
 
