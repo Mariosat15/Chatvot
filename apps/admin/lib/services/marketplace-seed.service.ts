@@ -2839,16 +2839,15 @@ export async function seedMarketplaceItems(
           existing.shortDescription = itemData.shortDescription;
         }
         existing.version = itemData.version || existing.version;
-        existing.isPublished = itemData.isPublished ?? true;
-        existing.status = itemData.status || "active";
+        // ── Admin-controlled fields: NEVER overwrite for existing items ──
+        // isFeatured, isPublished, and status are intentionally managed by the
+        // admin via the UI. Seeding must not undo admin decisions (e.g. unfeaturing
+        // a product or unpublishing it). These fields are only set on first creation.
         existing.category = itemData.category || existing.category;
         if (existing.price === 0 || existing.price === undefined) {
           existing.price = itemData.price ?? existing.price;
         }
         existing.isFree = itemData.isFree ?? existing.isFree;
-        if (itemData.isFeatured !== undefined) {
-          existing.isFeatured = itemData.isFeatured;
-        }
         if (!existing.tags || existing.tags.length === 0) {
           existing.tags = itemData.tags || existing.tags;
         }
