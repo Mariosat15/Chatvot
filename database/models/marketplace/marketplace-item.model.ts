@@ -113,6 +113,7 @@ export interface IStrategyRule {
   markerShape?: MarkerShape;  // defaults: buy→arrowUp, sell→arrowDown, neutral→circle
   markerColor?: string;       // hex color; defaults to signal-type color when omitted
   markerSize?: number;        // 1-5; defaults to signalStrength-derived value when omitted
+  showLabel?: boolean;        // show text label on the marker (default: true)
 }
 
 // Full Strategy Configuration
@@ -248,8 +249,9 @@ const StrategyRuleSchema = new Schema(
       type: String,
       enum: ["arrowUp", "arrowDown", "circle", "square"],
     },
-    markerColor: { type: String },  // hex color string, e.g. "#00ff88"
+    markerColor: { type: String },           // hex color string, e.g. "#00ff88"
     markerSize:  { type: Number, min: 1, max: 5 },
+    showLabel:   { type: Boolean, default: true }, // show text label on marker
   },
   { _id: false },
 );

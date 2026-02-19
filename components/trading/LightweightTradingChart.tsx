@@ -5710,12 +5710,18 @@ const LightweightTradingChart = ({
               ? "inBar"
               : "aboveBar";
 
+            // ── Label: per-rule showLabel flag (default true) ─────────────
+            const showLabel = signal.showLabel !== false; // undefined → show
+            const text = showLabel
+              ? signal.type.replace(/_/g, " ").toUpperCase()
+              : "";
+
             return {
               time: signal.time,
               position,
               color,
               shape,
-              text: signal.type.replace(/_/g, " ").toUpperCase(),
+              text,
               size,
             };
           });

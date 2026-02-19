@@ -22,6 +22,7 @@ export interface StrategySignal {
   markerShape?: string;   // "arrowUp" | "arrowDown" | "circle" | "square"
   markerColor?: string;   // hex color
   markerSize?: number;    // 1-5
+  showLabel?: boolean;    // whether to show text label (default: true)
 }
 
 // Candle data for calculations
@@ -717,6 +718,7 @@ export function generateStrategySignals(
           markerShape: rule.markerShape,
           markerColor: rule.markerColor,
           markerSize: rule.markerSize,
+          showLabel: rule.showLabel,
         });
       }
     }
