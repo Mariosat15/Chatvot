@@ -136,7 +136,6 @@ export default function GameChart({
   useEffect(() => {
     const handlePositionClosed = (event: CustomEvent) => {
       const { positionId, symbol: closedSymbol } = event.detail;
-      console.log("🎮 [GameChart] Position closed:", positionId, closedSymbol);
 
       // Track this position as closed
       closedPositionIdsRef.current.add(positionId);
@@ -162,10 +161,6 @@ export default function GameChart({
 
     const handleTPSLUpdated = (event: CustomEvent) => {
       const { positionId, takeProfit, stopLoss } = event.detail;
-      console.log("🎮 [GameChart] TP/SL updated:", positionId, {
-        takeProfit,
-        stopLoss,
-      });
 
       // Update live positions with new TP/SL values
       setLivePositions((prev) =>
@@ -183,7 +178,6 @@ export default function GameChart({
 
     const handlePositionsChanged = (event: CustomEvent) => {
       const { closedPositions } = event.detail;
-      console.log("🎮 [GameChart] Positions changed, closed:", closedPositions);
 
       // Mark closed positions
       if (closedPositions && Array.isArray(closedPositions)) {
@@ -520,9 +514,6 @@ export default function GameChart({
             if (message.type === "data_updated" && message.data) {
               const { symbol: updatedSymbol } = message.data;
               if (updatedSymbol === symbol) {
-                console.log(
-                  `🔄 [GameChart] Data updated for ${updatedSymbol} - will refresh on next load`,
-                );
                 // For GameChart, we just log - it doesn't need immediate refresh
                 // since game charts are typically short-term
               }

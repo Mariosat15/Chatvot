@@ -103,7 +103,6 @@ const PositionsTable = ({
   // This receives events directly from the server when TP/SL triggers
   usePositionEventListener(
     (event: PositionEvent) => {
-      console.log("⚡ [SSE] Position event received in table:", event);
 
       if (event.eventType === "closed") {
         // Instantly remove position from UI
@@ -159,15 +158,6 @@ const PositionsTable = ({
   useEffect(() => {
     const handlePositionClosed = (event: CustomEvent) => {
       const { positionId, reason, serverPositionIds } = event.detail;
-      console.log(
-        "🔔 [PositionsTable] Position closed event:",
-        positionId,
-        reason,
-      );
-      console.log(
-        "   Current positions:",
-        livePositions.map((p) => p._id),
-      );
 
       // Always add to closed set to prevent flicker, even if not in current list
       if (positionId !== "unknown") {
@@ -180,11 +170,6 @@ const PositionsTable = ({
         setLivePositions((prev) => {
           const filtered = prev.filter((p) => validIds.has(p._id));
           if (filtered.length < prev.length) {
-            console.log(
-              "🔔 [PositionsTable] Removed",
-              prev.length - filtered.length,
-              "positions via serverPositionIds",
-            );
             prev.forEach((p) => {
               if (!validIds.has(p._id)) {
                 closedPositionIdsRef.current.add(p._id);
@@ -218,7 +203,6 @@ const PositionsTable = ({
               });
             }
           } else {
-            console.log("   Position not found in livePositions");
           }
 
           return filtered;
@@ -231,11 +215,6 @@ const PositionsTable = ({
 
     // Also listen for general positions changed event to trigger refresh
     const handlePositionsChanged = (event: CustomEvent) => {
-      console.log("🔔 [PositionsTable] Positions changed event:", event.detail);
-      console.log(
-        "   Current livePositions:",
-        livePositions.map((p) => p._id),
-      );
 
       const { serverPositionIds, closedPositions, isInitialSync } =
         event.detail;
@@ -245,7 +224,6 @@ const PositionsTable = ({
       if (closedPositions && Array.isArray(closedPositions)) {
         closedPositions.forEach((id: string) => {
           closedPositionIdsRef.current.add(id);
-          console.log("🔔 [PositionsTable] Marked position as closed:", id);
         });
       }
 
@@ -256,22 +234,12 @@ const PositionsTable = ({
 
         // ⚡ IMPORTANT: Store server's position IDs as the authoritative source (in global state)
         setAuthoritativePositionIds(validIds);
-        console.log(
-          "🔔 [PositionsTable] Stored server position IDs:",
-          Array.from(validIds),
-        );
 
         setLivePositions((prev) => {
           // Check if there are any positions to remove
           const positionsToRemove = prev.filter((p) => !validIds.has(p._id));
 
           if (positionsToRemove.length > 0) {
-            console.log(
-              "🔔 [PositionsTable] Removing",
-              positionsToRemove.length,
-              "stale positions:",
-              positionsToRemove.map((p) => p._id),
-            );
 
             // Mark removed positions
             positionsToRemove.forEach((p) => {
@@ -340,30 +308,17 @@ const PositionsTable = ({
 
         // If position was explicitly closed (in closedPositionIdsRef), filter it out
         if (closedPositionIdsRef.current.has(p._id)) {
-          console.log(
-            "🔔 [PositionsTable] Filtering out closed position:",
-            p._id,
-          );
           return false;
         }
 
         // Position not in server list and not explicitly closed
         // This is likely a NEW position opened after the last sync
         // Add it to authoritative list to track it going forward
-        console.log(
-          "🔔 [PositionsTable] Detected new position in props:",
-          p._id,
-        );
         authoritativeIds.add(p._id);
         return true;
       });
 
       if (filteredPositions.length < beforeCount) {
-        console.log(
-          "🔔 [PositionsTable] Filtered out",
-          beforeCount - filteredPositions.length,
-          "stale positions from props",
-        );
       }
     }
 

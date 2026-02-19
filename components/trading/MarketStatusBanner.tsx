@@ -37,9 +37,6 @@ export default function MarketStatusBanner({
           setMarketStatus(statusData);
         } else {
           // Market status API might not be available - use time-based fallback
-          console.warn(
-            "Market status API not available, using time-based detection",
-          );
         }
 
         if (holidaysRes.ok) {
@@ -47,10 +44,8 @@ export default function MarketStatusBanner({
           setUpcomingHolidays(holidaysData.holidays || []);
         } else {
           // Holidays API might not be available
-          console.warn("Holidays API not available");
         }
       } catch (error) {
-        console.warn("Error fetching market data:", error);
       } finally {
         setLoading(false);
       }

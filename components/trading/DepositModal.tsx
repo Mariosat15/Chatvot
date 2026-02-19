@@ -255,7 +255,6 @@ export default function DepositModal({ children }: DepositModalProps) {
     if (step === "payment" && selectedProvider === "nuvei" && !nuveiLoaded) {
       // Check if SDK is already in window (from previous payment)
       if (typeof window !== "undefined" && window.SafeCharge) {
-        console.log("🔧 Syncing nuveiLoaded state - SDK already available");
         setNuveiLoaded(true);
       }
     }
@@ -276,7 +275,6 @@ export default function DepositModal({ children }: DepositModalProps) {
 
     // SECURITY: Prevent double-submit
     if (loading || isProcessingRef.current) {
-      console.log("🛡️ Blocked duplicate amount submit");
       return;
     }
 
@@ -319,7 +317,6 @@ export default function DepositModal({ children }: DepositModalProps) {
   const proceedWithProvider = async (provider: PaymentProvider) => {
     // SECURITY: Prevent double-clicks and race conditions
     if (isProcessingRef.current || loading) {
-      console.log("🛡️ Blocked duplicate request - already processing");
       return;
     }
 
@@ -345,7 +342,6 @@ export default function DepositModal({ children }: DepositModalProps) {
 
       // SECURITY: Check if this request is still valid (not superseded)
       if (lastRequestIdRef.current !== requestId) {
-        console.log("🛡️ Request superseded by newer request");
         return;
       }
 
@@ -466,7 +462,6 @@ export default function DepositModal({ children }: DepositModalProps) {
           reason: "User closed payment modal",
         }),
       });
-      console.log("Cancelled pending Nuvei transaction:", clientId);
     } catch (err) {
       console.error("Failed to cancel Nuvei transaction:", err);
     }
@@ -900,14 +895,12 @@ export default function DepositModal({ children }: DepositModalProps) {
             <Script
               src={providers.nuvei.sdkUrl}
               onLoad={() => {
-                console.log("Nuvei SDK loaded successfully");
                 setNuveiLoaded(true);
               }}
               onReady={() => {
                 // FIX: onReady fires when script is already loaded (cached)
                 // This ensures nuveiLoaded is set even on subsequent modal opens
                 if (window.SafeCharge && !nuveiLoaded) {
-                  console.log("Nuvei SDK already ready (cached)");
                   setNuveiLoaded(true);
                 }
               }}
@@ -1213,17 +1206,10 @@ function NuveiPaymentForm({
       sfcInitialized ||
       !cardFieldRef.current
     ) {
-      console.log("Nuvei init check:", {
-        sdkLoaded,
-        hasWindow: !!window.SafeCharge,
-        sfcInitialized,
-        hasRef: !!cardFieldRef.current,
-      });
       return;
     }
 
     try {
-      console.log("Initializing Nuvei with:", { merchantId, siteId, testMode });
 
       // Initialize SafeCharge - STORE the instance for later use with createPayment
       const sfc = window.SafeCharge({
@@ -1267,7 +1253,6 @@ function NuveiPaymentForm({
 
       // Listen for ready event
       cardField.on("ready", () => {
-        console.log("Nuvei card field ready");
         setCardFieldReady(true);
       });
 
@@ -1279,7 +1264,6 @@ function NuveiPaymentForm({
       // Store card field reference for payment
       setScard(cardField);
       setSfcInitialized(true);
-      console.log("Nuvei SDK initialized successfully");
     } catch (err) {
       console.error("Failed to initialize Nuvei:", err);
       setError("Failed to initialize payment form. Please try again.");
@@ -1312,7 +1296,6 @@ function NuveiPaymentForm({
 
     // SECURITY: Prevent double-clicks and race conditions
     if (isSubmittingRef.current || loading) {
-      console.log("🛡️ Blocked duplicate payment submit - already processing");
       return;
     }
 
@@ -1350,9 +1333,6 @@ function NuveiPaymentForm({
       let sfc = sfcRef.current;
       if (!sfc) {
         // Fallback: create new instance (less ideal, may fail for 3DS)
-        console.warn(
-          "⚠️ SafeCharge instance not found, creating new one (3DS may fail)",
-        );
         sfc = window.SafeCharge({
           env: testMode ? "int" : "prod",
           merchantId: merchantId,
@@ -1364,12 +1344,6 @@ function NuveiPaymentForm({
       const nameParts = cardHolderName.trim().split(" ");
       const firstName = nameParts[0] || "Customer";
       const lastName = nameParts.slice(1).join(" ") || "Customer";
-
-      console.log("🔐 Creating Nuvei payment:", {
-        sessionToken: sessionToken?.substring(0, 20) + "...",
-        clientUniqueId,
-        hasCardField: !!scard,
-      });
 
       // Create payment with required user details for 3DS2 compliance
       // According to Nuvei docs, 3DS2 requires complete user details including billing address
@@ -1416,7 +1390,6 @@ function NuveiPaymentForm({
           reason?: string;
           transactionId?: string;
         }) => {
-          console.log("Nuvei payment result:", result);
 
           if (result.result === "APPROVED" && result.errCode === "0") {
             // Verify payment on server
@@ -1450,11 +1423,6 @@ function NuveiPaymentForm({
               result.reason ||
               result.result ||
               "Payment failed";
-            console.log("Payment failed, notifying server:", {
-              clientUniqueId,
-              errorCode: result.errCode,
-              reason: failReason,
-            });
 
             try {
               await fetch("/api/nuvei/cancel-order", {

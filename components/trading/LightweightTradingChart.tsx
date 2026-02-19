@@ -162,11 +162,8 @@ interface LightweightTradingChartProps {
   tradingProps?: TradingProps;
 }
 
-// Debug logging - disable in production
-const DEBUG = process.env.NODE_ENV === "development" && false; // Set to true only when debugging
-const log = (...args: unknown[]): void => {
-  if (DEBUG) console.log(...args);
-};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const log = (..._args: unknown[]): void => {};
 
 const LightweightTradingChart = ({
   competitionId,
@@ -3664,8 +3661,6 @@ const LightweightTradingChart = ({
             }
           }
 
-        } else {
-          console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
         }
 
         // === OVERLAY REFRESH CLOSURE (two-tier: light/full) ===
@@ -4412,7 +4407,7 @@ const LightweightTradingChart = ({
               }
               // Note: support_resistance is static (level detection) -- not updated in real-time
             } catch (err) {
-              console.warn(`[OVL-REFRESH] Error refreshing ${_ovlType}:`, err);
+              void err; // suppress unused warning
             }
           });
         }
@@ -5083,10 +5078,6 @@ const LightweightTradingChart = ({
           const series = oscChart.addLineSeries({ color: hexToRgba(indicator.color, indicator.opacity || 100), lineWidth: indicator.lineWidth as any, title: indicator.customLabel || indicator.name });
           series.setData(lData.map(d => ({ time: d.time as UTCTimestamp, value: d.value })));
 
-        } else {
-          console.warn(
-            `⚠️ Unknown oscillator indicator type: ${indicator.type}`,
-          );
         }
 
         // Restore original methods and save tracked series
@@ -5208,9 +5199,7 @@ const LightweightTradingChart = ({
               // Restore visible range to preserve zoom/scroll
               if (savedRange) { try { _oscChartRef.timeScale().setVisibleLogicalRange(savedRange); } catch {} }
             }
-          } catch (err) {
-            console.warn(`[OSC-REFRESH] Error refreshing ${_indType} (${mode}):`, err);
-          }
+          } catch { /* non-fatal */ }
         });
 
         // Only fitContent on newly created charts, not on data refreshes
@@ -5218,9 +5207,7 @@ const LightweightTradingChart = ({
           oscChart.timeScale().fitContent();
         }
       }
-      } catch (indicatorErr) {
-        console.warn(`[updateIndicators] Error rendering indicator "${indicator.type}" (${indicator.id}):`, indicatorErr);
-      }
+      } catch { /* non-fatal: isolate broken indicator from crashing the chart */ }
     });
 
     log(`✅ Updated ${enabledIndicators.length} indicators`);
@@ -5375,9 +5362,7 @@ const LightweightTradingChart = ({
           }
         }
       })
-      .catch((err) => {
-        console.error("Error loading strategy service:", err);
-      });
+      .catch(() => { /* strategy service unavailable */ });
   }, [arsenalStrategies, setArsenalSignals]);
 
   // Generate signals when strategies change or candles load
@@ -6338,9 +6323,6 @@ const LightweightTradingChart = ({
 
                 // Only refresh if this chart is showing the updated symbol
                 if (updatedSymbol === symbol) {
-                  console.log(
-                    `🔄 [Chart] Data updated for ${updatedSymbol} - refreshing chart...`,
-                  );
                   // Trigger chart reload by incrementing the refresh counter
                   setDataRefreshTrigger((prev) => prev + 1);
                 }
@@ -6404,28 +6386,14 @@ const LightweightTradingChart = ({
                 // Track completed candle timestamps to prevent forming candles from overwriting them
                 const completedTimestamps = new Set<number>();
 
-                // 🔍 DEBUG: Log when completed candles are received
                 if (completedCandles && completedCandles.length > 0) {
-                  console.log(
-                    `📦 [Chart] Received ${completedCandles.length} completed candle(s) in WebSocket message`,
-                  );
-
                   if (candlestickSeriesRef.current) {
                     for (const completed of completedCandles) {
-                      // 🔍 DEBUG: Log each completed candle
-                      console.log(
-                        `   📥 Completed: ${completed.symbol} ${completed.timeframe} @ ${new Date(completed.time * 1000).toISOString()}`,
-                      );
-
                       // Check if this completed candle is for our symbol and timeframe
                       if (
                         completed.symbol === symbol &&
                         completed.timeframe === currentTf
                       ) {
-                        console.log(
-                          `   🎯 MATCHED: ${symbol} ${currentTf} @ ${new Date(completed.time * 1000).toISOString()}`,
-                        );
-
                         // Track this timestamp as "finalized" - forming candles should NOT overwrite it
                         completedTimestamps.add(completed.time);
 
@@ -6446,9 +6414,6 @@ const LightweightTradingChart = ({
                             volume:
                               candleDataRef.current[existingIndex].volume || 0,
                           };
-                          console.log(
-                            `   📝 Updated candleDataRef at index ${existingIndex}`,
-                          );
                         } else {
                           // Candle doesn't exist yet, add it
                           candleDataRef.current.push({
@@ -6461,9 +6426,6 @@ const LightweightTradingChart = ({
                           });
                           // Sort by time
                           candleDataRef.current.sort((a, b) => a.time - b.time);
-                          console.log(
-                            `   📝 Added new candle to candleDataRef`,
-                          );
                         }
 
                         // Use setData() to properly update historical candles (update() only works for last bar)
@@ -6488,36 +6450,17 @@ const LightweightTradingChart = ({
                             );
                             candlestickSeriesRef.current?.setData(candleData);
                           }
-                          console.log(
-                            `   ✅ APPLIED via setData(): O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`,
-                          );
-                        } catch (updateError) {
-                          console.error(
-                            `   ❌ FAILED to apply completed candle:`,
-                            updateError,
-                          );
-                        }
+                        } catch { /* non-fatal */ }
 
                         // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
                         if (
                           currentCandleRef.current &&
                           currentCandleRef.current.time === completedTime
                         ) {
-                          console.log(
-                            `   🔄 Reset currentCandleRef (was at same timestamp)`,
-                          );
                           currentCandleRef.current = null;
                         }
-                      } else {
-                        console.log(
-                          `   ⏭️ Skipped (not our symbol/tf): watching ${symbol}/${currentTf}, received ${completed.symbol}/${completed.timeframe}`,
-                        );
                       }
                     }
-                  } else {
-                    console.warn(
-                      `   ⚠️ candlestickSeriesRef.current is null - cannot apply completed candles!`,
-                    );
                   }
 
                   // Full indicator refresh after completed candles are applied
@@ -6555,28 +6498,7 @@ const LightweightTradingChart = ({
                 if (candle) {
                   // 🛡️ CRITICAL: Do NOT apply forming candle if we just finalized it as a completed candle
                   // This prevents stale forming candle data from overwriting the authoritative completed candle
-                  if (completedTimestamps.has(candle.time)) {
-                    // Skip this forming candle - it's stale data for a candle we just finalized
-                    // The next WebSocket message will have the new forming candle for the next period
-                    console.log(
-                      `🛡️ [Chart] BLOCKED forming candle: ${symbol} ${currentTf} @ ${new Date(candle.time * 1000).toISOString()} | Reason: timestamp ${candle.time} was just finalized as completed`,
-                    );
-                  } else {
-                    // 🔍 DEBUG: Log forming candle updates (throttled to avoid spam - only log every 5 seconds)
-                    const now = Date.now();
-                    const lastFormingLogKey = `lastFormingLog_${symbol}_${currentTf}`;
-                    const lastFormingLog =
-                      (window as unknown as Record<string, number>)[
-                        lastFormingLogKey
-                      ] || 0;
-                    if (now - lastFormingLog > 5000) {
-                      console.log(
-                        `📊 [Chart] Forming candle: ${symbol} ${currentTf} @ ${new Date(candle.time * 1000).toISOString()} | O:${candle.open?.toFixed(5)} H:${candle.high?.toFixed(5)} L:${candle.low?.toFixed(5)} C:${candle.close?.toFixed(5)}`,
-                      );
-                      (window as unknown as Record<string, number>)[
-                        lastFormingLogKey
-                      ] = now;
-                    }
+                  if (!completedTimestamps.has(candle.time)) {
                     updateChartWithCandle(candle, price);
                   }
                 }
