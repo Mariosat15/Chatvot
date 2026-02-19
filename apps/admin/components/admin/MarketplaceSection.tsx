@@ -51,6 +51,7 @@ import {
   Sun,
   Moon,
   X,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -690,6 +691,23 @@ export default function MarketplaceSection() {
     }
   };
 
+  const handleDuplicate = (item: MarketplaceItem) => {
+    // Strip DB-only fields, then set safe defaults for the copy
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id, createdAt, totalPurchases, actualPurchases, ...rest } = item as any;
+    const duplicated: Partial<MarketplaceItem> = {
+      ...rest,
+      name: `${item.name} (Copy)`,
+      slug: `${item.slug}-copy`,
+      isPublished: false,   // always start as draft
+      isFeatured: false,    // admin decides later
+      totalPurchases: 0,
+    };
+    setEditingItem(duplicated);
+    setActiveTab("basic");
+    setIsCreateOpen(true);
+  };
+
   const handleTogglePublish = async (item: MarketplaceItem) => {
     try {
       const response = await fetch("/api/marketplace", {
@@ -1026,6 +1044,15 @@ export default function MarketplaceSection() {
                               ) : (
                                 <Eye className="h-4 w-4" />
                               )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDuplicate(item)}
+                              title="Duplicate item"
+                              className="text-cyan-400 hover:text-cyan-300"
+                            >
+                              <Copy className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
