@@ -72,7 +72,11 @@ class VeriffService {
   }
 
   private generateHmacSignature(payload: string, secret: string): string {
-    return crypto.createHmac("sha256", secret).update(payload).digest("hex");
+    // Veriff requires: HMAC-SHA256( SHA256(body), apiSecret )
+    // Step 1: SHA-256 hash the raw payload → raw bytes
+    const payloadHash = crypto.createHash("sha256").update(payload).digest();
+    // Step 2: HMAC-SHA-256 of that hash using the API secret → hex
+    return crypto.createHmac("sha256", secret).update(payloadHash).digest("hex");
   }
 
   /**
