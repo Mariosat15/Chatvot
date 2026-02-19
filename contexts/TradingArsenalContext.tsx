@@ -55,7 +55,8 @@ export type IndicatorType =
   | "stellar_confluence_ribbon"
   | "kinetic_pressure_zones"
   | "nova_resonance_field"
-  | "spectre_liquidity_matrix";
+  | "spectre_liquidity_matrix"
+  | "radiant_fibonacci_matrix";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {
@@ -528,6 +529,8 @@ const INDICATOR_TYPE_MAP: Record<
   "nova resonance field": { type: "nova_resonance_field", displayType: "overlay" },
   spectre_liquidity_matrix: { type: "spectre_liquidity_matrix", displayType: "overlay" },
   "spectre liquidity matrix": { type: "spectre_liquidity_matrix", displayType: "overlay" },
+  radiant_fibonacci_matrix: { type: "radiant_fibonacci_matrix", displayType: "overlay" },
+  "radiant fibonacci matrix": { type: "radiant_fibonacci_matrix", displayType: "overlay" },
 };
 
 // Helper to convert marketplace item to chart indicator
@@ -914,6 +917,10 @@ export function marketplaceItemToIndicator(
       params.obStrength    = settings?.obStrength    || 1.5;
       params.period        = settings?.period        || 20;
       params.maxFVGAge     = settings?.maxFVGAge     || 50;
+      break;
+    case "radiant_fibonacci_matrix":
+      params.lookback  = settings?.lookback  || 55;
+      params.atrPeriod = settings?.atrPeriod || 14;
       break;
     default:
       // Generic period-based indicators

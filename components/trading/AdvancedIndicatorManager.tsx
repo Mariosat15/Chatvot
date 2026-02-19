@@ -474,6 +474,13 @@ export const INDICATOR_TEMPLATES = {
     defaultParams: { swingLookback: 5, obStrength: 1.5, period: 20, maxFVGAge: 50 },
     paramLabels: { swingLookback: "Swing Lookback", obStrength: "OB Strength (ATR×)", period: "Bias Period", maxFVGAge: "Max FVG Age (bars)" },
   },
+  radiant_fibonacci_matrix: {
+    name: "Radiant Fibonacci Matrix",
+    shortName: "RFM",
+    displayType: "overlay" as const,
+    defaultParams: { lookback: 55, atrPeriod: 14 },
+    paramLabels: { lookback: "Swing Lookback (bars)", atrPeriod: "ATR Period" },
+  },
 };
 
 // ─── Per-indicator component style/visibility configuration ───────────────────
@@ -822,6 +829,27 @@ export const INDICATOR_COMPONENT_CONFIG: Record<string, {
       { key: "signalLine", label: "Signal Line" },
       { key: "echoLine", label: "Echo Line" },
       { key: "signals", label: "NOVA/ECHO/DIV Signals" },
+    ],
+  },
+  radiant_fibonacci_matrix: {
+    colors: [
+      { key: "fib618",  label: "61.8% Golden Ratio",  default: "#ffd700" },
+      { key: "fib382",  label: "38.2% Level",          default: "#42a5f5" },
+      { key: "fib500",  label: "50% Midpoint",         default: "#ab47bc" },
+      { key: "fib786",  label: "78.6% Level",          default: "#ff7043" },
+      { key: "fib236",  label: "23.6% Level",          default: "#80deea" },
+      { key: "fib0100", label: "0% / 100% Levels",    default: "#607d8b" },
+      { key: "fibExt",  label: "Extension Levels",    default: "#ffe082" },
+    ],
+    visibility: [
+      { key: "fib618",  label: "61.8% Golden Ratio" },
+      { key: "fib382",  label: "38.2% Level" },
+      { key: "fib500",  label: "50% Midpoint" },
+      { key: "fib786",  label: "78.6% Level" },
+      { key: "fib236",  label: "23.6% Level" },
+      { key: "fib0100", label: "0% / 100% Levels" },
+      { key: "fibExt",  label: "Extension Levels (127.2% & 161.8%)" },
+      { key: "signals", label: "BOUNCE / BREAK Signals" },
     ],
   },
   spectre_liquidity_matrix: {

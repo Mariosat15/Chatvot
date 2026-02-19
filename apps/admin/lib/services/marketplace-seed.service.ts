@@ -2073,6 +2073,36 @@ const NOVA_RESONANCE_FIELD: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+const RADIANT_FIBONACCI_MATRIX: Partial<IMarketplaceItem> = {
+  name: "Radiant Fibonacci Matrix",
+  slug: "radiant-fibonacci-matrix",
+  shortDescription:
+    "Dynamic auto-Fibonacci retracement and extension indicator that continuously detects the dominant swing and paints all key Fib levels (23.6% – 161.8%) directly on price with BOUNCE and BREAK signals at the Golden Ratio.",
+  fullDescription: `# Radiant Fibonacci Matrix (RFM)\n\n## Overview\n**Radiant Fibonacci Matrix** auto-detects the dominant price swing using a rolling O(n) algorithm and paints all nine Fibonacci levels directly on your chart.\n\n## Levels\n- **0%** Steel gray — swing low\n- **23.6%** Cyan — shallow retracement\n- **38.2%** Blue — moderate pullback\n- **50%** Purple — psychological midpoint\n- **61.8%** 🌟 GOLD (thick) — Golden Ratio, highest-probability bounce zone\n- **78.6%** Orange — deep retracement\n- **100%** Steel gray — swing high\n- **127.2%** Light gold (dashed) — conservative extension target\n- **161.8%** 🌟 Gold — Golden Extension (primary price target)\n\n## Dynamic Swing\nThe indicator uses an O(n) monotonic deque to continuously detect the rolling swing high and low. Direction auto-adapts: bullish swing = extensions above HH; bearish swing = extensions below LL.\n\n## Signals\n- **BREAK ▲/▼**: Price closes through a Fib level (large arrow)\n- **BOUNCE ▲/▼**: Price touches a Fib level and reverses (small arrow)\nAll signals include the exact Fib label (e.g. "BOUNCE ▲ 61.8%").\n\n## Risk Warning\nNo indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 149.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "radiant_fibonacci_matrix",
+  iconName: "TrendingUp",
+  codeTemplate: JSON.stringify({
+    type: "radiant_fibonacci_matrix",
+    displayType: "overlay",
+    description: "Dynamic auto-Fibonacci retracement (23.6%–78.6%) and extensions (127.2%, 161.8%) with rolling swing detection",
+  }),
+  defaultSettings: {
+    lookback: 55,
+    atrPeriod: 14,
+    color: "#ffd700",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["fibonacci", "retracement", "extension", "golden-ratio", "swing", "support", "resistance", "auto-fib", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const SPECTRE_LIQUIDITY_MATRIX: Partial<IMarketplaceItem> = {
   name: "Spectre Liquidity Matrix",
   slug: "spectre-liquidity-matrix",
@@ -2132,6 +2162,7 @@ const ALL_ITEMS = [
   KINETIC_PRESSURE_ZONES,
   NOVA_RESONANCE_FIELD,
   SPECTRE_LIQUIDITY_MATRIX,
+  RADIANT_FIBONACCI_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

@@ -6582,3 +6582,140 @@ export function calculateSpectreLiquidityMatrix(
 
   return result;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RADIANT FIBONACCI MATRIX
+// Dynamic Auto-Fibonacci Retracement & Extension overlay indicator
+// Combines: Rolling swing high/low detection + All Fib levels (23.6–161.8%) +
+//           Level-interaction signal detection (BOUNCE / BREAK)
+// Uses O(n) monotonic deque for sliding window max/min
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface RadiantFibonacciMatrixData {
+  time:       number;
+  swingHigh:  number;
+  swingLow:   number;
+  swingTrend: "bullish" | "bearish";
+  // Retracement levels (always ordered low → high)
+  fib0:       number;   // 0%   = swing low
+  fib236:     number;   // 23.6%
+  fib382:     number;   // 38.2%
+  fib500:     number;   // 50%
+  fib618:     number;   // 61.8% — Golden Ratio (most important)
+  fib786:     number;   // 78.6%
+  fib100:     number;   // 100% = swing high
+  // Extension levels (direction-aware — beyond the dominant move)
+  fibExt1272: number;   // 127.2%
+  fibExt1618: number;   // 161.8% — Golden Extension
+  // Level-interaction signal
+  signal:     "bounce_up" | "bounce_down" | "break_up" | "break_down" | "none";
+  signalLevel: number;
+  nearestFib: string;
+}
+
+export function calculateRadiantFibonacciMatrix(
+  data:      OHLCData[],
+  lookback:  number = 55,   // Rolling window for swing detection
+  atrPeriod: number = 14,
+): RadiantFibonacciMatrixData[] {
+  const len = data.length;
+  if (len < lookback + 2) return [];
+
+  const highs  = data.map(d => d.high);
+  const lows   = data.map(d => d.low);
+  const closes = data.map(d => d.close);
+
+  // ── ATR (Wilder smoothing) ─────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i < atrPeriod ? tr : (atr[i - 1] * (atrPeriod - 1) + tr) / atrPeriod;
+  }
+
+  // ── Sliding window max/min with index tracking — O(n) monotonic deque ─────
+  const maxDeq: number[] = [];
+  const minDeq: number[] = [];
+  const winHigh: Array<{ val: number; idx: number }> = [];
+  const winLow:  Array<{ val: number; idx: number }> = [];
+
+  for (let i = 0; i < len; i++) {
+    while (maxDeq.length > 0 && maxDeq[0] < i - lookback)             maxDeq.shift();
+    while (minDeq.length > 0 && minDeq[0] < i - lookback)             minDeq.shift();
+    while (maxDeq.length > 0 && highs[maxDeq[maxDeq.length - 1]] <= highs[i]) maxDeq.pop();
+    while (minDeq.length > 0 && lows[minDeq[minDeq.length - 1]]   >= lows[i]) minDeq.pop();
+    maxDeq.push(i);
+    minDeq.push(i);
+    winHigh.push({ val: highs[maxDeq[0]], idx: maxDeq[0] });
+    winLow.push({ val: lows[minDeq[0]],   idx: minDeq[0] });
+  }
+
+  // ── Build per-candle output ────────────────────────────────────────────────
+  const result: RadiantFibonacciMatrixData[] = [];
+
+  for (let i = lookback; i < len; i++) {
+    const sh    = winHigh[i];
+    const sl    = winLow[i];
+    const range = sh.val - sl.val;
+    if (range < 1e-9) continue;
+
+    // Dominant trend: whichever extreme is MORE RECENT drives the direction
+    const swingTrend: "bullish" | "bearish" = sl.idx > sh.idx ? "bullish" : "bearish";
+
+    // Retracement levels (always from low to high)
+    const fib0   = sl.val;
+    const fib236 = sl.val + 0.236 * range;
+    const fib382 = sl.val + 0.382 * range;
+    const fib500 = sl.val + 0.500 * range;
+    const fib618 = sl.val + 0.618 * range;
+    const fib786 = sl.val + 0.786 * range;
+    const fib100 = sh.val;
+
+    // Extension levels — beyond the swing in the trend direction
+    const fibExt1272 = swingTrend === "bullish"
+      ? sh.val + 0.272 * range   // upside target above swing high
+      : sl.val - 0.272 * range;  // downside target below swing low
+    const fibExt1618 = swingTrend === "bullish"
+      ? sh.val + 0.618 * range
+      : sl.val - 0.618 * range;
+
+    // Signal detection: test if price crossed or bounced from a key Fib level
+    let signal: RadiantFibonacciMatrixData["signal"] = "none";
+    let signalLevel = 0;
+    let nearestFib  = "none";
+
+    if (i > 0) {
+      const prev = closes[i - 1];
+      const curr = closes[i];
+      const tol  = atr[i] * 0.35;  // ATR-scaled proximity tolerance
+
+      const levels: Array<[number, string]> = [
+        [fib618, "61.8%"], [fib382, "38.2%"], [fib500, "50%"],
+        [fib786, "78.6%"], [fib236, "23.6%"], [fib100, "100%"],
+        [fib0, "0%"], [fibExt1618, "161.8%"], [fibExt1272, "127.2%"],
+      ];
+
+      for (const [level, label] of levels) {
+        if (Math.abs((prev + curr) * 0.5 - level) < tol) {
+          if      (prev < level && curr > level) { signal = "break_up";   }
+          else if (prev > level && curr < level) { signal = "break_down"; }
+          else if (curr > prev)                  { signal = "bounce_up";  }
+          else if (curr < prev)                  { signal = "bounce_down";}
+          signalLevel = level;
+          nearestFib  = label;
+          break;
+        }
+      }
+    }
+
+    result.push({
+      time: data[i].time,
+      swingHigh: sh.val, swingLow: sl.val, swingTrend,
+      fib0, fib236, fib382, fib500, fib618, fib786, fib100,
+      fibExt1272, fibExt1618,
+      signal, signalLevel, nearestFib,
+    });
+  }
+
+  return result;
+}

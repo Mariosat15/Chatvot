@@ -2784,6 +2784,106 @@ No indicator guarantees profits. This indicator is a decision-support tool. Alwa
   riskLevel: "medium",
 };
 
+const RADIANT_FIBONACCI_MATRIX = {
+  name: "Radiant Fibonacci Matrix",
+  slug: "radiant-fibonacci-matrix",
+  shortDescription:
+    "Dynamic auto-Fibonacci retracement and extension indicator that continuously detects the dominant swing on your chart and paints all key Fibonacci levels (23.6% – 161.8%) directly onto price, with BOUNCE and BREAK signals at the Golden Ratio.",
+  fullDescription: `# Radiant Fibonacci Matrix (RFM)
+
+## Overview
+**Radiant Fibonacci Matrix** solves the #1 problem with Fibonacci trading: manually drawing retracements is slow, subjective and constantly needs updating. RFM **automatically detects the dominant price swing** using a rolling window algorithm and instantly paints all nine Fibonacci levels directly on your chart — retracement levels from 23.6% to 78.6%, plus Golden Ratio extensions at 127.2% and 161.8%. As the market evolves, the levels **adapt in real time**, always showing the most relevant Fibonacci context.
+
+## The Golden Architecture
+
+### 🟡 61.8% — The Golden Ratio (most important)
+The most respected level in financial markets. The 61.8% retracement is where the highest-probability reversals occur. RFM renders this as a **thick glowing gold line** — the brightest element in the indicator. When price returns to this level, the market is making a decision: bounce and continue the trend, or break and accelerate.
+
+### 📐 Full Retracement Ladder
+| Level | Color | Role |
+|---|---|---|
+| **0%** | Steel gray | Swing low (support anchor) |
+| **23.6%** | Cyan | Shallow retracement — strong trend |
+| **38.2%** | Blue | First key retracement — moderate pullback |
+| **50%** | Purple | Psychological midpoint — balanced market |
+| **61.8%** | 🌟 Gold (thick) | **Golden Ratio — highest-probability bounce** |
+| **78.6%** | Orange | Deep retracement — weak trend |
+| **100%** | Steel gray | Swing high (resistance anchor) |
+
+### 📈 Extension Levels (Price Targets)
+After price bounces from a retracement level, where does it go?
+
+| Level | Color | Target |
+|---|---|---|
+| **127.2%** | Light gold (dashed) | Conservative extension target |
+| **161.8%** | 🌟 Gold (solid) | **Golden Extension — primary price target** |
+
+Extension direction auto-adapts:
+- **Bullish swing**: extensions plotted ABOVE the swing high (upside targets)
+- **Bearish swing**: extensions plotted BELOW the swing low (downside targets)
+
+## Dynamic Swing Detection
+RFM uses an **O(n) monotonic deque algorithm** (the most efficient sliding window technique) to continuously identify the swing high and swing low within a configurable lookback window. The **dominant direction** is determined by which pivot is more recent:
+- If the **low is more recent**: bullish swing — retracements are pullback entries, extensions are upside targets
+- If the **high is more recent**: bearish swing — retracements are resistance levels, extensions are downside targets
+
+## Signal System
+
+| Signal | Meaning | Visual |
+|---|---|---|
+| **BREAK ▲** | Price closes above a Fib level — bullish momentum | 🟢 Large green arrow |
+| **BREAK ▼** | Price closes below a Fib level — bearish momentum | 🔴 Large red arrow |
+| **BOUNCE ▲** | Price touches a Fib level and reverses upward | 🟢 Small green arrow |
+| **BOUNCE ▼** | Price touches a Fib level and reverses downward | 🔴 Small red arrow |
+
+Signals appear on the **61.8% Golden Ratio series** and include the **exact Fib level label** (e.g., "BOUNCE ▲ 61.8%") so you always know which level triggered the event.
+
+## How to Trade
+
+### Bullish Setups (swing is bullish)
+1. **Deep retracement entries**: Wait for price to pull back to 38.2%–61.8%. If a BOUNCE ▲ signal fires at the golden ratio, enter long.
+2. **Golden Pocket**: The zone between 61.8% and 65% is the "golden pocket" — the highest-probability reversal area. Price entering this zone with a reversal candle is a premium entry signal.
+3. **Extension targets**: After a bounce from 61.8%, use the 127.2% and 161.8% levels as your take-profit targets.
+
+### Bearish Setups (swing is bearish)
+1. Sell into retracement bounces at 38.2%–61.8%
+2. BOUNCE ▼ signal at the golden ratio = short entry
+3. Extension levels below 0% = downside targets
+
+### Break Trades
+- **BREAK ▲ 100%** = price breaks the swing high — bullish breakout, target the 127.2% extension
+- **BREAK ▼ 0%** = price breaks the swing low — bearish breakout, target the 127.2% extension below
+
+## Parameters
+- **Swing Lookback** (default: 55): Rolling window size for swing high/low detection. Smaller = shorter, more reactive swings. Larger = major structural swings.
+- **ATR Period** (default: 14): Period for ATR calculation used in signal proximity tolerance.
+
+## Risk Warning
+No indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "indicator",
+  subcategory: "premium",
+  price: 149.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  indicatorType: "radiant_fibonacci_matrix",
+  iconName: "TrendingUp",
+  codeTemplate: JSON.stringify({
+    type: "radiant_fibonacci_matrix",
+    displayType: "overlay",
+    description: "Dynamic auto-Fibonacci retracement (23.6%–78.6%) and extensions (127.2%, 161.8%) with rolling swing detection and BOUNCE/BREAK signals",
+  }),
+  defaultSettings: {
+    lookback: 55,
+    atrPeriod: 14,
+    color: "#ffd700",
+    lineWidth: 2,
+  },
+  supportedAssets: [],
+  tags: ["fibonacci", "retracement", "extension", "golden-ratio", "swing", "support", "resistance", "auto-fib", "61.8", "161.8", "premium", "overlay"],
+  riskLevel: "medium",
+};
+
 const SPECTRE_LIQUIDITY_MATRIX = {
   name: "Spectre Liquidity Matrix",
   slug: "spectre-liquidity-matrix",
@@ -2901,6 +3001,7 @@ const ALL_ITEMS = [
   KINETIC_PRESSURE_ZONES,
   NOVA_RESONANCE_FIELD,
   SPECTRE_LIQUIDITY_MATRIX,
+  RADIANT_FIBONACCI_MATRIX,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,

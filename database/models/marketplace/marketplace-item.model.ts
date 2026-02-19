@@ -66,7 +66,8 @@ export type IndicatorType =
   | "stellar_confluence_ribbon"
   | "kinetic_pressure_zones"
   | "nova_resonance_field"
-  | "spectre_liquidity_matrix";
+  | "spectre_liquidity_matrix"
+  | "radiant_fibonacci_matrix";
 
 // Strategy Condition Operators
 export type ConditionOperator =

@@ -117,6 +117,7 @@ import {
   calculateKineticPressureZones,
   calculateNovaResonanceField,
   calculateSpectreLiquidityMatrix,
+  calculateRadiantFibonacciMatrix,
 } from "@/lib/services/indicators.service";
 
 interface Position {
@@ -3664,6 +3665,119 @@ const LightweightTradingChart = ({
 
         }
 
+        // ─── RADIANT FIBONACCI MATRIX ──────────────────────────────────────────
+        if (indicator.type === "radiant_fibonacci_matrix") {
+          const rfmData = calculateRadiantFibonacciMatrix(
+            candles,
+            indicator.parameters?.lookback  || 55,
+            indicator.parameters?.atrPeriod || 14,
+          );
+          if (rfmData.length > 0) {
+            const prec  = indicator.precision || 5;
+            const rfmId = indicator.id;
+
+            // User-configurable colors
+            const c618  = indicator.componentColors?.fib618  ?? "#ffd700";  // Golden
+            const c382  = indicator.componentColors?.fib382  ?? "#42a5f5";  // Blue
+            const c500  = indicator.componentColors?.fib500  ?? "#ab47bc";  // Purple
+            const c786  = indicator.componentColors?.fib786  ?? "#ff7043";  // Orange
+            const c236  = indicator.componentColors?.fib236  ?? "#80deea";  // Cyan
+            const c0100 = indicator.componentColors?.fib0100 ?? "#607d8b";  // Steel
+            const cExt  = indicator.componentColors?.fibExt  ?? "#ffe082";  // Light gold
+
+            const mapArr = (fn: (d: typeof rfmData[0]) => number) =>
+              rfmData.map(d => ({ time: d.time as UTCTimestamp, value: fn(d) }));
+
+            // 0% and 100% — swing boundary lines (thin dashed steel)
+            if (indicator.componentVisibility?.fib0100 !== false) {
+              const s0 = chart.addLineSeries({ color: c0100, lineWidth: 1 as any, lineStyle: 1, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const s100 = chart.addLineSeries({ color: c0100, lineWidth: 1 as any, lineStyle: 1, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              s0.setData(mapArr(d => d.fib0));
+              s100.setData(mapArr(d => d.fib100));
+              indicatorSeriesRef.current.set(`${rfmId}_0`, s0);
+              indicatorSeriesRef.current.set(`${rfmId}_100`, s100);
+            }
+
+            // 23.6% — lightest retracement (dashed cyan)
+            if (indicator.componentVisibility?.fib236 !== false) {
+              const s236 = chart.addLineSeries({ color: c236, lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              s236.setData(mapArr(d => d.fib236));
+              indicatorSeriesRef.current.set(`${rfmId}_236`, s236);
+            }
+
+            // 38.2% — key retracement (dashed blue)
+            if (indicator.componentVisibility?.fib382 !== false) {
+              const s382 = chart.addLineSeries({ color: c382, lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              s382.setData(mapArr(d => d.fib382));
+              indicatorSeriesRef.current.set(`${rfmId}_382`, s382);
+            }
+
+            // 50% — midpoint (dashed purple)
+            if (indicator.componentVisibility?.fib500 !== false) {
+              const s500 = chart.addLineSeries({ color: c500, lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              s500.setData(mapArr(d => d.fib500));
+              indicatorSeriesRef.current.set(`${rfmId}_500`, s500);
+            }
+
+            // 61.8% — GOLDEN RATIO (solid thick gold — most important level)
+            if (indicator.componentVisibility?.fib618 !== false) {
+              const s618 = chart.addLineSeries({
+                color: c618, lineWidth: 2 as any, lineStyle: 0,
+                title: indicator.customLabel || "Radiant Fibonacci Matrix",
+                priceScaleId: "right", lastValueVisible: true,
+                priceFormat: { type: "price", precision: prec },
+              });
+              s618.setData(rfmData.map(d => ({
+                time: d.time as UTCTimestamp,
+                value: d.fib618,
+                // Pulse the golden line: brighter in bullish trend, dimmer in bearish
+                color: hexToRgba(c618, d.swingTrend === "bullish" ? 100 : 70),
+              })));
+              indicatorSeriesRef.current.set(`${rfmId}_618`, s618);
+
+              // Attach BOUNCE / BREAK signals to the golden series
+              if (indicator.componentVisibility?.signals !== false) {
+                const rfmMarkers: any[] = rfmData
+                  .filter(d => d.signal !== "none")
+                  .map(d => ({
+                    time: d.time as UTCTimestamp,
+                    position: d.signal === "bounce_up" || d.signal === "break_up" ? "belowBar" : "aboveBar",
+                    color: d.signal === "break_up"    ? "#69f0ae"
+                         : d.signal === "break_down"  ? "#ff5252"
+                         : d.signal === "bounce_up"   ? "#b9f6ca"
+                         :                              "#ffcdd2",
+                    shape: d.signal.includes("up") ? "arrowUp" : "arrowDown",
+                    text: d.signal === "break_up"    ? `BREAK ▲ ${d.nearestFib}`
+                        : d.signal === "break_down"  ? `BREAK ▼ ${d.nearestFib}`
+                        : d.signal === "bounce_up"   ? `BOUNCE ▲ ${d.nearestFib}`
+                        :                              `BOUNCE ▼ ${d.nearestFib}`,
+                    size: d.signal.startsWith("break") ? 2 : 1,
+                  }));
+                if (rfmMarkers.length > 0) {
+                  try { s618.setMarkers(rfmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+                }
+              }
+            }
+
+            // 78.6% — deep retracement (dashed orange)
+            if (indicator.componentVisibility?.fib786 !== false) {
+              const s786 = chart.addLineSeries({ color: c786, lineWidth: 1 as any, lineStyle: 2, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              s786.setData(mapArr(d => d.fib786));
+              indicatorSeriesRef.current.set(`${rfmId}_786`, s786);
+            }
+
+            // Extension levels 127.2% and 161.8% (light gold)
+            if (indicator.componentVisibility?.fibExt !== false) {
+              const sExt1272 = chart.addLineSeries({ color: hexToRgba(cExt, 65), lineWidth: 1 as any, lineStyle: 3, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              const sExt1618 = chart.addLineSeries({ color: cExt,               lineWidth: 2 as any, lineStyle: 0, priceScaleId: "right", lastValueVisible: false, priceFormat: { type: "price", precision: prec } });
+              sExt1272.setData(mapArr(d => d.fibExt1272));
+              sExt1618.setData(mapArr(d => d.fibExt1618));
+              indicatorSeriesRef.current.set(`${rfmId}_ext1272`, sExt1272);
+              indicatorSeriesRef.current.set(`${rfmId}_ext1618`, sExt1618);
+            }
+          }
+        }
+
         // ─── SPECTRE LIQUIDITY MATRIX ──────────────────────────────────────────
         if (indicator.type === "spectre_liquidity_matrix") {
           const slmData = calculateSpectreLiquidityMatrix(
@@ -4505,6 +4619,51 @@ const LightweightTradingChart = ({
                     if (echoS) echoS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.echoLine, color: hexToRgba(_nrfEchoC, nrfOp(d)) })));
                     if (refS) refS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.priceRef })));
                     if (sigS) sigS.setData(nrfData.map(d => ({ time: d.time as UTCTimestamp, value: d.signalLine })));
+                  }
+                }
+              } else if (_ovlType === "radiant_fibonacci_matrix") {
+                const rfmData = calculateRadiantFibonacciMatrix(
+                  tc,
+                  p.lookback  || 55,
+                  p.atrPeriod || 14,
+                );
+                if (rfmData.length > 0) {
+                  const _c618  = _ovlColors.fib618  ?? "#ffd700";
+                  const _cExt  = _ovlColors.fibExt  ?? "#ffe082";
+                  const s0      = _ovlSeriesMap.get(`${_ovlId}_0`);
+                  const s100    = _ovlSeriesMap.get(`${_ovlId}_100`);
+                  const s236    = _ovlSeriesMap.get(`${_ovlId}_236`);
+                  const s382    = _ovlSeriesMap.get(`${_ovlId}_382`);
+                  const s500    = _ovlSeriesMap.get(`${_ovlId}_500`);
+                  const s618    = _ovlSeriesMap.get(`${_ovlId}_618`);
+                  const s786    = _ovlSeriesMap.get(`${_ovlId}_786`);
+                  const sE1272  = _ovlSeriesMap.get(`${_ovlId}_ext1272`);
+                  const sE1618  = _ovlSeriesMap.get(`${_ovlId}_ext1618`);
+
+                  if (mode === "light") {
+                    const last = rfmData[rfmData.length - 1];
+                    if (!last) return;
+                    const t = last.time as UTCTimestamp;
+                    if (s0)    s0.update({ time: t, value: last.fib0 } as any);
+                    if (s100)  s100.update({ time: t, value: last.fib100 } as any);
+                    if (s236)  s236.update({ time: t, value: last.fib236 } as any);
+                    if (s382)  s382.update({ time: t, value: last.fib382 } as any);
+                    if (s500)  s500.update({ time: t, value: last.fib500 } as any);
+                    if (s618)  s618.update({ time: t, value: last.fib618, color: hexToRgba(_c618, last.swingTrend === "bullish" ? 100 : 70) } as any);
+                    if (s786)  s786.update({ time: t, value: last.fib786 } as any);
+                    if (sE1272) sE1272.update({ time: t, value: last.fibExt1272 } as any);
+                    if (sE1618) sE1618.update({ time: t, value: last.fibExt1618 } as any);
+                  } else {
+                    const m = (fn: (d: typeof rfmData[0]) => number) => rfmData.map(d => ({ time: d.time as UTCTimestamp, value: fn(d) }));
+                    if (s0)    s0.setData(m(d => d.fib0));
+                    if (s100)  s100.setData(m(d => d.fib100));
+                    if (s236)  s236.setData(m(d => d.fib236));
+                    if (s382)  s382.setData(m(d => d.fib382));
+                    if (s500)  s500.setData(m(d => d.fib500));
+                    if (s618)  s618.setData(rfmData.map(d => ({ time: d.time as UTCTimestamp, value: d.fib618, color: hexToRgba(_c618, d.swingTrend === "bullish" ? 100 : 70) })));
+                    if (s786)  s786.setData(m(d => d.fib786));
+                    if (sE1272) sE1272.setData(m(d => d.fibExt1272));
+                    if (sE1618) sE1618.setData(m(d => d.fibExt1618));
                   }
                 }
               } else if (_ovlType === "spectre_liquidity_matrix") {
