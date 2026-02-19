@@ -2135,6 +2135,215 @@ const SPECTRE_LIQUIDITY_MATRIX: Partial<IMarketplaceItem> = {
   riskLevel: "medium",
 };
 
+// ─────────────────────────────────────────────────────────
+//  STRATEGIES
+// ─────────────────────────────────────────────────────────
+
+const APEX_CONFLUENCE_ENGINE: Partial<IMarketplaceItem> = {
+  name: "Apex Confluence Engine",
+  slug: "apex-confluence-engine",
+  shortDescription:
+    "Five-layer precision strategy using EMA trend structure, MACD momentum gates, RSI pressure zones and BB equilibrium for high-confidence STRONG BUY/SELL signals.",
+  fullDescription: `# Apex Confluence Engine (ACE)\n\n## Overview\n**Apex Confluence Engine** is a multi-layer signal strategy that requires up to five independent technical conditions to align simultaneously before firing a signal — eliminating low-quality trades and delivering only the highest-confidence entries.\n\n## Signal Logic\n\n### 🟢 ACE BULL LOCK (STRONG BUY — strength 5)\nAll 5 conditions must align simultaneously:\n1. EMA(20) crosses above EMA(50) — trend structure turns bullish\n2. MACD Line crosses above Signal Line — momentum confirms\n3. RSI(14) above 50 — pressure positive\n4. Price above Bollinger Middle Band — above fair value\n5. Price above EMA(200) — macro trend confirms long bias\n\n### 🟩 SNIPER LONG (BUY — strength 3)\n1. Price above EMA(200) — macro bullish\n2. RSI(14) crosses above 35 — oversold exhaustion\n3. MACD Histogram above 0 — momentum turning positive\n\n### 🔴 ACE BEAR LOCK (STRONG SELL — strength 5)\n1. EMA(20) crosses below EMA(50) — structure turns bearish\n2. MACD Line crosses below Signal Line — momentum confirms\n3. RSI(14) below 50 — pressure negative\n4. Price below Bollinger Middle Band — below fair value\n5. Price below EMA(200) — macro trend confirms short bias\n\n### 🟥 SNIPER SHORT (SELL — strength 3)\n1. Price below EMA(200) — macro bearish\n2. RSI(14) crosses below 65 — overbought exhaustion\n3. MACD Histogram below 0 — momentum turning negative\n\n## Recommended Chart Setup\nAdd alongside ACE: EMA 20, EMA 50, EMA 200, MACD (12/26/9), RSI (14), Bollinger Bands (20, 2)\n\n## Risk Warning\nNo indicator guarantees profits. This indicator is a decision-support tool. Always use proper risk management and never risk more than you can afford to lose.`,
+  category: "strategy",
+  price: 89.99,
+  status: "active",
+  isPublished: true,
+  isFeatured: true,
+  iconName: "Zap",
+  codeTemplate: JSON.stringify({
+    type: "strategy",
+    displayType: "signals",
+    description: "Five-layer trend/momentum/volatility confluence strategy firing only when EMA structure, MACD, RSI and Bollinger Bands all align",
+  }),
+  defaultSettings: {
+    color: "#00e5ff",
+    lineWidth: 2,
+  },
+  strategyConfig: {
+    rules: [
+      {
+        id: "ace_bull_lock",
+        name: "ACE BULL LOCK",
+        logic: "AND",
+        signal: "strong_buy",
+        signalStrength: 5,
+        conditions: [
+          {
+            id: "c1_ema_cross_bull",
+            indicator: "ema",
+            indicatorParams: { period: 20 },
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 50 },
+          },
+          {
+            id: "c2_macd_cross_bull",
+            indicator: "macd_line",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "crosses_above",
+            compareWith: "indicator",
+            compareIndicator: "macd_signal",
+            compareIndicatorParams: { fast: 12, slow: 26, signal: 9 },
+          },
+          {
+            id: "c3_rsi_positive",
+            indicator: "rsi",
+            indicatorParams: { period: 14 },
+            operator: "above",
+            compareWith: "value",
+            compareValue: 50,
+          },
+          {
+            id: "c4_above_bb_mid",
+            indicator: "price",
+            operator: "above",
+            compareWith: "indicator",
+            compareIndicator: "bb_middle",
+            compareIndicatorParams: { period: 20, stdDev: 2 },
+          },
+          {
+            id: "c5_macro_bull",
+            indicator: "price",
+            operator: "above",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 200 },
+          },
+        ],
+      },
+      {
+        id: "sniper_long",
+        name: "SNIPER LONG",
+        logic: "AND",
+        signal: "buy",
+        signalStrength: 3,
+        conditions: [
+          {
+            id: "c6_macro_bull_long",
+            indicator: "price",
+            operator: "above",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 200 },
+          },
+          {
+            id: "c7_rsi_recover",
+            indicator: "rsi",
+            indicatorParams: { period: 14 },
+            operator: "crosses_above",
+            compareWith: "value",
+            compareValue: 35,
+          },
+          {
+            id: "c8_macd_hist_pos",
+            indicator: "macd_histogram",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "above",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+      {
+        id: "ace_bear_lock",
+        name: "ACE BEAR LOCK",
+        logic: "AND",
+        signal: "strong_sell",
+        signalStrength: 5,
+        conditions: [
+          {
+            id: "c9_ema_cross_bear",
+            indicator: "ema",
+            indicatorParams: { period: 20 },
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 50 },
+          },
+          {
+            id: "c10_macd_cross_bear",
+            indicator: "macd_line",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "crosses_below",
+            compareWith: "indicator",
+            compareIndicator: "macd_signal",
+            compareIndicatorParams: { fast: 12, slow: 26, signal: 9 },
+          },
+          {
+            id: "c11_rsi_negative",
+            indicator: "rsi",
+            indicatorParams: { period: 14 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 50,
+          },
+          {
+            id: "c12_below_bb_mid",
+            indicator: "price",
+            operator: "below",
+            compareWith: "indicator",
+            compareIndicator: "bb_middle",
+            compareIndicatorParams: { period: 20, stdDev: 2 },
+          },
+          {
+            id: "c13_macro_bear",
+            indicator: "price",
+            operator: "below",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 200 },
+          },
+        ],
+      },
+      {
+        id: "sniper_short",
+        name: "SNIPER SHORT",
+        logic: "AND",
+        signal: "sell",
+        signalStrength: 3,
+        conditions: [
+          {
+            id: "c14_macro_bear_short",
+            indicator: "price",
+            operator: "below",
+            compareWith: "indicator",
+            compareIndicator: "ema",
+            compareIndicatorParams: { period: 200 },
+          },
+          {
+            id: "c15_rsi_reject",
+            indicator: "rsi",
+            indicatorParams: { period: 14 },
+            operator: "crosses_below",
+            compareWith: "value",
+            compareValue: 65,
+          },
+          {
+            id: "c16_macd_hist_neg",
+            indicator: "macd_histogram",
+            indicatorParams: { fast: 12, slow: 26, signal: 9 },
+            operator: "below",
+            compareWith: "value",
+            compareValue: 0,
+          },
+        ],
+      },
+    ],
+    defaultIndicators: ["ema", "macd", "rsi", "bb"],
+    signalDisplay: {
+      showOnChart: true,
+      showArrows: true,
+      showLabels: true,
+      arrowSize: "large",
+    },
+  },
+  supportedAssets: [],
+  tags: ["strategy", "ema", "macd", "rsi", "bollinger", "confluence", "trend", "momentum", "multi-layer", "signals", "premium"],
+  riskLevel: "medium",
+};
+
 const ALL_ITEMS = [
   // Indicators
   NEXUS_TREND_MATRIX,
@@ -2163,6 +2372,8 @@ const ALL_ITEMS = [
   NOVA_RESONANCE_FIELD,
   SPECTRE_LIQUIDITY_MATRIX,
   RADIANT_FIBONACCI_MATRIX,
+  // Strategies
+  APEX_CONFLUENCE_ENGINE,
   // Cosmetic Avatars
   AVATAR_SHADOW_TRADER,
   AVATAR_PHANTOM_OPERATIVE,
