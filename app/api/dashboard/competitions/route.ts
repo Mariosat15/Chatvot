@@ -333,7 +333,34 @@ export async function GET() {
       };
     });
 
-    // ── 12. Aggregate stats ────────────────────────────────────────────────
+    // ── 12. Latest price snapshot ──────────────────────────────────────────
+    let latestPrices: Record<string, { bid: number; ask: number; mid: number }> = {};
+    try {
+      const snapshot = await db
+        .collection("pricesnapshots")
+        .findOne({}, { sort: { timestamp: -1 } });
+      if (snapshot && Array.isArray(snapshot.prices)) {
+        for (const entry of snapshot.prices as Array<{
+          symbol: string;
+          bid: number;
+          ask: number;
+          mid: number;
+          isValid: boolean;
+        }>) {
+          if (entry.isValid && entry.symbol) {
+            latestPrices[entry.symbol] = {
+              bid: entry.bid,
+              ask: entry.ask,
+              mid: entry.mid,
+            };
+          }
+        }
+      }
+    } catch {
+      // prices are optional — don't fail the whole request
+    }
+
+    // ── 13. Aggregate stats ────────────────────────────────────────────────
     const allEvents = [...formattedCompetitions, ...formattedChallenges];
     const liveCount = allEvents.filter((e) => e.status === "active").length;
     const upcomingCount = allEvents.filter((e) => e.status === "upcoming").length;
@@ -347,6 +374,7 @@ export async function GET() {
       {
         competitions: formattedCompetitions,
         challenges: formattedChallenges,
+        prices: latestPrices,
         stats: {
           liveNow: liveCount,
           upcoming: upcomingCount,

@@ -438,7 +438,7 @@ body::before{content:'';position:fixed;inset:0;z-index:999;pointer-events:none;b
         </div>
       </div>
       <div class="sb">
-        <div class="sbt">Win Rate Leaders</div>
+        <div class="sbt">Win Probability ⚡</div>
         <div id="sbWRl"></div>
       </div>
       <div class="sb" style="flex:1">
@@ -565,7 +565,13 @@ async function fetchData(){
     const r=await fetch(`${API_BASE}/api/dashboard/competitions`,{cache:'no-store'});
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const data=await r.json();
-    const {competitions=[],challenges=[],stats={}}=data;
+    const {competitions=[],challenges=[],stats={},prices={}}=data;
+
+    // Inject live prices from snapshot into ticker
+    if(prices&&Object.keys(prices).length){
+      priceData=prices;
+      updateTicker();
+    }
 
     allEvents=[
       ...competitions.map(c=>({...c,_et:'competition'})),
@@ -582,9 +588,7 @@ async function fetchData(){
     if(curEv){
       const up=allEvents.find(e=>e.id===curEv.id);
       if(up){ curEv=up; refreshLive(up); }
-    }
-
-    fetchPrices().catch(()=>{});
+    } 
     if(rng) rng.className='spin-ring';
     if(lbl) lbl.textContent='live';
     const lu=document.getElementById('lastUp');
@@ -596,12 +600,8 @@ async function fetchData(){
 }
 
 async function fetchPrices(){
-  try{
-    const r=await fetch(`${API_BASE}/api/prices`,{cache:'no-store'});
-    if(!r.ok) return;
-    const d=await r.json();
-    if(d&&typeof d==='object'){ priceData=d; updateTicker(); }
-  }catch(e){}
+  // Prices come from the main dashboard API response (injected by fetchData)
+  // This is a no-op fallback kept for compatibility
 }
 
 /* =========================================================
@@ -792,6 +792,18 @@ const RK_C=['rk1','rk2','rk3'];
 const MR_C=['mr1','mr2','mr3'];
 const RC_C=['r1','r2','r3'];
 
+/* Pick the correct "race score" per competition ranking method */
+function getRaceScore(p, rankingMethod){
+  switch(rankingMethod){
+    case 'roi':         return p.liveRoi;
+    case 'win_rate':    return p.winRate;
+    case 'total_capital':
+    case 'equity':      return p.liveEquity;
+    case 'pnl':
+    default:            return p.livePnl;
+  }
+}
+
 function renderRace(ev){
   const track=document.getElementById('rTrack');
   if(!track) return;
@@ -801,7 +813,31 @@ function renderRace(ev){
     return;
   }
   const sorted=[...parts].sort((a,b)=>a.rank-b.rank);
-  const maxEq=Math.max(...sorted.filter(p=>!p.isDisqualified).map(p=>p.liveEquity||0),1);
+
+  // Compute race bar progress using the competition's ranking metric
+  const rm=ev.rankingMethod||'pnl';
+  const activeScores=sorted.filter(p=>!p.isDisqualified).map(p=>getRaceScore(p,rm));
+  const maxScore=activeScores.length?Math.max(...activeScores):1;
+  const minScore=activeScores.length?Math.min(...activeScores):0;
+  const scoreRange=Math.max(maxScore-minScore, 0.0001);
+
+  // Compute progress %: leader = 93%, last active = 8%, range between
+  function calcProg(p){
+    if(p.isDisqualified) return 3;
+    const score=getRaceScore(p,rm);
+    // Normalize 0→1 then map to 8→93 range
+    const norm=(score-minScore)/scoreRange;
+    return Math.max(8,Math.min(93,8+norm*85));
+  }
+
+  // Race label shows the ranking metric value
+  function raceLabel(p){
+    const rm2=ev.rankingMethod||'pnl';
+    if(rm2==='roi') return (p.liveRoi>=0?'+':'')+p.liveRoi.toFixed(1)+'%';
+    if(rm2==='win_rate') return p.winRate.toFixed(0)+'% WR';
+    if(rm2==='total_capital'||rm2==='equity') return fmtC(p.liveEquity);
+    return fmtPnl(p.livePnl); // default pnl
+  }
 
   // Try to update existing rows in-place (smooth animation)
   const existingRows={};
@@ -816,7 +852,7 @@ function renderRace(ev){
     const changed=prev!==undefined&&Math.abs(prev-p.livePnl)>0.01;
     prevEquity[p.userId]=p.livePnl;
 
-    const prog=p.isDisqualified?4:Math.max(5,Math.min(92,(p.liveEquity/maxEq)*87+5));
+    const prog=calcProg(p);
     const rkCls=i<3?RK_C[i]:'rkn';
     const rcCls=i<3?RC_C[i]:'';
     const medal=i<3?`<div class="mring ${MR_C[i]}"></div>`:'';
@@ -840,7 +876,7 @@ function renderRace(ev){
       const bf=row.querySelector('.barf');
       if(bf) bf.style.width=prog+'%';
       const bpnl=row.querySelector('.barpnl');
-      if(bpnl) bpnl.textContent=fmtPnl(p.livePnl);
+      if(bpnl) bpnl.textContent=raceLabel(p);
       const rpnlEl=row.querySelector('.rpnl');
       if(rpnlEl){
         rpnlEl.className='rpnl '+(p.livePnl>=0?'rpos':'rneg');
@@ -872,7 +908,7 @@ function renderRace(ev){
       </div>
       <div class="barw">
         <div class="barf" style="width:${prog}%;background:${bc}">
-          <span class="barpnl">${fmtPnl(p.livePnl)}</span>
+          <span class="barpnl">${raceLabel(p)}</span>
           ${runImg}
         </div>
       </div>
@@ -987,18 +1023,57 @@ function renderSidebar(ev){
   sb('sbOP',totalOP||'—');
   sb('sbDD',parts.length?maxDD.toFixed(1)+'%':'—');
 
-  // Win rate leaders
+  // Win Probability — composite score per trader
   const wrc=document.getElementById('sbWRl');
   if(wrc){
-    const sorted=[...parts].filter(p=>p.totalTrades>0).sort((a,b)=>b.winRate-a.winRate).slice(0,7);
-    const colors=['var(--gold)','var(--silver)','var(--bronze)','var(--cyan)','var(--blue)','var(--mag)','var(--green)'];
-    wrc.innerHTML='';
-    sorted.forEach((p,i)=>{
-      const r=document.createElement('div'); r.className='wr-row';
-      r.innerHTML=`<div class="wr-name">${p.username}</div><div class="wr-bg"><div class="wr-b" style="width:${p.winRate}%;background:${colors[i]}"></div></div><div class="wr-pct" style="color:${colors[i]}">${Math.round(p.winRate)}%</div>`;
-      wrc.appendChild(r);
-    });
-    if(!sorted.length) wrc.innerHTML='<div style="font-size:9px;color:var(--lo)">No trade data yet</div>';
+    const rm=ev.rankingMethod||'pnl';
+    const active=parts.filter(p=>!p.isDisqualified);
+    if(!active.length){ wrc.innerHTML='<div style="font-size:9px;color:var(--lo)">No active traders</div>'; }
+    else {
+      // Compute raw composite score per trader
+      const rankScores=active.map(p=>getRaceScore(p,rm));
+      const minRS=Math.min(...rankScores), maxRS=Math.max(...rankScores);
+      const rsRange=Math.max(maxRS-minRS,0.0001);
+
+      function winProb(p){
+        // 1. Equity/rank position score (0–1), most weight
+        const equityScore=(getRaceScore(p,rm)-minRS)/rsRange; // 0-1, 1=leader
+
+        // 2. Win rate score (0–1)
+        const wrScore=Math.min(p.winRate/100,1);
+
+        // 3. Profit factor score (0–1), capped at 3x = 100%
+        const pfScore=Math.min((p.profitFactor||0)/3,1);
+
+        // 4. Available cushion: available capital vs starting capital
+        const startC=ev.startingCapital||10000;
+        const cushion=Math.max(0,Math.min((p.availableCapital||0)/startC,1));
+
+        // 5. Drawdown penalty — high drawdown = risky
+        const ddPenalty=Math.min((p.maxDrawdownPercentage||0)/50,1); // 50% DD = full penalty
+
+        // 6. Open exposure penalty — many open positions = more uncertainty
+        const exposurePenalty=Math.min((p.currentOpenPositions||0)*0.08,0.4);
+
+        // Weighted composite
+        const raw=(equityScore*0.48)+(wrScore*0.22)+(pfScore*0.12)+(cushion*0.08)-(ddPenalty*0.07)-(exposurePenalty*0.03);
+        return Math.max(1,Math.min(99,Math.round(raw*100)));
+      }
+
+      const withProb=active.map(p=>({...p,prob:winProb(p)})).sort((a,b)=>b.prob-a.prob).slice(0,7);
+      // Color gradient: gold → silver → bronze → cyan → blue → mag → green
+      const colors=['var(--gold)','var(--silver)','var(--bronze)','var(--cyan)','var(--blue)','var(--mag)','var(--green)'];
+      wrc.innerHTML='';
+      withProb.forEach((p,i)=>{
+        const r=document.createElement('div'); r.className='wr-row';
+        const clr=colors[i]||colors[colors.length-1];
+        r.innerHTML=`
+          <div class="wr-name" title="${p.prob}% win probability">${p.username}</div>
+          <div class="wr-bg"><div class="wr-b" style="width:${p.prob}%;background:${clr}"></div></div>
+          <div class="wr-pct" style="color:${clr}">${p.prob}%</div>`;
+        wrc.appendChild(r);
+      });
+    }
   }
 
   // Live activity — show recent open positions
@@ -1027,23 +1102,44 @@ function renderSidebar(ev){
 /* =========================================================
    TICKER
    ========================================================= */
+// Track previous prices to compute real-time change direction
+const prevPrices={};
+
 function updateTicker(){
   const inner=document.getElementById('tickIn');
   if(!inner) return;
   const chunks=[];
-  TICKER_SYMS.forEach(sym=>{
-    const p=priceData[sym]||priceData[sym.toLowerCase()];
-    if(p){
-      const price=p.price||p.c||p.last;
-      const chg=p.changePercent||p.dp||0;
-      if(price){
-        const cls=chg>=0?'tu':'td';
-        const dec=sym.includes('JPY')||sym.includes('XAU')?2:4;
-        chunks.push(`<span><span class="th">${sym}</span> ${price.toFixed(dec)} <span class="${cls}">${chg>=0?'+':''}${chg.toFixed(2)}%</span></span>`);
-      }
-    }
+  // Try all ticker symbols + any symbols appearing in open positions of active events
+  const extraSyms=new Set();
+  allEvents.filter(e=>e.status==='active').forEach(e=>{
+    (e.openPositions||[]).forEach(p=>{ if(p.symbol) extraSyms.add(p.symbol.replace('/','').toUpperCase()); });
   });
-  if(!chunks.length){ inner.innerHTML='<span><span class="th">CHARTVOLT ARENA</span> — Live competition data</span>'.repeat(4); return; }
+  const syms=[...new Set([...TICKER_SYMS,...extraSyms])];
+
+  syms.forEach(sym=>{
+    // Price snapshot format: { mid, bid, ask }
+    // Also support legacy format: { price, c, last, changePercent, dp }
+    const p=priceData[sym]||priceData[sym.replace('USDT','')+'USDT']||priceData[sym.toLowerCase()];
+    if(!p) return;
+    const price=p.mid||p.price||p.c||p.last||p.ask;
+    if(!price) return;
+    // Compute directional change from previous
+    const prev=prevPrices[sym];
+    const chgSign=prev===undefined?0:price>prev?1:price<prev?-1:0;
+    prevPrices[sym]=price;
+    const dec=sym.includes('JPY')||sym.includes('XAU')||price>500?2:sym.includes('BTC')||sym.includes('ETH')?2:4;
+    const bid=p.bid?p.bid.toFixed(dec):null;
+    const ask=p.ask?p.ask.toFixed(dec):null;
+    const spread=p.bid&&p.ask?((p.ask-p.bid)*Math.pow(10,dec)).toFixed(1):null;
+    const arw=chgSign===1?'▲':chgSign===-1?'▼':'';
+    const cls=chgSign===1?'tu':chgSign===-1?'td':'';
+    chunks.push(`<span><span class="th">${sym}</span> <span class="${cls}">${arw} ${price.toFixed(dec)}</span>${spread?` <span style="color:var(--lo);font-size:9px">sp:${spread}</span>`:''}</span>`);
+  });
+
+  if(!chunks.length){
+    inner.innerHTML='<span><span class="th">CHARTVOLT ARENA</span></span><span><span class="tg">Awaiting market data…</span></span><span><span class="th">CHARTVOLT ARENA</span></span><span><span class="tg">Awaiting market data…</span></span>';
+    return;
+  }
   inner.innerHTML=[...chunks,...chunks].join('');
 }
 
