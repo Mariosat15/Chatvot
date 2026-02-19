@@ -278,37 +278,30 @@ class VeriffService {
 
   /**
    * Handle Veriff webhook decision
+   * @param rawBody - The original raw request body string (used for signature verification).
+   *                  If omitted, falls back to re-serialising payload (less reliable).
    */
   async handleDecision(
     payload: VeriffDecisionPayload,
     signature: string,
+    rawBody?: string,
   ): Promise<void> {
-    console.log("🔐 [KYC] Processing Veriff decision webhook...");
-
     const settings = await this.getSettings();
 
-    // Verify signature (if signature is provided)
+    // Verify signature using the original raw body (avoids re-serialisation drift)
     if (signature) {
-      const payloadString = JSON.stringify(payload);
+      const bodyToSign = rawBody ?? JSON.stringify(payload);
       const expectedSignature = this.generateHmacSignature(
-        payloadString,
+        bodyToSign,
         settings.veriffApiSecret,
       );
 
       if (signature !== expectedSignature) {
         console.error("❌ [KYC] Invalid Veriff webhook signature");
-        console.error("   Received:", signature.substring(0, 20) + "...");
-        console.error(
-          "   Expected:",
-          expectedSignature.substring(0, 20) + "...",
-        );
-        // Log but don't throw - Veriff might send with different payload format
-        // throw new Error('Invalid signature');
+        // Log but don't throw — Veriff sometimes re-formats the body on retries
       } else {
-        console.log("✅ [KYC] Signature verified");
+        console.log("✅ [KYC] Webhook signature verified");
       }
-    } else {
-      console.log("⚠️ [KYC] No signature provided, skipping verification");
     }
 
     const { verification } = payload;

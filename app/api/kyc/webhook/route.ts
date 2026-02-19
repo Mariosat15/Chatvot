@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
     // Handle different webhook types
     if (payload.verification && payload.verification.status) {
       // This is a decision webhook (traditional format)
-      console.log("🔐 [KYC Webhook] Processing decision webhook (traditional format)...");
-      await veriffService.handleDecision(payload, signature);
+      // Pass rawBody so handleDecision can verify the signature against the original bytes
+      await veriffService.handleDecision(payload, signature, rawBody);
       console.log("✅ [KYC Webhook] Decision processed successfully");
     } else if (payload.eventType === "fullauto" && payload.data?.verification?.decision) {
       // Fullauto webhook format - the decision is in data.verification.decision (not .status)
