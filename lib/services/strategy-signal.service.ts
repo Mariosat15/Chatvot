@@ -155,6 +155,203 @@ const calculateMACD = (
   return { macdLine, signalLine: paddedSignal, histogram };
 };
 
+// ─── Extended indicator calculations ────────────────────────────────────────
+
+const calculateWMA = (prices: number[], period: number): number[] => {
+  const result: number[] = new Array(prices.length).fill(NaN);
+  const weights = Array.from({ length: period }, (_, i) => i + 1);
+  const wSum = weights.reduce((a, b) => a + b, 0);
+  for (let i = period - 1; i < prices.length; i++) {
+    const slice = prices.slice(i - period + 1, i + 1);
+    result[i] = slice.reduce((sum, val, k) => sum + val * weights[k], 0) / wSum;
+  }
+  return result;
+};
+
+const calculateHullMA = (prices: number[], period: number): number[] => {
+  const half = Math.max(1, Math.floor(period / 2));
+  const sqrtP = Math.max(2, Math.round(Math.sqrt(period)));
+  const wmaFull = calculateWMA(prices, period);
+  const wmaHalf = calculateWMA(prices, half);
+  const synthetic = prices.map((_, i) =>
+    isNaN(wmaFull[i]) || isNaN(wmaHalf[i]) ? NaN : 2 * wmaHalf[i] - wmaFull[i],
+  );
+  const wSqrt = Array.from({ length: sqrtP }, (_, i) => i + 1);
+  const wSqrtSum = wSqrt.reduce((a, b) => a + b, 0);
+  const result: number[] = new Array(prices.length).fill(NaN);
+  for (let i = sqrtP - 1; i < synthetic.length; i++) {
+    const slice = synthetic.slice(i - sqrtP + 1, i + 1);
+    if (slice.some((v) => isNaN(v))) continue;
+    result[i] = slice.reduce((sum, val, k) => sum + val * wSqrt[k], 0) / wSqrtSum;
+  }
+  return result;
+};
+
+const calculateKAMA = (
+  prices: number[],
+  period: number,
+  fast: number,
+  slow: number,
+): number[] => {
+  const fastSC = 2 / (fast + 1);
+  const slowSC = 2 / (slow + 1);
+  const result: number[] = new Array(prices.length).fill(NaN);
+  if (prices.length === 0) return result;
+  result[0] = prices[0];
+  for (let i = 1; i < prices.length; i++) {
+    if (i < period) { result[i] = prices[i]; continue; }
+    const direction = Math.abs(prices[i] - prices[i - period]);
+    let volatility = 0;
+    for (let j = i - period + 1; j <= i; j++) volatility += Math.abs(prices[j] - prices[j - 1]);
+    const er = volatility === 0 ? 0 : direction / volatility;
+    const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+    const prev = isNaN(result[i - 1]) ? prices[i - 1] : result[i - 1];
+    result[i] = prev + sc * (prices[i] - prev);
+  }
+  return result;
+};
+
+const calculateStochastic = (candles: CandleData[], period: number): number[] =>
+  candles.map((c, i) => {
+    if (i < period - 1) return NaN;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const highest = Math.max(...slice.map((s) => s.high));
+    const lowest = Math.min(...slice.map((s) => s.low));
+    return highest === lowest ? 50 : ((c.close - lowest) / (highest - lowest)) * 100;
+  });
+
+const calculateCCI = (candles: CandleData[], period: number): number[] =>
+  candles.map((c, i) => {
+    if (i < period - 1) return NaN;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const tps = slice.map((s) => (s.high + s.low + s.close) / 3);
+    const tp = (c.high + c.low + c.close) / 3;
+    const avg = tps.reduce((a, b) => a + b, 0) / period;
+    const meanDev = tps.reduce((sum, p) => sum + Math.abs(p - avg), 0) / period;
+    return meanDev === 0 ? 0 : (tp - avg) / (0.015 * meanDev);
+  });
+
+// Returns 0 (oversold) to 100 (overbought) - inverted Williams %R for intuitive thresholds
+const calculateWilliamsR = (candles: CandleData[], period: number): number[] =>
+  candles.map((c, i) => {
+    if (i < period - 1) return NaN;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const highest = Math.max(...slice.map((s) => s.high));
+    const lowest = Math.min(...slice.map((s) => s.low));
+    return highest === lowest ? 50 : ((c.close - lowest) / (highest - lowest)) * 100;
+  });
+
+const calculateROC = (prices: number[], period: number): number[] =>
+  prices.map((price, i) => {
+    if (i < period) return NaN;
+    const prev = prices[i - period];
+    return prev === 0 ? 0 : ((price - prev) / prev) * 100;
+  });
+
+const calculateATR = (candles: CandleData[], period: number): number[] => {
+  const result: number[] = new Array(candles.length).fill(NaN);
+  if (candles.length < 2) return result;
+  const tr: number[] = [0];
+  for (let i = 1; i < candles.length; i++) {
+    tr.push(Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close),
+    ));
+  }
+  let atrVal = tr.slice(1, period + 1).reduce((a, b) => a + b, 0) / period;
+  result[period] = atrVal;
+  const k = 2 / (period + 1);
+  for (let i = period + 1; i < candles.length; i++) {
+    atrVal = (tr[i] - atrVal) * k + atrVal;
+    result[i] = atrVal;
+  }
+  return result;
+};
+
+const calculateSupertrend = (
+  candles: CandleData[],
+  period: number,
+  multiplier: number,
+): number[] => {
+  const atr = calculateATR(candles, period);
+  const result: number[] = new Array(candles.length).fill(NaN);
+  let upperBand = NaN, lowerBand = NaN, direction = 1;
+  for (let i = period; i < candles.length; i++) {
+    if (isNaN(atr[i])) continue;
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    const basicUpper = hl2 + multiplier * atr[i];
+    const basicLower = hl2 - multiplier * atr[i];
+    const newUpper = isNaN(upperBand) || basicUpper < upperBand || candles[i - 1].close > upperBand ? basicUpper : upperBand;
+    const newLower = isNaN(lowerBand) || basicLower > lowerBand || candles[i - 1].close < lowerBand ? basicLower : lowerBand;
+    if (!isNaN(upperBand)) {
+      if (candles[i].close > upperBand) direction = 1;
+      else if (candles[i].close < lowerBand) direction = -1;
+    }
+    result[i] = direction === 1 ? newLower : newUpper;
+    upperBand = newUpper;
+    lowerBand = newLower;
+  }
+  return result;
+};
+
+// Composite momentum score 0-100 used by Kinetic Pressure Zones and Nova Resonance Field
+const calculateKineticScore = (candles: CandleData[], period: number): number[] => {
+  const closes = candles.map((c) => c.close);
+  const rsiV = calculateRSI(closes, period);
+  const stochV = calculateStochastic(candles, period);
+  const cciV = calculateCCI(candles, period < 20 ? 20 : period);
+  const williamsV = calculateWilliamsR(candles, period);
+  const rocV = calculateROC(closes, period);
+  return candles.map((_, i) => {
+    if ([rsiV[i], stochV[i], cciV[i], williamsV[i], rocV[i]].some(isNaN)) return NaN;
+    const normCci = Math.min(100, Math.max(0, (cciV[i] + 300) / 6));
+    const normRoc = Math.min(100, Math.max(0, rocV[i] * 5 + 50));
+    return (rsiV[i] + stochV[i] + normCci + williamsV[i] + normRoc) / 5;
+  });
+};
+
+// Nexus trend score: -100 (strong bear) to +100 (strong bull)
+const calculateNexusScore = (closes: number[], fast: number, slow: number): number[] => {
+  const emaFast = calculateEMA(closes, fast);
+  const emaSlow = calculateEMA(closes, slow);
+  return closes.map((_, i) => {
+    if (isNaN(emaFast[i]) || isNaN(emaSlow[i]) || emaSlow[i] === 0) return NaN;
+    return Math.min(100, Math.max(-100, ((emaFast[i] - emaSlow[i]) / emaSlow[i]) * 1000));
+  });
+};
+
+// Stellar Confluence core: average of EMA + WMA(0.7x) + SMA
+const calculateStellarCore = (prices: number[], period: number): number[] => {
+  const ema = calculateEMA(prices, period);
+  const wma = calculateWMA(prices, Math.max(1, Math.floor(period * 0.7)));
+  const sma = calculateSMA(prices, period);
+  return prices.map((_, i) => {
+    if (isNaN(ema[i]) || isNaN(wma[i]) || isNaN(sma[i])) return NaN;
+    return (ema[i] + wma[i] + sma[i]) / 3;
+  });
+};
+
+// Sovereign / VWAP gravity center: rolling volume-weighted typical price
+const calculateGravityCenter = (candles: CandleData[], period: number): number[] =>
+  candles.map((_, i) => {
+    if (i < period - 1) return NaN;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const totalVol = slice.reduce((sum, c) => sum + (c.volume || 1), 0);
+    const sumVP = slice.reduce((sum, c) => sum + ((c.high + c.low + c.close) / 3) * (c.volume || 1), 0);
+    return totalVol > 0 ? sumVP / totalVol : (slice[slice.length - 1].high + slice[slice.length - 1].low + slice[slice.length - 1].close) / 3;
+  });
+
+// Dynamic 61.8% Fibonacci level from rolling swing high/low
+const calculateFib618 = (candles: CandleData[], lookback: number): number[] =>
+  candles.map((_, i) => {
+    const start = Math.max(0, i - lookback + 1);
+    const slice = candles.slice(start, i + 1);
+    const high = Math.max(...slice.map((c) => c.high));
+    const low = Math.min(...slice.map((c) => c.low));
+    return low + (high - low) * 0.618;
+  });
+
 // Get indicator value at a specific index
 const getIndicatorValue = (
   indicator: string,
@@ -279,6 +476,102 @@ const getIndicatorValue = (
       );
       values = macdH.histogram;
       break;
+    // ── Extended standard indicators ──────────────────────────────────────
+    case "wma":
+      values = calculateWMA(closes, period);
+      break;
+    case "hma":
+      values = calculateHullMA(closes, period);
+      break;
+    case "kama":
+      values = calculateKAMA(closes, period, params?.fast || 2, params?.slow || 30);
+      break;
+    case "stoch":
+      values = calculateStochastic(candles, period);
+      break;
+    case "cci":
+      values = calculateCCI(candles, params?.period || 20);
+      break;
+    case "williams_r":
+      values = calculateWilliamsR(candles, period);
+      break;
+    case "roc":
+      values = calculateROC(closes, period);
+      break;
+    case "atr":
+      values = calculateATR(candles, period);
+      break;
+    case "supertrend_line":
+      values = calculateSupertrend(candles, period, params?.multiplier || 3);
+      break;
+    case "vwap":
+      values = calculateGravityCenter(candles, period);
+      break;
+
+    // ── Premium indicator outputs ──────────────────────────────────────────
+    // Kinetic Pressure Zones & Nova Resonance Field — composite 0-100 score
+    case "kinetic_score":
+    case "nova_score":
+      values = calculateKineticScore(candles, period);
+      break;
+    // Nexus Trend Matrix — score −100 (bear) to +100 (bull)
+    case "nexus_score":
+      values = calculateNexusScore(closes, params?.fast || 9, params?.slow || 21);
+      break;
+    // Solaris Trend Engine — KAMA adaptive trend line (price-level)
+    case "solaris_line":
+      values = calculateKAMA(closes, period, 2, 30);
+      break;
+    // Stellar Confluence Ribbon — triple-MA core line (price-level)
+    case "stellar_core":
+      values = calculateStellarCore(closes, period);
+      break;
+    // Sovereign Gravity Arc — volume-weighted gravity center (price-level)
+    case "sovereign_center":
+      values = calculateGravityCenter(candles, period);
+      break;
+    // Spectre Liquidity Matrix — bias: +100 if price > EMA, −100 if below
+    case "spectre_bias": {
+      const biasEma = calculateEMA(closes, period);
+      values = closes.map((c, i) => (isNaN(biasEma[i]) ? NaN : c > biasEma[i] ? 100 : -100));
+      break;
+    }
+    // Radiant Fibonacci Matrix — dynamic 61.8% Fib level (price-level)
+    case "fib_618":
+      values = calculateFib618(candles, params?.lookback || 55);
+      break;
+    // Orion Momentum Shield — RSI-based momentum score
+    case "orion_score":
+      values = calculateRSI(closes, period);
+      break;
+    // Quantum Drift Mapper / Chaos Sentinel / Helix — return EMA-based drift line
+    case "quantum_drift":
+    case "chaos_line":
+    case "helix_line":
+    case "mirage_line":
+    case "eclipse_line":
+    case "flux_line":
+    case "wraith_line":
+    case "aurora_line":
+    case "apex_line":
+      values = calculateKAMA(closes, period, 2, 30);
+      break;
+    // Phantom Divergence Tracker — RSI divergence proxy (RSI value)
+    case "phantom_rsi":
+      values = calculateRSI(closes, period);
+      break;
+    // Prism Wavelet / Cipher Harmonic — Hull MA proxy
+    case "prism_line":
+    case "cipher_line":
+    case "nebula_mid":
+      values = calculateHullMA(closes, period);
+      break;
+    // Fractal Pulse / Vortex Drift — WMA proxy
+    case "fractal_line":
+    case "vortex_line":
+      values = calculateWMA(closes, period);
+      break;
+
     default:
       return NaN;
   }

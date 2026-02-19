@@ -31,60 +31,66 @@ import { Badge } from "@/components/ui/badge";
 
 // Available indicators for strategy conditions
 const AVAILABLE_INDICATORS = [
-  { value: "price", label: "Current Price", category: "price" },
-  { value: "open", label: "Open Price", category: "price" },
-  { value: "high", label: "High Price", category: "price" },
-  { value: "low", label: "Low Price", category: "price" },
-  { value: "close", label: "Close Price", category: "price" },
-  {
-    value: "sma",
-    label: "SMA (Simple Moving Average)",
-    category: "trend",
-    hasParams: true,
-  },
-  {
-    value: "ema",
-    label: "EMA (Exponential Moving Average)",
-    category: "trend",
-    hasParams: true,
-  },
-  {
-    value: "bb_upper",
-    label: "Bollinger Upper Band",
-    category: "volatility",
-    hasParams: true,
-  },
-  {
-    value: "bb_middle",
-    label: "Bollinger Middle Band",
-    category: "volatility",
-    hasParams: true,
-  },
-  {
-    value: "bb_lower",
-    label: "Bollinger Lower Band",
-    category: "volatility",
-    hasParams: true,
-  },
-  { value: "rsi", label: "RSI Value", category: "momentum", hasParams: true },
-  {
-    value: "macd_line",
-    label: "MACD Line",
-    category: "momentum",
-    hasParams: true,
-  },
-  {
-    value: "macd_signal",
-    label: "MACD Signal",
-    category: "momentum",
-    hasParams: true,
-  },
-  {
-    value: "macd_histogram",
-    label: "MACD Histogram",
-    category: "momentum",
-    hasParams: true,
-  },
+  // ── Price ────────────────────────────────────────────────────────────────
+  { value: "price",  label: "Current Price",  category: "price" },
+  { value: "open",   label: "Open Price",     category: "price" },
+  { value: "high",   label: "High Price",     category: "price" },
+  { value: "low",    label: "Low Price",      category: "price" },
+  { value: "close",  label: "Close Price",    category: "price" },
+
+  // ── Trend ─────────────────────────────────────────────────────────────────
+  { value: "sma",             label: "SMA (Simple Moving Average)",       category: "trend",      hasParams: true },
+  { value: "ema",             label: "EMA (Exponential Moving Average)",  category: "trend",      hasParams: true },
+  { value: "wma",             label: "WMA (Weighted Moving Average)",     category: "trend",      hasParams: true },
+  { value: "hma",             label: "HMA (Hull Moving Average)",         category: "trend",      hasParams: true },
+  { value: "kama",            label: "KAMA (Kaufman Adaptive MA)",        category: "trend",      hasParams: true },
+  { value: "supertrend_line", label: "Supertrend Line",                   category: "trend",      hasParams: true },
+  { value: "vwap",            label: "VWAP (Rolling)",                    category: "trend",      hasParams: true },
+
+  // ── Volatility ────────────────────────────────────────────────────────────
+  { value: "bb_upper",  label: "Bollinger Upper Band",  category: "volatility", hasParams: true },
+  { value: "bb_middle", label: "Bollinger Middle Band", category: "volatility", hasParams: true },
+  { value: "bb_lower",  label: "Bollinger Lower Band",  category: "volatility", hasParams: true },
+  { value: "atr",       label: "ATR (Avg True Range)",  category: "volatility", hasParams: true },
+
+  // ── Momentum ──────────────────────────────────────────────────────────────
+  { value: "rsi",            label: "RSI (0–100)",                   category: "momentum", hasParams: true },
+  { value: "stoch",          label: "Stochastic %K (0–100)",         category: "momentum", hasParams: true },
+  { value: "cci",            label: "CCI",                           category: "momentum", hasParams: true },
+  { value: "williams_r",     label: "Williams %R normalized (0–100)", category: "momentum", hasParams: true },
+  { value: "roc",            label: "Rate of Change (%)",            category: "momentum", hasParams: true },
+  { value: "macd_line",      label: "MACD Line",                     category: "momentum", hasParams: true },
+  { value: "macd_signal",    label: "MACD Signal Line",              category: "momentum", hasParams: true },
+  { value: "macd_histogram", label: "MACD Histogram",                category: "momentum", hasParams: true },
+
+  // ── Support / Resistance ──────────────────────────────────────────────────
+  { value: "fib_618", label: "Fibonacci 61.8% Level (dynamic)", category: "s/r", hasParams: true },
+
+  // ── Premium Indicators ────────────────────────────────────────────────────
+  // Each returns a single scalar value suitable for above/below/crosses conditions
+  { value: "kinetic_score",    label: "⭐ Kinetic Pressure Score (0–100)",            category: "premium", hasParams: true },
+  { value: "nova_score",       label: "⭐ Nova Resonance Score (0–100)",              category: "premium", hasParams: true },
+  { value: "nexus_score",      label: "⭐ Nexus Trend Score (−100 bear → +100 bull)", category: "premium", hasParams: true },
+  { value: "solaris_line",     label: "⭐ Solaris Adaptive Trend Line (price)",       category: "premium", hasParams: true },
+  { value: "stellar_core",     label: "⭐ Stellar Confluence Core Line (price)",      category: "premium", hasParams: true },
+  { value: "sovereign_center", label: "⭐ Sovereign Gravity Center (price)",          category: "premium", hasParams: true },
+  { value: "spectre_bias",     label: "⭐ Spectre Bias Score (+100 bull / −100 bear)", category: "premium", hasParams: true },
+  { value: "phantom_rsi",      label: "⭐ Phantom Divergence RSI (0–100)",           category: "premium", hasParams: true },
+  { value: "orion_score",      label: "⭐ Orion Momentum Score (0–100)",             category: "premium", hasParams: true },
+  { value: "prism_line",       label: "⭐ Prism Wavelet Core Line (price)",           category: "premium", hasParams: true },
+  { value: "cipher_line",      label: "⭐ Cipher Harmonic Line (price)",              category: "premium", hasParams: true },
+  { value: "helix_line",       label: "⭐ Helix Phase Engine Line (price)",           category: "premium", hasParams: true },
+  { value: "quantum_drift",    label: "⭐ Quantum Drift Mapper Line (price)",         category: "premium", hasParams: true },
+  { value: "chaos_line",       label: "⭐ Chaos Sentinel Line (price)",               category: "premium", hasParams: true },
+  { value: "aurora_line",      label: "⭐ Aurora Cascade Flow Line (price)",          category: "premium", hasParams: true },
+  { value: "flux_line",        label: "⭐ Flux Momentum Trail Line (price)",          category: "premium", hasParams: true },
+  { value: "eclipse_line",     label: "⭐ Eclipse Stealth Trail Line (price)",        category: "premium", hasParams: true },
+  { value: "wraith_line",      label: "⭐ Wraith Convergence Line (price)",           category: "premium", hasParams: true },
+  { value: "apex_line",        label: "⭐ Apex Predator Signal Line (price)",         category: "premium", hasParams: true },
+  { value: "nebula_mid",       label: "⭐ Nebula Phase Mid Line (price)",             category: "premium", hasParams: true },
+  { value: "fractal_line",     label: "⭐ Fractal Pulse Grid Line (price)",           category: "premium", hasParams: true },
+  { value: "vortex_line",      label: "⭐ Vortex Drift Cloud Line (price)",           category: "premium", hasParams: true },
+  { value: "mirage_line",      label: "⭐ Mirage Depth Scanner Line (price)",         category: "premium", hasParams: true },
 ];
 
 const OPERATORS = [
@@ -156,17 +162,61 @@ const getDefaultParams = (indicator: string): Record<string, number> => {
   switch (indicator) {
     case "sma":
     case "ema":
+    case "wma":
+    case "hma":
+      return { period: 20 };
+    case "kama":
+      return { period: 10, fast: 2, slow: 30 };
+    case "supertrend_line":
+      return { period: 10, multiplier: 3 };
+    case "vwap":
+    case "sovereign_center":
       return { period: 20 };
     case "bb_upper":
     case "bb_middle":
     case "bb_lower":
       return { period: 20, stdDev: 2 };
-    case "rsi":
+    case "atr":
       return { period: 14 };
+    case "rsi":
+    case "stoch":
+    case "williams_r":
+    case "phantom_rsi":
+    case "orion_score":
+      return { period: 14 };
+    case "cci":
+      return { period: 20 };
+    case "roc":
+      return { period: 10 };
     case "macd_line":
     case "macd_signal":
     case "macd_histogram":
       return { fast: 12, slow: 26, signal: 9 };
+    case "fib_618":
+      return { lookback: 55 };
+    case "kinetic_score":
+    case "nova_score":
+      return { period: 14 };
+    case "nexus_score":
+      return { fast: 9, slow: 21 };
+    case "solaris_line":
+    case "stellar_core":
+    case "spectre_bias":
+    case "prism_line":
+    case "cipher_line":
+    case "helix_line":
+    case "quantum_drift":
+    case "chaos_line":
+    case "aurora_line":
+    case "flux_line":
+    case "eclipse_line":
+    case "wraith_line":
+    case "apex_line":
+    case "nebula_mid":
+    case "fractal_line":
+    case "vortex_line":
+    case "mirage_line":
+      return { period: 20 };
     default:
       return {};
   }
