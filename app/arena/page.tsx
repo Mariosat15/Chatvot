@@ -171,21 +171,29 @@ function genSparkline(seed: string, startCap: number, equity: number, w = 60, h 
 
 type Candle = { o: number; h: number; l: number; c: number; bull: boolean; vol: number };
 
+// Fallback mids for common symbols — used until live prices arrive
+const SYMBOL_FALLBACK: Record<string, number> = {
+  EURUSD: 1.0850, GBPUSD: 1.2700, USDJPY: 151.50, XAUUSD: 2320.0,
+  BTCUSD: 65000.0, ETHUSD: 3400.0, USDCAD: 1.3600, AUDUSD: 0.6550,
+  USDCHF: 0.9050, NZDUSD: 0.6050, GBPJPY: 192.0, EURJPY: 164.5,
+};
+
 function generateCandles(symbol: string, mid: number, n = 32): Candle[] {
-  if (!mid) return [];
+  // Use live mid if available, otherwise fall back to well-known reference price
+  const refMid = mid || SYMBOL_FALLBACK[symbol.replace('/', '')] || 1.0;
   const bucket = Math.floor(Date.now() / 300000); // stable per 5-min bucket
   let rng = bucket;
   const seed = symbol + bucket;
   for (let i = 0; i < seed.length; i++) rng = (rng * 31 + seed.charCodeAt(i)) >>> 0;
   const rand = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 0xFFFFFFFF; };
-  const pip = symbol.includes('JPY') ? 0.01 : (symbol.includes('XAU') || mid > 500) ? 0.5 : 0.0001;
+  const pip = symbol.includes('JPY') ? 0.01 : (symbol.includes('XAU') || refMid > 500) ? 0.5 : 0.0001;
   const vol = pip * 18;
   const cs: Candle[] = [];
-  let price = mid * (1 - 0.004 + rand() * 0.007);
+  let price = refMid * (1 - 0.004 + rand() * 0.007);
   for (let i = 0; i < n; i++) {
     const o = price;
     const move = (rand() - 0.46) * vol * 2.5;
-    const c = i === n - 1 ? mid : o + move;
+    const c = i === n - 1 ? refMid : o + move;
     const h = Math.max(o, c) + rand() * vol * 0.9;
     const l = Math.min(o, c) - rand() * vol * 0.9;
     cs.push({ o, h, l, c, bull: c >= o, vol: 0.2 + rand() * 0.8 });
@@ -202,15 +210,13 @@ function CandleChart({ symbol, priceData, openPositions, leader }: {
   openPositions: OpenPos[];
   leader: Participant | null;
 }) {
-  const mid = priceData?.mid ?? 0;
+  const liveMid = priceData?.mid ?? 0;
+  // Use live price if available, otherwise fall back to reference price for instant render
+  const mid = liveMid || SYMBOL_FALLBACK[symbol.replace('/', '')] || 1.0;
+  const isLive = liveMid > 0;
   const dec = symbol.includes('JPY') ? 3 : (symbol.includes('XAU') || mid > 500) ? 2 : 5;
-  const candles = useMemo(() => generateCandles(symbol, mid), [symbol, Math.floor(Date.now() / 300000)]);// eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!mid || candles.length === 0) return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: 11 }}>
-      Waiting for price data…
-    </div>
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const candles = useMemo(() => generateCandles(symbol, liveMid), [symbol, liveMid > 0 ? Math.floor(Date.now() / 300000) : 0]);
 
   const VW = 730, CH = 300, VOL_H = 55, VH = CH + VOL_H;
   const CW = 14, CG = 8, TW = CW + CG, LM = 50;
@@ -226,8 +232,9 @@ function CandleChart({ symbol, priceData, openPositions, leader }: {
   ) : null;
 
   return (
+    <>
     <svg width="100%" height="100%" viewBox={`0 0 ${VW} ${VH}`}
-      preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 0 }}>
+      preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 0, opacity: isLive ? 1 : 0.45 }}>
       <defs>
         <linearGradient id="cvVolG" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#00b0ff" stopOpacity={0.3} />
@@ -298,6 +305,12 @@ function CandleChart({ symbol, priceData, openPositions, leader }: {
         );
       })}
     </svg>
+    {!isLive && (
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(7,7,13,.82)', border: '1px solid rgba(88,98,255,.25)', borderRadius: 6, padding: '6px 14px', fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, color: '#5862FF', letterSpacing: 2, pointerEvents: 'none' }}>
+        CONNECTING…
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1535,7 +1548,12 @@ export default function ArenaPage() {
         return as !== bs ? as - bs : new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
       });
       setEvents(all);
-      if (d.prices && Object.keys(d.prices).length) setPrices(d.prices);
+      if (d.prices && Object.keys(d.prices).length) {
+        // Normalise keys: "EUR/USD" → "EURUSD" so lookups always work without slashes
+        const norm: PriceMap = {};
+        for (const [k, v] of Object.entries(d.prices)) norm[k.replace('/', '')] = v;
+        setPrices(norm);
+      }
       if (d.stats) setStats(d.stats);
       const cur = curEvRef.current;
       if (cur) { const up = all.find(e => e.id === cur.id); if (up) setCurEv(up); }
