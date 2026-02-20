@@ -3738,29 +3738,6 @@ const LightweightTradingChart = ({
                 color: hexToRgba(c618, d.swingTrend === "bullish" ? 100 : 70),
               })));
               indicatorSeriesRef.current.set(`${rfmId}_618`, s618);
-
-              // Attach BOUNCE / BREAK signals to the golden series
-              if (indicator.componentVisibility?.signals !== false) {
-                const rfmMarkers: any[] = rfmData
-                  .filter(d => d.signal !== "none")
-                  .map(d => ({
-                    time: d.time as UTCTimestamp,
-                    position: d.signal === "bounce_up" || d.signal === "break_up" ? "belowBar" : "aboveBar",
-                    color: d.signal === "break_up"    ? "#69f0ae"
-                         : d.signal === "break_down"  ? "#ff5252"
-                         : d.signal === "bounce_up"   ? "#b9f6ca"
-                         :                              "#ffcdd2",
-                    shape: d.signal.includes("up") ? "arrowUp" : "arrowDown",
-                    text: d.signal === "break_up"    ? `BREAK ▲ ${d.nearestFib}`
-                        : d.signal === "break_down"  ? `BREAK ▼ ${d.nearestFib}`
-                        : d.signal === "bounce_up"   ? `BOUNCE ▲ ${d.nearestFib}`
-                        :                              `BOUNCE ▼ ${d.nearestFib}`,
-                    size: d.signal.startsWith("break") ? 2 : 1,
-                  }));
-                if (rfmMarkers.length > 0) {
-                  try { s618.setMarkers(rfmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
-                }
-              }
             }
 
             // 78.6% — deep retracement (dashed orange)
@@ -3778,6 +3755,64 @@ const LightweightTradingChart = ({
               sExt1618.setData(mapArr(d => d.fibExt1618));
               indicatorSeriesRef.current.set(`${rfmId}_ext1272`, sExt1272);
               indicatorSeriesRef.current.set(`${rfmId}_ext1618`, sExt1618);
+            }
+
+            // ── BOUNCE / BREAK signals ─────────────────────────────────────────
+            // Rendered INDEPENDENTLY of any individual level's visibility so that:
+            //   1. Hiding 61.8% doesn't wipe ALL signals (previous bug).
+            //   2. Hiding a specific level (e.g. 50%) also hides its signals.
+            // Signals are hosted on a dedicated transparent series so they work
+            // even when every Fibonacci line series has been hidden.
+            if (indicator.componentVisibility?.signals !== false) {
+              // Maps nearestFib label → componentVisibility key
+              const fibLabelToKey: Record<string, string> = {
+                "61.8%":  "fib618",
+                "38.2%":  "fib382",
+                "50%":    "fib500",
+                "78.6%":  "fib786",
+                "23.6%":  "fib236",
+                "100%":   "fib0100",
+                "0%":     "fib0100",
+                "127.2%": "fibExt",
+                "161.8%": "fibExt",
+              };
+
+              const rfmMarkers: any[] = rfmData
+                .filter(d => {
+                  if (d.signal === "none") return false;
+                  // Hide signals whose level's line is currently turned off
+                  const levelKey = fibLabelToKey[d.nearestFib];
+                  if (levelKey && indicator.componentVisibility?.[levelKey] === false) return false;
+                  return true;
+                })
+                .map(d => ({
+                  time:     d.time as UTCTimestamp,
+                  position: d.signal === "bounce_up" || d.signal === "break_up" ? "belowBar" : "aboveBar",
+                  color:    d.signal === "break_up"    ? "#69f0ae"
+                          : d.signal === "break_down"  ? "#ff5252"
+                          : d.signal === "bounce_up"   ? "#b9f6ca"
+                          :                              "#ffcdd2",
+                  shape:    d.signal.includes("up") ? "arrowUp" : "arrowDown",
+                  text:     d.signal === "break_up"    ? `BREAK ▲ ${d.nearestFib}`
+                          : d.signal === "break_down"  ? `BREAK ▼ ${d.nearestFib}`
+                          : d.signal === "bounce_up"   ? `BOUNCE ▲ ${d.nearestFib}`
+                          :                              `BOUNCE ▼ ${d.nearestFib}`,
+                  size:     d.signal.startsWith("break") ? 2 : 1,
+                }));
+
+              if (rfmMarkers.length > 0) {
+                // Dedicated invisible host series — keeps signals independent of
+                // which level lines are visible (uses fib618 values as price reference
+                // but is itself transparent with no axis label).
+                const sSig = chart.addLineSeries({
+                  color: "rgba(0,0,0,0)", lineWidth: 0 as any,
+                  priceScaleId: "right", lastValueVisible: false,
+                  priceLineVisible: false, crosshairMarkerVisible: false,
+                });
+                sSig.setData(rfmData.map(d => ({ time: d.time as UTCTimestamp, value: d.fib618 })));
+                try { sSig.setMarkers(rfmMarkers.sort((a: any, b: any) => (a.time as number) - (b.time as number))); } catch {}
+                indicatorSeriesRef.current.set(`${rfmId}_signals`, sSig);
+              }
             }
           }
         }
