@@ -167,6 +167,350 @@ function genSparkline(seed: string, startCap: number, equity: number, w = 60, h 
   return pts.map(([x, y]) => `${x.toFixed(1)},${(h - ((y - minY) / range) * (h - 3) - 1.5).toFixed(1)}`).join(' ');
 }
 
+// ─── Candle Generator ─────────────────────────────────────────────────────────
+
+type Candle = { o: number; h: number; l: number; c: number; bull: boolean; vol: number };
+
+function generateCandles(symbol: string, mid: number, n = 32): Candle[] {
+  if (!mid) return [];
+  const bucket = Math.floor(Date.now() / 300000); // stable per 5-min bucket
+  let rng = bucket;
+  const seed = symbol + bucket;
+  for (let i = 0; i < seed.length; i++) rng = (rng * 31 + seed.charCodeAt(i)) >>> 0;
+  const rand = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 0xFFFFFFFF; };
+  const pip = symbol.includes('JPY') ? 0.01 : (symbol.includes('XAU') || mid > 500) ? 0.5 : 0.0001;
+  const vol = pip * 18;
+  const cs: Candle[] = [];
+  let price = mid * (1 - 0.004 + rand() * 0.007);
+  for (let i = 0; i < n; i++) {
+    const o = price;
+    const move = (rand() - 0.46) * vol * 2.5;
+    const c = i === n - 1 ? mid : o + move;
+    const h = Math.max(o, c) + rand() * vol * 0.9;
+    const l = Math.min(o, c) - rand() * vol * 0.9;
+    cs.push({ o, h, l, c, bull: c >= o, vol: 0.2 + rand() * 0.8 });
+    price = c;
+  }
+  return cs;
+}
+
+// ─── Candlestick Chart SVG ────────────────────────────────────────────────────
+
+function CandleChart({ symbol, priceData, openPositions, leader }: {
+  symbol: string;
+  priceData: { bid: number; ask: number; mid: number } | null;
+  openPositions: OpenPos[];
+  leader: Participant | null;
+}) {
+  const mid = priceData?.mid ?? 0;
+  const dec = symbol.includes('JPY') ? 3 : (symbol.includes('XAU') || mid > 500) ? 2 : 5;
+  const candles = useMemo(() => generateCandles(symbol, mid), [symbol, Math.floor(Date.now() / 300000)]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!mid || candles.length === 0) return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: 11 }}>
+      Waiting for price data…
+    </div>
+  );
+
+  const VW = 730, CH = 300, VOL_H = 55, VH = CH + VOL_H;
+  const CW = 14, CG = 8, TW = CW + CG, LM = 50;
+  const allH = candles.map(c => c.h), allL = candles.map(c => c.l);
+  const pMax = Math.max(...allH) * 1.001, pMin = Math.min(...allL) * 0.999;
+  const pRange = pMax - pMin || 1;
+  const py = (p: number) => ((pMax - p) / pRange) * CH;
+  const maxVol = Math.max(...candles.map(c => c.vol));
+  const labels = [0, 1, 2, 3, 4].map(i => pMax - i * pRange / 4);
+  const curY = py(mid);
+  const leaderPos = leader ? openPositions.find(
+    p => p.userId === leader.userId && (p.symbol || '').replace('/', '').toUpperCase() === symbol
+  ) : null;
+
+  return (
+    <svg width="100%" height="100%" viewBox={`0 0 ${VW} ${VH}`}
+      preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 0 }}>
+      <defs>
+        <linearGradient id="cvVolG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#00b0ff" stopOpacity={0.3} />
+          <stop offset="100%" stopColor="#00b0ff" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {/* Grid + Price labels */}
+      {labels.map((p, i) => (
+        <g key={i}>
+          <line x1={LM} y1={py(p)} x2={VW} y2={py(p)} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+          <text x={2} y={py(p) + 3} fontSize={8} fill="rgba(255,255,255,0.2)" fontFamily="monospace">
+            {p.toFixed(dec < 3 ? 2 : 4)}
+          </text>
+        </g>
+      ))}
+      {/* Volume bars */}
+      {candles.map((c, i) => {
+        const x = LM + i * TW;
+        const bH = (c.vol / maxVol) * (VOL_H * 0.85);
+        return <rect key={i} x={x} y={VH - bH} width={CW} height={bH}
+          fill={c.bull ? 'rgba(0,230,118,0.15)' : 'rgba(255,23,68,0.15)'} rx={1} />;
+      })}
+      {/* Volatility ribbon */}
+      <rect x={LM} y={VH - 8} width={VW - LM} height={8} fill="url(#cvVolG)" />
+      {/* Candles */}
+      {candles.map((c, i) => {
+        const x = LM + i * TW, cx = x + CW / 2;
+        const color = c.bull ? '#00e676' : '#ff1744';
+        const bTop = py(Math.max(c.o, c.c)), bBot = py(Math.min(c.o, c.c));
+        const bH = Math.max(1.5, bBot - bTop);
+        return (
+          <g key={i}>
+            <line x1={cx} y1={py(c.h)} x2={cx} y2={py(c.l)} stroke={color} strokeWidth={1} />
+            <rect x={x} y={bTop} width={CW} height={bH} fill={color} rx={1} />
+          </g>
+        );
+      })}
+      {/* Current price dashed line */}
+      <line x1={LM} y1={curY} x2={VW - 52} y2={curY}
+        stroke="rgba(0,230,118,0.4)" strokeWidth={1} strokeDasharray="4,4" />
+      <rect x={VW - 52} y={curY - 8} width={50} height={16} rx={2} fill="rgba(0,230,118,0.2)" />
+      <text x={VW - 50} y={curY + 4} fontSize={8} fill="#00e676" fontWeight={700} fontFamily="monospace">
+        {mid.toFixed(dec)}
+      </text>
+      {/* Leader position overlay */}
+      {leaderPos && (
+        <>
+          <rect x={80} y={CH - 52} width={140} height={28} rx={4}
+            fill={leaderPos.side === 'long' ? 'rgba(0,230,118,0.15)' : 'rgba(255,23,68,0.15)'}
+            stroke={leaderPos.side === 'long' ? 'rgba(0,230,118,0.4)' : 'rgba(255,23,68,0.4)'} strokeWidth={1} />
+          <text x={92} y={CH - 34} fontSize={10} fontWeight={700} fontFamily="sans-serif"
+            fill={leaderPos.side === 'long' ? '#00e676' : '#ff1744'}>
+            {leaderPos.side === 'long' ? '▲' : '▼'} LEADER {leaderPos.side.toUpperCase()}
+          </text>
+        </>
+      )}
+      {/* Open position markers (up to 3) */}
+      {openPositions.slice(0, 3).map((pos, i) => {
+        const col = pos.side === 'long' ? '#00e676' : '#ff1744';
+        const mx = LM + (7 + i * 9) * TW + CW / 2;
+        const ey = py(pos.entryPrice);
+        if (mx > VW - 60 || ey < 0 || ey > CH) return null;
+        return (
+          <g key={i}>
+            <circle cx={mx} cy={ey} r={5} fill="none" stroke={col} strokeWidth={2} />
+            <text x={mx - 8} y={ey - 10} fontSize={8} fill={col} fontFamily="sans-serif">OPEN</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Race Line Chart (equity journey SVG) ─────────────────────────────────────
+
+function RaceLineChart({ ev }: { ev: AEvent }) {
+  const rm = ev.rankingMethod || 'pnl';
+  const sorted = useMemo(() =>
+    [...ev.participants].filter(p => p.totalTrades > 0 && !p.isDisqualified)
+      .sort((a, b) => raceScore(b, rm) - raceScore(a, rm)),
+    [ev, rm]
+  );
+  const all = ev.participants.filter(p => p.totalTrades > 0);
+  if (sorted.length === 0) return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 40, opacity: .3 }}>📈</div>
+      <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Race Data Yet</div>
+    </div>
+  );
+
+  const VW = 780, VH = 480, LM = 46, BM = 32, chartW = VW - LM;
+  const rois = all.map(p => p.liveRoi ?? 0);
+  const maxRoi = Math.max(...rois, 5), minRoi = Math.min(...rois, -3);
+  const roiRange = maxRoi - minRoi || 1;
+  const ry = (roi: number) => ((maxRoi - roi) / roiRange) * (VH - BM);
+  const baseline = ry(0);
+
+  const TOP_COLORS = [
+    '#ffd700', '#c0c0c0', '#cd7f32',
+    'rgba(0,230,118,0.8)', '#00b0ff', '#d500f9',
+    'rgba(255,171,0,0.7)', 'rgba(0,188,212,0.65)', 'rgba(255,23,68,0.55)', 'rgba(180,180,180,0.5)',
+  ];
+
+  const getPath = (p: Participant) => {
+    let rng = 0;
+    const s = p.username + p.userId.slice(-4);
+    for (let i = 0; i < s.length; i++) rng = (rng * 31 + s.charCodeAt(i)) >>> 0;
+    const rand = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 0xFFFFFFFF; };
+    const n = 10;
+    const pts: [number, number][] = [[0, 0]];
+    const step = (p.liveRoi ?? 0) / n;
+    for (let i = 1; i < n; i++) {
+      const noise = (rand() - 0.5) * Math.abs(p.liveRoi ?? 0) * 0.28;
+      pts.push([i, pts[pts.length - 1][1] + step + noise]);
+    }
+    pts.push([n, p.liveRoi ?? 0]);
+    return pts.map(([t, roi]) => `${(LM + (t / n) * chartW).toFixed(1)},${ry(roi).toFixed(1)}`).join(' ');
+  };
+
+  // Biggest movers (last-5m simulated)
+  const movers = sorted.slice(0, 8).map(p => {
+    let rng = 0;
+    const s = 'mv' + p.username;
+    for (let i = 0; i < s.length; i++) rng = (rng * 31 + s.charCodeAt(i)) >>> 0;
+    rng = (rng * 1664525 + 1013904223) >>> 0;
+    const pct = ((rng % 200) - 80) / 10; // -8% to +12%
+    return { p, pct };
+  }).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 4);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Left: Compact leaderboard + movers */}
+      <div style={{ width: 240, flexShrink: 0, borderRight: `1px solid ${CV.bd1}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
+        <div style={{ padding: '8px 14px 6px', borderBottom: `1px solid ${CV.bd0}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: '#555577', letterSpacing: 2, textTransform: 'uppercase' }}>Race Leaders</span>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none' }}>
+          {sorted.slice(0, 10).map((p, i) => {
+            const rkC = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : CV.gray;
+            return (
+              <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 12px', borderBottom: 'rgba(255,255,255,.03) solid 1px', background: i === 0 ? 'rgba(255,215,0,.04)' : i === 1 ? 'rgba(192,192,192,.02)' : i === 2 ? 'rgba(205,127,50,.02)' : 'transparent' }}>
+                <div style={{ width: 18, fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 11, fontWeight: 900, color: rkC, textAlign: 'right', flexShrink: 0 }}>{i + 1}</div>
+                <div style={{ width: 3, height: 3, borderRadius: '50%', background: TOP_COLORS[i] || CV.gray, flexShrink: 0 }} />
+                <Av u={p.username} img={p.profileImage} sz={18} />
+                <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, fontWeight: 600, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
+                <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: (p.liveRoi ?? 0) >= 0 ? '#00e676' : '#ff1744' }}>
+                  {(p.liveRoi ?? 0) >= 0 ? '+' : ''}{(p.liveRoi ?? 0).toFixed(1)}%
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding: '8px 12px', borderTop: `1px solid ${CV.bd1}`, flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: '#555577', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>⚡ Biggest Movers</div>
+          {movers.map(({ p, pct }) => (
+            <div key={p.userId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 4 }}>
+              <span style={{ color: '#bbb' }}>{p.username}</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontWeight: 700, color: pct >= 0 ? '#00e676' : '#ff1744' }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}% {pct >= 0 ? '↑' : '↓'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Center: Equity race lines */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: 32, flexShrink: 0, borderBottom: `1px solid ${CV.bd1}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, background: 'rgba(255,255,255,.012)' }}>
+          <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 800, color: '#fff' }}>Equity Race</span>
+          <span style={{ fontSize: 9, color: '#555577' }}>Base 0% = Start</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 3, color: '#00e676', background: 'rgba(0,230,118,.1)', border: '1px solid rgba(0,230,118,.2)' }}>Top 10 Highlighted</span>
+          <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 3, color: '#00b0ff', background: 'rgba(0,176,255,.1)', border: '1px solid rgba(0,176,255,.2)' }}>{all.length} Traders</span>
+        </div>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.025) 40px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,.015) 60px)' }} />
+          <svg width="100%" height="100%" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+            <defs>
+              <filter id="lineGlow"><feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            </defs>
+            {/* Y-axis labels */}
+            {[-1, -0.5, 0, 0.33, 0.67, 1].map(frac => {
+              const roi = minRoi + frac * roiRange;
+              const y = ry(roi);
+              return (
+                <g key={frac}>
+                  <line x1={LM} y1={y} x2={VW} y2={y} stroke="rgba(255,255,255,.03)" strokeWidth={1} />
+                  <text x={2} y={y + 3} fontSize={9} fill="rgba(255,255,255,.2)" fontFamily="monospace">
+                    {roi >= 0 ? '+' : ''}{roi.toFixed(0)}%
+                  </text>
+                </g>
+              );
+            })}
+            {/* Baseline (0%) */}
+            <line x1={LM} y1={baseline} x2={VW} y2={baseline} stroke="rgba(255,255,255,.07)" strokeWidth={1} strokeDasharray="4,4" />
+            {/* Time axis labels */}
+            {(['START', '30m', '1h', '1.5h', 'NOW'] as const).map((label, i) => (
+              <text key={label} x={LM + i * (chartW / 4)} y={VH - 8}
+                fontSize={8} fill="rgba(255,255,255,.2)" fontFamily="monospace">{label}</text>
+            ))}
+            {/* Field lines (faint) */}
+            {all.slice(10).map(p => (
+              <polyline key={p.userId} points={getPath(p)} fill="none" stroke="rgba(255,255,255,.04)" strokeWidth={1} />
+            ))}
+            {/* Top 10 colored lines (drawn back-to-front so #1 is on top) */}
+            {sorted.slice(0, 10).reverse().map((p, ri) => {
+              const idx = sorted.length - 1 - ri;
+              const col = TOP_COLORS[idx] ?? 'rgba(255,255,255,.3)';
+              const isLeader = idx === 0;
+              const path = getPath(p);
+              const lastPt = path.split(' ').pop()?.split(',') ?? [`${VW}`, `${VH / 2}`];
+              const lx = parseFloat(lastPt[0]), ly = parseFloat(lastPt[1]);
+              return (
+                <g key={p.userId}>
+                  <polyline points={path} fill="none" stroke={col}
+                    strokeWidth={isLeader ? 3.5 : idx < 3 ? 2.5 : idx < 5 ? 2 : 1.5}
+                    filter={isLeader ? 'url(#lineGlow)' : undefined} />
+                  {idx < 5 && (
+                    <>
+                      <circle cx={lx} cy={ly} r={isLeader ? 5 : 4} fill={col} filter={isLeader ? 'url(#lineGlow)' : undefined} />
+                      <text x={lx + 7} y={ly + 3} fontSize={9} fill={col} fontWeight={700} fontFamily="sans-serif">
+                        {p.username}{isLeader ? ' 👑' : ''}
+                      </text>
+                    </>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+          {/* Mini pip chart (bottom-right inset) */}
+          <div style={{ position: 'absolute', bottom: 20, right: 20, width: 190, height: 110, background: 'rgba(0,0,0,.55)', border: `1px solid ${CV.bd1}`, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 6, left: 10, fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 8, fontWeight: 700, color: '#555577', letterSpacing: 1 }}>MARKET CHART</div>
+            <svg width="100%" height="100%" viewBox="0 0 190 110" preserveAspectRatio="none">
+              <rect width="190" height="110" fill="#06060e" />
+              {[15,30,45,60,75,90,105,120,135,150,165,180].map((x, i) => {
+                const bull = i % 3 !== 1;
+                const o = 40 + Math.sin(i * 0.8) * 20, c = bull ? o - 10 : o + 10;
+                return (
+                  <g key={x}>
+                    <line x1={x} y1={Math.min(o, c) - 8} x2={x} y2={Math.max(o, c) + 8} stroke={bull ? '#00e676' : '#ff1744'} strokeWidth={1} />
+                    <rect x={x - 4} y={Math.min(o, c)} width={8} height={Math.max(2, Math.abs(c - o))} fill={bull ? '#00e676' : '#ff1744'} rx={1} />
+                  </g>
+                );
+              })}
+              <line x1="0" y1="30" x2="190" y2="30" stroke="rgba(0,230,118,.3)" strokeWidth={1} strokeDasharray="3,3" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Right: View filters + legend */}
+      <div style={{ width: 215, flexShrink: 0, borderLeft: `1px solid ${CV.bd1}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
+        <div style={{ padding: '8px 12px 6px', borderBottom: `1px solid ${CV.bd0}` }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: '#555577', letterSpacing: 2, textTransform: 'uppercase' }}>Highlighted</span>
+        </div>
+        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {sorted.slice(0, 5).map((p, i) => (
+            <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ width: 22, height: 3, background: TOP_COLORS[i] || CV.gray, borderRadius: 1.5, flexShrink: 0 }} />
+              <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, color: TOP_COLORS[i] || CV.gray, flex: 1 }}>{p.username}{i === 0 ? ' 👑' : ''}</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 9, color: (p.liveRoi ?? 0) >= 0 ? '#00e676' : '#ff1744' }}>
+                {(p.liveRoi ?? 0) >= 0 ? '+' : ''}{(p.liveRoi ?? 0).toFixed(1)}%
+              </span>
+            </div>
+          ))}
+          {sorted.length > 5 && <div style={{ fontSize: 9, color: '#555577', paddingTop: 2 }}>+ {sorted.length - 5} more traders (faint)</div>}
+        </div>
+        <div style={{ marginTop: 'auto', padding: '10px 12px', borderTop: `1px solid ${CV.bd1}` }}>
+          <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: '#555577', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>Field Summary</div>
+          {([
+            ['Traders Racing', String(sorted.length)],
+            ['Avg ROI', `${sorted.length ? (sorted.reduce((s, p) => s + (p.liveRoi ?? 0), 0) / sorted.length).toFixed(1) : '0'}%`],
+            ['Leader Edge', sorted.length >= 2 ? `+${((sorted[0]?.liveRoi ?? 0) - (sorted[1]?.liveRoi ?? 0)).toFixed(1)}%` : '—'],
+          ] as [string, string][]).map(([l, v]) => (
+            <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 5 }}>
+              <span style={{ color: '#bbb' }}>{l}</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', color: '#e0e0e0', fontWeight: 600 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function Av({ u, img, sz = 36, ring }: { u: string; img: string | null; sz?: number; ring?: string }) {
@@ -459,37 +803,101 @@ function Ticker({ prices, events }: { prices: PriceMap; events: AEvent[] }) {
 
 // ─── Scene 1: Overview ────────────────────────────────────────────────────────
 
+// Seeded rank delta for each trader (stable per 5-min bucket)
+function rankDelta(userId: string): number {
+  const bucket = Math.floor(Date.now() / 300000);
+  let rng = bucket;
+  const s = 'rk' + userId;
+  for (let i = 0; i < s.length; i++) rng = (rng * 31 + s.charCodeAt(i)) >>> 0;
+  rng = (rng * 1664525 + 1013904223) >>> 0;
+  return (rng % 5) - 2; // -2 to +2
+}
+
+const CHART_SYMS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSD', 'USDJPY', 'USDCAD'] as const;
+
 function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap; onTrader: (p: Participant) => void }) {
   const rm = ev.rankingMethod || 'pnl';
   const top10 = useMemo(() => [...ev.participants].filter(p => p.totalTrades > 0 && !p.isDisqualified).sort((a, b) => raceScore(b, rm) - raceScore(a, rm)).slice(0, 10), [ev, rm]);
-  const priceKeys = Object.keys(prices).filter(k => prices[k]?.mid);
-  const activeCount = ev.participants.filter(p => p.totalTrades > 0 && !p.isDisqualified).length;
-  const totalTrades = ev.participants.reduce((s, p) => s + p.totalTrades, 0);
-  const activeParts = ev.participants.filter(p => p.totalTrades > 0);
-  const avgWR = activeParts.length ? activeParts.reduce((s, p) => s + p.winRate, 0) / activeParts.length : 0;
+  const leader = top10[0] ?? null;
+
+  // Chart symbol/TF state
+  const [chartSym, setChartSym] = useState<string>(CHART_SYMS[0]);
+  const [chartTf, setChartTf] = useState<string>('5m');
+  const priceData = prices[chartSym] ?? null;
+  const mid = priceData?.mid ?? 0;
+  const dec = chartSym.includes('JPY') ? 3 : (chartSym.includes('XAU') || mid > 500) ? 2 : 5;
+
+  // Simulated price change vs candle[0].o
+  const candles = useMemo(() => generateCandles(chartSym, mid), [chartSym, Math.floor(Date.now() / 300000)]);// eslint-disable-line react-hooks/exhaustive-deps
+  const firstOpen = candles[0]?.o ?? mid;
+  const chg = mid - firstOpen;
+  const chgPct = firstOpen > 0 ? (chg / firstOpen) * 100 : 0;
+  const chgPos = chg >= 0;
+
+  // Action feed events (derived from live data)
+  const feedEvents = useMemo(() => {
+    const evts: Array<{ icon: string; html: React.ReactNode; time: string }> = [];
+    if (leader) {
+      evts.push({ icon: '👑', html: <><b style={{ color: '#fff' }}>New Leader!</b> {leader.username} leads with {fmtPnl(leader.livePnl)}</>, time: 'just now' });
+    }
+    const danger = ev.participants.find(p => !p.isDisqualified && p.maxDrawdownPercentage > 20);
+    if (danger) {
+      evts.push({ icon: '⚠️', html: <><b style={{ color: '#fff' }}>Danger Zone</b> — {danger.username} drawdown {danger.maxDrawdownPercentage.toFixed(0)}%</>, time: '2 min ago' });
+    }
+    ev.openPositions.slice(0, 5).forEach((pos, i) => {
+      const isL = pos.side === 'long';
+      evts.push({
+        icon: isL ? '📈' : '📉',
+        html: <><b style={{ color: '#fff' }}>{pos.username}</b> opened {isL ? 'LONG' : 'SHORT'} <span style={{ color: '#0FEDBE', fontFamily: 'monospace' }}>{(pos.symbol || '').replace('/', '')}</span>{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}</>,
+        time: tAgo(pos.openedAt) === 'now' ? 'just now' : tAgo(pos.openedAt) + ' ago',
+      });
+    });
+    if (top10[1]) {
+      evts.push({ icon: '🔥', html: <><b style={{ color: '#fff' }}>Big Move</b> — {top10[1].username} {fmtPnl(top10[1].livePnl)}</>, time: '5 min ago' });
+    }
+    ev.participants.filter(p => p.totalTrades > 3 && p.winRate >= 80).slice(0, 2).forEach(p => {
+      evts.push({ icon: '🏆', html: <><b style={{ color: '#fff' }}>{p.username}</b> win streak ×{p.winningTrades}</>, time: '10 min ago' });
+    });
+    return evts.slice(0, 9);
+  }, [ev, leader, top10]);
+
+  // Hot traders (top 3 positive movers)
+  const hot3 = useMemo(() => top10.filter(p => p.livePnl > 0).slice(0, 3), [top10]);
+
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-      {/* Left: Mini Leaderboard */}
-      <div style={{ width: 282, flexShrink: 0, borderRight: `1px solid ${CV.bd1}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
-        <div style={{ padding: '8px 14px 6px', borderBottom: `1px solid ${CV.bd0}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase' }}>Live Leaders</span>
-          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: CV.teal, letterSpacing: 2, padding: '1px 7px', borderRadius: 3, background: 'rgba(15,237,190,.08)', border: `1px solid ${CV.teal}22` }}>TOP 10</span>
+      {/* ── Left: Leaderboard (290px) ── */}
+      <div style={{ width: 290, flexShrink: 0, borderRight: `1px solid rgba(255,255,255,.07)`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
+        <div style={{ padding: '8px 14px 6px', borderBottom: `1px solid rgba(255,255,255,.07)`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: '#555577', letterSpacing: 3, textTransform: 'uppercase' }}>Live Leaders</span>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, padding: '1px 7px', borderRadius: 3, color: '#ffab00', background: 'rgba(255,171,0,.1)', border: '1px solid rgba(255,171,0,.2)', letterSpacing: 1 }}>TOP 10</span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none' }}>
-          {top10.length === 0 ? <div style={{ padding: 24, textAlign: 'center', fontSize: 11, color: CV.bd3 }}>No active traders yet</div> : top10.map((p, i) => {
+          {top10.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 11, color: '#555577' }}>No active traders yet</div>
+          ) : top10.map((p, i) => {
             const pnlPos = p.livePnl >= 0;
-            const rkColor = i === 0 ? CV.gold : i === 1 ? '#C0C0C0' : i === 2 ? CV.oran : CV.gray;
-            const sparkPts = genSparkline(p.username, ev.startingCapital, p.liveEquity);
-            const sparkColor = pnlPos ? CV.grn : CV.red;
+            const rkColor = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#9095A1';
+            const sparkPts = genSparkline(p.username, ev.startingCapital, p.liveEquity, 36, 18);
+            const sparkColor = pnlPos ? '#00e676' : '#ff1744';
+            const delta = rankDelta(p.userId);
             return (
-              <div key={p.userId} onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: 'rgba(255,255,255,.025) solid 1px', cursor: 'pointer', background: i === 0 ? 'rgba(253,212,88,.04)' : i === 1 ? 'rgba(192,192,192,.02)' : i === 2 ? 'rgba(255,130,67,.02)' : 'transparent', transition: 'background .15s' }}>
-                <div style={{ width: 20, fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 12, fontWeight: 900, color: rkColor, textAlign: 'center', flexShrink: 0, lineHeight: 1 }}>{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
+              <div key={p.userId} onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderBottom: 'rgba(255,255,255,.03) solid 1px', cursor: 'pointer', background: i === 0 ? 'rgba(255,215,0,.04)' : i === 1 ? 'rgba(192,192,192,.02)' : i === 2 ? 'rgba(205,127,50,.02)' : 'transparent' }}>
+                {/* Rank */}
+                <div style={{ width: 20, fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 11, fontWeight: 900, color: rkColor, textAlign: 'right', flexShrink: 0 }}>{i + 1}</div>
+                {/* Avatar */}
                 <Av u={p.username} img={p.profileImage} sz={22} ring={i < 3 ? rkColor : undefined} />
+                {/* Name + PnL */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 600, color: CV.lgt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
-                  <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: pnlPos ? CV.grn : CV.red }}>{fmtPnl(p.livePnl)}</div>
+                  <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 600, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: pnlPos ? '#00e676' : '#ff1744' }}>{fmtPnl(p.livePnl)}</div>
                 </div>
-                <svg width={60} height={24} viewBox="0 0 60 24" style={{ flexShrink: 0 }}>
+                {/* Rank delta */}
+                <div style={{ fontSize: 10, fontWeight: 700, flexShrink: 0, color: delta > 0 ? '#00e676' : delta < 0 ? '#ff1744' : '#555577', minWidth: 18, textAlign: 'center' }}>
+                  {delta > 0 ? `↑${delta}` : delta < 0 ? `↓${Math.abs(delta)}` : '—'}
+                </div>
+                {/* Sparkline */}
+                <svg width={36} height={18} viewBox="0 0 36 18" style={{ flexShrink: 0 }}>
                   <polyline points={sparkPts} fill="none" stroke={sparkColor} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
@@ -497,62 +905,67 @@ function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap;
           })}
         </div>
       </div>
-      {/* Center: Stats + Prices */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px 16px', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, flexShrink: 0 }}>
-          {([[String(activeCount), 'Active Traders', CV.teal], [String(totalTrades), 'Total Trades', CV.blue], [Math.round(avgWR) + '%', 'Avg Win Rate', CV.purp], [String(ev.openPositions.length), 'Open Positions', CV.oran]] as [string, string, string][]).map(([v, l, c]) => (
-            <div key={l} style={{ background: CV.bg3, border: `1px solid ${CV.bd1}`, borderRadius: 8, padding: '12px', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
-              <div style={{ fontSize: 8, color: CV.bd3, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 5 }}>{l}</div>
-            </div>
+
+      {/* ── Center: Candlestick Chart ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Chart header */}
+        <div style={{ height: 36, borderBottom: `1px solid rgba(255,255,255,.07)`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 9, flexShrink: 0, background: 'rgba(255,255,255,.012)' }}>
+          <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 13, fontWeight: 800, color: '#fff' }}>{chartSym.replace('USD', '/USD').replace('XAU/', 'XAU/')}</span>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, color: '#555577' }}>{mid ? mid.toFixed(dec) : '—'}</span>
+          {mid > 0 && <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: chgPos ? '#00e676' : '#ff1744' }}>
+            {chgPos ? '+' : ''}{chg.toFixed(dec)} ({chgPos ? '+' : ''}{chgPct.toFixed(2)}%)
+          </span>}
+          <div style={{ flex: 1 }} />
+          {/* TF buttons */}
+          {(['1m', '5m', '15m', '1h'] as const).map(tf => (
+            <button key={tf} onClick={() => setChartTf(tf)} style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3, cursor: 'pointer', background: chartTf === tf ? 'rgba(0,176,255,.15)' : 'rgba(255,255,255,.06)', color: chartTf === tf ? '#00b0ff' : '#555577', border: chartTf === tf ? '1px solid rgba(0,176,255,.25)' : '1px solid transparent' }}>{tf}</button>
+          ))}
+          <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,.07)' }} />
+          {/* Symbol buttons */}
+          {CHART_SYMS.slice(0, 4).map(sym => (
+            <button key={sym} onClick={() => setChartSym(sym)} style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', background: chartSym === sym ? 'rgba(15,237,190,.15)' : 'rgba(255,255,255,.06)', color: chartSym === sym ? '#0FEDBE' : '#555577', border: chartSym === sym ? '1px solid rgba(15,237,190,.25)' : '1px solid transparent' }}>{sym}</button>
           ))}
         </div>
-        <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase' }}>Market Prices</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(128px,1fr))', gap: 6, overflowY: 'auto', scrollbarWidth: 'none', flex: 1 }}>
-          {priceKeys.map(sym => {
-            const p = prices[sym];
-            const dec = sym.includes('JPY') || sym.includes('XAU') || p.mid > 500 ? 2 : 4;
-            return (
-              <div key={sym} style={{ background: CV.bg3, border: `1px solid ${CV.bd1}`, borderRadius: 7, padding: '8px 10px' }}>
-                <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 9, fontWeight: 700, color: CV.teal, marginBottom: 3 }}>{sym}</div>
-                <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 15, fontWeight: 700, color: CV.lgt }}>{p.mid.toFixed(dec)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                  <span style={{ fontSize: 8, color: CV.grn }}>B: {p.bid.toFixed(dec)}</span>
-                  <span style={{ fontSize: 8, color: CV.red }}>A: {p.ask.toFixed(dec)}</span>
-                </div>
-              </div>
-            );
-          })}
-          {priceKeys.length === 0 && <div style={{ fontSize: 11, color: CV.bd3, padding: '24px 0' }}>Waiting for price data…</div>}
+        {/* Chart area */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.025) 40px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,.015) 60px)' }} />
+          <CandleChart symbol={chartSym} priceData={priceData} openPositions={ev.openPositions} leader={leader} />
         </div>
       </div>
-      {/* Right: Activity Feed */}
-      <div style={{ width: 248, flexShrink: 0, borderLeft: `1px solid ${CV.bd1}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
-        <div style={{ padding: '8px 14px 6px', borderBottom: `1px solid ${CV.bd0}`, flexShrink: 0 }}>
-          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: CV.bd3, letterSpacing: 3, textTransform: 'uppercase' }}>⚡ Live Activity</span>
+
+      {/* ── Right: Action Feed (260px) ── */}
+      <div style={{ width: 260, flexShrink: 0, borderLeft: `1px solid rgba(255,255,255,.07)`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,.012)' }}>
+        <div style={{ padding: '8px 14px 6px', borderBottom: `1px solid rgba(255,255,255,.07)`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, fontWeight: 700, color: '#555577', letterSpacing: 3, textTransform: 'uppercase' }}>Action Feed</span>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00e676', boxShadow: '0 0 8px #00e676' }} />
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none', padding: '6px 0' }}>
-          {ev.openPositions.slice(0, 18).map((pos, i) => {
-            const isL = pos.side === 'long';
-            return (
-              <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 12px', borderBottom: 'rgba(255,255,255,.025) solid 1px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: 13, marginTop: 1, flexShrink: 0 }}>{isL ? '📈' : '📉'}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10, color: '#bbb', lineHeight: 1.4 }}>
-                    <strong style={{ color: '#fff' }}>{pos.username}</strong> {isL ? 'went' : 'shorted'}{' '}
-                    <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', color: CV.teal, fontWeight: 700 }}>{(pos.symbol || '').replace('/', '')}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-                    <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, color: pos.unrealizedPnl >= 0 ? CV.grn : CV.red, fontWeight: 700 }}>{pos.unrealizedPnl >= 0 ? '+' : ''}{fmtC(pos.unrealizedPnl)}</span>
-                    {pos.leverage > 1 && <span style={{ fontSize: 9, color: CV.oran }}>{pos.leverage}×</span>}
-                    <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 8, color: CV.bd3, marginLeft: 'auto' }}>{tAgo(pos.openedAt)}</span>
-                  </div>
-                </div>
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none' }}>
+          {feedEvents.map((e, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '7px 12px', borderBottom: 'rgba(255,255,255,.03) solid 1px' }}>
+              <div style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{e.icon}</div>
+              <div>
+                <div style={{ fontSize: 10, lineHeight: 1.45, color: '#bbb' }}>{e.html}</div>
+                <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 8, color: '#555577', marginTop: 2 }}>{e.time}</div>
               </div>
-            );
-          })}
-          {ev.openPositions.length === 0 && <div style={{ fontSize: 11, color: CV.bd3, textAlign: 'center', padding: '32px 0' }}>No open positions</div>}
+            </div>
+          ))}
+          {feedEvents.length === 0 && (
+            <div style={{ fontSize: 11, color: '#555577', textAlign: 'center', padding: '32px 0' }}>Waiting for activity…</div>
+          )}
         </div>
+        {/* Hot Traders section */}
+        {hot3.length > 0 && (
+          <div style={{ padding: '8px 12px 10px', borderTop: `1px solid rgba(255,255,255,.07)`, flexShrink: 0 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: '#555577', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 7 }}>Hot Traders 🔥</div>
+            {hot3.map(p => (
+              <div key={p.userId} onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
+                <Av u={p.username} img={p.profileImage} sz={20} />
+                <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, flex: 1, color: '#e0e0e0' }}>{p.username}</span>
+                <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: '#00e676' }}>{fmtPnl(p.livePnl)} ↑</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1324,40 +1737,7 @@ export default function ArenaPage() {
             {scene === 'overview' && <OverviewScene ev={curEv} prices={prices} onTrader={p => setSelTrader({ p, ev: curEv })} />}
 
             {/* ── RACE ── */}
-            {scene === 'race' && (
-              <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 5, overflowY: 'auto', scrollbarWidth: 'none' }}>
-                {curEv.participants.length === 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
-                    <div style={{ fontSize: 40, opacity: .35 }}>👥</div>
-                    <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 13, color: CV.gray, letterSpacing: 3 }}>No Participants Yet</div>
-                  </div>
-                ) : (
-                  <>
-                    {racers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '28px 0', fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 12, color: CV.bd3, letterSpacing: 2 }}>Waiting for first trades…</div>
-                    ) : racers.map((p, i) => (
-                      <RacerRow key={p.userId} p={p} ev={curEv} idx={i} onClick={() => setSelTrader({ p, ev: curEv })} />
-                    ))}
-                    {waiting.length > 0 && (
-                      <div style={{ marginTop: 16, borderTop: `1px dashed ${CV.bd1}`, paddingTop: 8 }}>
-                        <div style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 7, color: CV.bd2, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span>Awaiting Entry</span>
-                          <span style={{ background: CV.bg3, borderRadius: 10, padding: '1px 7px', color: CV.bd3 }}>{waiting.length}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {waiting.map(p => (
-                            <div key={p.userId} onClick={() => setSelTrader({ p, ev: curEv })} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', opacity: .28, cursor: 'pointer', borderRadius: 20, background: CV.bg3, border: `1px solid ${CV.bd0}` }}>
-                              <Av u={p.username} img={p.profileImage} sz={20} />
-                              <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, color: CV.bd3, fontWeight: 600 }}>{p.username}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+            {scene === 'race' && <RaceLineChart ev={curEv} />}
 
             {/* ── SPOTLIGHT ── */}
             {scene === 'spotlight' && <SpotlightScene ev={curEv} onTrader={p => setSelTrader({ p, ev: curEv })} />}
