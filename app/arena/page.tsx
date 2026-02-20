@@ -1069,10 +1069,10 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         return {
           time:     openSec as any,
           position: pos.side === 'long' ? 'belowBar' : 'aboveBar',
-          shape:    'circle',
+          shape:    pos.side === 'long' ? 'arrowUp' : 'arrowDown',
           color:    traderColor(pos.userId),
-          // no text — labels are shown via the HTML player cards overlay
-          size:     2,
+          text:     pos.username,
+          size:     3,
           id:       `${pos.userId}_${pos.entryPrice}`,
         };
       })
