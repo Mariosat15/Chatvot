@@ -209,14 +209,16 @@ export default function GameModeOrderForm({
           },
         );
       } else {
-        toast.error("❌ Trade failed!", {
-          description: result.message || "Unknown error",
+        toast.error("❌ Trade blocked", {
+          description: result.error || result.message || "Unable to place order. Please try again.",
         });
       }
     } catch (error) {
-      toast.error("❌ Error!", {
-        description: "Something went wrong. Try again!",
-      });
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("❌ Error placing trade", { description });
     } finally {
       setIsSubmitting(false);
     }

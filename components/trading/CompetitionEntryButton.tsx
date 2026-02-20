@@ -156,13 +156,22 @@ export default function CompetitionEntryButton({
     try {
       // Device fingerprinting happens globally via FingerprintProvider
       // Server-side restriction checks happen in enterCompetition action
-      await enterCompetition(competition._id);
-      toast.success("Successfully entered competition!");
-      router.refresh();
+      const result = await enterCompetition(competition._id);
+      if (result.success) {
+        toast.success("Successfully entered competition!");
+        router.refresh();
+      } else {
+        toast.error("Entry blocked", {
+          description: result.error || "Unable to enter competition. Please try again.",
+        });
+        setEntering(false);
+      }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to enter competition",
-      );
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Failed to enter competition", { description });
       setEntering(false);
     }
   };

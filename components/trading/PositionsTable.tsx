@@ -457,12 +457,18 @@ const PositionsTable = ({
 
         // Refresh server data to get updated stats (non-blocking visual feedback already done)
         router.refresh();
+      } else {
+        // Server returned a business-logic reason (market closed, paused, restricted, etc.)
+        const description = result.error || "Unable to close position. Please try again.";
+        toast.error("Close failed", { description });
       }
     } catch (error) {
-      toast.error("Failed to close position", {
-        description:
-          error instanceof Error ? error.message : "Please try again",
-      });
+      // Unexpected network / runtime error
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Failed to close position", { description });
     } finally {
       setClosingPosition(null);
     }

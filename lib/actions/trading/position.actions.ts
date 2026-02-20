@@ -790,10 +790,19 @@ export const closePosition = async (
       throw error;
     }
   } catch (error) {
-    console.error("Error closing position:", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Failed to close position",
-    );
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      typeof (error as { digest: string }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_")
+    ) {
+      throw error;
+    }
+    const msg =
+      error instanceof Error ? error.message : "Failed to close position";
+    console.error("Error closing position:", msg);
+    return { success: false as const, error: msg };
   }
 };
 

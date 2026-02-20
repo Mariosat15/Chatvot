@@ -196,10 +196,16 @@ export default function GameModeSimpleOrderForm({
           description: `${TRADE_SIZES[selectedSize].name} trade opened on ${symbol}`,
         });
       } else {
-        toast.error("Trade failed", { description: result.message });
+        toast.error("Trade blocked", {
+          description: result.error || result.message || "Unable to place order. Please try again.",
+        });
       }
     } catch (error) {
-      toast.error("Something went wrong", { description: "Please try again" });
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Trade failed", { description });
     } finally {
       setIsSubmitting(false);
     }

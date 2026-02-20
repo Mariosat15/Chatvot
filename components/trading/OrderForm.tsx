@@ -543,12 +543,18 @@ const OrderForm = ({
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("orderPlaced"));
         }
+      } else {
+        // Server returned a business-logic error with a friendly message
+        const description = result.error || "Unable to place order. Please try again.";
+        toast.error("Trade blocked", { description });
       }
     } catch (error) {
-      toast.error("Order failed", {
-        description:
-          error instanceof Error ? error.message : "Failed to place order",
-      });
+      // Unexpected network / runtime error
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Order failed", { description });
     } finally {
       setIsSubmitting(false);
     }

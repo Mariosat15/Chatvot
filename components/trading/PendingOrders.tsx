@@ -60,11 +60,17 @@ const PendingOrders = ({ orders }: PendingOrdersProps) => {
           description: result.message,
         });
         router.refresh();
+      } else {
+        toast.error("Cancel failed", {
+          description: result.error || "Unable to cancel order. Please try again.",
+        });
       }
     } catch (error) {
-      toast.error("Failed to cancel order", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Failed to cancel order", { description });
     } finally {
       setCancelling(null);
     }
