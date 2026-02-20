@@ -850,14 +850,14 @@ const ARENA_TFS = [
   { label: '15m', value: '15' },{ label: '1H', value: '60' },{ label: '4H', value: '240' },
 ];
 
-function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
+function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: PriceMap; countdown?: string }) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<any>(null);
   const seriesRef     = useRef<any>(null);
   const bidLineRef    = useRef<any>(null);
   const rafRef        = useRef<number>(0);
   const lastCRef      = useRef<{time:number;open:number;high:number;low:number}|null>(null);
-  const midRef        = useRef(0); // always holds the latest mid price for use in async callbacks
+  const midRef        = useRef(0);
 
   const [sym,        setSym]       = useState('EUR/USD');
   const [tf,         setTf]        = useState('5');
@@ -935,29 +935,36 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
     [ev.participants, rm]);
   const leaderId = top5[0]?.userId;
 
-  // ── Create chart ─────────────────────────────────────────────────────────
+  // ── Create area chart (navy/blue gaming theme) ───────────────────────────
   useEffect(() => {
     if (!containerRef.current) return;
     let chart: any, series: any, ro: ResizeObserver;
     import('lightweight-charts').then(({ createChart, ColorType, CrosshairMode, LineStyle }) => {
       if (!containerRef.current) return;
       chart = createChart(containerRef.current, {
-        layout: { background: { type: ColorType.Solid, color: '#05050c' }, textColor: 'rgba(144,149,161,.6)', fontSize: 10 },
-        grid: { vertLines: { color: 'rgba(255,255,255,.025)' }, horzLines: { color: 'rgba(255,255,255,.025)' } },
+        layout: { background: { type: ColorType.Solid, color: '#070e25' }, textColor: 'rgba(147,197,253,.5)', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(59,130,246,.06)' }, horzLines: { color: 'rgba(59,130,246,.06)' } },
         crosshair: {
           mode: CrosshairMode.Normal,
-          vertLine: { color: 'rgba(88,98,255,.55)', labelBackgroundColor: '#3d44cc', style: LineStyle.Dashed, width: 1 as any },
-          horzLine: { color: 'rgba(88,98,255,.55)', labelBackgroundColor: '#3d44cc', style: LineStyle.Dashed, width: 1 as any },
+          vertLine: { color: 'rgba(255,255,255,.25)', labelBackgroundColor: 'rgba(13,27,62,.95)', style: LineStyle.Dashed, width: 1 as any },
+          horzLine: { color: 'rgba(255,255,255,.25)', labelBackgroundColor: 'rgba(13,27,62,.95)', style: LineStyle.Dashed, width: 1 as any },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,.05)', entireTextOnly: true },
-        timeScale:       { borderColor: 'rgba(255,255,255,.05)', timeVisible: true, secondsVisible: false },
+        rightPriceScale: { borderColor: 'rgba(59,130,246,.15)', entireTextOnly: true },
+        timeScale:       { borderColor: 'rgba(59,130,246,.15)', timeVisible: true, secondsVisible: false },
         width:  containerRef.current.clientWidth,
         height: containerRef.current.clientHeight,
       });
-      series = chart.addCandlestickSeries({
-        upColor:'#0FEDBE', downColor:'#FF495B',
-        borderUpColor:'#0FEDBE', borderDownColor:'#FF495B',
-        wickUpColor:'rgba(15,237,190,.55)', wickDownColor:'rgba(255,73,91,.55)',
+      // Smooth area series — white glowing line + blue gradient fill
+      series = chart.addAreaSeries({
+        lineColor: 'rgba(255,255,255,.92)',
+        topColor:  'rgba(59,130,246,.5)',
+        bottomColor: 'rgba(7,14,37,.02)',
+        lineWidth: 3 as any,
+        priceLineVisible: false,
+        crosshairMarkerVisible: true,
+        crosshairMarkerBorderColor: '#fff',
+        crosshairMarkerBackgroundColor: '#3b82f6',
+        crosshairMarkerRadius: 5,
       });
       chartRef.current = chart; seriesRef.current = series;
       ro = new ResizeObserver(() => {
@@ -992,28 +999,24 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         const data = await res.json();
         if (!active || !seriesRef.current) return;
         const candles = data.candles ?? [];
-        seriesRef.current.setData(candles);
-        if (candles.length) lastCRef.current = candles[candles.length - 1];
+        // Area series uses {time, value} — extract close price
+        const areaData = candles
+          .map((c: any) => ({ time: c.time, value: c.close ?? c.value }))
+          .filter((c: any) => c.value !== undefined && c.value !== null);
+        seriesRef.current.setData(areaData);
+        if (candles.length) {
+          const lc = candles[candles.length - 1];
+          lastCRef.current = { time: lc.time, open: lc.close ?? lc.value, high: lc.close ?? lc.value, low: lc.close ?? lc.value };
+        }
         chartRef.current?.timeScale().fitContent();
-        // Immediately paint the current live candle so the chart isn't frozen
-        // after the TF switch while waiting for the next price tick.
+        // Immediately paint current live value so chart isn't frozen after TF switch
         const curMid = midRef.current;
         if (curMid > 0 && seriesRef.current) {
-          const tfSec      = parseInt(tf) * 60;
-          const nowSec     = Math.floor(Date.now() / 1000);
-          const bucket     = Math.floor(nowSec / tfSec) * tfSec;
-          const lc         = lastCRef.current;
-          const sameBucket = lc?.time === bucket;
-          const candle     = {
-            time:  bucket as any,
-            open:  sameBucket ? lc!.open : curMid,
-            high:  sameBucket ? Math.max(lc!.high, curMid) : curMid,
-            low:   sameBucket ? Math.min(lc!.low,  curMid) : curMid,
-            close: curMid,
-          };
+          const tfSec  = parseInt(tf) * 60;
+          const bucket = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
           try {
-            seriesRef.current.update(candle);
-            lastCRef.current = { time: bucket, open: candle.open, high: candle.high, low: candle.low };
+            seriesRef.current.update({ time: bucket as any, value: curMid });
+            lastCRef.current = { time: bucket, open: curMid, high: curMid, low: curMid };
           } catch { /* ignore */ }
         }
       } catch { /* ignore */ }
@@ -1033,27 +1036,15 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
     bidLineRef.current = series.createPriceLine({ price: bid, color: 'rgba(15,237,190,.7)', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `BID` });
   }, [bid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Extend live candle — ALWAYS targets the current TF bucket (fixes TF freeze) ──
-  // Using lc?.time caused updates to land on historical candles after a TF switch.
+  // ── Extend live candle — area series just needs {time, value} ─────────────
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !mid) return;
     const tfSec      = parseInt(tf) * 60;
-    const nowSec     = Math.floor(Date.now() / 1000);
-    const bucketTime = Math.floor(nowSec / tfSec) * tfSec;
-    const lc         = lastCRef.current;
-    // Only reuse tracked OHLC when we're still in the same bucket
-    const sameBucket = lc?.time === bucketTime;
-    const candle = {
-      time:  bucketTime as any,
-      open:  sameBucket ? lc!.open : mid,
-      high:  sameBucket ? Math.max(lc!.high, mid) : mid,
-      low:   sameBucket ? Math.min(lc!.low,  mid) : mid,
-      close: mid,
-    };
+    const bucketTime = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
     try {
-      series.update(candle);
-      lastCRef.current = { time: bucketTime, open: candle.open, high: candle.high, low: candle.low };
+      series.update({ time: bucketTime as any, value: mid });
+      lastCRef.current = { time: bucketTime, open: mid, high: mid, low: mid };
     } catch { /* chart may not be ready yet */ }
   }, [mid, tf]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1114,164 +1105,156 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const lossCnt = symPositions.filter(p => p.unrealizedPnl <  0).length;
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%', background:'#05050c', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ position:'relative', width:'100%', height:'100%', background:'#070e25', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <style>{`
-        @keyframes cvLive   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.6)} }
-        @keyframes cvFlagIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes cvLeader { 0%,100%{box-shadow:0 0 0 0 rgba(253,212,88,0)} 50%{box-shadow:0 0 0 6px rgba(253,212,88,.18)} }
-        @keyframes cvPnl    { 0%{opacity:.2} 60%{opacity:1} 100%{opacity:1} }
-        @keyframes cvCrown  { 0%,100%{filter:drop-shadow(0 0 6px #FFD700)} 50%{filter:drop-shadow(0 0 14px #FFD700)} }
+        @keyframes cvLive   { 0%,100%{opacity:1} 50%{opacity:.15} }
+        @keyframes trBubble { from{opacity:0;transform:translateY(-10px) scale(.9)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes cvCrown  { 0%,100%{filter:drop-shadow(0 0 5px #FFD700)} 50%{filter:drop-shadow(0 0 14px #FFD700)} }
+        @keyframes cvPnl    { 0%{opacity:0;transform:scale(.85)} 100%{opacity:1;transform:scale(1)} }
       `}</style>
 
-      {/* ── Broadcast header bar ── */}
-      <div style={{ height:48, flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'0 14px', borderBottom:'1px solid rgba(255,255,255,.06)', background:'rgba(255,255,255,.02)' }}>
-        {/* LIVE dot */}
-        <div style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:4, background:'rgba(255,73,91,.13)', border:'1px solid rgba(255,73,91,.3)', flexShrink:0 }}>
-          <div style={{ width:7, height:7, borderRadius:'50%', background:'#FF495B', animation:'cvLive 1.1s ease-in-out infinite' }} />
-          <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#FF495B', letterSpacing:2 }}>LIVE</span>
+      {/* ── Top bar: symbol/TF controls + live price ── */}
+      <div style={{ height:46, flexShrink:0, display:'flex', alignItems:'center', gap:7, padding:'0 14px', borderBottom:'1px solid rgba(59,130,246,.13)', background:'rgba(5,12,35,.85)', backdropFilter:'blur(8px)' }}>
+        {/* LIVE badge */}
+        <div style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, background:'rgba(239,68,68,.13)', border:'1px solid rgba(239,68,68,.32)', flexShrink:0 }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background:'#ef4444', animation:'cvLive 1s ease-in-out infinite' }} />
+          <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#ef4444', letterSpacing:2 }}>LIVE</span>
         </div>
-        {/* Symbol chips — with live trade count badges */}
+        {/* Symbol chips */}
         <div style={{ display:'flex', gap:3, flexShrink:0 }}>
           {ARENA_SYMS.map(s => {
             const cnt = positionsBySymbol[s.key]?.length ?? 0;
             const active = sym === s.label;
             return (
-              <button key={s.key} onClick={() => setSym(s.label)} style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'4px 8px', borderRadius:4, cursor:'pointer', transition:'all .12s', display:'flex', alignItems:'center', gap:4, background: active ? 'rgba(15,237,190,.15)' : cnt>0 ? 'rgba(88,98,255,.1)' : 'rgba(255,255,255,.04)', color: active ? '#0FEDBE' : cnt>0 ? '#7b84ff' : '#555577', border: active ? '1px solid rgba(15,237,190,.3)' : cnt>0 ? '1px solid rgba(88,98,255,.25)' : '1px solid rgba(255,255,255,.04)' }}>
+              <button key={s.key} onClick={() => setSym(s.label)} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:20, cursor:'pointer', transition:'all .15s', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, background: active ? 'rgba(59,130,246,.28)' : cnt > 0 ? 'rgba(59,130,246,.1)' : 'rgba(255,255,255,.04)', color: active ? '#93c5fd' : cnt > 0 ? '#7b84ff' : 'rgba(255,255,255,.3)', border: active ? '1px solid rgba(59,130,246,.5)' : cnt > 0 ? '1px solid rgba(59,130,246,.2)' : '1px solid rgba(255,255,255,.05)' }}>
                 {s.label}
-                {cnt > 0 && <span style={{ background: active ? '#0FEDBE' : '#5862FF', color:'#05050c', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900, minWidth:12, textAlign:'center' }}>{cnt}</span>}
+                {cnt > 0 && <span style={{ background: active ? '#3b82f6' : 'rgba(59,130,246,.5)', color:'#fff', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900 }}>{cnt}</span>}
               </button>
             );
           })}
         </div>
-        <div style={{ width:1, height:20, background:'rgba(255,255,255,.07)', flexShrink:0 }} />
+        <div style={{ width:1, height:18, background:'rgba(255,255,255,.07)', flexShrink:0 }} />
         {/* TF chips */}
         <div style={{ display:'flex', gap:3, flexShrink:0 }}>
           {ARENA_TFS.map(t => (
-            <button key={t.value} onClick={() => setTf(t.value)} style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'4px 7px', borderRadius:4, cursor:'pointer', transition:'all .12s', background: tf===t.value ? 'rgba(88,98,255,.15)' : 'rgba(255,255,255,.04)', color: tf===t.value ? '#7b84ff' : '#555577', border: tf===t.value ? '1px solid rgba(88,98,255,.3)' : '1px solid rgba(255,255,255,.04)' }}>{t.label}</button>
+            <button key={t.value} onClick={() => setTf(t.value)} style={{ padding:'3px 9px', borderRadius:20, cursor:'pointer', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, background: tf === t.value ? 'rgba(59,130,246,.22)' : 'transparent', color: tf === t.value ? '#93c5fd' : 'rgba(255,255,255,.3)', border: tf === t.value ? '1px solid rgba(59,130,246,.38)' : '1px solid transparent', transition:'all .12s' }}>{t.label}</button>
           ))}
         </div>
         <div style={{ flex:1 }} />
         {/* Live price */}
         {mid > 0 && (
-          <div style={{ display:'flex', alignItems:'baseline', gap:8, flexShrink:0 }}>
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:20, fontWeight:900, color:'#fff', letterSpacing:1 }}>{mid.toFixed(dec)}</span>
+          <div style={{ display:'flex', alignItems:'baseline', gap:7, flexShrink:0 }}>
+            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:22, fontWeight:900, color:'#fff', letterSpacing:1 }}>{mid.toFixed(dec)}</span>
             <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
-              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(15,237,190,.7)' }}>ASK {ask.toFixed(dec)}</span>
-              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(255,73,91,.7)'  }}>BID {bid.toFixed(dec)}</span>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(74,222,128,.7)' }}>ASK {ask.toFixed(dec)}</span>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(248,113,113,.7)' }}>BID {bid.toFixed(dec)}</span>
             </div>
           </div>
         )}
-        {/* Position pills */}
+        {/* Open trade counts */}
         {ev.openPositions.length > 0 && (
-          <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-            <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(88,98,255,.1)', border:'1px solid rgba(88,98,255,.2)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#7b84ff', letterSpacing:1 }}>{ev.openPositions.length} OPEN</div>
-            {winCnt  > 0 && <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(15,237,190,.08)', border:'1px solid rgba(15,237,190,.2)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#0FEDBE' }}>{winCnt} ▲</div>}
-            {lossCnt > 0 && <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(255,73,91,.08)',  border:'1px solid rgba(255,73,91,.2)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#FF495B' }}>{lossCnt} ▼</div>}
+          <div style={{ display:'flex', gap:4, flexShrink:0 }}>
+            <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(59,130,246,.12)', border:'1px solid rgba(59,130,246,.22)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#93c5fd' }}>{ev.openPositions.length} OPEN</div>
+            {winCnt  > 0 && <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(34,197,94,.1)',  border:'1px solid rgba(34,197,94,.22)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#4ade80' }}>{winCnt} ▲</div>}
+            {lossCnt > 0 && <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(239,68,68,.1)',  border:'1px solid rgba(239,68,68,.22)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#f87171' }}>{lossCnt} ▼</div>}
           </div>
         )}
       </div>
 
-      {/* ── Chart + overlay ── */}
+      {/* ── Chart area ── */}
       <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
+        {/* Radial blue glow — gives the chart the "depth" look from the image */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse at 50% 20%, rgba(59,130,246,.14) 0%, transparent 65%)', pointerEvents:'none', zIndex:1 }} />
+
         {loading && (
-          <div style={{ position:'absolute', inset:0, zIndex:20, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(5,5,12,.75)', backdropFilter:'blur(4px)' }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, color:'#5862FF', letterSpacing:3 }}>LOADING CHART…</div>
+          <div style={{ position:'absolute', inset:0, zIndex:20, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(7,14,37,.85)', backdropFilter:'blur(6px)' }}>
+            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, color:'#3b82f6', letterSpacing:3 }}>LOADING CHART…</div>
           </div>
         )}
+
         {/* Chart canvas */}
-        <div ref={containerRef} style={{ position:'absolute', inset:0 }} />
+        <div ref={containerRef} style={{ position:'absolute', inset:0, zIndex:2 }} />
 
-        {/* Overlay (pointer-events:none) */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:5 }}>
-
-          {/* Player cards — pinned to right edge at entry-price Y level.
-              Entry dots are rendered natively by series.setMarkers() (canvas-level,
-              scroll-safe). Collision-avoidance prevents cards from overlapping. */}
+        {/* ── Trade bubble overlay ── */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:10 }}>
           {(() => {
-            const CARD_H = 40; // approx card height + gap
-            // Build list with raw Y from RAF loop
+            const BUBBLE_H = 72; // name(18) + gap(4) + pill(32) + dot(8) + gap(10)
             const items = symPositions
-              .map(pos => ({
+              .map((pos, idx) => ({
                 pos,
-                key: `${pos.userId}_${pos.entryPrice}_${pos.symbol}`,
+                key:  `${pos.userId}_${pos.entryPrice}_${pos.symbol}`,
                 rawY: posCoords[`${pos.userId}_${pos.entryPrice}_${pos.symbol}`] ?? null,
+                // Stagger X across the chart (38 % → 80 %) so bubbles don't stack
+                xPct: 38 + (idx % 5) * 10,
               }))
               .filter(e => e.rawY !== null)
               .sort((a, b) => (a.rawY as number) - (b.rawY as number));
 
-            // Push cards down if they overlap (single top-to-bottom pass is usually enough)
+            // Collision avoidance — push overlapping bubbles down
             for (let i = 1; i < items.length; i++) {
-              const prev = items[i - 1];
-              const curr = items[i];
-              if ((curr.rawY as number) - (prev.rawY as number) < CARD_H) {
-                curr.rawY = (prev.rawY as number) + CARD_H;
+              if ((items[i].rawY as number) - (items[i-1].rawY as number) < BUBBLE_H) {
+                items[i].rawY = (items[i-1].rawY as number) + BUBBLE_H;
               }
             }
 
-            return items.map(({ pos, key, rawY }) => {
-              const y      = rawY as number;
-              const col    = traderColor(pos.userId);
-              const pnlPos = pos.unrealizedPnl >= 0;
-              const isLdr  = pos.userId === leaderId;
+            return items.map(({ pos, key, rawY, xPct }) => {
+              const y       = rawY as number;
+              const pnlPos  = pos.unrealizedPnl >= 0;
+              const pnlAbs  = Math.abs(Math.round(pos.unrealizedPnl));
+              const isLdr   = pos.userId === leaderId;
+              const bubClr  = pnlPos ? '#22c55e' : '#ef4444';
+              const bubGrad = pnlPos
+                ? 'linear-gradient(135deg,#15803d,#22c55e)'
+                : 'linear-gradient(135deg,#b91c1c,#ef4444)';
               return (
-                <div key={key} style={{ position:'absolute', right:90, top:y-18, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
-                  {isLdr && <span style={{ fontSize:16, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                  {/* connector stub aligned to price line */}
-                  <div style={{ width:14, height:2, background:`linear-gradient(to right,${col},${col}88)`, borderRadius:1 }} />
-                  {/* player card */}
-                  <div style={{ display:'flex', alignItems:'center', gap:7, padding:'5px 11px 5px 6px', borderRadius:6, background:'rgba(5,5,12,.94)', border:`1.5px solid ${col}66`, backdropFilter:'blur(12px)', boxShadow:`0 0 20px ${col}28, 0 2px 8px rgba(0,0,0,.6)` }}>
-                    {/* Avatar */}
-                    <div style={{ width:26, height:26, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#fff', border:`2px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
+                <div key={key} style={{ position:'absolute', left:`${xPct}%`, top: y - 58, display:'flex', flexDirection:'column', alignItems:'center', gap:0, animation:'trBubble .45s cubic-bezier(.34,1.56,.64,1)' }}>
+                  {/* Trader name row */}
+                  <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
+                    {isLdr && <span style={{ fontSize:12, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
+                    <div style={{ width:22, height:22, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff', border:`2px solid ${bubClr}`, overflow:'hidden', flexShrink:0 }}>
                       {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
                     </div>
-                    {/* Name — bigger */}
-                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', textShadow:`0 0 12px ${col}` }}>{pos.username}</span>
-                    {/* Direction badge */}
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:4, background: pos.side==='long'?'rgba(15,237,190,.2)':'rgba(255,73,91,.2)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.35)':'rgba(255,73,91,.35)'}` }}>
-                      {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
+                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.92)', whiteSpace:'nowrap', textShadow:'0 1px 6px rgba(0,0,0,.9)' }}>{pos.username}</span>
+                  </div>
+                  {/* PnL pill — exactly like the image */}
+                  <div style={{ padding:'5px 16px', borderRadius:22, background:bubGrad, border:`1px solid ${bubClr}`, boxShadow:`0 4px 16px ${bubClr}55, 0 2px 6px rgba(0,0,0,.5)`, display:'flex', alignItems:'center', gap:4, whiteSpace:'nowrap' }}>
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:14, fontWeight:900, color:'#fff', letterSpacing:.3, animation:'cvPnl .5s ease' }}>
+                      {pnlPos ? '+' : '−'}${pnlAbs > 0 ? pnlAbs.toLocaleString() : '0'}
                     </span>
-                    {/* PnL */}
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:13, fontWeight:900, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease', textShadow:`0 0 10px ${pnlPos?'#0FEDBE':'#FF495B'}66` }}>
-                      {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.7)', padding:'1px 5px', borderRadius:8, background:'rgba(0,0,0,.25)' }}>
+                      {pos.side === 'long' ? '▲' : '▼'}{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}
                     </span>
                   </div>
+                  {/* Connector pin to price level */}
+                  <div style={{ width:1, height:9, background:`${bubClr}99` }} />
+                  <div style={{ width:9, height:9, borderRadius:'50%', background:bubClr, boxShadow:`0 0 10px ${bubClr}, 0 0 4px #fff` }} />
                 </div>
               );
             });
           })()}
 
-          {/* Bottom strip — current pair stats */}
-          <div style={{ position:'absolute', bottom: otherPairChips.length > 0 ? 38 : 10, left:10, display:'flex', alignItems:'center', gap:6 }}>
-            {symPositions.length > 0 ? (
-              <>
-                <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(5,5,12,.85)', border:'1px solid rgba(88,98,255,.2)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#7b84ff', letterSpacing:1 }}>{symPositions.length} TRADER{symPositions.length!==1?'S':''} ON {sym}</div>
-                {winCnt  > 0 && <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(15,237,190,.07)', border:'1px solid rgba(15,237,190,.18)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#0FEDBE' }}>{winCnt} WINNING</div>}
-                {lossCnt > 0 && <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(255,73,91,.07)',  border:'1px solid rgba(255,73,91,.18)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#FF495B' }}>{lossCnt} LOSING</div>}
-              </>
-            ) : !loading && ev.openPositions.length > 0 && (
-              <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(5,5,12,.85)', border:'1px solid rgba(255,255,255,.05)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'#555577' }}>No open trades on {sym} · switch pair above</div>
-            )}
-          </div>
+          {/* No trades notice */}
+          {symPositions.length === 0 && !loading && ev.openPositions.length > 0 && (
+            <div style={{ position:'absolute', bottom:44, left:14, padding:'4px 12px', borderRadius:20, background:'rgba(7,14,37,.85)', border:'1px solid rgba(59,130,246,.15)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.3)' }}>
+              No open trades on {sym} — switch pair above
+            </div>
+          )}
 
-          {/* Other-pairs activity strip — interactive, lets viewer jump to any active pair */}
+          {/* Other-pairs chips */}
           {otherPairChips.length > 0 && (
-            <div style={{ position:'absolute', bottom:10, left:10, right:10, display:'flex', alignItems:'center', gap:6, pointerEvents:'all' }}>
-              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'#555577', flexShrink:0, letterSpacing:1 }}>ALSO ACTIVE:</span>
-              {otherPairChips.map(chip => {
-                const chipPnlPos = chip.pnl >= 0;
-                return (
-                  <button key={chip.key} onClick={() => setSym(chip.label)} style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:4, cursor:'pointer', transition:'all .15s', background:'rgba(5,5,12,.85)', border:'1px solid rgba(255,255,255,.1)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9 }}>
-                    <span style={{ color:'#ccc', fontWeight:700 }}>{chip.label}</span>
-                    <span style={{ background:'rgba(88,98,255,.3)', color:'#7b84ff', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900 }}>{chip.count}</span>
-                    <span style={{ color: chipPnlPos ? '#0FEDBE' : '#FF495B', fontWeight:700 }}>{chipPnlPos?'+':''}{chip.pnl >= 0 ? '+' : ''}${Math.round(Math.abs(chip.pnl))}</span>
-                  </button>
-                );
-              })}
+            <div style={{ position:'absolute', bottom:10, left:12, display:'flex', alignItems:'center', gap:6, pointerEvents:'all' }}>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(255,255,255,.25)', letterSpacing:1 }}>ALSO:</span>
+              {otherPairChips.map(chip => (
+                <button key={chip.key} onClick={() => setSym(chip.label)} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:20, cursor:'pointer', background:'rgba(7,14,37,.88)', border:'1px solid rgba(59,130,246,.2)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.65)', transition:'all .15s' }}>
+                  {chip.label}
+                  <span style={{ background:'rgba(59,130,246,.4)', color:'#93c5fd', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900 }}>{chip.count}</span>
+                </button>
+              ))}
             </div>
           )}
 
           {/* Watermark */}
-          <div style={{ position:'absolute', bottom:10, right:10, fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(88,98,255,.3)', letterSpacing:2, fontWeight:700 }}>CHARTVOLT ARENA</div>
+          <div style={{ position:'absolute', bottom: otherPairChips.length > 0 ? 36 : 10, right:12, fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(59,130,246,.2)', letterSpacing:2 }}>CHARTVOLT</div>
         </div>
       </div>
     </div>
@@ -1279,180 +1262,120 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
 }
 
 function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap; onTrader: (p: Participant) => void }) {
-  const rm = ev.rankingMethod || 'pnl';
-  const top10 = useMemo(() => [...ev.participants].filter(p => p.totalTrades > 0 && !p.isDisqualified).sort((a, b) => raceScore(b, rm) - raceScore(a, rm)).slice(0, 10), [ev, rm]);
-  const leader = top10[0] ?? null;
+  const rm     = ev.rankingMethod || 'pnl';
+  const sorted = useMemo(() => [...ev.participants].filter(p => p.totalTrades > 0 && !p.isDisqualified).sort((a, b) => raceScore(b, rm) - raceScore(a, rm)), [ev, rm]);
+  const [tab, setTab] = useState<'bets' | 'history'>('bets');
 
-  // Action feed events (derived from live data)
-  const feedEvents = useMemo(() => {
-    const evts: Array<{ icon: string; html: React.ReactNode; time: string }> = [];
-    if (leader) {
-      evts.push({ icon: '👑', html: <><b style={{ color: '#fff' }}>New Leader!</b> {leader.username} leads with {fmtPnl(leader.livePnl)}</>, time: 'just now' });
-    }
-    const danger = ev.participants.find(p => !p.isDisqualified && p.maxDrawdownPercentage > 20);
-    if (danger) {
-      evts.push({ icon: '⚠️', html: <><b style={{ color: '#fff' }}>Danger Zone</b> — {danger.username} drawdown {danger.maxDrawdownPercentage.toFixed(0)}%</>, time: '2 min ago' });
-    }
-    ev.openPositions.slice(0, 5).forEach((pos, i) => {
-      const isL = pos.side === 'long';
-      evts.push({
-        icon: isL ? '📈' : '📉',
-        html: <><b style={{ color: '#fff' }}>{pos.username}</b> opened {isL ? 'LONG' : 'SHORT'} <span style={{ color: '#0FEDBE', fontFamily: 'monospace' }}>{(pos.symbol || '').replace('/', '')}</span>{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}</>,
-        time: tAgo(pos.openedAt) === 'now' ? 'just now' : tAgo(pos.openedAt) + ' ago',
-      });
-    });
-    if (top10[1]) {
-      evts.push({ icon: '🔥', html: <><b style={{ color: '#fff' }}>Big Move</b> — {top10[1].username} {fmtPnl(top10[1].livePnl)}</>, time: '5 min ago' });
-    }
-    ev.participants.filter(p => p.totalTrades > 3 && p.winRate >= 80).slice(0, 2).forEach(p => {
-      evts.push({ icon: '🏆', html: <><b style={{ color: '#fff' }}>{p.username}</b> win streak ×{p.winningTrades}</>, time: '10 min ago' });
-    });
-    return evts.slice(0, 9);
-  }, [ev, leader, top10]);
+  // Local countdown timer derived from ev.endTime
+  const [countdown, setCountdown] = useState('--:--');
+  useEffect(() => {
+    const tick = () => {
+      const end  = ev.endTime ? new Date(ev.endTime).getTime() : 0;
+      const diff = Math.max(0, end - Date.now());
+      const m    = Math.floor(diff / 60000);
+      const s    = Math.floor((diff % 60000) / 1000);
+      setCountdown(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [ev.endTime]);
 
-  // Hot traders (top 3 positive movers)
-  const hot3 = useMemo(() => top10.filter(p => p.livePnl > 0).slice(0, 3), [top10]);
+  // Short room ID
+  const roomId = ev.id ? (ev.id.replace(/\D/g, '').slice(-5) || ev.id.slice(-5)) : '—';
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-      {/* ── Left: Sporty Leaderboard (290px) ── */}
-      <div style={{ width:290, flexShrink:0, borderRight:'1px solid rgba(255,255,255,.07)', display:'flex', flexDirection:'column', overflow:'hidden', background:'rgba(5,5,12,.6)' }}>
-        {/* Header */}
-        <div style={{ padding:'9px 14px 7px', borderBottom:'1px solid rgba(255,255,255,.07)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'rgba(255,255,255,.015)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <span style={{ fontSize:14 }}>🏆</span>
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, fontWeight:800, color:'#FDD458', letterSpacing:3, textTransform:'uppercase' }}>Live Leaders</span>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'linear-gradient(160deg,#0d1b3e 0%,#070e25 100%)' }}>
+
+      {/* ── Left: Trading Room panel (260px) ── */}
+      <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(59,130,246,.12)', background: 'rgba(5,12,35,.94)', backdropFilter: 'blur(10px)' }}>
+
+        {/* Room header */}
+        <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid rgba(59,130,246,.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+            <span style={{ fontSize: 17 }}>📊</span>
+            <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 15, fontWeight: 800, color: '#fff' }}>Trading room</span>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <div style={{ width:6, height:6, borderRadius:'50%', background:'#0FEDBE', boxShadow:'0 0 8px #0FEDBE', animation:'cvLive 1.2s ease-in-out infinite' }} />
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, padding:'1px 7px', borderRadius:3, color:'#FDD458', background:'rgba(253,212,88,.1)', border:'1px solid rgba(253,212,88,.2)', letterSpacing:1 }}>TOP {top10.length}</span>
-          </div>
+          <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 10, color: 'rgba(255,255,255,.3)', letterSpacing: 1 }}>ROOM ID  {roomId}</div>
         </div>
-        {/* Rows */}
-        <div style={{ flex:1, overflowY:'auto', scrollbarWidth:'none' }}>
-          {top10.length === 0 ? (
-            <div style={{ padding:24, textAlign:'center', fontSize:11, color:'#555577' }}>No active traders yet</div>
-          ) : top10.map((p, i) => {
+
+        {/* Timer card */}
+        <div style={{ margin: '12px 14px 4px', padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg,rgba(59,130,246,.16),rgba(99,102,241,.1))', border: '1px solid rgba(59,130,246,.22)', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: 2 }}>⏱ {countdown}</div>
+          <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Time left</div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', padding: '8px 14px 6px', gap: 6 }}>
+          <button onClick={() => setTab('bets')} style={{ flex: 1, padding: '7px 0', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 700, background: tab === 'bets' ? '#3b82f6' : 'rgba(255,255,255,.06)', color: tab === 'bets' ? '#fff' : 'rgba(255,255,255,.4)', border: tab === 'bets' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.08)', transition: 'all .15s' }}>All bets</button>
+          <button onClick={() => setTab('history')} style={{ flex: 1, padding: '7px 0', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 700, background: tab === 'history' ? '#3b82f6' : 'rgba(255,255,255,.06)', color: tab === 'history' ? '#fff' : 'rgba(255,255,255,.4)', border: tab === 'history' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.08)', transition: 'all .15s' }}>History</button>
+        </div>
+
+        {/* Section label */}
+        <div style={{ padding: '4px 16px 5px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11 }}>👥</span>
+          <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: 'rgba(255,255,255,.28)', letterSpacing: 2, textTransform: 'uppercase' }}>Other users</span>
+        </div>
+
+        {/* Trader list */}
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none' }}>
+          {sorted.length === 0 ? (
+            <div style={{ padding: '28px 16px', textAlign: 'center', color: 'rgba(255,255,255,.22)', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>⏳</div>
+              <div style={{ fontSize: 11 }}>No active traders yet</div>
+            </div>
+          ) : sorted.map((p, i) => {
             const pnlPos = p.livePnl >= 0;
-            const rkColors = ['#ffd700','#c0c0c0','#cd7f32'];
-            const rkColor  = rkColors[i] ?? '#555577';
-            const medals   = ['🥇','🥈','🥉'];
-            const medal    = medals[i];
-            const roi      = ((p.liveEquity - ev.startingCapital) / ev.startingCapital * 100);
-            const sparkPts = genSparkline(p.username, ev.startingCapital, p.liveEquity, 40, 20);
-            const sparkColor = pnlPos ? '#0FEDBE' : '#FF495B';
-            const delta    = rankDelta(p.userId);
-            const hasPos   = ev.openPositions.some(op => op.userId === p.userId);
+            const equity = Math.round(p.liveEquity);
+            const hasPos = ev.openPositions.some(op => op.userId === p.userId);
+            const medals = ['🥇', '🥈', '🥉'];
             return (
-              <div key={p.userId} onClick={() => onTrader(p)} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderBottom:'1px solid rgba(255,255,255,.03)', cursor:'pointer', transition:'background .15s', background: i===0 ? 'rgba(253,212,88,.05)' : i===1 ? 'rgba(192,192,192,.02)' : i===2 ? 'rgba(205,127,50,.02)' : 'transparent', position:'relative' }}>
-                {/* Left accent bar for top 3 */}
-                {i < 3 && <div style={{ position:'absolute', left:0, top:'20%', height:'60%', width:2, borderRadius:1, background:rkColor }} />}
-                {/* Rank badge */}
-                <div style={{ width:22, flexShrink:0, textAlign:'center' }}>
-                  {medal ? <span style={{ fontSize:14 }}>{medal}</span> : <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:10, fontWeight:900, color:rkColor }}>{i+1}</span>}
-                </div>
+              <div key={p.userId} onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.04)', transition: 'background .15s', background: i === 0 ? 'rgba(59,130,246,.08)' : 'transparent' }}>
                 {/* Avatar */}
-                <div style={{ position:'relative', flexShrink:0 }}>
-                  <Av u={p.username} img={p.profileImage} sz={26} ring={i<3?rkColor:undefined} />
-                  {hasPos && <div style={{ position:'absolute', bottom:-1, right:-1, width:7, height:7, borderRadius:'50%', background:'#0FEDBE', border:'1px solid #05050c', boxShadow:'0 0 6px #0FEDBE' }} />}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: avColor(p.username), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', border: `2px solid ${i === 0 ? '#3b82f6' : hasPos ? 'rgba(34,197,94,.6)' : 'rgba(255,255,255,.1)'}`, overflow: 'hidden', boxShadow: i === 0 ? '0 0 14px rgba(59,130,246,.45)' : 'none' }}>
+                    {p.profileImage ? <img src={p.profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : ini(p.username)}
+                  </div>
+                  {/* live trade dot */}
+                  {hasPos && <div style={{ position: 'absolute', bottom: -1, right: -1, width: 9, height: 9, borderRadius: '50%', background: '#22c55e', border: '2px solid rgba(5,12,35,.94)', boxShadow: '0 0 7px #22c55e' }} />}
+                  {/* rank medal overlay for top 3 */}
+                  {i < 3 && <div style={{ position: 'absolute', top: -4, left: -4, fontSize: 11 }}>{medals[i]}</div>}
                 </div>
-                {/* Info */}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:11, fontWeight:700, color: i===0?'#FDD458':'#e0e0e0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.username}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:1 }}>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:10, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B' }}>{pnlPos?'+':''}{fmtPnl(p.livePnl)}</span>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:pnlPos?'rgba(15,237,190,.6)':'rgba(255,73,91,.6)' }}>{roi>=0?'+':''}{roi.toFixed(1)}%</span>
-                    {p.winRate >= 70 && <span style={{ fontSize:8, opacity:.8 }}>🔥</span>}
+                {/* Name + PnL */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 12, fontWeight: 700, color: i === 0 ? '#93c5fd' : 'rgba(255,255,255,.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: pnlPos ? 'rgba(74,222,128,.75)' : 'rgba(248,113,113,.75)', marginTop: 1 }}>
+                    {pnlPos ? '+' : ''}{fmtPnl(p.livePnl)}
                   </div>
                 </div>
-                {/* Delta + Sparkline */}
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2, flexShrink:0 }}>
-                  <div style={{ fontSize:9, fontWeight:700, color: delta>0?'#0FEDBE':delta<0?'#FF495B':'#555577', fontFamily:'var(--font-geist-mono),monospace' }}>
-                    {delta>0?`↑${delta}`:delta<0?`↓${Math.abs(delta)}`:'—'}
-                  </div>
-                  <svg width={40} height={20} viewBox="0 0 40 20" style={{ flexShrink:0 }}>
-                    <polyline points={sparkPts} fill="none" stroke={sparkColor} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={.85} />
-                  </svg>
+                {/* Equity token badge — matches the image style */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '4px 9px', borderRadius: 20, background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.2)' }}>
+                  <span style={{ fontSize: 10 }}>🪙</span>
+                  <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 11, fontWeight: 800, color: '#93c5fd' }}>{equity.toLocaleString()}</span>
                 </div>
               </div>
             );
           })}
         </div>
-        {/* Footer stats */}
-        <div style={{ padding:'7px 14px', borderTop:'1px solid rgba(255,255,255,.06)', flexShrink:0, display:'flex', gap:12, background:'rgba(255,255,255,.012)' }}>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'#555577', letterSpacing:2, textTransform:'uppercase' }}>Active</div>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:13, fontWeight:800, color:'#0FEDBE' }}>{ev.participants.filter(p=>p.totalTrades>0).length}</div>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'#555577', letterSpacing:2, textTransform:'uppercase' }}>Open Trades</div>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:13, fontWeight:800, color:'#7b84ff' }}>{ev.openPositions.length}</div>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'#555577', letterSpacing:2, textTransform:'uppercase' }}>Best PnL</div>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:13, fontWeight:800, color:'#FDD458' }}>{top10[0] ? fmtPnl(top10[0].livePnl) : '—'}</div>
-          </div>
+
+        {/* Footer stats bar */}
+        <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(59,130,246,.1)', flexShrink: 0, display: 'flex', gap: 6 }}>
+          {[
+            { label: 'Active',  val: String(ev.participants.filter(p => p.totalTrades > 0).length), col: '#22c55e' },
+            { label: 'Trades',  val: String(ev.openPositions.length), col: '#93c5fd' },
+            { label: 'Best',    val: sorted[0] ? fmtPnl(sorted[0].livePnl) : '—', col: '#fbbf24' },
+          ].map(stat => (
+            <div key={stat.label} style={{ flex: 1, textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.04)' }}>
+              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 13, fontWeight: 900, color: stat.col }}>{stat.val}</div>
+              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 7, color: 'rgba(255,255,255,.28)', letterSpacing: 1, textTransform: 'uppercase', marginTop: 1 }}>{stat.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Center: Broadcast Chart ── */}
+      {/* ── Right: Area chart (fills remaining space) ── */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
-        <ArenaBroadcastChart ev={ev} prices={prices} />
-      </div>
-
-      {/* ── Right: Dramatic Action Feed (260px) ── */}
-      <div style={{ width:260, flexShrink:0, borderLeft:'1px solid rgba(255,255,255,.07)', display:'flex', flexDirection:'column', overflow:'hidden', background:'rgba(5,5,12,.6)' }}>
-        {/* Header */}
-        <div style={{ padding:'9px 14px 7px', borderBottom:'1px solid rgba(255,255,255,.07)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'rgba(255,255,255,.015)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <span style={{ fontSize:13 }}>⚡</span>
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, fontWeight:800, color:'#7b84ff', letterSpacing:3, textTransform:'uppercase' }}>Action Feed</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <div style={{ width:6, height:6, borderRadius:'50%', background:'#0FEDBE', boxShadow:'0 0 8px #0FEDBE', animation:'cvLive 1s ease-in-out infinite' }} />
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'rgba(15,237,190,.6)', letterSpacing:1 }}>LIVE</span>
-          </div>
-        </div>
-        {/* Events */}
-        <div style={{ flex:1, overflowY:'auto', scrollbarWidth:'none' }}>
-          {feedEvents.map((e, i) => {
-            // Determine event accent color
-            const accentByIcon: Record<string,string> = {
-              '👑':'#FDD458','⚠️':'#FF495B','📈':'#0FEDBE','📉':'#FF495B','🔥':'#FF8243','🏆':'#7b84ff',
-            };
-            const accent = accentByIcon[e.icon] ?? '#7b84ff';
-            return (
-              <div key={i} style={{ display:'flex', gap:9, alignItems:'flex-start', padding:'8px 12px', borderBottom:'1px solid rgba(255,255,255,.025)', borderLeft:`2px solid ${accent}30`, transition:'background .15s', background: i===0 ? `${accent}08` : 'transparent' }}>
-                <div style={{ width:26, height:26, borderRadius:5, background:`${accent}15`, border:`1px solid ${accent}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, flexShrink:0, marginTop:1 }}>{e.icon}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:10, lineHeight:1.5, color:'rgba(224,224,224,.9)' }}>{e.html}</div>
-                  <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'#555577', marginTop:2 }}>{e.time}</div>
-                </div>
-              </div>
-            );
-          })}
-          {feedEvents.length === 0 && (
-            <div style={{ fontSize:11, color:'#555577', textAlign:'center', padding:'40px 16px', lineHeight:1.6 }}>
-              <div style={{ fontSize:28, marginBottom:8 }}>⏳</div>Waiting for activity…
-            </div>
-          )}
-        </div>
-        {/* Hot Traders footer */}
-        {hot3.length > 0 && (
-          <div style={{ padding:'9px 12px 11px', borderTop:'1px solid rgba(255,255,255,.07)', flexShrink:0, background:'rgba(255,255,255,.015)' }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'#FF8243', letterSpacing:3, textTransform:'uppercase', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
-              <span>🔥</span><span>Hot Traders</span>
-            </div>
-            {hot3.map((p, hi) => (
-              <div key={p.userId} onClick={() => onTrader(p)} style={{ display:'flex', alignItems:'center', gap:8, marginBottom: hi < hot3.length-1 ? 6 : 0, cursor:'pointer', padding:'4px 6px', borderRadius:5, background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,131,67,.15)', transition:'background .15s' }}>
-                <span style={{ fontSize:12 }}>{['🔥','💪','⭐'][hi]}</span>
-                <Av u={p.username} img={p.profileImage} sz={20} ring="#FF8243" />
-                <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:600, flex:1, color:'#e0e0e0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.username}</span>
-                <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:10, fontWeight:800, color:'#0FEDBE' }}>{fmtPnl(p.livePnl)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ArenaBroadcastChart ev={ev} prices={prices} countdown={countdown} />
       </div>
     </div>
   );
