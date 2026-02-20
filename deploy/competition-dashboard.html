@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=1920,initial-scale=1">
 <title>CHARTVOLT LIVE — Trading Arena</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -1208,16 +1208,16 @@ function openTraderModal(p,ev){
         <div class="mname">${p.username}</div>
         <div class="mrank">${p.rank===1?'🥇 1ST PLACE':p.rank===2?'🥈 2ND PLACE':p.rank===3?'🥉 3RD PLACE':'RANK #'+p.rank}</div>
         <span class="mstatus ${stCls}">${stLbl}</span>
-      </div>
+</div>
       <button class="mclose" onclick="closeModal()">✕</button>
-    </div>
+</div>
     <div class="mstrip ${stripCls}"></div>
 
     <div class="mgrid">
       <div class="mcard">
         <div class="mcard-v" style="color:${pnlPos?'var(--green)':'var(--red)'}">${fmtPnl(p.livePnl)}</div>
         <div class="mcard-l">Live PnL</div>
-      </div>
+    </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--cyan)">${fmtC(p.liveEquity)}</div>
         <div class="mcard-l">Live Equity</div>
@@ -1225,22 +1225,22 @@ function openTraderModal(p,ev){
       <div class="mcard">
         <div class="mcard-v" style="color:${p.liveRoi>=0?'var(--green)':'var(--red)'}">${p.liveRoi>=0?'+':''}${p.liveRoi.toFixed(2)}%</div>
         <div class="mcard-l">ROI</div>
-      </div>
+    </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--mag)">${p.winRate.toFixed(1)}%</div>
         <div class="mcard-l">Win Rate</div>
-      </div>
     </div>
+  </div>
 
     <div class="mgrid3">
       <div class="mcard">
         <div class="mcard-v" style="color:var(--hi)">${p.totalTrades}</div>
         <div class="mcard-l">Total Trades</div>
-      </div>
+    </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--green)">${p.winningTrades}</div>
         <div class="mcard-l">Wins</div>
-      </div>
+        </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--red)">${p.losingTrades}</div>
         <div class="mcard-l">Losses</div>
@@ -1256,39 +1256,39 @@ function openTraderModal(p,ev){
       <div class="mcard">
         <div class="mcard-v" style="color:var(--gold)">${profitFactor}</div>
         <div class="mcard-l">Profit Factor</div>
-      </div>
+    </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--green)">${fmtC(p.largestWin)}</div>
         <div class="mcard-l">Largest Win</div>
-      </div>
+  </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--red)">${fmtC(p.largestLoss)}</div>
         <div class="mcard-l">Largest Loss</div>
-      </div>
+</div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--orange)">${p.maxDrawdownPercentage.toFixed(1)}%</div>
         <div class="mcard-l">Max Drawdown</div>
-      </div>
-    </div>
+</div>
+</div>
 
     <div class="mgrid">
       <div class="mcard">
         <div class="mcard-v" style="color:var(--cyan)">${fmtC(p.realizedPnl)}</div>
         <div class="mcard-l">Realized PnL</div>
-      </div>
+            </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--mid)">${fmtC(p.unrealizedPnl)}</div>
         <div class="mcard-l">Unrealized PnL</div>
-      </div>
+          </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--mid)">${p.currentOpenPositions}</div>
         <div class="mcard-l">Open Positions</div>
-      </div>
+            </div>
       <div class="mcard">
         <div class="mcard-v" style="color:var(--lo)">${fmtC(p.availableCapital)}</div>
         <div class="mcard-l">Free Capital</div>
-      </div>
-    </div>
+            </div>
+            </div>
 
     ${posHtml}
   `;
@@ -1339,7 +1339,7 @@ function showPodium(ev){
       ${prizeAmt?`<div class="podium-prize">Prize: ${fmtPrize(prizeAmt)}</div>`:''}
       <div class="podium-base" style="width:${s+20}px;height:${h}px;background:linear-gradient(180deg,${rankColors[si]}33,${rankColors[si]}11);border:1px solid ${rankColors[si]}44;">
         <div style="font-family:'Orbitron',sans-serif;font-size:${si===1?32:22}px;font-weight:900;color:${rankColors[si]};padding-bottom:8px;text-shadow:0 0 16px ${rankColors[si]}">${labels[si]}</div>
-      </div>
+        </div>
     `;
     stage.appendChild(slot);
   });
