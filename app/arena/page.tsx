@@ -944,29 +944,29 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
     import('lightweight-charts').then(({ createChart, ColorType, CrosshairMode, LineStyle }) => {
       if (!containerRef.current) return;
       chart = createChart(containerRef.current, {
-        layout: { background: { type: ColorType.Solid, color: '#070e25' }, textColor: 'rgba(147,197,253,.5)', fontSize: 11 },
-        grid: { vertLines: { color: 'rgba(59,130,246,.06)' }, horzLines: { color: 'rgba(59,130,246,.06)' } },
+        layout: { background: { type: ColorType.Solid, color: '#040d1e' }, textColor: 'rgba(100,160,255,.55)', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(59,130,246,.04)' }, horzLines: { color: 'rgba(59,130,246,.05)' } },
         crosshair: {
           mode: CrosshairMode.Normal,
-          vertLine: { color: 'rgba(255,255,255,.25)', labelBackgroundColor: 'rgba(13,27,62,.95)', style: LineStyle.Dashed, width: 1 as any },
-          horzLine: { color: 'rgba(255,255,255,.25)', labelBackgroundColor: 'rgba(13,27,62,.95)', style: LineStyle.Dashed, width: 1 as any },
+          vertLine: { color: 'rgba(100,180,255,.3)', labelBackgroundColor: 'rgba(10,22,60,.97)', style: LineStyle.Dashed, width: 1 as any },
+          horzLine: { color: 'rgba(100,180,255,.3)', labelBackgroundColor: 'rgba(10,22,60,.97)', style: LineStyle.Dashed, width: 1 as any },
         },
-        rightPriceScale: { borderColor: 'rgba(59,130,246,.15)', entireTextOnly: true },
-        timeScale:       { borderColor: 'rgba(59,130,246,.15)', timeVisible: true, secondsVisible: false },
+        rightPriceScale: { borderColor: 'rgba(59,130,246,.1)', entireTextOnly: true },
+        timeScale:       { borderColor: 'rgba(59,130,246,.1)', timeVisible: true, secondsVisible: false },
         width:  containerRef.current.clientWidth,
         height: containerRef.current.clientHeight,
       });
-      // Smooth area series — white glowing line + blue gradient fill
+      // Vivid area series — bright cyan line + deep blue gradient fill (matches image)
       series = chart.addAreaSeries({
-        lineColor: 'rgba(255,255,255,.92)',
-        topColor:  'rgba(59,130,246,.5)',
-        bottomColor: 'rgba(7,14,37,.02)',
-        lineWidth: 3 as any,
+        lineColor:   '#5ab4ff',
+        topColor:    'rgba(14,65,200,.75)',
+        bottomColor: 'rgba(4,13,30,.05)',
+        lineWidth:   3 as any,
         priceLineVisible: false,
         crosshairMarkerVisible: true,
         crosshairMarkerBorderColor: '#fff',
-        crosshairMarkerBackgroundColor: '#3b82f6',
-        crosshairMarkerRadius: 5,
+        crosshairMarkerBackgroundColor: '#1e6bff',
+        crosshairMarkerRadius: 6,
       });
       chartRef.current = chart; seriesRef.current = series;
       ro = new ResizeObserver(() => {
@@ -1127,70 +1127,76 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
   const lossCnt = symPositions.filter(p => p.unrealizedPnl <  0).length;
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%', background:'#070e25', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ position:'relative', width:'100%', height:'100%', background:'#040d1e', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <style>{`
-        @keyframes cvLive   { 0%,100%{opacity:1} 50%{opacity:.15} }
-        @keyframes trBubble { from{opacity:0;transform:translateY(-10px) scale(.9)} to{opacity:1;transform:translateY(0) scale(1)} }
-        @keyframes cvCrown  { 0%,100%{filter:drop-shadow(0 0 5px #FFD700)} 50%{filter:drop-shadow(0 0 14px #FFD700)} }
-        @keyframes cvPnl    { 0%{opacity:0;transform:scale(.85)} 100%{opacity:1;transform:scale(1)} }
+        @keyframes cvLive    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.2;transform:scale(.5)} }
+        @keyframes cvGlow    { 0%,100%{box-shadow:0 0 18px rgba(90,180,255,.35)} 50%{box-shadow:0 0 34px rgba(90,180,255,.7)} }
+        @keyframes cvCrown   { 0%,100%{filter:drop-shadow(0 0 6px #FFD700)} 50%{filter:drop-shadow(0 0 18px #FFD700)} }
+        @keyframes cvBubbleIn{ from{opacity:0;transform:scale(.7) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
+        @keyframes cvPnlFlash{ 0%{opacity:.4;transform:scale(.92)} 70%{opacity:1;transform:scale(1.04)} 100%{opacity:1;transform:scale(1)} }
       `}</style>
 
       {/* ── Top bar: symbol/TF controls + live price ── */}
-      <div style={{ height:46, flexShrink:0, display:'flex', alignItems:'center', gap:7, padding:'0 14px', borderBottom:'1px solid rgba(59,130,246,.13)', background:'rgba(5,12,35,.85)', backdropFilter:'blur(8px)' }}>
+      <div style={{ height:50, flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'0 16px', borderBottom:'1px solid rgba(90,150,255,.12)', background:'rgba(4,10,28,.92)', backdropFilter:'blur(12px)' }}>
         {/* LIVE badge */}
-        <div style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, background:'rgba(239,68,68,.13)', border:'1px solid rgba(239,68,68,.32)', flexShrink:0 }}>
-          <div style={{ width:6, height:6, borderRadius:'50%', background:'#ef4444', animation:'cvLive 1s ease-in-out infinite' }} />
-          <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#ef4444', letterSpacing:2 }}>LIVE</span>
+        <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.4)', flexShrink:0 }}>
+          <div style={{ width:7, height:7, borderRadius:'50%', background:'#ff4455', boxShadow:'0 0 8px #ff4455', animation:'cvLive 1.1s ease-in-out infinite' }} />
+          <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:900, color:'#ff6677', letterSpacing:2.5 }}>LIVE</span>
         </div>
         {/* Symbol chips */}
-        <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+        <div style={{ display:'flex', gap:4, flexShrink:0 }}>
           {ARENA_SYMS.map(s => {
             const cnt = positionsBySymbol[s.key]?.length ?? 0;
             const active = sym === s.label;
             return (
-              <button key={s.key} onClick={() => setSym(s.label)} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:20, cursor:'pointer', transition:'all .15s', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, background: active ? 'rgba(59,130,246,.28)' : cnt > 0 ? 'rgba(59,130,246,.1)' : 'rgba(255,255,255,.04)', color: active ? '#93c5fd' : cnt > 0 ? '#7b84ff' : 'rgba(255,255,255,.3)', border: active ? '1px solid rgba(59,130,246,.5)' : cnt > 0 ? '1px solid rgba(59,130,246,.2)' : '1px solid rgba(255,255,255,.05)' }}>
+              <button key={s.key} onClick={() => setSym(s.label)} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, cursor:'pointer', transition:'all .15s', fontFamily:'var(--font-geist-mono),monospace', fontSize:10, fontWeight:800, letterSpacing:.5, background: active ? 'linear-gradient(135deg,rgba(30,80,255,.7),rgba(90,150,255,.4))' : cnt > 0 ? 'rgba(30,60,180,.25)' : 'rgba(255,255,255,.04)', color: active ? '#fff' : cnt > 0 ? '#7aaeff' : 'rgba(255,255,255,.28)', border: active ? '1px solid rgba(90,150,255,.7)' : cnt > 0 ? '1px solid rgba(30,80,255,.3)' : '1px solid rgba(255,255,255,.06)', boxShadow: active ? '0 2px 16px rgba(30,80,255,.4)' : 'none' }}>
                 {s.label}
-                {cnt > 0 && <span style={{ background: active ? '#3b82f6' : 'rgba(59,130,246,.5)', color:'#fff', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900 }}>{cnt}</span>}
+                {cnt > 0 && <span style={{ background: active ? 'rgba(255,255,255,.25)' : 'rgba(30,80,255,.5)', color:'#fff', borderRadius:8, padding:'0 5px', fontSize:8, fontWeight:900 }}>{cnt}</span>}
               </button>
             );
           })}
         </div>
-        <div style={{ width:1, height:18, background:'rgba(255,255,255,.07)', flexShrink:0 }} />
+        <div style={{ width:1, height:20, background:'rgba(90,150,255,.12)', flexShrink:0 }} />
         {/* TF chips */}
         <div style={{ display:'flex', gap:3, flexShrink:0 }}>
           {ARENA_TFS.map(t => (
-            <button key={t.value} onClick={() => setTf(t.value)} style={{ padding:'3px 9px', borderRadius:20, cursor:'pointer', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, background: tf === t.value ? 'rgba(59,130,246,.22)' : 'transparent', color: tf === t.value ? '#93c5fd' : 'rgba(255,255,255,.3)', border: tf === t.value ? '1px solid rgba(59,130,246,.38)' : '1px solid transparent', transition:'all .12s' }}>{t.label}</button>
+            <button key={t.value} onClick={() => setTf(t.value)} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, background: tf === t.value ? 'rgba(30,80,255,.3)' : 'rgba(255,255,255,.04)', color: tf === t.value ? '#7aaeff' : 'rgba(255,255,255,.28)', border: tf === t.value ? '1px solid rgba(90,150,255,.45)' : '1px solid rgba(255,255,255,.05)', transition:'all .12s' }}>{t.label}</button>
           ))}
         </div>
         <div style={{ flex:1 }} />
         {/* Live price */}
         {mid > 0 && (
-          <div style={{ display:'flex', alignItems:'baseline', gap:7, flexShrink:0 }}>
-            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:22, fontWeight:900, color:'#fff', letterSpacing:1 }}>{mid.toFixed(dec)}</span>
-            <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
-              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(74,222,128,.7)' }}>ASK {ask.toFixed(dec)}</span>
-              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(248,113,113,.7)' }}>BID {bid.toFixed(dec)}</span>
+          <div style={{ display:'flex', alignItems:'baseline', gap:8, flexShrink:0, padding:'0 4px' }}>
+            <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:24, fontWeight:900, color:'#fff', letterSpacing:1, textShadow:'0 0 20px rgba(90,180,255,.6)' }}>{mid.toFixed(dec)}</span>
+            <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(74,222,128,.8)', letterSpacing:.5 }}>ASK {ask.toFixed(dec)}</span>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(255,120,120,.8)', letterSpacing:.5 }}>BID {bid.toFixed(dec)}</span>
             </div>
           </div>
         )}
         {/* Open trade counts */}
         {ev.openPositions.length > 0 && (
-          <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-            <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(59,130,246,.12)', border:'1px solid rgba(59,130,246,.22)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#93c5fd' }}>{ev.openPositions.length} OPEN</div>
-            {winCnt  > 0 && <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(34,197,94,.1)',  border:'1px solid rgba(34,197,94,.22)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#4ade80' }}>{winCnt} ▲</div>}
-            {lossCnt > 0 && <div style={{ padding:'3px 10px', borderRadius:20, background:'rgba(239,68,68,.1)',  border:'1px solid rgba(239,68,68,.22)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#f87171' }}>{lossCnt} ▼</div>}
+          <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+            <div style={{ padding:'4px 11px', borderRadius:20, background:'rgba(30,80,255,.15)', border:'1px solid rgba(90,150,255,.3)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#7aaeff', letterSpacing:.5 }}>{ev.openPositions.length} OPEN</div>
+            {winCnt  > 0 && <div style={{ padding:'4px 11px', borderRadius:20, background:'rgba(34,197,94,.12)',  border:'1px solid rgba(34,197,94,.3)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#4ade80' }}>{winCnt} ▲</div>}
+            {lossCnt > 0 && <div style={{ padding:'4px 11px', borderRadius:20, background:'rgba(239,68,68,.12)',  border:'1px solid rgba(239,68,68,.3)',  fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#f87171' }}>{lossCnt} ▼</div>}
           </div>
         )}
       </div>
 
       {/* ── Chart area ── */}
       <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
-        {/* Radial blue glow — gives the chart the "depth" look from the image */}
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse at 50% 20%, rgba(59,130,246,.14) 0%, transparent 65%)', pointerEvents:'none', zIndex:1 }} />
+        {/* Intense atmospheric radial glow — the signature "depth" from the image */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 55% at 50% 38%, rgba(14,65,200,.55) 0%, rgba(14,40,130,.2) 42%, transparent 70%)', pointerEvents:'none', zIndex:1 }} />
+        {/* Subtle top-edge glow */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:120, background:'linear-gradient(to bottom, rgba(30,80,255,.12), transparent)', pointerEvents:'none', zIndex:1 }} />
 
         {loading && (
-          <div style={{ position:'absolute', inset:0, zIndex:20, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(7,14,37,.85)', backdropFilter:'blur(6px)' }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, color:'#3b82f6', letterSpacing:3 }}>LOADING CHART…</div>
+          <div style={{ position:'absolute', inset:0, zIndex:20, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(4,10,28,.88)', backdropFilter:'blur(8px)' }}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+              <div style={{ width:40, height:40, borderRadius:'50%', border:'3px solid rgba(90,150,255,.2)', borderTop:'3px solid #5ab4ff', animation:'spin 1s linear infinite' }} />
+              <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, color:'#5ab4ff', letterSpacing:3 }}>LOADING…</div>
+            </div>
           </div>
         )}
 
@@ -1202,47 +1208,57 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
             set imperatively in the RAF loop — same frame as canvas, zero lag.   */}
         <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:10 }}>
           {symPositions.map(pos => {
-            const key     = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
-            const pnlPos  = pos.unrealizedPnl >= 0;
-            const pnlAbs  = Math.abs(Math.round(pos.unrealizedPnl));
-            const isLdr   = pos.userId === leaderId;
-            const bubClr  = pnlPos ? '#22c55e' : '#ef4444';
-            const bubGrad = pnlPos
-              ? 'linear-gradient(135deg,#15803d,#22c55e)'
-              : 'linear-gradient(135deg,#b91c1c,#ef4444)';
+            const key      = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
+            const pnlPos   = pos.unrealizedPnl >= 0;
+            const pnlAbs   = Math.abs(Math.round(pos.unrealizedPnl));
+            const isLdr    = pos.userId === leaderId;
+            const bubClr   = pnlPos ? '#00cc6a' : '#ff3d55';
+            const bubDark  = pnlPos ? '#007a40' : '#991f2e';
+            const bubLight = pnlPos ? '#00ff88' : '#ff8899';
             return (
               <div
                 key={key}
                 ref={el => { if (el) bubbleRefsMap.current.set(key, el); else bubbleRefsMap.current.delete(key); }}
                 style={{
                   position: 'absolute', top: 0, left: 0,
-                  opacity: 0,                          // starts invisible; RAF shows when valid
-                  transform: 'translate(-9999px,-9999px)', // off-screen until RAF places it
+                  opacity: 0,
+                  transform: 'translate(-9999px,-9999px)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  willChange: 'transform, opacity',    // hint GPU layer
+                  willChange: 'transform, opacity',
                   pointerEvents: 'none',
                 }}
               >
-                {/* Trader name + avatar */}
-                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4, filter:'drop-shadow(0 1px 4px rgba(0,0,0,.85))' }}>
-                  {isLdr && <span style={{ fontSize:12, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                  <div style={{ width:22, height:22, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff', border:`2px solid ${bubClr}`, overflow:'hidden', flexShrink:0 }}>
+                {/* Trader name + avatar row (above bubble) */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:5, padding:'3px 8px 3px 4px', borderRadius:20, background:'rgba(0,0,0,.6)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.08)', filter:'drop-shadow(0 2px 8px rgba(0,0,0,.9))' }}>
+                  {isLdr && <span style={{ fontSize:13, animation:'cvCrown 2s ease-in-out infinite', lineHeight:1 }}>👑</span>}
+                  <div style={{ width:24, height:24, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#fff', border:`2px solid ${bubClr}`, overflow:'hidden', flexShrink:0, boxShadow:`0 0 8px ${bubClr}88` }}>
                     {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
                   </div>
-                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap' }}>{pos.username}</span>
+                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', letterSpacing:.2 }}>{pos.username}</span>
                 </div>
-                {/* PnL pill — matches image style */}
-                <div style={{ padding:'5px 16px', borderRadius:22, background:bubGrad, border:`1px solid ${bubClr}88`, boxShadow:`0 4px 18px ${bubClr}55, 0 2px 8px rgba(0,0,0,.6)`, display:'flex', alignItems:'center', gap:5, whiteSpace:'nowrap' }}>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:14, fontWeight:900, color:'#fff', letterSpacing:.4 }}>
+
+                {/* Main PnL pill — large, vibrant, inner highlight (exactly like image) */}
+                <div style={{
+                  padding: '8px 20px', borderRadius: 28,
+                  background: `linear-gradient(180deg, ${bubClr} 0%, ${bubDark} 100%)`,
+                  border: `1.5px solid ${bubLight}55`,
+                  boxShadow: `0 6px 28px ${bubClr}66, 0 2px 12px rgba(0,0,0,.7), inset 0 1px 0 ${bubLight}44`,
+                  display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  {/* Inner top highlight stripe */}
+                  <div style={{ position:'absolute', top:0, left:'10%', right:'10%', height:1, background:`linear-gradient(to right,transparent,${bubLight}88,transparent)`, borderRadius:1 }} />
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:18, fontWeight:900, color:'#fff', letterSpacing:.5, textShadow:`0 1px 8px rgba(0,0,0,.5)`, animation:'cvPnlFlash .5s ease' }}>
                     {pnlPos ? '+' : '−'}${pnlAbs > 0 ? pnlAbs.toLocaleString() : '0'}
                   </span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.65)', padding:'1px 5px', borderRadius:8, background:'rgba(0,0,0,.3)' }}>
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:10, color:'rgba(255,255,255,.7)', padding:'2px 7px', borderRadius:10, background:'rgba(0,0,0,.28)', letterSpacing:.3 }}>
                     {pos.side === 'long' ? '▲' : '▼'}{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}
                   </span>
                 </div>
-                {/* Connector line + dot pointing to exact price level */}
-                <div style={{ width:1.5, height:10, background:`linear-gradient(to bottom,${bubClr},${bubClr}55)` }} />
-                <div style={{ width:9, height:9, borderRadius:'50%', background:bubClr, boxShadow:`0 0 10px ${bubClr}, 0 0 4px rgba(255,255,255,.6)` }} />
+
+                {/* Connector pin to exact price level */}
+                <div style={{ width:2, height:12, background:`linear-gradient(to bottom,${bubClr},${bubClr}33)` }} />
+                <div style={{ width:11, height:11, borderRadius:'50%', background:`radial-gradient(circle,${bubLight} 0%,${bubClr} 60%)`, boxShadow:`0 0 14px ${bubClr}, 0 0 5px rgba(255,255,255,.7)` }} />
               </div>
             );
           })}
@@ -1299,73 +1315,84 @@ function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap;
   const roomId = ev.id ? (ev.id.replace(/\D/g, '').slice(-5) || ev.id.slice(-5)) : '—';
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'linear-gradient(160deg,#0d1b3e 0%,#070e25 100%)' }}>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'linear-gradient(160deg,#091733 0%,#050e22 60%,#040b1a 100%)' }}>
+      <style>{`
+        @keyframes spin { to{transform:rotate(360deg)} }
+        @keyframes rankPulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+        .arenaRow:hover { background: rgba(30,80,255,.08) !important; }
+      `}</style>
 
-      {/* ── Left: Trading Room panel (260px) ── */}
-      <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(59,130,246,.12)', background: 'rgba(5,12,35,.94)', backdropFilter: 'blur(10px)' }}>
+      {/* ── Left: Trading Room panel ── */}
+      <div style={{ width: 268, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(30,80,255,.15)', background: 'linear-gradient(180deg,rgba(8,18,50,.97) 0%,rgba(5,12,35,.98) 100%)', backdropFilter: 'blur(14px)' }}>
 
         {/* Room header */}
-        <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid rgba(59,130,246,.1)' }}>
+        <div style={{ padding: '15px 16px 11px', borderBottom: '1px solid rgba(30,80,255,.12)', background: 'rgba(30,80,255,.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <span style={{ fontSize: 17 }}>📊</span>
-            <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 15, fontWeight: 800, color: '#fff' }}>Trading room</span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,rgba(30,80,255,.6),rgba(90,150,255,.3))', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, boxShadow:'0 2px 12px rgba(30,80,255,.4)' }}>📊</div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: .2 }}>Trading room</div>
+              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: 'rgba(100,150,255,.45)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 1 }}>ROOM ID  {roomId}</div>
+            </div>
           </div>
-          <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 10, color: 'rgba(255,255,255,.3)', letterSpacing: 1 }}>ROOM ID  {roomId}</div>
         </div>
 
-        {/* Timer card */}
-        <div style={{ margin: '12px 14px 4px', padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg,rgba(59,130,246,.16),rgba(99,102,241,.1))', border: '1px solid rgba(59,130,246,.22)', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: 2 }}>⏱ {countdown}</div>
-          <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Time left</div>
+        {/* Timer card — large and prominent like the image */}
+        <div style={{ margin: '12px 14px 8px', padding: '14px 16px', borderRadius: 16, background: 'linear-gradient(135deg,rgba(14,50,160,.65) 0%,rgba(30,80,255,.3) 50%,rgba(10,35,120,.6) 100%)', border: '1.5px solid rgba(90,150,255,.3)', textAlign: 'center', boxShadow: '0 4px 24px rgba(14,50,160,.5), inset 0 1px 0 rgba(90,150,255,.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>⏱</span>
+            <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: 3, textShadow: '0 0 24px rgba(90,180,255,.6)' }}>{countdown}</span>
+          </div>
+          <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 10, color: 'rgba(130,180,255,.6)', marginTop: 3, letterSpacing: .5 }}>Time left</div>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', padding: '8px 14px 6px', gap: 6 }}>
-          <button onClick={() => setTab('bets')} style={{ flex: 1, padding: '7px 0', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 700, background: tab === 'bets' ? '#3b82f6' : 'rgba(255,255,255,.06)', color: tab === 'bets' ? '#fff' : 'rgba(255,255,255,.4)', border: tab === 'bets' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.08)', transition: 'all .15s' }}>All bets</button>
-          <button onClick={() => setTab('history')} style={{ flex: 1, padding: '7px 0', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 11, fontWeight: 700, background: tab === 'history' ? '#3b82f6' : 'rgba(255,255,255,.06)', color: tab === 'history' ? '#fff' : 'rgba(255,255,255,.4)', border: tab === 'history' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.08)', transition: 'all .15s' }}>History</button>
+        <div style={{ display: 'flex', padding: '6px 14px 8px', gap: 6 }}>
+          <button onClick={() => setTab('bets')} style={{ flex: 1, padding: '8px 0', borderRadius: 22, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 12, fontWeight: 800, background: tab === 'bets' ? 'linear-gradient(135deg,#1e4fff,#3b6aff)' : 'rgba(255,255,255,.05)', color: tab === 'bets' ? '#fff' : 'rgba(255,255,255,.38)', border: tab === 'bets' ? '1px solid rgba(90,150,255,.5)' : '1px solid rgba(255,255,255,.06)', boxShadow: tab === 'bets' ? '0 3px 16px rgba(30,80,255,.45)' : 'none', transition: 'all .15s' }}>All bets</button>
+          <button onClick={() => setTab('history')} style={{ flex: 1, padding: '8px 0', borderRadius: 22, cursor: 'pointer', fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 12, fontWeight: 800, background: tab === 'history' ? 'linear-gradient(135deg,#1e4fff,#3b6aff)' : 'rgba(255,255,255,.05)', color: tab === 'history' ? '#fff' : 'rgba(255,255,255,.38)', border: tab === 'history' ? '1px solid rgba(90,150,255,.5)' : '1px solid rgba(255,255,255,.06)', boxShadow: tab === 'history' ? '0 3px 16px rgba(30,80,255,.45)' : 'none', transition: 'all .15s' }}>History</button>
         </div>
 
         {/* Section label */}
-        <div style={{ padding: '4px 16px 5px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ padding: '2px 16px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 11 }}>👥</span>
-          <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: 'rgba(255,255,255,.28)', letterSpacing: 2, textTransform: 'uppercase' }}>Other users</span>
+          <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: 'rgba(100,150,255,.4)', letterSpacing: 2, textTransform: 'uppercase' }}>Other users</span>
         </div>
 
         {/* Trader list */}
         <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none' }}>
           {sorted.length === 0 ? (
-            <div style={{ padding: '28px 16px', textAlign: 'center', color: 'rgba(255,255,255,.22)', lineHeight: 1.6 }}>
-              <div style={{ fontSize: 26, marginBottom: 6 }}>⏳</div>
-              <div style={{ fontSize: 11 }}>No active traders yet</div>
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'rgba(100,150,255,.35)', lineHeight: 1.7 }}>
+              <div style={{ fontSize: 30, marginBottom: 8, opacity: .5 }}>⏳</div>
+              <div style={{ fontSize: 12 }}>No active traders yet</div>
             </div>
           ) : sorted.map((p, i) => {
             const pnlPos = p.livePnl >= 0;
             const equity = Math.round(p.liveEquity);
             const hasPos = ev.openPositions.some(op => op.userId === p.userId);
             const medals = ['🥇', '🥈', '🥉'];
+            const isFirst = i === 0;
             return (
-              <div key={p.userId} onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.04)', transition: 'background .15s', background: i === 0 ? 'rgba(59,130,246,.08)' : 'transparent' }}>
+              <div key={p.userId} className="arenaRow" onClick={() => onTrader(p)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.035)', transition: 'background .15s', background: isFirst ? 'rgba(30,80,255,.1)' : 'transparent', position: 'relative' }}>
+                {/* Left accent bar for leader */}
+                {isFirst && <div style={{ position: 'absolute', left: 0, top: '15%', bottom: '15%', width: 3, borderRadius: '0 3px 3px 0', background: 'linear-gradient(180deg,#5ab4ff,#1e4fff)', boxShadow: '0 0 10px rgba(90,180,255,.6)' }} />}
                 {/* Avatar */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: avColor(p.username), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', border: `2px solid ${i === 0 ? '#3b82f6' : hasPos ? 'rgba(34,197,94,.6)' : 'rgba(255,255,255,.1)'}`, overflow: 'hidden', boxShadow: i === 0 ? '0 0 14px rgba(59,130,246,.45)' : 'none' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: avColor(p.username), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', border: `2.5px solid ${isFirst ? '#5ab4ff' : hasPos ? '#00cc6a' : 'rgba(255,255,255,.08)'}`, overflow: 'hidden', boxShadow: isFirst ? '0 0 18px rgba(90,180,255,.5)' : hasPos ? '0 0 10px rgba(0,204,106,.35)' : 'none' }}>
                     {p.profileImage ? <img src={p.profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : ini(p.username)}
                   </div>
-                  {/* live trade dot */}
-                  {hasPos && <div style={{ position: 'absolute', bottom: -1, right: -1, width: 9, height: 9, borderRadius: '50%', background: '#22c55e', border: '2px solid rgba(5,12,35,.94)', boxShadow: '0 0 7px #22c55e' }} />}
-                  {/* rank medal overlay for top 3 */}
-                  {i < 3 && <div style={{ position: 'absolute', top: -4, left: -4, fontSize: 11 }}>{medals[i]}</div>}
+                  {hasPos && <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: '#00cc6a', border: '2px solid rgba(8,18,50,.97)', boxShadow: '0 0 8px #00cc6a', animation: 'rankPulse 2s ease-in-out infinite' }} />}
+                  {i < 3 && <div style={{ position: 'absolute', top: -5, left: -5, fontSize: 12 }}>{medals[i]}</div>}
                 </div>
                 {/* Name + PnL */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 12, fontWeight: 700, color: i === 0 ? '#93c5fd' : 'rgba(255,255,255,.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
-                  <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 9, color: pnlPos ? 'rgba(74,222,128,.75)' : 'rgba(248,113,113,.75)', marginTop: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 13, fontWeight: 800, color: isFirst ? '#a8d4ff' : 'rgba(255,255,255,.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 11, fontWeight: 700, color: pnlPos ? '#00cc6a' : '#ff3d55', marginTop: 2 }}>
                     {pnlPos ? '+' : ''}{fmtPnl(p.livePnl)}
                   </div>
                 </div>
-                {/* Equity token badge — matches the image style */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '4px 9px', borderRadius: 20, background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.2)' }}>
-                  <span style={{ fontSize: 10 }}>🪙</span>
-                  <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 11, fontWeight: 800, color: '#93c5fd' }}>{equity.toLocaleString()}</span>
+                {/* "T" token badge — styled exactly like the image (teal badge) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '5px 10px', borderRadius: 20, background: 'rgba(0,204,106,.12)', border: '1px solid rgba(0,204,106,.28)', boxShadow: '0 2px 10px rgba(0,204,106,.15)' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg,#00cc6a,#009950)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 8, fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow:'0 1px 4px rgba(0,204,106,.5)' }}>T</div>
+                  <span style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 12, fontWeight: 900, color: '#00cc6a' }}>{equity.toLocaleString()}</span>
                 </div>
               </div>
             );
@@ -1373,21 +1400,21 @@ function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap;
         </div>
 
         {/* Footer stats bar */}
-        <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(59,130,246,.1)', flexShrink: 0, display: 'flex', gap: 6 }}>
+        <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(30,80,255,.12)', flexShrink: 0, display: 'flex', gap: 6, background: 'rgba(0,0,0,.15)' }}>
           {[
-            { label: 'Active',  val: String(ev.participants.filter(p => p.totalTrades > 0).length), col: '#22c55e' },
-            { label: 'Trades',  val: String(ev.openPositions.length), col: '#93c5fd' },
+            { label: 'Active',  val: String(ev.participants.filter(p => p.totalTrades > 0).length), col: '#00cc6a' },
+            { label: 'Trades',  val: String(ev.openPositions.length), col: '#5ab4ff' },
             { label: 'Best',    val: sorted[0] ? fmtPnl(sorted[0].livePnl) : '—', col: '#fbbf24' },
           ].map(stat => (
-            <div key={stat.label} style={{ flex: 1, textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.04)' }}>
-              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 13, fontWeight: 900, color: stat.col }}>{stat.val}</div>
-              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 7, color: 'rgba(255,255,255,.28)', letterSpacing: 1, textTransform: 'uppercase', marginTop: 1 }}>{stat.label}</div>
+            <div key={stat.label} style={{ flex: 1, textAlign: 'center', padding: '7px 4px', borderRadius: 10, background: 'rgba(30,80,255,.06)', border: '1px solid rgba(30,80,255,.1)' }}>
+              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 15, fontWeight: 900, color: stat.col, textShadow:`0 0 14px ${stat.col}66` }}>{stat.val}</div>
+              <div style={{ fontFamily: 'var(--font-geist-mono),monospace', fontSize: 7, color: 'rgba(100,150,255,.4)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 }}>{stat.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Right: Area chart (fills remaining space) ── */}
+      {/* ── Right: Area chart ── */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
         <ArenaBroadcastChart ev={ev} prices={prices} countdown={countdown} />
       </div>
