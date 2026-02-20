@@ -862,10 +862,12 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
   const [sym,        setSym]       = useState('EUR/USD');
   const [tf,         setTf]        = useState('5');
   const [loading,    setLoading]   = useState(true);
-  // Y-only: priceToCoordinate per position key (x handled natively by setMarkers)
-  const [posCoords,  setPosCoords] = useState<Record<string,number>>({});
   // Fast local price — overrides the parent's 5s prop with a 1s direct poll
   const [localPrice, setLocalPrice] = useState<{bid:number;ask:number;mid:number}|null>(null);
+  // Imperative DOM refs for bubbles — bypasses React state so updates happen
+  // in the same animation frame as the chart canvas (zero scroll lag)
+  const bubbleRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const posLinesRef   = useRef<Map<string, any>>(new Map());
 
   const priceKey  = sym.replace('/','');
 
@@ -1050,55 +1052,75 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
 
   // ── Native canvas entry-point markers (scroll-safe — rendered by chart engine) ──
   // Uses series.setMarkers() so they are perfectly pinned to (time, price) on canvas.
+  // ── Entry price lines: thin colored dotted lines per position (canvas-native, scroll-safe) ─
   useEffect(() => {
     const series = seriesRef.current; if (!series) return;
-    const markers = symPositions
-      .map(pos => {
-        const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
-        const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
-        if (!openSec) return null;
-        return {
-          time:     openSec as any,
-          position: pos.side === 'long' ? 'belowBar' : 'aboveBar',
-          shape:    pos.side === 'long' ? 'arrowUp' : 'arrowDown',
-          color:    traderColor(pos.userId),
-          text:     pos.username,
-          size:     3,
-          id:       `${pos.userId}_${pos.entryPrice}`,
-        };
-      })
-      .filter(Boolean)
-      // setMarkers requires sorted ascending by time
-      .sort((a, b) => (a!.time as number) - (b!.time as number));
-    try { series.setMarkers(markers as any[]); } catch {}
-    return () => { try { series.setMarkers([]); } catch {} };
+    posLinesRef.current.forEach(ln => { try { series.removePriceLine(ln); } catch {} });
+    posLinesRef.current.clear();
+    symPositions.forEach(pos => {
+      const col = traderColor(pos.userId);
+      try {
+        const ln = series.createPriceLine({
+          price: pos.entryPrice, color: col + 'aa',
+          lineWidth: 1 as any, lineStyle: 1, axisLabelVisible: false, title: '',
+        });
+        posLinesRef.current.set(`${pos.userId}_${pos.entryPrice}`, ln);
+      } catch {}
+    });
+    return () => {
+      posLinesRef.current.forEach(ln => { try { series.removePriceLine(ln); } catch {} });
+      posLinesRef.current.clear();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symPositions]);
 
-  // ── RAF: Y-only price-to-pixel for right-side player cards ───────────────
-  // X is NOT needed here — entry dots are painted natively by setMarkers above.
+  // ── RAF: IMPERATIVE DOM updates (no React setState = zero scroll lag) ────
+  // timeToCoordinate + priceToCoordinate fire every frame in sync with canvas.
   useEffect(() => {
     const tick = () => {
-      const series = seriesRef.current;
-      if (series) {
-        const coords: Record<string,number> = {};
-        symPositions.forEach(pos => {
-          const key = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
-          const y   = series.priceToCoordinate(pos.entryPrice);
-          if (y !== null && y !== undefined && y > 0 && y < 5000) coords[key] = y;
+      const series    = seriesRef.current;
+      const chart     = chartRef.current;
+      const container = containerRef.current;
+      if (series && chart && container) {
+        const containerH = container.clientHeight;
+
+        // Compute raw (x, y) for every position
+        const raw = symPositions.map(pos => {
+          const key     = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
+          const y       = series.priceToCoordinate(pos.entryPrice) as number | null;
+          const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
+          const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
+          const x       = openSec ? chart.timeScale().timeToCoordinate(openSec as any) as number | null : null;
+          const valid   = y !== null && y !== undefined && y > 10 && y < containerH - 10;
+          return { key, x: x ?? null, y: y ?? null, valid };
+        }).filter(e => e.valid).sort((a, b) => a.y! - b.y!);
+
+        // Collision avoidance (push overlapping bubbles down)
+        const BUBBLE_H = 82;
+        for (let i = 1; i < raw.length; i++) {
+          if (raw[i].y! - raw[i - 1].y! < BUBBLE_H) raw[i].y = raw[i - 1].y! + BUBBLE_H;
+        }
+
+        // Apply directly via style.transform — same frame as canvas, no lag
+        const positioned = new Set<string>();
+        raw.forEach(({ key, x, y }) => {
+          const el = bubbleRefsMap.current.get(key);
+          if (!el || x === null) return;
+          el.style.transform = `translate(${x}px,${y! - 62}px)`;
+          el.style.opacity   = '1';
+          positioned.add(key);
         });
-        setPosCoords(prev => {
-          const changed = symPositions.some(p => {
-            const k = `${p.userId}_${p.entryPrice}_${p.symbol}`;
-            return Math.abs((prev[k] ?? -1) - (coords[k] ?? -2)) > 0.5;
-          });
-          return changed ? coords : prev;
+
+        // Hide bubbles whose entry time is off the visible range
+        bubbleRefsMap.current.forEach((el, key) => {
+          if (!positioned.has(key)) el.style.opacity = '0';
         });
       }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symPositions]);
 
   const winCnt  = symPositions.filter(p => p.unrealizedPnl >= 0).length;
@@ -1176,62 +1198,54 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
         <div ref={containerRef} style={{ position:'absolute', inset:0, zIndex:2 }} />
 
         {/* ── Trade bubble overlay ── */}
+        {/* Each bubble is anchored at top:0 left:0 and moved via style.transform
+            set imperatively in the RAF loop — same frame as canvas, zero lag.   */}
         <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:10 }}>
-          {(() => {
-            const BUBBLE_H = 72; // name(18) + gap(4) + pill(32) + dot(8) + gap(10)
-            const items = symPositions
-              .map((pos, idx) => ({
-                pos,
-                key:  `${pos.userId}_${pos.entryPrice}_${pos.symbol}`,
-                rawY: posCoords[`${pos.userId}_${pos.entryPrice}_${pos.symbol}`] ?? null,
-                // Stagger X across the chart (38 % → 80 %) so bubbles don't stack
-                xPct: 38 + (idx % 5) * 10,
-              }))
-              .filter(e => e.rawY !== null)
-              .sort((a, b) => (a.rawY as number) - (b.rawY as number));
-
-            // Collision avoidance — push overlapping bubbles down
-            for (let i = 1; i < items.length; i++) {
-              if ((items[i].rawY as number) - (items[i-1].rawY as number) < BUBBLE_H) {
-                items[i].rawY = (items[i-1].rawY as number) + BUBBLE_H;
-              }
-            }
-
-            return items.map(({ pos, key, rawY, xPct }) => {
-              const y       = rawY as number;
-              const pnlPos  = pos.unrealizedPnl >= 0;
-              const pnlAbs  = Math.abs(Math.round(pos.unrealizedPnl));
-              const isLdr   = pos.userId === leaderId;
-              const bubClr  = pnlPos ? '#22c55e' : '#ef4444';
-              const bubGrad = pnlPos
-                ? 'linear-gradient(135deg,#15803d,#22c55e)'
-                : 'linear-gradient(135deg,#b91c1c,#ef4444)';
-              return (
-                <div key={key} style={{ position:'absolute', left:`${xPct}%`, top: y - 58, display:'flex', flexDirection:'column', alignItems:'center', gap:0, animation:'trBubble .45s cubic-bezier(.34,1.56,.64,1)' }}>
-                  {/* Trader name row */}
-                  <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
-                    {isLdr && <span style={{ fontSize:12, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                    <div style={{ width:22, height:22, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff', border:`2px solid ${bubClr}`, overflow:'hidden', flexShrink:0 }}>
-                      {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
-                    </div>
-                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.92)', whiteSpace:'nowrap', textShadow:'0 1px 6px rgba(0,0,0,.9)' }}>{pos.username}</span>
+          {symPositions.map(pos => {
+            const key     = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
+            const pnlPos  = pos.unrealizedPnl >= 0;
+            const pnlAbs  = Math.abs(Math.round(pos.unrealizedPnl));
+            const isLdr   = pos.userId === leaderId;
+            const bubClr  = pnlPos ? '#22c55e' : '#ef4444';
+            const bubGrad = pnlPos
+              ? 'linear-gradient(135deg,#15803d,#22c55e)'
+              : 'linear-gradient(135deg,#b91c1c,#ef4444)';
+            return (
+              <div
+                key={key}
+                ref={el => { if (el) bubbleRefsMap.current.set(key, el); else bubbleRefsMap.current.delete(key); }}
+                style={{
+                  position: 'absolute', top: 0, left: 0,
+                  opacity: 0,                          // starts invisible; RAF shows when valid
+                  transform: 'translate(-9999px,-9999px)', // off-screen until RAF places it
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  willChange: 'transform, opacity',    // hint GPU layer
+                  pointerEvents: 'none',
+                }}
+              >
+                {/* Trader name + avatar */}
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4, filter:'drop-shadow(0 1px 4px rgba(0,0,0,.85))' }}>
+                  {isLdr && <span style={{ fontSize:12, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
+                  <div style={{ width:22, height:22, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff', border:`2px solid ${bubClr}`, overflow:'hidden', flexShrink:0 }}>
+                    {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
                   </div>
-                  {/* PnL pill — exactly like the image */}
-                  <div style={{ padding:'5px 16px', borderRadius:22, background:bubGrad, border:`1px solid ${bubClr}`, boxShadow:`0 4px 16px ${bubClr}55, 0 2px 6px rgba(0,0,0,.5)`, display:'flex', alignItems:'center', gap:4, whiteSpace:'nowrap' }}>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:14, fontWeight:900, color:'#fff', letterSpacing:.3, animation:'cvPnl .5s ease' }}>
-                      {pnlPos ? '+' : '−'}${pnlAbs > 0 ? pnlAbs.toLocaleString() : '0'}
-                    </span>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.7)', padding:'1px 5px', borderRadius:8, background:'rgba(0,0,0,.25)' }}>
-                      {pos.side === 'long' ? '▲' : '▼'}{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}
-                    </span>
-                  </div>
-                  {/* Connector pin to price level */}
-                  <div style={{ width:1, height:9, background:`${bubClr}99` }} />
-                  <div style={{ width:9, height:9, borderRadius:'50%', background:bubClr, boxShadow:`0 0 10px ${bubClr}, 0 0 4px #fff` }} />
+                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap' }}>{pos.username}</span>
                 </div>
-              );
-            });
-          })()}
+                {/* PnL pill — matches image style */}
+                <div style={{ padding:'5px 16px', borderRadius:22, background:bubGrad, border:`1px solid ${bubClr}88`, boxShadow:`0 4px 18px ${bubClr}55, 0 2px 8px rgba(0,0,0,.6)`, display:'flex', alignItems:'center', gap:5, whiteSpace:'nowrap' }}>
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:14, fontWeight:900, color:'#fff', letterSpacing:.4 }}>
+                    {pnlPos ? '+' : '−'}${pnlAbs > 0 ? pnlAbs.toLocaleString() : '0'}
+                  </span>
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'rgba(255,255,255,.65)', padding:'1px 5px', borderRadius:8, background:'rgba(0,0,0,.3)' }}>
+                    {pos.side === 'long' ? '▲' : '▼'}{pos.leverage > 1 ? ` ${pos.leverage}×` : ''}
+                  </span>
+                </div>
+                {/* Connector line + dot pointing to exact price level */}
+                <div style={{ width:1.5, height:10, background:`linear-gradient(to bottom,${bubClr},${bubClr}55)` }} />
+                <div style={{ width:9, height:9, borderRadius:'50%', background:bubClr, boxShadow:`0 0 10px ${bubClr}, 0 0 4px rgba(255,255,255,.6)` }} />
+              </div>
+            );
+          })}
 
           {/* No trades notice */}
           {symPositions.length === 0 && !loading && ev.openPositions.length > 0 && (
