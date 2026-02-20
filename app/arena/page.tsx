@@ -858,6 +858,7 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const bidLineRef    = useRef<any>(null);
   const rafRef        = useRef<number>(0);
   const lastCRef      = useRef<{time:number;open:number;high:number;low:number}|null>(null);
+  const midRef        = useRef(0); // always holds the latest mid price for use in async callbacks
 
   const [sym,       setSym]       = useState('EUR/USD');
   const [tf,        setTf]        = useState('5');
@@ -966,11 +967,32 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         seriesRef.current.setData(candles);
         if (candles.length) lastCRef.current = candles[candles.length - 1];
         chartRef.current?.timeScale().fitContent();
+        // Re-apply live price immediately so chart doesn't look frozen
+        // until the next natural mid change (especially noticeable on TF switch)
+        const curMid = midRef.current;
+        if (curMid > 0 && seriesRef.current) {
+          const tfSec    = parseInt(tf) * 60;
+          const nowSec   = Math.floor(Date.now() / 1000);
+          const bucket   = Math.floor(nowSec / tfSec) * tfSec;
+          const lc       = lastCRef.current;
+          try {
+            seriesRef.current.update({
+              time:  (lc?.time ?? bucket) as any,
+              open:  lc?.open ?? curMid,
+              high:  Math.max(lc?.high ?? curMid, curMid),
+              low:   Math.min(lc?.low  ?? curMid, curMid),
+              close: curMid,
+            });
+          } catch { /* ignore */ }
+        }
       } catch { /* ignore */ }
       if (active) setLoading(false);
     })();
     return () => { active = false; };
   }, [sym, tf]);
+
+  // Keep midRef in sync so async callbacks always have the current price
+  useEffect(() => { midRef.current = mid; }, [mid]);
 
   // ── Live bid price line — always update on bid change ────────────────────
   useEffect(() => {
@@ -1027,11 +1049,13 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         if (!openSec) return null;
         return {
           time:     openSec as any,
+          // circle is cleaner + respects size better than arrowUp/Down
           position: pos.side === 'long' ? 'belowBar' : 'aboveBar',
-          shape:    pos.side === 'long' ? 'arrowUp'  : 'arrowDown',
+          shape:    'circle',
           color:    traderColor(pos.userId),
-          text:     pos.username,
-          size:     1,
+          // text shown as label above/below the marker by the chart engine
+          text:     `${pos.side === 'long' ? '▲' : '▼'} ${pos.username} ${pos.leverage > 1 ? pos.leverage + '×' : ''}`.trim(),
+          size:     2,
           id:       `${pos.userId}_${pos.entryPrice}`,
         };
       })
@@ -1143,56 +1167,61 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         {/* Overlay (pointer-events:none) */}
         <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:5 }}>
 
-          {/* Mini leaderboard — top-left */}
-          <div style={{ position:'absolute', top:10, left:10, display:'flex', flexDirection:'column', gap:3 }}>
-            <div style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:7, color:'rgba(255,215,0,.6)', letterSpacing:3, textTransform:'uppercase', marginBottom:2, display:'flex', alignItems:'center', gap:5 }}>
-              <span>🏆</span><span>Leaderboard</span>
-            </div>
-            {top5.map((p, i) => {
-              const pos = p.livePnl >= 0;
-              const medals = ['🥇','🥈','🥉','④','⑤'];
-              return (
-                <div key={p.userId} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:5, minWidth:185, backdropFilter:'blur(8px)', background: i===0 ? 'rgba(253,212,88,.1)' : 'rgba(5,5,12,.78)', border:`1px solid ${i===0?'rgba(253,212,88,.28)':'rgba(255,255,255,.06)'}`, animation: i===0 ? 'cvLeader 2.5s ease-in-out infinite' : undefined }}>
-                  <span style={{ fontSize:11 }}>{medals[i]}</span>
-                  <Av u={p.username} img={p.profileImage} sz={16} ring={i===0?'#FDD458':undefined} />
-                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:600, color:i===0?'#FDD458':'#ccc', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.username}</span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:10, fontWeight:800, color: pos?'#0FEDBE':'#FF495B' }}>{pos?'+':''}{fmtPnl(p.livePnl)}</span>
-                </div>
-              );
-            })}
-          </div>
-
           {/* Player cards — pinned to right edge at entry-price Y level.
               Entry dots are rendered natively by series.setMarkers() (canvas-level,
-              scroll-safe). The horizontal dotted price line is drawn by createPriceLine(). */}
-          {symPositions.map(pos => {
-            const posKey = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
-            const y      = posCoords[posKey];
-            if (!y) return null;
-            const col    = traderColor(pos.userId);
-            const pnlPos = pos.unrealizedPnl >= 0;
-            const isLdr  = pos.userId === leaderId;
-            return (
-              <div key={posKey} style={{ position:'absolute', right:90, top:y-16, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
-                {isLdr && <span style={{ fontSize:15, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                {/* short connector to align with the price line */}
-                <div style={{ width:12, height:1, background:col, opacity:.6 }} />
-                {/* player card */}
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 9px 4px 5px', borderRadius:5, background:'rgba(5,5,12,.92)', border:`1px solid ${col}55`, backdropFilter:'blur(10px)', boxShadow:`0 0 16px ${col}22` }}>
-                  <div style={{ width:20, height:20, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', border:`1.5px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
-                    {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
+              scroll-safe). Collision-avoidance prevents cards from overlapping. */}
+          {(() => {
+            const CARD_H = 40; // approx card height + gap
+            // Build list with raw Y from RAF loop
+            const items = symPositions
+              .map(pos => ({
+                pos,
+                key: `${pos.userId}_${pos.entryPrice}_${pos.symbol}`,
+                rawY: posCoords[`${pos.userId}_${pos.entryPrice}_${pos.symbol}`] ?? null,
+              }))
+              .filter(e => e.rawY !== null)
+              .sort((a, b) => (a.rawY as number) - (b.rawY as number));
+
+            // Push cards down if they overlap (single top-to-bottom pass is usually enough)
+            for (let i = 1; i < items.length; i++) {
+              const prev = items[i - 1];
+              const curr = items[i];
+              if ((curr.rawY as number) - (prev.rawY as number) < CARD_H) {
+                curr.rawY = (prev.rawY as number) + CARD_H;
+              }
+            }
+
+            return items.map(({ pos, key, rawY }) => {
+              const y      = rawY as number;
+              const col    = traderColor(pos.userId);
+              const pnlPos = pos.unrealizedPnl >= 0;
+              const isLdr  = pos.userId === leaderId;
+              return (
+                <div key={key} style={{ position:'absolute', right:90, top:y-18, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
+                  {isLdr && <span style={{ fontSize:16, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
+                  {/* connector stub aligned to price line */}
+                  <div style={{ width:14, height:2, background:`linear-gradient(to right,${col},${col}88)`, borderRadius:1 }} />
+                  {/* player card */}
+                  <div style={{ display:'flex', alignItems:'center', gap:7, padding:'5px 11px 5px 6px', borderRadius:6, background:'rgba(5,5,12,.94)', border:`1.5px solid ${col}66`, backdropFilter:'blur(12px)', boxShadow:`0 0 20px ${col}28, 0 2px 8px rgba(0,0,0,.6)` }}>
+                    {/* Avatar */}
+                    <div style={{ width:26, height:26, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#fff', border:`2px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
+                      {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
+                    </div>
+                    {/* Name — bigger */}
+                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', textShadow:`0 0 12px ${col}` }}>{pos.username}</span>
+                    {/* Direction badge */}
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:4, background: pos.side==='long'?'rgba(15,237,190,.2)':'rgba(255,73,91,.2)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.35)':'rgba(255,73,91,.35)'}` }}>
+                      {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
+                    </span>
+                    {/* PnL */}
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:13, fontWeight:900, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease', textShadow:`0 0 10px ${pnlPos?'#0FEDBE':'#FF495B'}66` }}>
+                      {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
+                    </span>
                   </div>
-                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:700, color:col, whiteSpace:'nowrap' }}>{pos.username}</span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, padding:'1px 5px', borderRadius:3, background: pos.side==='long'?'rgba(15,237,190,.15)':'rgba(255,73,91,.15)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.25)':'rgba(255,73,91,.25)'}` }}>
-                    {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
-                  </span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease' }}>
-                    {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
-                  </span>
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
 
           {/* Bottom strip — current pair stats */}
           <div style={{ position:'absolute', bottom: otherPairChips.length > 0 ? 38 : 10, left:10, display:'flex', alignItems:'center', gap:6 }}>
