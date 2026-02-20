@@ -19,6 +19,30 @@ export const metadata: Metadata = {
   title: "ChartVolt",
   description:
     "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.",
+  openGraph: {
+    title: "ChartVolt",
+    description:
+      "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.",
+    url: "https://chartvolt.com",
+    siteName: "ChartVolt",
+    images: [
+      {
+        url: "https://chartvolt.com/og-image.png", // place your image at public/og-image.png
+        width: 1200,
+        height: 630,
+        alt: "ChartVolt — Live Market Trading Platform",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ChartVolt",
+    description:
+      "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.",
+    images: ["https://chartvolt.com/og-image.png"],
+  },
 };
 
 export default function RootLayout({
