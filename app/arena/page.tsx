@@ -1084,19 +1084,42 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
       if (series && chart && container) {
         const containerH = container.clientHeight;
 
+        const containerW = container.clientWidth;
+        // Price-scale is ~65px wide; rightmost chart edge is about containerW - 70
+        const chartRightEdge = containerW - 72;
+
+        // Helper: get X for an entry time, falling back gracefully
+        // timeToCoordinate() returns null when the time is beyond loaded candles
+        // (very common for recent live entries). We fall back to visible-range right
+        // edge so the bubble always shows.
+        const getX = (openSec: number | null): number => {
+          if (openSec) {
+            const cx = chart.timeScale().timeToCoordinate(openSec as any) as number | null;
+            if (cx !== null) return cx;
+          }
+          // Fallback: right edge of the visible logical range
+          try {
+            const vr  = chart.timeScale().getVisibleRange() as any;
+            const toX = vr?.to ? chart.timeScale().timeToCoordinate(vr.to) as number | null : null;
+            if (toX !== null) return toX;
+          } catch {}
+          return chartRightEdge;
+        };
+
         // Compute raw (x, y) for every position
         const raw = symPositions.map(pos => {
           const key     = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
           const y       = series.priceToCoordinate(pos.entryPrice) as number | null;
           const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
           const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
-          const x       = openSec ? chart.timeScale().timeToCoordinate(openSec as any) as number | null : null;
+          const x       = getX(openSec);
+          // Only filter on Y (x always has a valid fallback now)
           const valid   = y !== null && y !== undefined && y > 10 && y < containerH - 10;
-          return { key, x: x ?? null, y: y ?? null, valid };
+          return { key, x, y: y ?? null, valid };
         }).filter(e => e.valid).sort((a, b) => a.y! - b.y!);
 
-        // Collision avoidance (push overlapping bubbles down)
-        const BUBBLE_H = 82;
+        // Collision avoidance (push overlapping bubbles down by Y)
+        const BUBBLE_H = 85;
         for (let i = 1; i < raw.length; i++) {
           if (raw[i].y! - raw[i - 1].y! < BUBBLE_H) raw[i].y = raw[i - 1].y! + BUBBLE_H;
         }
@@ -1105,13 +1128,14 @@ function ArenaBroadcastChart({ ev, prices, countdown }: { ev: AEvent; prices: Pr
         const positioned = new Set<string>();
         raw.forEach(({ key, x, y }) => {
           const el = bubbleRefsMap.current.get(key);
-          if (!el || x === null) return;
-          el.style.transform = `translate(${x}px,${y! - 62}px)`;
+          if (!el) return;
+          // Centre the bubble on the entry point (bubble is ~160px wide)
+          el.style.transform = `translate(${x - 80}px,${y! - 68}px)`;
           el.style.opacity   = '1';
           positioned.add(key);
         });
 
-        // Hide bubbles whose entry time is off the visible range
+        // Hide bubbles whose Y is off screen
         bubbleRefsMap.current.forEach((el, key) => {
           if (!positioned.has(key)) el.style.opacity = '0';
         });
