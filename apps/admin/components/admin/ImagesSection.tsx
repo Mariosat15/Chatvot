@@ -16,6 +16,7 @@ import {
   Star,
   Users,
   Quote,
+  Globe,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -25,6 +26,13 @@ interface ImageSettings {
   profileImage: string;
   dashboardPreview: string;
   favicon: string;
+}
+
+interface SeoSettings {
+  seoTitle: string;
+  seoDescription: string;
+  ogImageUrl: string;
+  siteUrl: string;
 }
 
 interface AuthPageSettings {
@@ -156,6 +164,13 @@ export default function ImagesSection() {
     authPageTestimonialRating: 5,
     authPageDashboardImage: "",
   });
+  const [seoSettings, setSeoSettings] = useState<SeoSettings>({
+    seoTitle: "",
+    seoDescription: "",
+    ogImageUrl: "",
+    siteUrl: "",
+  });
+  const [savingSeo, setSavingSeo] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [uploadedNames, setUploadedNames] = useState<Record<string, string>>(
     {},
@@ -174,7 +189,19 @@ export default function ImagesSection() {
       const response = await fetch("/api/images");
       if (response.ok) {
         const data = await response.json();
-        setImages(data);
+        setImages({
+          appLogo: data.appLogo || "",
+          emailLogo: data.emailLogo || "",
+          profileImage: data.profileImage || "",
+          dashboardPreview: data.dashboardPreview || "",
+          favicon: data.favicon || "",
+        });
+        setSeoSettings({
+          seoTitle: data.seoTitle || "",
+          seoDescription: data.seoDescription || "",
+          ogImageUrl: data.ogImageUrl || "",
+          siteUrl: data.siteUrl || "",
+        });
       }
     } catch (error) {
       toast.error("Failed to load images");
@@ -366,6 +393,31 @@ export default function ImagesSection() {
     }
   };
 
+  const handleSaveSeo = async () => {
+    setSavingSeo(true);
+    try {
+      const response = await fetch("/api/images", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(seoSettings),
+      });
+
+      if (response.ok) {
+        toast.success("SEO settings saved");
+        toast.info(
+          "Link previews update within 24 h once social platforms re-crawl the URL",
+        );
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "Save failed");
+      }
+    } catch {
+      toast.error("An error occurred");
+    } finally {
+      setSavingSeo(false);
+    }
+  };
+
   const handleSaveAuthSettings = async () => {
     setIsLoading(true);
 
@@ -519,6 +571,178 @@ export default function ImagesSection() {
           <Save className="h-5 w-5 mr-2" />
           {isLoading ? "Saving Changes..." : "Save Image Configuration"}
         </Button>
+      </div>
+
+      {/* ── SEO & Link Preview Section ── */}
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white rounded-xl blur-lg opacity-50" />
+              <div className="relative h-14 w-14 bg-white rounded-xl flex items-center justify-center shadow-xl">
+                <Globe className="h-7 w-7 text-emerald-600" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">
+                SEO &amp; Link Preview
+              </h2>
+              <p className="text-emerald-100 mt-1">
+                Controls what appears when you share a link on Discord, WhatsApp,
+                Twitter/X, etc.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 space-y-6">
+          {/* Site URL */}
+          <div className="space-y-2">
+            <Label className="text-gray-300">
+              Canonical Site URL
+            </Label>
+            <Input
+              value={seoSettings.siteUrl}
+              onChange={(e) =>
+                setSeoSettings((prev) => ({ ...prev, siteUrl: e.target.value }))
+              }
+              className="bg-gray-900 border-gray-700 text-white"
+              placeholder="https://chartvolt.com"
+            />
+            <p className="text-xs text-gray-500">
+              The public URL of your site — used in og:url tags. Must include https://.
+            </p>
+          </div>
+
+          {/* OG Title */}
+          <div className="space-y-2">
+            <Label className="text-gray-300">
+              Link Preview Title (og:title)
+            </Label>
+            <Input
+              value={seoSettings.seoTitle}
+              onChange={(e) =>
+                setSeoSettings((prev) => ({ ...prev, seoTitle: e.target.value }))
+              }
+              className="bg-gray-900 border-gray-700 text-white"
+              placeholder="ChartVolt — Live Market Trading Platform"
+            />
+            <p className="text-xs text-gray-500">
+              Recommended: 50–60 characters. Shown as the bold title in link cards.
+            </p>
+          </div>
+
+          {/* OG Description */}
+          <div className="space-y-2">
+            <Label className="text-gray-300">
+              Link Preview Description (og:description)
+            </Label>
+            <Textarea
+              value={seoSettings.seoDescription}
+              onChange={(e) =>
+                setSeoSettings((prev) => ({
+                  ...prev,
+                  seoDescription: e.target.value,
+                }))
+              }
+              className="bg-gray-900 border-gray-700 text-white min-h-[80px]"
+              placeholder="Monitor live market movements, receive tailored notifications..."
+            />
+            <p className="text-xs text-gray-500">
+              {seoSettings.seoDescription.length}/160 characters. Shown as the
+              subtitle in link cards.
+            </p>
+          </div>
+
+          {/* OG Image URL */}
+          <div className="space-y-2">
+            <Label className="text-gray-300">
+              Link Preview Image URL (og:image)
+            </Label>
+            <Input
+              value={seoSettings.ogImageUrl}
+              onChange={(e) =>
+                setSeoSettings((prev) => ({
+                  ...prev,
+                  ogImageUrl: e.target.value,
+                }))
+              }
+              className="bg-gray-900 border-gray-700 text-white"
+              placeholder="https://chartvolt.com/og-image.png"
+            />
+            <p className="text-xs text-gray-500">
+              Full public URL to a 1200×630 px PNG or JPEG. Upload the file to{" "}
+              <code className="bg-gray-700 px-1.5 py-0.5 rounded text-emerald-300">
+                public/og-image.png
+              </code>{" "}
+              then enter{" "}
+              <code className="bg-gray-700 px-1.5 py-0.5 rounded text-emerald-300">
+                {seoSettings.siteUrl || "https://yourdomain.com"}/og-image.png
+              </code>
+            </p>
+
+            {/* Live preview */}
+            {seoSettings.ogImageUrl && (
+              <div className="mt-3 border border-gray-700 rounded-xl overflow-hidden w-full max-w-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={seoSettings.ogImageUrl}
+                  alt="OG preview"
+                  className="w-full h-auto object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <div className="bg-gray-900 px-4 py-3">
+                  <p className="text-xs text-gray-500 truncate">
+                    {seoSettings.siteUrl || "yourdomain.com"}
+                  </p>
+                  <p className="text-sm font-semibold text-white truncate mt-0.5">
+                    {seoSettings.seoTitle || "—"}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
+                    {seoSettings.seoDescription || "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Info note */}
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-emerald-400 mt-0.5 shrink-0" />
+              <div className="text-xs text-gray-400 space-y-1">
+                <p>
+                  <span className="text-emerald-400 font-semibold">After saving</span>{" "}
+                  — the main app layout will use these values on every page request.
+                </p>
+                <p>
+                  Social platforms (Discord, WhatsApp, Twitter/X) cache OG data for
+                  24–48 hours. Use{" "}
+                  <a
+                    href="https://www.opengraph.xyz"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 underline"
+                  >
+                    opengraph.xyz
+                  </a>{" "}
+                  to force a re-fetch.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSaveSeo}
+            disabled={savingSeo}
+            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-14 text-lg shadow-lg shadow-emerald-500/30"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            {savingSeo ? "Saving..." : "Save SEO & Link Preview Settings"}
+          </Button>
+        </div>
       </div>
 
       {/* Auth Page Branding Section */}

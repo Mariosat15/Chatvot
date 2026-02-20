@@ -56,6 +56,11 @@ export async function GET() {
         emailLogo: whiteLabel?.emailLogo || "/assets/images/logo.png",
         favicon: whiteLabel?.favicon || "/favicon.ico",
         profileImage: whiteLabel?.profileImage || "/assets/images/PROFILE.png",
+        // SEO / Open Graph — editable from admin > Settings > Branding
+        seoTitle: whiteLabel?.seoTitle || "",
+        seoDescription: whiteLabel?.seoDescription || "",
+        ogImageUrl: whiteLabel?.ogImageUrl || "",
+        siteUrl: whiteLabel?.siteUrl || "",
       },
     };
 

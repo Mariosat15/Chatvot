@@ -21,6 +21,11 @@ export async function GET() {
       dashboardPreview:
         settings.dashboardPreview || "/assets/images/dashboard-preview.png",
       favicon: settings.favicon || "/favicon.ico",
+      // SEO / Open Graph fields
+      seoTitle: settings.seoTitle || "",
+      seoDescription: settings.seoDescription || "",
+      ogImageUrl: settings.ogImageUrl || "",
+      siteUrl: settings.siteUrl || "",
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -40,8 +45,18 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { appLogo, emailLogo, profileImage, dashboardPreview, favicon } =
-      body;
+    const {
+      appLogo,
+      emailLogo,
+      profileImage,
+      dashboardPreview,
+      favicon,
+      // SEO / Open Graph fields
+      seoTitle,
+      seoDescription,
+      ogImageUrl,
+      siteUrl,
+    } = body;
 
     let settings = await WhiteLabel.findOne();
     if (!settings) {
@@ -54,6 +69,11 @@ export async function PUT(request: NextRequest) {
     if (dashboardPreview !== undefined)
       settings.dashboardPreview = dashboardPreview;
     if (favicon !== undefined) settings.favicon = favicon;
+    // SEO fields
+    if (seoTitle !== undefined) settings.seoTitle = seoTitle;
+    if (seoDescription !== undefined) settings.seoDescription = seoDescription;
+    if (ogImageUrl !== undefined) settings.ogImageUrl = ogImageUrl;
+    if (siteUrl !== undefined) settings.siteUrl = siteUrl;
 
     await settings.save();
 

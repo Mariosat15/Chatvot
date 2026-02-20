@@ -8,6 +8,12 @@ export interface WhiteLabelDocument extends Document {
   dashboardPreview: string;
   favicon: string;
 
+  // SEO / Open Graph — editable from admin > Settings > Branding
+  seoTitle: string;
+  seoDescription: string;
+  ogImageUrl: string;      // Full public URL or path to OG image (1200×630)
+  siteUrl: string;         // Canonical site URL used in OG tags
+
   // Branding file backup (base64-encoded file data stored in DB for persistence)
   brandingFiles: Map<string, { data: string; contentType: string; updatedAt: Date }>;
 
@@ -96,6 +102,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       type: String,
       default: "/favicon.ico",
     },
+
+    // SEO / Open Graph
+    seoTitle: { type: String, default: "" },
+    seoDescription: { type: String, default: "" },
+    ogImageUrl: { type: String, default: "" },
+    siteUrl: { type: String, default: "" },
 
     // Branding file backup (base64-encoded, auto-restored if disk files are lost)
     brandingFiles: {

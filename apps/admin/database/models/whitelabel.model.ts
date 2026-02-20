@@ -8,6 +8,12 @@ export interface WhiteLabelDocument extends Document {
   dashboardPreview: string;
   favicon: string;
 
+  // SEO / Open Graph — editable from admin > Settings > Branding
+  seoTitle: string;
+  seoDescription: string;
+  ogImageUrl: string;
+  siteUrl: string;
+
   // General Settings
   nodeEnv: string;
   nextPublicBaseUrl: string;
@@ -93,6 +99,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       type: String,
       default: "/favicon.ico",
     },
+
+    // SEO / Open Graph
+    seoTitle: { type: String, default: "" },
+    seoDescription: { type: String, default: "" },
+    ogImageUrl: { type: String, default: "" },
+    siteUrl: { type: String, default: "" },
 
     // General Settings
     nodeEnv: {
