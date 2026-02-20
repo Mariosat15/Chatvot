@@ -854,20 +854,48 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<any>(null);
   const seriesRef     = useRef<any>(null);
-  const posLinesRef   = useRef<Map<string,any>>(new Map());
   const bidLineRef    = useRef<any>(null);
   const rafRef        = useRef<number>(0);
   const lastCRef      = useRef<{time:number;open:number;high:number;low:number}|null>(null);
   const midRef        = useRef(0); // always holds the latest mid price for use in async callbacks
 
-  const [sym,       setSym]       = useState('EUR/USD');
-  const [tf,        setTf]        = useState('5');
-  const [loading,   setLoading]   = useState(true);
+  const [sym,        setSym]       = useState('EUR/USD');
+  const [tf,         setTf]        = useState('5');
+  const [loading,    setLoading]   = useState(true);
   // Y-only: priceToCoordinate per position key (x handled natively by setMarkers)
-  const [posCoords, setPosCoords] = useState<Record<string,number>>({});
+  const [posCoords,  setPosCoords] = useState<Record<string,number>>({});
+  // Fast local price — overrides the parent's 5s prop with a 1s direct poll
+  const [localPrice, setLocalPrice] = useState<{bid:number;ask:number;mid:number}|null>(null);
 
   const priceKey  = sym.replace('/','');
-  const livePrice = prices[priceKey] ?? null;
+
+  // ── 1-second direct price poll (independent of parent's 5s competition poll) ──
+  useEffect(() => {
+    let active = true;
+    const fetchPrice = async () => {
+      if (!active) return;
+      try {
+        const r = await fetch('/api/trading/prices', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols: [priceKey] }),
+          cache: 'no-store',
+        });
+        if (r.ok && active) {
+          const d = await r.json();
+          const arr: any[] = d.prices ?? [];
+          const p = arr.find(x => x.symbol === priceKey || x.symbol === sym.replace('/',''));
+          if (p) setLocalPrice({ bid: Number(p.bid), ask: Number(p.ask), mid: (Number(p.bid) + Number(p.ask)) / 2 });
+        }
+      } catch { /* ignore */ }
+      if (active) setTimeout(fetchPrice, 1000);
+    };
+    setLocalPrice(null); // reset on symbol switch
+    fetchPrice();
+    return () => { active = false; };
+  }, [priceKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prefer 1s local price; fall back to parent 5s price
+  const livePrice = localPrice ?? (prices[priceKey] ?? null);
   const mid = livePrice?.mid ?? 0;
   const bid = livePrice?.bid ?? 0;
   const ask = livePrice?.ask ?? 0;
@@ -967,22 +995,25 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         seriesRef.current.setData(candles);
         if (candles.length) lastCRef.current = candles[candles.length - 1];
         chartRef.current?.timeScale().fitContent();
-        // Re-apply live price immediately so chart doesn't look frozen
-        // until the next natural mid change (especially noticeable on TF switch)
+        // Immediately paint the current live candle so the chart isn't frozen
+        // after the TF switch while waiting for the next price tick.
         const curMid = midRef.current;
         if (curMid > 0 && seriesRef.current) {
-          const tfSec    = parseInt(tf) * 60;
-          const nowSec   = Math.floor(Date.now() / 1000);
-          const bucket   = Math.floor(nowSec / tfSec) * tfSec;
-          const lc       = lastCRef.current;
+          const tfSec      = parseInt(tf) * 60;
+          const nowSec     = Math.floor(Date.now() / 1000);
+          const bucket     = Math.floor(nowSec / tfSec) * tfSec;
+          const lc         = lastCRef.current;
+          const sameBucket = lc?.time === bucket;
+          const candle     = {
+            time:  bucket as any,
+            open:  sameBucket ? lc!.open : curMid,
+            high:  sameBucket ? Math.max(lc!.high, curMid) : curMid,
+            low:   sameBucket ? Math.min(lc!.low,  curMid) : curMid,
+            close: curMid,
+          };
           try {
-            seriesRef.current.update({
-              time:  (lc?.time ?? bucket) as any,
-              open:  lc?.open ?? curMid,
-              high:  Math.max(lc?.high ?? curMid, curMid),
-              low:   Math.min(lc?.low  ?? curMid, curMid),
-              close: curMid,
-            });
+            seriesRef.current.update(candle);
+            lastCRef.current = { time: bucket, open: candle.open, high: candle.high, low: candle.low };
           } catch { /* ignore */ }
         }
       } catch { /* ignore */ }
@@ -1002,41 +1033,29 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
     bidLineRef.current = series.createPriceLine({ price: bid, color: 'rgba(15,237,190,.7)', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `BID` });
   }, [bid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Extend last candle with live mid (price always moves) ────────────────
+  // ── Extend live candle — ALWAYS targets the current TF bucket (fixes TF freeze) ──
+  // Using lc?.time caused updates to land on historical candles after a TF switch.
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !mid) return;
-    // Compute current bucket time so we can update even if lastCRef not yet set
-    const tfSec = parseInt(tf) * 60; // tf is in minutes: '1','5','15','60','240'
-    const nowSec = Math.floor(Date.now() / 1000);
+    const tfSec      = parseInt(tf) * 60;
+    const nowSec     = Math.floor(Date.now() / 1000);
     const bucketTime = Math.floor(nowSec / tfSec) * tfSec;
-    const lc = lastCRef.current;
+    const lc         = lastCRef.current;
+    // Only reuse tracked OHLC when we're still in the same bucket
+    const sameBucket = lc?.time === bucketTime;
+    const candle = {
+      time:  bucketTime as any,
+      open:  sameBucket ? lc!.open : mid,
+      high:  sameBucket ? Math.max(lc!.high, mid) : mid,
+      low:   sameBucket ? Math.min(lc!.low,  mid) : mid,
+      close: mid,
+    };
     try {
-      series.update({
-        time:  (lc?.time ?? bucketTime) as any,
-        open:  lc?.open ?? mid,
-        high:  Math.max(lc?.high ?? mid, mid),
-        low:   Math.min(lc?.low  ?? mid, mid),
-        close: mid,
-      });
+      series.update(candle);
+      lastCRef.current = { time: bucketTime, open: candle.open, high: candle.high, low: candle.low };
     } catch { /* chart may not be ready yet */ }
   }, [mid, tf]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Trader position price lines (horizontal dotted line at entry price) ──
-  useEffect(() => {
-    const series = seriesRef.current; if (!series) return;
-    posLinesRef.current.forEach(ln => { try { series.removePriceLine(ln); } catch {} });
-    posLinesRef.current.clear();
-    symPositions.forEach(pos => {
-      const col    = traderColor(pos.userId);
-      const pnlStr = `${pos.unrealizedPnl >= 0 ? '+' : ''}$${Math.round(pos.unrealizedPnl)}`;
-      try {
-        const ln = series.createPriceLine({ price: pos.entryPrice, color: col, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: `${pos.side === 'long' ? '▲' : '▼'} ${pos.username}  ${pnlStr}` });
-        posLinesRef.current.set(`${pos.userId}_${pos.entryPrice}`, ln);
-      } catch {}
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symPositions]);
 
   // ── Native canvas entry-point markers (scroll-safe — rendered by chart engine) ──
   // Uses series.setMarkers() so they are perfectly pinned to (time, price) on canvas.
@@ -1049,12 +1068,10 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
         if (!openSec) return null;
         return {
           time:     openSec as any,
-          // circle is cleaner + respects size better than arrowUp/Down
           position: pos.side === 'long' ? 'belowBar' : 'aboveBar',
           shape:    'circle',
           color:    traderColor(pos.userId),
-          // text shown as label above/below the marker by the chart engine
-          text:     `${pos.side === 'long' ? '▲' : '▼'} ${pos.username} ${pos.leverage > 1 ? pos.leverage + '×' : ''}`.trim(),
+          // no text — labels are shown via the HTML player cards overlay
           size:     2,
           id:       `${pos.userId}_${pos.entryPrice}`,
         };
