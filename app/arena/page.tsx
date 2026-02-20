@@ -845,23 +845,46 @@ function rankDelta(userId: string): number {
 
 const CHART_SYMS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSD', 'USDJPY', 'USDCAD'] as const;
 
+// ─── Trader colour palette — visually distinct per-user line colours ─────────
+// 12 vivid colours that look great on a dark chart background
+const TRADER_COLORS = [
+  '#0FEDBE', '#5862FF', '#FDD458', '#FF8243', '#D13BFF',
+  '#00b0ff', '#ff6b6b', '#69db7c', '#ffd43b', '#74c0fc',
+  '#f783ac', '#a9e34b',
+] as const;
+
+function traderColor(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) >>> 0;
+  return TRADER_COLORS[h % TRADER_COLORS.length];
+}
+
 // ─── Arena Live Chart — real LightweightTradingChart with all traders' positions ─
 
 function ArenaLiveChart({ ev }: { ev: AEvent }) {
   // Map arena OpenPos[] → Position[] format expected by LightweightTradingChart
   const positions = useMemo(() =>
-    ev.openPositions.map((pos, i) => ({
-      _id: `arena_${pos.userId}_${(pos.symbol || '').replace('/', '')}_${i}`,
-      // Chart expects "EUR/USD" format — keep as-is (already stored with slash from API)
-      symbol: pos.symbol || 'EUR/USD',
-      side: pos.side,
-      entryPrice: pos.entryPrice,
-      // Approximate lots: marginUsed × leverage ÷ (entryPrice × contractSize)
-      quantity: pos.entryPrice > 0 && pos.marginUsed > 0 && pos.leverage > 0
+    ev.openPositions.map((pos, i) => {
+      const lots = pos.entryPrice > 0 && pos.marginUsed > 0 && pos.leverage > 0
         ? Number(((pos.marginUsed * pos.leverage) / (pos.entryPrice * 100000)).toFixed(4))
-        : 0.01,
-      unrealizedPnl: pos.unrealizedPnl,
-    })),
+        : 0.01;
+      const pnlStr = pos.unrealizedPnl >= 0
+        ? `+$${pos.unrealizedPnl.toFixed(0)}`
+        : `-$${Math.abs(pos.unrealizedPnl).toFixed(0)}`;
+      return {
+        _id: `arena_${pos.userId}_${(pos.symbol || '').replace('/', '')}_${i}`,
+        // Chart expects "EUR/USD" format — keep as-is (already stored with slash from API)
+        symbol: pos.symbol || 'EUR/USD',
+        side: pos.side,
+        entryPrice: pos.entryPrice,
+        quantity: lots,
+        unrealizedPnl: pos.unrealizedPnl,
+        // Show username + PnL on the price-line axis label
+        label: `${pos.username}  ${pnlStr}`,
+        // Unique colour per trader so lines are easy to tell apart
+        lineColor: traderColor(pos.userId),
+      };
+    }),
   [ev.openPositions]);
 
   return (

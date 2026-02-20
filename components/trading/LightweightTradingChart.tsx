@@ -129,6 +129,10 @@ interface Position {
   unrealizedPnl: number;
   stopLoss?: number;
   takeProfit?: number;
+  /** Optional display label shown on the price-line axis (e.g. trader username in arena view) */
+  label?: string;
+  /** Optional hex/rgba colour override for the price line */
+  lineColor?: string;
 }
 
 interface PendingOrder {
@@ -7252,13 +7256,16 @@ const LightweightTradingChart = ({
         try {
           // Entry price line
           const isProfit = position.unrealizedPnl >= 0;
+          const defaultColor = position.side === "long" ? "#26a69a" : "#ef5350";
           const entryLine = series.createPriceLine({
             price: position.entryPrice,
-            color: position.side === "long" ? "#26a69a" : "#ef5350",
+            color: position.lineColor ?? defaultColor,
             lineWidth: 2,
             lineStyle: 2, // Dashed
             axisLabelVisible: showPriceLabels,
-            title: `${position.side === "long" ? "↑" : "↓"} ${position.quantity} lots`,
+            title: position.label
+              ? `${position.side === "long" ? "▲" : "▼"} ${position.label}`
+              : `${position.side === "long" ? "↑" : "↓"} ${position.quantity} lots`,
           });
           positionLinesRef.current.set(position._id, entryLine);
 
