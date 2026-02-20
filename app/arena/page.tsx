@@ -858,12 +858,12 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const bidLineRef    = useRef<any>(null);
   const rafRef        = useRef<number>(0);
   const lastCRef      = useRef<{time:number;open:number;high:number;low:number}|null>(null);
-  const prevBidRef    = useRef(0);
 
   const [sym,       setSym]       = useState('EUR/USD');
   const [tf,        setTf]        = useState('5');
   const [loading,   setLoading]   = useState(true);
-  const [posCoords, setPosCoords] = useState<Record<string,{x:number|null;y:number|null}>>({});
+  // Y-only: priceToCoordinate per position key (x handled natively by setMarkers)
+  const [posCoords, setPosCoords] = useState<Record<string,number>>({});
 
   const priceKey  = sym.replace('/','');
   const livePrice = prices[priceKey] ?? null;
@@ -1000,43 +1000,65 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
     } catch { /* chart may not be ready yet */ }
   }, [mid, tf]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Trader position price lines ───────────────────────────────────────────
+  // ── Trader position price lines (horizontal dotted line at entry price) ──
   useEffect(() => {
     const series = seriesRef.current; if (!series) return;
     posLinesRef.current.forEach(ln => { try { series.removePriceLine(ln); } catch {} });
     posLinesRef.current.clear();
     symPositions.forEach(pos => {
-      const col = traderColor(pos.userId);
+      const col    = traderColor(pos.userId);
       const pnlStr = `${pos.unrealizedPnl >= 0 ? '+' : ''}$${Math.round(pos.unrealizedPnl)}`;
       try {
         const ln = series.createPriceLine({ price: pos.entryPrice, color: col, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: `${pos.side === 'long' ? '▲' : '▼'} ${pos.username}  ${pnlStr}` });
-        posLinesRef.current.set(pos.userId, ln);
+        posLinesRef.current.set(`${pos.userId}_${pos.entryPrice}`, ln);
       } catch {}
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symPositions]);
 
-  // ── RAF: update overlay (x,y) coords using priceToCoordinate + timeToCoordinate ──
+  // ── Native canvas entry-point markers (scroll-safe — rendered by chart engine) ──
+  // Uses series.setMarkers() so they are perfectly pinned to (time, price) on canvas.
+  useEffect(() => {
+    const series = seriesRef.current; if (!series) return;
+    const markers = symPositions
+      .map(pos => {
+        const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
+        const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
+        if (!openSec) return null;
+        return {
+          time:     openSec as any,
+          position: pos.side === 'long' ? 'belowBar' : 'aboveBar',
+          shape:    pos.side === 'long' ? 'arrowUp'  : 'arrowDown',
+          color:    traderColor(pos.userId),
+          text:     pos.username,
+          size:     1,
+          id:       `${pos.userId}_${pos.entryPrice}`,
+        };
+      })
+      .filter(Boolean)
+      // setMarkers requires sorted ascending by time
+      .sort((a, b) => (a!.time as number) - (b!.time as number));
+    try { series.setMarkers(markers as any[]); } catch {}
+    return () => { try { series.setMarkers([]); } catch {} };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symPositions]);
+
+  // ── RAF: Y-only price-to-pixel for right-side player cards ───────────────
+  // X is NOT needed here — entry dots are painted natively by setMarkers above.
   useEffect(() => {
     const tick = () => {
       const series = seriesRef.current;
-      const chart  = chartRef.current;
-      if (series && chart) {
-        const coords: Record<string,{x:number|null;y:number|null}> = {};
+      if (series) {
+        const coords: Record<string,number> = {};
         symPositions.forEach(pos => {
           const key = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
-          const y = series.priceToCoordinate(pos.entryPrice);
-          const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
-          const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
-          let x: number | null = null;
-          try { x = openSec ? (chart.timeScale().timeToCoordinate(openSec as any) ?? null) : null; } catch {}
-          coords[key] = { x: (x !== null && x > 0) ? x : null, y: (y !== null && y !== undefined && y > 0 && y < 5000) ? y : null };
+          const y   = series.priceToCoordinate(pos.entryPrice);
+          if (y !== null && y !== undefined && y > 0 && y < 5000) coords[key] = y;
         });
         setPosCoords(prev => {
           const changed = symPositions.some(p => {
             const k = `${p.userId}_${p.entryPrice}_${p.symbol}`;
-            const old = prev[k]; const nw = coords[k];
-            return !old || Math.abs((old.y??-1)-(nw?.y??-2)) > 0.5 || Math.abs((old.x??-1)-(nw?.x??-2)) > 0.5;
+            return Math.abs((prev[k] ?? -1) - (coords[k] ?? -2)) > 0.5;
           });
           return changed ? coords : prev;
         });
@@ -1140,49 +1162,35 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
             })}
           </div>
 
-          {/* Trader position markers — entry dot at (x,y) + card pinned to right at y */}
+          {/* Player cards — pinned to right edge at entry-price Y level.
+              Entry dots are rendered natively by series.setMarkers() (canvas-level,
+              scroll-safe). The horizontal dotted price line is drawn by createPriceLine(). */}
           {symPositions.map(pos => {
             const posKey = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
-            const coord  = posCoords[posKey];
-            const y = coord?.y;
+            const y      = posCoords[posKey];
             if (!y) return null;
-            const x      = coord?.x ?? null;
             const col    = traderColor(pos.userId);
             const pnlPos = pos.unrealizedPnl >= 0;
             const isLdr  = pos.userId === leaderId;
             return (
-              <React.Fragment key={posKey}>
-                {/* ── Entry point dot at exact (openTime, entryPrice) ── */}
-                {x !== null && (
-                  <>
-                    {/* Outer glow ring */}
-                    <div style={{ position:'absolute', left:x-7, top:y-7, width:14, height:14, borderRadius:'50%', background:`${col}25`, border:`1px solid ${col}70`, pointerEvents:'none' }} />
-                    {/* Inner dot */}
-                    <div style={{ position:'absolute', left:x-4, top:y-4, width:8, height:8, borderRadius:'50%', background:col, border:'1.5px solid #05050c', boxShadow:`0 0 8px ${col}`, pointerEvents:'none', zIndex:8 }} />
-                    {/* Connector line from entry dot to the right-side card */}
-                    <div style={{ position:'absolute', left:x+5, top:y-0.5, right:94, height:1, background:`linear-gradient(to right, ${col}80, ${col}20)`, pointerEvents:'none' }} />
-                  </>
-                )}
-                {/* ── Player card pinned at right edge at price Y ── */}
-                <div style={{ position:'absolute', right:90, top:y-16, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
-                  {isLdr && <span style={{ fontSize:15, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                  {/* connector stub when no x coord */}
-                  {x === null && <div style={{ width:14, height:1, background:col, opacity:.6 }} />}
-                  {/* card */}
-                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 9px 4px 5px', borderRadius:5, background:'rgba(5,5,12,.92)', border:`1px solid ${col}55`, backdropFilter:'blur(10px)', boxShadow:`0 0 16px ${col}22` }}>
-                    <div style={{ width:20, height:20, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', border:`1.5px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
-                      {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
-                    </div>
-                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:700, color:col, whiteSpace:'nowrap' }}>{pos.username}</span>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, padding:'1px 5px', borderRadius:3, background: pos.side==='long'?'rgba(15,237,190,.15)':'rgba(255,73,91,.15)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.25)':'rgba(255,73,91,.25)'}` }}>
-                      {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
-                    </span>
-                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease' }}>
-                      {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
-                    </span>
+              <div key={posKey} style={{ position:'absolute', right:90, top:y-16, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
+                {isLdr && <span style={{ fontSize:15, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
+                {/* short connector to align with the price line */}
+                <div style={{ width:12, height:1, background:col, opacity:.6 }} />
+                {/* player card */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 9px 4px 5px', borderRadius:5, background:'rgba(5,5,12,.92)', border:`1px solid ${col}55`, backdropFilter:'blur(10px)', boxShadow:`0 0 16px ${col}22` }}>
+                  <div style={{ width:20, height:20, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', border:`1.5px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
+                    {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
                   </div>
+                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:700, color:col, whiteSpace:'nowrap' }}>{pos.username}</span>
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, padding:'1px 5px', borderRadius:3, background: pos.side==='long'?'rgba(15,237,190,.15)':'rgba(255,73,91,.15)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.25)':'rgba(255,73,91,.25)'}` }}>
+                    {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
+                  </span>
+                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease' }}>
+                    {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
+                  </span>
                 </div>
-              </React.Fragment>
+              </div>
             );
           })}
 
