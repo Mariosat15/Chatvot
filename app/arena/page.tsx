@@ -8,6 +8,23 @@
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
+import dynamic from 'next/dynamic';
+import { PriceProvider } from '@/contexts/PriceProvider';
+import { ChartSymbolProvider } from '@/contexts/ChartSymbolContext';
+import { TradingArsenalProvider } from '@/contexts/TradingArsenalContext';
+
+// Dynamically import the real trading chart (uses DOM APIs — no SSR)
+const LightweightTradingChart = dynamic(
+  () => import('@/components/trading/LightweightTradingChart'),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#07070d', fontFamily: 'monospace', fontSize: 11, color: '#5862FF', letterSpacing: 2 }}>
+        LOADING CHART…
+      </div>
+    ),
+  },
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -828,24 +845,48 @@ function rankDelta(userId: string): number {
 
 const CHART_SYMS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSD', 'USDJPY', 'USDCAD'] as const;
 
+// ─── Arena Live Chart — real LightweightTradingChart with all traders' positions ─
+
+function ArenaLiveChart({ ev }: { ev: AEvent }) {
+  // Map arena OpenPos[] → Position[] format expected by LightweightTradingChart
+  const positions = useMemo(() =>
+    ev.openPositions.map((pos, i) => ({
+      _id: `arena_${pos.userId}_${(pos.symbol || '').replace('/', '')}_${i}`,
+      // Chart expects "EUR/USD" format — keep as-is (already stored with slash from API)
+      symbol: pos.symbol || 'EUR/USD',
+      side: pos.side,
+      entryPrice: pos.entryPrice,
+      // Approximate lots: marginUsed × leverage ÷ (entryPrice × contractSize)
+      quantity: pos.entryPrice > 0 && pos.marginUsed > 0 && pos.leverage > 0
+        ? Number(((pos.marginUsed * pos.leverage) / (pos.entryPrice * 100000)).toFixed(4))
+        : 0.01,
+      unrealizedPnl: pos.unrealizedPnl,
+    })),
+  [ev.openPositions]);
+
+  return (
+    <PriceProvider>
+      <ChartSymbolProvider>
+        <TradingArsenalProvider>
+          {/* Full height container — the chart manages its own layout */}
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <LightweightTradingChart
+              competitionId={ev.id}
+              positions={positions}
+              pendingOrders={[]}
+              // tradingProps intentionally omitted → read-only watch mode (no OrderForm/PositionsTable)
+            />
+          </div>
+        </TradingArsenalProvider>
+      </ChartSymbolProvider>
+    </PriceProvider>
+  );
+}
+
 function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap; onTrader: (p: Participant) => void }) {
   const rm = ev.rankingMethod || 'pnl';
   const top10 = useMemo(() => [...ev.participants].filter(p => p.totalTrades > 0 && !p.isDisqualified).sort((a, b) => raceScore(b, rm) - raceScore(a, rm)).slice(0, 10), [ev, rm]);
   const leader = top10[0] ?? null;
-
-  // Chart symbol/TF state
-  const [chartSym, setChartSym] = useState<string>(CHART_SYMS[0]);
-  const [chartTf, setChartTf] = useState<string>('5m');
-  const priceData = prices[chartSym] ?? null;
-  const mid = priceData?.mid ?? 0;
-  const dec = chartSym.includes('JPY') ? 3 : (chartSym.includes('XAU') || mid > 500) ? 2 : 5;
-
-  // Simulated price change vs candle[0].o
-  const candles = useMemo(() => generateCandles(chartSym, mid), [chartSym, Math.floor(Date.now() / 300000)]);// eslint-disable-line react-hooks/exhaustive-deps
-  const firstOpen = candles[0]?.o ?? mid;
-  const chg = mid - firstOpen;
-  const chgPct = firstOpen > 0 ? (chg / firstOpen) * 100 : 0;
-  const chgPos = chg >= 0;
 
   // Action feed events (derived from live data)
   const feedEvents = useMemo(() => {
@@ -919,31 +960,9 @@ function OverviewScene({ ev, prices, onTrader }: { ev: AEvent; prices: PriceMap;
         </div>
       </div>
 
-      {/* ── Center: Candlestick Chart ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Chart header */}
-        <div style={{ height: 36, borderBottom: `1px solid rgba(255,255,255,.07)`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 9, flexShrink: 0, background: 'rgba(255,255,255,.012)' }}>
-          <span style={{ fontFamily: 'var(--font-geist-sans),sans-serif', fontSize: 13, fontWeight: 800, color: '#fff' }}>{chartSym.replace('USD', '/USD').replace('XAU/', 'XAU/')}</span>
-          <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, color: '#555577' }}>{mid ? mid.toFixed(dec) : '—'}</span>
-          {mid > 0 && <span style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 10, fontWeight: 700, color: chgPos ? '#00e676' : '#ff1744' }}>
-            {chgPos ? '+' : ''}{chg.toFixed(dec)} ({chgPos ? '+' : ''}{chgPct.toFixed(2)}%)
-          </span>}
-          <div style={{ flex: 1 }} />
-          {/* TF buttons */}
-          {(['1m', '5m', '15m', '1h'] as const).map(tf => (
-            <button key={tf} onClick={() => setChartTf(tf)} style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3, cursor: 'pointer', background: chartTf === tf ? 'rgba(0,176,255,.15)' : 'rgba(255,255,255,.06)', color: chartTf === tf ? '#00b0ff' : '#555577', border: chartTf === tf ? '1px solid rgba(0,176,255,.25)' : '1px solid transparent' }}>{tf}</button>
-          ))}
-          <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,.07)' }} />
-          {/* Symbol buttons */}
-          {CHART_SYMS.slice(0, 4).map(sym => (
-            <button key={sym} onClick={() => setChartSym(sym)} style={{ fontFamily: 'var(--font-geist-mono),sans-serif', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', background: chartSym === sym ? 'rgba(15,237,190,.15)' : 'rgba(255,255,255,.06)', color: chartSym === sym ? '#0FEDBE' : '#555577', border: chartSym === sym ? '1px solid rgba(15,237,190,.25)' : '1px solid transparent' }}>{sym}</button>
-          ))}
-        </div>
-        {/* Chart area */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.025) 40px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,.015) 60px)' }} />
-          <CandleChart symbol={chartSym} priceData={priceData} openPositions={ev.openPositions} leader={leader} />
-        </div>
+      {/* ── Center: Live Trading Chart (real LightweightTradingChart) ── */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+        <ArenaLiveChart ev={ev} />
       </div>
 
       {/* ── Right: Action Feed (260px) ── */}
