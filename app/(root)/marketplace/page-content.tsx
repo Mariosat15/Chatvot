@@ -194,7 +194,7 @@ export default function MarketplaceContent() {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [category, setCategory] = useState<Category>("all");
   const [search, setSearch] = useState("");
-  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [showFreeOnly] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(
     null,
   );
@@ -533,20 +533,6 @@ export default function MarketplaceContent() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Free Only Toggle */}
-            <button
-              onClick={() => setShowFreeOnly(!showFreeOnly)}
-              className={cn(
-                "flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all",
-                showFreeOnly
-                  ? "bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/20 text-green-400"
-                  : "text-gray-400 hover:text-white hover:bg-white/5",
-              )}
-            >
-              <Gift className="h-5 w-5" />
-              Free Only
-            </button>
-
             {/* View Toggle */}
             <div className="flex items-center bg-gray-900/50 rounded-xl border border-gray-700/50 p-1">
               <button
