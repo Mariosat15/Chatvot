@@ -63,7 +63,6 @@ type Ev = {
   rankingMethod: string; participants: P[]; openPositions: Pos[];
 };
 type Banner = { id: string; text: string; color: string; icon: string };
-type Candle = { o: number; h: number; l: number; c: number };
 
 /* ════════════════════════════════════════════════════════════════════
    HELPERS
@@ -124,115 +123,99 @@ const avatarColor = (n: string) =>
   ['#00d4ff', '#ff6b35', '#7c3aed', '#10b981', '#f59e0b', '#ec4899'][n.charCodeAt(0) % 6];
 
 /* ════════════════════════════════════════════════════════════════════
-   SEEDED RNG — deterministic, no re-randomisation on re-render
+   EQUITY LINE CHART  (SVG area chart — real live equity data)
 ════════════════════════════════════════════════════════════════════ */
-const mkRng = (seed: number) => {
-  let s = (seed | 0) + 1;
-  return () => { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; };
-};
-const userSeed = (uid: string) => uid.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 31;
+const EquityLine = ({
+  history, w = 300, h = 140,
+}: { history: number[]; w?: number; h?: number }) => {
+  // Need at least 2 points; pad with the first value if shorter
+  const data = history.length < 2
+    ? [history[0] ?? 10000, history[0] ?? 10000]
+    : history;
 
-/* ════════════════════════════════════════════════════════════════════
-   CANDLE GENERATOR
-════════════════════════════════════════════════════════════════════ */
-const genCandles = (history: number[], userId: string): Candle[] => {
-  const rng = mkRng(userSeed(userId));
-  // Pad to 24 candles with synthetic warm-up if needed
-  const padded = history.length >= 24
-    ? history.slice(-24)
-    : (() => {
-        const base = history[0] || 10000;
-        const synth = Array.from({ length: 24 - history.length }, (_, i) =>
-          base * (1 + (rng() - 0.5) * 0.008 * (24 - history.length - i)));
-        return [...synth, ...history];
-      })();
-  return padded.map((c, i) => {
-    const o = i > 0 ? padded[i - 1] : c;
-    const noise = Math.max(Math.abs(c - o) * 0.6, c * 0.0008);
-    const h = Math.max(o, c) + rng() * noise * 2.4;
-    const l = Math.min(o, c) - rng() * noise * 2.4;
-    return { o, h, l: Math.min(l, o, c) - 1e-9, c };
-  });
-};
-
-/* ════════════════════════════════════════════════════════════════════
-   CANDLESTICK CHART  (SVG)
-════════════════════════════════════════════════════════════════════ */
-const CandleChart = ({
-  history, userId, w = 300, h = 140,
-}: { history: number[]; userId: string; w?: number; h?: number }) => {
-  const candles = genCandles(history, userId);
-  const vals = candles.flatMap(c => [c.h, c.l]);
-  const minV = Math.min(...vals), maxV = Math.max(...vals), range = maxV - minV || 1;
-  const PT = 8, PB = 20, PL = 4, PR = 44;
+  const minV = Math.min(...data), maxV = Math.max(...data);
+  const range = maxV - minV || data[0] * 0.002 || 1; // avoid zero range
+  const PT = 10, PB = 22, PL = 4, PR = 44;
   const cw = w - PL - PR, ch = h - PT - PB;
+  const sx = (i: number) => PL + (i / (data.length - 1)) * cw;
   const sy = (v: number) => PT + (1 - (v - minV) / range) * ch;
-  const bw = Math.max(3, cw / candles.length - 2);
 
-  // 7-period EMA
-  const k = 2 / 8;
-  const ema: number[] = [];
-  candles.forEach((c, i) => ema.push(i === 0 ? c.c : c.c * k + ema[i - 1] * (1 - k)));
-  const emaPts = ema
-    .map((v, i) => `${(PL + (i / (candles.length - 1)) * cw).toFixed(1)},${sy(v).toFixed(1)}`)
-    .join(' ');
+  const first = data[0], last = data[data.length - 1];
+  const isPos = last >= first;
+  const col = isPos ? '#00ff88' : '#ff3366';
+  const pct = ((last - first) / (first || 1)) * 100;
+  const uid = `el${w}${h}${col.slice(1, 4)}`;
 
-  const last = candles[candles.length - 1];
-  const first = candles[0];
-  const pct = ((last.c - first.c) / (first.c || 1)) * 100;
+  // Build SVG path points
+  const pts = data.map((v, i) => `${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join(' ');
+  // Area polygon: line + close along bottom
+  const area = `${PL},${PT + ch} ${pts} ${sx(data.length - 1)},${PT + ch}`;
+
+  // 5-point moving average for smooth overlay
+  const ma: number[] = data.map((_, i) => {
+    const slice = data.slice(Math.max(0, i - 4), i + 1);
+    return slice.reduce((a, v) => a + v, 0) / slice.length;
+  });
+  const maPts = ma.map((v, i) => `${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join(' ');
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
-      {/* Grid lines */}
+      <defs>
+        <linearGradient id={uid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={col} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={col} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+
+      {/* Horizontal grid lines */}
       {[0.25, 0.5, 0.75].map(f => (
         <line key={f} x1={PL} x2={w - PR} y1={PT + f * ch} y2={PT + f * ch}
-          stroke="#ffffff07" strokeWidth="1" />
+          stroke="#ffffff08" strokeWidth="1" />
       ))}
 
-      {/* Candles */}
-      {candles.map((c, i) => {
-        const cx = PL + (i / (candles.length - 1)) * cw;
-        const isGr = c.c >= c.o;
-        const col = isGr ? '#00ff88' : '#ff3366';
-        const bodyT = sy(Math.max(c.o, c.c));
-        const bodyB = sy(Math.min(c.o, c.c));
-        const bh = Math.max(bodyB - bodyT, 1.5);
-        return (
-          <g key={i}>
-            <line x1={cx} x2={cx} y1={sy(c.h)} y2={sy(c.l)}
-              stroke={col} strokeWidth="1" opacity="0.65" />
-            <rect x={cx - bw / 2} y={bodyT} width={bw} height={bh}
-              fill={col} opacity={isGr ? 0.88 : 0.82}
-              style={{ filter: `drop-shadow(0 0 2px ${col}88)` }} />
-          </g>
-        );
-      })}
+      {/* Area fill */}
+      <polygon points={area} fill={`url(#${uid})`} />
 
-      {/* EMA overlay */}
-      <polyline points={emaPts} fill="none" stroke="#f59e0b"
-        strokeWidth="1.8" strokeLinejoin="round" opacity="0.8" />
+      {/* Main equity line */}
+      <polyline points={pts} fill="none" stroke={col} strokeWidth="2.5"
+        strokeLinejoin="round"
+        style={{ filter: `drop-shadow(0 0 4px ${col}99)` }} />
 
-      {/* Right price axis */}
+      {/* 5-MA smooth overlay */}
+      <polyline points={maPts} fill="none" stroke={col} strokeWidth="1"
+        strokeLinejoin="round" opacity="0.35" strokeDasharray="4 3" />
+
+      {/* Right axis labels */}
       {[0, 0.5, 1].map(f => {
         const price = minV + (1 - f) * range;
         return (
           <text key={f} x={w - PR + 5} y={PT + f * ch + 3.5}
-            fill="#444" fontSize="7.5" fontFamily="var(--font-geist-mono)">
+            fill="#3a3a5a" fontSize="7.5" fontFamily="var(--font-geist-mono)">
             {price.toFixed(0)}
           </text>
         );
       })}
 
-      {/* Current price line */}
-      <line x1={PL} x2={w - PR} y1={sy(last.c)} y2={sy(last.c)}
-        stroke={last.c >= first.c ? '#00ff88' : '#ff3366'} strokeWidth="1"
-        strokeDasharray="4 3" opacity="0.4" />
+      {/* Current-price dashed line */}
+      <line x1={PL} x2={w - PR} y1={sy(last)} y2={sy(last)}
+        stroke={col} strokeWidth="1" strokeDasharray="5 3" opacity="0.45" />
+      {/* Current price label on right */}
+      <rect x={w - PR + 2} y={sy(last) - 8} width={PR - 3} height={13} rx="3"
+        fill={col} opacity="0.15" />
+      <text x={w - PR + 4} y={sy(last) + 2.5} fill={col}
+        fontSize="8" fontFamily="var(--font-geist-mono)" fontWeight="700">
+        {last.toFixed(0)}
+      </text>
 
-      {/* % label bottom-left */}
-      <text x={PL + 3} y={h - 5} fill={pct >= 0 ? '#00ff88' : '#ff3366'}
-        fontSize="9.5" fontFamily="var(--font-geist-mono)" fontWeight="700">
+      {/* % change label bottom-left */}
+      <text x={PL + 3} y={h - 5} fill={col}
+        fontSize="10" fontFamily="var(--font-geist-mono)" fontWeight="700">
         {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
       </text>
+
+      {/* Dot at current position */}
+      <circle cx={sx(data.length - 1)} cy={sy(last)} r="4" fill={col}
+        style={{ filter: `drop-shadow(0 0 5px ${col})` }} />
     </svg>
   );
 };
@@ -438,7 +421,7 @@ const TraderCard = ({
         background: '#050510', borderRadius: 9, overflow: 'hidden',
         border: '1px solid #ffffff08', marginBottom: 10, flexShrink: 0,
       }}>
-        <CandleChart history={sparks} userId={p.userId} w={330} h={152} />
+        <EquityLine history={sparks} w={330} h={152} />
       </div>
 
       {/* — Stats row — */}
@@ -625,7 +608,7 @@ const GridView = ({ ev, sparks }: { ev: Ev; sparks: Record<string, number[]> }) 
               background: '#050510', borderRadius: 7, overflow: 'hidden',
               border: '1px solid #ffffff06', flex: 1, minHeight: 0,
             }}>
-              <CandleChart history={hist} userId={p.userId} w={320} h={106} />
+              <EquityLine history={hist} w={320} h={106} />
             </div>
 
             {/* Bottom badges */}
@@ -1095,7 +1078,9 @@ export default function StreamPage() {
   const vv = curEv ? calcVol(curEv.participants) : { label: 'LOW', pct: 18, col: '#10b981' };
   const allPositions = events.flatMap(e => e.openPositions);
   const numActive = curEv?.participants.filter(p => !p.isDisqualified).length ?? 0;
-  const isBattle = !curEv || curEv.type === 'challenge' || numActive <= 2;
+  // Challenges → 1v1 Battle View regardless of count
+  // Competitions → Grid for ≤8 active traders, Championship for 9+
+  const isBattle = !curEv || curEv.type === 'challenge';
   const isGrid = !isBattle && numActive <= 8;
 
   // Build sparks map for current event
