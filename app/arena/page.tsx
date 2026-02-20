@@ -863,7 +863,7 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const [sym,       setSym]       = useState('EUR/USD');
   const [tf,        setTf]        = useState('5');
   const [loading,   setLoading]   = useState(true);
-  const [posCoords, setPosCoords] = useState<Record<string,number>>({});
+  const [posCoords, setPosCoords] = useState<Record<string,{x:number|null;y:number|null}>>({});
 
   const priceKey  = sym.replace('/','');
   const livePrice = prices[priceKey] ?? null;
@@ -875,6 +875,29 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   const symPositions = useMemo(() =>
     ev.openPositions.filter(p => (p.symbol||'').replace('/','').toUpperCase() === priceKey.toUpperCase()),
     [ev.openPositions, priceKey]);
+
+  // All positions grouped by normalised symbol key — for multi-pair display
+  const positionsBySymbol = useMemo(() => {
+    const byKey: Record<string, typeof ev.openPositions> = {};
+    ev.openPositions.forEach(p => {
+      const k = (p.symbol||'').replace('/','').toUpperCase();
+      if (!byKey[k]) byKey[k] = [];
+      byKey[k].push(p);
+    });
+    return byKey;
+  }, [ev.openPositions]);
+
+  // Other pairs that have open trades (not the currently shown pair)
+  const otherPairChips = useMemo(() =>
+    Object.entries(positionsBySymbol)
+      .filter(([k]) => k !== priceKey.toUpperCase())
+      .map(([k, poss]) => ({
+        key: k,
+        label: ARENA_SYMS.find(s => s.key === k)?.label ?? k.slice(0,3)+'/'+k.slice(3),
+        count: poss.length,
+        pnl: poss.reduce((s, p) => s + p.unrealizedPnl, 0),
+      })),
+    [positionsBySymbol, priceKey]);
 
   const rm   = ev.rankingMethod || 'pnl';
   const top5 = useMemo(() =>
@@ -927,6 +950,7 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    lastCRef.current = null; // reset on every sym/tf change
     (async () => {
       for (let i = 0; i < 40 && !seriesRef.current; i++) await new Promise(r => setTimeout(r, 100));
       if (!seriesRef.current || !active) { if (active) setLoading(false); return; }
@@ -948,23 +972,33 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
     return () => { active = false; };
   }, [sym, tf]);
 
-  // ── Live bid price line ───────────────────────────────────────────────────
+  // ── Live bid price line — always update on bid change ────────────────────
   useEffect(() => {
     const series = seriesRef.current;
-    if (!series || !bid || Math.abs(bid - prevBidRef.current) < 0.000009) return;
-    prevBidRef.current = bid;
+    if (!series || !bid) return;
     if (bidLineRef.current) try { series.removePriceLine(bidLineRef.current); } catch {}
-    bidLineRef.current = series.createPriceLine({ price: bid, color: 'rgba(15,237,190,.7)', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: 'BID' });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Math.round(bid * 100000)]);
+    bidLineRef.current = series.createPriceLine({ price: bid, color: 'rgba(15,237,190,.7)', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `BID` });
+  }, [bid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Extend last candle with live mid ────────────────────────────────────
+  // ── Extend last candle with live mid (price always moves) ────────────────
   useEffect(() => {
     const series = seriesRef.current;
-    if (!series || !mid || !lastCRef.current) return;
+    if (!series || !mid) return;
+    // Compute current bucket time so we can update even if lastCRef not yet set
+    const tfSec = parseInt(tf) * 60; // tf is in minutes: '1','5','15','60','240'
+    const nowSec = Math.floor(Date.now() / 1000);
+    const bucketTime = Math.floor(nowSec / tfSec) * tfSec;
     const lc = lastCRef.current;
-    series.update({ time: lc.time as any, open: lc.open, high: Math.max(lc.high, mid), low: Math.min(lc.low, mid), close: mid });
-  }, [mid]);
+    try {
+      series.update({
+        time:  (lc?.time ?? bucketTime) as any,
+        open:  lc?.open ?? mid,
+        high:  Math.max(lc?.high ?? mid, mid),
+        low:   Math.min(lc?.low  ?? mid, mid),
+        close: mid,
+      });
+    } catch { /* chart may not be ready yet */ }
+  }, [mid, tf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Trader position price lines ───────────────────────────────────────────
   useEffect(() => {
@@ -982,14 +1016,30 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symPositions]);
 
-  // ── RAF: update overlay Y coords from series.priceToCoordinate ───────────
+  // ── RAF: update overlay (x,y) coords using priceToCoordinate + timeToCoordinate ──
   useEffect(() => {
     const tick = () => {
       const series = seriesRef.current;
-      if (series) {
-        const coords: Record<string,number> = {};
-        symPositions.forEach(pos => { const y = series.priceToCoordinate(pos.entryPrice); if (y !== null && y !== undefined && y > 0) coords[pos.userId] = y; });
-        setPosCoords(prev => symPositions.some(p => Math.abs((prev[p.userId]??-1)-(coords[p.userId]??-2)) > 0.5) ? coords : prev);
+      const chart  = chartRef.current;
+      if (series && chart) {
+        const coords: Record<string,{x:number|null;y:number|null}> = {};
+        symPositions.forEach(pos => {
+          const key = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
+          const y = series.priceToCoordinate(pos.entryPrice);
+          const openMs  = pos.openedAt ? new Date(pos.openedAt).getTime() : 0;
+          const openSec = openMs > 0 ? Math.floor(openMs / 1000) : null;
+          let x: number | null = null;
+          try { x = openSec ? (chart.timeScale().timeToCoordinate(openSec as any) ?? null) : null; } catch {}
+          coords[key] = { x: (x !== null && x > 0) ? x : null, y: (y !== null && y !== undefined && y > 0 && y < 5000) ? y : null };
+        });
+        setPosCoords(prev => {
+          const changed = symPositions.some(p => {
+            const k = `${p.userId}_${p.entryPrice}_${p.symbol}`;
+            const old = prev[k]; const nw = coords[k];
+            return !old || Math.abs((old.y??-1)-(nw?.y??-2)) > 0.5 || Math.abs((old.x??-1)-(nw?.x??-2)) > 0.5;
+          });
+          return changed ? coords : prev;
+        });
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1017,11 +1067,18 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
           <div style={{ width:7, height:7, borderRadius:'50%', background:'#FF495B', animation:'cvLive 1.1s ease-in-out infinite' }} />
           <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:800, color:'#FF495B', letterSpacing:2 }}>LIVE</span>
         </div>
-        {/* Symbol chips */}
+        {/* Symbol chips — with live trade count badges */}
         <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-          {ARENA_SYMS.map(s => (
-            <button key={s.key} onClick={() => setSym(s.label)} style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'4px 8px', borderRadius:4, cursor:'pointer', transition:'all .12s', background: sym===s.label ? 'rgba(15,237,190,.15)' : 'rgba(255,255,255,.04)', color: sym===s.label ? '#0FEDBE' : '#555577', border: sym===s.label ? '1px solid rgba(15,237,190,.3)' : '1px solid rgba(255,255,255,.04)' }}>{s.label}</button>
-          ))}
+          {ARENA_SYMS.map(s => {
+            const cnt = positionsBySymbol[s.key]?.length ?? 0;
+            const active = sym === s.label;
+            return (
+              <button key={s.key} onClick={() => setSym(s.label)} style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, padding:'4px 8px', borderRadius:4, cursor:'pointer', transition:'all .12s', display:'flex', alignItems:'center', gap:4, background: active ? 'rgba(15,237,190,.15)' : cnt>0 ? 'rgba(88,98,255,.1)' : 'rgba(255,255,255,.04)', color: active ? '#0FEDBE' : cnt>0 ? '#7b84ff' : '#555577', border: active ? '1px solid rgba(15,237,190,.3)' : cnt>0 ? '1px solid rgba(88,98,255,.25)' : '1px solid rgba(255,255,255,.04)' }}>
+                {s.label}
+                {cnt > 0 && <span style={{ background: active ? '#0FEDBE' : '#5862FF', color:'#05050c', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900, minWidth:12, textAlign:'center' }}>{cnt}</span>}
+              </button>
+            );
+          })}
         </div>
         <div style={{ width:1, height:20, background:'rgba(255,255,255,.07)', flexShrink:0 }} />
         {/* TF chips */}
@@ -1083,37 +1140,54 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
             })}
           </div>
 
-          {/* Trader position flags — anchored at entry-price Y via priceToCoordinate */}
+          {/* Trader position markers — entry dot at (x,y) + card pinned to right at y */}
           {symPositions.map(pos => {
-            const y = posCoords[pos.userId];
-            if (y === undefined || y < 16 || y > 4000) return null;
+            const posKey = `${pos.userId}_${pos.entryPrice}_${pos.symbol}`;
+            const coord  = posCoords[posKey];
+            const y = coord?.y;
+            if (!y) return null;
+            const x      = coord?.x ?? null;
             const col    = traderColor(pos.userId);
             const pnlPos = pos.unrealizedPnl >= 0;
             const isLdr  = pos.userId === leaderId;
             return (
-              <div key={pos.userId} style={{ position:'absolute', right:90, top:y-16, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
-                {isLdr && <span style={{ fontSize:16, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
-                {/* connector stub */}
-                <div style={{ width:14, height:1, background:col, opacity:.65 }} />
-                {/* player card */}
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 9px 4px 5px', borderRadius:5, background:'rgba(5,5,12,.9)', border:`1px solid ${col}55`, backdropFilter:'blur(10px)', boxShadow:`0 0 14px ${col}20` }}>
-                  <div style={{ width:20, height:20, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', border:`1.5px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
-                    {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
+              <React.Fragment key={posKey}>
+                {/* ── Entry point dot at exact (openTime, entryPrice) ── */}
+                {x !== null && (
+                  <>
+                    {/* Outer glow ring */}
+                    <div style={{ position:'absolute', left:x-7, top:y-7, width:14, height:14, borderRadius:'50%', background:`${col}25`, border:`1px solid ${col}70`, pointerEvents:'none' }} />
+                    {/* Inner dot */}
+                    <div style={{ position:'absolute', left:x-4, top:y-4, width:8, height:8, borderRadius:'50%', background:col, border:'1.5px solid #05050c', boxShadow:`0 0 8px ${col}`, pointerEvents:'none', zIndex:8 }} />
+                    {/* Connector line from entry dot to the right-side card */}
+                    <div style={{ position:'absolute', left:x+5, top:y-0.5, right:94, height:1, background:`linear-gradient(to right, ${col}80, ${col}20)`, pointerEvents:'none' }} />
+                  </>
+                )}
+                {/* ── Player card pinned at right edge at price Y ── */}
+                <div style={{ position:'absolute', right:90, top:y-16, display:'flex', alignItems:'center', gap:4, animation:'cvFlagIn .4s cubic-bezier(.34,1.56,.64,1)' }}>
+                  {isLdr && <span style={{ fontSize:15, animation:'cvCrown 2s ease-in-out infinite' }}>👑</span>}
+                  {/* connector stub when no x coord */}
+                  {x === null && <div style={{ width:14, height:1, background:col, opacity:.6 }} />}
+                  {/* card */}
+                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 9px 4px 5px', borderRadius:5, background:'rgba(5,5,12,.92)', border:`1px solid ${col}55`, backdropFilter:'blur(10px)', boxShadow:`0 0 16px ${col}22` }}>
+                    <div style={{ width:20, height:20, borderRadius:'50%', background:avColor(pos.username), display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', border:`1.5px solid ${col}`, flexShrink:0, overflow:'hidden' }}>
+                      {pos.profileImage ? <img src={pos.profileImage} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : ini(pos.username)}
+                    </div>
+                    <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:700, color:col, whiteSpace:'nowrap' }}>{pos.username}</span>
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, padding:'1px 5px', borderRadius:3, background: pos.side==='long'?'rgba(15,237,190,.15)':'rgba(255,73,91,.15)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.25)':'rgba(255,73,91,.25)'}` }}>
+                      {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
+                    </span>
+                    <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease' }}>
+                      {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
+                    </span>
                   </div>
-                  <span style={{ fontFamily:'var(--font-geist-sans),sans-serif', fontSize:10, fontWeight:700, color:col, whiteSpace:'nowrap' }}>{pos.username}</span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, padding:'1px 5px', borderRadius:3, background: pos.side==='long'?'rgba(15,237,190,.15)':'rgba(255,73,91,.15)', color: pos.side==='long'?'#0FEDBE':'#FF495B', border:`1px solid ${pos.side==='long'?'rgba(15,237,190,.25)':'rgba(255,73,91,.25)'}` }}>
-                    {pos.side==='long'?'▲ LONG':'▼ SHORT'}{pos.leverage>1?` ${pos.leverage}×`:''}
-                  </span>
-                  <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:11, fontWeight:800, color:pnlPos?'#0FEDBE':'#FF495B', animation:'cvPnl .6s ease' }}>
-                    {pnlPos?'+':''}{fmtPnl(pos.unrealizedPnl)}
-                  </span>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
 
-          {/* Bottom strip */}
-          <div style={{ position:'absolute', bottom:10, left:10, display:'flex', alignItems:'center', gap:6 }}>
+          {/* Bottom strip — current pair stats */}
+          <div style={{ position:'absolute', bottom: otherPairChips.length > 0 ? 38 : 10, left:10, display:'flex', alignItems:'center', gap:6 }}>
             {symPositions.length > 0 ? (
               <>
                 <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(5,5,12,.85)', border:'1px solid rgba(88,98,255,.2)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, fontWeight:700, color:'#7b84ff', letterSpacing:1 }}>{symPositions.length} TRADER{symPositions.length!==1?'S':''} ON {sym}</div>
@@ -1124,6 +1198,23 @@ function ArenaBroadcastChart({ ev, prices }: { ev: AEvent; prices: PriceMap }) {
               <div style={{ padding:'3px 9px', borderRadius:4, background:'rgba(5,5,12,.85)', border:'1px solid rgba(255,255,255,.05)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9, color:'#555577' }}>No open trades on {sym} · switch pair above</div>
             )}
           </div>
+
+          {/* Other-pairs activity strip — interactive, lets viewer jump to any active pair */}
+          {otherPairChips.length > 0 && (
+            <div style={{ position:'absolute', bottom:10, left:10, right:10, display:'flex', alignItems:'center', gap:6, pointerEvents:'all' }}>
+              <span style={{ fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'#555577', flexShrink:0, letterSpacing:1 }}>ALSO ACTIVE:</span>
+              {otherPairChips.map(chip => {
+                const chipPnlPos = chip.pnl >= 0;
+                return (
+                  <button key={chip.key} onClick={() => setSym(chip.label)} style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:4, cursor:'pointer', transition:'all .15s', background:'rgba(5,5,12,.85)', border:'1px solid rgba(255,255,255,.1)', fontFamily:'var(--font-geist-mono),monospace', fontSize:9 }}>
+                    <span style={{ color:'#ccc', fontWeight:700 }}>{chip.label}</span>
+                    <span style={{ background:'rgba(88,98,255,.3)', color:'#7b84ff', borderRadius:8, padding:'0 4px', fontSize:7, fontWeight:900 }}>{chip.count}</span>
+                    <span style={{ color: chipPnlPos ? '#0FEDBE' : '#FF495B', fontWeight:700 }}>{chipPnlPos?'+':''}{chip.pnl >= 0 ? '+' : ''}${Math.round(Math.abs(chip.pnl))}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Watermark */}
           <div style={{ position:'absolute', bottom:10, right:10, fontFamily:'var(--font-geist-mono),monospace', fontSize:8, color:'rgba(88,98,255,.3)', letterSpacing:2, fontWeight:700 }}>CHARTVOLT ARENA</div>
