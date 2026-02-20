@@ -36,6 +36,8 @@ import {
   RefreshCw,
   Trash2,
   Swords,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -183,6 +185,8 @@ const RISK_STYLES = {
   },
 };
 
+const MARKETPLACE_VIEW_KEY = "marketplace-view-mode";
+
 export default function MarketplaceContent() {
   const router = useRouter();
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -196,6 +200,21 @@ export default function MarketplaceContent() {
   );
   const [sortBy, setSortBy] = useState<SortOption>("popular");
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+
+  // Load saved view preference on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(MARKETPLACE_VIEW_KEY) as "card" | "list" | null;
+      if (saved === "card" || saved === "list") setViewMode(saved);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist view mode changes
+  const handleSetViewMode = (mode: "card" | "list") => {
+    setViewMode(mode);
+    try { localStorage.setItem(MARKETPLACE_VIEW_KEY, mode); } catch { /* ignore */ }
+  };
 
   // Use ref to store the current search value without triggering re-renders
   const searchRef = useRef(search);
@@ -528,6 +547,34 @@ export default function MarketplaceContent() {
               Free Only
             </button>
 
+            {/* View Toggle */}
+            <div className="flex items-center bg-gray-900/50 rounded-xl border border-gray-700/50 p-1">
+              <button
+                onClick={() => handleSetViewMode("card")}
+                title="Card view"
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === "card"
+                    ? "bg-emerald-500 text-white"
+                    : "text-gray-400 hover:text-gray-200",
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleSetViewMode("list")}
+                title="List view"
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === "list"
+                    ? "bg-emerald-500 text-white"
+                    : "text-gray-400 hover:text-gray-200",
+                )}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+
             {/* Sort Dropdown */}
             <div className="relative">
               <button
@@ -631,7 +678,7 @@ export default function MarketplaceContent() {
                   <h2 className="text-2xl font-bold text-white">Featured</h2>
                   <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-2"}>
                   {featuredItems.map((item) => {
                     // Use the correct card component based on category
                     if (item.category === "cosmetic") {
@@ -642,6 +689,7 @@ export default function MarketplaceContent() {
                           onView={() => setSelectedItem(item)}
                           onPurchase={() => handlePurchase(item)}
                           purchasing={purchasing === item._id}
+                          listView={viewMode === "list"}
                         />
                       );
                     }
@@ -653,6 +701,7 @@ export default function MarketplaceContent() {
                           onView={() => setSelectedItem(item)}
                           onPurchase={() => handlePurchase(item)}
                           purchasing={purchasing === item._id}
+                          listView={viewMode === "list"}
                         />
                       );
                     }
@@ -664,6 +713,7 @@ export default function MarketplaceContent() {
                         onPurchase={() => handlePurchase(item)}
                         purchasing={purchasing === item._id}
                         featured
+                        listView={viewMode === "list"}
                       />
                     );
                   })}
@@ -691,7 +741,7 @@ export default function MarketplaceContent() {
                     Become a Game Master! Create competitions, earn from
                     referrals, and build your trading community.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-2"}>
                     {gamemasterPackages.map((item) => (
                       <GameMasterCard
                         key={item._id}
@@ -699,6 +749,7 @@ export default function MarketplaceContent() {
                         onView={() => setSelectedItem(item)}
                         onPurchase={() => handlePurchase(item)}
                         purchasing={purchasing === item._id}
+                        listView={viewMode === "list"}
                       />
                     ))}
                   </div>
@@ -721,7 +772,7 @@ export default function MarketplaceContent() {
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-2"}>
                     {indicators.map((item) => (
                       <ItemCard
                         key={item._id}
@@ -729,6 +780,7 @@ export default function MarketplaceContent() {
                         onView={() => setSelectedItem(item)}
                         onPurchase={() => handlePurchase(item)}
                         purchasing={purchasing === item._id}
+                        listView={viewMode === "list"}
                       />
                     ))}
                   </div>
@@ -751,7 +803,7 @@ export default function MarketplaceContent() {
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-orange-500/20 to-transparent" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-2"}>
                     {strategies.map((item) => (
                       <ItemCard
                         key={item._id}
@@ -759,6 +811,7 @@ export default function MarketplaceContent() {
                         onView={() => setSelectedItem(item)}
                         onPurchase={() => handlePurchase(item)}
                         purchasing={purchasing === item._id}
+                        listView={viewMode === "list"}
                       />
                     ))}
                   </div>
@@ -779,7 +832,7 @@ export default function MarketplaceContent() {
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-pink-500/20 to-transparent" />
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  <div className={viewMode === "card" ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6" : "flex flex-col gap-2"}>
                     {cosmetics.map((item) => (
                       <CosmeticCard
                         key={item._id}
@@ -787,6 +840,7 @@ export default function MarketplaceContent() {
                         onView={() => setSelectedItem(item)}
                         onPurchase={() => handlePurchase(item)}
                         purchasing={purchasing === item._id}
+                        listView={viewMode === "list"}
                       />
                     ))}
                   </div>
@@ -951,12 +1005,14 @@ function ItemCard({
   onPurchase,
   purchasing,
   featured = false,
+  listView = false,
 }: {
   item: MarketplaceItem;
   onView: () => void;
   onPurchase: () => void;
   purchasing: boolean;
   featured?: boolean;
+  listView?: boolean;
 }) {
   // Properly detect category from the actual category field
   const isIndicator = item.category === "indicator";
@@ -1008,6 +1064,119 @@ function ItemCard({
 
   const hasImage = !!item.imageUrl;
 
+  // ── LIST VIEW ──────────────────────────────────────────────────────────────
+  if (listView) {
+    return (
+      <div
+        className={cn(
+          "group flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
+          "bg-gray-800/40 border border-gray-700/50",
+          "hover:border-gray-600/60 hover:bg-gray-800/70",
+          featured && "ring-1 ring-yellow-500/30",
+          item.owned && "ring-1 ring-emerald-500/30",
+        )}
+        onClick={onView}
+      >
+        {/* Thumbnail / Icon */}
+        <div
+          className={cn(
+            "w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-gradient-to-br",
+            gradientBg,
+          )}
+        >
+          {hasImage ? (
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="w-10 h-10 object-contain"
+            />
+          ) : (
+            <CategoryIcon className={cn("h-5 w-5", iconColor)} />
+          )}
+        </div>
+
+        {/* Name + description */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">
+              {item.name}
+            </h3>
+            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0", categoryBgColor)}>
+              {categoryLabel}
+            </span>
+            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0", riskStyle.bg, riskStyle.text, riskStyle.border)}>
+              {item.riskLevel.replace("_", " ")}
+            </span>
+            {featured && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
+                Featured
+              </span>
+            )}
+            {item.owned && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
+                Owned
+              </span>
+            )}
+            {item.isFree && !item.owned && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
+                Free
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 truncate mt-0.5">
+            {item.shortDescription}
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="hidden md:flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {item.totalPurchases}
+          </span>
+          {item.averageRating > 0 && (
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+              {item.averageRating.toFixed(1)}
+            </span>
+          )}
+        </div>
+
+        {/* Price */}
+        <div className="flex-shrink-0 text-right min-w-[64px]">
+          {item.isFree ? (
+            <span className="text-sm font-bold text-green-400">FREE</span>
+          ) : (
+            <span className="text-sm font-bold text-white">
+              ⚡ {item.price.toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        {/* Action */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onPurchase(); }}
+          disabled={purchasing}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex-shrink-0",
+            item.owned
+              ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+              : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20",
+          )}
+        >
+          {purchasing ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+          ) : item.owned ? (
+            <><Check className="h-3 w-3" />Owned</>
+          ) : (
+            <><ShoppingCart className="h-3 w-3" />Get</>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // ── CARD VIEW ──────────────────────────────────────────────────────────────
   return (
     <div
       className={cn(
@@ -1236,12 +1405,90 @@ function CosmeticCard({
   onView,
   onPurchase,
   purchasing,
+  listView = false,
 }: {
   item: MarketplaceItem;
   onView: () => void;
   onPurchase: () => void;
   purchasing: boolean;
+  listView?: boolean;
 }) {
+  if (listView) {
+    return (
+      <div
+        className={cn(
+          "group flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
+          "bg-gray-800/40 border border-gray-700/50 hover:border-pink-500/40 hover:bg-gray-800/70",
+          item.owned && "ring-1 ring-pink-500/30",
+        )}
+        onClick={onView}
+      >
+        {/* Thumbnail */}
+        <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gray-900 border border-gray-700/50">
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-contain" />
+          ) : (
+            <div className="w-10 h-10 flex items-center justify-center">
+              <User className="h-5 w-5 text-gray-600" />
+            </div>
+          )}
+        </div>
+
+        {/* Name + desc */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-white truncate group-hover:text-pink-400 transition-colors">
+              {item.name}
+            </h3>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-pink-500/10 text-pink-400 border border-pink-500/20 flex-shrink-0">
+              Avatar
+            </span>
+            {item.owned && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-pink-500/20 text-pink-400 border border-pink-500/30 flex-shrink-0">
+                Owned
+              </span>
+            )}
+            {item.isFree && !item.owned && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
+                Free
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 truncate mt-0.5">{item.shortDescription}</p>
+        </div>
+
+        {/* Price */}
+        <div className="flex-shrink-0 text-right min-w-[64px]">
+          {item.isFree ? (
+            <span className="text-sm font-bold text-green-400">FREE</span>
+          ) : (
+            <span className="text-sm font-bold text-pink-400">⚡ {item.price}</span>
+          )}
+        </div>
+
+        {/* Action */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onPurchase(); }}
+          disabled={purchasing}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex-shrink-0",
+            item.owned
+              ? "bg-pink-500/20 text-pink-400 cursor-default"
+              : "bg-pink-500 hover:bg-pink-600 text-white hover:shadow-lg hover:shadow-pink-500/30",
+          )}
+        >
+          {purchasing ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+          ) : item.owned ? (
+            <><Check className="h-3 w-3" />Owned</>
+          ) : (
+            <><ShoppingCart className="h-3 w-3" />Get</>
+          )}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -1346,14 +1593,92 @@ function GameMasterCard({
   onView,
   onPurchase,
   purchasing,
+  listView = false,
 }: {
   item: MarketplaceItem;
   onView: () => void;
   onPurchase: () => void;
   purchasing: boolean;
+  listView?: boolean;
 }) {
   const config = item.gameMasterConfig;
   const hasImage = !!item.imageUrl;
+
+  if (listView) {
+    return (
+      <div
+        className={cn(
+          "group flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
+          "bg-gray-800/40 border border-yellow-500/20 hover:border-yellow-500/40 hover:bg-gray-800/70",
+          item.owned && "ring-1 ring-yellow-500/40",
+        )}
+        onClick={onView}
+      >
+        {/* Icon */}
+        <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-yellow-500/20 to-amber-500/20 border border-yellow-500/20">
+          {hasImage ? (
+            <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-contain" />
+          ) : (
+            <Crown className="h-5 w-5 text-yellow-400" />
+          )}
+        </div>
+
+        {/* Name + desc */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">
+              {item.name}
+            </h3>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
+              Game Master
+            </span>
+            {item.owned && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
+                Active
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 truncate mt-0.5">{item.shortDescription}</p>
+        </div>
+
+        {/* Key stats */}
+        {config && (
+          <div className="hidden md:flex items-center gap-3 text-xs flex-shrink-0">
+            <span className="text-gray-400">{config.subscriptionDurationDays}d</span>
+            <span className="text-emerald-400 font-medium">{config.referralFeePercentage}% ref</span>
+            {config.canCreateCompetitions !== false && (
+              <span className="text-blue-400">{config.maxCompetitionsPerDay}/day</span>
+            )}
+          </div>
+        )}
+
+        {/* Price */}
+        <div className="flex-shrink-0 text-right min-w-[80px]">
+          <span className="text-sm font-bold text-white">⚡ {item.price.toLocaleString()}</span>
+        </div>
+
+        {/* Action */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onPurchase(); }}
+          disabled={purchasing || item.owned}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex-shrink-0",
+            item.owned
+              ? "bg-yellow-500/10 text-yellow-400 cursor-default"
+              : "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/20",
+          )}
+        >
+          {purchasing ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-black border-t-transparent" />
+          ) : item.owned ? (
+            <><Check className="h-3 w-3" />Active</>
+          ) : (
+            <><Crown className="h-3 w-3" />Get GM</>
+          )}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
