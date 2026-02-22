@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 
 // ── Defaults (used when DB has no values yet) ─────────────────────────────
 const DEFAULT_TITLE =
-  "ChartVolt — Live Market Trading Platform";
+  "ChartVolt — Live Market competition Trading Platform";
 const DEFAULT_DESC =
-  "Monitor live market movements, receive tailored notifications, and dive deep into comprehensive company profiles.";
+  "Trading competitions for the champions.";
 const DEFAULT_URL = "https://chartvolt.com";
 const DEFAULT_OG_IMAGE = `${DEFAULT_URL}/og-image.png`;
 

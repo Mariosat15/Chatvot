@@ -1,4 +1,4 @@
-import ModernDashboardCharts from "@/components/dashboard/ModernDashboardCharts";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { getComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 
 // Force dynamic rendering - this page uses authentication
@@ -10,7 +10,7 @@ const Dashboard = async () => {
 
   return (
     <div>
-      <ModernDashboardCharts data={dashboardData} />
+      <DashboardLayout data={dashboardData} />
     </div>
   );
 };

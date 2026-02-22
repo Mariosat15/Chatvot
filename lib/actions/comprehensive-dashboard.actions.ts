@@ -17,6 +17,11 @@ import {
   ForexSymbol,
   calculateUnrealizedPnL,
 } from "@/lib/services/pnl-calculator.service";
+import { getUserLevel } from "@/lib/services/xp-level.service";
+import { calculateXPProgress } from "@/lib/services/xp-config.service";
+import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import UserBadge from "@/database/models/user-badge.model";
+import BadgeConfig from "@/database/models/badge-config.model";
 
 /**
  * Comprehensive Dashboard Data
@@ -108,6 +113,27 @@ export interface ComprehensiveDashboardData {
     longestLossStreak: number;
     tradingDaysThisMonth: number;
     consecutiveProfitableDays: number;
+  };
+
+  // Player Profile (XP, Level, Badges, Rank)
+  player: {
+    level: number;
+    currentXP: number;
+    xpToNextLevel: number;
+    progressPercent: number;
+    title: string;
+    titleColor: string;
+    titleIcon: string;
+    globalRank: number;
+    totalUsers: number;
+    recentBadges: Array<{
+      id: string;
+      name: string;
+      icon: string;
+      rarity: string;
+      earnedAt: Date;
+    }>;
+    totalBadges: number;
   };
 }
 
@@ -694,6 +720,50 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const totalPnLPercentage =
     totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
 
+  // Fetch player profile data (XP, level, badges, rank) in parallel
+  const [userLevelData, xpProgress, rankData, earnedBadges] = await Promise.all([
+    getUserLevel(userId).catch(() => ({
+      currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader",
+      currentIcon: "⚔️", currentColor: "#9ca3af", totalBadgesEarned: 0,
+    })),
+    calculateXPProgress(0).then(async (fallback) => {
+      // Reason: We need the user's actual XP to calculate progress, but getUserLevel
+      // is already fetching it. Use the result after it resolves.
+      return fallback;
+    }).catch(() => ({
+      currentLevel: { level: 1, title: "Novice Trader", minXP: 0, icon: "⚔️", color: "#9ca3af", description: "" },
+      nextLevel: null, progressPercent: 0, xpToNext: 100,
+    })),
+    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),
+    UserBadge.find({ userId }).sort({ earnedAt: -1 }).limit(5).lean().catch(() => []),
+  ]);
+
+  // Recalculate XP progress with actual user XP
+  const actualXPProgress = await calculateXPProgress(
+    (userLevelData as any).currentXP || 0
+  ).catch(() => ({
+    currentLevel: { level: 1, title: "Novice Trader", minXP: 0, icon: "⚔️", color: "#9ca3af", description: "" },
+    nextLevel: null, progressPercent: 0, xpToNext: 100,
+  }));
+
+  // Fetch badge details for earned badges
+  const badgeIds = (earnedBadges as any[]).map((b: any) => b.badgeId);
+  const badgeConfigs = badgeIds.length > 0
+    ? await BadgeConfig.find({ id: { $in: badgeIds }, isActive: true }).lean().catch(() => [])
+    : [];
+  const badgeConfigMap = new Map((badgeConfigs as any[]).map((b: any) => [b.id, b]));
+
+  const recentBadges = (earnedBadges as any[]).map((ub: any) => {
+    const config = badgeConfigMap.get(ub.badgeId);
+    return {
+      id: ub.badgeId,
+      name: config?.name || ub.badgeId,
+      icon: config?.icon || "🏅",
+      rarity: config?.rarity || "common",
+      earnedAt: ub.earnedAt,
+    };
+  });
+
   return {
     user: {
       id: userId,
@@ -727,6 +797,19 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       positions: positionsWithPrices,
     },
     streaks,
+    player: {
+      level: (userLevelData as any).currentLevel || 1,
+      currentXP: (userLevelData as any).currentXP || 0,
+      xpToNextLevel: actualXPProgress.xpToNext,
+      progressPercent: actualXPProgress.progressPercent,
+      title: (userLevelData as any).currentTitle || "Novice Trader",
+      titleColor: (userLevelData as any).currentColor || "#9ca3af",
+      titleIcon: (userLevelData as any).currentIcon || "⚔️",
+      globalRank: rankData.rank,
+      totalUsers: rankData.totalUsers,
+      recentBadges,
+      totalBadges: (userLevelData as any).totalBadgesEarned || 0,
+    },
   };
 }
 

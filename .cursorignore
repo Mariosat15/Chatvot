@@ -1,9 +1,5 @@
 node_modules
-dist
 build
-.next
-coverage
-logs
 
 *.log
 *.csv
