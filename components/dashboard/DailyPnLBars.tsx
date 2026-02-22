@@ -186,9 +186,10 @@ export default function DailyPnLChart({ data }: DailyPnLChartProps) {
           {hoveredPoint ? (
             <div className="flex items-center gap-2 mt-1">
               <span
-                className={`text-lg font-bold font-[var(--font-geist-mono)] ${
+                className={`text-lg font-bold ${
                   hoveredPoint.pnl >= 0 ? "text-green-400" : "text-red-400"
                 }`}
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
               >
                 {hoveredPoint.pnl >= 0 ? "+" : ""}${hoveredPoint.pnl.toFixed(2)}
               </span>
@@ -199,9 +200,10 @@ export default function DailyPnLChart({ data }: DailyPnLChartProps) {
           ) : (
             <div className="flex items-center gap-3 mt-1">
               <span
-                className={`text-lg font-bold font-[var(--font-geist-mono)] ${
+                className={`text-lg font-bold ${
                   totalPnL >= 0 ? "text-green-400" : "text-red-400"
                 }`}
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
               >
                 {totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(2)}
               </span>

@@ -70,7 +70,7 @@ function AnimatedRing({
         </svg>
         {/* Center value */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm sm:text-base font-bold text-white font-[var(--font-geist-mono)]">
+          <span className="text-sm sm:text-base font-bold text-white" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
             {datum.displayValue}
           </span>
         </div>

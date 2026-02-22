@@ -148,9 +148,10 @@ export default function HeroStatsBar({
 
             {/* Value */}
             <div
-              className={`text-xl sm:text-2xl font-bold font-[var(--font-geist-mono)] ${
+              className={`text-xl sm:text-2xl font-bold ${
                 isNeg ? "text-red-400" : "text-white"
               }`}
+              style={{ fontFamily: "var(--font-geist-mono), monospace" }}
             >
               {stat.value}
             </div>

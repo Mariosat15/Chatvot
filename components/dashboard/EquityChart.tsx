@@ -177,7 +177,7 @@ export default function EquityChart({ data }: EquityChartProps) {
           </h3>
           {hoveredPoint ? (
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-lg font-bold text-white font-[var(--font-geist-mono)]">
+              <span className="text-lg font-bold text-white" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
                 ${hoveredPoint.value.toFixed(2)}
               </span>
               <span
@@ -192,7 +192,7 @@ export default function EquityChart({ data }: EquityChartProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-lg font-bold text-white font-[var(--font-geist-mono)]">
+              <span className="text-lg font-bold text-white" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
                 ${lastBalance.toFixed(2)}
               </span>
               <span
