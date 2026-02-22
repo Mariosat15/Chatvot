@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Crown, ChevronRight, Map, Star, Zap } from "lucide-react";
+import { Crown, ChevronRight, Map } from "lucide-react";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
@@ -82,7 +82,8 @@ export default function PlayerProfileCard({
         {name}
       </h3>
 
-      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      {/* Top row: Level badge + Title/Rank + Global Rank */}
+      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
         {/* Level Badge (hexagon-style) */}
         <div className="relative flex-shrink-0">
           <div
@@ -93,10 +94,8 @@ export default function PlayerProfileCard({
               boxShadow: `0 0 20px ${titleColor}22`,
             }}
           >
-            {/* Reason: titleIcon is a GameIconName string, not an emoji */}
             <GameIcon name={titleIcon as GameIconName} size={28} alt={title} />
           </div>
-          {/* Level number overlay */}
           <div
             className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold bg-gray-900 border-2"
             style={{ borderColor: titleColor, color: titleColor }}
@@ -105,9 +104,9 @@ export default function PlayerProfileCard({
           </div>
         </div>
 
-        {/* Player Info */}
+        {/* Player Info — title + rank only */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-3 overflow-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
             <span
               className="text-sm sm:text-base font-semibold shrink-0"
               style={{ color: titleColor }}
@@ -123,34 +122,6 @@ export default function PlayerProfileCard({
                 <span className="text-gray-600"> / {totalUsers}</span>
               </span>
             )}
-          </div>
-
-          {/* XP Progress Bar — matching profile page style exactly */}
-          <div className="w-full">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-gray-400 font-[var(--font-geist-mono)]">
-                XP: {currentXP.toLocaleString()}
-              </span>
-              <span className="text-xs text-gray-500">
-                {xpToNextLevel > 0 ? `${xpToNextLevel.toLocaleString()} XP needed` : "MAX LEVEL"}
-              </span>
-            </div>
-            {/* Reason: Matching profile XPProgressBar — h-6, purple gradient, rounded-full */}
-            <div className="relative">
-              <div className="h-6 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 relative"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${clampedProgress}%` }}
-                  transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-                >
-                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                </motion.div>
-              </div>
-              <p className="text-center text-xs font-bold text-white mt-2">
-                {clampedProgress.toFixed(1)}% Complete
-              </p>
-            </div>
           </div>
         </div>
 
@@ -173,6 +144,33 @@ export default function PlayerProfileCard({
             </span>
           </div>
         )}
+      </div>
+
+      {/* XP Progress Bar — full width, aligned with journey bar */}
+      <div className="relative z-10 w-full">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-400 font-[var(--font-geist-mono)]">
+            XP: {currentXP.toLocaleString()}
+          </span>
+          <span className="text-xs text-gray-500">
+            {xpToNextLevel > 0 ? `${xpToNextLevel.toLocaleString()} XP needed` : "MAX LEVEL"}
+          </span>
+        </div>
+        <div className="relative">
+          <div className="h-6 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+            <motion.div
+              className="h-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 relative"
+              initial={{ width: 0 }}
+              animate={{ width: `${clampedProgress}%` }}
+              transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+            >
+              <div className="absolute inset-0 bg-white/20 animate-pulse" />
+            </motion.div>
+          </div>
+          <p className="text-center text-xs font-bold text-white mt-2">
+            {clampedProgress.toFixed(1)}% Complete
+          </p>
+        </div>
       </div>
 
       {/* Recent Badges Row */}
@@ -267,32 +265,23 @@ export default function PlayerProfileCard({
             </div>
           </div>
 
-          {/* Recent milestones */}
+          {/* Recent milestones — horizontal chips like badges */}
           {journey.recentMilestones.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
               {journey.recentMilestones.map((ms, i) => (
                 <motion.div
                   key={ms.id}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-gray-800/50 border border-gray-700/30"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.6 + i * 0.1 }}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-amber-600/40 bg-amber-900/30 overflow-hidden animate-badge-reveal cursor-default"
+                  style={{
+                    animationDelay: `${i * 0.1}s`,
+                    boxShadow: "0 0 10px rgba(217,119,6,0.3)",
+                  }}
+                  title={`${ms.name} (+${ms.xp} XP)`}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
                 >
-                  <div className="flex-shrink-0 w-7 h-7 rounded-md bg-amber-900/30 border border-amber-700/40 flex items-center justify-center overflow-hidden">
-                    {/* Reason: ms.icon is a GameIconName string — render via GameIcon */}
-                    <GameIcon name={ms.icon as GameIconName} size={18} alt={ms.name} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-200 truncate">{ms.name}</p>
-                    <p className="text-[10px] text-gray-500">
-                      {new Date(ms.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <Zap className="w-3 h-3 text-yellow-400" />
-                    <span className="text-[10px] font-bold text-yellow-400">+{ms.xp}</span>
-                  </div>
-                  <Star className="w-3 h-3 text-amber-500/50 flex-shrink-0" />
+                  <GameIcon name={ms.icon as GameIconName} size={24} alt={ms.name} />
                 </motion.div>
               ))}
             </div>
