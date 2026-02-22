@@ -255,7 +255,7 @@ export default function PlayerProfileCard({
               </span>
             </div>
             <Link
-              href="/journey"
+              href="/profile?tab=journey"
               className="relative z-20 text-xs text-amber-500 hover:text-amber-400 flex items-center gap-0.5 transition-colors cursor-pointer"
             >
               View All <ChevronRight className="w-3 h-3" />
