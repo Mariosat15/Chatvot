@@ -79,7 +79,8 @@ export default function PlayerProfileCard({
               boxShadow: `0 0 20px ${titleColor}22`,
             }}
           >
-            <span>{titleIcon}</span>
+            {/* Reason: titleIcon is a GameIconName string, not an emoji */}
+            <GameIcon name={titleIcon as GameIconName} size={28} alt={title} />
           </div>
           {/* Level number overlay */}
           <div
@@ -143,8 +144,10 @@ export default function PlayerProfileCard({
         {globalRank > 0 && (
           <div className="flex-shrink-0 text-center">
             <div
-              className="text-3xl font-black font-[var(--font-geist-mono)] animate-rank-glow"
+              className="text-3xl animate-rank-glow"
               style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontWeight: 900,
                 color: titleColor,
                 "--rank-color": `${titleColor}88`,
               } as React.CSSProperties}
