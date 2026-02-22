@@ -61,20 +61,20 @@ export default function PlayerProfileCard({
 
       <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4">
         {/* Level Badge (hexagon-style) */}
-        <div className="relative flex-shrink-0">
+        <div className="relative flex-shrink-0 z-10">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold animate-hex-pulse"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold animate-hex-pulse"
             style={{
               background: `linear-gradient(135deg, ${titleColor}33, ${titleColor}11)`,
               border: `2px solid ${titleColor}66`,
               boxShadow: `0 0 20px ${titleColor}22`,
             }}
           >
-            <span className="text-2xl">{titleIcon}</span>
+            <span>{titleIcon}</span>
           </div>
           {/* Level number overlay */}
           <div
-            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-900 border-2"
+            className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold bg-gray-900 border-2"
             style={{ borderColor: titleColor, color: titleColor }}
           >
             {level}
@@ -82,23 +82,23 @@ export default function PlayerProfileCard({
         </div>
 
         {/* Player Info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-lg font-bold text-white truncate">{name}</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white truncate max-w-[200px] sm:max-w-none">{name}</h3>
             {globalRank > 0 && globalRank <= 3 && (
-              <Crown className="w-4 h-4 text-yellow-400" />
+              <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
             )}
           </div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-3 flex-wrap">
             <span
-              className="text-sm font-semibold"
+              className="text-xs sm:text-sm font-semibold truncate"
               style={{ color: titleColor }}
             >
               {title}
             </span>
             {globalRank > 0 && (
-              <span className="text-xs text-gray-500">
-                •  Rank #{globalRank}
+              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
+                • Rank #{globalRank}
                 <span className="text-gray-600"> / {totalUsers}</span>
               </span>
             )}
@@ -170,7 +170,7 @@ export default function PlayerProfileCard({
               return (
                 <motion.div
                   key={badge.id}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${rarity.border} ${rarity.bg} animate-badge-reveal`}
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg border ${rarity.border} ${rarity.bg} animate-badge-reveal cursor-default`}
                   style={{
                     animationDelay: `${i * 0.1}s`,
                     boxShadow: `0 0 10px ${rarity.glow}`,
@@ -180,10 +180,7 @@ export default function PlayerProfileCard({
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
                 >
-                  <span className="text-base">{badge.icon}</span>
-                  <span className="text-xs text-gray-300 font-medium truncate max-w-20">
-                    {badge.name}
-                  </span>
+                  <span className="text-lg">{badge.icon}</span>
                 </motion.div>
               );
             })}

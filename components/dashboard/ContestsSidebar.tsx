@@ -174,13 +174,15 @@ export default function ContestsSidebar({
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {comp.currentRank <= 3 ? (
+                      {comp.currentRank > 0 && comp.currentRank <= 3 ? (
                         <Crown className="w-3.5 h-3.5 text-yellow-400" />
                       ) : (
                         <Target className="w-3.5 h-3.5 text-gray-400" />
                       )}
                       <span className="text-xs text-gray-300 font-[var(--font-geist-mono)]">
-                        Rank #{comp.currentRank}/{comp.totalParticipants}
+                        {comp.currentRank > 0
+                          ? `Rank #${comp.currentRank}/${comp.totalParticipants}`
+                          : `Unranked / ${comp.totalParticipants}`}
                       </span>
                     </div>
                     <span
