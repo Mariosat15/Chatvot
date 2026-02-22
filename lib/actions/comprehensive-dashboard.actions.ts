@@ -841,6 +841,9 @@ async function buildChartData(
 ) {
   const now = new Date();
 
+  // Reason: Lightweight Charts v4 requires YYYY-MM-DD format — "Feb 22" is invalid
+  const toISODateStr = (d: Date) => d.toISOString().slice(0, 10);
+
   // Wallet Balance History - from transactions
   const walletBalanceHistory: {
     date: string;
@@ -858,10 +861,7 @@ async function buildChartData(
   // Initialize with transactions
   for (const tx of walletTransactions) {
     const txDate = new Date(tx.createdAt);
-    const dateStr = txDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const dateStr = toISODateStr(txDate);
 
     // Store the latest balance for each day
     dailyBalances.set(dateStr, {
@@ -875,10 +875,7 @@ async function buildChartData(
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const dateStr = toISODateStr(date);
 
     if (dailyBalances.has(dateStr)) {
       const dayData = dailyBalances.get(dateStr)!;
@@ -906,10 +903,7 @@ async function buildChartData(
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+      const dateStr = toISODateStr(date);
       walletBalanceHistory.push({
         date: dateStr,
         balance: currentBalance,
@@ -924,10 +918,7 @@ async function buildChartData(
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const dateStr = toISODateStr(date);
     dayPnLMap.set(dateStr, { pnl: 0, trades: 0 });
   }
 
@@ -951,10 +942,7 @@ async function buildChartData(
     else breakeven++;
 
     // Daily P&L (30-day window)
-    const dayKey = closedAt.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const dayKey = toISODateStr(closedAt);
     const dayEntry = dayPnLMap.get(dayKey);
     if (dayEntry) {
       dayEntry.pnl += pnl;
