@@ -370,6 +370,26 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       status: p.status || "active",
     }));
 
+    // Reason: participation.currentRank from DB can be stale or 0.
+    // Compute rank dynamically by sorting all participants (same as competition leaderboard).
+    const rankingMethod = competition.rules?.rankingMethod || "pnl";
+    let computedRank = participation.currentRank || 0;
+    if (competition.status === "active" && competitionParticipants.length > 0) {
+      const sorted = [...competitionParticipants]
+        .filter((p: any) => (p.status || "active") !== "disqualified")
+        .sort((a: any, b: any) => {
+          const aHasTrades = (a.totalTrades || 0) > 0;
+          const bHasTrades = (b.totalTrades || 0) > 0;
+          if (aHasTrades && !bHasTrades) return -1;
+          if (!aHasTrades && bHasTrades) return 1;
+          if (rankingMethod === "roi") return (b.pnlPercentage || 0) - (a.pnlPercentage || 0);
+          if (rankingMethod === "capital") return (b.currentCapital || 0) - (a.currentCapital || 0);
+          return (b.pnl || 0) - (a.pnl || 0); // default: pnl
+        });
+      const idx = sorted.findIndex((p: any) => p.userId?.toString() === userId);
+      if (idx !== -1) computedRank = idx + 1;
+    }
+
     const compData: CompetitionData = {
       id: competition._id.toString(),
       name: competition.name,
@@ -378,7 +398,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       endTime: competition.endTime,
       prizePool: competition.prizePool || competition.prizePoolCredits || 0,
       entryFee: competition.entryFee || competition.entryFeeCredits || 0,
-      currentRank: participation.currentRank || 0,
+      currentRank: computedRank,
       totalParticipants: competition.currentParticipants || 0,
       pnl: participation.pnl || 0,
       pnlPercentage: participation.pnlPercentage || 0,
@@ -410,7 +430,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
             : 0,
         averageWin: participation.averageWin || 0,
         averageLoss: participation.averageLoss || 0,
-        currentRank: participation.currentRank || 0,
+        currentRank: computedRank,
         status: participation.status || "active",
       },
       allParticipants: mappedParticipants,

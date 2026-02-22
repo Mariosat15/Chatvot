@@ -82,22 +82,22 @@ export default function PlayerProfileCard({
         </div>
 
         {/* Player Info */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-base sm:text-lg font-bold text-white truncate max-w-[200px] sm:max-w-none">{name}</h3>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 overflow-hidden">
+            <h3 className="text-base sm:text-lg font-bold text-white truncate">{name}</h3>
             {globalRank > 0 && globalRank <= 3 && (
               <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
             )}
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-3 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-3 overflow-hidden">
             <span
-              className="text-xs sm:text-sm font-semibold truncate"
+              className="text-xs sm:text-sm font-semibold shrink-0"
               style={{ color: titleColor }}
             >
               {title}
             </span>
             {globalRank > 0 && (
-              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
+              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap shrink-0">
                 • Rank #{globalRank}
                 <span className="text-gray-600"> / {totalUsers}</span>
               </span>
@@ -167,10 +167,14 @@ export default function PlayerProfileCard({
           <div className="flex items-center gap-2 flex-wrap">
             {recentBadges.map((badge, i) => {
               const rarity = RARITY_COLORS[badge.rarity] || RARITY_COLORS.common;
+              // Reason: badge.icon may be a text string or an emoji.
+              // If it's >2 chars it's text — show first letter as fallback.
+              const isEmoji = badge.icon.length <= 2;
+              const displayIcon = isEmoji ? badge.icon : badge.icon.charAt(0).toUpperCase();
               return (
                 <motion.div
                   key={badge.id}
-                  className={`w-9 h-9 flex items-center justify-center rounded-lg border ${rarity.border} ${rarity.bg} animate-badge-reveal cursor-default`}
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg border overflow-hidden ${rarity.border} ${rarity.bg} animate-badge-reveal cursor-default`}
                   style={{
                     animationDelay: `${i * 0.1}s`,
                     boxShadow: `0 0 10px ${rarity.glow}`,
@@ -180,7 +184,7 @@ export default function PlayerProfileCard({
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
                 >
-                  <span className="text-lg">{badge.icon}</span>
+                  <span className={isEmoji ? "text-lg" : "text-sm font-bold text-gray-300"}>{displayIcon}</span>
                 </motion.div>
               );
             })}
