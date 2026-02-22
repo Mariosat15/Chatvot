@@ -7,6 +7,7 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
 
 interface PlayerProfileCardProps {
+  name: string;
   level: number;
   currentXP: number;
   xpToNextLevel: number;
@@ -36,6 +37,7 @@ const RARITY_COLORS: Record<string, { border: string; bg: string; glow: string }
 };
 
 export default function PlayerProfileCard({
+  name,
   level,
   currentXP,
   xpToNextLevel,
@@ -60,6 +62,11 @@ export default function PlayerProfileCard({
       {/* Background texture */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(139,92,246,0.08),transparent_50%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,rgba(234,179,8,0.06),transparent_50%)] pointer-events-none" />
+
+      {/* Player Name — top center */}
+      <h3 className="relative z-10 text-center text-lg sm:text-xl font-bold text-white mb-3 truncate">
+        {name}
+      </h3>
 
       <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         {/* Level Badge (hexagon-style) */}
