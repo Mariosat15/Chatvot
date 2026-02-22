@@ -236,23 +236,34 @@ export default function PlayerProfileCard({
             </Link>
           </div>
 
-          {/* Map progress bar */}
+          {/* Map progress bar — matching XP bar style with amber color */}
           <div className="mb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-gray-500 capitalize">{journey.currentMapTheme} map</span>
-              <span className="text-[10px] text-gray-500">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-gray-400 font-[var(--font-geist-mono)]">
                 {journey.completedMilestones}/{journey.totalMilestones} milestones
               </span>
+              <span className="text-xs text-gray-500 capitalize">
+                {journey.currentMapTheme} map
+              </span>
             </div>
-            <div className="h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
-              <motion.div
-                className="h-full bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 rounded-full"
-                initial={{ width: 0 }}
-                animate={{
-                  width: `${journey.totalMilestones > 0 ? (journey.completedMilestones / journey.totalMilestones) * 100 : 0}%`,
-                }}
-                transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
-              />
+            <div className="relative">
+              <div className="h-6 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 relative"
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${journey.totalMilestones > 0 ? (journey.completedMilestones / journey.totalMilestones) * 100 : 0}%`,
+                  }}
+                  transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                </motion.div>
+              </div>
+              <p className="text-center text-xs font-bold text-white mt-2">
+                {journey.totalMilestones > 0
+                  ? ((journey.completedMilestones / journey.totalMilestones) * 100).toFixed(1)
+                  : "0.0"}% Complete
+              </p>
             </div>
           </div>
 
@@ -267,8 +278,9 @@ export default function PlayerProfileCard({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: 0.6 + i * 0.1 }}
                 >
-                  <div className="flex-shrink-0 w-7 h-7 rounded-md bg-amber-900/30 border border-amber-700/40 flex items-center justify-center text-sm">
-                    {ms.icon}
+                  <div className="flex-shrink-0 w-7 h-7 rounded-md bg-amber-900/30 border border-amber-700/40 flex items-center justify-center overflow-hidden">
+                    {/* Reason: ms.icon is a GameIconName string — render via GameIcon */}
+                    <GameIcon name={ms.icon as GameIconName} size={18} alt={ms.name} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-200 truncate">{ms.name}</p>
