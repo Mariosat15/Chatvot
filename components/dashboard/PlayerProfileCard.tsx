@@ -125,19 +125,28 @@ export default function PlayerProfileCard({
           </div>
         </div>
 
-        {/* Global Rank Badge */}
+        {/* Global Rank Badge — dynamic size + medal colors */}
         {globalRank > 0 && (
-          <div className="flex-shrink-0 text-center">
+          <div className="flex-shrink-0 text-center min-w-[48px]">
             <div
-              className="text-3xl animate-rank-glow"
+              className="animate-rank-glow whitespace-nowrap"
               style={{
                 fontFamily: "var(--font-geist-mono), monospace",
                 fontWeight: 900,
-                color: titleColor,
-                "--rank-color": `${titleColor}88`,
+                // Reason: Dynamic font size so large ranks (e.g. #10000) still fit
+                fontSize: globalRank < 10 ? 30 : globalRank < 100 ? 26 : globalRank < 1000 ? 22 : globalRank < 10000 ? 18 : 14,
+                // Reason: Gold=#1, Silver=#2, Bronze=#3, White=rest
+                color: globalRank === 1 ? "#FFD700" : globalRank === 2 ? "#C0C0C0" : globalRank === 3 ? "#CD7F32" : "#ffffff",
+                "--rank-color": globalRank === 1
+                  ? "rgba(255,215,0,0.6)"
+                  : globalRank === 2
+                    ? "rgba(192,192,192,0.6)"
+                    : globalRank === 3
+                      ? "rgba(205,127,50,0.6)"
+                      : "rgba(255,255,255,0.4)",
               } as React.CSSProperties}
             >
-              #{globalRank}
+              #{globalRank.toLocaleString()}
             </div>
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
               Global Rank
