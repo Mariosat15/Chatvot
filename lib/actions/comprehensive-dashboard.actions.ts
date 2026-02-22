@@ -25,6 +25,11 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import UserRestriction from "@/database/models/user-restriction.model";
+import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import AccountLockout from "@/database/models/account-lockout.model";
+import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
+import KYCSession from "@/database/models/kyc-session.model";
 
 /**
  * Comprehensive Dashboard Data
@@ -152,6 +157,51 @@ export interface ComprehensiveDashboardData {
       xp: number;
       completedAt: Date;
     }>;
+  };
+
+  // Account Status — restrictions, fraud alerts, investigations
+  accountStatus: {
+    // Active restrictions (bans, suspensions)
+    restrictions: Array<{
+      id: string;
+      type: "banned" | "suspended";
+      reason: string;
+      customReason?: string;
+      canTrade: boolean;
+      canEnterCompetitions: boolean;
+      canDeposit: boolean;
+      canWithdraw: boolean;
+      restrictedAt: Date;
+      expiresAt?: Date;
+    }>;
+    // Open/investigating fraud alerts involving this user
+    fraudAlerts: Array<{
+      id: string;
+      alertType: string;
+      severity: string;
+      status: string;
+      title: string;
+      description: string;
+      confidence: number;
+      detectedAt: Date;
+    }>;
+    // Active account lockouts
+    lockouts: Array<{
+      id: string;
+      reason: string;
+      lockedAt: Date;
+      lockedUntil?: Date;
+    }>;
+    // KYC status
+    kycStatus: "none" | "pending" | "approved" | "declined" | "resubmission";
+    kycDeclineReason?: string;
+    // Suspicion score summary
+    suspicionScore: number;
+    riskLevel: "low" | "medium" | "high" | "critical";
+    // Quick flags for UI
+    hasActiveRestriction: boolean;
+    hasOpenAlert: boolean;
+    isLocked: boolean;
   };
 }
 
@@ -867,6 +917,108 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     console.warn("⚠️ Failed to fetch journey data for dashboard:", err);
   }
 
+  // ── Account Status: restrictions, fraud alerts, lockouts, KYC, suspicion score ──
+  let accountStatusData: ComprehensiveDashboardData["accountStatus"] = {
+    restrictions: [],
+    fraudAlerts: [],
+    lockouts: [],
+    kycStatus: "none",
+    suspicionScore: 0,
+    riskLevel: "low",
+    hasActiveRestriction: false,
+    hasOpenAlert: false,
+    isLocked: false,
+  };
+  try {
+    const [restrictions, alerts, lockouts, kycSession, suspicion] = await Promise.all([
+      // Active restrictions for this user
+      UserRestriction.find({ userId, isActive: true }).lean().catch(() => []),
+      // Open/investigating fraud alerts involving this user
+      FraudAlert.find({
+        $or: [{ primaryUserId: userId }, { suspiciousUserIds: userId }],
+        status: { $in: ["pending", "investigating"] },
+      })
+        .select("alertType severity status title description confidence detectedAt")
+        .sort({ detectedAt: -1 })
+        .limit(10)
+        .lean()
+        .catch(() => []),
+      // Active account lockouts
+      AccountLockout.find({
+        $and: [
+          { $or: [{ userId }, { email: session.user.email }] },
+          { isActive: true },
+          { $or: [{ lockedUntil: { $gt: new Date() } }, { lockedUntil: null }] },
+        ],
+      })
+        .lean()
+        .catch(() => []),
+      // Latest KYC session
+      KYCSession.findOne({ userId })
+        .sort({ createdAt: -1 })
+        .select("status verificationReason")
+        .lean()
+        .catch(() => null),
+      // Suspicion score
+      SuspicionScore.findOne({ userId })
+        .select("totalScore riskLevel")
+        .lean()
+        .catch(() => null),
+    ]);
+
+    // Map KYC status
+    let kycStatus: ComprehensiveDashboardData["accountStatus"]["kycStatus"] = "none";
+    let kycDeclineReason: string | undefined;
+    if (kycSession) {
+      const s = (kycSession as any).status;
+      if (s === "approved") kycStatus = "approved";
+      else if (s === "declined") { kycStatus = "declined"; kycDeclineReason = (kycSession as any).verificationReason; }
+      else if (s === "resubmission_requested") kycStatus = "resubmission";
+      else if (["created", "started", "submitted"].includes(s)) kycStatus = "pending";
+    }
+
+    accountStatusData = {
+      restrictions: (restrictions as any[]).map((r) => ({
+        id: r._id.toString(),
+        type: r.restrictionType,
+        reason: r.reason,
+        customReason: r.customReason,
+        canTrade: r.canTrade,
+        canEnterCompetitions: r.canEnterCompetitions,
+        canDeposit: r.canDeposit,
+        canWithdraw: r.canWithdraw,
+        restrictedAt: r.restrictedAt,
+        expiresAt: r.expiresAt,
+      })),
+      fraudAlerts: (alerts as any[]).map((a) => ({
+        id: a._id.toString(),
+        alertType: a.alertType,
+        severity: a.severity,
+        status: a.status,
+        title: a.title,
+        description: a.description,
+        confidence: a.confidence,
+        detectedAt: a.detectedAt,
+      })),
+      lockouts: (lockouts as any[]).map((l) => ({
+        id: l._id.toString(),
+        reason: l.reason,
+        lockedAt: l.lockedAt,
+        lockedUntil: l.lockedUntil,
+      })),
+      kycStatus,
+      kycDeclineReason,
+      suspicionScore: (suspicion as any)?.totalScore || 0,
+      riskLevel: (suspicion as any)?.riskLevel || "low",
+      hasActiveRestriction: (restrictions as any[]).length > 0,
+      hasOpenAlert: (alerts as any[]).length > 0,
+      isLocked: (lockouts as any[]).length > 0,
+    };
+  } catch (err) {
+    // Non-critical — dashboard still works without account status data
+    console.warn("⚠️ Failed to fetch account status for dashboard:", err);
+  }
+
   return {
     user: {
       id: userId,
@@ -914,6 +1066,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       totalBadges: (userLevelData as any).totalBadgesEarned || 0,
     },
     journey: journeyData,
+    accountStatus: accountStatusData,
   };
 }
 

@@ -10,6 +10,7 @@ import ContestsSidebar from "./ContestsSidebar";
 import RecentTradesFeed from "./RecentTradesFeed";
 import StreaksShowcase from "./StreaksShowcase";
 import MarketHolidaysCard from "./MarketHolidaysCard";
+import AccountStatusCard from "./AccountStatusCard";
 
 // Reason: These charts use Lightweight Charts (browser-only) so must load client-side only
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
@@ -20,7 +21,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ data }: DashboardLayoutProps) {
-  const { overview, charts, competitions, challenges, recentActivity, streaks, player, journey } = data;
+  const { overview, charts, competitions, challenges, recentActivity, streaks, player, journey, accountStatus } = data;
 
   return (
     <div className="w-full space-y-4 p-3 sm:p-4 lg:p-6">
@@ -34,7 +35,10 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         totalTrades={overview.totalTrades}
       />
 
-      {/* Row 2: Player Profile + Market Holidays */}
+      {/* Row 2: Account Status (restrictions, alerts, investigations) */}
+      <AccountStatusCard accountStatus={accountStatus} />
+
+      {/* Row 3: Player Profile + Market Holidays */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <PlayerProfileCard
@@ -58,7 +62,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         </div>
       </div>
 
-      {/* Row 3: Performance Rings */}
+      {/* Row 4: Performance Rings */}
       <PerformanceRings
         winRate={overview.winRate}
         profitFactor={overview.profitFactor}
@@ -68,7 +72,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         largestLoss={overview.largestLoss}
       />
 
-      {/* Row 4: Charts + Contests Sidebar */}
+      {/* Row 5: Charts + Contests Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: Equity Chart + Daily P&L (2/3 width) */}
         <div className="lg:col-span-2 space-y-4">
@@ -93,7 +97,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         </div>
       </div>
 
-      {/* Row 5: Trading Analytics */}
+      {/* Row 6: Trading Analytics */}
       <TradingAnalytics
         winLoss={charts.winLossDistribution}
         tradesBySymbol={charts.tradesBySymbol}
@@ -103,7 +107,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         losingTrades={overview.losingTrades}
       />
 
-      {/* Row 6: Recent Activity + Streaks */}
+      {/* Row 7: Recent Activity + Streaks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <RecentTradesFeed
           trades={recentActivity.trades}
