@@ -41,7 +41,9 @@ export default function ProfileTabs({
   // Handle tab from URL query param
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "arsenal") {
+    if (tab === "badges") {
+      setActiveTab("badges");
+    } else if (tab === "arsenal") {
       setActiveTab("arsenal");
     } else if (tab === "verification") {
       setActiveTab("verification");

@@ -20,7 +20,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ data }: DashboardLayoutProps) {
-  const { overview, charts, competitions, challenges, recentActivity, streaks, player } = data;
+  const { overview, charts, competitions, challenges, recentActivity, streaks, player, journey } = data;
 
   return (
     <div className="w-full space-y-4 p-3 sm:p-4 lg:p-6">
@@ -50,6 +50,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             totalUsers={player.totalUsers}
             recentBadges={player.recentBadges}
             totalBadges={player.totalBadges}
+            journey={journey}
           />
         </div>
         <div>

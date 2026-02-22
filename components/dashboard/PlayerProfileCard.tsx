@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Crown, ChevronRight } from "lucide-react";
+import { Crown, ChevronRight, Map, Star, Zap } from "lucide-react";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
@@ -25,6 +25,19 @@ interface PlayerProfileCardProps {
     earnedAt: Date;
   }>;
   totalBadges: number;
+  journey?: {
+    currentMapName: string;
+    currentMapTheme: string;
+    completedMilestones: number;
+    totalMilestones: number;
+    recentMilestones: Array<{
+      id: string;
+      name: string;
+      icon: string;
+      xp: number;
+      completedAt: Date;
+    }>;
+  };
 }
 
 // Reason: Rarity determines the border glow color of badge chips
@@ -49,6 +62,7 @@ export default function PlayerProfileCard({
   totalUsers,
   recentBadges,
   totalBadges,
+  journey,
 }: PlayerProfileCardProps) {
   const clampedProgress = Math.min(Math.max(progressPercent, 0), 100);
 
@@ -169,7 +183,7 @@ export default function PlayerProfileCard({
               Recent Badges ({totalBadges} total)
             </span>
             <Link
-              href="/profile"
+              href="/profile?tab=badges"
               className="relative z-20 text-xs text-yellow-500 hover:text-yellow-400 flex items-center gap-0.5 transition-colors cursor-pointer"
             >
               View All <ChevronRight className="w-3 h-3" />
@@ -201,6 +215,76 @@ export default function PlayerProfileCard({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Recent Milestones + Journey Progress */}
+      {journey && journey.totalMilestones > 0 && (
+        <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Map className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                Journey — {journey.currentMapName}
+              </span>
+            </div>
+            <Link
+              href="/journey"
+              className="relative z-20 text-xs text-amber-500 hover:text-amber-400 flex items-center gap-0.5 transition-colors cursor-pointer"
+            >
+              View All <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Map progress bar */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-gray-500 capitalize">{journey.currentMapTheme} map</span>
+              <span className="text-[10px] text-gray-500">
+                {journey.completedMilestones}/{journey.totalMilestones} milestones
+              </span>
+            </div>
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
+              <motion.div
+                className="h-full bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 rounded-full"
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${journey.totalMilestones > 0 ? (journey.completedMilestones / journey.totalMilestones) * 100 : 0}%`,
+                }}
+                transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
+              />
+            </div>
+          </div>
+
+          {/* Recent milestones */}
+          {journey.recentMilestones.length > 0 && (
+            <div className="space-y-1.5">
+              {journey.recentMilestones.map((ms, i) => (
+                <motion.div
+                  key={ms.id}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-gray-800/50 border border-gray-700/30"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.6 + i * 0.1 }}
+                >
+                  <div className="flex-shrink-0 w-7 h-7 rounded-md bg-amber-900/30 border border-amber-700/40 flex items-center justify-center text-sm">
+                    {ms.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-200 truncate">{ms.name}</p>
+                    <p className="text-[10px] text-gray-500">
+                      {new Date(ms.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <Zap className="w-3 h-3 text-yellow-400" />
+                    <span className="text-[10px] font-bold text-yellow-400">+{ms.xp}</span>
+                  </div>
+                  <Star className="w-3 h-3 text-amber-500/50 flex-shrink-0" />
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </motion.div>

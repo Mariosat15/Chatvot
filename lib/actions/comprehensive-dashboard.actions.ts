@@ -22,6 +22,9 @@ import { calculateXPProgress } from "@/lib/services/xp-config.service";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 import UserBadge from "@/database/models/user-badge.model";
 import BadgeConfig from "@/database/models/badge-config.model";
+import UserJourneyProgress from "@/database/models/user-journey-progress.model";
+import JourneyMilestone from "@/database/models/journey-milestone.model";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
 
 /**
  * Comprehensive Dashboard Data
@@ -134,6 +137,21 @@ export interface ComprehensiveDashboardData {
       earnedAt: Date;
     }>;
     totalBadges: number;
+  };
+
+  // Journey / Milestones
+  journey: {
+    currentMapName: string;
+    currentMapTheme: string;
+    completedMilestones: number;
+    totalMilestones: number;
+    recentMilestones: Array<{
+      id: string;
+      name: string;
+      icon: string;
+      xp: number;
+      completedAt: Date;
+    }>;
   };
 }
 
@@ -784,6 +802,72 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     };
   });
 
+  // ── Journey / Milestone data ──────────────────────────────────────────
+  let journeyData = {
+    currentMapName: "",
+    currentMapTheme: "",
+    completedMilestones: 0,
+    totalMilestones: 0,
+    recentMilestones: [] as Array<{
+      id: string; name: string; icon: string; xp: number; completedAt: Date;
+    }>,
+  };
+  try {
+    const userProgress = await UserJourneyProgress.findOne({ userId })
+      .select("completedMilestones currentMapIndex mapId totalMilestonesCompleted")
+      .lean();
+
+    if (userProgress) {
+      // Fetch current map config
+      const mapConfig = await JourneyMapConfig.findOne({ isActive: true, sequenceOrder: (userProgress as any).currentMapIndex || 1 })
+        .select("name theme totalMilestones mapId")
+        .lean();
+
+      // Count total milestones on current map
+      const mapMilestoneCount = mapConfig
+        ? await JourneyMilestone.countDocuments({ mapId: (mapConfig as any).mapId, isActive: true })
+        : 0;
+
+      // Get the most recent 3 completed milestones with details
+      const completedArr = ((userProgress as any).completedMilestones || []) as Array<{
+        milestoneId: string; completedAt: Date; rewards: { xp: number };
+      }>;
+      const recentCompleted = completedArr
+        .slice()
+        .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+        .slice(0, 3);
+
+      // Fetch milestone details for the recent ones
+      const milestoneIds = recentCompleted.map((m) => m.milestoneId);
+      const milestoneDetails = milestoneIds.length > 0
+        ? await JourneyMilestone.find({ id: { $in: milestoneIds }, isActive: true })
+            .select("id name icon rewards")
+            .lean()
+        : [];
+      const milestoneMap = new Map((milestoneDetails as any[]).map((m: any) => [m.id, m]));
+
+      journeyData = {
+        currentMapName: (mapConfig as any)?.name || "Map 1",
+        currentMapTheme: (mapConfig as any)?.theme || "pirate",
+        completedMilestones: completedArr.length,
+        totalMilestones: mapMilestoneCount || (mapConfig as any)?.totalMilestones || 0,
+        recentMilestones: recentCompleted.map((cm) => {
+          const detail = milestoneMap.get(cm.milestoneId);
+          return {
+            id: cm.milestoneId,
+            name: detail?.name || cm.milestoneId,
+            icon: detail?.icon || "⭐",
+            xp: cm.rewards?.xp || detail?.rewards?.xp || 0,
+            completedAt: cm.completedAt,
+          };
+        }),
+      };
+    }
+  } catch (err) {
+    // Non-critical — dashboard still works without journey data
+    console.warn("⚠️ Failed to fetch journey data for dashboard:", err);
+  }
+
   return {
     user: {
       id: userId,
@@ -830,6 +914,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       recentBadges,
       totalBadges: (userLevelData as any).totalBadgesEarned || 0,
     },
+    journey: journeyData,
   };
 }
 
