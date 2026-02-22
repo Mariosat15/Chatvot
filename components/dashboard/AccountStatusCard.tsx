@@ -261,7 +261,9 @@ export default function AccountStatusCard({ accountStatus }: AccountStatusCardPr
                       </p>
                     )}
                     {!r.expiresAt && r.type === "banned" && (
-                      <p className="text-[10px] text-red-400/60">Permanent — contact support for appeal</p>
+                      <p className="text-[10px] text-red-400/60">
+                        Permanent — <a href="/messaging" className="underline hover:text-red-300">contact support</a> for appeal
+                      </p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
                       {[
@@ -342,7 +344,9 @@ export default function AccountStatusCard({ accountStatus }: AccountStatusCardPr
                       {l.lockedUntil ? (
                         <span>Unlocks: {new Date(l.lockedUntil).toLocaleDateString()}</span>
                       ) : (
-                        <span className="text-orange-400/60">Permanent — contact support</span>
+                        <span className="text-orange-400/60">
+                          Permanent — <a href="/messaging" className="underline hover:text-orange-300">contact support</a>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -376,7 +380,7 @@ export default function AccountStatusCard({ accountStatus }: AccountStatusCardPr
             <div className="pt-2 border-t border-gray-700/30">
               <p className="text-[10px] text-gray-500 text-center">
                 If you believe this is an error, please{" "}
-                <a href="/support" className="text-blue-400 hover:text-blue-300 underline">
+                <a href="/messaging" className="text-blue-400 hover:text-blue-300 underline">
                   contact support
                 </a>{" "}
                 for assistance.
