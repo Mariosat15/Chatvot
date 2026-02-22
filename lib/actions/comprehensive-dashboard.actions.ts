@@ -828,17 +828,16 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         ? await JourneyMilestone.countDocuments({ mapId: (mapConfig as any).mapId, isActive: true })
         : 0;
 
-      // Get the most recent 3 completed milestones with details
+      // Reason: Send ALL completed milestones (sorted newest first) so the dashboard can show them with expand/collapse
       const completedArr = ((userProgress as any).completedMilestones || []) as Array<{
         milestoneId: string; completedAt: Date; rewards: { xp: number };
       }>;
-      const recentCompleted = completedArr
+      const allCompleted = completedArr
         .slice()
-        .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-        .slice(0, 3);
+        .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 
-      // Fetch milestone details for the recent ones
-      const milestoneIds = recentCompleted.map((m) => m.milestoneId);
+      // Fetch milestone details for all completed ones
+      const milestoneIds = allCompleted.map((m) => m.milestoneId);
       const milestoneDetails = milestoneIds.length > 0
         ? await JourneyMilestone.find({ id: { $in: milestoneIds }, isActive: true })
             .select("id name icon rewards")
@@ -851,7 +850,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         currentMapTheme: (mapConfig as any)?.theme || "pirate",
         completedMilestones: completedArr.length,
         totalMilestones: mapMilestoneCount || (mapConfig as any)?.totalMilestones || 0,
-        recentMilestones: recentCompleted.map((cm) => {
+        recentMilestones: allCompleted.map((cm) => {
           const detail = milestoneMap.get(cm.milestoneId);
           return {
             id: cm.milestoneId,

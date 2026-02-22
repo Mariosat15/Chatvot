@@ -1,10 +1,14 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Crown, ChevronRight, Map } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Crown, ChevronRight, ChevronDown, Map } from "lucide-react";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
+
+// Reason: Number of items visible in the collapsed first row before expand arrow appears
+const COLLAPSED_LIMIT = 8;
 
 interface PlayerProfileCardProps {
   name: string;
@@ -65,6 +69,8 @@ export default function PlayerProfileCard({
   journey,
 }: PlayerProfileCardProps) {
   const clampedProgress = Math.min(Math.max(progressPercent, 0), 100);
+  const [badgesExpanded, setBadgesExpanded] = useState(false);
+  const [milestonesExpanded, setMilestonesExpanded] = useState(false);
 
   return (
     <motion.div
@@ -182,48 +188,61 @@ export default function PlayerProfileCard({
         </div>
       </div>
 
-      {/* Recent Badges Row */}
-      {recentBadges.length > 0 && (
-        <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
-              Recent Badges ({totalBadges} total)
-            </span>
-            <Link
-              href="/profile?tab=badges"
-              className="relative z-20 text-xs text-yellow-500 hover:text-yellow-400 flex items-center gap-0.5 transition-colors cursor-pointer"
-            >
-              View All <ChevronRight className="w-3 h-3" />
-            </Link>
+      {/* Badges — show all with expandable row */}
+      {recentBadges.length > 0 && (() => {
+        const hasOverflow = recentBadges.length > COLLAPSED_LIMIT;
+        const visibleBadges = badgesExpanded ? recentBadges : recentBadges.slice(0, COLLAPSED_LIMIT);
+        return (
+          <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                  Badges ({recentBadges.length})
+                </span>
+                {hasOverflow && (
+                  <button
+                    onClick={() => setBadgesExpanded((v) => !v)}
+                    className="flex items-center gap-0.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    {badgesExpanded ? "Collapse" : `+${recentBadges.length - COLLAPSED_LIMIT} more`}
+                    <ChevronDown
+                      className={`w-3 h-3 transition-transform duration-200 ${badgesExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                )}
+              </div>
+              <Link
+                href="/profile?tab=badges"
+                className="relative z-20 text-xs text-yellow-500 hover:text-yellow-400 flex items-center gap-0.5 transition-colors cursor-pointer"
+              >
+                View All <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <AnimatePresence mode="popLayout">
+                {visibleBadges.map((badge, i) => {
+                  const rarity = RARITY_COLORS[badge.rarity] || RARITY_COLORS.common;
+                  return (
+                    <motion.div
+                      key={badge.id}
+                      layout
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg border overflow-hidden ${rarity.border} ${rarity.bg} cursor-default`}
+                      style={{ boxShadow: `0 0 10px ${rarity.glow}` }}
+                      title={`${badge.name} (${badge.rarity})`}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, delay: i < COLLAPSED_LIMIT ? 0 : (i - COLLAPSED_LIMIT) * 0.03 }}
+                    >
+                      <GameIcon name={badge.icon as GameIconName} size={24} alt={badge.name} />
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {recentBadges.map((badge, i) => {
-              const rarity = RARITY_COLORS[badge.rarity] || RARITY_COLORS.common;
-              return (
-                <motion.div
-                  key={badge.id}
-                  className={`w-10 h-10 flex items-center justify-center rounded-lg border overflow-hidden ${rarity.border} ${rarity.bg} animate-badge-reveal cursor-default`}
-                  style={{
-                    animationDelay: `${i * 0.1}s`,
-                    boxShadow: `0 0 10px ${rarity.glow}`,
-                  }}
-                  title={`${badge.name} (${badge.rarity})`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
-                >
-                  {/* Reason: badge.icon is a GameIconName string — render via GameIcon */}
-                  <GameIcon
-                    name={badge.icon as GameIconName}
-                    size={24}
-                    alt={badge.name}
-                  />
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Recent Milestones + Journey Progress */}
       {journey && journey.totalMilestones > 0 && (
@@ -274,27 +293,48 @@ export default function PlayerProfileCard({
             </div>
           </div>
 
-          {/* Recent milestones — horizontal chips like badges */}
-          {journey.recentMilestones.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {journey.recentMilestones.map((ms, i) => (
-                <motion.div
-                  key={ms.id}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-amber-600/40 bg-amber-900/30 overflow-hidden animate-badge-reveal cursor-default"
-                  style={{
-                    animationDelay: `${i * 0.1}s`,
-                    boxShadow: "0 0 10px rgba(217,119,6,0.3)",
-                  }}
-                  title={`${ms.name} (+${ms.xp} XP)`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
-                >
-                  <GameIcon name={ms.icon as GameIconName} size={24} alt={ms.name} />
-                </motion.div>
-              ))}
-            </div>
-          )}
+          {/* Milestones — show all with expandable row */}
+          {journey.recentMilestones.length > 0 && (() => {
+            const ms = journey.recentMilestones;
+            const hasOverflow = ms.length > COLLAPSED_LIMIT;
+            const visibleMs = milestonesExpanded ? ms : ms.slice(0, COLLAPSED_LIMIT);
+            return (
+              <>
+                {hasOverflow && (
+                  <div className="flex items-center mb-2">
+                    <button
+                      onClick={() => setMilestonesExpanded((v) => !v)}
+                      className="flex items-center gap-0.5 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+                    >
+                      {milestonesExpanded ? "Collapse" : `+${ms.length - COLLAPSED_LIMIT} more`}
+                      <ChevronDown
+                        className={`w-3 h-3 transition-transform duration-200 ${milestonesExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <AnimatePresence mode="popLayout">
+                    {visibleMs.map((m, i) => (
+                      <motion.div
+                        key={m.id}
+                        layout
+                        className="w-10 h-10 flex items-center justify-center rounded-lg border border-amber-600/40 bg-amber-900/30 overflow-hidden cursor-default"
+                        style={{ boxShadow: "0 0 10px rgba(217,119,6,0.3)" }}
+                        title={`${m.name} (+${m.xp} XP)`}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, delay: i < COLLAPSED_LIMIT ? 0 : (i - COLLAPSED_LIMIT) * 0.03 }}
+                      >
+                        <GameIcon name={m.icon as GameIconName} size={24} alt={m.name} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </motion.div>
