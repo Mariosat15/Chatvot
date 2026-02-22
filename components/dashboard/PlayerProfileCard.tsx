@@ -7,7 +7,6 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
 
 interface PlayerProfileCardProps {
-  name: string;
   level: number;
   currentXP: number;
   xpToNextLevel: number;
@@ -84,7 +83,7 @@ export default function PlayerProfileCard({
           </div>
         </div>
 
-        {/* Player Info — no name displayed (sidebar already shows username) */}
+        {/* Player Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-3 overflow-hidden">
             <span
@@ -104,33 +103,30 @@ export default function PlayerProfileCard({
             )}
           </div>
 
-          {/* XP Progress Bar — same style as profile page */}
+          {/* XP Progress Bar — matching profile page style exactly */}
           <div className="w-full">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-gray-400 font-[var(--font-geist-mono)]">
                 XP: {currentXP.toLocaleString()}
               </span>
               <span className="text-xs text-gray-500">
-                {xpToNextLevel > 0 ? `${xpToNextLevel.toLocaleString()} to next` : "MAX LEVEL"}
+                {xpToNextLevel > 0 ? `${xpToNextLevel.toLocaleString()} XP needed` : "MAX LEVEL"}
               </span>
             </div>
+            {/* Reason: Matching profile XPProgressBar — h-6, purple gradient, rounded-full */}
             <div className="relative">
-              <div className="h-5 rounded-full bg-gray-700/60 overflow-hidden border border-gray-600/30">
+              <div className="h-6 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
                 <motion.div
-                  className="h-full rounded-full relative"
-                  style={{
-                    background: `linear-gradient(90deg, ${titleColor}, ${titleColor}DD, ${titleColor})`,
-                  }}
+                  className="h-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 relative"
                   initial={{ width: 0 }}
                   animate={{ width: `${clampedProgress}%` }}
                   transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
                 >
-                  {/* Pulse overlay like profile */}
                   <div className="absolute inset-0 bg-white/20 animate-pulse" />
                 </motion.div>
               </div>
-              <p className="text-center text-[10px] font-bold text-gray-400 mt-1">
-                {clampedProgress.toFixed(0)}% to Level {level + 1}
+              <p className="text-center text-xs font-bold text-white mt-2">
+                {clampedProgress.toFixed(1)}% Complete
               </p>
             </div>
           </div>

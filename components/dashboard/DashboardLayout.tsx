@@ -5,15 +5,15 @@ import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-das
 import HeroStatsBar from "./HeroStatsBar";
 import PlayerProfileCard from "./PlayerProfileCard";
 import PerformanceRings from "./PerformanceRings";
-import DailyPnLBars from "./DailyPnLBars";
 import TradingAnalytics from "./TradingAnalytics";
 import ContestsSidebar from "./ContestsSidebar";
 import RecentTradesFeed from "./RecentTradesFeed";
 import StreaksShowcase from "./StreaksShowcase";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 
-// Reason: EquityChart uses Lightweight Charts (browser-only) so must load client-side only
+// Reason: These charts use Lightweight Charts (browser-only) so must load client-side only
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
+const DailyPnLChart = dynamic(() => import("./DailyPnLBars"), { ssr: false });
 
 interface DashboardLayoutProps {
   data: ComprehensiveDashboardData;
@@ -38,7 +38,6 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <PlayerProfileCard
-            name={data.user.name}
             level={player.level}
             currentXP={player.currentXP}
             xpToNextLevel={player.xpToNextLevel}
@@ -72,7 +71,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         {/* Left: Equity Chart + Daily P&L (2/3 width) */}
         <div className="lg:col-span-2 space-y-4">
           <EquityChart data={charts.walletBalanceHistory} />
-          <DailyPnLBars data={charts.dailyPnL} />
+          <DailyPnLChart data={charts.dailyPnL} />
         </div>
 
         {/* Right: Contests sidebar (1/3 width) */}
