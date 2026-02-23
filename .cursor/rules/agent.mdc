@@ -183,9 +183,20 @@ When a bug is reported or encountered:
 5. **Check logs.** Use the terminal to read server logs. Check browser DevTools for client errors.
 6. **Isolate the cause.** Narrow down to the exact line/function/condition.
 7. **Fix the root cause, not the symptom.** A workaround is not a fix.
-8. **Verify the fix.** Run lints, test the specific scenario, check for regressions.
-9. **Document non-obvious fixes** with a `// Reason:` comment explaining why.
-10. **Save to memory** if the bug revealed a non-obvious pattern or architectural constraint.
+8. **Check for siblings** — search for the same pattern elsewhere in the codebase. If it's buggy here, it's probably buggy there too.
+9. **Add a guard** — type check, validation, or assertion to prevent recurrence.
+10. **Verify the fix.** Run lints, test the specific scenario, check for regressions.
+11. **Document non-obvious fixes** with a `// Reason:` comment explaining why.
+12. **Save to memory** if the bug revealed a non-obvious pattern or architectural constraint.
+
+### Proactive Bug Prevention
+
+Before submitting any code change, mentally check for:
+- **Null/undefined access** — will this crash if the data is missing?
+- **Type coercion traps** — `"0" == false` is true in JS. Use strict equality.
+- **Async race conditions** — can two callers hit this at the same time?
+- **Boundary values** — what happens at 0, -1, MAX_INT, empty string, empty array?
+- **Error swallowing** — is there a `catch` block that silently ignores the error?
 
 ---
 
@@ -202,6 +213,8 @@ Before considering any task complete, verify:
 - [ ] Complex logic has `// Reason:` comments explaining the why.
 - [ ] If new patterns or architecture decisions were made, save them to memory.
 - [ ] Todos are all marked as completed.
+- [ ] Security: auth check present, inputs validated, no injection vectors.
+- [ ] Run `read_lints` on ALL modified files before declaring done.
 
 ---
 
