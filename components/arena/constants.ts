@@ -1,19 +1,24 @@
-// ─── Chartvolt Derby Theme ────────────────────────────────────────────────────
+// ─── Chartvolt Derby Theme — Premium Neon Casino ──────────────────────────────
 
 /** Brand palette — dark-neon blue + gold derby theme */
 export const CV = {
-  // Backgrounds (dark navy)
-  bg0: '#030308', bg1: '#06081a', bg2: '#0a0e24', bg3: '#10152e', bg4: '#161c38', bg5: '#1c2342',
+  // Backgrounds (deep space navy)
+  bg0: '#020208', bg1: '#050814', bg2: '#0a0e22', bg3: '#0e1330', bg4: '#141938', bg5: '#1a2040',
   // Borders
-  bd0: '#161c38', bd1: '#1f2748', bd2: '#2a3358', bd3: '#3a4268',
+  bd0: '#141938', bd1: '#1c2348', bd2: '#262e58', bd3: '#384068',
   // Accent colors
   teal: '#0FEDBE', blue: '#5B8DFF', gold: '#FFD458', gol2: '#E8BA40',
   red: '#FF495B', oran: '#FF8243', purp: '#D13BFF',
-  gray: '#8890A4', lgt: '#D0D8E8', txt: '#e4e8f0', grn: '#22c55e',
-  // Derby-specific
+  gray: '#7B849E', lgt: '#C8D0E4', txt: '#E8ECF4', grn: '#22c55e',
+  // Derby neon
+  neon: '#00E5FF', neonPink: '#FF2DDB', neonGreen: '#39FF14',
+  // Track
   track: '#0C3D1A', trackLight: '#1A5E2B', turf: '#145A24',
   railGold: '#C9A84C', railDark: '#8B7635',
-  neon: '#00E5FF', neonPink: '#FF2DDB',
+  // Glass
+  glass: 'rgba(14,19,48,.65)',
+  glassBorder: 'rgba(91,141,255,.12)',
+  glassHover: 'rgba(91,141,255,.08)',
 } as const;
 
 /** Rank colors for medals */
@@ -21,7 +26,7 @@ export const RANK_COLORS = [CV.gold, '#C0C0C0', '#CD7F32'] as const;
 
 /** Rank glow intensities */
 export const RANK_GLOW = [
-  'rgba(255,212,88,.4)', 'rgba(192,192,192,.2)', 'rgba(205,127,50,.25)',
+  'rgba(255,212,88,.45)', 'rgba(192,192,192,.25)', 'rgba(205,127,50,.3)',
 ] as const;
 
 /** Scrolling ticker symbols */
@@ -29,18 +34,24 @@ export const TICKER_SYMS = [
   'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'USDCAD', 'BTCUSD', 'ETHUSD', 'AUDUSD',
 ];
 
+/** Ticker display labels */
+export const TICKER_LABELS: Record<string, string> = {
+  EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', XAUUSD: 'XAU/USD',
+  USDCAD: 'USD/CAD', BTCUSD: 'BTC/USD', ETHUSD: 'ETH/USD', AUDUSD: 'AUD/USD',
+};
+
 /** Avatar gradient palette */
 export const AV_GRADS = [
-  `#0a0d1e,${CV.blue}`, `#050e12,${CV.teal}`, `#120618,${CV.purp}`,
-  `#081808,${CV.grn}`, `#1a0508,${CV.red}`, `#0a0a1e,${CV.blue}`, `#150c02,${CV.oran}`,
+  `#080d22,${CV.blue}`, `#040e14,${CV.teal}`, `#140620,${CV.purp}`,
+  `#061806,${CV.grn}`, `#1c0408,${CV.red}`, `#080a20,${CV.neon}`, `#180e02,${CV.oran}`,
 ];
 
 /** Trader card tier config */
 export const TIER_CFG = {
-  champion: { border: CV.gold,  header: `linear-gradient(135deg,#1a1200,rgba(255,212,88,.22))`,  tag: 'rgba(255,212,88,.15)',  tagColor: CV.gold,  tagLabel: '🏆 Champion', glow: 'rgba(255,212,88,.3)' },
-  elite:    { border: CV.purp,  header: `linear-gradient(135deg,#12081a,rgba(209,59,255,.2))`,   tag: 'rgba(209,59,255,.15)', tagColor: CV.purp,  tagLabel: '⚡ Elite',    glow: 'rgba(209,59,255,.25)' },
-  veteran:  { border: CV.blue,  header: `linear-gradient(135deg,#080e22,rgba(91,141,255,.2))`,   tag: 'rgba(91,141,255,.15)', tagColor: CV.blue,  tagLabel: '🎯 Veteran',  glow: 'rgba(91,141,255,.22)' },
-  trader:   { border: CV.bd3,   header: `linear-gradient(135deg,${CV.bg2},${CV.bg3})`,           tag: 'rgba(136,144,164,.1)', tagColor: CV.gray,  tagLabel: '📊 Trader',   glow: 'rgba(0,0,0,0)' },
+  champion: { border: CV.gold,  header: `linear-gradient(135deg,#1a1200 0%,rgba(255,212,88,.18) 100%)`, tag: 'rgba(255,212,88,.12)',  tagColor: CV.gold,  tagLabel: '🏆 Champion', glow: 'rgba(255,212,88,.35)' },
+  elite:    { border: CV.purp,  header: `linear-gradient(135deg,#12081a 0%,rgba(209,59,255,.16) 100%)`, tag: 'rgba(209,59,255,.12)', tagColor: CV.purp,  tagLabel: '⚡ Elite',    glow: 'rgba(209,59,255,.28)' },
+  veteran:  { border: CV.blue,  header: `linear-gradient(135deg,#080e22 0%,rgba(91,141,255,.16) 100%)`, tag: 'rgba(91,141,255,.12)', tagColor: CV.blue,  tagLabel: '🎯 Veteran',  glow: 'rgba(91,141,255,.25)' },
+  trader:   { border: CV.bd3,   header: `linear-gradient(135deg,${CV.bg2} 0%,${CV.bg3} 100%)`,         tag: 'rgba(136,144,164,.08)', tagColor: CV.gray,  tagLabel: '📊 Trader',   glow: 'rgba(0,0,0,0)' },
 };
 
 /** Assign tier by rank */

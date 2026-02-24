@@ -30,6 +30,7 @@ export default function ArenaPage() {
   const [selected, setSelected] = useState<AEvent | null>(null);
   const [scene, setScene] = useState<SceneKey>('overview');
   const [prices, setPrices] = useState<PriceMap>({});
+  const [prevPrices, setPrevPrices] = useState<PriceMap>({});
   const [traderModal, setTraderModal] = useState<Participant | null>(null);
   const [chartSymbol, setChartSymbol] = useState('EURUSD');
   const [chartTf, setChartTf] = useState('1');
@@ -40,6 +41,10 @@ export default function ArenaPage() {
   // Previous equities for momentum tracking
   const prevEquitiesRef = useRef<Map<string, number>>(new Map());
   const [previousEquities, setPreviousEquities] = useState<Map<string, number>>(new Map());
+
+  // Interval refs for proper cleanup/restart
+  const compIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Inject CSS animations ────────────────────────────────────────────────────
   useEffect(() => { injectDerbyStyles(); }, []);
@@ -136,17 +141,36 @@ export default function ArenaPage() {
     }
   }, [selected]);
 
+  // Reason: Separate polling setup with proper visibility handling.
+  // The previous implementation cleared the interval on tab hide but never restarted it.
   useEffect(() => {
-    fetchCompetitions();
-    const interval = setInterval(fetchCompetitions, 5000);
-    // Pause on tab hidden
-    const onVis = () => {
-      if (document.hidden) clearInterval(interval);
+    const startPolling = () => {
+      fetchCompetitions();
+      if (compIntervalRef.current) clearInterval(compIntervalRef.current);
+      compIntervalRef.current = setInterval(fetchCompetitions, 3000);
     };
-    document.addEventListener('visibilitychange', onVis);
+
+    const stopPolling = () => {
+      if (compIntervalRef.current) {
+        clearInterval(compIntervalRef.current);
+        compIntervalRef.current = null;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVis);
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [fetchCompetitions]);
 
@@ -177,14 +201,43 @@ export default function ArenaPage() {
               map[key] = p.mid;
             }
           }
+          // Reason: Store previous prices before updating for direction tracking
+          setPrevPrices(prev => {
+            // Only update prevPrices if we had actual prices before
+            const hasPrev = Object.keys(prev).length > 0;
+            return hasPrev ? { ...prev } : map;
+          });
           setPrices(map);
         }
       } catch { /* silent */ }
     };
 
-    poll();
-    const iv = setInterval(poll, 1000);
-    return () => { alive = false; clearInterval(iv); };
+    const startPricePolling = () => {
+      poll();
+      if (priceIntervalRef.current) clearInterval(priceIntervalRef.current);
+      priceIntervalRef.current = setInterval(poll, 1000);
+    };
+
+    const stopPricePolling = () => {
+      if (priceIntervalRef.current) {
+        clearInterval(priceIntervalRef.current);
+        priceIntervalRef.current = null;
+      }
+    };
+
+    const onVis = () => {
+      if (document.hidden) stopPricePolling();
+      else startPricePolling();
+    };
+
+    startPricePolling();
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      alive = false;
+      stopPricePolling();
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [view]);
 
   // ── Fetch candles ────────────────────────────────────────────────────────────
@@ -260,37 +313,51 @@ export default function ArenaPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      minHeight: '100vh', background: CV.bg0,
+      minHeight: '100vh',
+      background: `linear-gradient(180deg, ${CV.bg0} 0%, #050812 50%, ${CV.bg0} 100%)`,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: CV.txt,
     }}>
       {/* Top Ticker */}
-      <Ticker prices={prices} />
+      <Ticker prices={prices} prevPrices={prevPrices} />
 
       {/* Header */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '12px 24px', borderBottom: `1px solid ${CV.bd0}`,
-        background: `linear-gradient(90deg, ${CV.bg1}, ${CV.bg2})`,
+        padding: '12px 24px',
+        borderBottom: `1px solid ${CV.bd0}`,
+        background: CV.glass,
+        backdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {view === 'live' && (
             <button
               onClick={handleBack}
               style={{
-                background: CV.bg3, border: `1px solid ${CV.bd1}`,
-                color: CV.gray, padding: '6px 14px', borderRadius: 8,
+                background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
+                border: `1px solid ${CV.bd2}`,
+                color: CV.lgt, padding: '6px 16px', borderRadius: 8,
                 fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                transition: 'all .2s',
               }}
             >
               ← Back
             </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 24 }}>🏇</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: `linear-gradient(135deg, ${CV.gold}20, ${CV.oran}20)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `1px solid ${CV.gold}30`,
+              fontSize: 20,
+            }}>
+              🏇
+            </div>
             <div>
               <div style={{
-                color: CV.gold, fontWeight: 800, fontSize: 16, letterSpacing: 2,
+                fontWeight: 800, fontSize: 16, letterSpacing: 2,
                 backgroundImage: `linear-gradient(90deg, ${CV.gold}, ${CV.oran}, ${CV.gold})`,
                 backgroundSize: '200% auto',
                 WebkitBackgroundClip: 'text',
@@ -299,7 +366,7 @@ export default function ArenaPage() {
               }}>
                 CHARTVOLT DERBY
               </div>
-              <div style={{ color: CV.gray, fontSize: 10, letterSpacing: 1 }}>
+              <div style={{ color: CV.gray, fontSize: 10, letterSpacing: 1.5 }}>
                 LIVE TRADING ARENA
               </div>
             </div>
@@ -308,19 +375,22 @@ export default function ArenaPage() {
 
         {/* Scene tabs (only in live view) */}
         {view === 'live' && (
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 3 }}>
             {SCENE_TABS.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setScene(tab.key)}
                 style={{
-                  background: scene === tab.key ? `${CV.gold}18` : 'transparent',
-                  border: `1px solid ${scene === tab.key ? CV.gold : CV.bd1}`,
+                  background: scene === tab.key
+                    ? `linear-gradient(135deg, ${CV.gold}15, ${CV.gold}08)`
+                    : 'transparent',
+                  border: `1px solid ${scene === tab.key ? CV.gold + '50' : CV.bd1}`,
                   color: scene === tab.key ? CV.gold : CV.gray,
                   padding: '6px 14px', borderRadius: 8,
                   fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  transition: 'all .15s',
+                  transition: 'all .2s',
                   display: 'flex', alignItems: 'center', gap: 4,
+                  boxShadow: scene === tab.key ? `0 0 12px ${CV.gold}15` : 'none',
                 }}
               >
                 <span>{tab.emoji}</span>
@@ -335,33 +405,63 @@ export default function ArenaPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
-              background: CV.teal, animation: 'derbyPulse 1.5s infinite',
+              background: CV.teal,
+              animation: 'livePulse 1.5s ease-out infinite',
+              boxShadow: `0 0 8px ${CV.teal}`,
             }} />
-            <span style={{ color: CV.teal, fontSize: 12, fontWeight: 700 }}>LIVE</span>
+            <span style={{ color: CV.teal, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>LIVE</span>
           </div>
         )}
       </header>
 
       {/* Main Content */}
-      <main style={{ padding: '20px 24px', maxWidth: 1440, margin: '0 auto' }}>
+      <main style={{ padding: '20px 24px', maxWidth: 1480, margin: '0 auto' }}>
         {/* ═══════ LOBBY VIEW ═══════ */}
         {view === 'lobby' && (
           <div style={{ animation: 'fadeSlideUp .4s ease-out' }}>
             {/* Welcome banner */}
             <div style={{
               background: `linear-gradient(135deg, ${CV.bg2}, ${CV.bg3})`,
-              borderRadius: 20, border: `1px solid ${CV.bd1}`,
-              padding: '40px 32px', marginBottom: 24, textAlign: 'center',
+              borderRadius: 20, border: `1px solid ${CV.glassBorder}`,
+              padding: '48px 40px', marginBottom: 28, textAlign: 'center',
               position: 'relative', overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
             }}>
+              {/* Background gradient orbs */}
               <div style={{
-                position: 'absolute', inset: 0,
-                background: `radial-gradient(ellipse at 30% 50%, ${CV.gold}08, transparent 60%)`,
-              }} />
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🏇</div>
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+              }}>
                 <div style={{
-                  color: CV.gold, fontSize: 28, fontWeight: 800, letterSpacing: 3, marginBottom: 8,
+                  position: 'absolute', width: 300, height: 300, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${CV.gold}08, transparent 70%)`,
+                  top: -80, left: '20%',
+                }} />
+                <div style={{
+                  position: 'absolute', width: 250, height: 250, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${CV.blue}06, transparent 70%)`,
+                  bottom: -60, right: '15%',
+                }} />
+                <div style={{
+                  position: 'absolute', width: 200, height: 200, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${CV.purp}05, transparent 70%)`,
+                  top: '30%', right: '30%',
+                }} />
+              </div>
+
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{
+                  width: 72, height: 72, margin: '0 auto 16px',
+                  borderRadius: 18,
+                  background: `linear-gradient(135deg, ${CV.gold}20, ${CV.oran}20)`,
+                  border: `1px solid ${CV.gold}30`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 36,
+                  animation: 'goldGlow 3s ease-in-out infinite',
+                }}>
+                  🏇
+                </div>
+                <div style={{
+                  fontSize: 32, fontWeight: 900, letterSpacing: 4, marginBottom: 10,
                   backgroundImage: `linear-gradient(90deg, ${CV.gold}, ${CV.oran}, ${CV.gold})`,
                   backgroundSize: '200% auto',
                   WebkitBackgroundClip: 'text',
@@ -370,7 +470,7 @@ export default function ArenaPage() {
                 }}>
                   CHARTVOLT TRADING DERBY
                 </div>
-                <div style={{ color: CV.gray, fontSize: 14 }}>
+                <div style={{ color: CV.lgt, fontSize: 15, maxWidth: 500, margin: '0 auto', lineHeight: 1.5 }}>
                   Watch live traders race to the top — Real trades, real competition, real-time action.
                 </div>
               </div>
@@ -378,18 +478,18 @@ export default function ArenaPage() {
 
             {/* Events grid */}
             {loading ? (
-              <div style={{ textAlign: 'center', color: CV.gray, padding: 60 }}>
-                <div style={{ fontSize: 32, marginBottom: 12, animation: 'derbyPulse 1.5s infinite' }}>🏇</div>
-                Loading races...
+              <div style={{ textAlign: 'center', color: CV.gray, padding: 80 }}>
+                <div style={{ fontSize: 40, marginBottom: 16, animation: 'avatarBob 1.5s ease-in-out infinite' }}>🏇</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>Loading races...</div>
               </div>
             ) : events.length === 0 ? (
-              <div style={{ textAlign: 'center', color: CV.gray, padding: 60 }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>🏁</div>
-                No active races right now. Check back soon!
+              <div style={{ textAlign: 'center', color: CV.gray, padding: 80 }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>🏁</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>No active races right now. Check back soon!</div>
               </div>
             ) : (
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
                 gap: 16,
               }}>
                 {events.map(ev => (
@@ -406,22 +506,37 @@ export default function ArenaPage() {
             {/* Event banner */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginBottom: 16, padding: '10px 16px',
-              background: CV.bg2, borderRadius: 12, border: `1px solid ${CV.bd1}`,
+              marginBottom: 16, padding: '12px 20px',
+              background: CV.glass, borderRadius: 14,
+              border: `1px solid ${CV.glassBorder}`,
+              backdropFilter: 'blur(8px)',
             }}>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', background: CV.teal,
+                  animation: 'livePulse 1.5s ease-out infinite',
+                }} />
                 <span style={{ color: CV.txt, fontSize: 16, fontWeight: 700 }}>{selected.name}</span>
-                <span style={{ color: CV.gray, fontSize: 12, marginLeft: 12 }}>
+                <span style={{
+                  color: CV.gray, fontSize: 11, padding: '2px 10px',
+                  background: `${CV.bg4}`, borderRadius: 6, border: `1px solid ${CV.bd1}`,
+                }}>
                   {selected.type === 'trading_competition' ? '🏇 Derby Race' : '⚔️ Challenge'}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <span style={{ color: CV.gold, fontSize: 13, fontWeight: 600 }}>
-                  💰 {selected.prizePool > 0 ? `$${selected.prizePool.toLocaleString()}` : 'Glory'}
-                </span>
-                <span style={{ color: CV.blue, fontSize: 13, fontWeight: 600 }}>
-                  🏇 {selected.currentParticipants} racers
-                </span>
+              <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>PRIZE</div>
+                  <div style={{ color: CV.gold, fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>
+                    {selected.prizePool > 0 ? `$${selected.prizePool.toLocaleString()}` : 'Glory'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>RACERS</div>
+                  <div style={{ color: CV.blue, fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>
+                    {selected.currentParticipants}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -430,6 +545,7 @@ export default function ArenaPage() {
               <OverviewScene
                 event={selected}
                 prices={prices}
+                prevPrices={prevPrices}
                 previousEquities={previousEquities}
                 chartSymbol={chartSymbol}
                 chartTf={chartTf}

@@ -1,10 +1,10 @@
 'use client';
-// ─── TraderCard — Pokémon-style Derby Stats Card ──────────────────────────────
+// ─── TraderCard — Premium Derby Stats Modal ─────────────────────────────────
 import React from 'react';
 import type { Participant } from './types';
 import { CV } from './constants';
 import { getTier } from './constants';
-import { fmt, fmtRoi, fmtPnl, calcRoi, calcWinRate, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle } from './helpers';
+import { fmt, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
 
 interface TraderCardProps {
@@ -23,9 +23,14 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
   const titleObj = getTraderTitle(p, startCap);
 
   const statRow = (label: string, value: string, color?: string) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${CV.bd0}` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${CV.bd0}60` }}>
       <span style={{ color: CV.gray, fontSize: 12 }}>{label}</span>
-      <span style={{ color: color || CV.txt, fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>{value}</span>
+      <span style={{
+        color: color || CV.txt, fontSize: 12, fontWeight: 600,
+        fontFamily: '"SF Mono", Consolas, monospace',
+      }}>
+        {value}
+      </span>
     </div>
   );
 
@@ -43,52 +48,64 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)',
+        background: 'rgba(2,2,8,.8)', backdropFilter: 'blur(12px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: 'fadeSlideUp .3s ease-out',
+        animation: 'fadeIn .2s ease-out',
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 380, maxHeight: '90vh', overflow: 'auto',
-          background: CV.bg2, borderRadius: 20,
+          width: 400, maxHeight: '90vh', overflow: 'auto',
+          background: `linear-gradient(180deg, ${CV.bg2}, ${CV.bg1})`,
+          borderRadius: 22,
           border: `2px solid ${tier.border}`,
-          boxShadow: `0 0 40px ${tier.glow}, 0 24px 48px rgba(0,0,0,.6)`,
+          boxShadow: `0 0 50px ${tier.glow}, 0 30px 60px rgba(0,0,0,.6)`,
+          animation: 'scaleIn .3s ease-out',
         }}
       >
         {/* Header */}
         <div style={{
           background: tier.header,
-          padding: '24px 20px 16px', textAlign: 'center',
-          borderRadius: '18px 18px 0 0',
+          padding: '28px 24px 20px', textAlign: 'center',
+          borderRadius: '20px 20px 0 0',
+          position: 'relative', overflow: 'hidden',
         }}>
+          {/* Background glow */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: `radial-gradient(circle at 50% 0%, ${tier.border}15, transparent 70%)`,
+          }} />
+
           {/* Tier tag */}
           <div style={{
             display: 'inline-block', background: tier.tag,
-            padding: '3px 12px', borderRadius: 12, marginBottom: 12,
+            padding: '4px 14px', borderRadius: 12, marginBottom: 14,
             color: tier.tagColor, fontSize: 11, fontWeight: 700, letterSpacing: .5,
+            border: `1px solid ${tier.border}25`,
+            position: 'relative',
           }}>
             {tier.tagLabel}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-            <Avatar src={p.profileImage} name={p.username} size={72} rank={rank} showRank glow={tier.border} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, position: 'relative' }}>
+            <Avatar src={p.profileImage} name={p.username} size={80} rank={rank} showRank glow={tier.border} bobbing />
           </div>
 
-          <div style={{ color: CV.txt, fontSize: 18, fontWeight: 700 }}>{p.username}</div>
-          <div style={{ color: tier.tagColor, fontSize: 12, marginTop: 4 }}>
+          <div style={{ color: CV.txt, fontSize: 20, fontWeight: 700, position: 'relative' }}>{p.username}</div>
+          <div style={{ color: tier.tagColor, fontSize: 12, marginTop: 4, position: 'relative' }}>
             {titleObj.emoji} {titleObj.title}
           </div>
 
           {/* Badges */}
           {badges.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 12, position: 'relative' }}>
               {badges.map((b, i) => (
                 <span key={i} style={{
                   background: 'rgba(0,0,0,.3)', color: b.color,
-                  padding: '2px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600,
-                  border: `1px solid ${b.color}30`,
+                  padding: '3px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                  border: `1px solid ${b.color}25`,
+                  backdropFilter: 'blur(4px)',
                 }}>
                   {b.emoji} {b.label}
                 </span>
@@ -98,20 +115,32 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
         </div>
 
         {/* Stats */}
-        <div style={{ padding: '16px 20px' }}>
+        <div style={{ padding: '18px 24px' }}>
           {/* Hero stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
             {[
               { label: 'Equity', value: fmt(p.liveEquity), color: CV.teal },
               { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
               { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
             ].map((s, i) => (
               <div key={i} style={{
-                background: CV.bg3, borderRadius: 10, padding: '10px 8px', textAlign: 'center',
+                background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
+                borderRadius: 12, padding: '12px 8px', textAlign: 'center',
                 border: `1px solid ${CV.bd0}`,
+                position: 'relative', overflow: 'hidden',
               }}>
-                <div style={{ color: CV.gray, fontSize: 10, marginBottom: 4 }}>{s.label}</div>
-                <div style={{ color: s.color, fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{s.value}</div>
+                <div style={{
+                  position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+                  width: '50%', height: 1, background: `linear-gradient(90deg, transparent, ${s.color}40, transparent)`,
+                }} />
+                <div style={{ color: CV.gray, fontSize: 10, marginBottom: 5 }}>{s.label}</div>
+                <div style={{
+                  color: s.color, fontSize: 17, fontWeight: 700,
+                  fontFamily: '"SF Mono", Consolas, monospace',
+                  textShadow: `0 0 8px ${s.color}20`,
+                }}>
+                  {s.value}
+                </div>
               </div>
             ))}
           </div>
@@ -131,28 +160,32 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
 
           {/* Open positions */}
           {p.openPositions && p.openPositions.length > 0 && (
-            <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 16 }}>
               <div style={{ color: CV.gray, fontSize: 11, fontWeight: 600, marginBottom: 8, letterSpacing: .5 }}>
                 OPEN POSITIONS
               </div>
               {p.openPositions.map((pos, i) => (
                 <div key={i} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '6px 8px', marginBottom: 4, borderRadius: 8,
-                  background: CV.bg3, border: `1px solid ${CV.bd0}`,
+                  padding: '7px 10px', marginBottom: 4, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
+                  border: `1px solid ${CV.bd0}`,
                 }}>
                   <div>
                     <span style={{ color: CV.txt, fontSize: 12, fontWeight: 600 }}>{pos.symbol}</span>
                     <span style={{
-                      marginLeft: 6, fontSize: 10, fontWeight: 700,
+                      marginLeft: 8, fontSize: 10, fontWeight: 700,
                       color: pos.side === 'long' ? CV.teal : CV.red,
+                      padding: '1px 6px', borderRadius: 4,
+                      background: pos.side === 'long' ? `${CV.teal}12` : `${CV.red}12`,
                     }}>
                       {pos.side.toUpperCase()}
                     </span>
                   </div>
                   <span style={{
                     color: pos.unrealizedPnl >= 0 ? CV.teal : CV.red,
-                    fontSize: 12, fontWeight: 600, fontFamily: 'monospace',
+                    fontSize: 12, fontWeight: 600,
+                    fontFamily: '"SF Mono", Consolas, monospace',
                   }}>
                     {fmtPnl(pos.unrealizedPnl)}
                   </span>
@@ -163,13 +196,15 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
         </div>
 
         {/* Close button */}
-        <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
+        <div style={{ padding: '0 24px 20px', textAlign: 'center' }}>
           <button
             onClick={onClose}
             style={{
-              background: CV.bg3, border: `1px solid ${CV.bd2}`,
-              color: CV.gray, padding: '8px 32px', borderRadius: 10,
+              background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
+              border: `1px solid ${CV.bd2}`,
+              color: CV.lgt, padding: '10px 40px', borderRadius: 12,
               fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              transition: 'all .2s',
             }}
           >
             Close
