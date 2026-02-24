@@ -66,8 +66,9 @@ export const getTraderTitle = (p: Participant, startCap: number) => {
 
 /** Time remaining until end date */
 export const timeLeft = (endDate: string) => {
+  if (!endDate) return 'N/A';
   const ms = new Date(endDate).getTime() - Date.now();
-  if (ms <= 0) return 'Ended';
+  if (isNaN(ms) || ms <= 0) return 'Ended';
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
   const s = Math.floor((ms % 60000) / 1000);

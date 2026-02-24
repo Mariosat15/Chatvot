@@ -8,7 +8,7 @@ import {
   OverviewScene, RaceScene, SpotlightScene, H2HScene, DangerScene, PodiumScene,
   injectDerbyStyles,
 } from '@/components/arena';
-import type { AEvent, PriceMap, DashData, SceneKey, Participant, CandleData, BubbleTrade } from '@/components/arena/types';
+import type { AEvent, PriceMap, SceneKey, Participant, CandleData, BubbleTrade, OpenPos } from '@/components/arena/types';
 import { CV } from '@/components/arena/constants';
 import { ranked } from '@/components/arena/helpers';
 
@@ -49,10 +49,78 @@ export default function ArenaPage() {
     try {
       const res = await fetch('/api/dashboard/competitions');
       if (!res.ok) return;
-      const data: DashData = await res.json();
-      setEvents(data.competitions || []);
+      const data = await res.json();
+
+      // Reason: API returns fields that differ from our AEvent interface.
+      // Map: id→_id, startTime→startDate, endTime→endDate, merge openPositions into participants.
+      const mapEvent = (ev: Record<string, unknown>): AEvent => {
+        const rawParticipants = (ev.participants || []) as Record<string, unknown>[];
+        const rawPositions = (ev.openPositions || []) as Record<string, unknown>[];
+
+        // Build a lookup: userId → their open positions
+        const posByUser: Record<string, unknown[]> = {};
+        for (const pos of rawPositions) {
+          const uid = pos.userId as string;
+          if (!posByUser[uid]) posByUser[uid] = [];
+          posByUser[uid].push(pos);
+        }
+
+        const participants: Participant[] = rawParticipants.map((p) => ({
+          userId: (p.userId as string) || '',
+          username: (p.username as string) || 'Anonymous',
+          profileImage: (p.profileImage as string | null) || null,
+          liveEquity: (p.liveEquity as number) || 0,
+          livePnl: (p.livePnl as number) || 0,
+          liveRoi: (p.liveRoi as number) || 0,
+          realizedPnl: (p.realizedPnl as number) || 0,
+          unrealizedPnl: (p.unrealizedPnl as number) || 0,
+          currentCapital: (p.currentCapital as number) || 0,
+          availableCapital: (p.availableCapital as number) || 0,
+          usedMargin: (p.usedMargin as number) || 0,
+          totalTrades: (p.totalTrades as number) || 0,
+          winningTrades: (p.winningTrades as number) || 0,
+          losingTrades: (p.losingTrades as number) || 0,
+          winRate: (p.winRate as number) || 0,
+          averageWin: (p.averageWin as number) || 0,
+          averageLoss: (p.averageLoss as number) || 0,
+          largestWin: (p.largestWin as number) || 0,
+          largestLoss: (p.largestLoss as number) || 0,
+          maxDrawdownPercentage: (p.maxDrawdownPercentage as number) || 0,
+          currentOpenPositions: (p.currentOpenPositions as number) || 0,
+          status: (p.status as string) || 'active',
+          isDisqualified: (p.isDisqualified as boolean) || false,
+          openPositions: (posByUser[(p.userId as string)] || []) as OpenPos[],
+        }));
+
+        // Reason: API returns type "competition"/"challenge" but arena components
+        // check for "trading_competition". Normalize here.
+        const rawType = (ev.type as string) || '';
+        const normalizedType = rawType === 'competition' ? 'trading_competition' : rawType;
+
+        return {
+          _id: (ev.id as string) || (ev._id as string) || '',
+          name: (ev.name as string) || '',
+          type: normalizedType,
+          status: (ev.status as string) || '',
+          startingCapital: (ev.startingCapital as number) || 10000,
+          prizePool: (ev.prizePool as number) || 0,
+          currentParticipants: (ev.currentParticipants as number) || 0,
+          maxParticipants: (ev.maxParticipants as number) || 0,
+          startDate: (ev.startTime as string) || (ev.startDate as string) || '',
+          endDate: (ev.endTime as string) || (ev.endDate as string) || '',
+          description: (ev.description as string) || undefined,
+          allowedAssets: (ev.assetClasses as string[]) || (ev.allowedAssets as string[]) || undefined,
+          participants,
+        };
+      };
+
+      const comps = ((data.competitions || []) as Record<string, unknown>[]).map(mapEvent);
+      const challs = ((data.challenges || []) as Record<string, unknown>[]).map(mapEvent);
+      const allEvents = [...comps, ...challs];
+      setEvents(allEvents);
+
       if (selected) {
-        const updated = (data.competitions || []).find((e: AEvent) => e._id === selected._id);
+        const updated = allEvents.find((e) => e._id === selected._id);
         if (updated) {
           // Track previous equities for momentum
           const prevMap = new Map<string, number>();
@@ -85,7 +153,9 @@ export default function ArenaPage() {
   // ── Fetch prices ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (view !== 'live') return;
-    const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'USDCAD', 'BTCUSD', 'ETHUSD', 'AUDUSD'];
+    // Reason: Prices API accepts both EURUSD and EUR/USD but returns EUR/USD format.
+    // We send slash-format and map response back to slashless keys for our PriceMap.
+    const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD', 'USD/CAD', 'BTC/USD', 'ETH/USD', 'AUD/USD'];
     let alive = true;
 
     const poll = async () => {
@@ -97,7 +167,18 @@ export default function ArenaPage() {
         });
         if (!res.ok || !alive) return;
         const data = await res.json();
-        if (data.prices) setPrices(data.prices);
+        if (data.prices && Array.isArray(data.prices)) {
+          // Reason: API returns array of { symbol:"EUR/USD", bid, ask, mid, ... }.
+          // Convert to PriceMap: { "EURUSD": midPrice, "GBPUSD": midPrice, ... }
+          const map: PriceMap = {};
+          for (const p of data.prices) {
+            if (p && p.symbol && typeof p.mid === 'number') {
+              const key = p.symbol.replace('/', '');
+              map[key] = p.mid;
+            }
+          }
+          setPrices(map);
+        }
       } catch { /* silent */ }
     };
 
@@ -111,12 +192,18 @@ export default function ArenaPage() {
     if (view !== 'live') return;
     let alive = true;
 
+    // Reason: Candles API validates against a whitelist that requires EUR/USD format (with slash).
+    // chartSymbol is stored as "EURUSD" — convert to "EUR/USD" for the API.
+    const slashSym = chartSymbol.length === 6
+      ? `${chartSymbol.slice(0, 3)}/${chartSymbol.slice(3)}`
+      : chartSymbol;
+
     const fetchCandles = async () => {
       try {
         const res = await fetch('/api/trading/candles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol: chartSymbol, timeframe: chartTf, limit: 200 }),
+          body: JSON.stringify({ symbol: slashSym, timeframe: chartTf, limit: 200 }),
         });
         if (!res.ok || !alive) return;
         const data = await res.json();
@@ -302,7 +389,7 @@ export default function ArenaPage() {
               </div>
             ) : (
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340, 1fr))',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: 16,
               }}>
                 {events.map(ev => (
