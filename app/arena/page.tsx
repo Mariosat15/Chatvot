@@ -42,6 +42,13 @@ export default function ArenaPage() {
   const prevEquitiesRef = useRef<Map<string, number>>(new Map());
   const [previousEquities, setPreviousEquities] = useState<Map<string, number>>(new Map());
 
+  // Reason: We need a ref for prices to avoid stale closure in the poll function.
+  // The setPrevPrices bug was that it always cloned the old prev, never advancing.
+  const livePricesRef = useRef<PriceMap>({});
+
+  // Available symbols from API (dynamic, not hardcoded)
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
+
   // Interval refs for proper cleanup/restart
   const compIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -124,6 +131,16 @@ export default function ArenaPage() {
       const allEvents = [...comps, ...challs];
       setEvents(allEvents);
 
+      // Reason: Extract available symbols from the API prices response.
+      // The API returns latestPrices as { "EUR/USD": { bid, ask, mid }, ... }
+      // Use these to dynamically populate ticker and chart selectors.
+      if (data.prices && typeof data.prices === 'object') {
+        const apiSyms = Object.keys(data.prices);
+        if (apiSyms.length > 0) {
+          setAvailableSymbols(apiSyms);
+        }
+      }
+
       if (selected) {
         const updated = allEvents.find((e) => e._id === selected._id);
         if (updated) {
@@ -175,11 +192,14 @@ export default function ArenaPage() {
   }, [fetchCompetitions]);
 
   // ── Fetch prices ─────────────────────────────────────────────────────────────
+  // Reason: Use availableSymbols from API when available, fallback to defaults.
+  // Prices API accepts slash format (EUR/USD) and returns { symbol, bid, ask, mid }.
   useEffect(() => {
     if (view !== 'live') return;
-    // Reason: Prices API accepts both EURUSD and EUR/USD but returns EUR/USD format.
-    // We send slash-format and map response back to slashless keys for our PriceMap.
-    const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CAD', 'AUD/USD', 'NZD/USD', 'USD/CHF', 'EUR/GBP'];
+
+    const defaultSyms = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CAD', 'AUD/USD', 'NZD/USD', 'USD/CHF', 'EUR/GBP'];
+    // Reason: Use dynamic symbols from API response if available (all admin-enabled pairs)
+    const symbols = availableSymbols.length > 0 ? availableSymbols : defaultSyms;
     let alive = true;
 
     const poll = async () => {
@@ -192,8 +212,6 @@ export default function ArenaPage() {
         if (!res.ok || !alive) return;
         const data = await res.json();
         if (data.prices && Array.isArray(data.prices)) {
-          // Reason: API returns array of { symbol:"EUR/USD", bid, ask, mid, ... }.
-          // Convert to PriceMap: { "EURUSD": midPrice, "GBPUSD": midPrice, ... }
           const map: PriceMap = {};
           for (const p of data.prices) {
             if (p && p.symbol && typeof p.mid === 'number') {
@@ -201,12 +219,10 @@ export default function ArenaPage() {
               map[key] = p.mid;
             }
           }
-          // Reason: Store previous prices before updating for direction tracking
-          setPrevPrices(prev => {
-            // Only update prevPrices if we had actual prices before
-            const hasPrev = Object.keys(prev).length > 0;
-            return hasPrev ? { ...prev } : map;
-          });
+          // Reason: FIX — previous logic cloned the same old prev each time, so direction
+          // arrows never updated. Now we store CURRENT prices (via ref) as prev, then set new.
+          setPrevPrices(livePricesRef.current);
+          livePricesRef.current = map;
           setPrices(map);
         }
       } catch { /* silent */ }
@@ -238,7 +254,7 @@ export default function ArenaPage() {
       stopPricePolling();
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [view]);
+  }, [view, availableSymbols]);
 
   // ── Fetch candles ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -318,8 +334,8 @@ export default function ArenaPage() {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: CV.txt,
     }}>
-      {/* Top Ticker */}
-      <Ticker prices={prices} prevPrices={prevPrices} />
+      {/* Top Ticker — uses dynamic symbols when available */}
+      <Ticker prices={prices} prevPrices={prevPrices} dynamicSymbols={availableSymbols} />
 
       {/* Header */}
       <header style={{
@@ -551,6 +567,7 @@ export default function ArenaPage() {
                 chartTf={chartTf}
                 candles={candles}
                 bubbles={bubbles}
+                availableSymbols={availableSymbols}
                 onSymbolChange={setChartSymbol}
                 onTfChange={setChartTf}
                 onSelectTrader={handleSelectTrader}
@@ -570,6 +587,7 @@ export default function ArenaPage() {
                 chartTf={chartTf}
                 candles={candles}
                 bubbles={bubbles}
+                availableSymbols={availableSymbols}
                 onSymbolChange={setChartSymbol}
                 onTfChange={setChartTf}
               />

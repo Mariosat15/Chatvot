@@ -3,7 +3,7 @@
 import React from 'react';
 import type { Participant, AEvent } from './types';
 import { CV, RANK_COLORS } from './constants';
-import { fmt, fmtRoi, fmtPnl, calcRoi, ranked, riskLevel, getTraderTitle } from './helpers';
+import { fmtEquity, fmtRoi, calcRoi, ranked, riskLevel, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
 
 interface LeaderboardProps {
@@ -115,21 +115,23 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
                 </div>
               </div>
 
-              {/* Live stats */}
+              {/* Live stats — full precision to capture small equity changes */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{
-                  color: CV.txt, fontSize: 12, fontWeight: 700,
+                  color: CV.txt, fontSize: 11, fontWeight: 700,
                   fontFamily: '"SF Mono", Consolas, monospace',
                 }}>
-                  {fmt(p.liveEquity)}
+                  {fmtEquity(p.liveEquity)}
                 </div>
-                <div style={{
-                  color: roi >= 0 ? CV.teal : CV.red,
-                  fontSize: 11, fontWeight: 700,
-                  fontFamily: '"SF Mono", Consolas, monospace',
-                  textShadow: Math.abs(roi) > 5 ? `0 0 6px ${roi >= 0 ? CV.teal : CV.red}30` : 'none',
-                }}>
-                  {fmtRoi(roi)}
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 2 }}>
+                  <span style={{
+                    color: roi >= 0 ? CV.teal : CV.red,
+                    fontSize: 10, fontWeight: 700,
+                    fontFamily: '"SF Mono", Consolas, monospace',
+                    textShadow: Math.abs(roi) > 5 ? `0 0 6px ${roi >= 0 ? CV.teal : CV.red}30` : 'none',
+                  }}>
+                    {fmtRoi(roi)}
+                  </span>
                 </div>
               </div>
 

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import type { AEvent, CandleData, BubbleTrade } from '../types';
 import { CV, getTier } from '../constants';
-import { ranked, fmt, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, calcSharpe } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, calcSharpe, getAllPositions } from '../helpers';
 import Avatar from '../Avatar';
 import BroadcastChart from '../BroadcastChart';
 
@@ -13,6 +13,7 @@ interface SpotlightSceneProps {
   chartTf: string;
   candles: CandleData[];
   bubbles: BubbleTrade[];
+  availableSymbols?: string[];
   onSymbolChange: (s: string) => void;
   onTfChange: (tf: string) => void;
 }
@@ -20,7 +21,7 @@ interface SpotlightSceneProps {
 const mono = '"SF Mono", Consolas, "Courier New", monospace';
 
 const SpotlightScene: React.FC<SpotlightSceneProps> = ({
-  event, chartSymbol, chartTf, candles, bubbles, onSymbolChange, onTfChange,
+  event, chartSymbol, chartTf, candles, bubbles, availableSymbols, onSymbolChange, onTfChange,
 }) => {
   const sorted = useMemo(() => ranked(event.participants), [event.participants]);
   const [idx, setIdx] = useState(0);
@@ -109,7 +110,7 @@ const SpotlightScene: React.FC<SpotlightSceneProps> = ({
             {/* Hero grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
               {[
-                { label: 'EQUITY', value: fmt(p.liveEquity), color: CV.teal },
+                { label: 'EQUITY', value: fmtEquity(p.liveEquity), color: CV.teal },
                 { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
                 { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
               ].map((s, i) => (
@@ -186,13 +187,15 @@ const SpotlightScene: React.FC<SpotlightSceneProps> = ({
         </div>
       </div>
 
-      {/* Right: Chart */}
+      {/* Right: Chart with position markers */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <BroadcastChart
           symbol={chartSymbol}
           tf={chartTf}
           candles={candles}
           bubbles={bubbles}
+          positions={getAllPositions(event.participants)}
+          dynamicSymbols={availableSymbols}
           onSymbolChange={onSymbolChange}
           onTfChange={onTfChange}
         />

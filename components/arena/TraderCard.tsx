@@ -4,7 +4,7 @@ import React from 'react';
 import type { Participant } from './types';
 import { CV } from './constants';
 import { getTier } from './constants';
-import { fmt, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle } from './helpers';
+import { fmt, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
 
 interface TraderCardProps {
@@ -119,7 +119,7 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
           {/* Hero stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
             {[
-              { label: 'Equity', value: fmt(p.liveEquity), color: CV.teal },
+              { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal },
               { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
               { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
             ].map((s, i) => (

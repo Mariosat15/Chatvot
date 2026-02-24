@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import type { Participant, AEvent } from './types';
 import { CV, RANK_COLORS } from './constants';
-import { raceProgress, calcRoi, fmtRoi, fmt, calcMomentum, ranked, getTraderTitle } from './helpers';
+import { raceProgress, calcRoi, fmtRoi, fmtEquity, calcMomentum, ranked, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
 
 interface DerbyTrackProps {
@@ -279,7 +279,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
                   color: CV.gray, fontSize: 10,
                   fontFamily: '"SF Mono", Consolas, monospace',
                 }}>
-                  {fmt(p.liveEquity)}
+                  {fmtEquity(p.liveEquity)}
                 </div>
               </div>
             </div>

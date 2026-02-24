@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV } from '../constants';
-import { ranked, fmt, fmtRoi, calcRoi, riskLevel, getTraderTitle } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, calcRoi, riskLevel, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
 
 interface DangerSceneProps {

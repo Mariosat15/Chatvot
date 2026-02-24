@@ -3,7 +3,7 @@
 import React from 'react';
 import type { AEvent, PriceMap, CandleData, BubbleTrade } from '../types';
 import { CV } from '../constants';
-import { fmt, ranked, calcRoi, fmtRoi, timeLeft, getAllPositions } from '../helpers';
+import { fmtEquity, ranked, calcRoi, fmtRoi, timeLeft, getAllPositions } from '../helpers';
 import DerbyTrack from '../DerbyTrack';
 import Leaderboard from '../Leaderboard';
 import BroadcastChart from '../BroadcastChart';
@@ -18,6 +18,8 @@ interface OverviewSceneProps {
   chartTf: string;
   candles: CandleData[];
   bubbles: BubbleTrade[];
+  /** Dynamic symbols from API */
+  availableSymbols?: string[];
   onSymbolChange: (s: string) => void;
   onTfChange: (tf: string) => void;
   onSelectTrader: (p: Participant) => void;
@@ -25,18 +27,17 @@ interface OverviewSceneProps {
 
 const OverviewScene: React.FC<OverviewSceneProps> = ({
   event, previousEquities, chartSymbol, chartTf,
-  candles, bubbles, onSymbolChange, onTfChange, onSelectTrader,
+  candles, bubbles, availableSymbols, onSymbolChange, onTfChange, onSelectTrader,
 }) => {
   const sorted = ranked(event.participants);
   const leader = sorted[0];
   const positions = getAllPositions(event.participants);
   const tl = timeLeft(event.endDate);
-  const totalPnl = sorted.reduce((acc, p) => acc + (p.liveEquity - event.startingCapital), 0);
 
   const statCards = [
     {
       label: 'PRIZE POOL', emoji: '💰',
-      value: fmt(event.prizePool),
+      value: fmtEquity(event.prizePool),
       color: CV.gold, glow: `${CV.gold}15`,
     },
     {
@@ -119,12 +120,14 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
             onSelectTrader={onSelectTrader}
           />
 
-          {/* Chart */}
+          {/* Chart with position markers */}
           <BroadcastChart
             symbol={chartSymbol}
             tf={chartTf}
             candles={candles}
             bubbles={bubbles}
+            positions={positions}
+            dynamicSymbols={availableSymbols}
             onSymbolChange={onSymbolChange}
             onTfChange={onTfChange}
           />

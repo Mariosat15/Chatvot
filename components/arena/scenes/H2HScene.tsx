@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, getTier } from '../constants';
-import { ranked, fmt, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
 
 interface H2HSceneProps {
@@ -26,7 +26,7 @@ const TraderColumn: React.FC<{ p: Participant; rank: number; startCap: number; s
   const txtAlign = side === 'left' ? ('right' as const) : ('left' as const);
 
   const stats = [
-    { label: 'Equity', value: fmt(p.liveEquity), color: CV.teal },
+    { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal },
     { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
     { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
     { label: 'Win Rate', value: `${p.winRate.toFixed(1)}%`, color: p.winRate > 50 ? CV.teal : CV.red },

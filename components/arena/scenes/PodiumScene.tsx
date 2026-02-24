@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, RANK_COLORS, RANK_GLOW } from '../constants';
-import { ranked, fmt, fmtRoi, fmtPnl, calcRoi, getTraderTitle } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
 
 interface PodiumSceneProps {
@@ -166,7 +166,7 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
                   {fmtRoi(roi)}
                 </span>
                 <span style={{ color: CV.gray, fontSize: 11, fontFamily: mono, width: 72, textAlign: 'right' }}>
-                  {fmt(p.liveEquity)}
+                  {fmtEquity(p.liveEquity)}
                 </span>
               </div>
             );

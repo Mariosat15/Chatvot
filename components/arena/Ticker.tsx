@@ -1,20 +1,41 @@
 'use client';
-// ─── Ticker — Premium Live Price Marquee ──────────────────────────────────────
-import React from 'react';
+// ─── Ticker — Premium Live Price Marquee with Dynamic Symbols ────────────────
+import React, { useMemo } from 'react';
 import type { PriceMap } from './types';
 import { CV, TICKER_SYMS, TICKER_LABELS } from './constants';
 
 interface TickerProps {
   prices: PriceMap;
   prevPrices?: PriceMap;
+  /** Dynamic symbols from API — overrides TICKER_SYMS when available */
+  dynamicSymbols?: string[];
 }
 
-const Ticker: React.FC<TickerProps> = ({ prices, prevPrices }) => {
-  const items = TICKER_SYMS.map(sym => {
+// Reason: Convert slash format "EUR/USD" to compact "EURUSD" for internal keys
+const toKey = (s: string) => s.replace('/', '');
+// Reason: Convert compact "EURUSD" to display "EUR/USD"
+const toLabel = (s: string) =>
+  s.includes('/') ? s : s.length === 6 ? `${s.slice(0, 3)}/${s.slice(3)}` : s;
+
+const Ticker: React.FC<TickerProps> = ({ prices, prevPrices, dynamicSymbols }) => {
+  // Reason: Use dynamic symbols from API if available, otherwise use hardcoded fallback.
+  // This ensures the ticker shows all admin-enabled pairs.
+  const symbolList = useMemo(() => {
+    if (dynamicSymbols && dynamicSymbols.length > 0) {
+      return dynamicSymbols.map(s => toKey(s));
+    }
+    return TICKER_SYMS;
+  }, [dynamicSymbols]);
+
+  const items = symbolList.map(sym => {
     const price = prices[sym] || 0;
     const prev = prevPrices?.[sym] || 0;
-    const direction = price > prev ? 'up' : price < prev ? 'down' : 'flat';
-    return { sym, price, direction, label: TICKER_LABELS[sym] || sym };
+    // Reason: Only show direction if we actually have a different previous price
+    const direction = prev > 0 && price !== prev
+      ? (price > prev ? 'up' : price < prev ? 'down' : 'flat')
+      : 'flat';
+    const label = TICKER_LABELS[sym] || toLabel(sym);
+    return { sym, price, direction, label };
   });
 
   // Duplicate 3x for seamless loop
@@ -48,9 +69,8 @@ const Ticker: React.FC<TickerProps> = ({ prices, prevPrices }) => {
       }}>
         {all.map((item, i) => {
           const isJpy = item.sym.includes('JPY');
-          const isXau = item.sym.includes('XAU');
-          const isCrypto = item.sym.includes('BTC') || item.sym.includes('ETH');
-          const decimals = isJpy ? 3 : isCrypto ? 2 : isXau ? 2 : 5;
+          // Reason: 5 decimals for standard pairs, 3 for JPY crosses
+          const decimals = isJpy ? 3 : 5;
 
           const dirColor = item.direction === 'up' ? CV.teal
             : item.direction === 'down' ? CV.red

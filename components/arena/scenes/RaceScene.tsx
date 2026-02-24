@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, TRADER_COLORS } from '../constants';
-import { ranked, calcRoi, fmtRoi, fmt, raceProgress, getTraderTitle, calcMomentum } from '../helpers';
+import { ranked, calcRoi, fmtRoi, fmtEquity, raceProgress, getTraderTitle, calcMomentum } from '../helpers';
 import Avatar from '../Avatar';
 
 interface RaceSceneProps {
@@ -194,7 +194,7 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
                 }}>
                   {fmtRoi(roi)}
                 </div>
-                <div style={{ color: CV.gray, fontSize: 10, fontFamily: '"SF Mono", Consolas, monospace' }}>{fmt(p.liveEquity)}</div>
+                <div style={{ color: CV.gray, fontSize: 10, fontFamily: '"SF Mono", Consolas, monospace' }}>{fmtEquity(p.liveEquity)}</div>
               </div>
             </div>
           );

@@ -1,17 +1,24 @@
 // ─── Arena Helper Functions ───────────────────────────────────────────────────
 import type { Participant, OpenPos } from './types';
 
-/** Format currency */
+/** Format currency (compact — for totals and summaries) */
 export const fmt = (v: number, d = 2) =>
   v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M`
     : v >= 1e3 ? `$${(v / 1e3).toFixed(1)}K`
     : `$${v.toFixed(d)}`;
 
-/** Format ROI */
-export const fmtRoi = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+/** Format live equity — full precision to capture small changes.
+ *  Shows $10,024.58 instead of $10.0K. */
+export const fmtEquity = (v: number) =>
+  `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Format PnL */
-export const fmtPnl = (v: number) => `${v >= 0 ? '+$' : '-$'}${Math.abs(v).toFixed(2)}`;
+/** Format ROI — 4 decimals for small movements */
+export const fmtRoi = (v: number) =>
+  `${v >= 0 ? '+' : ''}${Math.abs(v) < 0.01 ? v.toFixed(4) : v.toFixed(2)}%`;
+
+/** Format PnL — full precision */
+export const fmtPnl = (v: number) =>
+  `${v >= 0 ? '+$' : '-$'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Risk level from equity vs starting */
 export const riskLevel = (p: Participant, startCap: number) => {
