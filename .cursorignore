@@ -1,9 +1,93 @@
-node_modules
+# ── Build outputs ──
+.next
+out
 build
+dist
+**/dist
+apps/admin/.next
+apps/admin/out
 
+# ── Dependencies ──
+node_modules
+**/node_modules
+.pnp.*
+.yarn
+
+# ── Lock files (huge, no value to AI) ──
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# ── Logs & temp ──
 *.log
+*.log.*
+npm-debug.log*
+.npm
+
+# ── Data files ──
 *.csv
 *.parquet
-*.map
+*.sql
+*.sqlite
+
+# ── Archives ──
 *.zip
 *.tar
+*.tar.gz
+*.gz
+*.rar
+
+# ── Source maps ──
+*.map
+
+# ── Media (images, fonts, videos — not code) ──
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.otf
+*.mp4
+*.webm
+*.mp3
+*.wav
+
+# ── IDE & OS ──
+.vscode
+.idea
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+
+# ── Environment files (secrets — never index) ──
+.env
+.env.*
+!.env.example
+
+# ── Coverage & test artifacts ──
+coverage
+.nyc_output
+__snapshots__
+
+# ── Generated / cached ──
+.turbo
+.vercel
+.cache
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# ── Scripts (rarely need AI context) ──
+scripts/
+
+# ── Public static assets (not code) ──
+public/assets/
+public/images/
+public/fonts/
