@@ -31,13 +31,14 @@ export const RANK_GLOW = [
 
 /** Scrolling ticker symbols */
 export const TICKER_SYMS = [
-  'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'USDCAD', 'BTCUSD', 'ETHUSD', 'AUDUSD',
+  'EURUSD', 'GBPUSD', 'USDJPY', 'USDCAD', 'AUDUSD', 'NZDUSD', 'USDCHF', 'EURGBP',
 ];
 
 /** Ticker display labels */
 export const TICKER_LABELS: Record<string, string> = {
-  EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', XAUUSD: 'XAU/USD',
-  USDCAD: 'USD/CAD', BTCUSD: 'BTC/USD', ETHUSD: 'ETH/USD', AUDUSD: 'AUD/USD',
+  EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY',
+  USDCAD: 'USD/CAD', AUDUSD: 'AUD/USD', NZDUSD: 'NZD/USD',
+  USDCHF: 'USD/CHF', EURGBP: 'EUR/GBP',
 };
 
 /** Avatar gradient palette */
@@ -81,8 +82,8 @@ export const TRADER_COLORS = [
 /** Arena chart symbols */
 export const ARENA_SYMS = [
   { label: 'EUR/USD', key: 'EURUSD' }, { label: 'GBP/USD', key: 'GBPUSD' },
-  { label: 'XAU/USD', key: 'XAUUSD' }, { label: 'BTC/USD', key: 'BTCUSD' },
   { label: 'USD/JPY', key: 'USDJPY' }, { label: 'USD/CAD', key: 'USDCAD' },
+  { label: 'AUD/USD', key: 'AUDUSD' }, { label: 'NZD/USD', key: 'NZDUSD' },
 ];
 
 /** Arena chart timeframes */

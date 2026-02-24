@@ -179,7 +179,7 @@ export default function ArenaPage() {
     if (view !== 'live') return;
     // Reason: Prices API accepts both EURUSD and EUR/USD but returns EUR/USD format.
     // We send slash-format and map response back to slashless keys for our PriceMap.
-    const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD', 'USD/CAD', 'BTC/USD', 'ETH/USD', 'AUD/USD'];
+    const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CAD', 'AUD/USD', 'NZD/USD', 'USD/CHF', 'EUR/GBP'];
     let alive = true;
 
     const poll = async () => {
