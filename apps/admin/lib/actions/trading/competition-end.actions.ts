@@ -184,6 +184,12 @@ export async function finalizeCompetition(competitionId: string) {
           { session },
         );
 
+        // Reason: Mongoose create() returns array; destructure + guard for safety
+        const createdCloseOrder = closeOrder[0];
+        if (!createdCloseOrder) {
+          throw new Error(`Failed to create close order for position ${position._id}`);
+        }
+
         // Update position in database
         await TradingPosition.findByIdAndUpdate(
           position._id,
@@ -194,7 +200,7 @@ export async function finalizeCompetition(competitionId: string) {
               profitLoss: positionPnL,
               closedAt: new Date(),
               closeReason: "competition_end",
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
             },
           },
           { session },
@@ -231,7 +237,7 @@ export async function finalizeCompetition(competitionId: string) {
               hadTakeProfit: !!position.takeProfit,
               takeProfitPrice: position.takeProfit,
               openOrderId: position.openOrderId,
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
               positionId: position._id.toString(),
               isWinner: positionPnL > 0,
             },
@@ -452,7 +458,11 @@ export async function finalizeCompetition(competitionId: string) {
             ],
             { session },
           );
-          winnerWallet = winnerWallet[0];
+          // Reason: Mongoose create() returns array; guard for safety
+          winnerWallet = winnerWallet[0] ?? null;
+          if (!winnerWallet) {
+            throw new Error(`Failed to create wallet for winner ${winner.userId}`);
+          }
         }
 
         const balanceBefore = winnerWallet.creditBalance || 0;
@@ -497,7 +507,11 @@ export async function finalizeCompetition(competitionId: string) {
           { session },
         );
 
-        winnerTransactions.push(transaction[0]);
+        // Reason: Mongoose create() returns array; guard for safety
+        const createdTx = transaction[0];
+        if (createdTx) {
+          winnerTransactions.push(createdTx);
+        }
 
         // TODO: Send email notification
         console.log(`  📧 Email notification queued for ${winner.username}`);

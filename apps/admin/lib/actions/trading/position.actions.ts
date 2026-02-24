@@ -378,7 +378,13 @@ export const closePosition = async (
         { session: mongoSession },
       );
 
-      position.closeOrderId = closeOrder[0]._id.toString();
+      // Reason: Mongoose create() returns array; destructure + guard for safety
+      const createdCloseOrder = closeOrder[0];
+      if (!createdCloseOrder) {
+        throw new Error("Failed to create close order record");
+      }
+
+      position.closeOrderId = createdCloseOrder._id.toString();
       await position.save({ session: mongoSession });
 
       // Create trade history
@@ -417,7 +423,7 @@ export const closePosition = async (
             hadTakeProfit: !!position.takeProfit,
             takeProfitPrice: position.takeProfit,
             openOrderId: position.openOrderId,
-            closeOrderId: closeOrder[0]._id.toString(),
+            closeOrderId: createdCloseOrder._id.toString(),
             positionId: position._id.toString(),
             isWinner: realizedPnl > 0,
           },
@@ -425,7 +431,13 @@ export const closePosition = async (
         { session: mongoSession },
       );
 
-      position.tradeHistoryId = tradeHistory[0]._id.toString();
+      // Reason: Mongoose create() returns array; destructure + guard for safety
+      const createdTradeHistory = tradeHistory[0];
+      if (!createdTradeHistory) {
+        throw new Error("Failed to create trade history record");
+      }
+
+      position.tradeHistoryId = createdTradeHistory._id.toString();
       await position.save({ session: mongoSession });
 
       // Detect contest type and get participant
@@ -598,7 +610,7 @@ export const closePosition = async (
           await import("@/lib/services/fraud/similarity-detection.service");
 
         const tradeData = {
-          tradeId: tradeHistory[0]._id.toString(),
+          tradeId: createdTradeHistory._id.toString(),
           pair: position.symbol,
           direction:
             position.side === "long" ? ("buy" as const) : ("sell" as const),
@@ -960,7 +972,13 @@ export async function closePositionAutomatic(
       { session: mongoSession },
     );
 
-    position.closeOrderId = closeOrder[0]._id.toString();
+    // Reason: Mongoose create() returns array; destructure + guard for safety
+    const createdAutoCloseOrder = closeOrder[0];
+    if (!createdAutoCloseOrder) {
+      throw new Error("Failed to create auto close order record");
+    }
+
+    position.closeOrderId = createdAutoCloseOrder._id.toString();
     await position.save({ session: mongoSession });
 
     // Create trade history
@@ -991,7 +1009,7 @@ export async function closePositionAutomatic(
           hadTakeProfit: !!position.takeProfit,
           takeProfitPrice: position.takeProfit,
           openOrderId: position.openOrderId,
-          closeOrderId: closeOrder[0]._id.toString(),
+          closeOrderId: createdAutoCloseOrder._id.toString(),
           positionId: position._id.toString(),
           isWinner: realizedPnl > 0,
         },
@@ -999,7 +1017,13 @@ export async function closePositionAutomatic(
       { session: mongoSession },
     );
 
-    position.tradeHistoryId = tradeHistory[0]._id.toString();
+    // Reason: Mongoose create() returns array; destructure + guard for safety
+    const createdAutoTradeHistory = tradeHistory[0];
+    if (!createdAutoTradeHistory) {
+      throw new Error("Failed to create trade history record");
+    }
+
+    position.tradeHistoryId = createdAutoTradeHistory._id.toString();
     await position.save({ session: mongoSession });
 
     // Detect contest type and use correct participant model

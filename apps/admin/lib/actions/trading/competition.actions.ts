@@ -747,7 +747,8 @@ export const enterCompetition = async (competitionId: string) => {
       return {
         success: true,
         message: "Successfully entered competition",
-        participant: JSON.parse(JSON.stringify(participant[0])),
+        // Reason: Mongoose create() returns array; guard for safety
+        participant: JSON.parse(JSON.stringify(participant[0] ?? {})),
       };
     } catch (error) {
       // Rollback on error

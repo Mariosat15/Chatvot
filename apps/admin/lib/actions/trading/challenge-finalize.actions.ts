@@ -253,6 +253,12 @@ async function _finalizeChallengeAttempt(challengeId: string) {
           { session },
         );
 
+        // Reason: Mongoose create() returns array; destructure + guard for safety
+        const createdCloseOrder = closeOrder[0];
+        if (!createdCloseOrder) {
+          throw new Error(`Failed to create close order for position ${position._id}`);
+        }
+
         // Update position
         await TradingPosition.findByIdAndUpdate(
           position._id,
@@ -263,7 +269,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               profitLoss: positionPnL,
               closedAt: new Date(),
               closeReason: "challenge_end",
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
             },
           },
           { session },
@@ -300,7 +306,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               hadTakeProfit: !!position.takeProfit,
               takeProfitPrice: position.takeProfit,
               openOrderId: position.openOrderId,
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
               positionId: position._id.toString(),
               isWinner: positionPnL > 0,
             },

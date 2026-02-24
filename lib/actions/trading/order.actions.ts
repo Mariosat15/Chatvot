@@ -568,6 +568,12 @@ export const placeOrder = async (params: {
         { session: mongoSession },
       );
 
+      // Reason: Mongoose create() with session returns array; destructure + guard for safety
+      const createdOrder = order[0];
+      if (!createdOrder) {
+        throw new Error("Failed to create order record");
+      }
+
       // ⚡ For optimistic UI - store position data for immediate frontend update
       let positionData:
         | {
@@ -612,7 +618,7 @@ export const placeOrder = async (params: {
               maintenanceMargin: marginRequired * 0.5,
               status: "open",
               openedAt: new Date(),
-              openOrderId: order[0]._id.toString(),
+              openOrderId: createdOrder._id.toString(),
               lastPriceUpdate: new Date(),
               priceUpdateCount: 0,
             },
@@ -620,17 +626,23 @@ export const placeOrder = async (params: {
           { session: mongoSession },
         );
 
+        // Reason: Mongoose create() returns array; destructure + guard for safety
+        const createdPosition = position[0];
+        if (!createdPosition) {
+          throw new Error("Failed to create position record");
+        }
+
         // Update order with position ID
-        order[0].positionId = position[0]._id.toString();
-        await order[0].save({ session: mongoSession });
+        createdOrder.positionId = createdPosition._id.toString();
+        await createdOrder.save({ session: mongoSession });
 
         // Debug: Log TP/SL saved
         console.log(`📊 Position created with TP/SL:`, {
-          positionId: position[0]._id.toString(),
-          takeProfit: position[0].takeProfit,
-          stopLoss: position[0].stopLoss,
-          hasTakeProfit: !!position[0].takeProfit,
-          hasStopLoss: !!position[0].stopLoss,
+          positionId: createdPosition._id.toString(),
+          takeProfit: createdPosition.takeProfit,
+          stopLoss: createdPosition.stopLoss,
+          hasTakeProfit: !!createdPosition.takeProfit,
+          hasStopLoss: !!createdPosition.stopLoss,
         });
 
         // ⚡ Add to real-time TP/SL cache for instant triggering
@@ -639,7 +651,7 @@ export const placeOrder = async (params: {
             const { updatePositionInCache } =
               await import("@/lib/services/tpsl-realtime.service");
             updatePositionInCache(
-              position[0]._id.toString(),
+              createdPosition._id.toString(),
               symbol,
               side === "buy" ? "long" : "short",
               takeProfit ?? null,
@@ -685,8 +697,8 @@ export const placeOrder = async (params: {
           mid: currentPriceQuote.mid,
           spread: currentPriceQuote.spread,
           timestamp: new Date(),
-          tradeId: position[0]._id.toString(),
-          orderId: order[0]._id.toString(),
+          tradeId: createdPosition._id.toString(),
+          orderId: createdOrder._id.toString(),
           tradeType: "entry",
           tradeSide: side === "buy" ? "long" : "short",
           executionPrice,
@@ -726,7 +738,7 @@ export const placeOrder = async (params: {
 
         // ⚡ Store position data for immediate frontend update
         positionData = {
-          _id: position[0]._id.toString(),
+          _id: createdPosition._id.toString(),
           symbol,
           side: side === "buy" ? "long" : "short",
           quantity,
@@ -783,8 +795,8 @@ export const placeOrder = async (params: {
 
       return {
         success: true,
-        orderId: order[0]._id.toString(),
-        positionId: orderType === "market" ? order[0].positionId : undefined,
+        orderId: createdOrder._id.toString(),
+        positionId: orderType === "market" ? createdOrder.positionId : undefined,
         position: positionData, // ⚡ Include position for immediate UI update!
         message:
           orderType === "market"
@@ -1042,8 +1054,14 @@ export const checkLimitOrders = async (competitionId: string) => {
             { session: mongoSession },
           );
 
+          // Reason: Mongoose create() returns array; destructure + guard for safety
+          const createdPos = position[0];
+          if (!createdPos) {
+            throw new Error("Failed to create position for limit order");
+          }
+
           // Update order with position ID
-          order.positionId = position[0]._id.toString();
+          order.positionId = createdPos._id.toString();
           await order.save({ session: mongoSession });
 
           // Update participant
@@ -1154,8 +1172,14 @@ export const executeLimitOrder = async (
         { session: mongoSession },
       );
 
+      // Reason: Mongoose create() returns array; destructure + guard for safety
+      const createdPos = position[0];
+      if (!createdPos) {
+        throw new Error("Failed to create position for limit order execution");
+      }
+
       // Update order with position ID
-      order.positionId = position[0]._id.toString();
+      order.positionId = createdPos._id.toString();
       await order.save({ session: mongoSession });
 
       // Update participant
@@ -1179,7 +1203,7 @@ export const executeLimitOrder = async (
       await mongoSession.commitTransaction();
 
       console.log(`✅ Limit order executed: ${order.symbol} @ ${marketPrice}`);
-      return { success: true, positionId: position[0]._id.toString() };
+      return { success: true, positionId: createdPos._id.toString() };
     } catch (error) {
       await mongoSession.abortTransaction();
       console.error("Error executing limit order:", error);

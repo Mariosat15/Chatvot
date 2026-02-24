@@ -376,6 +376,12 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           { session },
         );
 
+        // Reason: Mongoose create() returns array; destructure + guard for safety
+        const createdCloseOrder = closeOrder[0];
+        if (!createdCloseOrder) {
+          throw new Error("Failed to create close order for competition end");
+        }
+
         // Update position in database
         await TradingPosition.findByIdAndUpdate(
           position._id,
@@ -386,7 +392,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               profitLoss: positionPnL,
               closedAt: new Date(),
               closeReason: "competition_end",
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
             },
           },
           { session },
@@ -423,7 +429,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               hadTakeProfit: !!position.takeProfit,
               takeProfitPrice: position.takeProfit,
               openOrderId: position.openOrderId,
-              closeOrderId: closeOrder[0]._id.toString(),
+              closeOrderId: createdCloseOrder._id.toString(),
               positionId: position._id.toString(),
               isWinner: positionPnL > 0,
             },
@@ -655,7 +661,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
             ],
             { session },
           );
-          winnerWallet = created[0];
+          // Reason: Mongoose create() returns array; guard for safety
+          winnerWallet = created[0] ?? null;
+          if (!winnerWallet) {
+            throw new Error(`Failed to create wallet for winner ${winner.userId}`);
+          }
           walletMap.set(winner.userId.toString(), winnerWallet);
         }
 
@@ -705,7 +715,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           { session },
         );
 
-        winnerTransactions.push(transaction[0]);
+        // Reason: Mongoose create() returns array; guard for safety
+        const createdTx = transaction[0];
+        if (createdTx) {
+          winnerTransactions.push(createdTx);
+        }
 
         // TODO: Send email notification
         console.log(`  📧 Email notification queued for ${winner.username}`);
@@ -1234,7 +1248,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               ],
               { session },
             );
-            gmWallet = created[0];
+            // Reason: Mongoose create() returns array; guard for safety
+            gmWallet = created[0] ?? null;
+            if (!gmWallet) {
+              throw new Error(`Failed to create wallet for GM ${gmId}`);
+            }
             walletMap.set(gmId.toString(), gmWallet);
           }
 

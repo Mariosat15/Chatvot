@@ -701,7 +701,8 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
       return {
         success: true,
         message: `Withdrawal request submitted. You will receive €${eurNet.toFixed(2)}`,
-        transaction: JSON.parse(JSON.stringify(withdrawalTransaction[0])),
+        // Reason: Mongoose create() returns array; guard for safety
+        transaction: JSON.parse(JSON.stringify(withdrawalTransaction[0] ?? {})),
         breakdown: {
           creditsWithdrawn: creditsAmount,
           feeCredits: feeAmountCredits,
