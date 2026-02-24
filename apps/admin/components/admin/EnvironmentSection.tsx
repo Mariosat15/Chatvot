@@ -26,9 +26,9 @@ import {
   Shield,
   AlertCircle,
   Server,
-  Lock,
   Brain,
   Sparkles,
+  Fingerprint,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -36,6 +36,7 @@ export default function EnvironmentSection() {
   const [formData, setFormData] = useState({
     // General
     nodeEnv: "development",
+    nextPublicAppUrl: "",
     nextPublicBaseUrl: "",
 
     // Email
@@ -58,6 +59,16 @@ export default function EnvironmentSection() {
     // Authentication
     betterAuthSecret: "",
     betterAuthUrl: "",
+    adminJwtSecret: "",
+
+    // KYC / Veriff
+    veriffApiKey: "",
+    veriffApiSecret: "",
+    veriffBaseUrl: "",
+
+    // Infrastructure
+    isPrimary: "true",
+    serverId: "",
   });
 
   const [showPasswords, setShowPasswords] = useState({
@@ -67,6 +78,9 @@ export default function EnvironmentSection() {
     openaiApiKey: false,
     mongodbUri: false,
     betterAuthSecret: false,
+    adminJwtSecret: false,
+    veriffApiKey: false,
+    veriffApiSecret: false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -82,9 +96,12 @@ export default function EnvironmentSection() {
       const response = await fetch("/api/environment");
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        setFormData((prev) => ({ ...prev, ...data }));
+      } else {
+        const errData = await response.json().catch(() => null);
+        toast.error(errData?.error || "Failed to load settings");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load settings");
     } finally {
       setIsFetching(false);
@@ -106,12 +123,12 @@ export default function EnvironmentSection() {
 
       if (response.ok) {
         toast.success("Environment variables updated successfully");
-        toast.info("Restart your application for changes to take effect");
+        toast.info(data.message || "Changes saved to database and .env file");
       } else {
         toast.error(data.error || "Update failed");
       }
-    } catch (error) {
-      toast.error("An error occurred");
+    } catch {
+      toast.error("An error occurred while saving");
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +136,10 @@ export default function EnvironmentSection() {
 
   const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const updateField = (field: string, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   if (isFetching) {
@@ -148,7 +169,12 @@ export default function EnvironmentSection() {
                 Environment Variables
               </h2>
               <p className="text-blue-100 mt-1">
-                Configure all application settings, API keys, and integrations
+                Configure all application settings, API keys, and integrations.
+                Changes are saved to both the database and the{" "}
+                <code className="bg-blue-700/50 px-1.5 py-0.5 rounded text-xs">
+                  .env
+                </code>{" "}
+                file.
               </p>
             </div>
           </div>
@@ -160,7 +186,7 @@ export default function EnvironmentSection() {
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="general" className="w-full">
             <div className="bg-gray-800/50 border-b border-gray-700 px-6 pt-6">
-              <TabsList className="bg-transparent w-full justify-start gap-2">
+              <TabsList className="bg-transparent w-full justify-start gap-2 flex-wrap">
                 <TabsTrigger
                   value="general"
                   className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
@@ -203,10 +229,18 @@ export default function EnvironmentSection() {
                   <Brain className="h-4 w-4 mr-2" />
                   AI
                 </TabsTrigger>
+                <TabsTrigger
+                  value="kyc"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
+                >
+                  <Fingerprint className="h-4 w-4 mr-2" />
+                  KYC
+                </TabsTrigger>
               </TabsList>
             </div>
 
             <div className="p-8">
+              {/* ─── General Tab ─── */}
               <TabsContent value="general" className="mt-0">
                 <div className="space-y-6">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
@@ -216,18 +250,13 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label
-                          htmlFor="nodeEnv"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Settings className="h-4 w-4 text-green-400" />
                           Node Environment
                         </Label>
                         <Select
                           value={formData.nodeEnv}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, nodeEnv: value })
-                          }
+                          onValueChange={(v) => updateField("nodeEnv", v)}
                         >
                           <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-11">
                             <SelectValue />
@@ -244,28 +273,89 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label
-                          htmlFor="nextPublicBaseUrl"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Globe className="h-4 w-4 text-green-400" />
-                          Base URL (Public)
+                          App URL (NEXT_PUBLIC_APP_URL)
                         </Label>
                         <Input
-                          id="nextPublicBaseUrl"
+                          type="url"
+                          value={formData.nextPublicAppUrl}
+                          onChange={(e) =>
+                            updateField("nextPublicAppUrl", e.target.value)
+                          }
+                          className="bg-gray-800 border-gray-600 text-gray-100 h-11"
+                          placeholder="https://yourdomain.com"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          The primary public URL of your application
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Globe className="h-4 w-4 text-green-400" />
+                          Base URL (NEXT_PUBLIC_BASE_URL)
+                        </Label>
+                        <Input
                           type="url"
                           value={formData.nextPublicBaseUrl}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              nextPublicBaseUrl: e.target.value,
-                            })
+                            updateField("nextPublicBaseUrl", e.target.value)
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
-                          placeholder="http://localhost:3000"
+                          placeholder="https://yourdomain.com"
                         />
                         <p className="text-xs text-gray-500 mt-2">
-                          The public URL where your application is hosted
+                          Base URL for API calls and internal links
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Infrastructure */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Server className="h-5 w-5 text-green-400" />
+                      Infrastructure
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Server className="h-4 w-4 text-green-400" />
+                          IS_PRIMARY
+                        </Label>
+                        <Select
+                          value={formData.isPrimary}
+                          onValueChange={(v) => updateField("isPrimary", v)}
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-11">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">true</SelectItem>
+                            <SelectItem value="false">false</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Whether this is the primary server instance
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Server className="h-4 w-4 text-green-400" />
+                          SERVER_ID
+                        </Label>
+                        <Input
+                          value={formData.serverId}
+                          onChange={(e) =>
+                            updateField("serverId", e.target.value)
+                          }
+                          className="bg-gray-800 border-gray-600 text-gray-100 h-11"
+                          placeholder="auto-generated or hostname"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Unique identifier for this server in the fleet
                         </p>
                       </div>
                     </div>
@@ -273,6 +363,7 @@ export default function EnvironmentSection() {
                 </div>
               </TabsContent>
 
+              {/* ─── Email Tab ─── */}
               <TabsContent value="email" className="mt-0">
                 <div className="space-y-6">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
@@ -282,22 +373,15 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label
-                          htmlFor="nodemailerEmail"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Mail className="h-4 w-4 text-purple-400" />
                           Email Address
                         </Label>
                         <Input
-                          id="nodemailerEmail"
                           type="email"
                           value={formData.nodemailerEmail}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              nodemailerEmail: e.target.value,
-                            })
+                            updateField("nodemailerEmail", e.target.value)
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
                           placeholder="your-email@gmail.com"
@@ -308,16 +392,12 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label
-                          htmlFor="nodemailerPassword"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Key className="h-4 w-4 text-purple-400" />
                           App Password
                         </Label>
                         <div className="relative">
                           <Input
-                            id="nodemailerPassword"
                             type={
                               showPasswords.nodemailerPassword
                                 ? "text"
@@ -325,10 +405,10 @@ export default function EnvironmentSection() {
                             }
                             value={formData.nodemailerPassword}
                             onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                nodemailerPassword: e.target.value,
-                              })
+                              updateField(
+                                "nodemailerPassword",
+                                e.target.value,
+                              )
                             }
                             className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                             placeholder="Gmail app-specific password"
@@ -357,54 +437,31 @@ export default function EnvironmentSection() {
                 </div>
               </TabsContent>
 
+              {/* ─── API Keys Tab ─── */}
               <TabsContent value="apis" className="mt-0">
                 <div className="space-y-6">
-                  {/* Notice */}
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-semibold text-yellow-500 mb-1">
-                        Read-Only Credentials
-                      </h4>
-                      <p className="text-sm text-gray-300">
-                        API credentials shown here are{" "}
-                        <strong>read-only</strong>. Payment provider credentials
-                        (Stripe, Clerk, etc.) are managed in the{" "}
-                        <strong>Payment Providers</strong> tab. To edit other
-                        credentials, update them directly in your{" "}
-                        <code className="bg-gray-800 px-2 py-1 rounded text-xs">
-                          .env
-                        </code>{" "}
-                        file.
-                      </p>
-                    </div>
-                  </div>
-
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
                     <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                       <Key className="h-5 w-5 text-orange-400" />
-                      Massive.com API Keys (Read-Only)
+                      Massive.com API Keys
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Massive API Key */}
                       <div>
-                        <Label
-                          htmlFor="massiveApiKey"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Key className="h-4 w-4 text-orange-400" />
-                          Massive API Key
+                          MASSIVE_API_KEY
                         </Label>
                         <div className="relative">
                           <Input
-                            id="massiveApiKey"
                             type={
                               showPasswords.massiveApiKey ? "text" : "password"
                             }
                             value={formData.massiveApiKey}
-                            disabled
-                            className="bg-gray-900 border-gray-700 text-gray-400 h-11 pr-10 cursor-not-allowed"
-                            placeholder="Managed in Payment Providers"
+                            onChange={(e) =>
+                              updateField("massiveApiKey", e.target.value)
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="Server-side API key"
                           />
                           <button
                             type="button"
@@ -423,25 +480,26 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label
-                          htmlFor="nextPublicMassiveApiKey"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Key className="h-4 w-4 text-orange-400" />
-                          Massive API Key (Public)
+                          NEXT_PUBLIC_MASSIVE_API_KEY
                         </Label>
                         <div className="relative">
                           <Input
-                            id="nextPublicMassiveApiKey"
                             type={
                               showPasswords.nextPublicMassiveApiKey
                                 ? "text"
                                 : "password"
                             }
                             value={formData.nextPublicMassiveApiKey}
-                            disabled
-                            className="bg-gray-900 border-gray-700 text-gray-400 h-11 pr-10 cursor-not-allowed"
-                            placeholder="Managed in Payment Providers"
+                            onChange={(e) =>
+                              updateField(
+                                "nextPublicMassiveApiKey",
+                                e.target.value,
+                              )
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="Public (client-side) API key"
                           />
                           <button
                             type="button"
@@ -461,10 +519,22 @@ export default function EnvironmentSection() {
                         </div>
                       </div>
                     </div>
+                    <p className="text-xs text-gray-500 mt-4">
+                      Real-time Forex data from{" "}
+                      <a
+                        href="https://massive.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-400 hover:text-orange-300"
+                      >
+                        massive.com
+                      </a>
+                    </p>
                   </div>
                 </div>
               </TabsContent>
 
+              {/* ─── Database Tab ─── */}
               <TabsContent value="database" className="mt-0">
                 <div className="space-y-6">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
@@ -473,23 +543,16 @@ export default function EnvironmentSection() {
                       MongoDB Configuration
                     </h3>
                     <div>
-                      <Label
-                        htmlFor="mongodbUri"
-                        className="text-gray-300 flex items-center gap-2 mb-2"
-                      >
+                      <Label className="text-gray-300 flex items-center gap-2 mb-2">
                         <Database className="h-4 w-4 text-cyan-400" />
                         MongoDB Connection String
                       </Label>
                       <div className="relative">
                         <Input
-                          id="mongodbUri"
                           type={showPasswords.mongodbUri ? "text" : "password"}
                           value={formData.mongodbUri}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              mongodbUri: e.target.value,
-                            })
+                            updateField("mongodbUri", e.target.value)
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                           placeholder="mongodb+srv://username:password@cluster.mongodb.net/dbname"
@@ -511,9 +574,25 @@ export default function EnvironmentSection() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Warning */}
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-red-400 mb-1">
+                        Caution
+                      </h4>
+                      <p className="text-sm text-gray-300">
+                        Changing the MongoDB URI requires an application restart
+                        and affects all database connections. Make sure the new
+                        URI is correct before saving.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
+              {/* ─── Auth Tab ─── */}
               <TabsContent value="auth" className="mt-0">
                 <div className="space-y-6">
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
@@ -523,16 +602,12 @@ export default function EnvironmentSection() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <Label
-                          htmlFor="betterAuthSecret"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Key className="h-4 w-4 text-red-400" />
-                          Better Auth Secret
+                          BETTER_AUTH_SECRET
                         </Label>
                         <div className="relative">
                           <Input
-                            id="betterAuthSecret"
                             type={
                               showPasswords.betterAuthSecret
                                 ? "text"
@@ -540,13 +615,10 @@ export default function EnvironmentSection() {
                             }
                             value={formData.betterAuthSecret}
                             onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                betterAuthSecret: e.target.value,
-                              })
+                              updateField("betterAuthSecret", e.target.value)
                             }
                             className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
-                            placeholder="Random secret string for authentication"
+                            placeholder="Random secret string for user authentication"
                           />
                           <button
                             type="button"
@@ -565,32 +637,87 @@ export default function EnvironmentSection() {
                       </div>
 
                       <div>
-                        <Label
-                          htmlFor="betterAuthUrl"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Globe className="h-4 w-4 text-red-400" />
-                          Better Auth URL
+                          BETTER_AUTH_URL
                         </Label>
                         <Input
-                          id="betterAuthUrl"
                           type="url"
                           value={formData.betterAuthUrl}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              betterAuthUrl: e.target.value,
-                            })
+                            updateField("betterAuthUrl", e.target.value)
                           }
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
-                          placeholder="http://localhost:3000"
+                          placeholder="https://yourdomain.com"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Admin JWT Secret */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-red-400" />
+                      Admin Panel Authentication
+                    </h3>
+                    <div>
+                      <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Key className="h-4 w-4 text-red-400" />
+                        ADMIN_JWT_SECRET
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type={
+                            showPasswords.adminJwtSecret ? "text" : "password"
+                          }
+                          value={formData.adminJwtSecret}
+                          onChange={(e) =>
+                            updateField("adminJwtSecret", e.target.value)
+                          }
+                          className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                          placeholder="Secret for admin panel JWT tokens"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            togglePasswordVisibility("adminJwtSecret")
+                          }
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                        >
+                          {showPasswords.adminJwtSecret ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Generate with:{" "}
+                        <code className="bg-gray-800 px-2 py-0.5 rounded text-xs">
+                          openssl rand -hex 32
+                        </code>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Auth warning */}
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-red-400 mb-1">
+                        Security Warning
+                      </h4>
+                      <p className="text-sm text-gray-300">
+                        Changing auth secrets will invalidate all existing user
+                        sessions. Users will need to log in again. Make sure
+                        this is intentional.
+                      </p>
                     </div>
                   </div>
                 </div>
               </TabsContent>
 
+              {/* ─── AI Tab ─── */}
               <TabsContent value="ai" className="mt-0">
                 <div className="space-y-6">
                   {/* AI Feature Toggles */}
@@ -607,14 +734,13 @@ export default function EnvironmentSection() {
                             Enable AI Features
                           </Label>
                           <p className="text-sm text-gray-400 mt-1">
-                            Master toggle for all AI-powered features in the
-                            application
+                            Master toggle for all AI-powered features
                           </p>
                         </div>
                         <Switch
                           checked={formData.openaiEnabled}
                           onCheckedChange={(checked) =>
-                            setFormData({ ...formData, openaiEnabled: checked })
+                            updateField("openaiEnabled", checked)
                           }
                         />
                       </div>
@@ -628,17 +754,13 @@ export default function EnvironmentSection() {
                             AI for Email Personalization
                           </Label>
                           <p className="text-sm text-gray-400 mt-1">
-                            Use AI to generate personalized welcome emails for
-                            new users
+                            Use AI to generate personalized welcome emails
                           </p>
                         </div>
                         <Switch
                           checked={formData.openaiForEmails}
                           onCheckedChange={(checked) =>
-                            setFormData({
-                              ...formData,
-                              openaiForEmails: checked,
-                            })
+                            updateField("openaiForEmails", checked)
                           }
                           disabled={!formData.openaiEnabled}
                         />
@@ -653,27 +775,19 @@ export default function EnvironmentSection() {
                       OpenAI Configuration
                     </h3>
                     <div className="space-y-4">
-                      {/* API Key */}
                       <div>
-                        <Label
-                          htmlFor="openaiApiKey"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Key className="h-4 w-4 text-violet-400" />
-                          OpenAI API Key
+                          OPENAI_API_KEY
                         </Label>
                         <div className="relative">
                           <Input
-                            id="openaiApiKey"
                             type={
                               showPasswords.openaiApiKey ? "text" : "password"
                             }
                             value={formData.openaiApiKey}
                             onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                openaiApiKey: e.target.value,
-                              })
+                              updateField("openaiApiKey", e.target.value)
                             }
                             className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
                             placeholder="sk-..."
@@ -705,20 +819,14 @@ export default function EnvironmentSection() {
                         </p>
                       </div>
 
-                      {/* Model Selection */}
                       <div>
-                        <Label
-                          htmlFor="openaiModel"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
                           <Settings className="h-4 w-4 text-violet-400" />
                           AI Model
                         </Label>
                         <Select
                           value={formData.openaiModel}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, openaiModel: value })
-                          }
+                          onValueChange={(v) => updateField("openaiModel", v)}
                         >
                           <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-11">
                             <SelectValue />
@@ -756,19 +864,132 @@ export default function EnvironmentSection() {
                         </h4>
                         <ul className="text-xs text-gray-400 mt-2 space-y-1 list-disc list-inside">
                           <li>
-                            Performance Simulator Analysis - AI-powered test
+                            Performance Simulator Analysis — AI-powered test
                             result analysis
                           </li>
                           <li>
-                            Email Personalization - Personalized welcome emails
-                            for new users
+                            Email Personalization — Personalized welcome emails
                           </li>
                           <li>
                             Future: Trading pattern analysis, fraud detection
-                            enhancements
                           </li>
                         </ul>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ─── KYC Tab ─── */}
+              <TabsContent value="kyc" className="mt-0">
+                <div className="space-y-6">
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Fingerprint className="h-5 w-5 text-teal-400" />
+                      Veriff KYC Configuration
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Key className="h-4 w-4 text-teal-400" />
+                          VERIFF_API_KEY
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            type={
+                              showPasswords.veriffApiKey ? "text" : "password"
+                            }
+                            value={formData.veriffApiKey}
+                            onChange={(e) =>
+                              updateField("veriffApiKey", e.target.value)
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="Veriff API key"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              togglePasswordVisibility("veriffApiKey")
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                          >
+                            {showPasswords.veriffApiKey ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Key className="h-4 w-4 text-teal-400" />
+                          VERIFF_API_SECRET
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            type={
+                              showPasswords.veriffApiSecret
+                                ? "text"
+                                : "password"
+                            }
+                            value={formData.veriffApiSecret}
+                            onChange={(e) =>
+                              updateField("veriffApiSecret", e.target.value)
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="Veriff API secret"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              togglePasswordVisibility("veriffApiSecret")
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                          >
+                            {showPasswords.veriffApiSecret ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Globe className="h-4 w-4 text-teal-400" />
+                          VERIFF_BASE_URL
+                        </Label>
+                        <Input
+                          type="url"
+                          value={formData.veriffBaseUrl}
+                          onChange={(e) =>
+                            updateField("veriffBaseUrl", e.target.value)
+                          }
+                          className="bg-gray-800 border-gray-600 text-gray-100 h-11"
+                          placeholder="https://stationapi.veriff.com"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Veriff Station API base URL
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4 flex items-start gap-3">
+                    <Fingerprint className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-teal-400">
+                        Multi-Server Note
+                      </h4>
+                      <p className="text-sm text-gray-300">
+                        Veriff API keys and secrets{" "}
+                        <strong>must be identical</strong> across all servers in
+                        a multi-server deployment to ensure webhook signatures
+                        validate correctly.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -785,23 +1006,43 @@ export default function EnvironmentSection() {
                       Important
                     </h4>
                     <p className="text-xs text-gray-400 mt-1">
-                      After saving changes, you must restart your application
-                      for the new environment variables to take effect.
+                      Settings are saved to both the database and the{" "}
+                      <code className="bg-gray-800 px-1.5 py-0.5 rounded">
+                        .env
+                      </code>{" "}
+                      file. Most changes take effect immediately, but{" "}
+                      <code className="bg-gray-800 px-1.5 py-0.5 rounded">
+                        NEXT_PUBLIC_*
+                      </code>{" "}
+                      variables, auth secrets, and the MongoDB URI require an
+                      application restart.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold h-14 text-lg shadow-lg shadow-blue-500/50"
-              >
-                <Save className="h-5 w-5 mr-2" />
-                {isLoading
-                  ? "Saving Changes..."
-                  : "Save All Environment Variables"}
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={fetchSettings}
+                  disabled={isLoading}
+                  className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reload
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold h-14 text-lg shadow-lg shadow-blue-500/50"
+                >
+                  <Save className="h-5 w-5 mr-2" />
+                  {isLoading
+                    ? "Saving Changes..."
+                    : "Save All Environment Variables"}
+                </Button>
+              </div>
             </div>
           </Tabs>
         </form>
