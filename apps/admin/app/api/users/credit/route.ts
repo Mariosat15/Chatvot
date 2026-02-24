@@ -66,14 +66,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update wallet balance
+    // Update wallet balance and tracking fields
+    // Reason: Use dedicated admin tracking fields instead of polluting
+    // totalDeposited/totalWithdrawn (which are for real deposits/withdrawals only).
+    // This prevents false-positive reconciliation deposit/withdrawal mismatch warnings.
     wallet.creditBalance = newBalance;
 
-    // Only update totalDeposited/totalWithdrawn if adding/removing credits
     if (amount > 0) {
-      wallet.totalDeposited += amount;
+      wallet.totalAdminCredits = (wallet.totalAdminCredits || 0) + amount;
     } else {
-      wallet.totalWithdrawn += Math.abs(amount);
+      wallet.totalAdminDebits = (wallet.totalAdminDebits || 0) + Math.abs(amount);
     }
 
     await wallet.save();

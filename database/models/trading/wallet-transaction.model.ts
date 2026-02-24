@@ -21,7 +21,8 @@ export interface IWalletTransaction extends Document {
     | "gamemaster_subscription" // Game master monthly subscription fee
     | "gamemaster_subscription_refund" // Refund if subscription cancelled
     | "gamemaster_earning" // Game master earnings from referred users
-    | "gamemaster_challenge_referral"; // Game master challenge referral earnings
+    | "gamemaster_challenge_referral" // Game master challenge referral earnings
+    | "incident_compensation"; // Compensation issued for incident resolution
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
@@ -70,6 +71,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         "gamemaster_subscription_refund",
         "gamemaster_earning",
         "gamemaster_challenge_referral",
+        "incident_compensation",
       ],
     },
     amount: {

@@ -139,10 +139,11 @@ export async function POST(
 
         const newBalance = wallet.creditBalance + comp.amount;
 
-        // Update wallet
+        // Update wallet balance AND tracking field
+        // Reason: Track incident compensation separately so reconciliation recognizes it
         await CreditWallet.findByIdAndUpdate(
           wallet._id,
-          { $inc: { creditBalance: comp.amount } },
+          { $inc: { creditBalance: comp.amount, totalIncidentCompensation: comp.amount } },
           { session: mongoSession },
         );
 
@@ -155,6 +156,8 @@ export async function POST(
               amount: comp.amount,
               balanceBefore: wallet.creditBalance,
               balanceAfter: newBalance,
+              currency: "EUR",
+              exchangeRate: 1,
               status: "completed",
               description: `Compensation for incident #${incidentId.slice(-6)}: ${comp.reason}`,
               metadata: {

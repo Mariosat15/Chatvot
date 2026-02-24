@@ -47,7 +47,11 @@ interface UserReconciliationDetail {
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
     totalSpentOnMarketplace: number;
-    totalGmEarnings?: number; // GM referral earnings
+    totalAdminCredits: number;
+    totalAdminDebits: number;
+    totalIncidentCompensation: number;
+    totalGmEarnings: number;
+    totalRefunded: number;
   };
   calculated: {
     expectedBalance: number;
@@ -59,7 +63,10 @@ interface UserReconciliationDetail {
     competitionSpentTotal: number;
     challengeSpentTotal: number;
     marketplaceSpentTotal: number;
-    gmEarningsTotal: number; // GM referral earnings from transactions
+    gmEarningsTotal: number;
+    adminAdjustmentNet: number;
+    incidentCompensationTotal: number;
+    refundTotal: number;
     pendingWithdrawalCredits?: number;
     pendingDepositCredits?: number;
   };
@@ -77,12 +84,13 @@ interface UserReconciliationDetail {
     withdrawalRefunds: number;
     manualCredits: number;
     platformFees: number;
-    gmCompetitionEarnings: number; // GM earnings from competition referrals
-    gmChallengeEarnings: number; // GM earnings from challenge referrals
+    gmCompetitionEarnings: number;
+    gmChallengeEarnings: number;
+    incidentCompensations: number;
     refunds: number; // Legacy: sum of all refunds
     other: number;
   };
-  isGameMaster?: boolean; // Flag if user is a GM
+  isGameMaster?: boolean;
   issues: ReconciliationIssue[];
   healthy: boolean;
 }
@@ -675,33 +683,46 @@ async function verifyUserWallet(userId: string, userEmail: string) {
   }
 
   // Check deposit total
+  // Reason: Include deposit + manual_deposit_credit types.
+  // Legacy data may have positive admin_adjustment amounts in totalDeposited,
+  // so account for those to avoid false-positive mismatches.
   const depositTx = transactions.filter(
-    (tx) => tx.transactionType === "deposit",
+    (tx) => tx.transactionType === "deposit" || tx.transactionType === "manual_deposit_credit",
   );
   const calculatedDeposits = depositTx.reduce(
     (sum, tx) => sum + Math.abs(tx.amount || 0),
     0,
   );
 
-  if (Math.abs((wallet.totalDeposited || 0) - calculatedDeposits) > 0.01) {
+  // Account for legacy admin credits stored in totalDeposited
+  const legacyAdminCredits = transactions
+    .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) > 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const adminCreditsField = (wallet as any).totalAdminCredits || 0;
+  const legacyAdminInDeposits = Math.max(0, legacyAdminCredits - adminCreditsField);
+  const expectedDeposits = calculatedDeposits + legacyAdminInDeposits;
+
+  if (Math.abs((wallet.totalDeposited || 0) - expectedDeposits) > 0.01) {
     issues.push({
       type: "deposit_total_mismatch",
       severity: "warning",
       userId,
       userEmail,
       details: {
-        expected: Math.round(calculatedDeposits * 100) / 100,
+        expected: Math.round(expectedDeposits * 100) / 100,
         actual: wallet.totalDeposited || 0,
         difference:
           Math.round(
-            ((wallet.totalDeposited || 0) - calculatedDeposits) * 100,
+            ((wallet.totalDeposited || 0) - expectedDeposits) * 100,
           ) / 100,
-        description: `totalDeposited mismatch`,
+        description: `totalDeposited mismatch` +
+          (legacyAdminInDeposits > 0 ? ` (includes ${legacyAdminInDeposits} legacy admin credits)` : ""),
       },
     });
   }
 
   // Check withdrawal total
+  // Reason: Account for legacy admin debits stored in totalWithdrawn
   const completedWithdrawals = await WithdrawalRequest.find({
     userId,
     status: "completed",
@@ -711,20 +732,28 @@ async function verifyUserWallet(userId: string, userEmail: string) {
     0,
   );
 
-  if (Math.abs((wallet.totalWithdrawn || 0) - calculatedWithdrawals) > 0.01) {
+  const legacyAdminDebits = transactions
+    .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) < 0)
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+  const adminDebitsField = (wallet as any).totalAdminDebits || 0;
+  const legacyAdminInWithdrawals = Math.max(0, legacyAdminDebits - adminDebitsField);
+  const expectedWithdrawals = calculatedWithdrawals + legacyAdminInWithdrawals;
+
+  if (Math.abs((wallet.totalWithdrawn || 0) - expectedWithdrawals) > 0.01) {
     issues.push({
       type: "withdrawal_total_mismatch",
       severity: "warning",
       userId,
       userEmail,
       details: {
-        expected: Math.round(calculatedWithdrawals * 100) / 100,
+        expected: Math.round(expectedWithdrawals * 100) / 100,
         actual: wallet.totalWithdrawn || 0,
         difference:
           Math.round(
-            ((wallet.totalWithdrawn || 0) - calculatedWithdrawals) * 100,
+            ((wallet.totalWithdrawn || 0) - expectedWithdrawals) * 100,
           ) / 100,
-        description: `totalWithdrawn mismatch`,
+        description: `totalWithdrawn mismatch` +
+          (legacyAdminInWithdrawals > 0 ? ` (includes ${legacyAdminInWithdrawals} legacy admin debits)` : ""),
       },
     });
   }
@@ -882,6 +911,11 @@ async function getDetailedUserReconciliation(
     totalSpentOnCompetitions: wallet?.totalSpentOnCompetitions || 0,
     totalSpentOnChallenges: wallet?.totalSpentOnChallenges || 0,
     totalSpentOnMarketplace: (wallet as any)?.totalSpentOnMarketplace || 0,
+    totalAdminCredits: (wallet as any)?.totalAdminCredits || 0,
+    totalAdminDebits: (wallet as any)?.totalAdminDebits || 0,
+    totalIncidentCompensation: (wallet as any)?.totalIncidentCompensation || 0,
+    totalGmEarnings: (wallet as any)?.totalGmEarnings || 0,
+    totalRefunded: (wallet as any)?.totalRefunded || 0,
   };
 
   // Get all completed transactions
@@ -920,6 +954,7 @@ async function getDetailedUserReconciliation(
   let challengeSpentTotal = 0; // Entry fees (NET of refunds)
   let marketplaceSpentTotal = 0;
   let adminAdjustmentTotal = 0; // Track admin adjustments separately
+  let incidentCompensationTotal = 0; // Track incident compensations separately
   let otherCreditsTotal = 0; // withdrawal_refund, manual_deposit_credit, etc.
 
   // Transaction breakdown by type
@@ -928,17 +963,18 @@ async function getDetailedUserReconciliation(
     withdrawals: 0,
     competitionJoins: 0,
     competitionWins: 0,
-    competitionRefunds: 0, // NEW: Track refunds separately
+    competitionRefunds: 0,
     challengeJoins: 0,
     challengeWins: 0,
-    challengeRefunds: 0, // NEW: Track refunds separately
+    challengeRefunds: 0,
     marketplacePurchases: 0,
     adminAdjustments: 0,
-    withdrawalRefunds: 0, // NEW: Track withdrawal refunds
-    manualCredits: 0, // NEW: Track manual credits
-    platformFees: 0, // NEW: Track platform fees
-    gmCompetitionEarnings: 0, // GM earnings from competition referrals
-    gmChallengeEarnings: 0, // GM earnings from challenge referrals
+    withdrawalRefunds: 0,
+    manualCredits: 0,
+    platformFees: 0,
+    gmCompetitionEarnings: 0,
+    gmChallengeEarnings: 0,
+    incidentCompensations: 0,
     other: 0,
   };
 
@@ -1046,6 +1082,12 @@ async function getDetailedUserReconciliation(
         breakdown.gmChallengeEarnings++;
         break;
 
+      case "incident_compensation":
+        // Compensation issued for incident resolution (always positive)
+        incidentCompensationTotal += Math.abs(amount);
+        breakdown.incidentCompensations++;
+        break;
+
       default:
         breakdown.other++;
     }
@@ -1113,7 +1155,12 @@ async function getDetailedUserReconciliation(
   }
 
   // Check deposit total (should include manual_deposit_credit)
-  const depositDiff = Math.abs(walletData.totalDeposited - depositTotal);
+  // Reason: Legacy admin credits may have been added to totalDeposited — account for them
+  const legacyAdminCreditsInDeposit = adminAdjustmentTotal > 0
+    ? Math.max(0, adminAdjustmentTotal - walletData.totalAdminCredits)
+    : 0;
+  const expectedDepositTotal = depositTotal + legacyAdminCreditsInDeposit;
+  const depositDiff = Math.abs(walletData.totalDeposited - expectedDepositTotal);
   if (depositDiff > 0.01) {
     issues.push({
       type: "deposit_total_mismatch",
@@ -1121,22 +1168,30 @@ async function getDetailedUserReconciliation(
       userId,
       userEmail,
       details: {
-        expected: Math.round(depositTotal * 100) / 100,
+        expected: Math.round(expectedDepositTotal * 100) / 100,
         actual: walletData.totalDeposited,
         difference:
-          Math.round((walletData.totalDeposited - depositTotal) * 100) / 100,
+          Math.round((walletData.totalDeposited - expectedDepositTotal) * 100) / 100,
         description:
-          `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(depositTotal * 100) / 100}` +
+          `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(expectedDepositTotal * 100) / 100}` +
           (breakdown.manualCredits > 0
             ? ` (includes ${breakdown.manualCredits} manual credits)`
+            : "") +
+          (legacyAdminCreditsInDeposit > 0
+            ? ` (includes ${legacyAdminCreditsInDeposit} legacy admin credits)`
             : ""),
       },
     });
   }
 
   // Check withdrawal total against WithdrawalRequest (more reliable)
+  // Reason: Legacy admin debits may have been added to totalWithdrawn — account for them
+  const legacyAdminDebitsInWithdrawals = adminAdjustmentTotal < 0
+    ? Math.max(0, Math.abs(adminAdjustmentTotal) - walletData.totalAdminDebits)
+    : 0;
+  const expectedWithdrawalTotal = withdrawalFromRequests + legacyAdminDebitsInWithdrawals;
   const withdrawalDiff = Math.abs(
-    walletData.totalWithdrawn - withdrawalFromRequests,
+    walletData.totalWithdrawn - expectedWithdrawalTotal,
   );
   if (withdrawalDiff > 0.01) {
     issues.push({
@@ -1145,13 +1200,16 @@ async function getDetailedUserReconciliation(
       userId,
       userEmail,
       details: {
-        expected: Math.round(withdrawalFromRequests * 100) / 100,
+        expected: Math.round(expectedWithdrawalTotal * 100) / 100,
         actual: walletData.totalWithdrawn,
         difference:
           Math.round(
-            (walletData.totalWithdrawn - withdrawalFromRequests) * 100,
+            (walletData.totalWithdrawn - expectedWithdrawalTotal) * 100,
           ) / 100,
-        description: `Withdrawal total mismatch: stored ${walletData.totalWithdrawn}, from requests ${Math.round(withdrawalFromRequests * 100) / 100}`,
+        description: `Withdrawal total mismatch: stored ${walletData.totalWithdrawn}, from requests ${Math.round(expectedWithdrawalTotal * 100) / 100}` +
+          (legacyAdminDebitsInWithdrawals > 0
+            ? ` (includes ${legacyAdminDebitsInWithdrawals} legacy admin debits)`
+            : ""),
       },
     });
   }
@@ -1281,13 +1339,19 @@ async function getDetailedUserReconciliation(
     breakdown.gmCompetitionEarnings > 0 ||
     breakdown.gmChallengeEarnings > 0;
 
+  // Calculate total refunds for tracking
+  const refundTotal =
+    breakdown.competitionRefunds +
+    breakdown.challengeRefunds +
+    breakdown.withdrawalRefunds;
+
   return {
     userId,
     userEmail,
     userName,
     wallet: {
       ...walletData,
-      totalGmEarnings: gmEarningsTotal, // Add GM earnings to wallet display
+      totalGmEarnings: walletData.totalGmEarnings || gmEarningsTotal,
     },
     calculated: {
       // Expected balance calculated from ALL transactions (the source of truth)
@@ -1301,6 +1365,9 @@ async function getDetailedUserReconciliation(
       challengeSpentTotal: Math.round(challengeSpentTotal * 100) / 100,
       marketplaceSpentTotal: Math.round(marketplaceSpentTotal * 100) / 100,
       gmEarningsTotal: Math.round(gmEarningsTotal * 100) / 100,
+      adminAdjustmentNet: Math.round(adminAdjustmentTotal * 100) / 100,
+      incidentCompensationTotal: Math.round(incidentCompensationTotal * 100) / 100,
+      refundTotal,
       pendingWithdrawalCredits:
         Math.round(pendingWithdrawalCredits * 100) / 100,
       pendingDepositCredits: Math.round(pendingDepositCredits * 100) / 100,
@@ -1308,10 +1375,7 @@ async function getDetailedUserReconciliation(
     transactionBreakdown: {
       ...breakdown,
       // Legacy fields for backwards compatibility
-      refunds:
-        breakdown.competitionRefunds +
-        breakdown.challengeRefunds +
-        breakdown.withdrawalRefunds,
+      refunds: refundTotal,
     },
     isGameMaster,
     issues,

@@ -11,6 +11,11 @@ export interface ICreditWallet extends Document {
   totalSpentOnChallenges: number; // Total spent on 1v1 challenges
   totalWonFromChallenges: number; // Total winnings from 1v1 challenges
   totalSpentOnMarketplace: number; // Total spent on marketplace purchases
+  totalAdminCredits: number; // Total credits added by admin (positive adjustments)
+  totalAdminDebits: number; // Total credits removed by admin (negative adjustments)
+  totalIncidentCompensation: number; // Total credits from incident compensations
+  totalGmEarnings: number; // Total Game Master earnings (referral commissions)
+  totalRefunded: number; // Total credits refunded (competition/challenge/withdrawal refunds)
   isActive: boolean; // Wallet status
 
   // KYC Fields
@@ -78,6 +83,31 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
     totalSpentOnMarketplace: {
       type: Number,
       required: true,
+      default: 0,
+      min: 0,
+    },
+    totalAdminCredits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalAdminDebits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalIncidentCompensation: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalGmEarnings: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalRefunded: {
+      type: Number,
       default: 0,
       min: 0,
     },

@@ -70,6 +70,11 @@ export interface UserReconciliationResult {
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
     totalSpentOnMarketplace: number;
+    totalAdminCredits: number;
+    totalAdminDebits: number;
+    totalIncidentCompensation: number;
+    totalGmEarnings: number;
+    totalRefunded: number;
   };
   calculated: {
     expectedBalance: number;
@@ -77,6 +82,10 @@ export interface UserReconciliationResult {
     depositTotal: number;
     withdrawalTotal: number;
     marketplaceSpentTotal: number;
+    adminAdjustmentNet: number;
+    incidentCompensationTotal: number;
+    gmEarningsTotal: number;
+    refundTotal: number;
   };
   issues: ReconciliationIssue[];
   healthy: boolean;
@@ -276,26 +285,39 @@ export async function verifyUserWallet(
   }
 
   // Calculate deposit total from COMPLETED transactions only
+  // Reason: Include deposit + manual_deposit_credit types.
+  // Legacy data may also include positive admin_adjustment amounts in totalDeposited,
+  // so we account for those to avoid false-positive mismatches.
   const depositTransactions = completedTransactions.filter(
-    (tx) => tx.transactionType === "deposit",
+    (tx) => tx.transactionType === "deposit" || tx.transactionType === "manual_deposit_credit",
   );
   const calculatedDeposits = depositTransactions.reduce(
     (sum, tx) => sum + Math.abs(tx.amount || 0),
     0,
   );
 
-  // Check 2: Total deposited matches deposit transactions
-  if (Math.abs((wallet.totalDeposited || 0) - calculatedDeposits) > 0.01) {
+  // Account for legacy admin adjustments that were stored in totalDeposited
+  const legacyAdminCreditsInDeposits = completedTransactions
+    .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) > 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  // Subtract what's now tracked separately in totalAdminCredits
+  const adminCreditsField = (wallet as any).totalAdminCredits || 0;
+  const legacyAdminInDeposits = Math.max(0, legacyAdminCreditsInDeposits - adminCreditsField);
+  const expectedDeposits = calculatedDeposits + legacyAdminInDeposits;
+
+  // Check 2: Total deposited matches deposit transactions (+ legacy admin credits)
+  if (Math.abs((wallet.totalDeposited || 0) - expectedDeposits) > 0.01) {
     issues.push({
       type: "deposit_total_mismatch",
       severity: "warning",
       userId,
       userEmail,
       details: {
-        expected: calculatedDeposits,
+        expected: expectedDeposits,
         actual: wallet.totalDeposited || 0,
-        difference: (wallet.totalDeposited || 0) - calculatedDeposits,
-        description: `totalDeposited (${wallet.totalDeposited || 0}) doesn't match deposit transactions (${calculatedDeposits})`,
+        difference: (wallet.totalDeposited || 0) - expectedDeposits,
+        description: `totalDeposited (${wallet.totalDeposited || 0}) doesn't match deposit transactions (${expectedDeposits})` +
+          (legacyAdminInDeposits > 0 ? ` (includes ${legacyAdminInDeposits} legacy admin credits)` : ""),
       },
     });
   }
@@ -306,18 +328,27 @@ export async function verifyUserWallet(
     0,
   );
 
-  // Check 3: Total withdrawn matches completed withdrawals
-  if (Math.abs((wallet.totalWithdrawn || 0) - calculatedWithdrawals) > 0.01) {
+  // Account for legacy admin debits that were stored in totalWithdrawn
+  const legacyAdminDebitsInWithdrawals = completedTransactions
+    .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) < 0)
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+  const adminDebitsField = (wallet as any).totalAdminDebits || 0;
+  const legacyAdminInWithdrawals = Math.max(0, legacyAdminDebitsInWithdrawals - adminDebitsField);
+  const expectedWithdrawals = calculatedWithdrawals + legacyAdminInWithdrawals;
+
+  // Check 3: Total withdrawn matches completed withdrawals (+ legacy admin debits)
+  if (Math.abs((wallet.totalWithdrawn || 0) - expectedWithdrawals) > 0.01) {
     issues.push({
       type: "withdrawal_total_mismatch",
       severity: "warning",
       userId,
       userEmail,
       details: {
-        expected: calculatedWithdrawals,
+        expected: expectedWithdrawals,
         actual: wallet.totalWithdrawn || 0,
-        difference: (wallet.totalWithdrawn || 0) - calculatedWithdrawals,
-        description: `totalWithdrawn (${wallet.totalWithdrawn || 0}) doesn't match completed withdrawals (${calculatedWithdrawals})`,
+        difference: (wallet.totalWithdrawn || 0) - expectedWithdrawals,
+        description: `totalWithdrawn (${wallet.totalWithdrawn || 0}) doesn't match completed withdrawals (${expectedWithdrawals})` +
+          (legacyAdminInWithdrawals > 0 ? ` (includes ${legacyAdminInWithdrawals} legacy admin debits)` : ""),
       },
     });
   }
@@ -552,6 +583,12 @@ export async function getUserReconciliation(
     totalWonFromChallenges?: number;
     totalSpentOnCompetitions?: number;
     totalSpentOnChallenges?: number;
+    totalSpentOnMarketplace?: number;
+    totalAdminCredits?: number;
+    totalAdminDebits?: number;
+    totalIncidentCompensation?: number;
+    totalGmEarnings?: number;
+    totalRefunded?: number;
     userEmail?: string;
   } | null;
   if (!wallet) return null;
@@ -571,33 +608,47 @@ export async function getUserReconciliation(
     0,
   );
 
-  // Get pending deposits
-  const pendingDeposits = await WalletTransaction.find({
-    userId,
-    transactionType: "deposit",
-    status: "pending",
-  }).lean();
-  const pendingDepositCredits = pendingDeposits.reduce(
-    (sum, tx) => sum + Math.abs(tx.amount || 0),
-    0,
-  );
-
+  // Reason: The TRUE expected balance is the SUM of all completed transaction amounts.
+  // This is the source of truth — it accounts for deposits, withdrawals, wins, refunds,
+  // admin adjustments, incident compensations, GM earnings, platform fees, and all other types.
+  // Using wallet aggregate fields alone was incomplete and missed admin/incident/GM flows.
   const balanceFromCompletedTransactions = completedTransactions.reduce(
     (sum, tx) => sum + (tx.amount || 0),
     0,
   );
-
-  // Actual expected balance = completed transactions - pending withdrawals (already deducted)
-  const balanceFromTransactions =
-    balanceFromCompletedTransactions - pendingWithdrawalCredits;
+  const expectedBalance = Math.round(balanceFromCompletedTransactions * 100) / 100;
 
   const depositTotal = completedTransactions
-    .filter((tx) => tx.transactionType === "deposit")
+    .filter((tx) => tx.transactionType === "deposit" || tx.transactionType === "manual_deposit_credit")
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
 
-  // Calculate marketplace purchases from transactions
   const marketplaceSpentTotal = completedTransactions
     .filter((tx) => tx.transactionType === "marketplace_purchase")
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+
+  // Calculate admin adjustment net from transactions
+  const adminAdjustmentNet = completedTransactions
+    .filter((tx) => tx.transactionType === "admin_adjustment")
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+  // Calculate incident compensation total from transactions
+  const incidentCompensationTotal = completedTransactions
+    .filter((tx) => tx.transactionType === "incident_compensation")
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+
+  // Calculate GM earnings from transactions
+  const gmEarningsTotal = completedTransactions
+    .filter((tx) => tx.transactionType === "gamemaster_earning" || tx.transactionType === "gamemaster_challenge_referral")
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+
+  // Calculate total refunds from transactions
+  const refundTotal = completedTransactions
+    .filter((tx) =>
+      tx.transactionType === "competition_refund" ||
+      tx.transactionType === "challenge_refund" ||
+      tx.transactionType === "withdrawal_refund" ||
+      tx.transactionType === "gamemaster_subscription_refund"
+    )
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
 
   const completedWithdrawals = await WithdrawalRequest.find({
@@ -614,17 +665,6 @@ export async function getUserReconciliation(
     wallet.userEmail || "Unknown",
   );
 
-  // Calculate expected balance (including marketplace purchases and pending)
-  const expectedBalance =
-    (wallet.totalDeposited || 0) -
-    (wallet.totalWithdrawn || 0) +
-    (wallet.totalWonFromCompetitions || 0) +
-    (wallet.totalWonFromChallenges || 0) -
-    (wallet.totalSpentOnCompetitions || 0) -
-    (wallet.totalSpentOnChallenges || 0) -
-    ((wallet as any).totalSpentOnMarketplace || 0) -
-    pendingWithdrawalCredits; // Account for pending withdrawals
-
   return {
     userId,
     userEmail: wallet.userEmail || "Unknown",
@@ -636,18 +676,24 @@ export async function getUserReconciliation(
       totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
       totalSpentOnCompetitions: wallet.totalSpentOnCompetitions || 0,
       totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
-      totalSpentOnMarketplace: (wallet as any).totalSpentOnMarketplace || 0,
+      totalSpentOnMarketplace: wallet.totalSpentOnMarketplace || 0,
+      totalAdminCredits: wallet.totalAdminCredits || 0,
+      totalAdminDebits: wallet.totalAdminDebits || 0,
+      totalIncidentCompensation: wallet.totalIncidentCompensation || 0,
+      totalGmEarnings: wallet.totalGmEarnings || 0,
+      totalRefunded: wallet.totalRefunded || 0,
     },
     calculated: {
       expectedBalance,
-      balanceFromTransactions,
+      balanceFromTransactions: expectedBalance,
       depositTotal,
       withdrawalTotal,
       marketplaceSpentTotal,
-      // Add pending info for visibility
-      pendingWithdrawalCredits,
-      pendingDepositCredits,
-    } as any,
+      adminAdjustmentNet: Math.round(adminAdjustmentNet * 100) / 100,
+      incidentCompensationTotal: Math.round(incidentCompensationTotal * 100) / 100,
+      gmEarningsTotal: Math.round(gmEarningsTotal * 100) / 100,
+      refundTotal: Math.round(refundTotal * 100) / 100,
+    },
     issues: verifyResult.issues,
     healthy:
       verifyResult.issues.filter((i) => i.severity === "critical").length === 0,
