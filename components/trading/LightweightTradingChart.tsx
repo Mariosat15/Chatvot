@@ -7617,6 +7617,49 @@ const LightweightTradingChart = ({
   ]);
 
   const currentPrice = prices.get(symbol);
+
+  // ⚡ CRITICAL: Keep chart price label in sync with PriceProvider's latest bid.
+  // Reason: The header SELL/BUY reads from PriceProvider. The chart label reads from
+  // the last series.update() call. PriceProvider can get a newer price (via its own
+  // REST poll at 1000ms) between forming candle polls (200ms). Without this sync,
+  // the header shows 1.17820 while the chart shows 1.17816 until the next forming
+  // candle poll catches up. This effect ensures they are ALWAYS identical.
+  useEffect(() => {
+    if (
+      !currentPrice ||
+      !candlestickSeriesRef.current ||
+      !currentCandleRef.current
+    )
+      return;
+
+    const liveBid = currentPrice.bid;
+    const forming = currentCandleRef.current;
+
+    // Only sync if the bid actually differs from what the chart is showing
+    if (forming.close === liveBid) return;
+
+    // Update the forming candle's close + ensure high/low encompass it
+    forming.close = liveBid;
+    forming.high = Math.max(forming.high, liveBid);
+    forming.low = Math.min(forming.low, liveBid);
+
+    // Push the update to the chart canvas
+    if (chartType === "line") {
+      (candlestickSeriesRef.current as any).update({
+        time: forming.time,
+        value: liveBid,
+      });
+    } else {
+      candlestickSeriesRef.current?.update({
+        time: forming.time as UTCTimestamp,
+        open: forming.open,
+        high: forming.high,
+        low: forming.low,
+        close: liveBid,
+      });
+    }
+  }, [currentPrice, chartType]);
+
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
