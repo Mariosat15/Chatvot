@@ -301,6 +301,7 @@ const LightweightTradingChart = ({
     marketStatus,
     isStale,
     forceRefresh,
+    injectPrice,
   } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
 
@@ -6632,6 +6633,10 @@ const LightweightTradingChart = ({
           price: price.ask,
           title: `ASK ${price.ask.toFixed(5)}`,
         });
+
+        // Reason: Inject price into PriceProvider so PositionsTable & LiveAccountInfo
+        // update in near-real-time (~200ms) instead of waiting for the 1s REST poll.
+        injectPrice(symbol, price.bid, price.ask);
       }
 
       // MERGE candle data instead of replacing

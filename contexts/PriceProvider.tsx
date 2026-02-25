@@ -70,6 +70,8 @@ interface PriceContextValue {
   isStale: boolean;
   lastUpdate: number;
   forceRefresh: () => void;
+  /** Inject a price directly (used by chart forming-candle poll for sub-second position updates) */
+  injectPrice: (symbol: ForexSymbol, bid: number, ask: number) => void;
 }
 
 // Combined state to batch updates (prevents multiple re-renders)
@@ -150,6 +152,42 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     }));
     log("🔄 Force refresh triggered");
   }, []);
+
+  // Inject a price directly from the chart's fast forming-candle poll (~200ms)
+  // Reason: Chart updates every 200ms but PriceProvider only polls every 1-2s.
+  // This bridges the gap so PositionsTable & LiveAccountInfo update in near-real-time.
+  const injectPrice = useCallback(
+    (symbol: ForexSymbol, bid: number, ask: number) => {
+      const quote: PriceQuote = {
+        symbol,
+        bid,
+        ask,
+        mid: Number(((bid + ask) / 2).toFixed(5)),
+        spread: Number(Math.abs(ask - bid).toFixed(5)),
+        timestamp: Date.now(),
+      };
+      const normalized = normalizePriceQuote(quote);
+
+      setState((prev) => {
+        const existing = prev.prices.get(symbol);
+        if (!priceChanged(existing, normalized)) return prev; // No meaningful change
+
+        const newPrices = new Map(prev.prices);
+        newPrices.set(symbol, normalized);
+        return {
+          ...prev,
+          prices: newPrices,
+          isConnected: true,
+          isStale: false,
+          lastUpdate: Date.now(),
+        };
+      });
+
+      // Also reset the stale tracking
+      lastFetchRef.current = Date.now();
+    },
+    [],
+  );
 
   // Stale price detection
   useEffect(() => {
@@ -369,8 +407,9 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
       isStale: state.isStale,
       lastUpdate: state.lastUpdate,
       forceRefresh,
+      injectPrice,
     }),
-    [state, subscribe, unsubscribe, forceRefresh],
+    [state, subscribe, unsubscribe, forceRefresh, injectPrice],
   );
 
   return (

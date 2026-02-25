@@ -258,7 +258,7 @@ export function createBatchUpdater<T>(
  */
 export const PERFORMANCE_INTERVALS = {
   // Price updates
-  PRICE_POLLING: 2000, // 2 seconds (was 1000)
+  PRICE_POLLING: 1000, // 1 second — reduced from 2s for tighter position stats sync
   PRICE_UI_UPDATE: 500, // 500ms for UI smoothness
 
   // Status checks — competitions/challenges change status rarely (only at end time)
