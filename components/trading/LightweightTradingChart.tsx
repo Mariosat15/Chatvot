@@ -6683,22 +6683,33 @@ const LightweightTradingChart = ({
       const existing = currentCandleRef.current;
       const isSameCandle = existing && existing.time === candle.time;
 
+      // ⚡ CRITICAL: Use the live bid price as the candle close when available.
+      // Reason: candle.close comes from the forming-candle API (server-side aggregation)
+      // which may be 1-2 ticks behind. price.bid is the real-time latest bid from the
+      // same API response. Using it as close ensures the chart's y-axis price label
+      // matches the position table's current price EXACTLY.
+      const liveClose = price ? price.bid : candle.close;
+
       const candleData: CandlestickData<UTCTimestamp> = {
         time: candle.time as UTCTimestamp,
         // Keep the existing open if same candle (first price of period), otherwise use new
         open: isSameCandle ? existing.open : candle.open,
-        // Always keep the HIGHEST high
-        high: isSameCandle ? Math.max(existing.high, candle.high) : candle.high,
-        // Always keep the LOWEST low
-        low: isSameCandle ? Math.min(existing.low, candle.low) : candle.low,
-        // Always use the latest close
-        close: candle.close,
+        // Always keep the HIGHEST high — include liveClose so wick reaches the label
+        high: isSameCandle
+          ? Math.max(existing.high, candle.high, liveClose)
+          : Math.max(candle.high, liveClose),
+        // Always keep the LOWEST low — include liveClose so wick reaches the label
+        low: isSameCandle
+          ? Math.min(existing.low, candle.low, liveClose)
+          : Math.min(candle.low, liveClose),
+        // Always use the live bid as close so chart label = position current price
+        close: liveClose,
       };
 
       if (chartType === "line") {
         (candlestickSeriesRef.current as any).update({
           time: candle.time as UTCTimestamp,
-          value: candle.close,
+          value: liveClose,
         });
       } else {
         candlestickSeriesRef.current?.update(candleData);
