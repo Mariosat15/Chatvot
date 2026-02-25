@@ -46,14 +46,17 @@ function normalizePriceQuote(quote: PriceQuote): PriceQuote {
 
 /**
  * Check if a price has meaningfully changed (avoids unnecessary re-renders)
+ * Reason: Threshold must be SMALLER than the minimum tick (0.00001 for 5-decimal forex)
+ * because IEEE 754 floating point subtraction can produce values like 0.0000099999...
+ * which would fail a >= 0.00001 check even though the price moved by 1 pip.
  */
 function priceChanged(
   oldPrice: PriceQuote | undefined,
   newPrice: PriceQuote,
 ): boolean {
   if (!oldPrice) return true;
-  // Only trigger update if bid, ask, or mid changed by at least 0.00001
-  const threshold = 0.00001;
+  // Use 0.000001 (0.1 pip) to catch every real price movement despite floating point imprecision
+  const threshold = 0.000001;
   return (
     Math.abs(oldPrice.bid - newPrice.bid) >= threshold ||
     Math.abs(oldPrice.ask - newPrice.ask) >= threshold
@@ -154,23 +157,30 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   // Inject a price directly from the chart's fast forming-candle poll (~200ms)
-  // Reason: Chart updates every 200ms but PriceProvider only polls every 1-2s.
+  // Reason: Chart updates every 200ms but PriceProvider only polls every 1s.
   // This bridges the gap so PositionsTable & LiveAccountInfo update in near-real-time.
+  // IMPORTANT: No threshold check here — the chart already throttles to 200ms,
+  // and we must propagate every tick so positions match the chart exactly.
   const injectPrice = useCallback(
     (symbol: ForexSymbol, bid: number, ask: number) => {
+      const now = Date.now();
       const quote: PriceQuote = {
         symbol,
         bid,
         ask,
         mid: Number(((bid + ask) / 2).toFixed(5)),
         spread: Number(Math.abs(ask - bid).toFixed(5)),
-        timestamp: Date.now(),
+        timestamp: now,
       };
       const normalized = normalizePriceQuote(quote);
 
       setState((prev) => {
         const existing = prev.prices.get(symbol);
-        if (!priceChanged(existing, normalized)) return prev; // No meaningful change
+
+        // Exact equality check — skip ONLY if bid AND ask are identical (truly no change)
+        if (existing && existing.bid === normalized.bid && existing.ask === normalized.ask) {
+          return prev;
+        }
 
         const newPrices = new Map(prev.prices);
         newPrices.set(symbol, normalized);
@@ -179,12 +189,12 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
           prices: newPrices,
           isConnected: true,
           isStale: false,
-          lastUpdate: Date.now(),
+          lastUpdate: now,
         };
       });
 
       // Also reset the stale tracking
-      lastFetchRef.current = Date.now();
+      lastFetchRef.current = now;
     },
     [],
   );
