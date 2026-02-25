@@ -7209,8 +7209,18 @@ const LightweightTradingChart = ({
         // Update chart with latest candles from server
         const latestCandles = data.candles;
 
+        // ⚡ CRITICAL: Skip the LAST candle in this batch if it matches the
+        // current forming candle. The fast forming-candle poll (200ms) already
+        // updates the forming candle with live bid price as close. This slow
+        // poll (5s) uses stale server-side candle.close which would overwrite
+        // the live price label, causing a visible lag.
+        const formingTime = currentCandleRef.current?.time;
+
         for (const candle of latestCandles) {
           try {
+            // Skip if this is the forming candle — the fast poll keeps it live
+            if (formingTime && candle.time === formingTime) continue;
+
             const candleData: CandlestickData<UTCTimestamp> = {
               time: candle.time as UTCTimestamp,
               open: candle.open,
@@ -7232,7 +7242,7 @@ const LightweightTradingChart = ({
               candlestickSeriesRef.current?.update(candleData);
             }
 
-            // Update reference to latest candle
+            // Update reference to latest candle (only for non-forming candles)
             currentCandleRef.current = candleData;
           } catch {
             // Ignore individual candle update errors
@@ -7240,14 +7250,20 @@ const LightweightTradingChart = ({
         }
 
         // Update candleDataRef for indicators (time already in seconds from API)
+        // Only update historical (non-forming) candles to avoid overwriting live close
         if (candleDataRef.current.length > 0 && latestCandles.length > 0) {
           const lastServerCandle = latestCandles[latestCandles.length - 1];
           const lastRefIndex = candleDataRef.current.length - 1;
 
+          // ⚡ Skip if this is the forming candle — fast poll keeps it live
+          const isFormingCandle =
+            formingTime && lastServerCandle.time === formingTime;
+
           if (
+            !isFormingCandle &&
             candleDataRef.current[lastRefIndex].time === lastServerCandle.time
           ) {
-            // Update existing candle
+            // Update existing completed candle
             candleDataRef.current[lastRefIndex] = {
               time: lastServerCandle.time, // Already in seconds
               open: lastServerCandle.open,
