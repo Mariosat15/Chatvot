@@ -6665,15 +6665,6 @@ const LightweightTradingChart = ({
       )
         return;
 
-      // ⚡ CRITICAL: Inject price into PriceProvider UNCONDITIONALLY.
-      // This must happen regardless of whether bid/ask lines are visible.
-      // Reason: Previously this was inside the bid/ask line block, so when lines
-      // were disabled, injectPrice was never called and positions fell back to
-      // the 1-second REST poll instead of the 200ms chart feed.
-      if (price) {
-        injectPrice(symbol as ForexSymbol, price.bid, price.ask);
-      }
-
       // Update bid/ask lines (only if enabled)
       if (price && bidPriceLineRef.current && askPriceLineRef.current) {
         bidPriceLineRef.current.applyOptions({
@@ -6713,6 +6704,15 @@ const LightweightTradingChart = ({
       }
 
       currentCandleRef.current = candleData;
+
+      // ⚡ CRITICAL: Inject price into PriceProvider AFTER the chart canvas update.
+      // Reason: Chart canvas paints synchronously via .update(), then injectPrice
+      // triggers React setState which schedules a DOM re-render. By calling it after
+      // the canvas update, both the chart and position stats visually sync on the
+      // same frame. Must be OUTSIDE the bid/ask line conditional so it always fires.
+      if (price) {
+        injectPrice(symbol as ForexSymbol, price.bid, price.ask);
+      }
 
       // Keep candleDataRef in sync with forming candle so indicators use the latest price
       let isNewPeriod = false;
