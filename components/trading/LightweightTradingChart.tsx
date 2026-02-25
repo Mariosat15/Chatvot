@@ -6665,7 +6665,16 @@ const LightweightTradingChart = ({
       )
         return;
 
-      // Update bid/ask lines
+      // ⚡ CRITICAL: Inject price into PriceProvider UNCONDITIONALLY.
+      // This must happen regardless of whether bid/ask lines are visible.
+      // Reason: Previously this was inside the bid/ask line block, so when lines
+      // were disabled, injectPrice was never called and positions fell back to
+      // the 1-second REST poll instead of the 200ms chart feed.
+      if (price) {
+        injectPrice(symbol as ForexSymbol, price.bid, price.ask);
+      }
+
+      // Update bid/ask lines (only if enabled)
       if (price && bidPriceLineRef.current && askPriceLineRef.current) {
         bidPriceLineRef.current.applyOptions({
           price: price.bid,
@@ -6675,10 +6684,6 @@ const LightweightTradingChart = ({
           price: price.ask,
           title: `ASK ${price.ask.toFixed(5)}`,
         });
-
-        // Reason: Inject price into PriceProvider so PositionsTable & LiveAccountInfo
-        // update in near-real-time (~200ms) instead of waiting for the 1s REST poll.
-        injectPrice(symbol, price.bid, price.ask);
       }
 
       // MERGE candle data instead of replacing
