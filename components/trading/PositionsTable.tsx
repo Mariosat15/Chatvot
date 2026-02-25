@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -365,24 +365,21 @@ const PositionsTable = ({
     };
   }, [positions, subscribe, unsubscribe]);
 
-  // Update positions with real-time prices - exclude locally closed positions
-  // ⚡ PRESERVE pending TP/SL edits to prevent race condition
-  useEffect(() => {
+  // Reason: Compute live-priced positions IN THE SAME RENDER CYCLE as the price change.
+  // Previously this was a useEffect+setLivePositions pattern which caused a double-render:
+  //   Render1 (stale prices on screen) → useEffect → setState → Render2 (new prices)
+  // With useMemo, prices are applied during Render1 itself — zero extra delay.
+  const pricedPositions = useMemo(() => {
     const now = Date.now();
 
-    // Clean up expired pending edits
+    // Clean up expired pending edits (side effect in memo is safe here — it's just ref cleanup)
     pendingTPSLEditsRef.current.forEach((edit, positionId) => {
       if (now - edit.timestamp > PENDING_EDIT_TIMEOUT) {
         pendingTPSLEditsRef.current.delete(positionId);
       }
     });
 
-    // Filter out closed positions first
-    const activePositions = positions.filter(
-      (p) => !closedPositionIdsRef.current.has(p._id),
-    );
-
-    const updatedPositions = activePositions.map((position) => {
+    return livePositions.map((position) => {
       const currentPrice = prices.get(position.symbol as ForexSymbol);
       if (!currentPrice) return position;
 
@@ -412,9 +409,7 @@ const PositionsTable = ({
         }),
       };
     });
-
-    setLivePositions(updatedPositions);
-  }, [prices, positions]);
+  }, [prices, livePositions]);
 
   const handleClosePosition = async (
     positionId: string,
@@ -474,8 +469,8 @@ const PositionsTable = ({
     }
   };
 
-  // Apply filters
-  const filteredPositions = livePositions.filter((position) => {
+  // Apply filters — uses pricedPositions (live prices applied via useMemo, zero delay)
+  const filteredPositions = pricedPositions.filter((position) => {
     if (filterSymbol !== "all" && position.symbol !== filterSymbol)
       return false;
     if (filterSide !== "all" && position.side !== filterSide) return false;

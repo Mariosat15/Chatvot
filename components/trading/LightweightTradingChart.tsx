@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   createChart,
   IChartApi,
@@ -12,6 +12,7 @@ import { useDragScroll } from "@/hooks/useDragScroll";
 import {
   ForexSymbol,
   FOREX_PAIRS,
+  calculateUnrealizedPnL,
 } from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
@@ -323,6 +324,47 @@ const LightweightTradingChart = ({
   } catch {
     // Arsenal context not available (e.g., outside of provider)
   }
+
+  // Reason: Compute live account stats in the SAME render cycle as price changes.
+  // tradingProps is a server-rendered snapshot — it never updates client-side.
+  // This useMemo overlays real-time prices to keep fullscreen account panel in sync.
+  const liveAccount = useMemo(() => {
+    if (!tradingProps) return null;
+
+    let totalUnrealizedPnl = 0;
+    for (const pos of positions) {
+      const quote = prices.get(pos.symbol as ForexSymbol);
+      if (!quote) {
+        // Fall back to cached PnL from the position itself
+        totalUnrealizedPnl += pos.unrealizedPnl ?? 0;
+        continue;
+      }
+      const marketPrice = pos.side === "long" ? quote.bid : quote.ask;
+      totalUnrealizedPnl += calculateUnrealizedPnL(
+        pos.side,
+        pos.entryPrice,
+        marketPrice,
+        pos.quantity,
+        pos.symbol as ForexSymbol,
+      );
+    }
+
+    const equity = tradingProps.currentBalance + totalUnrealizedPnl;
+    const available = Math.max(0, equity - tradingProps.existingUsedMargin);
+    const marginLevel =
+      tradingProps.existingUsedMargin > 0.01
+        ? (equity / tradingProps.existingUsedMargin) * 100
+        : Infinity;
+
+    return {
+      equity,
+      unrealizedPnl: totalUnrealizedPnl,
+      available,
+      marginLevel,
+      balance: tradingProps.currentBalance,
+      usedMargin: tradingProps.existingUsedMargin,
+    };
+  }, [prices, positions, tradingProps]);
 
   const [timeframe, setTimeframe] = useState<Timeframe>("5");
   const [loading, setLoading] = useState(true);
@@ -8415,7 +8457,8 @@ const LightweightTradingChart = ({
                 </div>
               </div>
 
-              {/* Compact Account Overview for Fullscreen */}
+              {/* Compact Account Overview for Fullscreen — uses liveAccount (useMemo) for zero-delay updates */}
+              {liveAccount && (
               <div className="w-[400px] overflow-auto dark-scrollbar flex-shrink-0 bg-[#0d0f14]">
                 <div className="p-2 h-full flex flex-col">
                   <div className="text-[10px] font-bold text-[#787b86] uppercase tracking-wider mb-2 px-1">
@@ -8428,7 +8471,7 @@ const LightweightTradingChart = ({
                         Balance
                       </div>
                       <div className="text-sm font-bold text-white tabular-nums">
-                        ${tradingProps.currentBalance.toFixed(2)}
+                        ${liveAccount.balance.toFixed(2)}
                       </div>
                     </div>
                     {/* Equity */}
@@ -8437,7 +8480,7 @@ const LightweightTradingChart = ({
                         Equity
                       </div>
                       <div className="text-sm font-bold text-[#2962ff] tabular-nums">
-                        ${tradingProps.currentEquity.toFixed(2)}
+                        ${liveAccount.equity.toFixed(2)}
                       </div>
                     </div>
                     {/* Available */}
@@ -8446,7 +8489,7 @@ const LightweightTradingChart = ({
                         Available
                       </div>
                       <div className="text-sm font-bold text-[#26a69a] tabular-nums">
-                        ${tradingProps.availableCapital.toFixed(2)}
+                        ${liveAccount.available.toFixed(2)}
                       </div>
                     </div>
                     {/* Unrealized P&L */}
@@ -8457,23 +8500,13 @@ const LightweightTradingChart = ({
                       <div
                         className={cn(
                           "text-sm font-bold tabular-nums",
-                          tradingProps.currentEquity -
-                            tradingProps.currentBalance >=
-                            0
+                          liveAccount.unrealizedPnl >= 0
                             ? "text-[#26a69a]"
                             : "text-[#ef5350]",
                         )}
                       >
-                        {tradingProps.currentEquity -
-                          tradingProps.currentBalance >=
-                        0
-                          ? "+"
-                          : ""}
-                        $
-                        {(
-                          tradingProps.currentEquity -
-                          tradingProps.currentBalance
-                        ).toFixed(2)}
+                        {liveAccount.unrealizedPnl >= 0 ? "+" : ""}
+                        ${liveAccount.unrealizedPnl.toFixed(2)}
                       </div>
                     </div>
                     {/* Used Margin */}
@@ -8482,7 +8515,7 @@ const LightweightTradingChart = ({
                         Used Margin
                       </div>
                       <div className="text-sm font-bold text-[#f7931a] tabular-nums">
-                        ${tradingProps.existingUsedMargin.toFixed(2)}
+                        ${liveAccount.usedMargin.toFixed(2)}
                       </div>
                     </div>
                     {/* Margin Level */}
@@ -8493,24 +8526,22 @@ const LightweightTradingChart = ({
                       <div
                         className={cn(
                           "text-sm font-bold tabular-nums",
-                          tradingProps.existingUsedMargin > 0.01
-                            ? (tradingProps.currentEquity /
-                                tradingProps.existingUsedMargin) *
-                                100 >
-                              200
-                              ? "text-[#26a69a]"
-                              : "text-[#ef5350]"
-                            : "text-[#787b86]",
+                          liveAccount.marginLevel > 200
+                            ? "text-[#26a69a]"
+                            : liveAccount.marginLevel < Infinity
+                              ? "text-[#ef5350]"
+                              : "text-[#787b86]",
                         )}
                       >
-                        {tradingProps.existingUsedMargin > 0.01
-                          ? `${((tradingProps.currentEquity / tradingProps.existingUsedMargin) * 100).toFixed(0)}%`
+                        {liveAccount.usedMargin > 0.01
+                          ? `${liveAccount.marginLevel.toFixed(0)}%`
                           : "—"}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>
         </>

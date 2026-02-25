@@ -58,14 +58,17 @@ export function AccountStrip({
     // Calculate live unrealized P&L
     let totalPnl = 0;
     for (const pos of positions) {
-      const currentPrice = prices[pos.symbol as ForexSymbol];
-      if (currentPrice) {
+      // Reason: prices is a Map (from usePrices), use .get() not bracket access
+      const quote = prices.get(pos.symbol as ForexSymbol);
+      if (quote) {
+        // Use correct price based on side (bid for longs, ask for shorts)
+        const marketPrice = pos.side === "long" ? quote.bid : quote.ask;
         const pnl = calculateUnrealizedPnL(
           pos.side,
-          pos.quantity,
           pos.entryPrice,
-          currentPrice,
-          pos.symbol as ForexSymbol
+          marketPrice,
+          pos.quantity,
+          pos.symbol as ForexSymbol,
         );
         totalPnl += pnl;
       } else {

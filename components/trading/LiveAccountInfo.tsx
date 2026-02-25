@@ -73,13 +73,9 @@ export function LiveAccountInfo({
   // Thresholds from props or defaults
   const thresholds = marginThresholds || DEFAULT_THRESHOLDS;
 
-  // Live-updating state
-  const [liveEquity, setLiveEquity] = useState(initialEquity);
-  const [liveUnrealizedPnl, setLiveUnrealizedPnl] =
-    useState(initialUnrealizedPnl);
-  const [liveAvailableCapital, setLiveAvailableCapital] = useState(
-    initialAvailableCapital,
-  );
+  // Reason: liveEquity/liveUnrealizedPnl/liveAvailableCapital are now derived
+  // directly from calculatedData (useMemo) below, not from state.
+  // This eliminates the double-render delay that useEffect+setState caused.
 
   // Liquidation state management
   const [liquidationState, setLiquidationState] = useState<
@@ -158,12 +154,13 @@ export function LiveAccountInfo({
     thresholds.MARGIN_CALL,
   ]);
 
-  // Update display state when calculations change
-  useEffect(() => {
-    setLiveUnrealizedPnl(calculatedData.totalUnrealizedPnl);
-    setLiveEquity(calculatedData.newEquity);
-    setLiveAvailableCapital(calculatedData.newAvailableCapital);
-  }, [calculatedData]);
+  // Reason: Derive display values directly from calculatedData (useMemo).
+  // Previously this was a useEffect+setState which caused a double-render:
+  //   Render1 (stale values on screen) → useEffect → setState → Render2 (correct values)
+  // Now the computed values are available in the SAME render cycle as the price change.
+  const liveEquity = calculatedData.newEquity;
+  const liveUnrealizedPnl = calculatedData.totalUnrealizedPnl;
+  const liveAvailableCapital = calculatedData.newAvailableCapital;
 
   // PRIMARY: Formula-based liquidation trigger
   // When local calculation shows margin below liquidation threshold, execute immediately
