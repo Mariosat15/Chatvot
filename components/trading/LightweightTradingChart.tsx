@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { flushSync } from "react-dom";
 import {
   createChart,
   IChartApi,
@@ -6718,16 +6717,14 @@ const LightweightTradingChart = ({
       currentCandleRef.current = candleData;
 
       // ⚡ CRITICAL: Inject price into PriceProvider AFTER the chart canvas update.
-      // Reason: The chart canvas paints synchronously via .update(), but React 18
-      // always defers setState to the next microtask/frame. Without flushSync, the
-      // position stats lag behind the chart by 1 frame (~16ms) which is visible.
-      // flushSync forces React to process the state update SYNCHRONOUSLY — so the
-      // DOM re-render (positions, P&L) happens on the SAME frame as the canvas paint.
+      // Reason: series.update() marks the chart for repaint on the NEXT animation frame.
+      // By calling injectPrice WITHOUT flushSync, React 18 batches the setState and
+      // processes it on the NEXT render cycle — which is the SAME animation frame as
+      // the chart canvas repaint. This ensures the chart and positions update visually
+      // on the exact same frame (~16ms), eliminating any visible desync.
       // Must be OUTSIDE the bid/ask line conditional so it always fires.
       if (price) {
-        flushSync(() => {
-          injectPrice(symbol as ForexSymbol, price.bid, price.ask);
-        });
+        injectPrice(symbol as ForexSymbol, price.bid, price.ask);
       }
 
       // Keep candleDataRef in sync with forming candle so indicators use the latest price
