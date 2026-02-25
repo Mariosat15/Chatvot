@@ -122,6 +122,12 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   const errorCountRef = useRef(0);
   // Track stale check interval
   const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track when each symbol was last injected by the chart's fast poll
+  // Reason: The chart calls injectPrice every ~200ms with the definitive server price.
+  // The REST poll runs every ~1000ms and can overwrite with a slightly different value,
+  // causing positions to show a different price than the chart. By tracking injection
+  // times we let the REST poll skip symbols the chart is actively feeding.
+  const injectedAtRef = useRef<Map<ForexSymbol, number>>(new Map());
 
   // Subscribe to a symbol
   const subscribe = useCallback((symbol: ForexSymbol) => {
@@ -164,6 +170,10 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   const injectPrice = useCallback(
     (symbol: ForexSymbol, bid: number, ask: number) => {
       const now = Date.now();
+
+      // Mark this symbol as chart-controlled so the REST poll skips it
+      injectedAtRef.current.set(symbol, now);
+
       const quote: PriceQuote = {
         symbol,
         bid,
@@ -288,6 +298,17 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
             const newPrices = new Map(prev.prices);
 
             data.prices.forEach((quote: PriceQuote) => {
+              // ⚡ CRITICAL: Skip symbols that the chart is actively feeding via injectPrice.
+              // Reason: The chart calls injectPrice every ~200ms with the definitive price from
+              // the forming candle API. If the REST poll (1000ms) overwrites it with a slightly
+              // different value, positions desync from the chart. By skipping recently-injected
+              // symbols, the chart remains the single source of truth for the active symbol,
+              // while the REST poll still updates all other symbols (watchlist, etc.) normally.
+              const lastInjected = injectedAtRef.current.get(quote.symbol as ForexSymbol);
+              if (lastInjected && (now - lastInjected) < 1500) {
+                return; // Chart is the authority for this symbol — skip REST update
+              }
+
               const normalized = normalizePriceQuote(quote);
               const existing = prev.prices.get(quote.symbol);
 
