@@ -76,6 +76,14 @@ const mainNavItems: NavItem[] = [
     gradient: "from-emerald-500/20 to-emerald-600/5",
   },
   {
+    href: "/championship",
+    label: "Championship Live",
+    icon: <GameIcon name="crown" size={22} />,
+    color: "text-cyan-300",
+    gradient: "from-cyan-500/20 to-blue-600/5",
+    badge: "LIVE",
+  },
+  {
     href: "/messaging",
     label: "Messages",
     icon: <GameIcon name="flag" size={22} />,

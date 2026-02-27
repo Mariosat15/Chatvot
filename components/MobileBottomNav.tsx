@@ -37,6 +37,13 @@ const navItems: NavItem[] = [
     activeColor: "bg-red-500/20",
   },
   {
+    href: "/championship",
+    label: "Live",
+    iconName: "crown",
+    color: "text-cyan-300",
+    activeColor: "bg-cyan-500/20",
+  },
+  {
     href: "/wallet",
     label: "Wallet",
     iconName: "chest1",
