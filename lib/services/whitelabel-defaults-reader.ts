@@ -39,3 +39,7 @@ export function getDefaultXPConfig(): { badgeXP: any; levels: any } | null {
 export function getDefaultMilestones(): { milestones: any[]; maps: any[] } | null {
   return readDefaultFile("milestones");
 }
+
+export function getDefaultPages(): any[] | null {
+  return readDefaultFile("pages");
+}

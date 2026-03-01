@@ -26,6 +26,17 @@ export async function register() {
       }
     }, 5000); // 5 second delay to let server fully initialize
 
+    // Seed site pages (terms, privacy, etc.) — safe to call every startup
+    setTimeout(async () => {
+      try {
+        const { seedSitePages } =
+          await import("./lib/services/site-page-seed.service");
+        await seedSitePages();
+      } catch (err) {
+        console.error("❌ [Instrumentation] Failed to seed site pages:", err);
+      }
+    }, 6000); // 6 second delay to let MongoDB connect first
+
     // Start server fleet heartbeat (reports stats to MongoDB every 30s)
     setTimeout(async () => {
       try {

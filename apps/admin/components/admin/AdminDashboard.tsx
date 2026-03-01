@@ -126,6 +126,7 @@ import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSe
 import IncidentsSection from "@/components/admin/IncidentsSection";
 import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection";
 import GamificationWizardSection from "@/components/admin/GamificationWizardSection";
+import SitePagesSection from "@/components/admin/SitePagesSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -184,6 +185,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Home className="h-5 w-5" />,
         color: "text-yellow-400",
         bgColor: "bg-yellow-500/10 hover:bg-yellow-500/20",
+      },
+      {
+        id: "site-pages",
+        label: "Site Pages",
+        icon: <FileText className="h-5 w-5" />,
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
       },
       {
         id: "marketplace",
@@ -943,6 +951,8 @@ export default function AdminDashboard({
         );
       case "hero-page":
         return <LandingPageBuilder key={currentRefreshKey} />;
+      case "site-pages":
+        return <SitePagesSection key={currentRefreshKey} />;
       case "competitions":
         return <CompetitionsListSection key={currentRefreshKey} />;
       case "challenges":

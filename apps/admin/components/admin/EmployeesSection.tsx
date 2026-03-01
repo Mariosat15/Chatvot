@@ -118,6 +118,7 @@ const SECTION_LABELS: Record<string, string> = {
   overview: "Overview",
   // Content
   "hero-page": "Hero Page",
+  "site-pages": "Site Pages",
   marketplace: "Marketplace",
   // Trading
   competitions: "Competitions",
@@ -188,7 +189,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 const SECTION_GROUPS = {
   Dashboard: ["overview"],
-  Content: ["hero-page", "marketplace"],
+  Content: ["hero-page", "site-pages", "marketplace"],
   Trading: [
     "competitions",
     "challenges",

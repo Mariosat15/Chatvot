@@ -15,6 +15,7 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import XPConfig from "@/database/models/xp-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import SitePage from "@/database/models/site-page.model";
 import path from "path";
 import fs from "fs";
 
@@ -199,6 +200,36 @@ export async function seedMilestonesFromDefaults(): Promise<boolean> {
   return true;
 }
 
+// ─── Site Pages defaults ─────────────────────────────────────────────────────
+
+export async function savePageDefaults() {
+  await connectToDatabase();
+  const pages = await SitePage.find({}).lean();
+  const clean = pages.map((p: any) => {
+    const { _id, __v, createdAt, updatedAt, ...rest } = p;
+    return rest;
+  });
+  return writeDefaultFile("pages", clean);
+}
+
+export function getDefaultPages(): any[] | null {
+  return readDefaultFile("pages");
+}
+
+/**
+ * Seed site pages from saved defaults. Returns true if defaults were used.
+ */
+export async function seedPagesFromDefaults(): Promise<boolean> {
+  const defaults = getDefaultPages();
+  if (!defaults || defaults.length === 0) return false;
+
+  await connectToDatabase();
+  await SitePage.deleteMany({});
+  await SitePage.insertMany(defaults);
+  console.log(`[Defaults] Seeded ${defaults.length} site pages from saved defaults`);
+  return true;
+}
+
 /**
  * Get summary of all saved defaults
  */
@@ -207,5 +238,6 @@ export function getDefaultsSummary() {
     badges: hasDefaults("badges"),
     xp_config: hasDefaults("xp_config"),
     milestones: hasDefaults("milestones"),
+    pages: hasDefaults("pages"),
   };
 }
