@@ -32,7 +32,7 @@ export interface IPriceSnapshot extends Document {
   prices: IPriceSnapshotEntry[];
 
   // Health status at time of snapshot
-  healthStatus: "healthy" | "degraded" | "critical";
+  healthStatus: "healthy" | "degraded" | "critical" | "market_closed";
   connectionStatus: "connected" | "reconnecting" | "disconnected";
   healthySymbolCount: number;
   totalSymbolCount: number;
@@ -89,7 +89,7 @@ const PriceSnapshotSchema: Schema = new Schema(
     prices: [PriceSnapshotEntrySchema],
     healthStatus: {
       type: String,
-      enum: ["healthy", "degraded", "critical"],
+      enum: ["healthy", "degraded", "critical", "market_closed"],
       required: true,
     },
     connectionStatus: {

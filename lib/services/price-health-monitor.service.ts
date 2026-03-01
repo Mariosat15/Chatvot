@@ -903,6 +903,28 @@ class PriceHealthMonitorService {
   }
 
   /**
+   * Acknowledge ALL unacknowledged alerts at once
+   */
+  acknowledgeAllAlerts(acknowledgedBy: string): number {
+    const now = new Date();
+    let count = 0;
+    for (const alert of this.state.alerts) {
+      if (!alert.acknowledged) {
+        alert.acknowledged = true;
+        alert.acknowledgedAt = now;
+        alert.acknowledgedBy = acknowledgedBy;
+        this.updateAlertInDatabase(alert.id, {
+          acknowledged: true,
+          acknowledgedAt: now,
+          acknowledgedBy,
+        }).catch(console.error);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Update alert in database
    */
   private async updateAlertInDatabase(

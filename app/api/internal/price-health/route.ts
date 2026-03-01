@@ -104,7 +104,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Action: Acknowledge alert
+    // Action: Acknowledge ALL alerts
+    if (action === "acknowledgeAll") {
+      const count = priceHealthMonitor.acknowledgeAllAlerts(
+        acknowledgedBy || "admin",
+      );
+      return NextResponse.json({
+        success: true,
+        message: `${count} alert(s) acknowledged`,
+        acknowledgedCount: count,
+      });
+    }
+
+    // Action: Acknowledge a single alert
     if (action === "acknowledge" || alertId) {
       if (!alertId) {
         return NextResponse.json(

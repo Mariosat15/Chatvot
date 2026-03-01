@@ -28,7 +28,7 @@ export interface SnapshotResult {
   success: boolean;
   snapshotId?: string;
   timestamp: Date;
-  healthStatus: "healthy" | "degraded" | "critical";
+  healthStatus: "healthy" | "degraded" | "critical" | "market_closed";
   priceCount: number;
   healthyCount: number;
 }
