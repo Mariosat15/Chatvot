@@ -37,9 +37,9 @@ async function loadBranding(): Promise<Branding> {
       CompanySettings.findOne().lean<Record<string, unknown>>(),
     ]);
 
-    const DEFAULT_LOGO = "/assets/images/logo.png";
-    const rawLogo = (wl?.appLogo as string) || "";
-    const logo = rawLogo && rawLogo !== DEFAULT_LOGO ? rawLogo : "";
+    // Reason: logo.png now ships in public/assets/images/ so the default path
+    // resolves to a valid file. No need to filter it out.
+    const logo = (wl?.appLogo as string) || "/assets/images/logo.png";
 
     return {
       siteName: (cs?.companyName as string) || "ChartVolt",

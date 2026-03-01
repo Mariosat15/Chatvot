@@ -791,6 +791,7 @@ export default function LandingPageBuilder() {
   const [settings, setSettings] = useState<LandingSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resettingDefaults, setResettingDefaults] = useState(false);
   const [activeTab, setActiveTab] = useState("hero-page");
 
   // ── Site Pages integration (for footer link ↔ page status) ─────────────
@@ -1327,6 +1328,41 @@ export default function LandingPageBuilder() {
     }
   };
 
+  // Reason: When new marketing-grade default templates are deployed, existing DB
+  // settings override them. This button replaces the form state with the latest
+  // defaults, then auto-saves to DB so the live site updates immediately.
+  const resetToDefaults = async () => {
+    if (
+      !window.confirm(
+        "This will replace ALL your current landing page content with the latest default templates and save immediately. Continue?"
+      )
+    )
+      return;
+
+    setResettingDefaults(true);
+    try {
+      setSettings(defaultSettings);
+      // Auto-save the defaults to DB so the live site updates
+      const response = await fetch("/api/hero-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mapToDbSettings(defaultSettings)),
+      });
+      if (response.ok) {
+        toast.success(
+          "Landing page reset to latest defaults and saved!"
+        );
+      } else {
+        toast.error("Reset applied locally but failed to save to database");
+      }
+    } catch (error) {
+      console.error("Error resetting to defaults:", error);
+      toast.error("Failed to reset to defaults");
+    } finally {
+      setResettingDefaults(false);
+    }
+  };
+
   const updateField = <K extends keyof LandingSettings>(
     key: K,
     value: LandingSettings[K],
@@ -1396,6 +1432,20 @@ export default function LandingPageBuilder() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={resetToDefaults}
+            disabled={resettingDefaults}
+            className="border-orange-500/50 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+            title="Replace all content with the latest marketing-grade defaults and save"
+          >
+            {resettingDefaults ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Reset to Defaults
+          </Button>
           <Button
             variant="outline"
             onClick={fetchSettings}

@@ -37,19 +37,15 @@ export async function GET() {
     }
 
     // Get branding from WhiteLabel (existing branding settings)
-    let whiteLabel = await WhiteLabel.findOne();
-    // Reason: The schema defaults appLogo to "/assets/images/logo.png" which
-    // doesn't actually exist. Treat the default placeholder as "no logo set"
-    // so the frontend falls back to the text/icon logo instead of a broken image.
-    const DEFAULT_LOGO_PLACEHOLDER = "/assets/images/logo.png";
-    const rawLogo = whiteLabel?.appLogo || "";
-    const brandingLogo =
-      rawLogo.length > 0 && rawLogo !== DEFAULT_LOGO_PLACEHOLDER
-        ? rawLogo
-        : "";
+    const whiteLabel = await WhiteLabel.findOne();
+    // Reason: The default logo.png now ships in public/assets/images/ alongside
+    // appLogo.png, so we no longer need to filter it out. If the admin uploads a
+    // custom logo, the path in WhiteLabel.appLogo will change; otherwise the
+    // default file is served.
+    const brandingLogo = whiteLabel?.appLogo || "/assets/images/logo.png";
 
     // Get company settings for site name
-    let companySettings = await CompanySettings.findOne();
+    const companySettings = await CompanySettings.findOne();
     const companyName =
       companySettings?.companyName || settings.siteName || "TradingArena";
 
