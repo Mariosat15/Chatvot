@@ -1835,7 +1835,12 @@ export default function LandingPageContent() {
             style={{ borderTop: `1px solid ${theme?.colors.border}` }}
           >
             <p className="text-sm" style={{ color: theme?.colors.textMuted }}>
-              {settings.footerCopyright}
+              {/* Reason: Replace {YEAR} placeholder with current year so the
+                  copyright notice stays up-to-date without admin intervention. */}
+              {settings.footerCopyright?.replace(
+                /\{YEAR\}/g,
+                String(new Date().getFullYear()),
+              )}
             </p>
             <div className="flex items-center gap-4">
               <span

@@ -732,6 +732,49 @@ export default function LandingPageBuilder() {
     null,
   );
   const [generatingDisclaimer, setGeneratingDisclaimer] = useState(false);
+  const [generatingCopyright, setGeneratingCopyright] = useState(false);
+
+  // ── Generate legally correct copyright notice ───────────────────────────
+  const handleGenerateCopyright = useCallback(async () => {
+    setGeneratingCopyright(true);
+    try {
+      const res = await fetch("/api/company-settings");
+      const cs = await res.json();
+      const companyName =
+        cs?.companyName && cs.companyName !== "Your Company Name"
+          ? cs.companyName
+          : "Company Name";
+      const legalName = cs?.legalName || "";
+      const country = cs?.country || "";
+
+      // Reason: Use {YEAR} placeholder so the frontend replaces it with
+      // the current year at render time — the copyright never goes stale.
+      const year = "{YEAR}";
+
+      // Build a legally correct copyright notice.
+      // Standard format: © {year} {legal entity}. All rights reserved.
+      // If legal name differs from trade name, include both.
+      let notice: string;
+      if (legalName && legalName !== companyName) {
+        notice = `© ${year} ${legalName} (trading as ${companyName}). All rights reserved.`;
+      } else {
+        notice = `© ${year} ${companyName}. All rights reserved.`;
+      }
+
+      // Append registration info if available
+      if (cs?.registrationNumber) {
+        const countryName = country ? ` (${country})` : "";
+        notice += ` Reg. No. ${cs.registrationNumber}${countryName}.`;
+      }
+
+      setSettings((prev) => ({ ...prev, footerCopyright: notice }));
+      toast.success("Copyright notice generated with company details");
+    } catch {
+      toast.error("Failed to fetch company details for copyright");
+    } finally {
+      setGeneratingCopyright(false);
+    }
+  }, []);
 
   // ── Generate Risk Disclaimer via AI ─────────────────────────────────────
   const handleGenerateRiskDisclaimer = useCallback(async () => {
@@ -3089,14 +3132,35 @@ export default function LandingPageBuilder() {
 
                 {/* Copyright */}
                 <div>
-                  <Label className="text-gray-400">Copyright Text</Label>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-gray-400">Copyright Text</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateCopyright}
+                      disabled={generatingCopyright}
+                      className="border-yellow-600 text-yellow-500 hover:bg-yellow-500/10 h-7 text-xs"
+                    >
+                      {generatingCopyright ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Sparkles className="h-3 w-3 mr-1" />
+                      )}
+                      {generatingCopyright ? "Generating..." : "Generate Copyright"}
+                    </Button>
+                  </div>
                   <Input
                     value={settings.footerCopyright}
                     onChange={(e) =>
                       updateField("footerCopyright", e.target.value)
                     }
-                    className="bg-gray-900 border-gray-600 text-white mt-1"
+                    className="bg-gray-900 border-gray-600 text-white"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use <code className="text-yellow-500/80">{"{YEAR}"}</code> to
+                    auto-update the year (e.g. &quot;© {"{YEAR}"} ChartVolt&quot;).
+                    The landing page replaces it with the current year automatically.
+                  </p>
                 </div>
 
                 {/* ── Info: Footer Links ↔ Site Pages ────────── */}

@@ -802,7 +802,10 @@ export default function EnterprisePage() {
                   </>
                 )}
                 <span className="text-gray-400">
-                  {settings.footerCopyright}
+                  {settings.footerCopyright?.replace(
+                    /\{YEAR\}/g,
+                    String(new Date().getFullYear()),
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-6 text-sm text-gray-400">
