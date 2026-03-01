@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -26,6 +26,10 @@ import {
   ExternalLink,
   RefreshCw,
   Check,
+  Pencil,
+  AlertTriangle,
+  CheckCircle2,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -703,9 +707,72 @@ export default function LandingPageBuilder() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("hero-page");
 
+  // ── Site Pages integration (for footer link ↔ page status) ─────────────
+  const [existingPageSlugs, setExistingPageSlugs] = useState<Set<string>>(
+    new Set(),
+  );
+  const [creatingPageForSlug, setCreatingPageForSlug] = useState<string | null>(
+    null,
+  );
+
+  const fetchSitePages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/pages");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.pages)) {
+        setExistingPageSlugs(
+          new Set(data.pages.map((p: { slug: string }) => p.slug)),
+        );
+      }
+    } catch {
+      // Silent — non-critical
+    }
+  }, []);
+
+  /**
+   * Create a site page for a footer link that doesn't have one yet.
+   * After creation, the admin can edit it from the Site Pages section.
+   */
+  const handleCreatePageForLink = async (label: string, href: string) => {
+    const slug = href.replace(/^\//, "").replace(/\//g, "-") || "new-page";
+    setCreatingPageForSlug(slug);
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          title: label || "New Page",
+          sections: [
+            { id: "1", type: "heading", title: label, content: "", order: 0 },
+            {
+              id: "2",
+              type: "paragraph",
+              content:
+                "This page was auto-created from a footer link. Edit it in the Site Pages section to add your content.",
+              order: 1,
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Page "/${slug}" created — edit it in Site Pages`);
+        fetchSitePages();
+      } else {
+        toast.error(data.error || "Failed to create page");
+      }
+    } catch {
+      toast.error("Failed to create page");
+    } finally {
+      setCreatingPageForSlug(null);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
-  }, []);
+    fetchSitePages();
+  }, [fetchSitePages]);
 
   const fetchSettings = async () => {
     try {
@@ -2969,201 +3036,93 @@ export default function LandingPageBuilder() {
                   />
                 </div>
 
-                {/* Platform Menu */}
-                <div className="p-4 bg-gray-900 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300 font-semibold">
-                      Platform Menu Links
-                    </Label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        addItem("footerMenuPlatform", {
-                          id: Date.now().toString(),
-                          label: "New Link",
-                          href: "/",
-                          enabled: true,
-                        })
-                      }
-                      className="border-gray-600"
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Add Link
-                    </Button>
+                {/* ── Info: Footer Links ↔ Site Pages ────────── */}
+                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-3">
+                  <Link2 className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+                  <div className="text-sm text-blue-300">
+                    <p className="font-medium mb-1">
+                      Footer links are connected to Site Pages
+                    </p>
+                    <p className="text-blue-400/80 text-xs">
+                      Internal links (e.g. <code>/terms</code>,{" "}
+                      <code>/privacy</code>) point to pages managed in the{" "}
+                      <strong>Site Pages</strong> section. Use{" "}
+                      <CheckCircle2 className="h-3 w-3 inline text-green-400" />{" "}
+                      to see which links already have a page, and click{" "}
+                      <Pencil className="h-3 w-3 inline" /> to edit or{" "}
+                      <Plus className="h-3 w-3 inline" /> to create one.
+                    </p>
                   </div>
-                  {settings.footerMenuPlatform.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <Switch
-                        checked={item.enabled}
-                        onCheckedChange={(v) =>
-                          updateArrayItem("footerMenuPlatform", item.id, {
-                            enabled: v,
-                          })
-                        }
-                      />
-                      <Input
-                        value={item.label}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuPlatform", item.id, {
-                            label: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="Label"
-                      />
-                      <Input
-                        value={item.href}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuPlatform", item.id, {
-                            href: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="/path"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() =>
-                          removeItem("footerMenuPlatform", item.id)
-                        }
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
                 </div>
+
+                {/* Platform Menu */}
+                <FooterMenuBlock
+                  title="Platform Menu Links"
+                  menuKey="footerMenuPlatform"
+                  items={settings.footerMenuPlatform}
+                  existingPageSlugs={existingPageSlugs}
+                  creatingPageForSlug={creatingPageForSlug}
+                  onAdd={() =>
+                    addItem("footerMenuPlatform", {
+                      id: Date.now().toString(),
+                      label: "New Link",
+                      href: "/",
+                      enabled: true,
+                    })
+                  }
+                  onUpdate={(id, updates) =>
+                    updateArrayItem("footerMenuPlatform", id, updates)
+                  }
+                  onRemove={(id) => removeItem("footerMenuPlatform", id)}
+                  onCreatePage={handleCreatePageForLink}
+                  placeholder="/path"
+                />
 
                 {/* Support Menu */}
-                <div className="p-4 bg-gray-900 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300 font-semibold">
-                      Support Menu Links
-                    </Label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        addItem("footerMenuSupport", {
-                          id: Date.now().toString(),
-                          label: "New Link",
-                          href: "/",
-                          enabled: true,
-                        })
-                      }
-                      className="border-gray-600"
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Add Link
-                    </Button>
-                  </div>
-                  {settings.footerMenuSupport.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <Switch
-                        checked={item.enabled}
-                        onCheckedChange={(v) =>
-                          updateArrayItem("footerMenuSupport", item.id, {
-                            enabled: v,
-                          })
-                        }
-                      />
-                      <Input
-                        value={item.label}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuSupport", item.id, {
-                            label: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="Label"
-                      />
-                      <Input
-                        value={item.href}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuSupport", item.id, {
-                            href: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="/path or mailto:"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeItem("footerMenuSupport", item.id)}
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <FooterMenuBlock
+                  title="Support Menu Links"
+                  menuKey="footerMenuSupport"
+                  items={settings.footerMenuSupport}
+                  existingPageSlugs={existingPageSlugs}
+                  creatingPageForSlug={creatingPageForSlug}
+                  onAdd={() =>
+                    addItem("footerMenuSupport", {
+                      id: Date.now().toString(),
+                      label: "New Link",
+                      href: "/",
+                      enabled: true,
+                    })
+                  }
+                  onUpdate={(id, updates) =>
+                    updateArrayItem("footerMenuSupport", id, updates)
+                  }
+                  onRemove={(id) => removeItem("footerMenuSupport", id)}
+                  onCreatePage={handleCreatePageForLink}
+                  placeholder="/path or mailto:"
+                />
 
                 {/* Business Menu */}
-                <div className="p-4 bg-gray-900 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300 font-semibold">
-                      Business Menu Links
-                    </Label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        addItem("footerMenuBusiness", {
-                          id: Date.now().toString(),
-                          label: "New Link",
-                          href: "/",
-                          enabled: true,
-                        })
-                      }
-                      className="border-gray-600"
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Add Link
-                    </Button>
-                  </div>
-                  {settings.footerMenuBusiness.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <Switch
-                        checked={item.enabled}
-                        onCheckedChange={(v) =>
-                          updateArrayItem("footerMenuBusiness", item.id, {
-                            enabled: v,
-                          })
-                        }
-                      />
-                      <Input
-                        value={item.label}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuBusiness", item.id, {
-                            label: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="Label"
-                      />
-                      <Input
-                        value={item.href}
-                        onChange={(e) =>
-                          updateArrayItem("footerMenuBusiness", item.id, {
-                            href: e.target.value,
-                          })
-                        }
-                        className="bg-gray-800 border-gray-600 text-white flex-1"
-                        placeholder="/path"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() =>
-                          removeItem("footerMenuBusiness", item.id)
-                        }
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <FooterMenuBlock
+                  title="Business Menu Links"
+                  menuKey="footerMenuBusiness"
+                  items={settings.footerMenuBusiness}
+                  existingPageSlugs={existingPageSlugs}
+                  creatingPageForSlug={creatingPageForSlug}
+                  onAdd={() =>
+                    addItem("footerMenuBusiness", {
+                      id: Date.now().toString(),
+                      label: "New Link",
+                      href: "/",
+                      enabled: true,
+                    })
+                  }
+                  onUpdate={(id, updates) =>
+                    updateArrayItem("footerMenuBusiness", id, updates)
+                  }
+                  onRemove={(id) => removeItem("footerMenuBusiness", id)}
+                  onCreatePage={handleCreatePageForLink}
+                  placeholder="/path"
+                />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -3726,6 +3685,141 @@ export default function LandingPageBuilder() {
           </Accordion>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── Footer Menu Block — Shared sub-component for each menu group ──────────
+interface FooterMenuBlockProps {
+  title: string;
+  menuKey: string;
+  items: Array<{ id: string; label: string; href: string; enabled: boolean }>;
+  existingPageSlugs: Set<string>;
+  creatingPageForSlug: string | null;
+  onAdd: () => void;
+  onUpdate: (
+    id: string,
+    updates: Partial<{ label: string; href: string; enabled: boolean }>,
+  ) => void;
+  onRemove: (id: string) => void;
+  onCreatePage: (label: string, href: string) => void;
+  placeholder: string;
+}
+
+function FooterMenuBlock({
+  title,
+  items,
+  existingPageSlugs,
+  creatingPageForSlug,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onCreatePage,
+  placeholder,
+}: FooterMenuBlockProps) {
+  /**
+   * Determine if a link is an internal page link (starts with /)
+   * and not a special link (mailto:, http://, #, etc.)
+   */
+  const isInternalLink = (href: string) =>
+    href.startsWith("/") && !href.startsWith("//");
+
+  /**
+   * Extract slug from an href (e.g. "/terms" → "terms", "/enterprise/pricing" → "enterprise-pricing")
+   */
+  const slugFromHref = (href: string) =>
+    href
+      .replace(/^\//, "")
+      .replace(/\//g, "-")
+      .toLowerCase();
+
+  return (
+    <div className="p-4 bg-gray-900 rounded-lg space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-gray-300 font-semibold">{title}</Label>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onAdd}
+          className="border-gray-600"
+        >
+          <Plus className="h-4 w-4 mr-1" /> Add Link
+        </Button>
+      </div>
+      {items.map((item) => {
+        const internal = isInternalLink(item.href);
+        const slug = internal ? slugFromHref(item.href) : "";
+        const pageExists = internal && slug && existingPageSlugs.has(slug);
+        const isCreating = creatingPageForSlug === slug;
+
+        return (
+          <div key={item.id} className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={item.enabled}
+                onCheckedChange={(v) => onUpdate(item.id, { enabled: v })}
+              />
+              <Input
+                value={item.label}
+                onChange={(e) =>
+                  onUpdate(item.id, { label: e.target.value })
+                }
+                className="bg-gray-800 border-gray-600 text-white flex-1"
+                placeholder="Label"
+              />
+              <Input
+                value={item.href}
+                onChange={(e) =>
+                  onUpdate(item.id, { href: e.target.value })
+                }
+                className="bg-gray-800 border-gray-600 text-white flex-1"
+                placeholder={placeholder}
+              />
+
+              {/* Page status + actions for internal links */}
+              {internal && slug && (
+                <>
+                  {pageExists ? (
+                    <Badge
+                      variant="outline"
+                      className="text-green-400 border-green-500/40 shrink-0 text-[10px] gap-1"
+                      title="Site page exists for this link"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Page
+                    </Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-500/40 text-amber-400 hover:text-amber-300 shrink-0 text-[10px] h-7 px-2"
+                      onClick={() => onCreatePage(item.label, item.href)}
+                      disabled={isCreating}
+                      title="Create a site page for this link"
+                    >
+                      {isCreating ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                      )}
+                      Create Page
+                    </Button>
+                  )}
+                </>
+              )}
+
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onRemove(item.id)}
+                className="text-red-500 hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

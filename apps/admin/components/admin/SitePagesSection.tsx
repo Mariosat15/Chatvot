@@ -8,7 +8,6 @@ import {
   Trash2,
   Pencil,
   Eye,
-  EyeOff,
   ArrowUp,
   ArrowDown,
   Loader2,
@@ -22,6 +21,8 @@ import {
   List,
   Minus,
   Code,
+  Sparkles,
+  Link2,
 } from "lucide-react";
 import {
   Card,
@@ -68,6 +69,24 @@ const SECTION_TYPES = [
   { value: "html", label: "HTML", icon: Code },
 ] as const;
 
+// ── Page type templates available for AI generation ─────────────────────────
+const PAGE_TEMPLATES = [
+  { value: "terms", label: "Terms of Service", slug: "terms" },
+  { value: "privacy", label: "Privacy Policy", slug: "privacy" },
+  { value: "refund", label: "Refund Policy", slug: "refund-policy" },
+  { value: "aml", label: "AML Policy", slug: "aml-policy" },
+  {
+    value: "responsible-trading",
+    label: "Responsible Trading",
+    slug: "responsible-trading",
+  },
+  { value: "about", label: "About Us", slug: "about" },
+  { value: "contact", label: "Contact Us", slug: "contact" },
+  { value: "faq", label: "FAQ", slug: "faq" },
+  { value: "cookies", label: "Cookie Policy", slug: "cookie-policy" },
+  { value: "custom", label: "Custom Page", slug: "" },
+] as const;
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SitePagesSection() {
   const [pages, setPages] = useState<SitePage[]>([]);
@@ -77,6 +96,8 @@ export default function SitePagesSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [newSlug, setNewSlug] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
 
   // ── Fetch pages ─────────────────────────────────────────────────────────────
   const fetchPages = useCallback(async () => {
@@ -229,6 +250,129 @@ export default function SitePagesSection() {
     }
   };
 
+  // ── Generate content from template + company details ────────────────────
+  const handleGenerateContent = async (
+    pageType: string,
+    pageTitle?: string,
+  ) => {
+    try {
+      setGenerating(true);
+      const res = await fetch("/api/pages/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageType, pageTitle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        return data;
+      } else {
+        toast.error(data.error || "Failed to generate content");
+        return null;
+      }
+    } catch {
+      toast.error("Failed to generate content");
+      return null;
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /**
+   * Create a new page from a selected template.
+   * Generates content using company details, then creates the page.
+   */
+  const handleCreateFromTemplate = async () => {
+    if (!selectedTemplate) {
+      toast.error("Please select a page template");
+      return;
+    }
+
+    const template = PAGE_TEMPLATES.find((t) => t.value === selectedTemplate);
+    if (!template) return;
+
+    const slug =
+      selectedTemplate === "custom"
+        ? newSlug.trim()
+        : template.slug || newSlug.trim();
+    const title =
+      selectedTemplate === "custom"
+        ? newTitle.trim()
+        : newTitle.trim() || template.label;
+
+    if (!slug) {
+      toast.error("Slug is required");
+      return;
+    }
+
+    // Generate content
+    const generated = await handleGenerateContent(selectedTemplate, title);
+    if (!generated) return;
+
+    try {
+      setSaving(true);
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          title: generated.title || title,
+          subtitle: generated.subtitle || "",
+          sections: generated.sections || [],
+          seoTitle: generated.seoTitle || "",
+          seoDescription: generated.seoDescription || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          `"${generated.title}" created with auto-generated content!`,
+        );
+        setShowCreate(false);
+        setNewSlug("");
+        setNewTitle("");
+        setSelectedTemplate("");
+        fetchPages();
+      } else {
+        toast.error(data.error || "Failed to create page");
+      }
+    } catch {
+      toast.error("Failed to create page");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Regenerate content for an existing page being edited.
+   */
+  const handleRegenerateForEditor = async () => {
+    if (!editingPage) return;
+
+    // Guess page type from slug
+    const guessType =
+      PAGE_TEMPLATES.find((t) => t.slug === editingPage.slug)?.value ||
+      "custom";
+
+    const generated = await handleGenerateContent(
+      guessType,
+      editingPage.title,
+    );
+    if (!generated) return;
+
+    setEditingPage({
+      ...editingPage,
+      title: generated.title || editingPage.title,
+      subtitle: generated.subtitle || editingPage.subtitle,
+      sections: generated.sections || editingPage.sections,
+      seoTitle: generated.seoTitle || editingPage.seoTitle,
+      seoDescription: generated.seoDescription || editingPage.seoDescription,
+    });
+
+    toast.success(
+      "Content regenerated from template — review and save when ready",
+    );
+  };
+
   // ── Section helpers ────────────────────────────────────────────────────────
   const addSection = (type: PageSection["type"]) => {
     if (!editingPage) return;
@@ -297,6 +441,7 @@ export default function SitePagesSection() {
       <PageEditor
         page={editingPage}
         saving={saving}
+        generating={generating}
         onPageChange={setEditingPage}
         onSave={handleSave}
         onClose={() => setEditingPage(null)}
@@ -304,6 +449,7 @@ export default function SitePagesSection() {
         onUpdateSection={updateSection}
         onRemoveSection={removeSection}
         onMoveSection={moveSection}
+        onRegenerate={handleRegenerateForEditor}
       />
     );
   }
@@ -355,10 +501,66 @@ export default function SitePagesSection() {
         </CardHeader>
       </Card>
 
+      {/* Info: Connection to Footer Links */}
+      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-3">
+        <Link2 className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+        <div className="text-sm text-blue-300">
+          <p className="font-medium mb-1">
+            Connected to Footer Links
+          </p>
+          <p className="text-blue-400/80 text-xs">
+            Pages created here are automatically available at their URL (e.g.{" "}
+            <code className="bg-blue-500/20 px-1 rounded">/terms</code>).
+            To show them in the landing page footer, add a matching link in{" "}
+            <strong>Hero Page → Footer</strong> section. Use{" "}
+            <Sparkles className="h-3 w-3 inline text-yellow-400" />{" "}
+            <strong>Generate from Template</strong> to auto-fill page content
+            using your company details from Settings → Company.
+          </p>
+        </div>
+      </div>
+
       {/* Create Page Dialog */}
       {showCreate && (
         <Card className="bg-gray-900 border-blue-500/50">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
+            {/* Template selector */}
+            <div>
+              <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-yellow-400" />
+                Generate from Template
+                <span className="text-xs text-gray-500 font-normal">
+                  (uses your company details to fill content)
+                </span>
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {PAGE_TEMPLATES.map((t) => (
+                  <Button
+                    key={t.value}
+                    size="sm"
+                    variant={
+                      selectedTemplate === t.value ? "default" : "outline"
+                    }
+                    className={
+                      selectedTemplate === t.value
+                        ? "bg-blue-600"
+                        : "border-gray-600"
+                    }
+                    onClick={() => {
+                      setSelectedTemplate(t.value);
+                      if (t.value !== "custom") {
+                        setNewSlug(t.slug);
+                        setNewTitle(t.label);
+                      }
+                    }}
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Slug + title fields */}
             <div className="flex items-end gap-4">
               <div className="flex-1">
                 <Label>URL Slug</Label>
@@ -381,24 +583,44 @@ export default function SitePagesSection() {
                   className="mt-1"
                 />
               </div>
-              <Button onClick={handleCreate} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+
+              {/* Create buttons */}
+              <div className="flex gap-2">
+                {selectedTemplate ? (
+                  <Button
+                    onClick={handleCreateFromTemplate}
+                    disabled={saving || generating}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    {saving || generating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-1" />
+                    )}
+                    {generating ? "Generating..." : "Generate & Create"}
+                  </Button>
                 ) : (
-                  <Plus className="h-4 w-4 mr-1" />
+                  <Button onClick={handleCreate} disabled={saving}>
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-1" />
+                    )}
+                    Create Blank
+                  </Button>
                 )}
-                Create
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowCreate(false);
-                  setNewSlug("");
-                  setNewTitle("");
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowCreate(false);
+                    setNewSlug("");
+                    setNewTitle("");
+                    setSelectedTemplate("");
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -502,6 +724,7 @@ export default function SitePagesSection() {
 function PageEditor({
   page,
   saving,
+  generating,
   onPageChange,
   onSave,
   onClose,
@@ -509,9 +732,11 @@ function PageEditor({
   onUpdateSection,
   onRemoveSection,
   onMoveSection,
+  onRegenerate,
 }: {
   page: SitePage;
   saving: boolean;
+  generating: boolean;
   onPageChange: (p: SitePage) => void;
   onSave: () => void;
   onClose: () => void;
@@ -519,6 +744,7 @@ function PageEditor({
   onUpdateSection: (id: string, updates: Partial<PageSection>) => void;
   onRemoveSection: (id: string) => void;
   onMoveSection: (id: string, direction: "up" | "down") => void;
+  onRegenerate: () => void;
 }) {
   const sortedSections = [...page.sections].sort(
     (a, b) => a.order - b.order,
@@ -540,6 +766,21 @@ function PageEditor({
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRegenerate}
+                disabled={generating}
+                className="border-yellow-500/40 text-yellow-400 hover:text-yellow-300"
+                title="Regenerate content from template using company details"
+              >
+                {generating ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-1" />
+                )}
+                {generating ? "Generating..." : "Regenerate"}
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
