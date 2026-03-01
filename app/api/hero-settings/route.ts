@@ -38,10 +38,14 @@ export async function GET() {
 
     // Get branding from WhiteLabel (existing branding settings)
     let whiteLabel = await WhiteLabel.findOne();
-    // Use logo from branding if set and not empty, otherwise leave empty (frontend handles fallback)
+    // Reason: The schema defaults appLogo to "/assets/images/logo.png" which
+    // doesn't actually exist. Treat the default placeholder as "no logo set"
+    // so the frontend falls back to the text/icon logo instead of a broken image.
+    const DEFAULT_LOGO_PLACEHOLDER = "/assets/images/logo.png";
+    const rawLogo = whiteLabel?.appLogo || "";
     const brandingLogo =
-      whiteLabel?.appLogo && whiteLabel.appLogo.length > 0
-        ? whiteLabel.appLogo
+      rawLogo.length > 0 && rawLogo !== DEFAULT_LOGO_PLACEHOLDER
+        ? rawLogo
         : "";
 
     // Get company settings for site name

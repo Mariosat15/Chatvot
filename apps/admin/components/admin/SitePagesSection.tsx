@@ -1,28 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText,
-  Save,
   Plus,
   Trash2,
   Pencil,
-  Eye,
-  ArrowUp,
-  ArrowDown,
   Loader2,
   ExternalLink,
   Shield,
   Download,
   RefreshCw,
   X,
-  Type,
-  AlignLeft,
-  List,
-  Minus,
-  Code,
   Sparkles,
   Link2,
+  CheckCircle2,
+  Globe,
+  Scale,
+  Megaphone,
+  LayoutGrid,
 } from "lucide-react";
 import {
   Card,
@@ -35,87 +31,45 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import SitePageEditor, {
+  getMainAppUrl,
+  type SitePage,
+  type PageSection,
+} from "./SitePageEditor";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface PageSection {
-  id: string;
-  type: "heading" | "paragraph" | "list" | "divider" | "html";
-  title?: string;
-  content: string;
-  order: number;
-}
-
-interface SitePage {
-  _id?: string;
+// ─── Template Configuration ──────────────────────────────────────────────────
+// Reason: Structured templates with categories, descriptions, and visual
+// metadata so the template chooser can render rich, informative cards.
+interface TemplateItem {
+  value: string;
+  label: string;
   slug: string;
-  title: string;
-  subtitle: string;
-  sections: PageSection[];
-  isActive: boolean;
-  isSystem: boolean;
-  seoTitle: string;
-  seoDescription: string;
-  updatedAt?: string;
+  icon: string;
+  description: string;
+  category: "legal" | "marketing" | "other";
 }
 
-const SECTION_TYPES = [
-  { value: "heading", label: "Heading", icon: Type },
-  { value: "paragraph", label: "Paragraph", icon: AlignLeft },
-  { value: "list", label: "List", icon: List },
-  { value: "divider", label: "Divider", icon: Minus },
-  { value: "html", label: "HTML", icon: Code },
+const PAGE_TEMPLATES: TemplateItem[] = [
+  { value: "terms", label: "Terms of Service", slug: "terms", icon: "📋", description: "Legal terms governing platform use, eligibility, and user obligations", category: "legal" },
+  { value: "privacy", label: "Privacy Policy", slug: "privacy", icon: "🔒", description: "GDPR & CCPA compliant data collection and protection practices", category: "legal" },
+  { value: "cookies", label: "Cookie Policy", slug: "cookie-policy", icon: "🍪", description: "Cookie usage, consent management, and tracking technologies", category: "legal" },
+  { value: "refund", label: "Refund Policy", slug: "refund-policy", icon: "💳", description: "Refund conditions, cancellation terms, and chargeback rules", category: "legal" },
+  { value: "aml", label: "AML / KYC Policy", slug: "aml-policy", icon: "🛡️", description: "Anti-Money Laundering compliance, sanctions screening, and KYC", category: "legal" },
+  { value: "responsible-trading", label: "Responsible Trading", slug: "responsible-trading", icon: "⚖️", description: "Responsible participation guidelines, self-exclusion, and spending limits", category: "legal" },
+  { value: "risk-disclaimer", label: "Risk Disclaimer", slug: "risk-disclaimer", icon: "⚠️", description: "Simulated trading risks, regulatory status, and liability limitations", category: "legal" },
+  { value: "about", label: "About Us", slug: "about", icon: "🏢", description: "Company story, mission, team, and what the platform offers", category: "marketing" },
+  { value: "contact", label: "Contact Us", slug: "contact", icon: "📧", description: "Support channels, business inquiries, complaint procedures", category: "marketing" },
+  { value: "faq", label: "FAQ", slug: "faq", icon: "❓", description: "Frequently asked questions about the platform and trading", category: "marketing" },
+  { value: "custom", label: "Custom Page", slug: "", icon: "✏️", description: "Start from scratch with a blank page", category: "other" },
+];
+
+const TEMPLATE_CATEGORIES = [
+  { key: "legal", label: "Legal & Compliance", icon: Scale, color: "text-amber-400", bgColor: "bg-amber-500/10", borderColor: "border-amber-500/20" },
+  { key: "marketing", label: "Marketing & Information", icon: Megaphone, color: "text-blue-400", bgColor: "bg-blue-500/10", borderColor: "border-blue-500/20" },
+  { key: "other", label: "Other", icon: LayoutGrid, color: "text-gray-400", bgColor: "bg-gray-500/10", borderColor: "border-gray-500/20" },
 ] as const;
-
-// ── Page type templates available for AI generation ─────────────────────────
-const PAGE_TEMPLATES = [
-  { value: "terms", label: "Terms of Service", slug: "terms" },
-  { value: "privacy", label: "Privacy Policy", slug: "privacy" },
-  { value: "refund", label: "Refund Policy", slug: "refund-policy" },
-  { value: "aml", label: "AML Policy", slug: "aml-policy" },
-  {
-    value: "responsible-trading",
-    label: "Responsible Trading",
-    slug: "responsible-trading",
-  },
-  {
-    value: "risk-disclaimer",
-    label: "Risk Disclaimer",
-    slug: "risk-disclaimer",
-  },
-  { value: "about", label: "About Us", slug: "about" },
-  { value: "contact", label: "Contact Us", slug: "contact" },
-  { value: "faq", label: "FAQ", slug: "faq" },
-  { value: "cookies", label: "Cookie Policy", slug: "cookie-policy" },
-  { value: "custom", label: "Custom Page", slug: "" },
-] as const;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-/** Build the preview URL pointing to the main app (not admin). */
-function getMainAppUrl(): string {
-  // 1. Prefer explicit env var
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
-  }
-
-  // 2. Derive from current window location
-  if (typeof window !== "undefined") {
-    const origin = window.location.origin;
-
-    // Production: admin.chartvolt.com → chartvolt.com
-    // Reason: admin runs on a subdomain, not a separate port, in production.
-    if (origin.includes("admin.")) {
-      return origin.replace("admin.", "").replace(/\/+$/, "");
-    }
-
-    // Dev: localhost:3001 → localhost:3000
-    return origin.replace(/:\d+$/, ":3000").replace(/\/+$/, "");
-  }
-
-  return "http://localhost:3000";
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SitePagesSection() {
@@ -129,17 +83,27 @@ export default function SitePagesSection() {
   const [generating, setGenerating] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
 
-  // ── Fetch pages ─────────────────────────────────────────────────────────────
+  // ── Derived data ─────────────────────────────────────────────────────────
+  const existingSlugs = useMemo(
+    () => new Set(pages.map((p) => p.slug)),
+    [pages],
+  );
+
+  const stats = useMemo(() => ({
+    total: pages.length,
+    active: pages.filter((p) => p.isActive).length,
+    system: pages.filter((p) => p.isSystem).length,
+    custom: pages.filter((p) => !p.isSystem).length,
+  }), [pages]);
+
+  // ── Fetch pages ──────────────────────────────────────────────────────────
   const fetchPages = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/pages");
       const data = await res.json();
-      if (data.success) {
-        setPages(data.pages);
-      } else {
-        toast.error(data.error || "Failed to load pages");
-      }
+      if (data.success) setPages(data.pages);
+      else toast.error(data.error || "Failed to load pages");
     } catch {
       toast.error("Failed to load pages");
     } finally {
@@ -151,13 +115,12 @@ export default function SitePagesSection() {
     fetchPages();
   }, [fetchPages]);
 
-  // ── Create page ─────────────────────────────────────────────────────────────
+  // ── CRUD Operations ──────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!newSlug.trim() || !newTitle.trim()) {
       toast.error("Slug and title are required");
       return;
     }
-
     try {
       setSaving(true);
       const res = await fetch("/api/pages", {
@@ -167,28 +130,15 @@ export default function SitePagesSection() {
           slug: newSlug.trim(),
           title: newTitle.trim(),
           sections: [
-            {
-              id: "1",
-              type: "heading",
-              title: newTitle.trim(),
-              content: "",
-              order: 0,
-            },
-            {
-              id: "2",
-              type: "paragraph",
-              content: "Page content goes here. Edit this section to add your content.",
-              order: 1,
-            },
+            { id: "1", type: "heading", title: newTitle.trim(), content: "", order: 0 },
+            { id: "2", type: "paragraph", content: "Page content goes here. Edit this section to add your content.", order: 1 },
           ],
         }),
       });
       const data = await res.json();
       if (data.success) {
         toast.success("Page created successfully");
-        setShowCreate(false);
-        setNewSlug("");
-        setNewTitle("");
+        resetCreateForm();
         fetchPages();
       } else {
         toast.error(data.error || "Failed to create page");
@@ -200,7 +150,6 @@ export default function SitePagesSection() {
     }
   };
 
-  // ── Save page ───────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!editingPage) return;
     try {
@@ -225,24 +174,18 @@ export default function SitePagesSection() {
     }
   };
 
-  // ── Delete page ─────────────────────────────────────────────────────────────
   const handleDelete = async (slug: string) => {
     if (!confirm("Are you sure you want to delete this page?")) return;
     try {
       const res = await fetch(`/api/pages/${slug}`, { method: "DELETE" });
       const data = await res.json();
-      if (data.success) {
-        toast.success("Page deleted");
-        fetchPages();
-      } else {
-        toast.error(data.error || "Failed to delete page");
-      }
+      if (data.success) { toast.success("Page deleted"); fetchPages(); }
+      else toast.error(data.error || "Failed to delete page");
     } catch {
       toast.error("Failed to delete page");
     }
   };
 
-  // ── Toggle active ──────────────────────────────────────────────────────────
   const handleToggleActive = async (page: SitePage) => {
     try {
       const res = await fetch(`/api/pages/${page.slug}`, {
@@ -252,9 +195,7 @@ export default function SitePagesSection() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(
-          `Page ${!page.isActive ? "activated" : "deactivated"}`,
-        );
+        toast.success(`Page ${!page.isActive ? "activated" : "deactivated"}`);
         fetchPages();
       }
     } catch {
@@ -262,17 +203,13 @@ export default function SitePagesSection() {
     }
   };
 
-  // ── Save as defaults ───────────────────────────────────────────────────────
   const handleSaveDefaults = async () => {
     try {
       setSaving(true);
       const res = await fetch("/api/pages/save-defaults", { method: "POST" });
       const data = await res.json();
-      if (data.success) {
-        toast.success(data.message || "Defaults saved");
-      } else {
-        toast.error(data.error || "Failed to save defaults");
-      }
+      if (data.success) toast.success(data.message || "Defaults saved");
+      else toast.error(data.error || "Failed to save defaults");
     } catch {
       toast.error("Failed to save defaults");
     } finally {
@@ -280,11 +217,8 @@ export default function SitePagesSection() {
     }
   };
 
-  // ── Generate content from template + company details ────────────────────
-  const handleGenerateContent = async (
-    pageType: string,
-    pageTitle?: string,
-  ) => {
+  // ── Generate content ─────────────────────────────────────────────────────
+  const handleGenerateContent = async (pageType: string, pageTitle?: string) => {
     try {
       setGenerating(true);
       const res = await fetch("/api/pages/generate", {
@@ -293,12 +227,9 @@ export default function SitePagesSection() {
         body: JSON.stringify({ pageType, pageTitle }),
       });
       const data = await res.json();
-      if (data.success) {
-        return data;
-      } else {
-        toast.error(data.error || "Failed to generate content");
-        return null;
-      }
+      if (data.success) return data;
+      toast.error(data.error || "Failed to generate content");
+      return null;
     } catch {
       toast.error("Failed to generate content");
       return null;
@@ -307,34 +238,18 @@ export default function SitePagesSection() {
     }
   };
 
-  /**
-   * Create a new page from a selected template.
-   * Generates content using company details, then creates the page.
-   */
   const handleCreateFromTemplate = async () => {
     if (!selectedTemplate) {
       toast.error("Please select a page template");
       return;
     }
-
     const template = PAGE_TEMPLATES.find((t) => t.value === selectedTemplate);
     if (!template) return;
 
-    const slug =
-      selectedTemplate === "custom"
-        ? newSlug.trim()
-        : template.slug || newSlug.trim();
-    const title =
-      selectedTemplate === "custom"
-        ? newTitle.trim()
-        : newTitle.trim() || template.label;
+    const slug = selectedTemplate === "custom" ? newSlug.trim() : template.slug || newSlug.trim();
+    const title = selectedTemplate === "custom" ? newTitle.trim() : newTitle.trim() || template.label;
+    if (!slug) { toast.error("Slug is required"); return; }
 
-    if (!slug) {
-      toast.error("Slug is required");
-      return;
-    }
-
-    // Generate content
     const generated = await handleGenerateContent(selectedTemplate, title);
     if (!generated) return;
 
@@ -354,13 +269,8 @@ export default function SitePagesSection() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(
-          `"${generated.title}" created with auto-generated content!`,
-        );
-        setShowCreate(false);
-        setNewSlug("");
-        setNewTitle("");
-        setSelectedTemplate("");
+        toast.success(`"${generated.title}" created with auto-generated content!`);
+        resetCreateForm();
         fetchPages();
       } else {
         toast.error(data.error || "Failed to create page");
@@ -372,23 +282,11 @@ export default function SitePagesSection() {
     }
   };
 
-  /**
-   * Regenerate content for an existing page being edited.
-   */
   const handleRegenerateForEditor = async () => {
     if (!editingPage) return;
-
-    // Guess page type from slug
-    const guessType =
-      PAGE_TEMPLATES.find((t) => t.slug === editingPage.slug)?.value ||
-      "custom";
-
-    const generated = await handleGenerateContent(
-      guessType,
-      editingPage.title,
-    );
+    const guessType = PAGE_TEMPLATES.find((t) => t.slug === editingPage.slug)?.value || "custom";
+    const generated = await handleGenerateContent(guessType, editingPage.title);
     if (!generated) return;
-
     setEditingPage({
       ...editingPage,
       title: generated.title || editingPage.title,
@@ -397,13 +295,10 @@ export default function SitePagesSection() {
       seoTitle: generated.seoTitle || editingPage.seoTitle,
       seoDescription: generated.seoDescription || editingPage.seoDescription,
     });
-
-    toast.success(
-      "Content regenerated from template — review and save when ready",
-    );
+    toast.success("Content regenerated — review and save when ready");
   };
 
-  // ── Section helpers ────────────────────────────────────────────────────────
+  // ── Section helpers ──────────────────────────────────────────────────────
   const addSection = (type: PageSection["type"]) => {
     if (!editingPage) return;
     const maxOrder = Math.max(0, ...editingPage.sections.map((s) => s.order));
@@ -414,49 +309,46 @@ export default function SitePagesSection() {
       content: type === "paragraph" ? "New paragraph content." : "",
       order: maxOrder + 1,
     };
-    setEditingPage({
-      ...editingPage,
-      sections: [...editingPage.sections, newSection],
-    });
+    setEditingPage({ ...editingPage, sections: [...editingPage.sections, newSection] });
   };
 
   const updateSection = (id: string, updates: Partial<PageSection>) => {
     if (!editingPage) return;
     setEditingPage({
       ...editingPage,
-      sections: editingPage.sections.map((s) =>
-        s.id === id ? { ...s, ...updates } : s,
-      ),
+      sections: editingPage.sections.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     });
   };
 
   const removeSection = (id: string) => {
     if (!editingPage) return;
-    setEditingPage({
-      ...editingPage,
-      sections: editingPage.sections.filter((s) => s.id !== id),
-    });
+    setEditingPage({ ...editingPage, sections: editingPage.sections.filter((s) => s.id !== id) });
   };
 
   const moveSection = (id: string, direction: "up" | "down") => {
     if (!editingPage) return;
-    const sorted = [...editingPage.sections].sort(
-      (a, b) => a.order - b.order,
-    );
+    const sorted = [...editingPage.sections].sort((a, b) => a.order - b.order);
     const idx = sorted.findIndex((s) => s.id === id);
-    if (
-      (direction === "up" && idx <= 0) ||
-      (direction === "down" && idx >= sorted.length - 1)
-    )
-      return;
+    if ((direction === "up" && idx <= 0) || (direction === "down" && idx >= sorted.length - 1)) return;
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    const temp = sorted[idx]!.order;
-    sorted[idx]!.order = sorted[swapIdx]!.order;
-    sorted[swapIdx]!.order = temp;
+    // Reason: Direct index access is safe here because bounds are validated above.
+    const current = sorted.at(idx);
+    const swap = sorted.at(swapIdx);
+    if (!current || !swap) return;
+    const tempOrder = current.order;
+    current.order = swap.order;
+    swap.order = tempOrder;
     setEditingPage({ ...editingPage, sections: sorted });
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const resetCreateForm = () => {
+    setShowCreate(false);
+    setNewSlug("");
+    setNewTitle("");
+    setSelectedTemplate("");
+  };
+
+  // ── Render: Loading ─────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -465,10 +357,10 @@ export default function SitePagesSection() {
     );
   }
 
-  // ── Page Editor View ───────────────────────────────────────────────────────
+  // ── Render: Page Editor ────────────────────────────────────────────────
   if (editingPage) {
     return (
-      <PageEditor
+      <SitePageEditor
         page={editingPage}
         saving={saving}
         generating={generating}
@@ -484,10 +376,10 @@ export default function SitePagesSection() {
     );
   }
 
-  // ── Pages List View ────────────────────────────────────────────────────────
+  // ── Render: Pages List ─────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Header with Stats ─────────────────────────────────────────── */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -497,125 +389,176 @@ export default function SitePagesSection() {
                 Site Pages
               </CardTitle>
               <CardDescription>
-                Manage legal, informational, and custom pages. These are
-                accessible from footer links and direct URLs.
+                Manage legal, informational, and custom pages for your platform.
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSaveDefaults}
-                disabled={saving}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Save as Defaults
+              <Button size="sm" variant="outline" onClick={handleSaveDefaults} disabled={saving}>
+                <Download className="h-4 w-4 mr-1" /> Save as Defaults
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={fetchPages}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh
+              <Button size="sm" variant="outline" onClick={fetchPages}>
+                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
               </Button>
-              <Button
-                size="sm"
-                onClick={() => setShowCreate(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Page
+              <Button size="sm" onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4 mr-1" /> New Page
               </Button>
             </div>
+          </div>
+          {/* Stats bar */}
+          <div className="grid grid-cols-4 gap-3 mt-4">
+            <StatBadge label="Total" value={stats.total} color="text-white" bg="bg-gray-800" />
+            <StatBadge label="Active" value={stats.active} color="text-green-400" bg="bg-green-500/10" />
+            <StatBadge label="System" value={stats.system} color="text-blue-400" bg="bg-blue-500/10" />
+            <StatBadge label="Custom" value={stats.custom} color="text-purple-400" bg="bg-purple-500/10" />
           </div>
         </CardHeader>
       </Card>
 
-      {/* Info: Connection to Footer Links */}
+      {/* ── Info Banner ───────────────────────────────────────────────── */}
       <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-3">
         <Link2 className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
         <div className="text-sm text-blue-300">
-          <p className="font-medium mb-1">
-            Connected to Footer Links
-          </p>
+          <p className="font-medium mb-1">Connected to Footer Links</p>
           <p className="text-blue-400/80 text-xs">
-            Pages created here are automatically available at their URL (e.g.{" "}
-            <code className="bg-blue-500/20 px-1 rounded">/terms</code>).
-            To show them in the landing page footer, add a matching link in{" "}
-            <strong>Hero Page → Footer</strong> section. Use{" "}
+            Pages are automatically accessible at their URL (e.g.{" "}
+            <code className="bg-blue-500/20 px-1 rounded">/terms</code>). To
+            add them to the footer, go to{" "}
+            <strong>Hero Page → Footer</strong>. Use{" "}
             <Sparkles className="h-3 w-3 inline text-yellow-400" />{" "}
-            <strong>Generate from Template</strong> to auto-fill page content
-            using your company details from Settings → Company.
+            <strong>Generate from Template</strong> to auto-fill content with
+            your company details.
           </p>
         </div>
       </div>
 
-      {/* Create Page Dialog */}
+      {/* ── Create Page / Template Chooser ─────────────────────────────── */}
       {showCreate && (
-        <Card className="bg-gray-900 border-blue-500/50">
-          <CardContent className="pt-6 space-y-4">
-            {/* Template selector */}
-            <div>
-              <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-yellow-400" />
-                Generate from Template
-                <span className="text-xs text-gray-500 font-normal">
-                  (uses your company details to fill content)
-                </span>
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {PAGE_TEMPLATES.map((t) => (
-                  <Button
-                    key={t.value}
-                    size="sm"
-                    variant={
-                      selectedTemplate === t.value ? "default" : "outline"
-                    }
-                    className={
-                      selectedTemplate === t.value
-                        ? "bg-blue-600"
-                        : "border-gray-600"
-                    }
-                    onClick={() => {
-                      setSelectedTemplate(t.value);
-                      if (t.value !== "custom") {
-                        setNewSlug(t.slug);
-                        setNewTitle(t.label);
-                      }
-                    }}
-                  >
-                    {t.label}
-                  </Button>
-                ))}
+        <Card className="bg-gray-900 border-blue-500/40 shadow-lg shadow-blue-500/5">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-yellow-400" />
+                  Create New Page
+                </CardTitle>
+                <CardDescription>
+                  Select a template to auto-generate professional content, or
+                  create a blank page.
+                </CardDescription>
               </div>
+              <Button variant="ghost" size="icon" onClick={resetCreateForm}>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Template cards grouped by category */}
+            {TEMPLATE_CATEGORIES.map((cat) => {
+              const templates = PAGE_TEMPLATES.filter(
+                (t) => t.category === cat.key,
+              );
+              if (templates.length === 0) return null;
+              const CatIcon = cat.icon;
+              return (
+                <div key={cat.key}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CatIcon className={`h-4 w-4 ${cat.color}`} />
+                    <span className={`text-sm font-semibold ${cat.color}`}>
+                      {cat.label}
+                    </span>
+                    <div className="flex-1 h-px bg-gray-800" />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {templates.map((t) => {
+                      const exists = existingSlugs.has(t.slug);
+                      const isSelected = selectedTemplate === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          onClick={() => {
+                            setSelectedTemplate(t.value);
+                            if (t.value !== "custom") {
+                              setNewSlug(t.slug);
+                              setNewTitle(t.label);
+                            } else {
+                              setNewSlug("");
+                              setNewTitle("");
+                            }
+                          }}
+                          className={`
+                            relative text-left p-4 rounded-xl border transition-all duration-200
+                            ${isSelected
+                              ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/30 shadow-lg shadow-blue-500/10"
+                              : "border-gray-700/50 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/60"
+                            }
+                            ${exists && !isSelected ? "opacity-60" : ""}
+                          `}
+                        >
+                          {/* Exists badge */}
+                          {exists && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-400" />
+                            </div>
+                          )}
+                          {/* Icon */}
+                          <span className="text-2xl block mb-2">{t.icon}</span>
+                          {/* Label */}
+                          <span className="block text-sm font-medium text-white mb-1">
+                            {t.label}
+                          </span>
+                          {/* Description */}
+                          <span className="block text-xs text-gray-400 leading-relaxed line-clamp-2">
+                            {t.description}
+                          </span>
+                          {/* Slug preview */}
+                          {t.slug && (
+                            <span className="block text-xs text-gray-600 mt-2 font-mono">
+                              /{t.slug}
+                            </span>
+                          )}
+                          {/* Exists info */}
+                          {exists && (
+                            <Badge
+                              variant="outline"
+                              className="mt-2 text-[10px] border-green-500/30 text-green-400"
+                            >
+                              Already created
+                            </Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
 
-            {/* Slug + title fields */}
-            <div className="flex items-end gap-4">
-              <div className="flex-1">
-                <Label>URL Slug</Label>
-                <Input
-                  value={newSlug}
-                  onChange={(e) => setNewSlug(e.target.value)}
-                  placeholder="e.g. terms, refund-policy, about"
-                  className="mt-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This will be the URL path: /{newSlug || "your-slug"}
-                </p>
+            {/* Slug + title + action bar */}
+            <div className="border-t border-gray-800 pt-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label className="text-gray-400 text-xs">URL Slug</Label>
+                  <Input
+                    value={newSlug}
+                    onChange={(e) => setNewSlug(e.target.value)}
+                    placeholder="e.g. terms, refund-policy"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">
+                    Page URL: <code>{getMainAppUrl()}/{newSlug || "your-slug"}</code>
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-gray-400 text-xs">Page Title</Label>
+                  <Input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Terms of Service"
+                    className="mt-1"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <Label>Page Title</Label>
-                <Input
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Terms of Service"
-                  className="mt-1"
-                />
-              </div>
-
-              {/* Create buttons */}
-              <div className="flex gap-2">
+              <div className="flex items-center gap-3">
                 {selectedTemplate ? (
                   <Button
                     onClick={handleCreateFromTemplate}
@@ -623,405 +566,176 @@ export default function SitePagesSection() {
                     className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
                     {saving || generating ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
-                      <Sparkles className="h-4 w-4 mr-1" />
+                      <Sparkles className="h-4 w-4 mr-2" />
                     )}
-                    {generating ? "Generating..." : "Generate & Create"}
+                    {generating ? "Generating content..." : "Generate & Create"}
                   </Button>
                 ) : (
                   <Button onClick={handleCreate} disabled={saving}>
                     {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
-                      <Plus className="h-4 w-4 mr-1" />
+                      <Plus className="h-4 w-4 mr-2" />
                     )}
-                    Create Blank
+                    Create Blank Page
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreate(false);
-                    setNewSlug("");
-                    setNewTitle("");
-                    setSelectedTemplate("");
-                  }}
-                >
-                  <X className="h-4 w-4" />
+                <Button variant="ghost" onClick={resetCreateForm}>
+                  Cancel
                 </Button>
+                {selectedTemplate && (
+                  <p className="text-xs text-gray-500 ml-auto">
+                    Content will be generated using your{" "}
+                    <strong className="text-gray-400">Company Details</strong>{" "}
+                    from Settings
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Pages Grid */}
-      <div className="grid gap-4">
+      {/* ── Pages Grid ────────────────────────────────────────────────── */}
+      <div className="space-y-3">
         {pages.length === 0 ? (
           <Card className="bg-gray-900 border-gray-800">
-            <CardContent className="py-10 text-center text-gray-400">
-              No pages yet. Create your first page to get started.
+            <CardContent className="py-16 text-center">
+              <Globe className="h-12 w-12 text-gray-700 mx-auto mb-4" />
+              <p className="text-gray-400 text-lg font-medium mb-2">
+                No pages yet
+              </p>
+              <p className="text-gray-500 text-sm mb-6">
+                Create your first page to get started. Use templates for instant
+                professional content.
+              </p>
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Create First Page
+              </Button>
             </CardContent>
           </Card>
         ) : (
-          pages.map((page) => (
-            <Card
-              key={page.slug}
-              className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors"
-            >
-              <CardContent className="py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-white truncate">
-                        {page.title}
-                      </span>
-                      {page.isSystem && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Shield className="h-3 w-3 mr-1" />
-                          System
-                        </Badge>
-                      )}
-                      <Badge
-                        variant={page.isActive ? "default" : "outline"}
-                        className="text-xs"
-                      >
-                        {page.isActive ? "Active" : "Inactive"}
-                      </Badge>
+          pages.map((page) => {
+            const templateInfo = PAGE_TEMPLATES.find(
+              (t) => t.slug === page.slug,
+            );
+            return (
+              <Card
+                key={page.slug}
+                className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-all group"
+              >
+                <CardContent className="py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    {/* Template icon or generic */}
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-800 border border-gray-700/50 flex items-center justify-center text-lg">
+                      {templateInfo?.icon || "📄"}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                      <span>/{page.slug}</span>
-                      <span>•</span>
-                      <span>{page.sections.length} sections</span>
-                      {page.updatedAt && (
-                        <>
-                          <span>•</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-white truncate">
+                          {page.title}
+                        </span>
+                        {page.isSystem && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] gap-1"
+                          >
+                            <Shield className="h-3 w-3" /> System
+                          </Badge>
+                        )}
+                        <Badge
+                          variant={page.isActive ? "default" : "outline"}
+                          className={`text-[10px] ${
+                            page.isActive
+                              ? "bg-green-500/20 text-green-400 border-green-500/30"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {page.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                        <code className="bg-gray-800 px-1.5 py-0.5 rounded text-gray-400">
+                          /{page.slug}
+                        </code>
+                        <span>{page.sections.length} sections</span>
+                        {page.updatedAt && (
                           <span>
                             Updated{" "}
                             {new Date(page.updatedAt).toLocaleDateString()}
                           </span>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <Switch
-                    checked={page.isActive}
-                    onCheckedChange={() => handleToggleActive(page)}
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() =>
-                      window.open(`${getMainAppUrl()}/${page.slug}`, "_blank")
-                    }
-                    title="Preview page on main app"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setEditingPage({ ...page })}
-                    title="Edit page"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  {!page.isSystem && (
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 ml-4">
+                    <Switch
+                      checked={page.isActive}
+                      onCheckedChange={() => handleToggleActive(page)}
+                    />
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => handleDelete(page.slug)}
-                      className="text-red-500 hover:text-red-400"
-                      title="Delete page"
+                      onClick={() =>
+                        window.open(
+                          `${getMainAppUrl()}/${page.slug}`,
+                          "_blank",
+                        )
+                      }
+                      title="Preview on main app"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditingPage({ ...page })}
+                      title="Edit page"
+                      className="text-blue-400 hover:text-blue-300"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {!page.isSystem && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDelete(page.slug)}
+                        className="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete page"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
   );
 }
 
-// ─── Page Editor Sub-Component ───────────────────────────────────────────────
-function PageEditor({
-  page,
-  saving,
-  generating,
-  onPageChange,
-  onSave,
-  onClose,
-  onAddSection,
-  onUpdateSection,
-  onRemoveSection,
-  onMoveSection,
-  onRegenerate,
+// ─── Small stat badge component ──────────────────────────────────────────────
+function StatBadge({
+  label,
+  value,
+  color,
+  bg,
 }: {
-  page: SitePage;
-  saving: boolean;
-  generating: boolean;
-  onPageChange: (p: SitePage) => void;
-  onSave: () => void;
-  onClose: () => void;
-  onAddSection: (type: PageSection["type"]) => void;
-  onUpdateSection: (id: string, updates: Partial<PageSection>) => void;
-  onRemoveSection: (id: string) => void;
-  onMoveSection: (id: string, direction: "up" | "down") => void;
-  onRegenerate: () => void;
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
 }) {
-  const sortedSections = [...page.sections].sort(
-    (a, b) => a.order - b.order,
-  );
-
   return (
-    <div className="space-y-6">
-      {/* Editor Header */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-blue-400" />
-                Editing: {page.title}
-              </CardTitle>
-              <CardDescription>
-                /{page.slug} — {page.isSystem ? "System page" : "Custom page"}
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onRegenerate}
-                disabled={generating}
-                className="border-yellow-500/40 text-yellow-400 hover:text-yellow-300"
-                title="Regenerate content from template using company details"
-              >
-                {generating ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-1" />
-                )}
-                {generating ? "Generating..." : "Regenerate"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.open(`${getMainAppUrl()}/${page.slug}`, "_blank")}
-              >
-                <Eye className="h-4 w-4 mr-1" />
-                Preview
-              </Button>
-              <Button size="sm" onClick={onSave} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                ) : (
-                  <Save className="h-4 w-4 mr-1" />
-                )}
-                Save
-              </Button>
-              <Button size="sm" variant="ghost" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Page Details */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="pt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Page Title</Label>
-              <Input
-                value={page.title}
-                onChange={(e) =>
-                  onPageChange({ ...page, title: e.target.value })
-                }
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Subtitle</Label>
-              <Input
-                value={page.subtitle}
-                onChange={(e) =>
-                  onPageChange({ ...page, subtitle: e.target.value })
-                }
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>SEO Title</Label>
-              <Input
-                value={page.seoTitle}
-                onChange={(e) =>
-                  onPageChange({ ...page, seoTitle: e.target.value })
-                }
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>SEO Description</Label>
-              <Input
-                value={page.seoDescription}
-                onChange={(e) =>
-                  onPageChange({ ...page, seoDescription: e.target.value })
-                }
-                className="mt-1"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sections Editor */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white text-base">
-              Content Sections
-            </CardTitle>
-            <div className="flex gap-1">
-              {SECTION_TYPES.map((st) => (
-                <Button
-                  key={st.value}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onAddSection(st.value)}
-                  title={`Add ${st.label}`}
-                >
-                  <st.icon className="h-3.5 w-3.5 mr-1" />
-                  {st.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {sortedSections.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">
-              No sections yet. Add a section above to start building your
-              page.
-            </p>
-          ) : (
-            sortedSections.map((section, idx) => (
-              <div
-                key={section.id}
-                className="border border-gray-700/50 rounded-lg p-4 space-y-2 bg-gray-800/30"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {section.type}
-                    </Badge>
-                    <span className="text-xs text-gray-500">
-                      #{idx + 1}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => onMoveSection(section.id, "up")}
-                      disabled={idx === 0}
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => onMoveSection(section.id, "down")}
-                      disabled={idx === sortedSections.length - 1}
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-red-500 hover:text-red-400"
-                      onClick={() => onRemoveSection(section.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Section-type-specific editing */}
-                {section.type === "heading" && (
-                  <Input
-                    value={section.title || ""}
-                    onChange={(e) =>
-                      onUpdateSection(section.id, {
-                        title: e.target.value,
-                      })
-                    }
-                    placeholder="Heading text"
-                    className="font-bold"
-                  />
-                )}
-                {section.type === "paragraph" && (
-                  <Textarea
-                    value={section.content}
-                    onChange={(e) =>
-                      onUpdateSection(section.id, {
-                        content: e.target.value,
-                      })
-                    }
-                    placeholder="Paragraph content"
-                    rows={3}
-                  />
-                )}
-                {section.type === "list" && (
-                  <div>
-                    <Textarea
-                      value={section.content}
-                      onChange={(e) =>
-                        onUpdateSection(section.id, {
-                          content: e.target.value,
-                        })
-                      }
-                      placeholder="One item per line"
-                      rows={4}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Enter one list item per line.
-                    </p>
-                  </div>
-                )}
-                {section.type === "html" && (
-                  <Textarea
-                    value={section.content}
-                    onChange={(e) =>
-                      onUpdateSection(section.id, {
-                        content: e.target.value,
-                      })
-                    }
-                    placeholder="<p>Custom HTML content</p>"
-                    rows={4}
-                    className="font-mono text-sm"
-                  />
-                )}
-                {section.type === "divider" && (
-                  <hr className="border-gray-600" />
-                )}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+    <div className={`${bg} rounded-lg px-3 py-2 text-center`}>
+      <div className={`text-xl font-bold ${color}`}>{value}</div>
+      <div className="text-xs text-gray-500">{label}</div>
     </div>
   );
 }
