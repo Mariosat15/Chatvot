@@ -87,6 +87,17 @@ const PAGE_TEMPLATES = [
   { value: "custom", label: "Custom Page", slug: "" },
 ] as const;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+/** Build the preview URL using the main app URL (not the admin's port). */
+function getMainAppUrl(): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined"
+      ? window.location.origin.replace(/:\d+$/, ":3000")
+      : "http://localhost:3000");
+  return base.replace(/\/+$/, "");
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SitePagesSection() {
   const [pages, setPages] = useState<SitePage[]>([]);
@@ -685,9 +696,9 @@ export default function SitePagesSection() {
                     size="icon"
                     variant="ghost"
                     onClick={() =>
-                      window.open(`/${page.slug}`, "_blank")
+                      window.open(`${getMainAppUrl()}/${page.slug}`, "_blank")
                     }
-                    title="Preview page"
+                    title="Preview page on main app"
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
@@ -784,7 +795,7 @@ function PageEditor({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => window.open(`/${page.slug}`, "_blank")}
+                onClick={() => window.open(`${getMainAppUrl()}/${page.slug}`, "_blank")}
               >
                 <Eye className="h-4 w-4 mr-1" />
                 Preview

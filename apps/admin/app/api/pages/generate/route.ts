@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import CompanySettingsModel from "@/database/models/company-settings.model";
 
 // ─── Company details interface ───────────────────────────────────────────────
 interface CompanyInfo {
@@ -46,36 +47,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch company details from DB
+    // Fetch company details from CompanySettings collection (singleton)
     await connectToDatabase();
-    const mongoose = await import("mongoose");
-    const WhiteLabel =
-      mongoose.models.WhiteLabel ||
-      mongoose.model("WhiteLabel", new mongoose.Schema({}, { strict: false }));
-
-    const wl = await WhiteLabel.findOne({}).lean();
-    const companySettings = (wl as Record<string, unknown>)
-      ?.companySettings as Partial<CompanyInfo> | undefined;
+    const cs = await CompanySettingsModel.findOne({}).lean();
 
     const company: CompanyInfo = {
-      companyName:
-        companySettings?.companyName ||
-        (wl as Record<string, unknown>)?.platformName?.toString() ||
-        "Our Platform",
-      legalName: companySettings?.legalName || "Our Platform Ltd.",
-      email: companySettings?.email || "support@ourplatform.com",
-      phone: companySettings?.phone || "",
-      website:
-        companySettings?.website ||
-        (wl as Record<string, unknown>)?.siteUrl?.toString() ||
-        "https://ourplatform.com",
-      addressLine1: companySettings?.addressLine1 || "",
-      city: companySettings?.city || "",
-      stateProvince: companySettings?.stateProvince || "",
-      postalCode: companySettings?.postalCode || "",
-      country: companySettings?.country || "",
-      registrationNumber: companySettings?.registrationNumber || "",
-      vatNumber: companySettings?.vatNumber || "",
+      companyName: cs?.companyName || "Our Platform",
+      legalName: cs?.legalName || "Our Platform Ltd.",
+      email: cs?.email || "support@ourplatform.com",
+      phone: cs?.phone || "",
+      website: cs?.website || process.env.NEXT_PUBLIC_APP_URL || "https://ourplatform.com",
+      addressLine1: cs?.addressLine1 || "",
+      city: cs?.city || "",
+      stateProvince: cs?.stateProvince || "",
+      postalCode: cs?.postalCode || "",
+      country: cs?.country || "",
+      registrationNumber: cs?.registrationNumber || "",
+      vatNumber: cs?.vatNumber || "",
     };
 
     const fullAddress = [
