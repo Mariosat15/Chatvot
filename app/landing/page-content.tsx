@@ -30,6 +30,18 @@ import {
   Shield,
   Timer,
   Coins,
+  Globe,
+  Lock,
+  CreditCard,
+  Bell,
+  FileText,
+  PieChart,
+  Headphones,
+  Server,
+  Database,
+  Code,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +83,18 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Gift,
   Flame,
   Shield,
+  Globe,
+  Lock,
+  CreditCard,
+  Bell,
+  FileText,
+  PieChart,
+  Headphones,
+  Server,
+  Database,
+  Code,
+  Mail,
+  Phone,
 };
 
 interface HeroSettings {

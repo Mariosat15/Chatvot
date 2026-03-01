@@ -377,14 +377,14 @@ const defaultSettings: LandingSettings = {
 
   // Hero
   heroEnabled: true,
-  heroTitle: "DOMINATE THE MARKETS",
+  heroTitle: "TRADE. COMPETE. CONQUER.",
   heroSubtitle: "THE ULTIMATE TRADING ARENA",
   heroDescription:
-    "Compete against traders worldwide in real-time competitions and 1v1 challenges.",
-  heroBadgeText: "🔥 Live Trading Battles",
-  heroPrimaryCTAText: "Start Trading",
+    "Enter the world's most electrifying trading competition platform. Compete head-to-head against traders worldwide, climb the leaderboards, and win real prizes — all with zero financial risk.",
+  heroBadgeText: "🔥 Live Trading Battles — Join 10,000+ Traders",
+  heroPrimaryCTAText: "Join the Arena",
   heroPrimaryCTALink: "/sign-up",
-  heroSecondaryCTAText: "View Competitions",
+  heroSecondaryCTAText: "Watch Live Competitions",
   heroSecondaryCTALink: "/competitions",
   heroParticlesEnabled: true,
 
@@ -396,106 +396,147 @@ const defaultSettings: LandingSettings = {
       id: "1",
       value: "10000",
       suffix: "+",
-      label: "Active Traders",
+      label: "Active Traders Worldwide",
       enabled: true,
     },
     {
       id: "2",
       value: "1000000",
-      suffix: "+",
-      label: "Prize Pool",
+      suffix: "$+",
+      label: "Total Prizes Awarded",
       enabled: true,
     },
     {
       id: "3",
-      value: "50000",
+      value: "250000",
       suffix: "+",
-      label: "Trades Daily",
+      label: "Trades Executed Daily",
       enabled: true,
     },
-    { id: "4", value: "100", suffix: "+", label: "Countries", enabled: true },
+    {
+      id: "4",
+      value: "120",
+      suffix: "+",
+      label: "Countries Represented",
+      enabled: true,
+    },
   ],
 
   // Features
   featuresEnabled: true,
-  featuresTitle: "Platform Features",
-  featuresSubtitle: "Everything you need to become a trading champion",
+  featuresTitle: "Built for Champions",
+  featuresSubtitle:
+    "Every tool, every edge, every advantage — engineered to help you dominate the competition",
   features: [
     {
       id: "1",
       icon: "Trophy",
-      title: "Competitions",
-      description: "Join daily, weekly, and monthly trading competitions",
+      title: "Live Trading Competitions",
+      description:
+        "Enter daily, weekly, and monthly tournaments with real-time leaderboards. Compete for cash prizes, exclusive badges, and global bragging rights.",
       enabled: true,
     },
     {
       id: "2",
       icon: "Swords",
-      title: "1v1 Challenges",
-      description: "Challenge any trader to a head-to-head battle",
+      title: "1v1 Head-to-Head Duels",
+      description:
+        "Challenge any trader to a direct showdown. Set the stake, choose the timeframe, and prove you're the better trader in intense one-on-one battles.",
       enabled: true,
     },
     {
       id: "3",
       icon: "BarChart3",
-      title: "Real-Time Analytics",
-      description: "Track your performance with detailed analytics",
+      title: "Professional-Grade Charts",
+      description:
+        "Trade on advanced TradingView-powered charts with 50+ technical indicators, drawing tools, and multi-timeframe analysis — all in real-time.",
       enabled: true,
     },
     {
       id: "4",
       icon: "Award",
-      title: "Leaderboards",
-      description: "Climb the ranks and earn your place at the top",
+      title: "Global Leaderboards & Rankings",
+      description:
+        "Track your rank against thousands of traders. Earn XP, climb seasonal tiers, and showcase your achievements on your public profile.",
       enabled: true,
     },
     {
       id: "5",
-      icon: "ShoppingBag",
-      title: "Marketplace",
-      description: "Buy and sell trading strategies and signals",
+      icon: "Shield",
+      title: "Zero Financial Risk",
+      description:
+        "Trade with virtual capital in a risk-free environment. Perfect your strategy, test new approaches, and build confidence — all without risking a single dollar.",
       enabled: true,
     },
     {
       id: "6",
+      icon: "Zap",
+      title: "Real-Time Price Feeds",
+      description:
+        "Execute trades on live market prices streamed directly from institutional-grade data providers. No delays, no re-quotes — just raw market action.",
+      enabled: true,
+    },
+    {
+      id: "7",
       icon: "Gift",
-      title: "Rewards",
-      description: "Earn badges, XP, and real prizes",
+      title: "Rewards & Achievement System",
+      description:
+        "Unlock badges, earn XP for every trade, and collect rewards as you progress. From Bronze to Legendary — every milestone is recognized and celebrated.",
+      enabled: true,
+    },
+    {
+      id: "8",
+      icon: "Globe",
+      title: "Trade 28+ Forex Pairs",
+      description:
+        "Access all major, minor, and exotic currency pairs with institutional-grade spreads. Diversify your strategy across the world's most liquid markets.",
+      enabled: true,
+    },
+    {
+      id: "9",
+      icon: "Users",
+      title: "Thriving Trader Community",
+      description:
+        "Join a global community of competitive traders. Share strategies, follow top performers, and learn from the best in real-time activity feeds.",
       enabled: true,
     },
   ],
 
   // How It Works
   howItWorksEnabled: true,
-  howItWorksTitle: "How It Works",
-  howItWorksSubtitle: "Get started in 4 simple steps",
+  howItWorksTitle: "From Sign-Up to Victory in Minutes",
+  howItWorksSubtitle: "Your path to the top of the leaderboard",
   howItWorksSteps: [
     {
       id: "1",
       step: 1,
-      title: "Create Account",
-      description: "Sign up and verify your email",
+      title: "Create Your Free Account",
+      description:
+        "Sign up in under 60 seconds with just your email. No credit card required, no hidden fees — instant access to the full trading arena.",
       enabled: true,
     },
     {
       id: "2",
       step: 2,
-      title: "Choose Competition",
-      description: "Pick from various competition types",
+      title: "Pick Your Battlefield",
+      description:
+        "Choose from daily sprint tournaments, weekly marathons, or intense 1v1 duels. Filter by entry fee, prize pool, or trading pairs to find your perfect match.",
       enabled: true,
     },
     {
       id: "3",
       step: 3,
-      title: "Start Trading",
-      description: "Execute trades and build your portfolio",
+      title: "Trade Like a Pro",
+      description:
+        "Execute trades on real-time market data using professional charts and tools. Deploy your strategy across 28+ forex pairs with zero financial risk.",
       enabled: true,
     },
     {
       id: "4",
       step: 4,
-      title: "Win Prizes",
-      description: "Top the leaderboard and claim rewards",
+      title: "Claim Your Prizes",
+      description:
+        "Finish at the top of the leaderboard and withdraw your winnings instantly. Earn badges, XP, and seasonal rewards as you build your legacy.",
       enabled: true,
     },
   ],
@@ -503,33 +544,35 @@ const defaultSettings: LandingSettings = {
   // Competitions
   competitionsEnabled: true,
   competitionsTitle: "Trading Competitions",
-  competitionsSubtitle: "🏆 Competitive Trading",
+  competitionsSubtitle: "🏆 Where Legends Are Made",
   competitionsDescription:
-    "Join thousands of traders in daily, weekly, and monthly competitions with real prizes.",
-  competitionsCTAText: "View Competitions",
+    "Join thousands of traders in high-stakes tournaments with real cash prizes. From 5-minute blitz rounds to month-long marathons — there's a competition for every trading style. Enter now and prove you have what it takes.",
+  competitionsCTAText: "Browse Competitions",
   competitionsCTALink: "/competitions",
 
   // Challenges
   challengesEnabled: true,
-  challengesTitle: "1v1 Challenges",
-  challengesSubtitle: "⚔️ Head-to-Head Battles",
+  challengesTitle: "1v1 Trading Duels",
+  challengesSubtitle: "⚔️ Settle It Head-to-Head",
   challengesDescription:
-    "Challenge any trader to a direct duel and prove your skills.",
-  challengesCTAText: "Find Opponent",
+    "Think you're better than another trader? Prove it. Challenge anyone to a direct 1v1 duel — choose the stake, set the rules, and let the market decide the winner. No luck, just pure skill.",
+  challengesCTAText: "Challenge a Trader",
   challengesCTALink: "/challenges",
 
   // CTA
   ctaEnabled: true,
-  ctaTitle: "Ready to Compete?",
-  ctaSubtitle: "Join the arena today",
-  ctaDescription: "Create your free account and start your trading journey",
-  ctaButtonText: "Get Started Now",
+  ctaTitle: "Your Next Trade Could Change Everything",
+  ctaSubtitle: "Join 10,000+ traders already competing",
+  ctaDescription:
+    "Create your free account in under 60 seconds. No credit card. No risk. Just pure competitive trading. The leaderboard is waiting — are you ready to claim your spot?",
+  ctaButtonText: "Start Competing Now — It's Free",
   ctaButtonLink: "/sign-up",
 
   // Footer
   footerEnabled: true,
-  footerCopyright: "© 2024 ChartVolt. All rights reserved.",
-  footerDisclaimer: "",
+  footerCopyright: "© {YEAR} ChartVolt. All rights reserved.",
+  footerDisclaimer:
+    "ChartVolt is a competitive trading platform that uses virtual currency for educational and entertainment purposes. Results from virtual trading do not guarantee real-world performance.",
   footerRiskDisclaimer:
     "Trading in financial markets involves substantial risk of loss and is not suitable for every investor. The valuation of financial instruments may fluctuate, and as a result, traders may lose more than their original investment. Past performance is not indicative of future results. All trading strategies are used at your own risk. This platform is for educational and entertainment purposes only. Virtual currency used on this platform has no real monetary value.",
   footerMenuPlatform: [
@@ -566,113 +609,132 @@ const defaultSettings: LandingSettings = {
   ],
 
   // Enterprise
-  enterpriseHeroTitle: "Launch Your Own Trading Platform",
-  enterpriseHeroSubtitle: "Enterprise Solutions",
+  enterpriseHeroTitle: "Launch Your Own Trading Competition Platform",
+  enterpriseHeroSubtitle: "Enterprise White-Label Solutions",
   enterpriseHeroDescription:
-    "Complete white-label solution with powerful admin panel and everything you need.",
-  enterpriseHeroBadge: "Enterprise Solutions",
-  enterpriseHeroCTAText: "Request Demo",
+    "Deploy a fully branded, production-ready trading competition platform in weeks — not months. Complete with real-time price feeds, advanced admin panel, competition engine, and everything you need to engage and monetize a global audience of traders.",
+  enterpriseHeroBadge: "🏢 Enterprise White-Label",
+  enterpriseHeroCTAText: "Request a Live Demo",
   enterpriseHeroCTALink: "#contact",
 
   enterpriseWhiteLabelEnabled: true,
-  enterpriseWhiteLabelTitle: "White Label Solution",
-  enterpriseWhiteLabelSubtitle: "Launch your own branded trading platform",
+  enterpriseWhiteLabelTitle: "Your Brand. Your Platform. Our Technology.",
+  enterpriseWhiteLabelSubtitle:
+    "Everything you need to launch a world-class trading arena under your own brand",
   enterpriseWhiteLabelFeatures: [
     {
       id: "1",
       icon: "Palette",
-      title: "Full Branding",
-      description: "Custom logo, colors, and styling",
+      title: "Complete Brand Customization",
+      description:
+        "Your logo, colors, fonts, and styling everywhere — from the landing page to email notifications. Fully white-labeled, zero ChartVolt branding.",
       enabled: true,
     },
     {
       id: "2",
       icon: "Globe",
-      title: "Custom Domain",
-      description: "Your own domain with SSL",
+      title: "Custom Domain & SSL",
+      description:
+        "Run on your own domain (e.g., arena.yourbrand.com) with enterprise-grade SSL encryption and CDN-backed global delivery.",
       enabled: true,
     },
     {
       id: "3",
       icon: "Mail",
-      title: "Email Branding",
-      description: "Branded email templates",
+      title: "Branded Communications",
+      description:
+        "Automated email templates, transactional emails, and notification systems — all branded with your identity and customizable via the admin panel.",
       enabled: true,
     },
     {
       id: "4",
       icon: "Code",
-      title: "API Access",
-      description: "Full API for integrations",
+      title: "REST API & Webhooks",
+      description:
+        "Full API access for third-party integrations, custom analytics pipelines, and webhook events for real-time platform monitoring.",
       enabled: true,
     },
     {
       id: "5",
       icon: "Server",
       title: "Dedicated Infrastructure",
-      description: "Your own servers",
+      description:
+        "Isolated servers, dedicated database instances, and guaranteed uptime SLAs. Your platform runs independently for maximum performance and security.",
       enabled: true,
     },
     {
       id: "6",
       icon: "Headphones",
-      title: "Priority Support",
-      description: "24/7 dedicated support",
+      title: "24/7 Priority Support & Onboarding",
+      description:
+        "Dedicated account manager, priority support queue, and comprehensive onboarding — from setup to your first live competition.",
       enabled: true,
     },
   ],
 
   enterpriseAdminEnabled: true,
-  enterpriseAdminTitle: "Complete Control Center",
-  enterpriseAdminSubtitle: "Powerful Admin Panel",
-  enterpriseAdminDescription: "Everything you need to manage your platform",
+  enterpriseAdminTitle: "The Most Powerful Admin Panel in Trading",
+  enterpriseAdminSubtitle: "Complete Operations Control Center",
+  enterpriseAdminDescription:
+    "Manage every aspect of your platform from a single, intuitive dashboard — users, competitions, payments, content, and more. Built for operators who demand total control.",
   enterpriseAdminFeatures: [
     {
       id: "1",
       icon: "BarChart3",
-      title: "Analytics",
-      description: "Real-time dashboards",
+      title: "Real-Time Analytics Dashboard",
+      description:
+        "Live user metrics, revenue tracking, competition performance, and engagement analytics — all visualized with professional charts and exportable reports.",
       color: "from-cyan-500 to-blue-600",
       enabled: true,
     },
     {
       id: "2",
       icon: "Users",
-      title: "User Management",
-      description: "Complete user control",
+      title: "Advanced User Management",
+      description:
+        "Full user lifecycle control — KYC verification, role-based access, wallet management, activity logs, and automated restriction systems.",
       color: "from-purple-500 to-pink-600",
       enabled: true,
     },
     {
       id: "3",
       icon: "Trophy",
-      title: "Competitions",
-      description: "Create and manage",
+      title: "Competition Engine",
+      description:
+        "Create unlimited competition types — tournaments, leagues, 1v1 duels, and custom formats. Configure entry fees, prize pools, rules, and schedules with granular control.",
       color: "from-yellow-500 to-orange-600",
       enabled: true,
     },
     {
       id: "4",
       icon: "Shield",
-      title: "Fraud Detection",
-      description: "AI-powered security",
+      title: "Fraud Detection & Security",
+      description:
+        "AI-powered anomaly detection, IP tracking, multi-account prevention, and real-time risk scoring — protecting your platform and your users around the clock.",
       color: "from-red-500 to-rose-600",
       enabled: true,
     },
   ],
 
   enterprisePricingEnabled: true,
-  enterprisePricingTitle: "Simple Pricing",
-  enterprisePricingSubtitle: "Choose the plan that fits your needs",
+  enterprisePricingTitle: "Transparent, Scalable Pricing",
+  enterprisePricingSubtitle:
+    "Plans that grow with your business — from startup to global scale",
   enterprisePricingTiers: [
     {
       id: "1",
       name: "Starter",
       price: "$499",
       period: "/month",
-      description: "For small communities",
-      features: ["Up to 1,000 users", "Basic admin", "Email support"],
-      ctaText: "Get Started",
+      description: "Perfect for communities and startups",
+      features: [
+        "Up to 1,000 active users",
+        "Basic admin panel",
+        "5 concurrent competitions",
+        "Email support (48h SLA)",
+        "Standard branding options",
+      ],
+      ctaText: "Start Free Trial",
       highlighted: false,
       enabled: true,
     },
@@ -681,14 +743,17 @@ const defaultSettings: LandingSettings = {
       name: "Professional",
       price: "$1,499",
       period: "/month",
-      description: "For growing platforms",
+      description: "For growing platforms and brokers",
       features: [
-        "Up to 10,000 users",
-        "Full admin",
-        "Priority support",
-        "Custom branding",
+        "Up to 10,000 active users",
+        "Full admin + analytics",
+        "Unlimited competitions",
+        "Priority support (4h SLA)",
+        "Complete white-label branding",
+        "Custom domain & SSL",
+        "API access & webhooks",
       ],
-      ctaText: "Start Trial",
+      ctaText: "Start 14-Day Trial",
       highlighted: true,
       enabled: true,
     },
@@ -697,25 +762,29 @@ const defaultSettings: LandingSettings = {
       name: "Enterprise",
       price: "Custom",
       period: "",
-      description: "For large operations",
+      description: "For global operators and institutions",
       features: [
         "Unlimited users",
-        "White label",
-        "Dedicated servers",
-        "24/7 support",
+        "Full white-label solution",
+        "Dedicated servers & SLA",
+        "24/7 dedicated support",
+        "Custom integrations",
+        "Onboarding & training",
+        "Source code escrow",
       ],
-      ctaText: "Contact Sales",
+      ctaText: "Talk to Sales",
       highlighted: false,
       enabled: true,
     },
   ],
 
   enterpriseContactEnabled: true,
-  enterpriseContactTitle: "Ready to Get Started?",
-  enterpriseContactSubtitle: "Contact our sales team",
+  enterpriseContactTitle: "Ready to Launch Your Trading Platform?",
+  enterpriseContactSubtitle:
+    "Get a personalized demo and custom proposal from our enterprise team",
   enterpriseContactEmail: "enterprise@chartvolt.com",
   enterpriseContactPhone: "+1 (234) 567-890",
-  enterpriseContactCTAText: "Schedule Demo",
+  enterpriseContactCTAText: "Schedule a Live Demo",
 };
 
 export default function LandingPageBuilder() {
@@ -1186,9 +1255,15 @@ export default function LandingPageBuilder() {
         hero: s.heroEnabled,
         features: s.featuresEnabled,
         stats: s.statsEnabled,
+        liveStats: true,
         howItWorks: s.howItWorksEnabled,
         competitions: s.competitionsEnabled,
         challenges: s.challengesEnabled,
+        leaderboard: true,
+        activityFeed: true,
+        testimonials: true,
+        trustBadges: true,
+        faq: true,
         cta: s.ctaEnabled,
         footer: s.footerEnabled,
       },
