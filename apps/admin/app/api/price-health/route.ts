@@ -45,8 +45,16 @@ export async function GET(request: NextRequest) {
         healthyCount: 0,
         degradedCount: 0,
         criticalCount: 0,
+        marketClosedCount: 0,
         symbols: [],
         alerts: [],
+        marketStatus: {
+          forex: { isOpen: true },
+          crypto: { isOpen: true },
+          stocks: { isOpen: true },
+          indices: { isOpen: true },
+          commodities: { isOpen: true },
+        },
         message: "Price health data unavailable - main app may not be running",
       },
     });

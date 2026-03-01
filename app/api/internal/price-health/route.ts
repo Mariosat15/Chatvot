@@ -4,7 +4,8 @@ import { priceSnapshotService } from "@/lib/services/price-snapshot.service";
 
 /**
  * GET /api/internal/price-health
- * Internal API for admin dashboard to fetch price health status
+ * Internal API for admin dashboard to fetch price health status.
+ * Now includes market status context (open/closed/holiday) per asset class.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Initialize health monitor if not already (async - loads enabled symbols from DB)
     await priceHealthMonitor.initialize();
 
-    // Get health snapshot
+    // Get health snapshot (now includes market status)
     const healthSnapshot = priceHealthMonitor.getHealthSnapshot();
 
     // Get snapshot service status
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
         healthyCount: healthSnapshot.healthyCount,
         degradedCount: healthSnapshot.degradedCount,
         criticalCount: healthSnapshot.criticalCount,
+        marketClosedCount: healthSnapshot.marketClosedCount,
         symbols: healthSnapshot.symbols.map((s) => ({
           symbol: s.symbol,
           status: s.status,
@@ -44,6 +46,8 @@ export async function GET(request: NextRequest) {
           isAnomaly: s.isAnomaly,
           source: s.source,
           lastPrice: s.lastPrice,
+          assetClass: s.assetClass,
+          closedReason: s.closedReason,
         })),
         alerts: healthSnapshot.alerts.map((a) => ({
           id: a.id,
@@ -54,6 +58,7 @@ export async function GET(request: NextRequest) {
           timestamp: a.timestamp,
           acknowledged: a.acknowledged,
         })),
+        marketStatus: healthSnapshot.marketStatus,
       },
       snapshot: {
         isRunning: snapshotStatus.isRunning,

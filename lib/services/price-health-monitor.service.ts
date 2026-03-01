@@ -4,7 +4,13 @@
  * Monitors the health of price feeds in real-time and triggers alerts
  * when issues are detected (staleness, anomalies, disconnections).
  *
- * Used for competition risk mitigation - ensures fair pricing during competitions.
+ * SMART FEATURES:
+ * - Checks admin-configured market hours / holidays / weekends before alerting.
+ * - Crypto = 24/7; Forex = Mon–Fri; Stocks/Indices/Commodities = per-schedule.
+ * - Alert cooldown: 20 minutes per symbol (prevents log spam).
+ * - "Infinitys" bug fixed — shows "never received" when no tick has arrived.
+ *
+ * Used for competition risk mitigation — ensures fair pricing during competitions.
  *
  * IMPORTANT: Only monitors symbols that are ENABLED in the admin TradingSymbol settings.
  * Disabled symbols are not monitored to avoid false alerts.
@@ -22,7 +28,11 @@ const FOREX_SYMBOLS_FALLBACK = Object.keys(FOREX_PAIRS) as ForexSymbol[];
 // Types & Interfaces
 // ============================================
 
-export type PriceHealthStatus = "healthy" | "degraded" | "critical";
+export type PriceHealthStatus =
+  | "healthy"
+  | "degraded"
+  | "critical"
+  | "market_closed";
 
 export interface SymbolHealthInfo {
   symbol: ForexSymbol;
@@ -35,6 +45,25 @@ export interface SymbolHealthInfo {
   isAnomaly: boolean;
   status: PriceHealthStatus;
   source: "websocket" | "rest" | "cache" | "fallback";
+  /** Asset class derived from symbol characteristics */
+  assetClass: AssetClass;
+  /** If market_closed, explains why (weekend, holiday, after-hours) */
+  closedReason?: string;
+}
+
+export type AssetClass =
+  | "forex"
+  | "crypto"
+  | "stocks"
+  | "indices"
+  | "commodities";
+
+export interface MarketStatusInfo {
+  isOpen: boolean;
+  reason?: string;
+  isHoliday?: boolean;
+  holidayName?: string;
+  nextOpenDescription?: string;
 }
 
 export interface PriceHealthSnapshot {
@@ -46,7 +75,10 @@ export interface PriceHealthSnapshot {
   healthyCount: number;
   degradedCount: number;
   criticalCount: number;
+  marketClosedCount: number;
   alerts: PriceAlert[];
+  /** Per-asset-class market status */
+  marketStatus: Record<AssetClass, MarketStatusInfo>;
 }
 
 export interface PriceAlert {
@@ -72,8 +104,8 @@ export interface PriceHealthConfig {
   staleThresholdMs: number; // How long without update = stale (default: 30s)
   criticalStaleThresholdMs: number; // How long without update = critical (default: 60s)
   anomalyThresholdPercent: number; // Price change % that triggers anomaly (default: 1%)
-  alertCooldownMs: number; // Minimum time between same type alerts (default: 60s)
-  checkIntervalMs: number; // How often to check health (default: 5s)
+  alertCooldownMs: number; // Minimum time between same type alerts (default: 20min)
+  checkIntervalMs: number; // How often to check health (default: 10s)
 }
 
 // ============================================
@@ -81,11 +113,12 @@ export interface PriceHealthConfig {
 // ============================================
 
 const DEFAULT_CONFIG: PriceHealthConfig = {
-  staleThresholdMs: 30000, // 30 seconds
-  criticalStaleThresholdMs: 60000, // 60 seconds
+  staleThresholdMs: 30_000, // 30 seconds
+  criticalStaleThresholdMs: 60_000, // 60 seconds
   anomalyThresholdPercent: 1.0, // 1% sudden change
-  alertCooldownMs: 60000, // 60 seconds between same alerts
-  checkIntervalMs: 5000, // Check every 5 seconds
+  // Reason: 20-minute cooldown prevents log spam while still catching real issues.
+  alertCooldownMs: 1_200_000, // 20 minutes (was 60s — caused severe log spam)
+  checkIntervalMs: 10_000, // Check every 10 seconds (was 5s — unnecessary)
 };
 
 // ============================================
@@ -107,6 +140,8 @@ interface PriceHealthGlobalState {
   lastConnectionChange: number;
   adminNotifiedOfDisconnect: boolean;
   subscribers: Set<(snapshot: PriceHealthSnapshot) => void>;
+  /** Cached market status per asset class (refreshed every 60s) */
+  marketStatusCache: Map<AssetClass, { status: MarketStatusInfo; ts: number }>;
 }
 
 function getGlobalState(): PriceHealthGlobalState {
@@ -125,11 +160,32 @@ function getGlobalState(): PriceHealthGlobalState {
       lastConnectionChange: Date.now(),
       adminNotifiedOfDisconnect: false,
       subscribers: new Set(),
+      marketStatusCache: new Map(),
     };
   }
   return (globalThis as Record<string, unknown>)[
     GLOBAL_KEY
   ] as PriceHealthGlobalState;
+}
+
+// ============================================
+// Asset Class Resolver
+// ============================================
+
+/**
+ * Determine the asset class for a symbol.
+ * Currently all FOREX_PAIRS entries are forex. In the future
+ * if crypto/stocks/indices/commodities are added, this function
+ * should check the TradingSymbol model's category or a mapping.
+ */
+function resolveAssetClass(symbol: ForexSymbol): AssetClass {
+  // Reason: All symbols in the FOREX_PAIRS master list are forex.
+  // If the platform adds crypto (BTC/USD, ETH/USD) or stocks in the future,
+  // this function should be extended to classify them correctly.
+  if (symbol in FOREX_PAIRS) {
+    return "forex";
+  }
+  return "forex"; // Safe default
 }
 
 // ============================================
@@ -159,8 +215,9 @@ class PriceHealthMonitorService {
     this.startHealthChecks();
     this.state.initialized = true;
     console.log(
-      "🏥 [PriceHealthMonitor] Initialized with config:",
-      this.state.config,
+      "🏥 [PriceHealthMonitor] Initialized — alert cooldown:",
+      `${this.state.config.alertCooldownMs / 60000}min,`,
+      `check interval: ${this.state.config.checkIntervalMs / 1000}s`,
     );
     console.log(
       `🏥 [PriceHealthMonitor] Monitoring ${this.state.enabledSymbols.length} enabled symbols`,
@@ -184,25 +241,22 @@ class PriceHealthMonitorService {
         .lean();
 
       if (enabledDocs && enabledDocs.length > 0) {
-        // Map database symbols to ForexSymbol format (they might be stored as EUR/USD or EURUSD)
         this.state.enabledSymbols = (
           enabledDocs as unknown as Array<{ symbol: string }>
         )
           .map((doc) => doc.symbol as ForexSymbol)
-          .filter((symbol) => symbol in FOREX_PAIRS); // Only track symbols we know how to handle
+          .filter((symbol) => symbol in FOREX_PAIRS);
 
         console.log(
           `🏥 [PriceHealthMonitor] Loaded ${this.state.enabledSymbols.length} enabled symbols from database`,
         );
       } else {
-        // Fallback to all symbols if database is empty or not seeded
         console.log(
           "🏥 [PriceHealthMonitor] No enabled symbols in database, using fallback (all symbols)",
         );
         this.state.enabledSymbols = [...FOREX_SYMBOLS_FALLBACK];
       }
     } catch (error) {
-      // Fallback to all symbols on error
       console.warn(
         "🏥 [PriceHealthMonitor] Failed to load symbols from database, using fallback:",
         error,
@@ -224,6 +278,7 @@ class PriceHealthMonitorService {
         isAnomaly: false,
         status: "critical",
         source: "fallback",
+        assetClass: resolveAssetClass(symbol),
       });
     }
   }
@@ -237,7 +292,6 @@ class PriceHealthMonitorService {
 
     await this.loadEnabledSymbols();
 
-    // Log changes
     const newSymbols = this.state.enabledSymbols.filter(
       (s) => !previousSymbols.has(s),
     );
@@ -256,7 +310,6 @@ class PriceHealthMonitorService {
       );
     }
 
-    // Notify subscribers of the change
     this.notifySubscribers();
   }
 
@@ -283,7 +336,6 @@ class PriceHealthMonitorService {
     price: number,
     source: "websocket" | "rest" | "cache" | "fallback",
   ): void {
-    // Skip if symbol is not being monitored (disabled in admin)
     if (!this.state.enabledSymbols.includes(symbol)) {
       return;
     }
@@ -306,7 +358,7 @@ class PriceHealthMonitorService {
     // Check for anomaly (sudden large price movement)
     const isAnomaly =
       priceChangePercent > this.state.config.anomalyThresholdPercent &&
-      now - previousUpdate < 1000; // Within 1 second
+      now - previousUpdate < 1000;
 
     // Update health info
     health.previousPrice = previousPrice;
@@ -318,6 +370,7 @@ class PriceHealthMonitorService {
     health.isAnomaly = isAnomaly;
     health.source = source;
     health.status = isAnomaly ? "degraded" : "healthy";
+    health.closedReason = undefined;
 
     // Trigger anomaly alert if needed
     if (isAnomaly) {
@@ -347,7 +400,6 @@ class PriceHealthMonitorService {
     this.state.reconnectAttempts = reconnectAttempts;
     this.state.lastConnectionChange = Date.now();
 
-    // Connection lost
     if (previousStatus === "connected" && status !== "connected") {
       this.triggerAlert({
         type: "connection_lost",
@@ -358,7 +410,6 @@ class PriceHealthMonitorService {
       this.state.adminNotifiedOfDisconnect = false;
     }
 
-    // Connection restored
     if (previousStatus !== "connected" && status === "connected") {
       this.triggerAlert({
         type: "connection_restored",
@@ -369,7 +420,6 @@ class PriceHealthMonitorService {
       this.state.adminNotifiedOfDisconnect = false;
     }
 
-    // Max reconnect attempts reached
     if (reconnectAttempts >= 10 && !this.state.adminNotifiedOfDisconnect) {
       this.triggerAlert({
         type: "max_reconnect_reached",
@@ -378,12 +428,126 @@ class PriceHealthMonitorService {
         metadata: { reconnectAttempts },
       });
       this.state.adminNotifiedOfDisconnect = true;
-      // Notify admin via system
       this.notifyAdminOfCriticalIssue(
         "Price feed connection failed after maximum retry attempts",
       );
     }
   }
+
+  // ─── Market Hours Integration ──────────────────────────────────────────
+
+  /**
+   * Check if the market for a given asset class is currently open.
+   * Uses a 60-second cache to avoid hammering the DB on every health check.
+   */
+  private async getMarketStatus(
+    assetClass: AssetClass,
+  ): Promise<MarketStatusInfo> {
+    const cached = this.state.marketStatusCache.get(assetClass);
+    if (cached && Date.now() - cached.ts < 60_000) {
+      return cached.status;
+    }
+
+    try {
+      // Dynamic import to avoid circular deps
+      const { isMarketOpen } = await import("./market-hours.service");
+      const result = await isMarketOpen(assetClass);
+
+      const status: MarketStatusInfo = {
+        isOpen: result.isOpen,
+        reason: result.reason,
+        isHoliday: result.isHoliday,
+        holidayName: result.holidayName,
+      };
+
+      // Add helpful context about when market reopens
+      if (!result.isOpen) {
+        status.nextOpenDescription = this.estimateNextOpen(assetClass);
+      }
+
+      this.state.marketStatusCache.set(assetClass, {
+        status,
+        ts: Date.now(),
+      });
+      return status;
+    } catch (error) {
+      console.warn(
+        `🏥 [PriceHealthMonitor] Failed to check market hours for ${assetClass}:`,
+        error,
+      );
+      // Reason: If market hours check fails, assume open to avoid
+      // suppressing real alerts. Better to have a false positive
+      // than miss a real price feed outage.
+      return { isOpen: true };
+    }
+  }
+
+  /**
+   * Estimate when the market next opens (human-readable).
+   */
+  private estimateNextOpen(assetClass: AssetClass): string {
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0=Sun, 6=Sat
+
+    if (assetClass === "crypto") {
+      return "Crypto markets are 24/7";
+    }
+
+    if (assetClass === "forex") {
+      // Forex is closed Sat 00:00 → Sun ~22:00 UTC
+      if (dayOfWeek === 6) {
+        return "Reopens Sunday ~22:00 UTC";
+      }
+      if (dayOfWeek === 0) {
+        const hour = now.getUTCHours();
+        if (hour < 22) {
+          return "Reopens today ~22:00 UTC";
+        }
+        return "Should be open now";
+      }
+      // Weekday — likely after-hours or holiday
+      return "Check market schedule in admin settings";
+    }
+
+    // Stocks / indices / commodities
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return "Reopens Monday";
+    }
+    return "Check trading schedule in admin settings";
+  }
+
+  /**
+   * Get aggregated market status for all relevant asset classes.
+   */
+  private async getAllMarketStatuses(): Promise<
+    Record<AssetClass, MarketStatusInfo>
+  > {
+    // Determine which asset classes we actually monitor
+    const assetClasses = new Set<AssetClass>();
+    for (const health of this.state.symbolHealth.values()) {
+      assetClasses.add(health.assetClass);
+    }
+    // Always include forex since it's the primary
+    assetClasses.add("forex");
+
+    const statuses: Record<AssetClass, MarketStatusInfo> = {
+      forex: { isOpen: true },
+      crypto: { isOpen: true },
+      stocks: { isOpen: true },
+      indices: { isOpen: true },
+      commodities: { isOpen: true },
+    };
+
+    await Promise.all(
+      Array.from(assetClasses).map(async (ac) => {
+        statuses[ac] = await this.getMarketStatus(ac);
+      }),
+    );
+
+    return statuses;
+  }
+
+  // ─── Health Checks ─────────────────────────────────────────────────────
 
   /**
    * Start periodic health checks
@@ -399,13 +563,19 @@ class PriceHealthMonitorService {
   }
 
   /**
-   * Perform a health check on all symbols
+   * Perform a health check on all symbols.
+   * Now market-hours-aware: symbols whose market is closed
+   * are marked as "market_closed" instead of "critical".
    */
-  private performHealthCheck(): void {
+  private async performHealthCheck(): Promise<void> {
     const now = Date.now();
     let healthyCount = 0;
     let degradedCount = 0;
     let criticalCount = 0;
+    let marketClosedCount = 0;
+
+    // Fetch market statuses (cached, max 1 DB call per 60s per asset class)
+    const marketStatuses = await this.getAllMarketStatuses();
 
     for (const [symbol, health] of this.state.symbolHealth) {
       // Update stale duration
@@ -413,21 +583,41 @@ class PriceHealthMonitorService {
         health.staleDuration = now - health.lastUpdate;
       }
 
-      // Check staleness
+      // ⚡ CRITICAL: Check if this symbol's market is closed
+      const mktStatus = marketStatuses[health.assetClass];
+      if (mktStatus && !mktStatus.isOpen) {
+        // Market is closed — do NOT flag as stale/critical
+        health.status = "market_closed";
+        health.closedReason = mktStatus.isHoliday
+          ? `Holiday: ${mktStatus.holidayName}`
+          : mktStatus.reason || "Market closed";
+        health.isStale = false;
+        marketClosedCount++;
+        continue;
+      }
+
+      // Market is open — evaluate staleness normally
+      health.closedReason = undefined;
+
       health.isStale =
         health.staleDuration > this.state.config.staleThresholdMs;
 
-      // Determine status
       if (health.staleDuration > this.state.config.criticalStaleThresholdMs) {
         health.status = "critical";
         criticalCount++;
 
-        // Trigger stale alert
+        // Reason: Format the stale duration properly.
+        // When lastUpdate is 0 (never received), staleDuration is Infinity.
+        const staleDesc =
+          health.lastUpdate === 0
+            ? "never received a price tick"
+            : `${Math.round(health.staleDuration / 1000)}s without update`;
+
         this.triggerAlert({
           type: "price_stale",
           severity: "error",
           symbol,
-          message: `Price for ${symbol} is critically stale (${Math.round(health.staleDuration / 1000)}s without update)`,
+          message: `Price for ${symbol} is critically stale (${staleDesc})`,
           metadata: { staleDuration: health.staleDuration },
         });
       } else if (health.isStale || health.isAnomaly) {
@@ -439,26 +629,27 @@ class PriceHealthMonitorService {
       }
     }
 
-    // Check overall health (based on enabled symbols count)
-    const enabledCount = this.state.enabledSymbols.length;
+    // Determine overall status — ignore market_closed symbols
+    const activeCount = healthyCount + degradedCount + criticalCount;
     const overallStatus: PriceHealthStatus =
-      criticalCount > 0
-        ? "critical"
-        : degradedCount > enabledCount / 4
-          ? "degraded"
-          : "healthy";
+      activeCount === 0
+        ? "market_closed" // All symbols have their market closed
+        : criticalCount > 0
+          ? "critical"
+          : degradedCount > activeCount / 4
+            ? "degraded"
+            : "healthy";
 
-    // Trigger critical health alert if too many symbols are unhealthy
-    if (overallStatus === "critical") {
+    // Only trigger critical health alert if market is open and symbols are stale
+    if (overallStatus === "critical" && criticalCount > 0) {
       this.triggerAlert({
         type: "critical_health",
         severity: "critical",
-        message: `Price feed health is CRITICAL: ${criticalCount} symbols critically stale`,
-        metadata: { healthyCount, degradedCount, criticalCount },
+        message: `Price feed health is CRITICAL: ${criticalCount} symbol(s) critically stale while market is open`,
+        metadata: { healthyCount, degradedCount, criticalCount, marketClosedCount },
       });
     }
 
-    // Notify subscribers
     this.notifySubscribers();
   }
 
@@ -513,7 +704,6 @@ class PriceHealthMonitorService {
     try {
       await connectToDatabase();
 
-      // Dynamic import to avoid circular dependencies
       const PriceHealthAlert = (
         await import("@/database/models/price-health-alert.model")
       ).default;
@@ -541,7 +731,6 @@ class PriceHealthMonitorService {
     try {
       await connectToDatabase();
 
-      // Get admin users from collection (no User model exists)
       const usersCollection = mongoose.connection.collection("user");
       const admins = await usersCollection
         .find({ role: "admin" })
@@ -596,7 +785,6 @@ class PriceHealthMonitorService {
    * Only includes enabled symbols that are being monitored
    */
   getHealthSnapshot(): PriceHealthSnapshot {
-    // Only return health info for enabled symbols
     const symbols = Array.from(this.state.symbolHealth.values()).filter((s) =>
       this.state.enabledSymbols.includes(s.symbol),
     );
@@ -604,14 +792,31 @@ class PriceHealthMonitorService {
     const healthyCount = symbols.filter((s) => s.status === "healthy").length;
     const degradedCount = symbols.filter((s) => s.status === "degraded").length;
     const criticalCount = symbols.filter((s) => s.status === "critical").length;
+    const marketClosedCount = symbols.filter(
+      (s) => s.status === "market_closed",
+    ).length;
 
-    const enabledCount = this.state.enabledSymbols.length;
+    const activeCount = healthyCount + degradedCount + criticalCount;
     const overallStatus: PriceHealthStatus =
-      criticalCount > 0
-        ? "critical"
-        : degradedCount > enabledCount / 4
-          ? "degraded"
-          : "healthy";
+      activeCount === 0
+        ? "market_closed"
+        : criticalCount > 0
+          ? "critical"
+          : degradedCount > activeCount / 4
+            ? "degraded"
+            : "healthy";
+
+    // Build market status from cache
+    const marketStatus: Record<AssetClass, MarketStatusInfo> = {
+      forex: { isOpen: true },
+      crypto: { isOpen: true },
+      stocks: { isOpen: true },
+      indices: { isOpen: true },
+      commodities: { isOpen: true },
+    };
+    for (const [ac, cached] of this.state.marketStatusCache) {
+      marketStatus[ac] = cached.status;
+    }
 
     return {
       timestamp: new Date(),
@@ -622,7 +827,9 @@ class PriceHealthMonitorService {
       healthyCount,
       degradedCount,
       criticalCount,
-      alerts: this.state.alerts.slice(-20), // Last 20 alerts
+      marketClosedCount,
+      alerts: this.state.alerts.slice(-20),
+      marketStatus,
     };
   }
 
@@ -686,7 +893,6 @@ class PriceHealthMonitorService {
     alert.acknowledgedAt = new Date();
     alert.acknowledgedBy = acknowledgedBy;
 
-    // Update in database
     this.updateAlertInDatabase(alertId, {
       acknowledged: true,
       acknowledgedAt: alert.acknowledgedAt,
