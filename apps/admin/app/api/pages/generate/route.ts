@@ -53,11 +53,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch company details from CompanySettings collection (singleton)
+    // Reason: Use getSingleton() — it auto-creates a default doc if none exists,
+    // matching how CompanyDetailsSection reads/saves the data.
     await connectToDatabase();
-    const cs = await CompanySettingsModel.findOne({}).lean();
+    const cs = await CompanySettingsModel.getSingleton();
+
+    console.log("📋 [Generate] CompanySettings found:", {
+      companyName: cs?.companyName,
+      legalName: cs?.legalName,
+      email: cs?.email,
+      country: cs?.country,
+    });
 
     const company: CompanyInfo = {
-      companyName: cs?.companyName || "Our Platform",
+      companyName: cs?.companyName && cs.companyName !== "Your Company Name"
+        ? cs.companyName
+        : "Our Platform",
       legalName: cs?.legalName || "Our Platform Ltd.",
       email: cs?.email || "support@ourplatform.com",
       phone: cs?.phone || "",

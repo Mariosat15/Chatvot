@@ -93,14 +93,28 @@ const PAGE_TEMPLATES = [
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-/** Build the preview URL using the main app URL (not the admin's port). */
+/** Build the preview URL pointing to the main app (not admin). */
 function getMainAppUrl(): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== "undefined"
-      ? window.location.origin.replace(/:\d+$/, ":3000")
-      : "http://localhost:3000");
-  return base.replace(/\/+$/, "");
+  // 1. Prefer explicit env var
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
+  }
+
+  // 2. Derive from current window location
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin;
+
+    // Production: admin.chartvolt.com → chartvolt.com
+    // Reason: admin runs on a subdomain, not a separate port, in production.
+    if (origin.includes("admin.")) {
+      return origin.replace("admin.", "").replace(/\/+$/, "");
+    }
+
+    // Dev: localhost:3001 → localhost:3000
+    return origin.replace(/:\d+$/, ":3000").replace(/\/+$/, "");
+  }
+
+  return "http://localhost:3000";
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

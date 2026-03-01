@@ -65,6 +65,23 @@ import {
   LandingTheme,
 } from "@/lib/themes/landing-themes";
 
+/** Build the preview URL pointing to the main app (not admin). */
+function getMainAppUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
+  }
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin;
+    // Production: admin.chartvolt.com → chartvolt.com
+    if (origin.includes("admin.")) {
+      return origin.replace("admin.", "").replace(/\/+$/, "");
+    }
+    // Dev: localhost:3001 → localhost:3000
+    return origin.replace(/:\d+$/, ":3000").replace(/\/+$/, "");
+  }
+  return "http://localhost:3000";
+}
+
 // Available icons for selection
 const availableIcons = [
   "Trophy",
@@ -2206,7 +2223,7 @@ export default function LandingPageBuilder() {
             <h3 className="text-lg font-semibold text-white">
               Hero Page Sections
             </h3>
-            <a href="/" target="_blank" rel="noopener noreferrer">
+            <a href={getMainAppUrl()} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm" className="border-gray-600">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Preview Page
@@ -3180,7 +3197,7 @@ export default function LandingPageBuilder() {
             <h3 className="text-lg font-semibold text-white">
               Enterprise Page Sections
             </h3>
-            <a href="/enterprise" target="_blank" rel="noopener noreferrer">
+            <a href={`${getMainAppUrl()}/enterprise`} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm" className="border-gray-600">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Preview Page

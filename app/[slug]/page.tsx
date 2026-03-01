@@ -20,6 +20,7 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  if (STATIC_ASSET_PATTERN.test(slug)) return { title: "Not Found" };
   try {
     await connectToDatabase();
     const page = await SitePage.findOne({
@@ -82,6 +83,10 @@ function SectionRenderer({ section }: { section: ISitePageSection }) {
   }
 }
 
+// Reason: Static assets like favicon.ico, robots.txt, sitemap.xml can be
+// caught by this dynamic route. Return 404 immediately for non-page slugs.
+const STATIC_ASSET_PATTERN = /\.(ico|png|jpg|jpeg|gif|svg|webp|xml|txt|json|js|css|woff2?|ttf|eot|map)$/i;
+
 /**
  * Dynamic site page renderer.
  *
@@ -91,6 +96,11 @@ function SectionRenderer({ section }: { section: ISitePageSection }) {
  */
 export default async function DynamicSitePage({ params }: PageProps) {
   const { slug } = await params;
+
+  // Early exit for static assets that leaked into the dynamic route
+  if (STATIC_ASSET_PATTERN.test(slug)) {
+    notFound();
+  }
 
   try {
     await connectToDatabase();
