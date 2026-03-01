@@ -714,6 +714,28 @@ export default function LandingPageBuilder() {
   const [creatingPageForSlug, setCreatingPageForSlug] = useState<string | null>(
     null,
   );
+  const [generatingDisclaimer, setGeneratingDisclaimer] = useState(false);
+
+  // ── Generate Risk Disclaimer via AI ─────────────────────────────────────
+  const handleGenerateRiskDisclaimer = useCallback(async () => {
+    setGeneratingDisclaimer(true);
+    try {
+      const res = await fetch("/api/pages/generate-risk-disclaimer", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.success && data.text) {
+        setSettings((prev) => ({ ...prev, footerRiskDisclaimer: data.text }));
+        toast.success("Risk disclaimer generated successfully");
+      } else {
+        toast.error(data.error || "Failed to generate risk disclaimer");
+      }
+    } catch {
+      toast.error("Failed to generate risk disclaimer");
+    } finally {
+      setGeneratingDisclaimer(false);
+    }
+  }, []);
 
   const fetchSitePages = useCallback(async () => {
     try {
@@ -2991,20 +3013,44 @@ export default function LandingPageBuilder() {
 
                 {/* Risk Disclaimer */}
                 <div className="p-4 bg-gray-900 rounded-lg space-y-3">
-                  <Label className="text-yellow-500 font-semibold">
-                    ⚠️ Risk Disclaimer
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-yellow-500 font-semibold">
+                      ⚠️ Risk Disclaimer
+                    </Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateRiskDisclaimer}
+                      disabled={generatingDisclaimer}
+                      className="border-yellow-600 text-yellow-500 hover:bg-yellow-500/10"
+                    >
+                      {generatingDisclaimer ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          Generate Risk Disclaimer
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <Textarea
                     value={settings.footerRiskDisclaimer}
                     onChange={(e) =>
                       updateField("footerRiskDisclaimer", e.target.value)
                     }
                     className="bg-gray-800 border-gray-600 text-white"
-                    rows={5}
+                    rows={7}
                     placeholder="Trading involves substantial risk..."
                   />
                   <p className="text-xs text-gray-500">
                     This is the main risk disclaimer shown in the footer.
+                    Click &quot;Generate Risk Disclaimer&quot; to auto-generate
+                    a professional, legally compliant disclaimer using your
+                    company details.
                   </p>
                 </div>
 

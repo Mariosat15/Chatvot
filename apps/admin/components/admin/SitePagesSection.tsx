@@ -80,6 +80,11 @@ const PAGE_TEMPLATES = [
     label: "Responsible Trading",
     slug: "responsible-trading",
   },
+  {
+    value: "risk-disclaimer",
+    label: "Risk Disclaimer",
+    slug: "risk-disclaimer",
+  },
   { value: "about", label: "About Us", slug: "about" },
   { value: "contact", label: "Contact Us", slug: "contact" },
   { value: "faq", label: "FAQ", slug: "faq" },
