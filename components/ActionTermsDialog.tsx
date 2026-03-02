@@ -155,6 +155,17 @@ export default function ActionTermsDialog({
 
   const handleAccept = () => {
     markAcceptedInSession(slug);
+
+    // Reason: Fire-and-forget POST to record the acceptance in the database.
+    // We don't block the user flow on this — the audit record is best-effort.
+    fetch("/api/terms-acceptance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    }).catch(() => {
+      // Silently fail — session acceptance is already recorded client-side
+    });
+
     onAccept();
   };
 

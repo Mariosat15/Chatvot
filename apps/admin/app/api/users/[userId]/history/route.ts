@@ -698,6 +698,37 @@ export async function GET(
       console.error("Error fetching GM competitions:", e);
     }
 
+    // 17. Terms Acceptances
+    try {
+      const acceptances = await db
+        .collection("termsacceptances")
+        .find({
+          userId: userId,
+        })
+        .sort({ acceptedAt: -1 })
+        .toArray();
+
+      for (const acceptance of acceptances) {
+        history.push({
+          id: acceptance._id.toString(),
+          type: "terms_acceptance",
+          category: acceptance.termsSlug || "terms",
+          description: `📜 Accepted: ${acceptance.termsTitle || acceptance.termsSlug || "Terms"}`,
+          status: "accepted",
+          createdAt: acceptance.acceptedAt || acceptance.createdAt,
+          details: {
+            termsSlug: acceptance.termsSlug,
+            termsTitle: acceptance.termsTitle,
+            termsUpdatedAt: acceptance.termsUpdatedAt,
+            ipAddress: acceptance.ipAddress,
+            userAgent: acceptance.userAgent,
+          },
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching terms acceptances:", e);
+    }
+
     // Sort all history by date (newest first)
     history.sort(
       (a, b) =>

@@ -56,6 +56,7 @@ import {
   DollarSign,
   Pause,
   Play,
+  ScrollText,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -219,6 +220,11 @@ const HISTORY_TYPE_CONFIG: Record<
     color: "text-orange-400",
     bgColor: "bg-orange-500/20",
     icon: Lock,
+  },
+  terms_acceptance: {
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-500/20",
+    icon: ScrollText,
   },
   note: {
     color: "text-gray-400",
@@ -407,6 +413,15 @@ export default function UserFullDetailPanel({
     dateTo: "",
     search: "",
   });
+
+  // Terms Viewer State
+  const [termsViewerOpen, setTermsViewerOpen] = useState(false);
+  const [termsViewerData, setTermsViewerData] = useState<{
+    slug: string;
+    title: string;
+    sections: { id: string; type: string; title?: string; content: string; order: number }[];
+  } | null>(null);
+  const [loadingTerms, setLoadingTerms] = useState(false);
 
   // Gamification Sync State
   const [syncingGamification, setSyncingGamification] = useState(false);
@@ -625,6 +640,33 @@ export default function UserFullDetailPanel({
       fetchHistory();
     }
   }, [activeTab, history.length, loadingHistory, fetchHistory]);
+
+  // Fetch terms content for "View Terms" button in activity history
+  const handleViewTerms = useCallback(async (slug: string) => {
+    setLoadingTerms(true);
+    setTermsViewerOpen(true);
+    try {
+      const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+      const res = await fetch(`${mainAppUrl}/api/action-terms/${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.terms) {
+          setTermsViewerData(data.terms);
+        } else {
+          toast.error("Terms page not found");
+          setTermsViewerOpen(false);
+        }
+      } else {
+        toast.error("Failed to load terms content");
+        setTermsViewerOpen(false);
+      }
+    } catch {
+      toast.error("Failed to load terms content");
+      setTermsViewerOpen(false);
+    } finally {
+      setLoadingTerms(false);
+    }
+  }, []);
 
   // Verify password before sensitive actions
   const handleVerifyPassword = async () => {
@@ -2984,6 +3026,18 @@ export default function UserFullDetailPanel({
                                                   : item.amount}
                                               </span>
                                             )}
+                                          {/* View Terms button for terms_acceptance entries */}
+                                          {item.type === "terms_acceptance" && item.details?.termsSlug && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-6 px-2 text-[10px] border-emerald-600/40 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                                              onClick={() => handleViewTerms(item.details!.termsSlug)}
+                                            >
+                                              <Eye className="h-3 w-3 mr-1" />
+                                              View Terms
+                                            </Button>
+                                          )}
                                         </div>
 
                                         {/* Details (expandable on hover) */}
@@ -3684,6 +3738,75 @@ export default function UserFullDetailPanel({
                     <Shield className="h-4 w-4 mr-2" />
                   )}
                   Verify
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Terms Viewer Dialog */}
+      {termsViewerOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center">
+          <Card className="bg-gray-800 border-emerald-500/50 w-[550px] max-h-[80vh] flex flex-col">
+            <CardHeader className="pb-3 shrink-0">
+              <CardTitle className="text-emerald-400 flex items-center gap-2">
+                <ScrollText className="h-5 w-5" />
+                {termsViewerData?.title || "Terms & Conditions"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 overflow-y-auto flex-1 min-h-0">
+              {loadingTerms ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 text-emerald-400 animate-spin" />
+                </div>
+              ) : termsViewerData ? (
+                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 space-y-3">
+                  {termsViewerData.sections
+                    .sort((a, b) => a.order - b.order)
+                    .map((section) => {
+                      if (section.type === "heading") {
+                        return (
+                          <h3 key={section.id} className="text-sm font-bold text-gray-100 mt-3 mb-1">
+                            {section.title || section.content}
+                          </h3>
+                        );
+                      }
+                      if (section.type === "list") {
+                        return (
+                          <ul key={section.id} className="text-xs text-gray-300 space-y-1 ml-4 mb-2">
+                            {section.content.split("\n").map((item, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="text-emerald-500 mt-0.5 shrink-0">•</span>
+                                <span className="leading-relaxed">{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      }
+                      if (section.type === "divider") {
+                        return <hr key={section.id} className="border-gray-700/50 my-2" />;
+                      }
+                      return (
+                        <p key={section.id} className="text-xs text-gray-300 leading-relaxed mb-2">
+                          {section.content}
+                        </p>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-8">No terms content found.</p>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTermsViewerOpen(false);
+                    setTermsViewerData(null);
+                  }}
+                  className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                >
+                  Close
                 </Button>
               </div>
             </CardContent>
