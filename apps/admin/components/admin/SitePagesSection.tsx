@@ -596,7 +596,7 @@ export default function SitePagesSection() {
                   <Button
                     onClick={handleCreateFromTemplate}
                     disabled={saving || generating}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
                     {saving || generating ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -662,7 +662,7 @@ export default function SitePagesSection() {
                 <CardContent className="py-4 flex items-center justify-between">
                   <div className="flex items-center gap-4 min-w-0 flex-1">
                     {/* Template icon or generic */}
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-800 border border-gray-700/50 flex items-center justify-center text-lg">
+                    <div className="shrink-0 w-10 h-10 rounded-lg bg-gray-800 border border-gray-700/50 flex items-center justify-center text-lg">
                       {templateInfo?.icon || "📄"}
                     </div>
                     <div className="min-w-0 flex-1">
