@@ -199,11 +199,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Log the action
+    // Reason: auditLogService.log expects { admin: { id, email }, ... } — not flat fields.
     await auditLogService.log({
+      admin: {
+        id: admin.adminId || "unknown",
+        email: admin.email || "unknown",
+        name: admin.name,
+        role: admin.role,
+      },
       action: "manual_deposit_credit",
-      adminEmail: admin.email || "unknown",
-      targetUserId: failedDeposit.userId,
-      details: `Manually credited ${creditsToAdd} credits (€${eurAmount}) for failed deposit ${transactionId}. Reason: ${reason}`,
+      category: "financial",
+      description: `Manually credited ${creditsToAdd} credits (€${eurAmount}) for failed deposit ${transactionId}. Reason: ${reason}`,
+      targetType: "transaction",
+      targetId: transactionId,
+      targetName: failedDeposit.userId,
       metadata: {
         originalTransactionId: transactionId,
         newTransactionId: manualCreditTransaction[0]._id.toString(),
