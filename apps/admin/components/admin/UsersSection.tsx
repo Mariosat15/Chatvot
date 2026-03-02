@@ -1094,6 +1094,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       {/* Full Screen Detail Panel */}
       {selectedUser && (
         <UserFullDetailPanel
+          key={selectedUser.id}
           open={detailPanelOpen}
           onOpenChange={(open) => {
             setDetailPanelOpen(open);

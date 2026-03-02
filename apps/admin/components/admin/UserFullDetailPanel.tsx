@@ -631,6 +631,14 @@ export default function UserFullDetailPanel({
       setEditAddress(user.address || "");
       setEditPostalCode(user.postalCode || "");
       setEditPhone(user.phone || "");
+
+      // Reason: Reset tab-specific state when switching users to prevent stale data.
+      // The key={user.id} on the parent handles this via unmount/remount,
+      // but this is a defensive measure in case the component is reused.
+      setActiveTab("overview");
+      setHistory([]);
+      setAvailableHistoryTypes([]);
+      setHistoryFilters({ type: "all", status: "all", dateFrom: "", dateTo: "", search: "" });
     }
   }, [open, user, fetchUserData, fetchAssignment]);
 

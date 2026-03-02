@@ -123,6 +123,17 @@ export function CustomerAuditTrail({
   const [page, setPage] = useState(0);
   const limit = 20;
 
+  // Reason: When switching between users, reset all stale data immediately
+  // to prevent showing the previous user's audit trail during fetch.
+  useEffect(() => {
+    setEntries([]);
+    setCategories([]);
+    setTotal(0);
+    setPage(0);
+    setSelectedCategory("all");
+    setExpandedEntries(new Set());
+  }, [customerId]);
+
   const fetchAuditTrail = useCallback(async () => {
     try {
       setLoading(true);
