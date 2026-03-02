@@ -32,6 +32,8 @@ interface TermsData {
   title: string;
   subtitle?: string;
   sections: TermsSection[];
+  /** true = show every session, false = show only once per user ever */
+  showEveryTime?: boolean;
 }
 
 interface ActionTermsDialogProps {
@@ -48,12 +50,16 @@ interface ActionTermsDialogProps {
 // ─── Session Storage Key ────────────────────────────────────────────────────
 // Reason: We cache acceptance per slug per browser session so users
 // don't have to re-accept every time they open the same dialog.
-const ACCEPTED_KEY_PREFIX = "action_terms_accepted_";
+const SESSION_KEY_PREFIX = "action_terms_accepted_";
+
+// Reason: For "show only once" mode, we cache the permanent acceptance
+// in localStorage so we don't re-check the server every time.
+const PERMANENT_KEY_PREFIX = "action_terms_permanent_";
 
 function hasAcceptedInSession(slug: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return sessionStorage.getItem(`${ACCEPTED_KEY_PREFIX}${slug}`) === "true";
+    return sessionStorage.getItem(`${SESSION_KEY_PREFIX}${slug}`) === "true";
   } catch {
     return false;
   }
@@ -62,15 +68,37 @@ function hasAcceptedInSession(slug: string): boolean {
 function markAcceptedInSession(slug: string): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(`${ACCEPTED_KEY_PREFIX}${slug}`, "true");
+    sessionStorage.setItem(`${SESSION_KEY_PREFIX}${slug}`, "true");
   } catch {
     // Silently fail — sessionStorage may be unavailable
+  }
+}
+
+function hasAcceptedPermanently(slug: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(`${PERMANENT_KEY_PREFIX}${slug}`) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function markAcceptedPermanently(slug: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`${PERMANENT_KEY_PREFIX}${slug}`, "true");
+  } catch {
+    // Silently fail
   }
 }
 
 // ─── Cache ──────────────────────────────────────────────────────────────────
 // Reason: Avoid re-fetching terms from the API every time the dialog opens.
 const termsCache = new Map<string, TermsData>();
+
+// Reason: Cache the server-side acceptance check result so we don't
+// call GET /api/terms-acceptance?slug=X on every open.
+const serverAcceptanceCache = new Map<string, boolean>();
 
 // ─── Component ──────────────────────────────────────────────────────────────
 export default function ActionTermsDialog({
@@ -90,42 +118,80 @@ export default function ActionTermsDialog({
   useEffect(() => {
     if (!open || !slug) return;
 
-    // Check session cache — auto-accept if already accepted this session
+    // ── Quick session check (works for "every time" mode) ──────────────
     if (hasAcceptedInSession(slug)) {
       onAccept();
       return;
     }
 
-    // Check in-memory cache
-    if (termsCache.has(slug)) {
-      setTerms(termsCache.get(slug)!);
-      setChecked(false);
-      setHasScrolledToBottom(false);
+    // ── Permanent acceptance check (for "once only" mode) ──────────────
+    // If we already know from localStorage that user accepted permanently, skip.
+    if (hasAcceptedPermanently(slug)) {
+      // Also mark session so we don't re-check localStorage on every open
+      markAcceptedInSession(slug);
+      onAccept();
       return;
     }
 
-    // Fetch from API
-    setLoading(true);
-    setError("");
-    setChecked(false);
-    setHasScrolledToBottom(false);
+    // Fetch terms from API (or use cache)
+    const loadTerms = async () => {
+      setLoading(true);
+      setError("");
+      setChecked(false);
+      setHasScrolledToBottom(false);
 
-    fetch(`/api/action-terms/${encodeURIComponent(slug)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.terms) {
-          setTerms(data.terms);
-          termsCache.set(slug, data.terms);
-        } else {
-          setError(data.error || "Terms not available");
+      try {
+        // Get terms data (from cache or API)
+        let termsData = termsCache.get(slug);
+        if (!termsData) {
+          const res = await fetch(`/api/action-terms/${encodeURIComponent(slug)}`);
+          const data = await res.json();
+          if (data.success && data.terms) {
+            termsData = data.terms;
+            termsCache.set(slug, termsData!);
+          } else {
+            setError(data.error || "Terms not available");
+            return;
+          }
         }
-      })
-      .catch(() => {
+
+        // Reason: If showEveryTime is false, check server-side if user already accepted.
+        // This handles cross-device / cleared-localStorage scenarios.
+        const isOnceOnly = termsData!.showEveryTime === false;
+        if (isOnceOnly && !serverAcceptanceCache.has(slug)) {
+          try {
+            const checkRes = await fetch(
+              `/api/terms-acceptance?slug=${encodeURIComponent(slug)}`,
+            );
+            const checkData = await checkRes.json();
+            if (checkData.success && checkData.hasAccepted) {
+              serverAcceptanceCache.set(slug, true);
+              markAcceptedPermanently(slug);
+              markAcceptedInSession(slug);
+              onAccept();
+              return;
+            }
+            serverAcceptanceCache.set(slug, false);
+          } catch {
+            // If server check fails, show the terms as a fallback (safer)
+          }
+        } else if (isOnceOnly && serverAcceptanceCache.get(slug)) {
+          // Already confirmed server-side acceptance
+          markAcceptedPermanently(slug);
+          markAcceptedInSession(slug);
+          onAccept();
+          return;
+        }
+
+        setTerms(termsData!);
+      } catch {
         setError("Failed to load terms. Please try again.");
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    loadTerms();
   }, [open, slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track scroll position
@@ -155,6 +221,13 @@ export default function ActionTermsDialog({
 
   const handleAccept = () => {
     markAcceptedInSession(slug);
+
+    // Reason: If "once only" mode, also mark permanent acceptance in localStorage
+    // and update the server cache so subsequent checks skip the popup.
+    if (terms?.showEveryTime === false) {
+      markAcceptedPermanently(slug);
+      serverAcceptanceCache.set(slug, true);
+    }
 
     // Reason: Fire-and-forget POST to record the acceptance in the database.
     // We don't block the user flow on this — the audit record is best-effort.

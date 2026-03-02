@@ -30,6 +30,12 @@ export interface DefaultPage {
   isSystem: boolean;
   /** @default "page" */
   category?: DefaultPageCategory;
+  /**
+   * For action_terms only.
+   * true  = show popup every session (default)
+   * false = show only once ever per user
+   */
+  showEveryTime?: boolean;
   seoTitle: string;
   seoDescription: string;
   sections: DefaultPageSection[];

@@ -45,6 +45,7 @@ export async function GET(
             subtitle: fallback.subtitle,
             sections: fallback.sections,
             updatedAt: new Date().toISOString(),
+            showEveryTime: fallback.showEveryTime ?? true,
           },
         });
       }
@@ -63,6 +64,9 @@ export async function GET(
         subtitle: page.subtitle,
         sections: page.sections,
         updatedAt: page.updatedAt,
+        // Reason: Client uses this to decide caching strategy:
+        // true = session-only cache, false = permanent (check server-side acceptance)
+        showEveryTime: page.showEveryTime ?? true,
       },
     });
   } catch (error) {

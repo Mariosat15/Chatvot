@@ -37,6 +37,7 @@ export async function GET(
         subtitle: page.subtitle,
         sections: page.sections,
         updatedAt: page.updatedAt,
+        showEveryTime: page.showEveryTime ?? true,
       },
     });
   } catch (error) {

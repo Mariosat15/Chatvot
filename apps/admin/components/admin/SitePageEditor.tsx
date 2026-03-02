@@ -50,6 +50,8 @@ export interface SitePage {
   seoTitle: string;
   seoDescription: string;
   category?: "legal" | "marketing" | "action_terms" | "other";
+  /** true = show popup every session, false = show only once per user ever */
+  showEveryTime?: boolean;
   updatedAt?: string;
 }
 

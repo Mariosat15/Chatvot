@@ -213,6 +213,29 @@ export default function SitePagesSection() {
     }
   };
 
+  // Reason: Toggles whether the action-terms popup shows every session or only once per user.
+  const handleToggleShowEveryTime = async (page: SitePage) => {
+    const newValue = !(page.showEveryTime ?? true);
+    try {
+      const res = await fetch(`/api/pages/${page.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showEveryTime: newValue }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          newValue
+            ? "Popup will show every time user performs this action"
+            : "Popup will show only once per user (after first acceptance)",
+        );
+        fetchPages();
+      }
+    } catch {
+      toast.error("Failed to update popup frequency");
+    }
+  };
+
   const handleSaveDefaults = async () => {
     try {
       setSaving(true);
@@ -694,6 +717,27 @@ export default function SitePagesSection() {
                       checked={page.isActive}
                       onCheckedChange={() => handleToggleActive(page)}
                     />
+                    {/* Reason: Show frequency toggle only for action_terms pages */}
+                    {page.category === "action_terms" && (
+                      <div
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-gray-700/50 bg-gray-800/50 cursor-pointer hover:bg-gray-800"
+                        onClick={() => handleToggleShowEveryTime(page)}
+                        title={
+                          (page.showEveryTime ?? true)
+                            ? "Currently: shows every session. Click to show only once."
+                            : "Currently: shows only once per user. Click to show every session."
+                        }
+                      >
+                        {(page.showEveryTime ?? true) ? (
+                          <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                        )}
+                        <span className="text-[10px] font-medium whitespace-nowrap">
+                          {(page.showEveryTime ?? true) ? "Every Time" : "Once Only"}
+                        </span>
+                      </div>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"

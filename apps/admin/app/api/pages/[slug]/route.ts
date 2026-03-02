@@ -57,6 +57,7 @@ export async function PUT(
     if (body.subtitle !== undefined) page.subtitle = body.subtitle;
     if (body.sections !== undefined) page.sections = body.sections;
     if (body.isActive !== undefined) page.isActive = body.isActive;
+    if (body.showEveryTime !== undefined) page.showEveryTime = body.showEveryTime;
     if (body.seoTitle !== undefined) page.seoTitle = body.seoTitle;
     if (body.seoDescription !== undefined)
       page.seoDescription = body.seoDescription;

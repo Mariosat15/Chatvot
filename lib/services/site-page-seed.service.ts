@@ -38,6 +38,7 @@ function toSeedDoc(page: DefaultPage) {
     isActive: true,
     isSystem: page.isSystem,
     category: page.category || "page",
+    showEveryTime: page.showEveryTime ?? true,
     seoTitle: page.seoTitle || "",
     seoDescription: page.seoDescription || "",
   };

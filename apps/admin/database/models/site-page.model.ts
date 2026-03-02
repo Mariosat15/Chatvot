@@ -27,6 +27,13 @@ export interface ISitePage extends Document {
   isSystem: boolean;
   /** Category distinguishes regular pages from action-specific pop-up terms */
   category: SitePageCategory;
+  /**
+   * For action_terms pages only.
+   * true  = popup shows every time the user performs the action (per session)
+   * false = popup shows only once ever (persisted server-side after first accept)
+   * @default true
+   */
+  showEveryTime: boolean;
   seoTitle?: string;
   seoDescription?: string;
   lastUpdatedBy?: string;
@@ -71,6 +78,7 @@ const SitePageSchema = new Schema<ISitePage>(
       default: "page",
       index: true,
     },
+    showEveryTime: { type: Boolean, default: true },
     seoTitle: { type: String, default: "" },
     seoDescription: { type: String, default: "" },
     lastUpdatedBy: { type: String, default: "" },
