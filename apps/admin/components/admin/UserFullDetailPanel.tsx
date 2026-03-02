@@ -642,12 +642,23 @@ export default function UserFullDetailPanel({
   }, [activeTab, history.length, loadingHistory, fetchHistory]);
 
   // Fetch terms content for "View Terms" button in activity history
+  // Reason: Try local admin route first (shares same DB), then fall back to main app URL
   const handleViewTerms = useCallback(async (slug: string) => {
     setLoadingTerms(true);
     setTermsViewerOpen(true);
     try {
-      const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-      const res = await fetch(`${mainAppUrl}/api/action-terms/${encodeURIComponent(slug)}`);
+      const encodedSlug = encodeURIComponent(slug);
+      // Try local admin route first (shares same MongoDB)
+      let res = await fetch(`/api/action-terms/${encodedSlug}`);
+
+      // If local route fails, try main app URL
+      if (!res.ok) {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+        if (mainAppUrl) {
+          res = await fetch(`${mainAppUrl}/api/action-terms/${encodedSlug}`);
+        }
+      }
+
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.terms) {
