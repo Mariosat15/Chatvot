@@ -171,25 +171,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const platformFeeAmount = failedDeposit.metadata?.platformFeeAmount || 0;
     const bankFeeAmount = failedDeposit.metadata?.bankFeeAmount || 0;
 
-    if (eurAmount > 0) {
+    // Reason: Record platform financial transaction for the deposit fee.
+    // PlatformTransaction schema requires `transactionType` and `amountEUR`.
+    if (eurAmount > 0 && platformFeeAmount > 0) {
       await PlatformFinancials.create(
         [
           {
-            date: new Date(),
-            type: "deposit_fee",
+            transactionType: "deposit_fee",
             amount: platformFeeAmount,
-            currency: "EUR",
+            amountEUR: platformFeeAmount,
+            sourceType: "user_deposit",
+            sourceId: transactionId,
             userId: failedDeposit.userId,
-            transactionId: manualCreditTransaction[0]._id.toString(),
-            description: `Manual deposit credit - Platform fee from failed deposit resolution`,
-            metadata: {
-              originalTransactionId: transactionId,
-              eurAmount,
+            feeDetails: {
+              depositAmount: eurAmount,
               platformFee: platformFeeAmount,
               bankFee: bankFeeAmount,
-              netPlatformEarning: platformFeeAmount - bankFeeAmount,
-              adminEmail: admin.email,
+              netEarning: platformFeeAmount - bankFeeAmount,
             },
+            description: `Manual deposit credit - Platform fee from failed deposit resolution`,
+            processedByEmail: admin.email,
+            notes: `Original transaction: ${transactionId}. Reason: ${reason}`,
           },
         ],
         { session },
