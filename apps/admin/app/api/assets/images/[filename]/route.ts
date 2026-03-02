@@ -120,9 +120,25 @@ export async function GET(
       console.warn(`⚠️ [Serve] DB fallback failed:`, dbErr);
     }
 
-    console.error(`❌ [Serve] Image not found: ${sanitizedFilename}`);
-    console.error(`   Searched paths:`, possiblePaths);
-    return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    // Reason: Downgrade to warn — missing branding files are a content issue,
+    // not a code error. Log once at warn level to avoid spamming server logs.
+    console.warn(
+      `⚠️ Branding image not found: ${sanitizedFilename} (checked ${possiblePaths.length} paths)`,
+    );
+
+    // Return a 1x1 transparent PNG instead of JSON error so <img> tags
+    // degrade gracefully without broken image icons or fetch errors.
+    const transparentPixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    return new NextResponse(transparentPixel, {
+      status: 404,
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+      },
+    });
   } catch (error) {
     console.error("❌ [Serve] Error serving branding image:", error);
     return NextResponse.json(

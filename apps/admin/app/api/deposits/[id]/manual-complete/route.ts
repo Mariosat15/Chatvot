@@ -103,8 +103,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       failedDeposit.metadata?.baseAmount ||
       0;
 
-    // Get current balance
-    const balanceBefore = wallet.balance;
+    // Reason: CreditWallet model uses `creditBalance`, not `balance`.
+    // Using the wrong field name caused NaN/undefined errors.
+    const balanceBefore = wallet.creditBalance ?? 0;
     const balanceAfter = balanceBefore + creditsToAdd;
 
     // Create manual deposit credit transaction
@@ -141,12 +142,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { session },
     );
 
-    // Update user's wallet balance
+    // Reason: CreditWallet field is `creditBalance`, not `balance`.
+    // Also increment `totalDeposited` since this is resolving a real deposit.
     await CreditWallet.findByIdAndUpdate(
       wallet._id,
       {
-        $inc: { balance: creditsToAdd },
-        $set: { lastTransactionAt: new Date() },
+        $inc: { creditBalance: creditsToAdd, totalDeposited: eurAmount || creditsToAdd },
       },
       { session },
     );
