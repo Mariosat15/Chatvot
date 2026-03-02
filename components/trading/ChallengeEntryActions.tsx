@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Swords, Check, X, RefreshCw, Clock, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface ChallengeEntryActionsProps {
   challengeId: string;
@@ -21,9 +24,17 @@ export default function ChallengeEntryActions({
   isChallenged,
 }: ChallengeEntryActionsProps) {
   const [responding, setResponding] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
 
+  // Reason: Show terms dialog before accepting a challenge
   const handleAccept = async () => {
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with challenge acceptance */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setResponding(true);
     try {
       const res = await fetch(`/api/challenges/${challengeId}/accept`, {
@@ -72,40 +83,50 @@ export default function ChallengeEntryActions({
   // Pending - show accept/decline for challenged user
   if (status === "pending" && isChallenged) {
     return (
-      <div className="rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border border-yellow-500/30 p-6">
-        <h3 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
-          ⚔️ Challenge Received!
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          You&apos;ve been challenged to a 1v1 trading battle. Accept to start
-          trading immediately!
-        </p>
-        <div className="flex gap-2">
-          <Button
-            onClick={handleAccept}
-            disabled={responding}
-            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-6"
-          >
-            {responding ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Check className="h-5 w-5 mr-2" />
-                Accept Challenge
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={handleDecline}
-            disabled={responding}
-            variant="outline"
-            className="flex-1 border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6"
-          >
-            <X className="h-5 w-5 mr-2" />
-            Decline
-          </Button>
+      <>
+        <div className="rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border border-yellow-500/30 p-6">
+          <h3 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
+            ⚔️ Challenge Received!
+          </h3>
+          <p className="text-sm text-gray-400 mb-4">
+            You&apos;ve been challenged to a 1v1 trading battle. Accept to start
+            trading immediately!
+          </p>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleAccept}
+              disabled={responding}
+              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-6"
+            >
+              {responding ? (
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <Check className="h-5 w-5 mr-2" />
+                  Accept Challenge
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDecline}
+              disabled={responding}
+              variant="outline"
+              className="flex-1 border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6"
+            >
+              <X className="h-5 w-5 mr-2" />
+              Decline
+            </Button>
+          </div>
         </div>
-      </div>
+
+        {/* Action Terms Dialog — shown before accepting a challenge */}
+        <ActionTermsDialog
+          slug={ACTION_TERM_SLUGS.CHALLENGE}
+          open={showTerms}
+          onAccept={proceedAfterTerms}
+          onDecline={() => setShowTerms(false)}
+        />
+      </>
     );
   }
 

@@ -41,6 +41,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface MarketplaceItem {
   _id: string;
@@ -280,11 +283,28 @@ export default function MarketplaceContent() {
     "renew" | "delete" | null
   >(null);
 
+  // Reason: Show terms dialog before marketplace purchases
+  const [showTerms, setShowTerms] = useState(false);
+  const [pendingPurchaseItem, setPendingPurchaseItem] =
+    useState<MarketplaceItem | null>(null);
+
   const handlePurchase = async (item: MarketplaceItem) => {
     if (item.owned) {
       router.push("/profile?tab=trading-arsenal");
       return;
     }
+
+    // Show terms dialog before proceeding with purchase
+    setPendingPurchaseItem(item);
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with the actual purchase */
+  const proceedWithPurchase = async () => {
+    setShowTerms(false);
+    const item = pendingPurchaseItem;
+    if (!item) return;
+    setPendingPurchaseItem(null);
 
     try {
       setPurchasing(item._id);
@@ -980,6 +1000,17 @@ export default function MarketplaceContent() {
           </div>
         </div>
       )}
+
+      {/* Action Terms Dialog — shown before marketplace purchases */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.MARKETPLACE}
+        open={showTerms}
+        onAccept={proceedWithPurchase}
+        onDecline={() => {
+          setShowTerms(false);
+          setPendingPurchaseItem(null);
+        }}
+      />
     </div>
   );
 }

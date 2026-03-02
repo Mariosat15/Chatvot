@@ -11,6 +11,11 @@ export interface ISitePageSection {
   order: number;
 }
 
+// ─── Category Types ─────────────────────────────────────────────────────────
+// Reason: "page" = regular site pages (terms, privacy, about, etc.)
+//         "action_terms" = short pop-up terms shown before critical user actions
+export type SitePageCategory = "page" | "action_terms";
+
 // ─── Main Interface ──────────────────────────────────────────────────────────
 export interface ISitePage extends Document {
   slug: string;
@@ -20,6 +25,8 @@ export interface ISitePage extends Document {
   isActive: boolean;
   /** System pages (terms, privacy) cannot be deleted */
   isSystem: boolean;
+  /** Category distinguishes regular pages from action-specific pop-up terms */
+  category: SitePageCategory;
   seoTitle?: string;
   seoDescription?: string;
   lastUpdatedBy?: string;
@@ -58,6 +65,12 @@ const SitePageSchema = new Schema<ISitePage>(
     sections: { type: [SitePageSectionSchema], default: [] },
     isActive: { type: Boolean, default: true },
     isSystem: { type: Boolean, default: false },
+    category: {
+      type: String,
+      enum: ["page", "action_terms"],
+      default: "page",
+      index: true,
+    },
     seoTitle: { type: String, default: "" },
     seoDescription: { type: String, default: "" },
     lastUpdatedBy: { type: String, default: "" },

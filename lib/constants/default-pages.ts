@@ -1,13 +1,19 @@
 /**
- * Default Site Pages — Terms of Service & Privacy Policy
+ * Default Site Pages — Terms of Service, Privacy Policy & Action Terms
  *
- * These serve as the initial seed content for legal pages.
- * They are inserted into the DB on first deployment (or DB reset)
+ * These serve as the initial seed content for legal pages and action-specific
+ * pop-up terms. They are inserted into the DB on first deployment (or DB reset)
  * and can be fully customized by the admin afterward.
  *
  * The admin-customized versions are also saved to data/defaults/pages.json
  * so they persist across DB resets (same pattern as badge defaults).
+ *
+ * Categories:
+ *   "page"         — Regular full-page site pages (terms, privacy, about, etc.)
+ *   "action_terms" — Short pop-up terms shown before critical user actions
  */
+
+export type DefaultPageCategory = "page" | "action_terms";
 
 export interface DefaultPageSection {
   id: string;
@@ -22,6 +28,8 @@ export interface DefaultPage {
   title: string;
   subtitle: string;
   isSystem: boolean;
+  /** @default "page" */
+  category?: DefaultPageCategory;
   seoTitle: string;
   seoDescription: string;
   sections: DefaultPageSection[];
@@ -402,5 +410,227 @@ const PRIVACY_PAGE: DefaultPage = {
   ],
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTION TERMS — Pop-up terms shown before critical user actions
+// Reason: Short, clear, and legally protective. Users must accept before
+// proceeding with the action. Editable by admin in Site Pages section.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ACTION_TERMS_CREDIT_PURCHASE: DefaultPage = {
+  slug: "terms-credit-purchase",
+  title: "Credit Purchase Terms",
+  subtitle: "Please read and accept before purchasing credits.",
+  isSystem: true,
+  category: "action_terms",
+  seoTitle: "",
+  seoDescription: "",
+  sections: [
+    {
+      id: "acp-1",
+      type: "heading",
+      title: "Credit Purchase Agreement",
+      content: "",
+      order: 0,
+    },
+    {
+      id: "acp-2",
+      type: "paragraph",
+      content:
+        "By purchasing credits, you acknowledge and agree to the following terms. Credits are virtual currency used exclusively on this platform for entering trading competitions and challenges. Credits have no real-world monetary value outside this platform.",
+      order: 1,
+    },
+    {
+      id: "acp-3",
+      type: "list",
+      content:
+        "All credit purchases are final and non-refundable except as required by applicable law\nCredits can only be used within this platform for competitions and challenges\nCredit value is determined by the platform's published conversion rate\nThe platform reserves the right to modify credit pricing with prior notice\nYou confirm you are at least 18 years of age and legally permitted to make this purchase\nVAT and processing fees may apply and will be shown before payment",
+      order: 2,
+    },
+    {
+      id: "acp-4",
+      type: "paragraph",
+      content:
+        "By clicking 'I Accept', you agree to these terms and authorize the charge to your selected payment method. If you have questions, please contact support before proceeding.",
+      order: 3,
+    },
+  ],
+};
+
+const ACTION_TERMS_WITHDRAWAL: DefaultPage = {
+  slug: "terms-withdrawal",
+  title: "Withdrawal Terms",
+  subtitle: "Please read and accept before withdrawing funds.",
+  isSystem: true,
+  category: "action_terms",
+  seoTitle: "",
+  seoDescription: "",
+  sections: [
+    {
+      id: "aw-1",
+      type: "heading",
+      title: "Withdrawal Agreement",
+      content: "",
+      order: 0,
+    },
+    {
+      id: "aw-2",
+      type: "paragraph",
+      content:
+        "By submitting a withdrawal request, you acknowledge and agree to the following terms. Withdrawals are subject to verification, processing fees, and minimum/maximum limits set by the platform.",
+      order: 1,
+    },
+    {
+      id: "aw-3",
+      type: "list",
+      content:
+        "Withdrawal requests are subject to identity verification (KYC) as required by law\nProcessing fees and minimum withdrawal amounts apply as displayed\nFunds will be sent to your verified payment method — processing typically takes 3-5 business days\nThe platform reserves the right to delay or decline withdrawals pending fraud review\nYou confirm that you are the authorized account holder and the recipient of funds\nIncomplete or suspicious requests may require additional documentation",
+      order: 2,
+    },
+    {
+      id: "aw-4",
+      type: "paragraph",
+      content:
+        "By clicking 'I Accept', you confirm that all information provided is accurate, you are the authorized account holder, and you agree to the withdrawal terms and any applicable fees.",
+      order: 3,
+    },
+  ],
+};
+
+const ACTION_TERMS_MARKETPLACE: DefaultPage = {
+  slug: "terms-marketplace",
+  title: "Marketplace Purchase Terms",
+  subtitle: "Please read and accept before purchasing this item.",
+  isSystem: true,
+  category: "action_terms",
+  seoTitle: "",
+  seoDescription: "",
+  sections: [
+    {
+      id: "amp-1",
+      type: "heading",
+      title: "Marketplace Purchase Agreement",
+      content: "",
+      order: 0,
+    },
+    {
+      id: "amp-2",
+      type: "paragraph",
+      content:
+        "By purchasing an item from the marketplace, you acknowledge and agree to the following terms. Marketplace items are digital goods (indicators, strategies, cosmetics, or game master packages) delivered instantly to your account.",
+      order: 1,
+    },
+    {
+      id: "amp-3",
+      type: "list",
+      content:
+        "All marketplace purchases are final — digital items are non-refundable once delivered\nItems are licensed for your personal use only and cannot be resold or transferred\nThe platform does not guarantee specific trading results from purchased indicators or strategies\nItem availability and pricing may change without prior notice\nCredits will be deducted from your wallet immediately upon purchase\nYou confirm you understand the item description and its intended use",
+      order: 2,
+    },
+    {
+      id: "amp-4",
+      type: "paragraph",
+      content:
+        "By clicking 'I Accept', you agree to purchase this item under these terms. The credit cost will be deducted from your wallet immediately.",
+      order: 3,
+    },
+  ],
+};
+
+const ACTION_TERMS_COMPETITION: DefaultPage = {
+  slug: "terms-competition-entry",
+  title: "Competition Entry Terms",
+  subtitle: "Please read and accept before entering this competition.",
+  isSystem: true,
+  category: "action_terms",
+  seoTitle: "",
+  seoDescription: "",
+  sections: [
+    {
+      id: "ace-1",
+      type: "heading",
+      title: "Competition Entry Agreement",
+      content: "",
+      order: 0,
+    },
+    {
+      id: "ace-2",
+      type: "paragraph",
+      content:
+        "By entering this competition, you acknowledge and agree to the following terms. Competitions involve simulated trading with virtual capital. Entry fees are non-refundable once the competition begins.",
+      order: 1,
+    },
+    {
+      id: "ace-3",
+      type: "list",
+      content:
+        "Entry fees are deducted from your credit wallet and are non-refundable once the competition starts\nAll trading within competitions is simulated — no real financial instruments are traded\nThe platform reserves the right to disqualify participants for rule violations, collusion, or exploitation\nPrize distribution follows the competition rules defined at the time of creation\nMargin calls and liquidation may apply — resulting in disqualification and loss of entry fee\nResults and rankings are final as determined by the platform's scoring system",
+      order: 2,
+    },
+    {
+      id: "ace-4",
+      type: "paragraph",
+      content:
+        "By clicking 'I Accept', you agree to the competition rules, accept the risk of losing your entry fee, and acknowledge that results are final.",
+      order: 3,
+    },
+  ],
+};
+
+const ACTION_TERMS_CHALLENGE: DefaultPage = {
+  slug: "terms-challenge",
+  title: "Challenge Terms",
+  subtitle: "Please read and accept before creating or accepting this challenge.",
+  isSystem: true,
+  category: "action_terms",
+  seoTitle: "",
+  seoDescription: "",
+  sections: [
+    {
+      id: "ach-1",
+      type: "heading",
+      title: "1v1 Challenge Agreement",
+      content: "",
+      order: 0,
+    },
+    {
+      id: "ach-2",
+      type: "paragraph",
+      content:
+        "By creating or accepting a 1v1 challenge, you acknowledge and agree to the following terms. Challenges are head-to-head simulated trading competitions between two participants.",
+      order: 1,
+    },
+    {
+      id: "ach-3",
+      type: "list",
+      content:
+        "Entry fees are deducted immediately and are non-refundable once the challenge is accepted\nBoth participants trade with equal virtual starting capital under identical conditions\nA platform fee may be deducted from the prize pool as specified at the time of creation\nThe winner receives the combined prize pool minus the platform fee\nThe platform reserves the right to void challenges in cases of fraud, collusion, or exploitation\nDeclined or expired challenges result in a full refund of the entry fee to the challenger",
+      order: 2,
+    },
+    {
+      id: "ach-4",
+      type: "paragraph",
+      content:
+        "By clicking 'I Accept', you agree to the challenge terms, accept the risk of losing your entry fee, and acknowledge that results are final.",
+      order: 3,
+    },
+  ],
+};
+
 // ─── Export ──────────────────────────────────────────────────────────────────
+// Reason: Regular pages and action terms are exported separately so the
+// seed service can insert them with the correct `category` field.
 export const DEFAULT_PAGES: DefaultPage[] = [TERMS_PAGE, PRIVACY_PAGE];
+
+export const DEFAULT_ACTION_TERMS: DefaultPage[] = [
+  ACTION_TERMS_CREDIT_PURCHASE,
+  ACTION_TERMS_WITHDRAWAL,
+  ACTION_TERMS_MARKETPLACE,
+  ACTION_TERMS_COMPETITION,
+  ACTION_TERMS_CHALLENGE,
+];
+
+/** All default pages combined (for backward compatibility with seed logic) */
+export const ALL_DEFAULT_PAGES: DefaultPage[] = [
+  ...DEFAULT_PAGES,
+  ...DEFAULT_ACTION_TERMS,
+];

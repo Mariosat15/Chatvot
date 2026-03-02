@@ -20,6 +20,9 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 // Level names for display
 const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
@@ -55,6 +58,7 @@ export default function CompetitionEntryButton({
   userLevel = { level: 1, title: "Novice Trader", icon: "🌱" },
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
@@ -135,6 +139,7 @@ export default function CompetitionEntryButton({
     }
   };
 
+  // Reason: Show terms dialog before entering a competition
   const handleEnter = async () => {
     if (!canAfford) {
       toast.error(`Insufficient balance. Need €${entryFee}`);
@@ -151,6 +156,13 @@ export default function CompetitionEntryButton({
       return;
     }
 
+    // Show terms dialog before proceeding
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with competition entry */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setEntering(true);
 
     try {
@@ -400,6 +412,14 @@ export default function CompetitionEntryButton({
           </div>
         </div>
       )}
+
+      {/* Action Terms Dialog — shown before entering competition */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.COMPETITION_ENTRY}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </div>
   );
 }

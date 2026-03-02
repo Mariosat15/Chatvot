@@ -11,6 +11,9 @@ import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 import { DifficultyBadge } from "@/components/ui/difficulty-badge";
 import {
   calculateCompetitionDifficulty,
@@ -119,6 +122,7 @@ export default function CompetitionCard({
   platformLeverage = 100,
 }: CompetitionCardProps) {
   const [entering, setEntering] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [liveCountdown, setLiveCountdown] = useState("");
   const router = useRouter();
   const { formatCredits, settings } = useAppSettings();
@@ -246,8 +250,15 @@ export default function CompetitionCard({
   const getEntryFee = () =>
     competition.entryFee || competition.entryFeeCredits || 0;
 
+  // Reason: Show terms dialog before entering a competition
   const handleEnter = async () => {
     if (!canAfford || isFull) return;
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with competition entry */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setEntering(true);
     try {
       const result = await enterCompetition(competition._id);
@@ -1025,6 +1036,14 @@ export default function CompetitionCard({
           </p>
         )}
       </div>
+
+      {/* Action Terms Dialog — shown before entering competition */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.COMPETITION_ENTRY}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </div>
   );
 }

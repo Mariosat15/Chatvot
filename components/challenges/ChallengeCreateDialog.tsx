@@ -24,6 +24,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface ChallengeCreateDialogProps {
   open: boolean;
@@ -51,6 +54,7 @@ export default function ChallengeCreateDialog({
 }: ChallengeCreateDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [settings, setSettings] = useState<ChallengeSettings | null>(null);
   const [formData, setFormData] = useState({
     entryFee: 10,
@@ -159,7 +163,15 @@ export default function ChallengeCreateDialog({
   const platformFeeAmount = Math.floor(prizePool * (platformFee / 100));
   const winnerPrize = prizePool - platformFeeAmount;
 
+  // Reason: Show terms dialog before creating a challenge
   const handleSubmit = async () => {
+    if (!challengedUser) return;
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with challenge creation */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     if (!challengedUser) return;
 
     setLoading(true);
@@ -478,6 +490,14 @@ export default function ChallengeCreateDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Action Terms Dialog — shown before creating a challenge */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.CHALLENGE}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </Dialog>
   );
 }

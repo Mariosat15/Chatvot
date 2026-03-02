@@ -1,12 +1,15 @@
 import SitePage from "@/database/models/site-page.model";
-import { DEFAULT_PAGES } from "@/lib/constants/default-pages";
+import {
+  ALL_DEFAULT_PAGES,
+  type DefaultPage,
+} from "@/lib/constants/default-pages";
 import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * Read saved page defaults from data/defaults/pages.json (file system).
  * Uses dynamic import to avoid bundling fs in client code.
  */
-function getDefaultPagesFromFile(): typeof DEFAULT_PAGES | null {
+function getDefaultPagesFromFile(): DefaultPage[] | null {
   try {
     const path = require("path");
     const fs = require("fs");
@@ -22,9 +25,31 @@ function getDefaultPagesFromFile(): typeof DEFAULT_PAGES | null {
 }
 
 /**
+ * Build a seed-ready document from a DefaultPage definition.
+ * Reason: Centralizes the mapping so both fresh-DB and sync paths
+ * produce identical documents including the new `category` field.
+ */
+function toSeedDoc(page: DefaultPage) {
+  return {
+    slug: page.slug,
+    title: page.title,
+    subtitle: page.subtitle || "",
+    sections: page.sections,
+    isActive: true,
+    isSystem: page.isSystem,
+    category: page.category || "page",
+    seoTitle: page.seoTitle || "",
+    seoDescription: page.seoDescription || "",
+  };
+}
+
+/**
  * Seed default site pages to database.
  * Prefers saved defaults from data/defaults/pages.json,
  * falls back to hardcoded constants in lib/constants/default-pages.ts.
+ *
+ * Includes both regular pages (terms, privacy) AND action-specific pop-up
+ * terms (credit purchase, withdrawal, marketplace, competition, challenge).
  *
  * Does NOT overwrite existing pages — only inserts missing ones.
  * This is safe to call on every startup.
@@ -37,7 +62,7 @@ export async function seedSitePages(): Promise<void> {
 
     // Determine source: saved defaults or hardcoded constants
     const savedDefaults = getDefaultPagesFromFile();
-    const source = savedDefaults ?? DEFAULT_PAGES;
+    const source = savedDefaults ?? ALL_DEFAULT_PAGES;
     const sourceName = savedDefaults ? "saved defaults" : "constants";
 
     if (existingCount === 0) {
@@ -45,18 +70,7 @@ export async function seedSitePages(): Promise<void> {
       console.log(
         `🌱 Seeding ${source.length} site pages from ${sourceName}...`,
       );
-      await SitePage.insertMany(
-        source.map((page) => ({
-          slug: page.slug,
-          title: page.title,
-          subtitle: page.subtitle || "",
-          sections: page.sections,
-          isActive: true,
-          isSystem: page.isSystem,
-          seoTitle: page.seoTitle || "",
-          seoDescription: page.seoDescription || "",
-        })),
-      );
+      await SitePage.insertMany(source.map(toSeedDoc));
       console.log(`✅ Seeded ${source.length} site pages`);
     } else {
       // DB has pages — sync: insert any missing system pages
@@ -66,16 +80,7 @@ export async function seedSitePages(): Promise<void> {
       let added = 0;
       for (const page of source) {
         if (!existingSet.has(page.slug)) {
-          await SitePage.create({
-            slug: page.slug,
-            title: page.title,
-            subtitle: page.subtitle || "",
-            sections: page.sections,
-            isActive: true,
-            isSystem: page.isSystem,
-            seoTitle: page.seoTitle || "",
-            seoDescription: page.seoDescription || "",
-          });
+          await SitePage.create(toSeedDoc(page));
           added++;
         }
       }

@@ -49,6 +49,7 @@ export interface SitePage {
   isSystem: boolean;
   seoTitle: string;
   seoDescription: string;
+  category?: "legal" | "marketing" | "action_terms" | "other";
   updatedAt?: string;
 }
 

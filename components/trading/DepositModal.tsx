@@ -33,6 +33,9 @@ import {
 import { useRouter } from "next/navigation";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import Script from "next/script";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface DepositModalProps {
   children: React.ReactNode;
@@ -149,6 +152,9 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [selectedProvider, setSelectedProvider] =
     useState<PaymentProvider>("stripe");
   const [step, setStep] = useState<"amount" | "provider" | "payment">("amount");
+
+  // Terms acceptance gate
+  const [showTerms, setShowTerms] = useState(false);
 
   // SECURITY: Refs to prevent double-clicks and race conditions
   const isProcessingRef = useRef(false);
@@ -270,6 +276,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     return available;
   };
 
+  // Reason: Show terms dialog first. If user accepts, proceed to provider/payment step.
   const handleAmountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -299,6 +306,14 @@ export default function DepositModal({ children }: DepositModalProps) {
       setError("Invalid amount format");
       return;
     }
+
+    // Show terms dialog before proceeding
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds to provider selection or payment */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
 
     const availableProviders = getAvailableProviders();
 
@@ -885,7 +900,17 @@ export default function DepositModal({ children }: DepositModalProps) {
               onCancel={() => setStep("provider")}
             />
           </Elements>
-        ) : step === "payment" &&
+        ) : null}
+
+        {/* Action Terms Dialog — shown before proceeding to payment */}
+        <ActionTermsDialog
+          slug={ACTION_TERM_SLUGS.CREDIT_PURCHASE}
+          open={showTerms}
+          onAccept={proceedAfterTerms}
+          onDecline={() => setShowTerms(false)}
+        />
+
+        {step === "payment" &&
           nuveiSessionToken &&
           selectedProvider === "nuvei" &&
           providers?.nuvei ? (

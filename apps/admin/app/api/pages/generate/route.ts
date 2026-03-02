@@ -130,6 +130,11 @@ function getPageTitle(
     faq: "Frequently Asked Questions",
     cookies: "Cookie Policy",
     "risk-disclaimer": "Risk Disclaimer",
+    "terms-credit-purchase": "Credit Purchase Terms",
+    "terms-withdrawal": "Withdrawal Terms",
+    "terms-marketplace": "Marketplace Purchase Terms",
+    "terms-competition-entry": "Competition Entry Terms",
+    "terms-challenge": "Challenge Terms",
   };
   return titles[pageType] || customTitle || "New Page";
 }
@@ -146,6 +151,11 @@ function getPageSubtitle(pageType: string, companyName: string): string {
     faq: `Answers to commonly asked questions about ${companyName}.`,
     cookies: `This Cookie Policy explains how ${companyName} uses cookies and similar technologies.`,
     "risk-disclaimer": `Important risk information for users of ${companyName}.`,
+    "terms-credit-purchase": `Please read and accept these terms before purchasing credits on ${companyName}.`,
+    "terms-withdrawal": `Please read and accept these terms before withdrawing funds from ${companyName}.`,
+    "terms-marketplace": `Please read and accept these terms before purchasing items from the ${companyName} marketplace.`,
+    "terms-competition-entry": `Please read and accept these terms before entering a competition on ${companyName}.`,
+    "terms-challenge": `Please read and accept these terms before creating or accepting a 1v1 challenge on ${companyName}.`,
   };
   return subtitles[pageType] || `Information provided by ${companyName}.`;
 }
@@ -177,6 +187,16 @@ function generatePageContent(
       return generateCookies(company);
     case "risk-disclaimer":
       return generateRiskDisclaimer(company);
+    case "terms-credit-purchase":
+      return generateCreditPurchaseTerms(company);
+    case "terms-withdrawal":
+      return generateWithdrawalTerms(company);
+    case "terms-marketplace":
+      return generateMarketplaceTerms(company);
+    case "terms-competition-entry":
+      return generateCompetitionEntryTerms(company);
+    case "terms-challenge":
+      return generateChallengeTerms(company);
     default:
       return generateCustom(company);
   }
@@ -882,6 +902,178 @@ function generateFAQ(c: CompanyInfo): GeneratedSection[] {
     s(
       "paragraph",
       `Email us at ${c.email}. Our support team is available Monday–Friday, 09:00–18:00 UTC, and aims to respond within 24 hours. For urgent security concerns, include "URGENT" in your subject line.`,
+    ),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTION TERMS — Credit Purchase
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function generateCreditPurchaseTerms(c: CompanyInfo): GeneratedSection[] {
+  resetOrder();
+  return [
+    s("heading", "Credit Purchase Agreement"),
+    s(
+      "paragraph",
+      `By purchasing credits on ${c.companyName}, operated by ${c.legalName}, you acknowledge and agree to the following terms. Credits are virtual currency used exclusively on this platform for entering trading competitions and challenges. Credits have no real-world monetary value outside this platform.`,
+    ),
+    s("divider", ""),
+    s("heading", "Purchase Terms"),
+    s(
+      "list",
+      `All credit purchases are final and non-refundable except as required by applicable law or as outlined in our Refund Policy.\nCredits can only be used within the ${c.companyName} platform for competitions, challenges, and marketplace purchases.\nCredit value is determined by the platform's published conversion rate at the time of purchase.\n${c.legalName} reserves the right to modify credit pricing with prior notice to users.\nYou confirm you are at least 18 years of age and legally permitted to make this purchase.\nVAT, sales tax, and payment processing fees may apply and will be displayed before payment confirmation.`,
+    ),
+    s("divider", ""),
+    s("heading", "Payment Processing"),
+    s(
+      "paragraph",
+      `All payments are processed through PCI DSS-compliant third-party payment service providers. ${c.legalName} does not directly store your full payment card details. By completing a purchase, you authorize the charge to your selected payment method. In accordance with Article 16(m) of EU Directive 2011/83/EU, you acknowledge that digital content supplied immediately upon purchase is exempt from the standard fourteen (14) day withdrawal period.`,
+    ),
+    s("divider", ""),
+    s("heading", "Acceptance"),
+    s(
+      "paragraph",
+      `By clicking 'I Accept', you agree to these terms and authorize the charge to your selected payment method. If you have questions, please contact ${c.email} before proceeding.`,
+    ),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTION TERMS — Withdrawal
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function generateWithdrawalTerms(c: CompanyInfo): GeneratedSection[] {
+  resetOrder();
+  return [
+    s("heading", "Withdrawal Agreement"),
+    s(
+      "paragraph",
+      `By submitting a withdrawal request on ${c.companyName}, operated by ${c.legalName}, you acknowledge and agree to the following terms. Withdrawals are subject to identity verification, processing fees, and minimum/maximum limits set by the platform.`,
+    ),
+    s("divider", ""),
+    s("heading", "Withdrawal Conditions"),
+    s(
+      "list",
+      `Withdrawal requests are subject to identity verification (KYC) as required by applicable Anti-Money Laundering laws (EU Directive 2015/849, US Bank Secrecy Act).\nProcessing fees and minimum withdrawal amounts apply as displayed on the withdrawal page.\nFunds will be sent to your verified payment method — processing typically takes 3–5 business days depending on your payment provider.\n${c.legalName} reserves the right to delay or decline withdrawals pending fraud review or compliance investigation.\nYou confirm that you are the authorized account holder and the legitimate recipient of the funds.\nIncomplete, suspicious, or unverified requests may require additional documentation before processing.`,
+    ),
+    s("divider", ""),
+    s("heading", "Tax Obligations"),
+    s(
+      "paragraph",
+      `You are solely responsible for reporting and paying any taxes, duties, or levies applicable to your withdrawals in your jurisdiction. ${c.legalName} may be required to report certain transactions to tax authorities as mandated by law.`,
+    ),
+    s("divider", ""),
+    s("heading", "Acceptance"),
+    s(
+      "paragraph",
+      `By clicking 'I Accept', you confirm that all information provided is accurate, you are the authorized account holder, and you agree to the withdrawal terms and any applicable fees. Contact ${c.email} with questions.`,
+    ),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTION TERMS — Marketplace Purchase
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function generateMarketplaceTerms(c: CompanyInfo): GeneratedSection[] {
+  resetOrder();
+  return [
+    s("heading", "Marketplace Purchase Agreement"),
+    s(
+      "paragraph",
+      `By purchasing an item from the ${c.companyName} marketplace, operated by ${c.legalName}, you acknowledge and agree to the following terms. Marketplace items are digital goods (indicators, strategies, cosmetics, or game master packages) delivered instantly to your account.`,
+    ),
+    s("divider", ""),
+    s("heading", "Purchase Conditions"),
+    s(
+      "list",
+      `All marketplace purchases are final — digital items are non-refundable once delivered to your account.\nItems are licensed for your personal use only and may not be resold, redistributed, or transferred to other users.\n${c.legalName} does not guarantee specific trading results from purchased indicators, strategies, or tools.\nItem availability, descriptions, and pricing may change without prior notice.\nCredits will be deducted from your wallet immediately upon purchase confirmation.\nYou confirm you understand the item description, its intended use, and its limitations.`,
+    ),
+    s("divider", ""),
+    s("heading", "Intellectual Property"),
+    s(
+      "paragraph",
+      `All marketplace items remain the intellectual property of ${c.legalName} or the original creator. Your purchase grants you a non-exclusive, non-transferable license to use the item within the ${c.companyName} platform. Reverse engineering, copying, or distributing marketplace items is prohibited.`,
+    ),
+    s("divider", ""),
+    s("heading", "Acceptance"),
+    s(
+      "paragraph",
+      `By clicking 'I Accept', you agree to purchase this item under these terms. The credit cost will be deducted from your wallet immediately. Contact ${c.email} with questions.`,
+    ),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTION TERMS — Competition Entry
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function generateCompetitionEntryTerms(c: CompanyInfo): GeneratedSection[] {
+  resetOrder();
+  return [
+    s("heading", "Competition Entry Agreement"),
+    s(
+      "paragraph",
+      `By entering a competition on ${c.companyName}, operated by ${c.legalName}, you acknowledge and agree to the following terms. Competitions involve simulated trading with virtual capital. Entry fees are non-refundable once the competition begins.`,
+    ),
+    s("divider", ""),
+    s("heading", "Entry Conditions"),
+    s(
+      "list",
+      `Entry fees are deducted from your credit wallet immediately and are non-refundable once the competition starts.\nAll trading within competitions is simulated — no real financial instruments are traded on live markets.\n${c.legalName} reserves the right to disqualify participants for rule violations, collusion, use of unauthorized tools, or exploitation of platform vulnerabilities.\nPrize distribution follows the competition rules defined at the time of creation — these rules are final.\nMargin calls and liquidation may apply within the simulated environment, potentially resulting in disqualification and loss of entry fee.\nResults and rankings are final as determined by the platform's scoring system.`,
+    ),
+    s("divider", ""),
+    s("heading", "Competition Rules"),
+    s(
+      "paragraph",
+      `Each competition has specific rules regarding duration, starting capital, allowed instruments, leverage limits, ranking criteria, and prize distribution. These rules are published on the competition detail page before entry. By entering, you agree to abide by all competition-specific rules in addition to these general terms and the platform's Terms of Service.`,
+    ),
+    s("divider", ""),
+    s("heading", "Fair Play"),
+    s(
+      "paragraph",
+      `${c.companyName} enforces strict fair play policies. Any participant found to be colluding, manipulating outcomes, using multiple accounts, or exploiting bugs will be immediately disqualified and may face permanent account suspension. Forfeited entry fees will not be refunded.`,
+    ),
+    s("divider", ""),
+    s("heading", "Acceptance"),
+    s(
+      "paragraph",
+      `By clicking 'I Accept', you agree to the competition rules, accept the risk of losing your entry fee, and acknowledge that results are final. Contact ${c.email} with questions.`,
+    ),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTION TERMS — 1v1 Challenge
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function generateChallengeTerms(c: CompanyInfo): GeneratedSection[] {
+  resetOrder();
+  return [
+    s("heading", "1v1 Challenge Agreement"),
+    s(
+      "paragraph",
+      `By creating or accepting a 1v1 challenge on ${c.companyName}, operated by ${c.legalName}, you acknowledge and agree to the following terms. Challenges are head-to-head simulated trading competitions between two participants.`,
+    ),
+    s("divider", ""),
+    s("heading", "Challenge Conditions"),
+    s(
+      "list",
+      `Entry fees are deducted immediately from both participants and are non-refundable once the challenge is accepted.\nBoth participants trade with equal virtual starting capital under identical simulated market conditions.\nA platform fee may be deducted from the combined prize pool as specified at the time of challenge creation.\nThe winner receives the combined prize pool minus the platform fee.\n${c.legalName} reserves the right to void challenges in cases of fraud, collusion, account sharing, or exploitation of platform vulnerabilities.\nDeclined or expired challenges result in a full refund of the entry fee to the challenger.`,
+    ),
+    s("divider", ""),
+    s("heading", "Challenge Rules"),
+    s(
+      "paragraph",
+      `Challenge parameters (duration, starting capital, ranking method, tie-breaker rules) are set by the challenger and visible to both parties before acceptance. Once accepted, these parameters are locked and cannot be modified. Both participants must adhere to the platform's general Terms of Service and fair play policies throughout the challenge.`,
+    ),
+    s("divider", ""),
+    s("heading", "Result Determination"),
+    s(
+      "paragraph",
+      `Challenge results are determined automatically by the platform's scoring system based on the ranking method selected at creation. In the event of a tie, tie-breaker rules apply as configured. Results are final and binding. ${c.legalName} reserves the right to review and adjust results in cases of confirmed rule violations.`,
+    ),
+    s("divider", ""),
+    s("heading", "Acceptance"),
+    s(
+      "paragraph",
+      `By clicking 'I Accept', you agree to the challenge terms, accept the risk of losing your entry fee, and acknowledge that results are final. Contact ${c.email} with questions.`,
     ),
   ];
 }

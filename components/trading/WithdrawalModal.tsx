@@ -34,6 +34,9 @@ import {
   Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface WithdrawalModalProps {
   children: React.ReactNode;
@@ -103,6 +106,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
   const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(
     null,
   );
+  const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
 
   // Fetch withdrawal info when modal opens
@@ -150,25 +154,32 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     }
   };
 
+  // Reason: Show terms dialog before proceeding with withdrawal submission.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const amountEUR = parseFloat(amount);
+    if (isNaN(amountEUR) || amountEUR <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+    if (!selectedMethodId) {
+      setError("Please select a withdrawal method");
+      return;
+    }
+
+    // Show terms dialog before proceeding
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with withdrawal */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setLoading(true);
 
     try {
       const amountEUR = parseFloat(amount);
-
-      if (isNaN(amountEUR) || amountEUR <= 0) {
-        setError("Please enter a valid amount");
-        setLoading(false);
-        return;
-      }
-
-      if (!selectedMethodId) {
-        setError("Please select a withdrawal method");
-        setLoading(false);
-        return;
-      }
 
       // Get selected method details
       const selectedMethod = withdrawalInfo?.availableWithdrawalMethods?.find(
@@ -781,6 +792,14 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           </form>
         )}
       </DialogContent>
+
+      {/* Action Terms Dialog — shown before proceeding with withdrawal */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.WITHDRAWAL}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </Dialog>
   );
 }

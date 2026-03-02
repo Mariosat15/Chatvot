@@ -48,10 +48,11 @@ interface TemplateItem {
   slug: string;
   icon: string;
   description: string;
-  category: "legal" | "marketing" | "other";
+  category: "legal" | "marketing" | "action_terms" | "other";
 }
 
 const PAGE_TEMPLATES: TemplateItem[] = [
+  // Legal & Compliance
   { value: "terms", label: "Terms of Service", slug: "terms", icon: "📋", description: "Legal terms governing platform use, eligibility, and user obligations", category: "legal" },
   { value: "privacy", label: "Privacy Policy", slug: "privacy", icon: "🔒", description: "GDPR & CCPA compliant data collection and protection practices", category: "legal" },
   { value: "cookies", label: "Cookie Policy", slug: "cookie-policy", icon: "🍪", description: "Cookie usage, consent management, and tracking technologies", category: "legal" },
@@ -59,14 +60,23 @@ const PAGE_TEMPLATES: TemplateItem[] = [
   { value: "aml", label: "AML / KYC Policy", slug: "aml-policy", icon: "🛡️", description: "Anti-Money Laundering compliance, sanctions screening, and KYC", category: "legal" },
   { value: "responsible-trading", label: "Responsible Trading", slug: "responsible-trading", icon: "⚖️", description: "Responsible participation guidelines, self-exclusion, and spending limits", category: "legal" },
   { value: "risk-disclaimer", label: "Risk Disclaimer", slug: "risk-disclaimer", icon: "⚠️", description: "Simulated trading risks, regulatory status, and liability limitations", category: "legal" },
+  // Marketing & Information
   { value: "about", label: "About Us", slug: "about", icon: "🏢", description: "Company story, mission, team, and what the platform offers", category: "marketing" },
   { value: "contact", label: "Contact Us", slug: "contact", icon: "📧", description: "Support channels, business inquiries, complaint procedures", category: "marketing" },
   { value: "faq", label: "FAQ", slug: "faq", icon: "❓", description: "Frequently asked questions about the platform and trading", category: "marketing" },
+  // Action Terms — shown to users before critical actions (purchase, withdrawal, etc.)
+  { value: "terms-credit-purchase", label: "Credit Purchase Terms", slug: "terms-credit-purchase", icon: "💰", description: "Terms shown before buying credits — covers refunds, virtual currency, and charges", category: "action_terms" },
+  { value: "terms-withdrawal", label: "Withdrawal Terms", slug: "terms-withdrawal", icon: "🏦", description: "Terms shown before withdrawing — covers KYC, fees, and processing", category: "action_terms" },
+  { value: "terms-marketplace", label: "Marketplace Purchase Terms", slug: "terms-marketplace", icon: "🛒", description: "Terms shown before marketplace purchases — covers digital goods and licensing", category: "action_terms" },
+  { value: "terms-competition-entry", label: "Competition Entry Terms", slug: "terms-competition-entry", icon: "🏆", description: "Terms shown before entering competitions — covers entry fees and rules", category: "action_terms" },
+  { value: "terms-challenge", label: "Challenge Terms", slug: "terms-challenge", icon: "⚔️", description: "Terms shown before creating/accepting challenges — covers 1v1 rules and fees", category: "action_terms" },
+  // Other
   { value: "custom", label: "Custom Page", slug: "", icon: "✏️", description: "Start from scratch with a blank page", category: "other" },
 ];
 
 const TEMPLATE_CATEGORIES = [
   { key: "legal", label: "Legal & Compliance", icon: Scale, color: "text-amber-400", bgColor: "bg-amber-500/10", borderColor: "border-amber-500/20" },
+  { key: "action_terms", label: "Action Terms (Popups)", icon: Shield, color: "text-orange-400", bgColor: "bg-orange-500/10", borderColor: "border-orange-500/20" },
   { key: "marketing", label: "Marketing & Information", icon: Megaphone, color: "text-blue-400", bgColor: "bg-blue-500/10", borderColor: "border-blue-500/20" },
   { key: "other", label: "Other", icon: LayoutGrid, color: "text-gray-400", bgColor: "bg-gray-500/10", borderColor: "border-gray-500/20" },
 ] as const;
@@ -643,6 +653,14 @@ export default function SitePagesSection() {
                             className="text-[10px] gap-1"
                           >
                             <Shield className="h-3 w-3" /> System
+                          </Badge>
+                        )}
+                        {page.category === "action_terms" && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] gap-1 border-orange-500/30 text-orange-400"
+                          >
+                            ⚡ Action Popup
                           </Badge>
                         )}
                         <Badge
