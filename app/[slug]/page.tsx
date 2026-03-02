@@ -18,7 +18,7 @@ interface PageProps {
 // Reason: Static assets like favicon.ico, robots.txt, sitemap.xml can be
 // caught by this dynamic route. Return 404 immediately for non-page slugs.
 const STATIC_ASSET_PATTERN =
-  /\.(ico|png|jpg|jpeg|gif|svg|webp|xml|txt|json|js|css|woff2?|ttf|eot|map)$/i;
+  /\.(ico|png|jpg|jpeg|gif|svg|webp|xml|txt|json|js|css|woff2?|ttf|eot|map|php|asp|aspx|jsp|cgi|env|sql|bak|log|ini|yml|yaml|toml|sh|bat)$/i;
 
 // ─── Branding loader ────────────────────────────────────────────────────────
 interface Branding {
