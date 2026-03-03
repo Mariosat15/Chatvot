@@ -1,110 +1,67 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
-  Crown,
-  Copy,
-  Check,
-  Users,
-  TrendingUp,
-  Calendar,
-  Percent,
-  Trophy,
-  Link2,
-  RefreshCw,
-  Zap,
-  Clock,
-  Shield,
-  Gift,
-  ChevronRight,
-  ExternalLink,
-  Loader2,
-  AlertCircle,
-  ShoppingBag,
-  Pause,
-  Play,
-  Trash2,
-  AlertTriangle,
-  XCircle,
+  Crown, Users, TrendingUp, Calendar, Trophy, Link2, RefreshCw,
+  Clock, ChevronRight, Loader2, AlertCircle, ShoppingBag,
+  Pause, Play, AlertTriangle, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { OverviewTab, CompetitionsTab, ReferralsTab, EarningsTab } from "./gamemaster-dashboard-tabs";
+import { WarningBanner, RefField, KPI, SubscriptionPanel, CancelModal } from "./gamemaster-dashboard-helpers";
+import { useGmSubscription } from "./use-gm-subscription";
+import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData } from "./gamemaster-dashboard-types";
 
+// ─── Types ────────────────────────────────────────────────────────────
 interface GameMasterData {
-  subscription: {
-    _id: string;
-    status: string;
-    packageName: string;
-    referralCode: string;
-    startDate: string;
-    endDate: string;
-    autoRenew: boolean;
-    renewalPrice: number;
-    limits: {
-      maxCompetitionsPerDay: number;
-      maxUsersPerCompetition: number;
-      referralFeePercentage: number;
-      canCreateCompetitions?: boolean;
-      canEarnFromChallenges?: boolean;
-      challengeReferralFeePercentage?: number;
-    };
-    canCreateCompetitions: boolean; // Computed field from API (based on package)
-    canEarnFromChallenges: boolean; // Computed field from API (based on package)
-    currentPeriodCompetitionsCreated: number;
-    totalCompetitionsCreated: number;
-    totalEarnings: number;
-    pendingEarnings: number;
-    totalReferredUsers: number;
-    activeReferredUsers: number;
-    // Pause and cancellation state
-    isPaused?: boolean;
-    pausedAt?: string;
-    scheduledForDeletion?: boolean;
-    scheduledDeletionAt?: string;
-  } | null;
-  referredUsers: Array<{
-    _id: string;
-    name: string;
-    email: string;
-    createdAt: string;
-  }>;
-  recentEarnings: Array<{
-    _id: string;
-    amount: number;
-    source: string;
-    createdAt: string;
-  }>;
+  subscription: SubscriptionData | null;
+  referredUsers: ReferralItem[];
+  recentEarnings: EarningItem[];
+  recentCompetitions: CompetitionItem[];
+  stats: DashboardStats;
 }
 
+const TABS = ["Overview", "Competitions", "Referrals", "Earnings"] as const;
+type Tab = (typeof TABS)[number];
+
+// ─── Main Component ───────────────────────────────────────────────────
 export default function GameMasterDashboardContent() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<GameMasterData | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [togglingRenewal, setTogglingRenewal] = useState(false);
-  const [togglingPause, setTogglingPause] = useState(false);
-  const [schedulingCancel, setSchedulingCancel] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("Overview");
+  const [compFilter, setCompFilter] = useState("all");
+  const [earningsFilter, setEarningsFilter] = useState("all");
+  const [referralSearch, setReferralSearch] = useState("");
 
-  useEffect(() => {
-    fetchGameMasterData();
-  }, []);
+  // ── Subscription Management Hook ──────────────────────────────────
+  const getSub = useCallback(() => data?.subscription ?? null, [data?.subscription]);
+  const updateSub = useCallback(
+    (partial: Partial<SubscriptionData>) => {
+      setData((prev) =>
+        prev?.subscription ? { ...prev, subscription: { ...prev.subscription, ...partial } } : prev,
+      );
+    },
+    [],
+  );
+  const {
+    togglingRenewal, togglingPause, schedulingCancel,
+    showCancelConfirm, setShowCancelConfirm,
+    toggleAutoRenew, togglePause, toggleScheduledCancellation,
+  } = useGmSubscription(getSub, updateSub);
+
+  useEffect(() => { fetchGameMasterData(); }, []);
 
   const fetchGameMasterData = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/gamemaster/dashboard");
-      const result = await response.json();
-
-      if (result.success) {
-        setData(result.data);
-      } else {
-        // User is not a Game Master
-        setData({ subscription: null, referredUsers: [], recentEarnings: [] });
-      }
+      const res = await fetch("/api/gamemaster/dashboard");
+      const result = await res.json();
+      if (result.success) setData(result.data);
+      else setData(null);
     } catch (error) {
       console.error("Error fetching GM data:", error);
       toast.error("Failed to load Game Master data");
@@ -116,976 +73,210 @@ export default function GameMasterDashboardContent() {
   const copyToClipboard = async (text: string, type: "code" | "link") => {
     try {
       await navigator.clipboard.writeText(text);
-      if (type === "code") {
-        setCopiedCode(true);
-        setTimeout(() => setCopiedCode(false), 2000);
-      } else {
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2000);
-      }
+      const setter = type === "code" ? setCopiedCode : setCopiedLink;
+      setter(true);
+      setTimeout(() => setter(false), 2000);
       toast.success("Copied to clipboard!");
-    } catch {
-      toast.error("Failed to copy");
-    }
+    } catch { toast.error("Failed to copy"); }
   };
 
-  const toggleAutoRenew = async () => {
-    if (!data?.subscription) return;
+  // ── Derived State ─────────────────────────────────────────────────
+  const sub = data?.subscription;
+  const stats = data?.stats;
+  const daysRemaining = sub?.endDate
+    ? Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / 86400000))
+    : 0;
+  const referralLink = sub?.referralCode
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/sign-up?ref=${sub.referralCode}`
+    : "";
+  const isExpired = !sub || sub.status !== "active" || daysRemaining === 0;
+  const isPaused = sub?.isPaused === true;
+  const isScheduledForDeletion = sub?.scheduledForDeletion === true;
 
-    try {
-      setTogglingRenewal(true);
-      const response = await fetch("/api/gamemaster/toggle-renewal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoRenew: !data.subscription.autoRenew }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                subscription: prev.subscription
-                  ? {
-                      ...prev.subscription,
-                      autoRenew: !prev.subscription.autoRenew,
-                    }
-                  : null,
-              }
-            : null,
-        );
-        toast.success(
-          `Auto-renewal ${!data.subscription.autoRenew ? "enabled" : "disabled"}`,
-        );
-      } else {
-        toast.error(result.error || "Failed to update auto-renewal");
-      }
-    } catch (error) {
-      console.error("Error toggling auto-renewal:", error);
-      toast.error("Failed to update auto-renewal");
-    } finally {
-      setTogglingRenewal(false);
+  // ── Chart Data ────────────────────────────────────────────────────
+  const earningsChartData = useMemo(() => {
+    if (!data?.recentEarnings?.length) return [];
+    const map = new Map<string, number>();
+    for (const e of data.recentEarnings) {
+      const d = new Date(e.createdAt);
+      const key = `${d.getMonth() + 1}/${d.getDate()}`;
+      map.set(key, (map.get(key) || 0) + (e.netEarning || 0));
     }
-  };
+    return Array.from(map.entries()).slice(-14).map(([month, earnings]) => ({ month, earnings: +earnings.toFixed(2) }));
+  }, [data?.recentEarnings]);
 
-  const togglePause = async () => {
-    if (!data?.subscription) return;
+  const compStatusPieData = useMemo(() => {
+    if (!stats) return [];
+    const items = [
+      { name: "Active", value: stats.activeCompetitions || 0 },
+      { name: "Completed", value: stats.completedCompetitions || 0 },
+    ];
+    const total = stats.totalCompetitions || 0;
+    const counted = items.reduce((s, i) => s + i.value, 0);
+    if (total > counted) items.push({ name: "Other", value: total - counted });
+    return items.filter((i) => i.value > 0);
+  }, [stats]);
 
-    const isPaused = data.subscription.isPaused;
-    const action = isPaused ? "resume" : "pause";
+  const compStats = useMemo(() => {
+    if (!data?.recentCompetitions) return null;
+    const comps = data.recentCompetitions;
+    return {
+      active: comps.filter((c) => c.status === "active").length,
+      completed: comps.filter((c) => c.status === "completed").length,
+      upcoming: comps.filter((c) => c.status === "upcoming").length,
+      cancelled: comps.filter((c) => c.status === "cancelled").length,
+      totalParticipants: comps.reduce((s, c) => s + (c.participants || 0), 0),
+      totalPrizePool: comps.reduce((s, c) => s + (c.prizePool || 0), 0),
+    };
+  }, [data?.recentCompetitions]);
 
-    try {
-      setTogglingPause(true);
-      const response = await fetch("/api/gamemaster/pause", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+  const filteredComps = useMemo(() => {
+    if (!data?.recentCompetitions) return [];
+    return compFilter === "all" ? data.recentCompetitions : data.recentCompetitions.filter((c) => c.status === compFilter);
+  }, [data?.recentCompetitions, compFilter]);
 
-      const result = await response.json();
-      if (result.success) {
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                subscription: prev.subscription
-                  ? {
-                      ...prev.subscription,
-                      isPaused: !isPaused,
-                      pausedAt: isPaused ? undefined : new Date().toISOString(),
-                    }
-                  : null,
-              }
-            : null,
-        );
+  const filteredEarnings = useMemo(() => {
+    if (!data?.recentEarnings) return [];
+    return earningsFilter === "all" ? data.recentEarnings : data.recentEarnings.filter((e) => e.status === earningsFilter);
+  }, [data?.recentEarnings, earningsFilter]);
 
-        if (action === "pause") {
-          toast.warning(
-            "Subscription paused. You will NOT receive referral fees while paused.",
-            {
-              duration: 5000,
-            },
-          );
-        } else {
-          toast.success(
-            "Subscription resumed! You will now receive referral fees again.",
-          );
-        }
-      } else {
-        toast.error(result.error || `Failed to ${action} subscription`);
-      }
-    } catch (error) {
-      console.error(`Error ${action}ing subscription:`, error);
-      toast.error(`Failed to ${action} subscription`);
-    } finally {
-      setTogglingPause(false);
-    }
-  };
+  const filteredReferrals = useMemo(() => {
+    if (!data?.referredUsers) return [];
+    if (!referralSearch.trim()) return data.referredUsers;
+    const q = referralSearch.toLowerCase();
+    return data.referredUsers.filter((r) => r.name?.toLowerCase().includes(q) || r.email?.toLowerCase().includes(q));
+  }, [data?.referredUsers, referralSearch]);
 
-  const toggleScheduledCancellation = async () => {
-    if (!data?.subscription) return;
-
-    const isScheduled = data.subscription.scheduledForDeletion;
-    const action = isScheduled ? "unschedule" : "schedule";
-
-    try {
-      setSchedulingCancel(true);
-      const response = await fetch("/api/gamemaster/schedule-cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                subscription: prev.subscription
-                  ? {
-                      ...prev.subscription,
-                      scheduledForDeletion: !isScheduled,
-                      scheduledDeletionAt: isScheduled
-                        ? undefined
-                        : new Date().toISOString(),
-                      autoRenew: isScheduled
-                        ? prev.subscription.autoRenew
-                        : false, // Disable autoRenew on schedule
-                    }
-                  : null,
-              }
-            : null,
-        );
-
-        if (action === "schedule") {
-          const daysRemaining = Math.max(
-            0,
-            Math.ceil(
-              (new Date(data.subscription.endDate).getTime() - Date.now()) /
-                (1000 * 60 * 60 * 24),
-            ),
-          );
-          toast.info(
-            `Subscription scheduled for deletion after ${daysRemaining} days. You will continue earning until then.`,
-            {
-              duration: 6000,
-            },
-          );
-        } else {
-          toast.success(
-            "Cancellation cancelled. Your subscription will not be deleted.",
-          );
-        }
-        setShowCancelConfirm(false);
-      } else {
-        toast.error(result.error || `Failed to ${action} cancellation`);
-      }
-    } catch (error) {
-      console.error(`Error ${action}ing cancellation:`, error);
-      toast.error(`Failed to ${action} cancellation`);
-    } finally {
-      setSchedulingCancel(false);
-    }
-  };
-
+  // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-yellow-500" />
-          <p className="text-gray-400">Loading Game Master Dashboard...</p>
-        </div>
+        <Loader2 className="h-12 w-12 animate-spin text-yellow-500" />
       </div>
     );
   }
 
-  // Not a Game Master - show upgrade prompt
-  if (!data?.subscription) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0f]">
-        <div className="max-w-4xl mx-auto px-4 py-20">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 mb-8">
-              <Crown className="h-12 w-12 text-yellow-400" />
-            </div>
+  // ── Not a Game Master ─────────────────────────────────────────────
+  if (!sub) return <NotGameMasterView />;
 
-            <h1 className="text-4xl font-bold text-white mb-4">
-              Become a Game Master
-            </h1>
-            <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Create competitions, build your trading community, and earn from
-              referrals. Unlock the power of Game Master status today!
-            </p>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                <Trophy className="h-10 w-10 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Create Competitions
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Host your own trading competitions for your community
-                </p>
-              </div>
-              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                <Users className="h-10 w-10 text-emerald-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Grow Your Community
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Refer traders and build your trading network
-                </p>
-              </div>
-              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                <TrendingUp className="h-10 w-10 text-blue-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Earn Rewards
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Get a percentage of entry fees from your referrals
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/marketplace?category=gamemaster"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold text-lg rounded-2xl transition-all shadow-lg shadow-yellow-500/20"
-            >
-              <ShoppingBag className="h-6 w-6" />
-              View Game Master Packages
-              <ChevronRight className="h-5 w-5" />
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const sub = data.subscription;
-  const daysRemaining = Math.max(
-    0,
-    Math.ceil(
-      (new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-    ),
-  );
-  const referralLink = `${typeof window !== "undefined" ? window.location.origin : ""}/sign-up?ref=${sub.referralCode}`;
-  const isExpired = sub.status !== "active" || daysRemaining === 0;
-  const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7; // Warning when 7 days or less
-  const isExpiringCritical = daysRemaining > 0 && daysRemaining <= 3; // Critical when 3 days or less
-  const isPaused = sub.isPaused === true;
-  const isScheduledForDeletion = sub.scheduledForDeletion === true;
-  const canEarnFees = !isExpired && !isPaused;
-
+  // ── Active Dashboard ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-gray-800">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-amber-500/10" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between flex-wrap gap-6">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
-                <Crown className="h-8 w-8 text-yellow-400" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
+                <Crown className="h-7 w-7 text-yellow-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                   Game Master Dashboard
-                  <span
-                    className={cn(
-                      "px-3 py-1 rounded-full text-sm font-semibold",
-                      isExpired
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-emerald-500/20 text-emerald-400",
-                    )}
-                  >
-                    {isExpired ? "Expired" : "Active"}
+                  <span className={cn("px-3 py-1 rounded-full text-xs font-semibold", isExpired ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400")}>
+                    {isExpired ? "Expired" : isPaused ? "Paused" : "Active"}
                   </span>
                 </h1>
-                <p className="text-gray-400 mt-1">{sub.packageName}</p>
+                <p className="text-gray-400 text-sm mt-0.5">{sub.packageName}</p>
               </div>
             </div>
-
-            <button
-              onClick={fetchGameMasterData}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
+            <button onClick={fetchGameMasterData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors text-sm">
+              <RefreshCw className="h-4 w-4" /> Refresh
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Warning for expired subscription */}
-        {isExpired && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-4">
-            <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-red-400">
-                Your Game Master subscription has expired
-              </h3>
-              <p className="text-gray-400 text-sm mt-1">
-                Renew your subscription to continue creating competitions and
-                earning from referrals.
-              </p>
-              <Link
-                href="/marketplace?category=gamemaster"
-                className="inline-flex items-center gap-2 mt-3 text-yellow-400 hover:text-yellow-300 font-medium"
-              >
-                Renew Subscription <ExternalLink className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Warning for paused subscription */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Banners */}
+        {isExpired && <WarningBanner icon={AlertCircle} color="red" title="Subscription expired" desc="Renew to continue creating competitions and earning." link="/marketplace?category=gamemaster" linkText="Renew Subscription" />}
         {isPaused && !isExpired && (
-          <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl flex items-start gap-4">
-            <Pause className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-400">
-                Subscription Paused
-              </h3>
-              <p className="text-gray-400 text-sm mt-1">
-                Your Game Master subscription is paused. You will{" "}
-                <span className="text-yellow-400 font-semibold">
-                  NOT receive referral fees
-                </span>{" "}
-                from your referrals until you resume.
-              </p>
-              <button
-                onClick={togglePause}
-                disabled={togglingPause}
-                className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-              >
-                {togglingPause ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                Resume Subscription
-              </button>
-            </div>
-          </div>
+          <WarningBanner icon={Pause} color="yellow" title="Subscription Paused" desc="You will NOT receive referral fees until you resume.">
+            <button onClick={togglePause} disabled={togglingPause} className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50">
+              {togglingPause ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Resume
+            </button>
+          </WarningBanner>
         )}
-
-        {/* Warning for scheduled deletion */}
         {isScheduledForDeletion && !isExpired && (
-          <div className="mb-8 p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-start gap-4">
-            <AlertTriangle className="h-6 w-6 text-orange-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-orange-400">
-                Scheduled for Cancellation
-              </h3>
-              <p className="text-gray-400 text-sm mt-1">
-                Your subscription is scheduled to be deleted on{" "}
-                <span className="text-orange-400 font-semibold">
-                  {new Date(sub.endDate).toLocaleDateString()}
-                </span>
-                . You will continue receiving referral fees until then.
-              </p>
-              <button
-                onClick={toggleScheduledCancellation}
-                disabled={schedulingCancel}
-                className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-              >
-                {schedulingCancel ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <XCircle className="h-4 w-4" />
-                )}
-                Cancel Deletion
-              </button>
-            </div>
-          </div>
+          <WarningBanner icon={AlertTriangle} color="orange" title="Scheduled for Cancellation" desc={`Deletes on ${sub.endDate ? new Date(sub.endDate).toLocaleDateString() : "expiry"}.`}>
+            <button onClick={toggleScheduledCancellation} disabled={schedulingCancel} className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50">
+              {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Cancel Deletion
+            </button>
+          </WarningBanner>
         )}
 
-        {/* Referral Section */}
-        <div className="mb-8">
-          <div
-            className={cn(
-              "rounded-2xl p-6 border",
-              isPaused
-                ? "bg-gray-800/50 border-gray-700/50 opacity-75"
-                : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20",
-            )}
-          >
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Link2
-                className={
-                  isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"
-                }
-              />
-              Your Referral Link
-              {isPaused && (
-                <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
-                  PAUSED
-                </span>
-              )}
-            </h2>
-            <p className="text-gray-400 text-sm mb-4">
-              {isPaused ? (
-                <span className="text-yellow-400">
-                  ⚠️ Your subscription is paused. Referral fees are not being
-                  collected.
-                </span>
-              ) : (
-                <>
-                  Share this link to invite new traders. You'll earn{" "}
-                  <span className="text-emerald-400 font-semibold">
-                    {sub.limits.referralFeePercentage}%
-                  </span>{" "}
-                  of their competition entry fees!
-                </>
-              )}
-            </p>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Referral Code */}
-              <div>
-                <label className="text-sm text-gray-500 mb-2 block">
-                  Referral Code
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-900 rounded-xl px-4 py-3 font-mono text-xl text-yellow-400 border border-gray-700">
-                    {sub.referralCode}
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(sub.referralCode, "code")}
-                    className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
-                  >
-                    {copiedCode ? (
-                      <Check className="h-5 w-5 text-emerald-400" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Full Referral Link */}
-              <div>
-                <label className="text-sm text-gray-500 mb-2 block">
-                  Full Referral Link
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-900 rounded-xl px-4 py-3 text-sm text-gray-300 border border-gray-700 truncate">
-                    {referralLink}
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(referralLink, "link")}
-                    className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
-                  >
-                    {copiedLink ? (
-                      <Check className="h-5 w-5 text-emerald-400" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Referral Link */}
+        <div className={cn("rounded-2xl p-5 border", isPaused ? "bg-gray-800/50 border-gray-700/50 opacity-75" : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20")}>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <Link2 className={isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"} /> Your Referral Link
+            {isPaused && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">PAUSED</span>}
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <RefField label="Referral Code" value={sub.referralCode || ""} copied={copiedCode} onCopy={() => copyToClipboard(sub.referralCode || "", "code")} mono />
+            <RefField label="Full Referral Link" value={referralLink} copied={copiedLink} onCopy={() => copyToClipboard(referralLink, "link")} />
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <TrendingUp className="h-5 w-5 text-emerald-400" />
-              </div>
-              <span className="text-sm text-gray-400">Total Earnings</span>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              ⚡ {sub.totalEarnings.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <Users className="h-5 w-5 text-blue-400" />
-              </div>
-              <span className="text-sm text-gray-400">Referred Users</span>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              {sub.totalReferredUsers}
-            </p>
-          </div>
-
-          <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Trophy className="h-5 w-5 text-purple-400" />
-              </div>
-              <span className="text-sm text-gray-400">
-                Competitions Created
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              {sub.totalCompetitionsCreated}
-            </p>
-          </div>
-
-          <div
-            className={`rounded-2xl p-5 border ${
-              isExpiringCritical
-                ? "bg-red-900/30 border-red-500/50"
-                : isExpiringSoon
-                  ? "bg-yellow-900/20 border-yellow-500/50"
-                  : "bg-gray-800/50 border-gray-700/50"
-            }`}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className={`p-2 rounded-lg ${
-                  isExpiringCritical
-                    ? "bg-red-500/20"
-                    : isExpiringSoon
-                      ? "bg-yellow-500/20"
-                      : "bg-yellow-500/10"
-                }`}
-              >
-                <Calendar
-                  className={`h-5 w-5 ${
-                    isExpiringCritical
-                      ? "text-red-400"
-                      : isExpiringSoon
-                        ? "text-yellow-400"
-                        : "text-yellow-400"
-                  }`}
-                />
-              </div>
-              <span className="text-sm text-gray-400">Days Remaining</span>
-            </div>
-            <p
-              className={`text-2xl font-bold ${
-                isExpiringCritical
-                  ? "text-red-400 animate-pulse"
-                  : isExpiringSoon
-                    ? "text-yellow-400"
-                    : "text-white"
-              }`}
-            >
-              {daysRemaining}
-            </p>
-            {isExpiringCritical && (
-              <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
-                ⚠️ Expires soon! Renew now
-              </p>
-            )}
-            {isExpiringSoon && !isExpiringCritical && (
-              <p className="text-xs text-yellow-400 mt-2">
-                ⏰ Expiring in {daysRemaining} days
-              </p>
-            )}
-          </div>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <KPI icon={TrendingUp} color="emerald" label="Total Earnings" value={`⚡ ${(stats?.totalEarnings ?? 0).toFixed(2)}`} />
+          <KPI icon={Clock} color="yellow" label="Pending" value={`⚡ ${(stats?.pendingEarnings ?? 0).toFixed(2)}`} />
+          <KPI icon={Users} color="blue" label="Total Referrals" value={String(stats?.totalReferredUsers ?? 0)} />
+          <KPI icon={Users} color="purple" label="Active Referrals" value={String(stats?.activeReferredUsers ?? 0)} />
+          <KPI icon={Trophy} color="amber" label="Competitions" value={String(stats?.totalCompetitions ?? 0)} />
+          <KPI icon={Calendar} color={daysRemaining <= 3 ? "red" : daysRemaining <= 7 ? "yellow" : "emerald"} label="Days Left" value={String(daysRemaining)} pulse={daysRemaining <= 3 && daysRemaining > 0} />
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Subscription Details */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-yellow-400" />
-              Subscription Details
-            </h2>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Package</span>
-                <span className="text-white font-medium">
-                  {sub.packageName}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Create Competitions</span>
-                <span
-                  className={cn(
-                    "font-medium",
-                    sub.canCreateCompetitions
-                      ? "text-emerald-400"
-                      : "text-purple-400",
-                  )}
-                >
-                  {sub.canCreateCompetitions ? "Enabled" : "Referral-Only"}
-                </span>
-              </div>
-              {sub.canCreateCompetitions && (
-                <>
-                  <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                    <span className="text-gray-400">Competitions/Day</span>
-                    <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} /{" "}
-                      {sub.limits.maxCompetitionsPerDay}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                    <span className="text-gray-400">Max Users/Competition</span>
-                    <span className="text-white font-medium">
-                      {sub.limits.maxUsersPerCompetition}
-                    </span>
-                  </div>
-                </>
-              )}
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Competition Referral Fee</span>
-                <span className="text-emerald-400 font-medium">
-                  {sub.limits.referralFeePercentage}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Challenge Earnings</span>
-                <span
-                  className={cn(
-                    "font-medium",
-                    sub.canEarnFromChallenges
-                      ? "text-orange-400"
-                      : "text-gray-500",
-                  )}
-                >
-                  {sub.canEarnFromChallenges
-                    ? `${sub.limits.challengeReferralFeePercentage ?? sub.limits.referralFeePercentage}% ⚔️`
-                    : "Not Included"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Expires</span>
-                <span className="text-white font-medium">
-                  {new Date(sub.endDate).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <span className="text-gray-400">Auto-Renewal</span>
-                <button
-                  onClick={toggleAutoRenew}
-                  disabled={togglingRenewal}
-                  className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    sub.autoRenew ? "bg-emerald-500" : "bg-gray-600",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                      sub.autoRenew ? "translate-x-6" : "translate-x-1",
-                    )}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {sub.autoRenew && (
-              <p className="text-sm text-gray-500 mt-4">
-                <Clock className="h-4 w-4 inline mr-1" />
-                Auto-renews for ⚡ {sub.renewalPrice.toLocaleString()} credits
-                on {new Date(sub.endDate).toLocaleDateString()}
-              </p>
-            )}
-
-            {/* Subscription Management Controls */}
-            {!isExpired && (
-              <div className="mt-6 pt-6 border-t border-gray-700/50">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                  Subscription Controls
-                </h3>
-
-                {/* Pause/Resume Toggle */}
-                <div className="flex items-center justify-between py-3 mb-3 bg-gray-900/50 rounded-lg px-4">
-                  <div>
-                    <span className="text-white font-medium flex items-center gap-2">
-                      {isPaused ? (
-                        <Pause className="h-4 w-4 text-yellow-400" />
-                      ) : (
-                        <Play className="h-4 w-4 text-emerald-400" />
-                      )}
-                      {isPaused ? "Paused" : "Active"}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {isPaused
-                        ? "Not receiving referral fees"
-                        : "Receiving referral fees"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={togglePause}
-                    disabled={togglingPause}
-                    className={cn(
-                      "px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50",
-                      isPaused
-                        ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                        : "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30",
-                    )}
-                  >
-                    {togglingPause ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : isPaused ? (
-                      <>
-                        <Play className="h-4 w-4" /> Resume
-                      </>
-                    ) : (
-                      <>
-                        <Pause className="h-4 w-4" /> Pause
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Cancel Subscription */}
-                {!isScheduledForDeletion ? (
-                  <button
-                    onClick={() => setShowCancelConfirm(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-900/50 hover:bg-red-500/10 border border-gray-700 hover:border-red-500/30 rounded-lg text-gray-400 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Cancel Subscription
-                  </button>
-                ) : (
-                  <div className="flex items-center justify-between py-3 px-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                    <div>
-                      <span className="text-orange-400 font-medium flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Scheduled for Deletion
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Ends {new Date(sub.endDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={toggleScheduledCancellation}
-                      disabled={schedulingCancel}
-                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {schedulingCancel ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <XCircle className="h-4 w-4" />
-                      )}
-                      Keep
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Package Limits / Create Competition */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-yellow-400" />
-              Quick Actions
-            </h2>
-
-            <div className="space-y-4">
-              {/* Today's Usage - Only show if can create competitions */}
-              {sub.canCreateCompetitions && (
-                <div className="bg-gray-900/50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400">Today's Competitions</span>
-                    <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} /{" "}
-                      {sub.limits.maxCompetitionsPerDay}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-yellow-500 to-amber-500 transition-all"
-                      style={{
-                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Create Competition - Only show if can create competitions */}
-              {sub.canCreateCompetitions ? (
-                <Link
-                  href="/gamemaster/create-competition"
-                  className={cn(
-                    "flex items-center justify-between p-4 rounded-xl transition-all",
-                    isExpired
-                      ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
-                      : "bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20 text-white border border-yellow-500/20",
-                  )}
-                  onClick={(e) => isExpired && e.preventDefault()}
-                >
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-5 w-5 text-yellow-400" />
-                    <div>
-                      <p className="font-medium">Create Competition</p>
-                      <p className="text-sm text-gray-400">
-                        Host a new trading competition
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5" />
-                </Link>
-              ) : (
-                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-500/20">
-                      <TrendingUp className="h-5 w-5 text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-purple-400">
-                        Referral-Only Package
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Earn {sub.limits.referralFeePercentage}% from your
-                        referrals in all competitions
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <Link
-                href="/gamemaster/referrals"
-                className="flex items-center justify-between p-4 bg-gray-900/50 hover:bg-gray-900 rounded-xl transition-all text-white"
-              >
-                <div className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-blue-400" />
-                  <div>
-                    <p className="font-medium">View Referrals</p>
-                    <p className="text-sm text-gray-400">
-                      See all your referred users
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5" />
-              </Link>
-
-              <Link
-                href="/gamemaster/earnings"
-                className="flex items-center justify-between p-4 bg-gray-900/50 hover:bg-gray-900 rounded-xl transition-all text-white"
-              >
-                <div className="flex items-center gap-3">
-                  <Gift className="h-5 w-5 text-emerald-400" />
-                  <div>
-                    <p className="font-medium">View Earnings</p>
-                    <p className="text-sm text-gray-400">
-                      Detailed earnings history
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5" />
-              </Link>
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex items-center gap-1 bg-gray-900/50 rounded-xl p-1 border border-gray-800">
+          {TABS.map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={cn("flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors", activeTab === tab ? "bg-yellow-500 text-black shadow" : "text-gray-400 hover:text-white hover:bg-gray-800")}>
+              {tab}
+            </button>
+          ))}
         </div>
 
-        {/* Referred Users */}
-        {data.referredUsers.length > 0 && (
-          <div className="mt-8 bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-400" />
-              Your Referred Users
-              <span className="text-sm font-normal text-gray-400">
-                ({data.referredUsers.length} total)
-              </span>
-            </h2>
+        {activeTab === "Overview" && stats && <OverviewTab stats={stats} subscription={sub} earningsChartData={earningsChartData} compStatusPieData={compStatusPieData} compStats={compStats} />}
+        {activeTab === "Competitions" && <CompetitionsTab competitions={filteredComps} filter={compFilter} onFilterChange={setCompFilter} subscription={sub} isExpired={isExpired} />}
+        {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} />}
+        {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} stats={stats} />}
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-400 border-b border-gray-700">
-                    <th className="pb-3 font-medium">User</th>
-                    <th className="pb-3 font-medium">Joined</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.referredUsers.slice(0, 10).map((user) => (
-                    <tr key={user._id} className="border-b border-gray-700/50">
-                      <td className="py-4">
-                        <div>
-                          <p className="text-white font-medium">{user.name}</p>
-                          <p className="text-sm text-gray-500">{user.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 text-gray-400">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <SubscriptionPanel sub={sub} isExpired={isExpired} isPaused={isPaused} isScheduledForDeletion={isScheduledForDeletion} togglingRenewal={togglingRenewal} togglingPause={togglingPause} schedulingCancel={schedulingCancel} toggleAutoRenew={toggleAutoRenew} togglePause={togglePause} onShowCancelConfirm={() => setShowCancelConfirm(true)} toggleScheduledCancellation={toggleScheduledCancellation} />
       </div>
 
-      {/* Cancel Confirmation Modal */}
-      {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 rounded-2xl max-w-md w-full p-6 border border-gray-700">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-orange-500/20 rounded-xl">
-                <AlertTriangle className="h-6 w-6 text-orange-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">
-                  Cancel Subscription?
-                </h3>
-                <p className="text-sm text-gray-400">
-                  This action schedules your subscription for deletion
-                </p>
-              </div>
-            </div>
+      {showCancelConfirm && <CancelModal endDate={sub.endDate} schedulingCancel={schedulingCancel} onClose={() => setShowCancelConfirm(false)} onConfirm={toggleScheduledCancellation} />}
+    </div>
+  );
+}
 
-            <div className="space-y-4 mb-6">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
-                <p className="text-sm text-emerald-400 flex items-center gap-2">
-                  <Check className="h-4 w-4" />
-                  You'll continue earning referral fees until{" "}
-                  {new Date(sub.endDate).toLocaleDateString()}
-                </p>
-              </div>
-
-              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
-                <p className="text-sm text-orange-400 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  After that, your subscription will be permanently deleted
-                </p>
-              </div>
-
-              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                <p className="text-sm text-gray-400">
-                  <strong className="text-white">Note:</strong> Auto-renewal
-                  will be disabled. You can undo this anytime before expiry.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
-              >
-                Keep Subscription
-              </button>
-              <button
-                onClick={toggleScheduledCancellation}
-                disabled={schedulingCancel}
-                className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {schedulingCancel ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" />
-                    Schedule Deletion
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+// ─── Not a Game Master View ───────────────────────────────────────────
+function NotGameMasterView() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0f]">
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+        <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 mb-8">
+          <Crown className="h-12 w-12 text-yellow-400" />
         </div>
-      )}
+        <h1 className="text-4xl font-bold text-white mb-4">Become a Game Master</h1>
+        <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">Create competitions, build your trading community, and earn from referrals.</p>
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {[
+            { icon: Trophy, color: "text-yellow-400", t: "Create Competitions", d: "Host your own trading competitions" },
+            { icon: Users, color: "text-emerald-400", t: "Grow Community", d: "Refer traders and build your network" },
+            { icon: TrendingUp, color: "text-blue-400", t: "Earn Rewards", d: "Percentage of entry fees from referrals" },
+          ].map((item) => (
+            <div key={item.t} className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
+              <item.icon className={`h-10 w-10 ${item.color} mx-auto mb-4`} />
+              <h3 className="text-lg font-semibold text-white mb-2">{item.t}</h3>
+              <p className="text-gray-400 text-sm">{item.d}</p>
+            </div>
+          ))}
+        </div>
+        <Link href="/marketplace?category=gamemaster" className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold text-lg rounded-2xl transition-all shadow-lg shadow-yellow-500/20">
+          <ShoppingBag className="h-6 w-6" /> View Game Master Packages <ChevronRight className="h-5 w-5" />
+        </Link>
+      </div>
     </div>
   );
 }

@@ -21,12 +21,13 @@ export async function finalizeCompetition(competitionId: string) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await _finalizeCompetitionAttempt(competitionId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const mongoErr = error as Record<string, unknown> | null;
       const isTransient =
-        error?.errorLabelSet?.has?.("TransientTransactionError") ||
-        error?.errorLabels?.includes?.("TransientTransactionError") ||
-        error?.code === 112 || // WriteConflict
-        error?.codeName === "WriteConflict";
+        (mongoErr?.errorLabelSet as Set<string> | undefined)?.has?.("TransientTransactionError") ||
+        (mongoErr?.errorLabels as string[] | undefined)?.includes?.("TransientTransactionError") ||
+        mongoErr?.code === 112 || // WriteConflict
+        mongoErr?.codeName === "WriteConflict";
 
       if (isTransient && attempt < MAX_RETRIES) {
         const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000);
@@ -40,6 +41,13 @@ export async function finalizeCompetition(competitionId: string) {
       throw error;
     }
   }
+
+  // Reason: This line is only reached if MAX_RETRIES is 0 (impossible with current config).
+  // Added to satisfy TypeScript's "not all code paths return a value" check.
+  return {
+    success: false,
+    error: `Competition finalization failed after ${MAX_RETRIES} retries`,
+  };
 }
 
 async function _finalizeCompetitionAttempt(competitionId: string) {
@@ -297,11 +305,12 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           }
         }
       }
-    } catch (healthError: any) {
+    } catch (healthError: unknown) {
       // Reason: Only log a warning for actual health check failures, not for expected
       // "not available" cases (which happen on every server action call).
-      if (healthError?.message !== "not_available") {
-        console.warn(`⚠️ [FINALIZATION] Health check failed:`, healthError?.message || healthError);
+      const healthErrMsg = (healthError as Error | undefined)?.message;
+      if (healthErrMsg !== "not_available") {
+        console.warn(`⚠️ [FINALIZATION] Health check failed:`, healthErrMsg || healthError);
       }
       // Continue with normal price fetch
     }
@@ -657,7 +666,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     }).session(session);
 
     const walletMap = new Map(
-      existingWallets.map((w: any) => [w.userId.toString(), w]),
+      existingWallets.map((w) => [w.userId.toString(), w]),
     );
 
     // Distribute to each winner
@@ -839,9 +848,12 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     console.log(`🎮 Calculating Game Master referral fees...`);
 
     let totalGmEarnings = 0; // Track total GM earnings to subtract from platform fee
+    // Reason: gmSubscription is a lean MongoDB document from native driver findOne.
+    // Using Record<string, unknown> with index signature for the subscription document.
+    type GmSubDoc = { _id: unknown; [key: string]: unknown };
     const gmPayments: Array<{
       gmId: string;
-      gmSubscription: any;
+      gmSubscription: GmSubDoc;
       users: { userId: string; userName: string; userEmail: string }[];
       feePercentage: number;
       totalEarning: number;
@@ -1246,7 +1258,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
 
           // Update game master subscription stats (inside transaction for consistency)
           await db.collection("gamemastersubscriptions").updateOne(
-            { _id: gmSubscription._id },
+            { _id: gmSubscription._id as import("mongoose").Types.ObjectId },
             {
               $inc: {
                 totalEarnings: totalEarning,
@@ -1341,7 +1353,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
 
           // Update subscription pending earnings (inside transaction)
           await db.collection("gamemastersubscriptions").updateOne(
-            { _id: gmSubscription._id },
+            { _id: gmSubscription._id as import("mongoose").Types.ObjectId },
             {
               $inc: { pendingEarnings: -totalEarning },
             },

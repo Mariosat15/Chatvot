@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
               try { return new mongoose.Types.ObjectId(t.sourceId as string); }
               catch { return null; }
             })
-            .filter(Boolean);
+            .filter((id): id is mongoose.Types.ObjectId => id !== null);
 
           const comps = await db.collection("competitions")
             .find({ _id: { $in: compIds } }, { projection: { _id: 1, gameMasterId: 1 } })
