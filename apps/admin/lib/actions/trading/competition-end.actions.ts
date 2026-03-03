@@ -401,10 +401,37 @@ export async function finalizeCompetition(competitionId: string) {
 
     // STEP 3: Distribute prizes with tie handling
     console.log(`💰 Distributing prizes...`);
-    const prizePool = competition.prizePool || 0;
+
+    // Reason: SAFEGUARD against distributing more credits than were actually collected.
+    // The actual collected fees = currentParticipants × entryFee.
+    // If competition.prizePool is somehow inflated (e.g. from a bug where it was
+    // pre-set to an estimated value AND then incremented per entry), cap it.
+    const actualCollectedFees =
+      (competition.currentParticipants || 0) * (competition.entryFee || 0);
+    let prizePool = competition.prizePool || 0;
+
+    if (prizePool > actualCollectedFees && actualCollectedFees > 0) {
+      console.error(
+        `🚨 [COMPETITION] PRIZE POOL INTEGRITY VIOLATION for ${competitionId}!`,
+      );
+      console.error(
+        `   Stored prizePool: ${prizePool}, actual collected (${competition.currentParticipants} × ${competition.entryFee}): ${actualCollectedFees}`,
+      );
+      console.error(
+        `   Capping prizePool to actual collected fees to prevent phantom credit distribution.`,
+      );
+      prizePool = actualCollectedFees;
+
+      // Also fix the stored value so the DB is consistent
+      await Competition.findByIdAndUpdate(competitionId, {
+        $set: { prizePool: actualCollectedFees },
+      });
+    }
+
     const platformFeePercentage = competition.platformFeePercentage / 100;
 
     console.log(`  Gross Prize Pool: ${prizePool} credits`);
+    console.log(`  Actual Collected: ${actualCollectedFees} credits`);
     console.log(`  Platform Fee: ${competition.platformFeePercentage}%`);
 
     // FIXED: Calculate prizes from GROSS pool, then deduct platform fee from each winner

@@ -8562,10 +8562,10 @@ const LightweightTradingChart = ({
                         className={cn(
                           "text-sm font-bold tabular-nums",
                           liveAccount.marginLevel > 200
-                            ? "text-[#26a69a]"
+                              ? "text-[#26a69a]"
                             : liveAccount.marginLevel < Infinity
                               ? "text-[#ef5350]"
-                              : "text-[#787b86]",
+                            : "text-[#787b86]",
                         )}
                       >
                         {liveAccount.usedMargin > 0.01

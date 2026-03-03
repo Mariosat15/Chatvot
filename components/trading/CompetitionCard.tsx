@@ -139,6 +139,13 @@ export default function CompetitionCard({
   const rankingInfo =
     RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
+  // Reason: Determine who created this competition for the creator badge.
+  // gameMasterId is set only by GM routes — its presence indicates a GM-created competition.
+  const isGmCreated = !!competition.gameMasterId;
+  const creatorLabel = isGmCreated
+    ? `GM: ${competition.gameMasterName || "Game Master"}`
+    : "Admin";
+
   // Platform leverage is now passed as a prop from the parent (fetched ONCE)
   // instead of each card making its own API call (was N+1 pattern: 20 cards = 20 calls)
   const maxLeverage = platformLeverage;
@@ -345,6 +352,16 @@ export default function CompetitionCard({
                       ✓ ENTERED
                     </span>
                   )}
+                  {/* Creator Badge */}
+                  <span
+                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      isGmCreated
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                        : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                    }`}
+                  >
+                    {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-400">
                   <span className="flex items-center gap-1">
@@ -597,6 +614,19 @@ export default function CompetitionCard({
         <h3 className="text-xl font-black text-center text-gray-100 mb-2 group-hover:text-yellow-400 transition-colors">
           {competition.name}
         </h3>
+
+        {/* Creator Badge */}
+        <div className="flex justify-center mb-2">
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+              isGmCreated
+                ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+            }`}
+          >
+            {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
+          </span>
+        </div>
 
         {/* Difficulty Badge */}
         <div className="flex justify-center mb-3">

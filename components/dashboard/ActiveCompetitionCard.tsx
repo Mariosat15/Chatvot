@@ -62,9 +62,24 @@ export default function ActiveCompetitionCard({
               >
                 {competition.name}
               </Link>
-              <p className="text-sm text-gray-400 mt-2 line-clamp-2">
-                {competition.description}
-              </p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <p className="text-sm text-gray-400 line-clamp-1 flex-1">
+                  {competition.description}
+                </p>
+                {/* Creator Badge */}
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    competition.gameMasterId
+                      ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                      : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                  }`}
+                >
+                  {competition.gameMasterId ? "🎮" : "🛡️"}{" "}
+                  {competition.gameMasterId
+                    ? `GM: ${competition.gameMasterName || "Game Master"}`
+                    : "Admin"}
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-row md:flex-col items-center md:items-end gap-2">

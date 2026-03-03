@@ -239,7 +239,11 @@ export async function POST(request: NextRequest) {
       status: "upcoming",
       entryFee: parseFloat(entryFee),
       startingCapital: startingCapital ? parseFloat(startingCapital) : 10000,
-      prizePool: parseFloat(prizePool),
+      // Reason: Start at 0 — actual prize pool is built incrementally via $inc
+      // when each user enters (competition.actions.ts enterCompetition).
+      // Setting to a pre-calculated estimate caused double-counting: the estimate
+      // was stored AND each entry fee was added on top, creating phantom credits.
+      prizePool: 0,
       minParticipants: 2,
       maxParticipants: parseInt(maxParticipants),
       currentParticipants: 0,
