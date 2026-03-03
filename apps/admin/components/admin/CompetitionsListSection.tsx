@@ -17,6 +17,8 @@ import {
   XCircle,
   Ban,
   Loader2,
+  Crown,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -115,6 +117,8 @@ interface Competition {
   prizePool: number;
   platformFeePercentage: number;
   assetClasses: string[];
+  gameMasterId?: string;
+  gameMasterName?: string;
 }
 
 export default function CompetitionsListSection() {
@@ -381,6 +385,19 @@ export default function CompetitionsListSection() {
                     {getStatusIcon(competition.status)}
                     {competition.status.toUpperCase()}
                   </div>
+
+                  {/* Creator Badge */}
+                  {competition.gameMasterId ? (
+                    <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-purple-500/20 text-purple-400 border-purple-500/30">
+                      <Crown className="h-3 w-3" />
+                      GM: {competition.gameMasterName || "Game Master"}
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                      <Shield className="h-3 w-3" />
+                      Admin
+                    </div>
+                  )}
 
                   {/* Live Countdown for Upcoming */}
                   {competition.status === "upcoming" && (

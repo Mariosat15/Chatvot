@@ -39,7 +39,7 @@ export async function GET() {
       );
     }
 
-    // Get referred users with details
+    // Get referred users with details (all, not just 10)
     const referredUsers = await db
       .collection("user")
       .find({
@@ -53,7 +53,7 @@ export async function GET() {
         image: 1,
       })
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(100)
       .toArray();
 
     // Get total referred users count
@@ -61,7 +61,7 @@ export async function GET() {
       referredByGameMasterId: auth.userId,
     });
 
-    // Get competitions created by this game master
+    // Get all competitions created by this game master (up to 50)
     const competitions = await db
       .collection("competitions")
       .find({
@@ -72,12 +72,15 @@ export async function GET() {
         name: 1,
         status: 1,
         currentParticipants: 1,
+        maxParticipants: 1,
         prizePool: 1,
+        entryFee: 1,
         startTime: 1,
         endTime: 1,
+        createdAt: 1,
       })
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(50)
       .toArray();
 
     // Get total competitions created
@@ -125,15 +128,23 @@ export async function GET() {
       totalTransactions: 0,
     };
 
-    // Get recent earnings
+    // Get all earnings (up to 100)
     const recentEarnings = await db
       .collection("gamemasterearnings")
       .find({
         gameMasterId: auth.userId,
       })
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(100)
       .toArray();
+
+    // Get completed competitions count
+    const completedCompetitions = await db
+      .collection("competitions")
+      .countDocuments({
+        gameMasterId: auth.userId,
+        status: "completed",
+      });
 
     // Calculate days remaining
     const daysRemaining = Math.max(
@@ -165,6 +176,7 @@ export async function GET() {
         totalReferredUsers,
         totalCompetitions,
         activeCompetitions,
+        completedCompetitions,
         ...earnings,
       },
       recentReferrals: referredUsers.map((u) => ({
@@ -179,9 +191,12 @@ export async function GET() {
         name: c.name,
         status: c.status,
         participants: c.currentParticipants,
+        maxParticipants: c.maxParticipants,
         prizePool: c.prizePool,
+        entryFee: c.entryFee,
         startTime: c.startTime,
         endTime: c.endTime,
+        createdAt: c.createdAt,
       })),
       recentEarnings: recentEarnings.map((e) => ({
         id: e._id.toString(),

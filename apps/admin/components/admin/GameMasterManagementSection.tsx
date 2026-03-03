@@ -9,25 +9,19 @@ import {
   RefreshCw,
   Crown,
   Eye,
-  Ban,
   CheckCircle,
   XCircle,
-  Calendar,
-  TrendingUp,
-  AlertCircle,
-  ChevronLeft,
   Clock,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  ExternalLink,
+  AlertCircle,
   User,
-  Swords,
   Link2,
   Database,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import GameMasterDetailView, {
+  type DetailedGameMasterData,
+} from "./GameMasterDetailView";
 
 interface GameMaster {
   id: string;
@@ -63,45 +57,8 @@ interface Stats {
   totalCompetitions: number;
 }
 
-interface DetailedGameMaster {
-  subscription: GameMaster & {
-    pendingEarnings: number;
-    activeReferredUsers: number;
-    renewalHistory: Array<{
-      date: string;
-      amount: number;
-      status: string;
-      failureReason?: string;
-    }>;
-    suspendedReason?: string;
-  };
-  referredUsers: Array<{
-    id: string;
-    name: string;
-    email: string;
-    createdAt: string;
-    referredAt: string;
-  }>;
-  competitions: Array<{
-    id: string;
-    name: string;
-    status: string;
-    participants: number;
-    prizePool: number;
-    startTime: string;
-    endTime: string;
-  }>;
-  earnings: Array<{
-    id: string;
-    sourceType: string;
-    sourceName: string;
-    referredUserName: string;
-    entryFeeAmount: number;
-    netEarning: number;
-    status: string;
-    createdAt: string;
-  }>;
-}
+// Reason: DetailedGameMaster interface is now exported from GameMasterDetailView
+type DetailedGameMaster = DetailedGameMasterData;
 
 interface SyncStatus {
   totalReferrals: number;
@@ -306,362 +263,20 @@ export default function GameMasterManagementSection({
     }
   };
 
-  // Detail view
+  // Detail view — delegated to the extracted component
   if (selectedGM) {
-    const gm = selectedGM.subscription;
-    const daysRemaining = Math.max(
-      0,
-      Math.ceil(
-        (new Date(gm.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-      ),
-    );
-
     return (
-      <div className="space-y-6">
-        <button
-          onClick={() => {
-            setSelectedGM(null);
-            // Clear URL params when going back
-            if (initialGmId) {
-              router.replace(pathname, { scroll: false });
-            }
-          }}
-          className="flex items-center gap-2 text-gray-400 hover:text-white"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back to list
-        </button>
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-900/50 rounded-lg">
-              <Crown className="h-8 w-8 text-amber-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white">{gm.userName}</h2>
-              <p className="text-gray-400">{gm.userEmail}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span
-                  className={`px-2 py-1 rounded text-xs ${getStatusColor(gm.status)}`}
-                >
-                  {gm.status.toUpperCase()}
-                </span>
-                <span className="text-xs text-gray-500 font-mono">
-                  ID: {gm.userId}
-                </span>
-              </div>
-              {/* Link to User Profile */}
-              <Link
-                href={`/dashboard?activeTab=users&userId=${gm.userId}`}
-                className="mt-2 inline-flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
-              >
-                <User className="h-3 w-3" />
-                View User Profile
-                <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {/* Competition Creation Status (read-only, based on package) */}
-            {gm.status === "active" && (
-              <div
-                className={`flex items-center gap-2 px-4 py-2 rounded ${
-                  gm.limits?.canCreateCompetitions !== false
-                    ? "bg-green-600/20 text-green-400 border border-green-600/50"
-                    : "bg-gray-600/20 text-gray-400 border border-gray-600/50"
-                }`}
-                title={`Based on ${gm.packageName} package settings`}
-              >
-                <Trophy className="h-4 w-4" />
-                {gm.limits?.canCreateCompetitions !== false
-                  ? "Comps: ON"
-                  : "Comps: OFF"}
-              </div>
-            )}
-            {gm.status === "active" && (
-              <button
-                onClick={() =>
-                  handleAction(gm.id, "suspend", {
-                    reason: "Suspended by admin",
-                  })
-                }
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-              >
-                <Ban className="h-4 w-4" />
-                Suspend
-              </button>
-            )}
-            {gm.status === "suspended" && (
-              <button
-                onClick={() => handleAction(gm.id, "reactivate")}
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Reactivate
-              </button>
-            )}
-            <button
-              onClick={() =>
-                handleAction(gm.id, "extend", { extensionDays: 30 })
-              }
-              disabled={actionLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              <Calendar className="h-4 w-4" />
-              Extend 30 Days
-            </button>
-            <button
-              onClick={() => handleAction(gm.id, "revoke")}
-              disabled={actionLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-900 disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Revoke
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        {(() => {
-          const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7;
-          const isCritical = daysRemaining > 0 && daysRemaining <= 3;
-
-          return (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div
-                className={`rounded-lg p-4 border ${
-                  isCritical
-                    ? "bg-red-900/30 border-red-500/50"
-                    : isExpiringSoon
-                      ? "bg-yellow-900/20 border-yellow-500/50"
-                      : "bg-gray-800 border-gray-700"
-                }`}
-              >
-                <p className="text-gray-400 text-sm">Days Remaining</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    isCritical
-                      ? "text-red-400"
-                      : isExpiringSoon
-                        ? "text-yellow-400"
-                        : "text-white"
-                  }`}
-                >
-                  {daysRemaining}
-                </p>
-                {isCritical && (
-                  <p className="text-xs text-red-400 mt-1">⚠️ Expires soon!</p>
-                )}
-                {isExpiringSoon && !isCritical && (
-                  <p className="text-xs text-yellow-400 mt-1">
-                    ⏰ Expiring soon
-                  </p>
-                )}
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <p className="text-gray-400 text-sm">Total Referrals</p>
-                <p className="text-2xl font-bold text-white">
-                  {gm.totalReferredUsers}
-                </p>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <p className="text-gray-400 text-sm">Total Earnings</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {(gm.totalEarnings ?? 0).toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <p className="text-gray-400 text-sm">Competitions Created</p>
-                <p className="text-2xl font-bold text-white">
-                  {gm.totalCompetitionsCreated}
-                </p>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Subscription Info */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              Subscription Details
-            </h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Package</span>
-                <span className="text-white">{gm.packageName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Referral Code</span>
-                <span className="font-mono text-amber-400">
-                  {gm.referralCode}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Start Date</span>
-                <span className="text-white">
-                  {new Date(gm.startDate).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">End Date</span>
-                <span className="text-white">
-                  {new Date(gm.endDate).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Auto-Renewal</span>
-                <span
-                  className={gm.autoRenew ? "text-green-400" : "text-red-400"}
-                >
-                  {gm.autoRenew ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Renewal Price</span>
-                <span className="text-white">{gm.renewalPrice} Credits</span>
-              </div>
-              <hr className="border-gray-700 my-3" />
-              <div className="flex justify-between">
-                <span className="text-gray-400">Can Create Competitions</span>
-                <span
-                  className={`font-medium ${gm.limits?.canCreateCompetitions !== false ? "text-green-400" : "text-gray-500"}`}
-                >
-                  {gm.limits?.canCreateCompetitions !== false
-                    ? "Yes"
-                    : "No (Pack)"}
-                </span>
-              </div>
-              {/* Only show these when competitions are enabled in the package */}
-              {gm.limits?.canCreateCompetitions !== false && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Max Competitions/Day</span>
-                    <span className="text-white">
-                      {gm.limits?.maxCompetitionsPerDay || 1}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Max Users/Competition</span>
-                    <span className="text-white">
-                      {gm.limits?.maxUsersPerCompetition || 50}
-                    </span>
-                  </div>
-                </>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-400">Referral Fee %</span>
-                <span className="text-white">
-                  {gm.limits.referralFeePercentage}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Referrals */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              Recent Referrals
-            </h3>
-            {selectedGM.referredUsers.length === 0 ? (
-              <p className="text-gray-400 text-center py-4">No referrals yet</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {selectedGM.referredUsers.slice(0, 10).map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 bg-gray-900/50 rounded hover:bg-gray-900/70 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium">
-                        {user.name}
-                      </p>
-                      <p className="text-gray-400 text-xs truncate">
-                        {user.email}
-                      </p>
-                      <p className="text-gray-500 text-xs font-mono mt-0.5">
-                        ID: {user.id}
-                      </p>
-                    </div>
-                    <div className="text-right ml-3">
-                      <p className="text-gray-400 text-xs">
-                        {new Date(
-                          user.referredAt || user.createdAt,
-                        ).toLocaleDateString()}
-                      </p>
-                      <Link
-                        href={`/dashboard?activeTab=users&userId=${user.id}`}
-                        className="text-xs text-cyan-400 hover:text-cyan-300"
-                      >
-                        View User
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Earnings History */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Earnings History
-          </h3>
-          {selectedGM.earnings.length === 0 ? (
-            <p className="text-gray-400 text-center py-4">No earnings yet</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-gray-400 text-sm border-b border-gray-700">
-                    <th className="pb-2">Source</th>
-                    <th className="pb-2">Referred User</th>
-                    <th className="pb-2">Entry Fee</th>
-                    <th className="pb-2">Earning</th>
-                    <th className="pb-2">Status</th>
-                    <th className="pb-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedGM.earnings.slice(0, 20).map((e) => (
-                    <tr key={e.id} className="border-b border-gray-700/50">
-                      <td className="py-2 text-white">{e.sourceName}</td>
-                      <td className="py-2 text-gray-300">
-                        {e.referredUserName}
-                      </td>
-                      <td className="py-2 text-gray-300">
-                        {e.entryFeeAmount ?? 0}
-                      </td>
-                      <td className="py-2 text-green-400">
-                        +{(e.netEarning ?? 0).toFixed(2)}
-                      </td>
-                      <td className="py-2">
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            e.status === "paid"
-                              ? "bg-green-900/50 text-green-400"
-                              : "bg-yellow-900/50 text-yellow-400"
-                          }`}
-                        >
-                          {e.status}
-                        </span>
-                      </td>
-                      <td className="py-2 text-gray-400 text-sm">
-                        {new Date(e.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+      <GameMasterDetailView
+        data={selectedGM}
+        onBack={() => {
+          setSelectedGM(null);
+          if (initialGmId) {
+            router.replace(pathname, { scroll: false });
+          }
+        }}
+        onAction={handleAction}
+        actionLoading={actionLoading}
+      />
     );
   }
 

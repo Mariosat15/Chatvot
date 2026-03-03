@@ -199,10 +199,10 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
         /* webpackIgnore: true */ PRICE_HEALTH_SERVICE
       ).catch(() => null);
       if (!priceHealthModule) {
-        console.log(
-          `ℹ️ [FINALIZATION] Price health service not available in this context - will use live prices`,
-        );
-        throw new Error("Price health service not initialized");
+        // Reason: Price health service is only available when the WS price streamer is running
+        // in the same process. In server actions (Next.js), it's not initialized — this is expected.
+        // We silently fall through to fetch live prices instead.
+        throw new Error("not_available");
       }
 
       const { priceHealthMonitor } = priceHealthModule;
@@ -297,8 +297,12 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
           }
         }
       }
-    } catch (healthError) {
-      console.warn(`⚠️ [FINALIZATION] Health check unavailable:`, healthError);
+    } catch (healthError: any) {
+      // Reason: Only log a warning for actual health check failures, not for expected
+      // "not available" cases (which happen on every server action call).
+      if (healthError?.message !== "not_available") {
+        console.warn(`⚠️ [FINALIZATION] Health check failed:`, healthError?.message || healthError);
+      }
       // Continue with normal price fetch
     }
 
