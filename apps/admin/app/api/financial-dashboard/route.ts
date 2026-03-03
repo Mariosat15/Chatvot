@@ -6,7 +6,11 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { PlatformFinancialsService } from "@/lib/services/platform-financials.service";
+import {
+  PlatformTransaction,
+} from "@/database/models/platform-financials.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import mongoose from "mongoose";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
@@ -157,6 +161,88 @@ export async function GET(request: NextRequest) {
       { $limit: 10 },
     ]);
 
+    // Reason: Break down competition platform fees by admin-created vs GM-created competitions.
+    // Uses $lookup to join PlatformTransactions (platform_fee for competitions) with the competitions collection
+    // and checks if gameMasterId is set to distinguish admin vs GM competitions.
+    let adminCompPlatformFees = 0;
+    let gmCompPlatformFees = 0;
+    let adminCompPlatformFeeCount = 0;
+    let gmCompPlatformFeeCount = 0;
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        const compFeeBreakdown = await PlatformTransaction.aggregate([
+          {
+            $match: {
+              transactionType: "platform_fee",
+              sourceType: "competition",
+              sourceId: { $exists: true, $ne: null },
+            },
+          },
+          {
+            $addFields: {
+              sourceObjectId: {
+                $cond: {
+                  if: { $regexMatch: { input: "$sourceId", regex: /^[a-f\d]{24}$/i } },
+                  then: { $toObjectId: "$sourceId" },
+                  else: null,
+                },
+              },
+            },
+          },
+          {
+            $lookup: {
+              from: "competitions",
+              localField: "sourceObjectId",
+              foreignField: "_id",
+              as: "competition",
+            },
+          },
+          {
+            $addFields: {
+              isGmCompetition: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $gt: [{ $size: "$competition" }, 0] },
+                      {
+                        $ne: [
+                          { $arrayElemAt: ["$competition.gameMasterId", 0] },
+                          null,
+                        ],
+                      },
+                    ],
+                  },
+                  then: true,
+                  else: false,
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$isGmCompetition",
+              totalFees: { $sum: "$amount" },
+              totalFeesEUR: { $sum: "$amountEUR" },
+              count: { $sum: 1 },
+            },
+          },
+        ]);
+
+        for (const item of compFeeBreakdown) {
+          if (item._id === true) {
+            gmCompPlatformFees = item.totalFees || 0;
+            gmCompPlatformFeeCount = item.count || 0;
+          } else {
+            adminCompPlatformFees = item.totalFees || 0;
+            adminCompPlatformFeeCount = item.count || 0;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error getting competition fee breakdown:", e);
+    }
+
     // Get recent transactions (last 50) with user info
     const recentTransactions = await WalletTransaction.find()
       .sort({ createdAt: -1 })
@@ -277,6 +363,14 @@ export async function GET(request: NextRequest) {
           gmChallengePaymentCount: gmChallengeFees?.count || 0,
           gmFeesDetail: gmFeesDetail, // Top GMs by earnings
           unclaimedPools: unclaimedPoolsSummary,
+          // Reason: Breakdown of competition platform fees by creator type (admin vs GM).
+          // This helps admins understand revenue attribution and validate GM competition economics.
+          competitionFeeBreakdown: {
+            adminCompetitionFees: adminCompPlatformFees,
+            adminCompetitionFeeCount: adminCompPlatformFeeCount,
+            gmCompetitionFees: gmCompPlatformFees,
+            gmCompetitionFeeCount: gmCompPlatformFeeCount,
+          },
         },
         // NEW: Liability tracking for bank reconciliation
         liabilityMetrics: {

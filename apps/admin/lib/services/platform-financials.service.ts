@@ -142,12 +142,17 @@ export const PlatformFinancialsService = {
     const conversionSettings = await CreditConversionSettings.getSingleton();
     const eurAmount = params.amount / conversionSettings.eurToCreditsRate;
 
+    // Reason: Challenge fees must use "challenge_platform_fee" to be tracked
+    // separately from competition fees in financial reports. Without this,
+    // challenge fees are lumped into totalPlatformFees instead of totalChallengeFees.
     const transactionType =
       params.sourceType === "user_deposit"
         ? "deposit_fee"
         : params.sourceType === "user_withdrawal"
           ? "withdrawal_fee"
-          : "platform_fee";
+          : params.sourceType === "challenge"
+            ? "challenge_platform_fee"
+            : "platform_fee";
 
     await PlatformTransaction.create({
       transactionType,

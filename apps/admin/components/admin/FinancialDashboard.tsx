@@ -135,6 +135,14 @@ interface PlatformFinancials {
   totalRetainedGmFees: number; // GM fees retained due to inactive subscriptions
   retainedGmFeesCount: number; // Number of retained GM fee instances
 
+  // Competition fee breakdown by creator (admin vs GM)
+  competitionFeeBreakdown?: {
+    adminCompetitionFees: number;
+    adminCompetitionFeeCount: number;
+    gmCompetitionFees: number;
+    gmCompetitionFeeCount: number;
+  };
+
   // Marketplace revenue
   totalMarketplaceSales: number;
   marketplacePurchases: number;
@@ -1383,7 +1391,27 @@ export default function FinancialDashboard() {
                     </div>
                     {/* Competition Fees */}
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
-                      <span className="text-gray-300">Competition Fees</span>
+                      <div>
+                        <span className="text-gray-300">Competition Fees</span>
+                        {/* Reason: Show admin vs GM breakdown so admins can see revenue attribution */}
+                        {platformFinancials?.competitionFeeBreakdown && (
+                          <div className="text-xs text-gray-500">
+                            Admin: {currencySymbol}
+                            {(
+                              platformFinancials.competitionFeeBreakdown
+                                .adminCompetitionFees || 0
+                            ).toFixed(2)}{" "}
+                            ({platformFinancials.competitionFeeBreakdown.adminCompetitionFeeCount || 0})
+                            {" | "}
+                            GM: {currencySymbol}
+                            {(
+                              platformFinancials.competitionFeeBreakdown
+                                .gmCompetitionFees || 0
+                            ).toFixed(2)}{" "}
+                            ({platformFinancials.competitionFeeBreakdown.gmCompetitionFeeCount || 0})
+                          </div>
+                        )}
+                      </div>
                       <span className="text-green-400 font-semibold">
                         +{currencySymbol}
                         {(platformFinancials?.totalPlatformFees || 0).toFixed(
@@ -2334,6 +2362,24 @@ export default function FinancialDashboard() {
                         <p className="text-xs text-gray-500">
                           % of prize pools
                         </p>
+                        {/* Reason: Show admin vs GM breakdown for detailed revenue attribution */}
+                        {platformFinancials?.competitionFeeBreakdown && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            🛡️ Admin: {currencySymbol}
+                            {(
+                              platformFinancials.competitionFeeBreakdown
+                                .adminCompetitionFees || 0
+                            ).toFixed(2)}{" "}
+                            ({platformFinancials.competitionFeeBreakdown.adminCompetitionFeeCount || 0} comps)
+                            {" · "}
+                            👑 GM: {currencySymbol}
+                            {(
+                              platformFinancials.competitionFeeBreakdown
+                                .gmCompetitionFees || 0
+                            ).toFixed(2)}{" "}
+                            ({platformFinancials.competitionFeeBreakdown.gmCompetitionFeeCount || 0} comps)
+                          </p>
+                        )}
                       </div>
                       <span className="text-emerald-400 font-semibold">
                         +{currencySymbol}

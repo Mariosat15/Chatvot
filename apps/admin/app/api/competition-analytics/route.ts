@@ -291,6 +291,10 @@ export async function GET(request: NextRequest) {
           participants: participantsCount,
           prizePool,
           platformFeePercentage,
+          // Creator info
+          gameMasterId: (comp as any).gameMasterId || null,
+          gameMasterName: (comp as any).gameMasterName || null,
+          createdByAdmin: !(comp as any).gameMasterId,
           // Financial breakdown
           totalCollected, // Total entry fees collected
           platformFeeEarned, // What platform actually kept
@@ -348,6 +352,18 @@ export async function GET(request: NextRequest) {
       0,
     );
     const totalCompetitions = competitionAnalytics.length;
+
+    // Reason: Breakdown of admin vs GM created competitions for financial clarity
+    const adminComps = completedComps.filter((c) => c.createdByAdmin);
+    const gmComps = completedComps.filter((c) => !c.createdByAdmin);
+    const adminCompFees = adminComps.reduce(
+      (sum, c) => sum + c.platformFeeEarned,
+      0,
+    );
+    const gmCompFees = gmComps.reduce(
+      (sum, c) => sum + c.platformFeeEarned,
+      0,
+    );
 
     // ========== 1v1 CHALLENGE ANALYTICS ==========
     const challenges = await Challenge.find({
@@ -492,6 +508,11 @@ export async function GET(request: NextRequest) {
             completedComps.length > 0
               ? totalPrizePools / completedComps.length
               : 0,
+          // Admin vs GM breakdown
+          adminCompetitionCount: adminComps.length,
+          gmCompetitionCount: gmComps.length,
+          adminCompetitionFees: adminCompFees,
+          gmCompetitionFees: gmCompFees,
         },
         // 1v1 Challenge data
         challenges: challengeAnalytics,

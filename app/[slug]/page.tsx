@@ -20,6 +20,11 @@ interface PageProps {
 const STATIC_ASSET_PATTERN =
   /\.(ico|png|jpg|jpeg|gif|svg|webp|xml|txt|json|js|css|woff2?|ttf|eot|map|php|asp|aspx|jsp|cgi|env|sql|bak|log|ini|yml|yaml|toml|sh|bat)$/i;
 
+// Reason: Bots and crawlers often try locale-prefixed paths like /de, /fr, /es.
+// These 2-letter paths are almost never valid page slugs in this app.
+// Reject them early to avoid unnecessary database lookups and error logs.
+const LOCALE_PATTERN = /^[a-z]{2}(-[a-z]{2})?$/i;
+
 // ─── Branding loader ────────────────────────────────────────────────────────
 interface Branding {
   siteName: string;
@@ -68,7 +73,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  if (STATIC_ASSET_PATTERN.test(slug)) return { title: "Not Found" };
+  if (STATIC_ASSET_PATTERN.test(slug) || LOCALE_PATTERN.test(slug))
+    return { title: "Not Found" };
   try {
     await connectToDatabase();
     const page = await SitePage.findOne({
@@ -200,8 +206,8 @@ function TableOfContents({
 export default async function DynamicSitePage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Early exit for static assets that leaked into the dynamic route
-  if (STATIC_ASSET_PATTERN.test(slug)) {
+  // Early exit for static assets and locale paths that leaked into the dynamic route
+  if (STATIC_ASSET_PATTERN.test(slug) || LOCALE_PATTERN.test(slug)) {
     notFound();
   }
 
