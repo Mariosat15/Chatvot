@@ -1172,6 +1172,9 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
         sourceId: competition._id.toString(),
         sourceName: competition.name,
         description: `Platform fee (${competition.platformFeePercentage}% - ${totalGmEarnings.toFixed(2)} GM fees) from ${competition.name}`,
+        // Reason: Stored at recording time so the financial dashboard can
+        // break down competition fees by admin vs GM without expensive joins.
+        isGmCreated: !!competition.gameMasterId,
       });
     }
 

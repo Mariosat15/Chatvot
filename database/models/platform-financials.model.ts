@@ -33,6 +33,10 @@ export interface IPlatformTransaction extends Document {
   sourceId?: string; // Competition ID, Transaction ID, Incident ID, etc.
   sourceName?: string; // Competition name, user email, incident title, etc.
 
+  // Reason: Stored at recording time to avoid expensive $lookup aggregations
+  // when breaking down competition fees by admin vs GM created.
+  isGmCreated?: boolean; // true if competition was created by a Game Master
+
   // For unclaimed pools
   unclaimedReason?:
     | "no_participants"
@@ -161,6 +165,9 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
     },
     sourceId: String,
     sourceName: String,
+    // Reason: Stored at recording time so financial dashboard can break down
+    // competition fees by admin vs GM without expensive $lookup joins.
+    isGmCreated: { type: Boolean, default: false },
     unclaimedReason: {
       type: String,
       enum: [

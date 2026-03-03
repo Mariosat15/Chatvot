@@ -161,82 +161,84 @@ export async function GET(request: NextRequest) {
       { $limit: 10 },
     ]);
 
-    // Reason: Break down competition platform fees by admin-created vs GM-created competitions.
-    // Uses $lookup to join PlatformTransactions (platform_fee for competitions) with the competitions collection
-    // and checks if gameMasterId is set to distinguish admin vs GM competitions.
+    // Reason: One-time backfill — set isGmCreated on existing competition platform fees
+    // that were recorded before the flag was introduced. After first run, the $match
+    // returns 0 docs so the cost is a single index scan.
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        const untagged = await PlatformTransaction.find({
+          transactionType: "platform_fee",
+          sourceType: "competition",
+          isGmCreated: { $exists: false },
+          sourceId: { $exists: true, $ne: null },
+        }).lean();
+
+        if (untagged.length > 0) {
+          const compIds = untagged
+            .map((t) => {
+              try { return new mongoose.Types.ObjectId(t.sourceId as string); }
+              catch { return null; }
+            })
+            .filter(Boolean);
+
+          const comps = await db.collection("competitions")
+            .find({ _id: { $in: compIds } }, { projection: { _id: 1, gameMasterId: 1 } })
+            .toArray();
+
+          const gmCompIdSet = new Set(
+            comps.filter((c) => c.gameMasterId).map((c) => c._id.toString()),
+          );
+
+          const bulkOps = untagged.map((t) => ({
+            updateOne: {
+              filter: { _id: t._id },
+              update: { $set: { isGmCreated: gmCompIdSet.has(t.sourceId as string) } },
+            },
+          }));
+
+          if (bulkOps.length > 0) {
+            await PlatformTransaction.bulkWrite(bulkOps);
+            console.log(`✅ [BACKFILL] Tagged ${bulkOps.length} competition platform fees with isGmCreated`);
+          }
+        }
+      }
+    } catch (backfillErr) {
+      console.error("⚠️ [BACKFILL] Error backfilling isGmCreated:", backfillErr);
+    }
+
+    // Reason: Break down competition platform fees by admin-created vs GM-created.
+    // Uses the `isGmCreated` flag stored directly on PlatformTransaction at recording time,
+    // avoiding expensive $lookup joins to the competitions collection.
     let adminCompPlatformFees = 0;
     let gmCompPlatformFees = 0;
     let adminCompPlatformFeeCount = 0;
     let gmCompPlatformFeeCount = 0;
     try {
-      const db = mongoose.connection.db;
-      if (db) {
-        const compFeeBreakdown = await PlatformTransaction.aggregate([
-          {
-            $match: {
-              transactionType: "platform_fee",
-              sourceType: "competition",
-              sourceId: { $exists: true, $ne: null },
-            },
+      const compFeeBreakdown = await PlatformTransaction.aggregate([
+        {
+          $match: {
+            transactionType: "platform_fee",
+            sourceType: "competition",
           },
-          {
-            $addFields: {
-              sourceObjectId: {
-                $cond: {
-                  if: { $regexMatch: { input: "$sourceId", regex: /^[a-f\d]{24}$/i } },
-                  then: { $toObjectId: "$sourceId" },
-                  else: null,
-                },
-              },
-            },
+        },
+        {
+          $group: {
+            _id: { $ifNull: ["$isGmCreated", false] },
+            totalFees: { $sum: "$amount" },
+            totalFeesEUR: { $sum: "$amountEUR" },
+            count: { $sum: 1 },
           },
-          {
-            $lookup: {
-              from: "competitions",
-              localField: "sourceObjectId",
-              foreignField: "_id",
-              as: "competition",
-            },
-          },
-          {
-            $addFields: {
-              isGmCompetition: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $gt: [{ $size: "$competition" }, 0] },
-                      {
-                        $ne: [
-                          { $arrayElemAt: ["$competition.gameMasterId", 0] },
-                          null,
-                        ],
-                      },
-                    ],
-                  },
-                  then: true,
-                  else: false,
-                },
-              },
-            },
-          },
-          {
-            $group: {
-              _id: "$isGmCompetition",
-              totalFees: { $sum: "$amount" },
-              totalFeesEUR: { $sum: "$amountEUR" },
-              count: { $sum: 1 },
-            },
-          },
-        ]);
+        },
+      ]);
 
-        for (const item of compFeeBreakdown) {
-          if (item._id === true) {
-            gmCompPlatformFees = item.totalFees || 0;
-            gmCompPlatformFeeCount = item.count || 0;
-          } else {
-            adminCompPlatformFees = item.totalFees || 0;
-            adminCompPlatformFeeCount = item.count || 0;
-          }
+      for (const item of compFeeBreakdown) {
+        if (item._id === true) {
+          gmCompPlatformFees = item.totalFees || 0;
+          gmCompPlatformFeeCount = item.count || 0;
+        } else {
+          adminCompPlatformFees = item.totalFees || 0;
+          adminCompPlatformFeeCount = item.count || 0;
         }
       }
     } catch (e) {

@@ -132,6 +132,9 @@ export const PlatformFinancialsService = {
     sourceId?: string;
     sourceName?: string;
     description: string;
+    // Reason: Flag set at recording time so the financial dashboard can
+    // distinguish admin-created vs GM-created competition fees without joins.
+    isGmCreated?: boolean;
   }): Promise<void> => {
     await connectToDatabase();
 
@@ -155,6 +158,7 @@ export const PlatformFinancialsService = {
       sourceId: params.sourceId,
       sourceName: params.sourceName,
       description: params.description,
+      ...(params.isGmCreated !== undefined && { isGmCreated: params.isGmCreated }),
     });
 
     console.log(
