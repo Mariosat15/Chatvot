@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       leverage,
       tags,
       imageUrl,
+      startingCapital,
     } = body;
 
     // Validate required fields
@@ -209,14 +210,37 @@ export async function POST(request: NextRequest) {
     const user = await db.collection("user").findOne({ id: auth.userId });
     const gameMasterName = user?.name || auth.name || "Game Master";
 
+    // Reason: Generate a unique slug from the competition name.
+    // The Competition model has a unique index on slug — null/missing slug
+    // causes E11000 duplicate key errors on the second insert.
+    const baseSlug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    let slug = baseSlug || `comp-${Date.now()}`;
+    let counter = 1;
+
+    // Check for existing slugs and increment if needed
+    while (await db.collection("competitions").findOne({ slug })) {
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+
     // Create competition
+    // Reason: Include all schema-required fields with sensible defaults.
+    // This route uses raw insertOne (bypassing Mongoose), so schema defaults
+    // don't apply — every required field must be explicitly set.
     const competition = {
       _id: new ObjectId(),
       name,
       description: description || "",
+      slug,
       status: "upcoming",
       entryFee: parseFloat(entryFee),
+      startingCapital: startingCapital ? parseFloat(startingCapital) : 10000,
       prizePool: parseFloat(prizePool),
+      minParticipants: 2,
       maxParticipants: parseInt(maxParticipants),
       currentParticipants: 0,
       startTime: new Date(startTime),
@@ -226,11 +250,30 @@ export async function POST(request: NextRequest) {
         : new Date(startTime),
       allowedSymbols: allowedSymbols || ["EUR/USD", "GBP/USD", "USD/JPY"],
       leverage: leverage || 100,
+      competitionType: "time_based",
+      platformFeePercentage: 20,
+      prizeDistribution: [
+        { rank: 1, percentage: 50 },
+        { rank: 2, percentage: 30 },
+        { rank: 3, percentage: 20 },
+      ],
+      rules: {
+        rankingMetric: "pnl",
+        tieBreaker1: "trades_count",
+        minimumTrades: 0,
+        tiePrizeDistribution: "split_equally",
+        disqualifyOnLiquidation: true,
+      },
+      levelRequirement: { enabled: false, minLevel: 1 },
+      maxPositionSize: 20,
+      maxOpenPositions: 10,
+      allowShortSelling: false,
+      marginCallThreshold: 100,
       tags: tags || [],
       imageUrl: imageUrl || null,
       gameMasterId: auth.userId,
       gameMasterName,
-      createdBy: auth.userId, // Game master is the creator
+      createdBy: auth.userId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

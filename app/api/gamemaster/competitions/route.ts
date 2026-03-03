@@ -357,11 +357,28 @@ export async function POST(request: NextRequest) {
       tiePrizeDistribution: "split_equally",
     };
 
+    // Reason: Generate a unique slug from the competition name.
+    // The Competition model has a unique index on slug — null/missing slug
+    // causes E11000 duplicate key errors on the second insert.
+    const baseSlug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    let slug = baseSlug || `comp-${Date.now()}`;
+    let counter = 1;
+
+    while (await db.collection("competitions").findOne({ slug })) {
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+
     // Create competition
     const competition = {
       _id: new ObjectId(),
       name,
       description: description || "",
+      slug,
       status: "upcoming",
       entryFee: entryFeeNum,
       startingCapital: parseFloat(startingCapital),
@@ -429,6 +446,13 @@ export async function POST(request: NextRequest) {
             manualLevel: difficulty.manualLevel,
           }
         : { mode: "auto" },
+      // Reason: These fields are required by the Mongoose schema but since we use
+      // raw insertOne (bypassing Mongoose), defaults don't apply.
+      competitionType: "time_based",
+      maxPositionSize: 20,
+      maxOpenPositions: 10,
+      allowShortSelling: false,
+      marginCallThreshold: 100,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
