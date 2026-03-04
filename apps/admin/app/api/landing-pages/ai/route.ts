@@ -203,6 +203,194 @@ IMAGE PLACEMENT RULES (CRITICAL — FOLLOW EXACTLY):
 ═══════════════════════════════════════════════════════`;
 }
 
+// ─── Platform Knowledge (Actual ChartVolt Benefits) ─────────────────────────
+// Reason: Without this, the AI makes up generic trading content instead of using
+// real platform features and benefits from the ChartVolt documentation.
+
+const PLATFORM_KNOWLEDGE = `
+═══════════════════════════════════════════════════════
+PLATFORM KNOWLEDGE — ChartVolt Trading Competition Platform
+═══════════════════════════════════════════════════════
+This is a REAL trading competition platform. ALWAYS use these ACTUAL features and benefits
+in landing page copy instead of making up generic content.
+
+WHAT CHARTVOLT IS:
+- A gamified trading competition platform where users trade with VIRTUAL credits but can win REAL cash prizes
+- White-label solution — fully customizable branding
+- Users deposit real money (EUR) to buy credits, enter competitions, trade with virtual capital, and win real prizes
+
+CORE FEATURES (use these in Features/How-It-Works sections):
+1. TRADING COMPETITIONS — Multi-user tournaments with configurable prize pools
+   • Multiple ranking methods: P&L, ROI, Sharpe Ratio, Win Rate, Total Capital
+   • Automatic prize distribution to winners
+   • Real-time leaderboards with tie-breaking logic
+   • Minimum participant requirements with auto-refund
+
+2. 1v1 CHALLENGES — Head-to-head trading battles
+   • Challenge any online trader directly
+   • Winner takes all (minus platform fee)
+   • Real-time presence detection
+   • VS screen with fighter-style presentation
+
+3. 100+ TRADING PAIRS — Forex, Crypto, Stocks, Commodities, Indices
+   • Sub-50ms real-time price updates from institutional feeds
+   • Professional-grade TradingView charting with 50+ indicators
+   • Margin trading with configurable leverage
+
+4. CREDIT WALLET SYSTEM — Virtual currency economy
+   • Deposit real money → receive credits
+   • Multiple payment methods (Stripe, Nuvei)
+   • Secure withdrawals with KYC verification
+
+5. GAMIFICATION — Badges, XP, Levels
+   • Earn badges for achievements (Common, Rare, Epic, Legendary)
+   • Level progression from Novice to Trading God (10 levels)
+   • Social features and achievements
+
+6. ENTERPRISE SECURITY — Fraud detection, device fingerprinting, audit logs
+   • Multi-account detection, VPN/proxy detection
+   • Comprehensive KYC integration (Veriff)
+
+COPY GUIDELINES — When writing about platform benefits:
+- Use SPECIFIC numbers: "100+ trading pairs", "sub-50ms execution", "$2.47M+ in prizes awarded"
+- Mention REAL features: "TradingView-powered charts", "real-time leaderboards", "1v1 challenges"
+- Reference ACTUAL flow: "Deposit → Enter → Trade → Win → Withdraw"
+- NEVER make up features the platform doesn't have
+- ALWAYS tie theme language to real platform value (e.g., "Navigate the Radioactive Markets" → real-time forex trading)
+═══════════════════════════════════════════════════════`;
+
+// ─── Game Icons Catalogue ────────────────────────────────────────────────────
+// Reason: The platform has hundreds of game-themed PNG icons in /game-icons/.
+// The AI should use these for feature items, stats, how-it-works steps, etc.
+// The LP renderer will display them as <img> elements when the path starts with "/game-icons/"
+
+const GAME_ICONS_CATALOGUE = `
+═══════════════════════════════════════════════════════
+GAME ICONS — Themed PNG Icons Available at /game-icons/
+═══════════════════════════════════════════════════════
+
+The platform has hundreds of high-quality themed PNG icons. Use these in the "icon" field
+of features, stats, and how-it-works items. When the icon value starts with "/game-icons/",
+the renderer displays it as an image instead of a Lucide SVG.
+
+HOW TO USE: Set the "icon" field to the FULL PATH, e.g.: "icon": "/game-icons/skull.png"
+
+CATEGORIES AND RECOMMENDED ICONS BY THEME:
+
+🏆 Trophies & Rankings (for prize sections, leaderboards):
+  /game-icons/1. TROPHY.png, /game-icons/2. STAR TROPHY.png, /game-icons/16. GAME TROPHY.png
+  /game-icons/3. GOLD MEDAL.png, /game-icons/16. Crown.png, /game-icons/11. CHAMPION AWARD.png
+  /game-icons/20. VICTORY AWARD.png, /game-icons/trophy 1 .png, /game-icons/trophy 2 .png
+
+💰 Currency & Treasure (for credit/prize pool sections):
+  /game-icons/coin.png, /game-icons/3. Coin.png, /game-icons/gems.png
+  /game-icons/treasure.png, /game-icons/chest 1.png, /game-icons/chest 2.png
+  /game-icons/5. money.png, /game-icons/money deposite.png, /game-icons/pouch 1.png
+
+⚔️ Weapons (for competitive/battle themes):
+  /game-icons/sword.png, /game-icons/9. Sword.png, /game-icons/10. Axe.png
+  /game-icons/Bomb.png, /game-icons/Cannon.png, /game-icons/Bow 3D.png
+  /game-icons/hammer 1.png, /game-icons/skull.png
+
+🛡️ Defense & Equipment (for security/protection features):
+  /game-icons/shield 1.png, /game-icons/shield 2.png, /game-icons/Magic Shiled 3D.png
+  /game-icons/helmet 1.png, /game-icons/armor 1.png, /game-icons/15. Key.png
+
+🧪 Potions & Spells (for power-up/advantage themes):
+  /game-icons/fire spell.png, /game-icons/lightning speel.png, /game-icons/energi potion.png
+  /game-icons/healt potion.png, /game-icons/ice speel.png, /game-icons/rage potion.png
+  /game-icons/poison speel.png, /game-icons/blu fire speel.png
+
+📊 Finance & Trading (for platform features):
+  /game-icons/1. invest portfolio.png, /game-icons/2. trade.png, /game-icons/3. profit.png
+  /game-icons/profit.png, /game-icons/incrase provit.png, /game-icons/stock down.png
+  /game-icons/portofolio.png, /game-icons/gold invest.png, /game-icons/dolar plant.png
+  /game-icons/Equity.png, /game-icons/fluctuation.png, /game-icons/financial calculation.png
+
+⚠️ Risk & Status (for risk/warning sections):
+  /game-icons/1. Risk Warning.png, /game-icons/target.png, /game-icons/timer.png
+  /game-icons/warning 1.png, /game-icons/skull.png
+
+🎮 Gaming Hardware (for competitive gaming themes):
+  /game-icons/hedset.png, /game-icons/joystick 1.png, /game-icons/keyboard.png, /game-icons/WASD.png
+
+🌲 Characters & Creatures (for RPG/adventure themes):
+  /game-icons/7. Rookie.png, /game-icons/8. Lord.png, /game-icons/11. Archer.png, /game-icons/6. War.png
+
+🏴‍☠️ Pirate Theme (for ocean/adventure themes):
+  /game-icons/Pirate Ship.png, /game-icons/Anchor.png, /game-icons/Pirate Flag.png
+  /game-icons/Pirate Hat.png, /game-icons/Compass.png, /game-icons/Pirate Coins.png
+
+⭐ Stars & Rewards:
+  /game-icons/star 1.png, /game-icons/star 2.png, /game-icons/star 3.png
+  /game-icons/reward 1.png, /game-icons/reward 2.png, /game-icons/reward 3.png
+
+🔥 Cyber & Tech (for futuristic/cyber themes):
+  /game-icons/cyber 1.png through /game-icons/cyber 10.png
+  /game-icons/technology 1.png through /game-icons/technology 10.png
+
+ICON SELECTION STRATEGY:
+- For RADIOACTIVE/WASTELAND themes: skull, bomb, fire spell, poison potion, warning icons
+- For OCEAN/LUXURY themes: anchor, pirate ship, compass, treasure, gems
+- For FIRE/INFERNO themes: fire spell, rage potion, bomb, sword, axe
+- For CYBER/NEON themes: cyber icons, technology icons, joystick, WASD, headset
+- For ARCTIC/FROST themes: ice spell, shield, helmet, key
+- For GOLD/VIP themes: crown, trophy, gold medal, gems, treasure, champion award
+- For NATURE/FOREST themes: health potion, green spell, bow
+- ALWAYS use at least 4-6 different game icons across the page
+- Mix game icons with Lucide icons for variety (e.g., game icon on features, Lucide on how-it-works)
+═══════════════════════════════════════════════════════`;
+
+// ─── Hero Theme Reference (Inspiration from Hero Page Themes) ────────────────
+// Reason: The hero page has complete themed designs. The AI should use these as
+// reference for color palettes, effects, and visual identity when users request themed pages.
+
+const THEME_REFERENCE = `
+═══════════════════════════════════════════════════════
+THEME REFERENCE — Existing Hero Page Themes (Use as Inspiration)
+═══════════════════════════════════════════════════════
+
+These are COMPLETE visual themes from the hero page. When a user requests a specific theme,
+use these as color/style reference to create a MATCHING experience.
+
+─── FALLOUT / RADIOACTIVE THEME ───
+Colors: primary #c8b400 (mustard gold), accent #ff6b00 (orange), background #0a0a05 (near black)
+Card background: rgba(42, 42, 26, 0.8), border: #4a4a2a, glow: rgba(200, 180, 0, 0.5)
+Text: #e8e8c8 (warm white), muted: #a8a888
+Fonts: "Special Elite" cursive for headings, "Roboto Condensed" for body, "VT323" monospace for accent
+Effects: dot particles in #c8b400, subtle glow, solid card style
+Gradients: from-[#0a0a05] via-[#1a1a0a] to-[#2a2a1a]
+Text gradient: from-[#c8b400] to-[#ff6b00]
+CTA: bg-[#c8b400] text-black, hover bg-[#a89600], secondary: border-[#ff6b00] text-[#ff6b00]
+Icons: ☢️ battle, 🏆 trophy, 💀 CTA icon, 🛡️ users, 💊 currency, ⚡ power
+USE: accentColor "yellow" or "orange", bgGradient with deep browns/olives, game icons: skull, bomb, fire spell, poison potion
+
+─── GAMING NEON THEME ───
+Colors: primary #a855f7 (purple), accent #ec4899 (pink), background #0a0a1a
+Card: rgba(168, 85, 247, 0.1), border: #2d1b69, glow: rgba(168, 85, 247, 0.5)
+Effects: sparkle particles, intense glow, neon card style
+Gradients: from-[#0a0a1a] via-[#1a0a2e] to-[#0a0a1a]
+USE: accentColor "violet" or "pink", neon-style gradients
+
+─── OCEAN LUXURY THEME ───
+Colors: primary #0ea5e9 (sky blue), accent #06b6d4 (cyan), background #0a1628
+Effects: bubble particles, glass card style, medium glow
+USE: accentColor "cyan" or "blue", deep navy gradients
+
+─── INFERNO THEME ───
+Colors: primary #ef4444 (red), accent #f97316 (orange), background #0a0505
+Effects: sparkle particles in red, intense glow, gradient cards
+USE: accentColor "rose" or "orange", dark red gradients
+
+─── ARCTIC THEME ───
+Colors: primary #38bdf8 (light blue), accent #e2e8f0 (silver), background #0a1520
+Effects: snow particles, glass card style, subtle glow
+USE: accentColor "cyan" or "blue", icy blue-white gradients
+
+RULE: When the user specifies a theme, MATCH the color palette and effects from the reference above.
+Don't just use the theme NAME — use the actual COLORS and STYLES.
+═══════════════════════════════════════════════════════`;
+
 // ─── Design System Documentation ────────────────────────────────────────────
 
 const DESIGN_SYSTEM = `
@@ -354,7 +542,11 @@ content: {
     { "icon": "Zap", "title": "Feature name", "description": "2-3 compelling sentences", "image": "OPTIONAL_PEXELS_URL" }
   ]
 }
-Icons: Zap, Shield, Trophy, BarChart3, TrendingUp, Users, Globe, Rocket, Star, Heart, Target, Award, Clock, DollarSign, Lock, Sparkles, Crown, Flame, Gift, Medal, Brain, Lightbulb, Gauge, Gem, Eye
+Icons — TWO types supported:
+  A) Lucide names: Zap, Shield, Trophy, BarChart3, TrendingUp, Users, Globe, Rocket, Star, Heart, Target, Award, Clock, DollarSign, Lock, Sparkles, Crown, Flame, Gift, Medal, Brain, Lightbulb, Gauge, Gem, Eye
+  B) Game icon PATHS (preferred for themed pages): "/game-icons/skull.png", "/game-icons/1. TROPHY.png", etc.
+  → See GAME ICONS CATALOGUE above for the full list of available paths.
+  → Game icons render as themed PNG images and look much more immersive than SVG icons.
 
 ───────────────────────────────────────────────────────
 3. type "stats" → Impressive numbers grid
@@ -364,10 +556,11 @@ content: {
   "title": "Section headline",
   "subtitle": "Optional subtitle",
   "items": [
-    { "value": "$2.47M+", "label": "Total Prizes Awarded", "icon": "DollarSign" }
+    { "value": "$2.47M+", "label": "Total Prizes Awarded", "icon": "/game-icons/5. money.png" }
   ]
 }
 Use 3-4 stats with SPECIFIC non-round numbers for credibility.
+"icon" supports both Lucide names AND game icon paths (see GAME ICONS CATALOGUE).
 
 ───────────────────────────────────────────────────────
 4. type "how-it-works" → Step-by-step process
@@ -380,6 +573,7 @@ content: {
     { "step": "1", "title": "Step name", "description": "Clear instructions", "icon": "UserPlus" }
   ]
 }
+"icon" supports both Lucide names AND game icon paths (e.g., "/game-icons/15. Key.png").
 Use exactly 3-4 steps.
 
 ───────────────────────────────────────────────────────
@@ -473,6 +667,12 @@ content: { "html": "<div>...</div>" }
 function getEnhanceSystemPrompt(imageCatalogue: string): string {
   return `You are a world-class landing page designer and conversion rate optimizer with 15 years of experience at top agencies like Pentagram, IDEO, and Huge. Your specialty is transforming basic templates into stunning, high-converting pages with UNIQUE visual themes.
 
+${PLATFORM_KNOWLEDGE}
+
+${GAME_ICONS_CATALOGUE}
+
+${THEME_REFERENCE}
+
 ${DESIGN_SYSTEM}
 
 ${SECTION_TYPES_DOC}
@@ -485,18 +685,20 @@ Your job is to DRAMATICALLY transform it to match the user's EXACT THEME — not
 
 ENHANCEMENT STRATEGY:
 1. READ the user's instructions carefully — if they say "radioactive green", EVERYTHING must feel radioactive green. If "ocean blue luxury", EVERYTHING must feel like deep ocean luxury.
-2. Choose accentColors that MATCH the theme (green/emerald for radioactive, blue/cyan for ocean, rose/orange for fire, violet/pink for synthwave, etc.)
+2. Choose accentColors that MATCH the theme — CHECK THE THEME REFERENCE section for exact color palettes
 3. Add "style" objects to EVERY section with varied bgGradient that match the theme
 4. ADD 2-3 new sections (image-text, banner, gallery) to create a richer page
-5. REWRITE ALL COPY to match the TONE and THEME the user describes:
-   - If gaming theme: use gaming language, competition metaphors
-   - If luxury theme: use exclusive, prestige, VIP language
-   - If tech theme: use innovation, cutting-edge, algorithm language
-   - Headlines: Power words, emotional triggers, specific numbers. Max 8 words.
+5. REWRITE ALL COPY using ACTUAL PLATFORM FEATURES from the PLATFORM KNOWLEDGE section:
+   - Features/Benefits must describe REAL ChartVolt features (competitions, 1v1 challenges, 100+ pairs, real-time leaderboards)
+   - Wrap real features in THEME LANGUAGE (e.g., "Navigate Toxic Markets" → but the underlying benefit is real-time forex trading)
+   - Use SPECIFIC numbers from platform knowledge ($2.47M+ prizes, 100+ trading pairs, sub-50ms execution)
+   - NEVER make up features the platform doesn't have
 6. Use 6-8 DIFFERENT Pexels images — they should ALL be relevant to the theme
 7. Use DIFFERENT background gradients per section — but ALL within the theme color family
 8. Use DIFFERENT layout variants (features: "alternating", testimonials: "cards")
-9. Generate "customCss" with 3-5 CSS effects that match the theme
+9. Generate "customCss" with 5-8 CSS effects that match the theme (glows, animations, particles)
+10. Use GAME ICONS from /game-icons/ for features and stats items — pick icons that match the theme
+11. Mix game icon paths and Lucide icon names for variety
 
 CRITICAL: Return ONLY a JSON object: { "sections": [...], "customCss": "..." }
 The customCss should include theme-appropriate CSS animations, glows, glass effects, etc.
@@ -506,7 +708,11 @@ NO markdown. NO explanation. NO commentary. ONLY the JSON object.`;
 function getGenerateSystemPrompt(imageCatalogue: string): string {
   return `You are a world-class landing page designer, copywriter, and conversion expert with deep expertise in themed, immersive web experiences. You create pages that feel like they belong to billion-dollar brands. Every page has a UNIQUE VISUAL IDENTITY that matches the user's exact theme.
 
-The platform is a TRADING COMPETITION platform where users trade with virtual funds and compete for real cash prizes.
+${PLATFORM_KNOWLEDGE}
+
+${GAME_ICONS_CATALOGUE}
+
+${THEME_REFERENCE}
 
 ${DESIGN_SYSTEM}
 
@@ -518,22 +724,25 @@ YOUR GENERATION MISSION:
 Create a COMPLETELY UNIQUE, visually stunning, THEMED landing page. The user will describe a specific theme, mood, or concept. YOU MUST FOLLOW IT EXACTLY.
 
 THEME ADHERENCE (CRITICAL):
-- If the user says "radioactive green" → ALL accent colors should be green/emerald, gradients should use green/emerald tones, copy should use radioactive/wasteland metaphors
-- If the user says "ocean luxury" → ALL accents blue/cyan, gradients navy/blue, copy uses ocean/depth metaphors
-- If the user says "fire inferno" → ALL accents rose/orange, gradients red/orange, copy uses fire/battle metaphors
+- CHECK THE THEME REFERENCE section above for exact color palettes and visual styles
+- If the user says "radioactive" → Use the FALLOUT THEME colors (#c8b400 gold, #ff6b00 orange, dark olive backgrounds), accentColor "yellow"/"orange", game icons like skull, bomb, poison potion
+- If the user says "ocean luxury" → Use OCEAN THEME colors (sky blue, cyan, navy), accentColor "cyan"/"blue", game icons like anchor, pirate ship, compass, treasure
+- If the user says "fire inferno" → Use INFERNO THEME colors (red, orange, dark red), accentColor "rose"/"orange", game icons like fire spell, rage potion, sword
+- If "cyberpunk/neon" → GAMING NEON colors (purple, pink, dark navy), accentColor "violet"/"pink", cyber/tech icons
 - The theme must be CONSISTENT throughout — not just the hero, but EVERY section should feel themed
 - ALL Pexels images should match the theme — don't use a beach image in a cyberpunk page
 
 MANDATORY REQUIREMENTS:
-1. Create 8-10 sections using a MIX of types. Include at least:
+1. Create 10-12 sections using a MIX of types. Include at least:
    - 1 hero section (with dramatic Pexels background matching theme)
    - 2-3 image-text sections (with real Pexels images, alternating "default" and "reversed" layouts)
-   - 1 features section (with "alternating" layout and images on 2+ items)
-   - 1 stats section (with specific non-round numbers)
+   - 1 features section (with "alternating" layout and images on 2+ items, use GAME ICONS)
+   - 1 stats section (with specific non-round numbers from PLATFORM KNOWLEDGE, use GAME ICONS)
    - 1 banner section (with atmospheric Pexels background)
    - 1 gallery section (with 4-6 unique Pexels images)
    - 1 testimonials section (with "cards" layout)
-   - 1 faq section (5-6 items)
+   - 1 how-it-works section (3-4 steps with "horizontal" layout)
+   - 1 faq section (5-6 items about REAL platform features)
    - 1 cta section (with Pexels background)
 
 2. VISUAL THEMING — every section must have a "style" object:
@@ -542,20 +751,30 @@ MANDATORY REQUIREMENTS:
    - Use bgImage on hero, banner, CTA, and at least 1 image-text section
    - Vary layouts: features→"alternating", how-it-works→"horizontal", testimonials→"cards"
 
-3. THEMED COPYWRITING:
+3. THEMED COPYWRITING with REAL PLATFORM FEATURES:
    - Hero headline: 5-8 words using THEME METAPHORS (not generic "Start Trading")
-   - Subheadlines: Expand with SPECIFIC numbers AND theme language
+   - Subheadlines: REAL platform benefits wrapped in theme language
+   - Features: REAL ChartVolt features (competitions, 1v1 challenges, 100+ pairs, leaderboards, badges, credit wallet)
+   - Stats: REAL numbers (100+ Trading Pairs, Sub-50ms Execution, $2.47M+ Prizes Awarded, 10,000+ Traders)
+   - FAQs: Answer REAL questions about how competitions work, prizes, deposits, trading
    - CTAs: Theme-appropriate action words + benefit + urgency
    - Badge: Social proof with specific numbers + theme flavor
-   - Every headline should use language that fits the theme world
+   - EVERY headline uses theme language but describes REAL features
 
-4. AUTHENTIC TESTIMONIALS with theme flavor:
+4. GAME ICONS (CRITICAL — use at least 4-6 across the page):
+   - Features items → use game icon paths as "icon" value (e.g., "/game-icons/1. TROPHY.png")
+   - Stats items → use game icon paths for visual impact
+   - How-it-works steps → mix Lucide names AND game icon paths
+   - Pick icons that MATCH THE THEME (see GAME ICONS CATALOGUE above)
+
+5. AUTHENTIC TESTIMONIALS with theme flavor AND real trading context:
+   - Mention SPECIFIC features: "The real-time leaderboard kept me on edge"
+   - Reference trading pairs: EUR/USD, BTC/USD, Gold
+   - Mention competition prizes: "Won €15,000 in the Championship"
    - Different nationalities, trading styles, experience levels
-   - Mention specific pairs (EUR/USD, BTC, Gold), amounts won
-   - Use theme-appropriate language in quotes
    - Mix of 4★ and 5★ ratings
 
-5. IMAGE DISTRIBUTION (CRITICAL — at least 8 unique images):
+6. IMAGE DISTRIBUTION (CRITICAL — at least 8 unique Pexels images):
    - Hero: 1 dramatic background
    - Image-text sections: 1 per section (2-3 images)
    - Banner: 1 atmospheric background
@@ -564,13 +783,16 @@ MANDATORY REQUIREMENTS:
    - Features: 1-2 on feature items
    - NEVER reuse the same URL
 
-6. CUSTOM CSS (REQUIRED):
-   Generate a "customCss" string with 3-5 CSS effects matching the theme:
-   - Glowing effects in the theme's primary color
-   - A pulsing/animated CTA button
+7. CUSTOM CSS (REQUIRED — make it DRAMATIC):
+   Generate a "customCss" string with 5-8 CSS effects matching the theme:
+   - Glowing text effects in the theme's primary color (text-shadow)
+   - A pulsing/animated CTA button with theme-colored glow
    - Glassmorphism or frosted glass card effects
-   - A subtle background animation or text effect
+   - Animated gradient backgrounds or shimmer effects
+   - Floating/particle-like animations
+   - Scan-line or overlay effects for appropriate themes
    - All CSS classes must be prefixed with "lp-"
+   - CSS MUST use theme-appropriate colors (green for radioactive, blue for ocean, etc.)
 
 Section order: hero → image-text → features → stats → banner → image-text → how-it-works → testimonials → gallery → faq → cta
 

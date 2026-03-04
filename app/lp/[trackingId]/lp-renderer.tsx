@@ -180,8 +180,36 @@ const iconMap = new Map<string, React.ComponentType<{ className?: string }>>([
   ["Check", Check],
 ]);
 
-function getIcon(name: string) {
-  return iconMap.get(name) || Zap;
+// ─── Game Icon Support ────────────────────────────────────────────────────────
+// Reason: The AI uses game icon paths like "/game-icons/skull.png" for themed icons.
+// This component renders either a Lucide SVG icon or a game icon <img> depending on the value.
+function isGameIconPath(icon: string): boolean {
+  return icon.startsWith("/game-icons/") || icon.startsWith("/assets/");
+}
+
+function IconDisplay({
+  icon,
+  className,
+  size = 28,
+}: {
+  icon: string;
+  className?: string;
+  size?: number;
+}) {
+  if (isGameIconPath(icon)) {
+    return (
+      <img
+        src={icon}
+        alt=""
+        width={size}
+        height={size}
+        className={`object-contain shrink-0 ${className || ""}`}
+        draggable={false}
+      />
+    );
+  }
+  const LucideIcon = iconMap.get(icon) || Zap;
+  return <LucideIcon className={className} />;
 }
 
 // ─── Per-Section Accent Color System ─────────────────────────────────────────
@@ -535,7 +563,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
           </div>
           <div className="space-y-20">
             {items.map((item: Record<string, unknown>, i: number) => {
-              const Icon = getIcon(String(item.icon || "Zap"));
+              const iconStr = String(item.icon || "Zap");
               const isReversed = i % 2 === 1;
               const itemImage = String(item.image || "");
               return (
@@ -549,12 +577,12 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
                     </div>
                   ) : (
                     <div className={`lg:w-1/2 h-64 lg:h-80 rounded-3xl ${accent.bg10} flex items-center justify-center`}>
-                      <Icon className={`h-24 w-24 ${accent.text} opacity-30`} />
+                      <IconDisplay icon={iconStr} className={`${accent.text} opacity-30`} size={96} />
                     </div>
                   )}
                   <div className="lg:w-1/2 space-y-4">
                     <div className={`w-14 h-14 ${accent.bg10} rounded-2xl flex items-center justify-center`}>
-                      <Icon className={`h-7 w-7 ${accent.text}`} />
+                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} />
                     </div>
                     <h3 className="text-2xl font-bold text-white">{String(item.title || "")}</h3>
                     <p className="text-gray-400 text-lg leading-relaxed">{String(item.description || "")}</p>
@@ -580,7 +608,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
           className={`grid grid-cols-1 md:grid-cols-2 ${items.length >= 3 ? "lg:grid-cols-3" : ""} ${items.length === 4 ? "lg:grid-cols-4" : ""} gap-8`}
         >
           {items.map((item: Record<string, unknown>, i: number) => {
-            const Icon = getIcon(String(item.icon || "Zap"));
+            const iconStr = String(item.icon || "Zap");
             const itemImage = String(item.image || "");
             return (
               <div
@@ -596,7 +624,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
                     </div>
                   ) : (
                     <div className={`w-14 h-14 ${accent.bg10} rounded-2xl flex items-center justify-center mb-6 group-hover:${accent.bg20} transition-colors duration-300`}>
-                      <Icon className={`h-7 w-7 ${accent.text}`} />
+                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} />
                     </div>
                   )}
                   <h3 className="text-xl font-bold text-white mb-3">{String(item.title || "")}</h3>
@@ -626,12 +654,12 @@ function StatsSection({ content }: { content: Record<string, unknown> }) {
         <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mb-16 rounded-full`} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
           {items.map((item: Record<string, unknown>, i: number) => {
-            const Icon = item.icon ? getIcon(String(item.icon)) : null;
+            const iconStr = item.icon ? String(item.icon) : null;
             return (
               <div key={String(item.id || i)} className="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-300">
-                {Icon && (
+                {iconStr && (
                   <div className={`w-12 h-12 ${accent.bg10} rounded-xl flex items-center justify-center mx-auto mb-4`}>
-                    <Icon className={`h-6 w-6 ${accent.text} opacity-80`} />
+                    <IconDisplay icon={iconStr} className={`h-6 w-6 ${accent.text} opacity-80`} size={24} />
                   </div>
                 )}
                 <div className={`text-4xl md:text-5xl font-extrabold ${accent.text} mb-3 tracking-tight`}>
@@ -670,12 +698,12 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
             {/* Connecting line */}
             <div className="hidden md:block absolute top-16 left-[15%] right-[15%] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             {steps.map((step: Record<string, unknown>, i: number) => {
-              const Icon = step.icon ? getIcon(String(step.icon)) : null;
+              const iconStr = step.icon ? String(step.icon) : null;
               return (
                 <div key={String(step.id || i)} className="text-center relative group">
                   <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-xl ${accent.shadow} group-hover:scale-110 transition-transform duration-300`}>
-                    {Icon ? (
-                      <Icon className="h-7 w-7 text-black" />
+                    {iconStr ? (
+                      <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
                     ) : (
                       <span className="text-black font-extrabold text-xl">{i + 1}</span>
                     )}
@@ -701,7 +729,7 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
         </div>
         <div className="space-y-6">
           {steps.map((step: Record<string, unknown>, i: number) => {
-            const Icon = step.icon ? getIcon(String(step.icon)) : null;
+            const iconStr = step.icon ? String(step.icon) : null;
             return (
               <div
                 key={String(step.id || i)}
@@ -710,8 +738,8 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
                 <div
                   className={`shrink-0 w-16 h-16 bg-gradient-to-br ${accent.gradientBtn} rounded-2xl flex items-center justify-center shadow-lg ${accent.shadow}`}
                 >
-                  {Icon ? (
-                    <Icon className="h-7 w-7 text-black" />
+                  {iconStr ? (
+                    <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
                   ) : (
                     <span className="text-black font-extrabold text-xl">{i + 1}</span>
                   )}
