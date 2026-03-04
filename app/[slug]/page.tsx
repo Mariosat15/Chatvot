@@ -23,7 +23,37 @@ const STATIC_ASSET_PATTERN =
 // Reason: Bots and crawlers often try locale-prefixed paths like /de, /fr, /es.
 // These 2-letter paths are almost never valid page slugs in this app.
 // Reject them early to avoid unnecessary database lookups and error logs.
-const LOCALE_PATTERN = /^[a-z]{2}(-[a-z]{2})?$/i;
+function isAlpha(ch: string): boolean {
+  const c = ch.charCodeAt(0);
+  return (c >= 65 && c <= 90) || (c >= 97 && c <= 122); // A-Z or a-z
+}
+function isLocaleSlug(slug: string): boolean {
+  const len = slug.length;
+  // Match "xx" (e.g. "de") or "xx-yy" (e.g. "en-us")
+  if (len === 2) return isAlpha(slug[0]) && isAlpha(slug[1]);
+  if (len === 5 && slug[2] === "-") {
+    return isAlpha(slug[0]) && isAlpha(slug[1]) && isAlpha(slug[3]) && isAlpha(slug[4]);
+  }
+  return false;
+}
+
+// Reason: Vulnerability scanners (bots) probe common CMS/server paths like
+// /wp-includes, /wp-admin, /cgi-bin, /phpmyadmin, /.env, etc.
+// None of these are valid site pages. Reject early to silence error logs.
+const SCANNER_PROBE_PREFIXES = new Set([
+  "wp-", "wordpress", "cgi-bin", "phpmyadmin", "phpinfo",
+  ".well-known", ".env", ".git", ".htaccess", ".svn",
+  "admin.php", "xmlrpc", "vendor", "node_modules",
+  "server-status", "server-info", "telescope",
+]);
+
+function isScannerProbe(slug: string): boolean {
+  const lower = slug.toLowerCase();
+  for (const prefix of SCANNER_PROBE_PREFIXES) {
+    if (lower === prefix || lower.startsWith(prefix)) return true;
+  }
+  return false;
+}
 
 // ─── Branding loader ────────────────────────────────────────────────────────
 interface Branding {
@@ -73,7 +103,7 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  if (STATIC_ASSET_PATTERN.test(slug) || LOCALE_PATTERN.test(slug))
+  if (STATIC_ASSET_PATTERN.test(slug) || isLocaleSlug(slug) || isScannerProbe(slug))
     return { title: "Not Found" };
   try {
     await connectToDatabase();
@@ -206,8 +236,8 @@ function TableOfContents({
 export default async function DynamicSitePage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Early exit for static assets and locale paths that leaked into the dynamic route
-  if (STATIC_ASSET_PATTERN.test(slug) || LOCALE_PATTERN.test(slug)) {
+  // Early exit for static assets, locale paths, and scanner probes that leaked into the dynamic route
+  if (STATIC_ASSET_PATTERN.test(slug) || isLocaleSlug(slug) || isScannerProbe(slug)) {
     notFound();
   }
 
