@@ -1020,7 +1020,7 @@ function GallerySection({ content }: { content: Record<string, unknown> }) {
           {items.map((item: Record<string, unknown>, i: number) => (
             <div key={String(item.id || i)} className="group rounded-3xl overflow-hidden relative">
               <img
-                src={String(item.image || item.src || "")}
+                src={String(item.image || item.url || item.src || "")}
                 alt={String(item.title || item.alt || "")}
                 className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-700"
               />
