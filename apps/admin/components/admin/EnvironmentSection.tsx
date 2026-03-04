@@ -29,6 +29,7 @@ import {
   Brain,
   Sparkles,
   Fingerprint,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
