@@ -37,6 +37,17 @@ export async function register() {
       }
     }, 6000); // 6 second delay to let MongoDB connect first
 
+    // Seed landing page templates — safe to call every startup
+    setTimeout(async () => {
+      try {
+        const { seedLandingPageTemplates } =
+          await import("./lib/services/landing-page-seed.service");
+        await seedLandingPageTemplates();
+      } catch (err) {
+        console.error("❌ [Instrumentation] Failed to seed landing page templates:", err);
+      }
+    }, 7000); // 7 second delay
+
     // Start server fleet heartbeat (reports stats to MongoDB every 30s)
     setTimeout(async () => {
       try {

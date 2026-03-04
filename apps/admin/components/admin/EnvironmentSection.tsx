@@ -66,6 +66,9 @@ export default function EnvironmentSection() {
     veriffApiSecret: "",
     veriffBaseUrl: "",
 
+    // Pexels (Landing Pages)
+    pexelsApiKey: "",
+
     // Infrastructure
     isPrimary: "true",
     serverId: "",
@@ -81,6 +84,7 @@ export default function EnvironmentSection() {
     adminJwtSecret: false,
     veriffApiKey: false,
     veriffApiSecret: false,
+    pexelsApiKey: false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -135,11 +139,23 @@ export default function EnvironmentSection() {
   };
 
   const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
-    setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
+    setShowPasswords((prev) => {
+      const next = { ...prev };
+      const key = field as keyof typeof next;
+      // eslint-disable-next-line security/detect-object-injection
+      next[key] = !next[key];
+      return next;
+    });
   };
 
   const updateField = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev };
+      const key = field as keyof typeof next;
+      // eslint-disable-next-line security/detect-object-injection
+      next[key] = value as never;
+      return next;
+    });
   };
 
   if (isFetching) {
@@ -235,6 +251,13 @@ export default function EnvironmentSection() {
                 >
                   <Fingerprint className="h-4 w-4 mr-2" />
                   KYC
+                </TabsTrigger>
+                <TabsTrigger
+                  value="pexels"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Pexels
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -990,6 +1013,68 @@ export default function EnvironmentSection() {
                         a multi-server deployment to ensure webhook signatures
                         validate correctly.
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ─── Pexels Tab ─── */}
+              <TabsContent value="pexels" className="mt-0">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5 text-cyan-400" />
+                      Pexels API Configuration
+                    </h3>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Pexels provides free stock images for landing pages.{" "}
+                      <a
+                        href="https://www.pexels.com/api/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Get your API key →
+                      </a>
+                    </p>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Key className="h-4 w-4 text-cyan-400" />
+                          PEXELS_API_KEY
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            type={
+                              showPasswords.pexelsApiKey ? "text" : "password"
+                            }
+                            value={formData.pexelsApiKey}
+                            onChange={(e) =>
+                              updateField("pexelsApiKey", e.target.value)
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="Pexels API key"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              togglePasswordVisibility("pexelsApiKey")
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                          >
+                            {showPasswords.pexelsApiKey ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Used for fetching stock images when creating landing
+                          pages. The key is also saved to the database for
+                          runtime access.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

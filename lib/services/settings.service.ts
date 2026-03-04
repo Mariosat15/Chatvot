@@ -97,7 +97,8 @@ export async function getPaymentProviders() {
 export async function getSetting(key: string, fallback: any = "") {
   try {
     const settings = await getSettings();
-    return settings[key] || fallback;
+    const settingsMap = new Map(Object.entries(settings));
+    return settingsMap.get(key) || fallback;
   } catch (error) {
     console.error("Error getting setting", key, error);
     return fallback;
@@ -173,7 +174,8 @@ export async function getEnv(
 
   // If it's an essential variable, read from process.env
   if (essentialEnvVars.includes(key)) {
-    return process.env[key] || fallback;
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
   }
 
   // For all other variables, try database first, then fall back to process.env
@@ -181,27 +183,31 @@ export async function getEnv(
     const settings = await getSettings();
 
     // Map environment variable names to database field names
-    const dbKeyMap: Record<string, string> = {
-      NODEMAILER_EMAIL: "nodemailerEmail",
-      NODEMAILER_PASSWORD: "nodemailerPassword",
-      MASSIVE_API_KEY: "massiveApiKey",
-      NEXT_PUBLIC_MASSIVE_API_KEY: "nextPublicMassiveApiKey",
-      NEXT_PUBLIC_BASE_URL: "nextPublicBaseUrl",
-      OPENAI_API_KEY: "openaiApiKey",
-      OPENAI_MODEL: "openaiModel",
-      OPENAI_ENABLED: "openaiEnabled",
-      OPENAI_FOR_EMAILS: "openaiForEmails",
-    };
+    const dbKeyMap = new Map<string, string>([
+      ["NODEMAILER_EMAIL", "nodemailerEmail"],
+      ["NODEMAILER_PASSWORD", "nodemailerPassword"],
+      ["MASSIVE_API_KEY", "massiveApiKey"],
+      ["NEXT_PUBLIC_MASSIVE_API_KEY", "nextPublicMassiveApiKey"],
+      ["NEXT_PUBLIC_BASE_URL", "nextPublicBaseUrl"],
+      ["OPENAI_API_KEY", "openaiApiKey"],
+      ["OPENAI_MODEL", "openaiModel"],
+      ["OPENAI_ENABLED", "openaiEnabled"],
+      ["OPENAI_FOR_EMAILS", "openaiForEmails"],
+      ["PEXELS_API_KEY", "pexelsApiKey"],
+    ]);
 
-    const dbKey = dbKeyMap[key];
-    if (dbKey && settings[dbKey]) {
-      return settings[dbKey];
+    const dbKey = dbKeyMap.get(key);
+    const settingsMap = new Map(Object.entries(settings));
+    if (dbKey && settingsMap.get(dbKey)) {
+      return settingsMap.get(dbKey);
     }
 
     // Fall back to process.env
-    return process.env[key] || fallback;
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
   } catch {
     // If database is unavailable, fall back to process.env
-    return process.env[key] || fallback;
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
   }
 }

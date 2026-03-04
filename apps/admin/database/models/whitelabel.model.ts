@@ -59,6 +59,9 @@ export interface WhiteLabelDocument extends Document {
   inngestEventKey: string;
   inngestMode: "dev" | "cloud"; // dev = local dev server, cloud = Inngest Cloud (production)
 
+  // Pexels API (stock images for landing pages)
+  pexelsApiKey: string;
+
   // Price Feed Configuration
   priceFeedMode: "websocket" | "api" | "both"; // both = websocket primary, api fallback
   priceFeedWebsocketEnabled: boolean;
@@ -228,6 +231,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       type: String,
       enum: ["dev", "cloud"],
       default: "dev", // Default to dev mode (local Inngest dev server)
+    },
+
+    // Pexels API (stock images for landing pages)
+    pexelsApiKey: {
+      type: String,
+      default: "",
     },
 
     // Price Feed Configuration

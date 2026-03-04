@@ -76,7 +76,6 @@ import CurrencySettingsSection from "@/components/admin/CurrencySettingsSection"
 import FinancialDashboard from "@/components/admin/FinancialDashboard";
 import CompetitionAnalytics from "@/components/admin/CompetitionAnalytics";
 import CompetitionsListSection from "@/components/admin/CompetitionsListSection";
-import ChallengeSettingsSection from "@/components/admin/ChallengeSettingsSection";
 import ChallengesAdminSection from "@/components/admin/ChallengesAdminSection";
 import DatabaseSection from "@/components/admin/DatabaseSection";
 import UsersSection from "@/components/admin/UsersSection";
@@ -127,6 +126,7 @@ import IncidentsSection from "@/components/admin/IncidentsSection";
 import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection";
 import GamificationWizardSection from "@/components/admin/GamificationWizardSection";
 import SitePagesSection from "@/components/admin/SitePagesSection";
+import LandingPagesSection from "@/components/admin/LandingPagesSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -192,6 +192,13 @@ const menuGroups: MenuGroup[] = [
         icon: <FileText className="h-5 w-5" />,
         color: "text-emerald-400",
         bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
+      },
+      {
+        id: "landing-pages",
+        label: "Landing Pages",
+        icon: <Sparkles className="h-5 w-5" />,
+        color: "text-cyan-400",
+        bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
       },
       {
         id: "marketplace",
@@ -677,7 +684,7 @@ const menuGroups: MenuGroup[] = [
 ];
 
 // Flat menuItems for backward compatibility
-const menuItems: MenuItem[] = menuGroups.flatMap((group) => group.items);
+const _menuItems: MenuItem[] = menuGroups.flatMap((group) => group.items);
 
 export default function AdminDashboard({
   isFirstLogin,
@@ -731,24 +738,26 @@ export default function AdminDashboard({
     ) {
       setActiveSection(urlActiveTab);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlActiveTab]);
 
   // Refresh keys for each section - increment to force refresh
-  const [refreshKeys, setRefreshKeys] = useState<Record<string, number>>({});
+  const [refreshKeys, setRefreshKeys] = useState<Map<string, number>>(new Map());
 
   // Get current refresh key for active section
-  const currentRefreshKey = refreshKeys[activeSection] || 0;
+  const currentRefreshKey = refreshKeys.get(activeSection) ?? 0;
 
   // Trigger refresh for a specific section
   const triggerSectionRefresh = useCallback((section: string) => {
-    setRefreshKeys((prev) => ({
-      ...prev,
-      [section]: (prev[section] || 0) + 1,
-    }));
+    setRefreshKeys((prev) => {
+      const next = new Map(prev);
+      next.set(section, (prev.get(section) ?? 0) + 1);
+      return next;
+    });
   }, []);
 
   // Admin events subscription (polls every 30s) - toasts disabled to prevent spam
-  const { isConnected: isEventConnected } = useAdminEvents({
+  const { isConnected: _isEventConnected } = useAdminEvents({
     onEvent: (event) => {
       // Only log significant events, not routine updates
       if (event.type !== "general_refresh") {
@@ -865,7 +874,7 @@ export default function AdminDashboard({
       await fetch("/api/auth/logout", { method: "POST" });
       toast.success("Logged out successfully");
       router.push("/login");
-    } catch (error) {
+    } catch {
       toast.error("Logout failed");
     }
   };
@@ -953,6 +962,8 @@ export default function AdminDashboard({
         return <LandingPageBuilder key={currentRefreshKey} />;
       case "site-pages":
         return <SitePagesSection key={currentRefreshKey} />;
+      case "landing-pages":
+        return <LandingPagesSection key={currentRefreshKey} />;
       case "competitions":
         return <CompetitionsListSection key={currentRefreshKey} />;
       case "challenges":
