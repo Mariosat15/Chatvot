@@ -1,5 +1,5 @@
 import LandingPageTemplate from "@/database/models/landing-page-template.model";
-import WhiteLabel from "@/database/models/whitelabel.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { ALL_LANDING_PAGE_TEMPLATES } from "@/lib/constants/landing-page-templates";
 import { connectToDatabase } from "@/database/mongoose";
 
