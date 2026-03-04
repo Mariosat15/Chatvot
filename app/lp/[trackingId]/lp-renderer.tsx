@@ -246,6 +246,118 @@ const ACCENT_MAP = new Map<string, AccentClasses>([
     },
   ],
   [
+    "green",
+    {
+      text: "text-green-400",
+      bg10: "bg-green-500/10",
+      bg20: "bg-green-500/20",
+      border30: "border-green-500/30",
+      gradientBtn: "from-green-500 to-emerald-500",
+      gradientBtnHover: "hover:from-green-400 hover:to-emerald-400",
+      shadow: "shadow-green-500/25",
+      shadowHover: "hover:shadow-green-500/40",
+      fill: "fill-green-400",
+      divider: "from-green-500 to-emerald-500",
+      ring: "ring-green-500/30",
+    },
+  ],
+  [
+    "lime",
+    {
+      text: "text-lime-400",
+      bg10: "bg-lime-500/10",
+      bg20: "bg-lime-500/20",
+      border30: "border-lime-500/30",
+      gradientBtn: "from-lime-500 to-green-500",
+      gradientBtnHover: "hover:from-lime-400 hover:to-green-400",
+      shadow: "shadow-lime-500/25",
+      shadowHover: "hover:shadow-lime-500/40",
+      fill: "fill-lime-400",
+      divider: "from-lime-500 to-green-500",
+      ring: "ring-lime-500/30",
+    },
+  ],
+  [
+    "amber",
+    {
+      text: "text-amber-400",
+      bg10: "bg-amber-500/10",
+      bg20: "bg-amber-500/20",
+      border30: "border-amber-500/30",
+      gradientBtn: "from-amber-500 to-orange-500",
+      gradientBtnHover: "hover:from-amber-400 hover:to-orange-400",
+      shadow: "shadow-amber-500/25",
+      shadowHover: "hover:shadow-amber-500/40",
+      fill: "fill-amber-400",
+      divider: "from-amber-500 to-orange-500",
+      ring: "ring-amber-500/30",
+    },
+  ],
+  [
+    "red",
+    {
+      text: "text-red-400",
+      bg10: "bg-red-500/10",
+      bg20: "bg-red-500/20",
+      border30: "border-red-500/30",
+      gradientBtn: "from-red-500 to-rose-500",
+      gradientBtnHover: "hover:from-red-400 hover:to-rose-400",
+      shadow: "shadow-red-500/25",
+      shadowHover: "hover:shadow-red-500/40",
+      fill: "fill-red-400",
+      divider: "from-red-500 to-rose-500",
+      ring: "ring-red-500/30",
+    },
+  ],
+  [
+    "purple",
+    {
+      text: "text-purple-400",
+      bg10: "bg-purple-500/10",
+      bg20: "bg-purple-500/20",
+      border30: "border-purple-500/30",
+      gradientBtn: "from-purple-500 to-violet-500",
+      gradientBtnHover: "hover:from-purple-400 hover:to-violet-400",
+      shadow: "shadow-purple-500/25",
+      shadowHover: "hover:shadow-purple-500/40",
+      fill: "fill-purple-400",
+      divider: "from-purple-500 to-violet-500",
+      ring: "ring-purple-500/30",
+    },
+  ],
+  [
+    "sky",
+    {
+      text: "text-sky-400",
+      bg10: "bg-sky-500/10",
+      bg20: "bg-sky-500/20",
+      border30: "border-sky-500/30",
+      gradientBtn: "from-sky-500 to-blue-500",
+      gradientBtnHover: "hover:from-sky-400 hover:to-blue-400",
+      shadow: "shadow-sky-500/25",
+      shadowHover: "hover:shadow-sky-500/40",
+      fill: "fill-sky-400",
+      divider: "from-sky-500 to-blue-500",
+      ring: "ring-sky-500/30",
+    },
+  ],
+  [
+    "fuchsia",
+    {
+      text: "text-fuchsia-400",
+      bg10: "bg-fuchsia-500/10",
+      bg20: "bg-fuchsia-500/20",
+      border30: "border-fuchsia-500/30",
+      gradientBtn: "from-fuchsia-500 to-pink-500",
+      gradientBtnHover: "hover:from-fuchsia-400 hover:to-pink-400",
+      shadow: "shadow-fuchsia-500/25",
+      shadowHover: "hover:shadow-fuchsia-500/40",
+      fill: "fill-fuchsia-400",
+      divider: "from-fuchsia-500 to-pink-500",
+      ring: "ring-fuchsia-500/30",
+    },
+  ],
+  [
     "blue",
     {
       text: "text-blue-400",
@@ -513,7 +625,7 @@ function HeroSection({ content }: { content: Record<string, unknown> }) {
             {badge}
           </div>
         )}
-        <h1 className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-8 leading-[1.05] tracking-tight">
+        <h1 className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-8 leading-[1.05] tracking-tight lp-glow lp-title">
           {headline}
         </h1>
         {subheadline && (
@@ -524,7 +636,7 @@ function HeroSection({ content }: { content: Record<string, unknown> }) {
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <a
             href={ctaUrl}
-            className={`inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105 hover:-translate-y-0.5`}
+            className={`inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105 hover:-translate-y-0.5 lp-pulse lp-btn lp-cta`}
           >
             {ctaText}
             <ArrowRight className="h-5 w-5" />
@@ -557,7 +669,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
       <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
             {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
             <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
           </div>
@@ -600,7 +712,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
@@ -613,7 +725,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
             return (
               <div
                 key={String(item.id || i)}
-                className={`group relative p-8 bg-white/[0.03] border border-white/[0.06] rounded-3xl hover:${accent.border30} transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-black/20 overflow-hidden`}
+                className={`group relative p-8 bg-white/[0.03] border border-white/[0.06] rounded-3xl hover:${accent.border30} transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-black/20 overflow-hidden lp-glass lp-card`}
               >
                 {/* Hover glow */}
                 <div className={`absolute inset-0 ${accent.bg10} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl`} />
@@ -649,16 +761,16 @@ function StatsSection({ content }: { content: Record<string, unknown> }) {
   return (
     <SectionBg sectionStyle={ss} fallbackBg="bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950" className="py-24 px-6">
       <div className="max-w-6xl mx-auto text-center">
-        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{title}</h2>
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 lp-glow">{title}</h2>
         {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-4">{subtitle}</p>}
         <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mb-16 rounded-full`} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
           {items.map((item: Record<string, unknown>, i: number) => {
             const iconStr = item.icon ? String(item.icon) : null;
             return (
-              <div key={String(item.id || i)} className="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-300">
+              <div key={String(item.id || i)} className="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-300 lp-glass lp-card">
                 {iconStr && (
-                  <div className={`w-12 h-12 ${accent.bg10} rounded-xl flex items-center justify-center mx-auto mb-4`}>
+                  <div className={`w-12 h-12 ${accent.bg10} rounded-xl flex items-center justify-center mx-auto mb-4 lp-float lp-icon`}>
                     <IconDisplay icon={iconStr} className={`h-6 w-6 ${accent.text} opacity-80`} size={24} />
                   </div>
                 )}
@@ -690,7 +802,7 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
       <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
             {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
             <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
           </div>
@@ -700,8 +812,8 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
             {steps.map((step: Record<string, unknown>, i: number) => {
               const iconStr = step.icon ? String(step.icon) : null;
               return (
-                <div key={String(step.id || i)} className="text-center relative group">
-                  <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-xl ${accent.shadow} group-hover:scale-110 transition-transform duration-300`}>
+                <div key={String(step.id || i)} className="text-center relative group lp-glass lp-card">
+                  <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-xl ${accent.shadow} group-hover:scale-110 transition-transform duration-300 lp-float lp-icon`}>
                     {iconStr ? (
                       <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
                     ) : (
@@ -723,7 +835,7 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
@@ -733,10 +845,10 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
             return (
               <div
                 key={String(step.id || i)}
-                className="flex gap-6 items-start p-8 bg-white/[0.02] border border-white/[0.06] rounded-3xl hover:border-white/[0.1] transition-all duration-300 group"
+                className="flex gap-6 items-start p-8 bg-white/[0.02] border border-white/[0.06] rounded-3xl hover:border-white/[0.1] transition-all duration-300 group lp-glass lp-card"
               >
                 <div
-                  className={`shrink-0 w-16 h-16 bg-gradient-to-br ${accent.gradientBtn} rounded-2xl flex items-center justify-center shadow-lg ${accent.shadow}`}
+                  className={`shrink-0 w-16 h-16 bg-gradient-to-br ${accent.gradientBtn} rounded-2xl flex items-center justify-center shadow-lg ${accent.shadow} lp-float lp-icon`}
                 >
                   {iconStr ? (
                     <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
@@ -773,7 +885,7 @@ function TestimonialsSection({ content }: { content: Record<string, unknown> }) 
       <SectionBg sectionStyle={ss} fallbackBg="bg-gray-900" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
             {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
             <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
           </div>
@@ -810,7 +922,7 @@ function TestimonialsSection({ content }: { content: Record<string, unknown> }) 
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-900" className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
@@ -881,7 +993,7 @@ function CTASection({ content }: { content: Record<string, unknown> }) {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href={ctaUrl}
-            className={`inline-flex items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105`}
+            className={`inline-flex items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105 lp-pulse lp-btn lp-cta`}
           >
             {ctaText}
             <ArrowRight className="h-5 w-5" />
@@ -911,7 +1023,7 @@ function FAQSection({ content }: { content: Record<string, unknown> }) {
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
@@ -969,7 +1081,7 @@ function ImageTextSection({ content }: { content: Record<string, unknown> }) {
         {/* Text side */}
         <div className="lg:w-1/2 space-y-6">
           {subtitle && <span className={`text-sm font-bold ${accent.text} uppercase tracking-[0.2em]`}>{subtitle}</span>}
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">{title}</h2>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight lp-glow">{title}</h2>
           {description && <p className="text-gray-400 text-lg leading-relaxed">{description}</p>}
           {bullets.length > 0 && (
             <ul className="space-y-4 pt-4">
@@ -1040,7 +1152,7 @@ function GallerySection({ content }: { content: Record<string, unknown> }) {
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">{title}</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
@@ -1103,9 +1215,16 @@ export default function LandingPageRenderer({ page }: { page: SerializedPage }) 
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white antialiased">
-      {/* Custom CSS */}
-      {page.customCss && <style>{page.customCss}</style>}
+    <div className={`min-h-screen bg-gray-950 text-white antialiased ${page.customCss ? "lp-page lp-animated-bg" : ""}`}>
+      {/* Custom CSS + auto-mapping rules */}
+      {page.customCss && (
+        <style>{`${page.customCss}
+/* Auto-map lp-* classes to elements when defined */
+${page.customCss.includes(".lp-glow") ? ".lp-page h1,.lp-page h2{text-shadow:inherit}.lp-page h1,.lp-page h2{text-shadow:0 0 20px var(--lp-glow-color,rgba(0,255,0,0.5)),0 0 40px var(--lp-glow-color,rgba(0,255,0,0.3))}" : ""}
+${page.customCss.includes(".lp-glass") ? ".lp-page [class*='border-white']:not(footer):not(summary){backdrop-filter:blur(8px);border-color:var(--lp-accent-color,rgba(0,255,0,0.12))!important}" : ""}
+${page.customCss.includes(".lp-scanline") ? ".lp-page section{position:relative}.lp-page section::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:1}" : ""}
+`}</style>
+      )}
 
       {/* Sections */}
       {sortedSections.map((section) => {

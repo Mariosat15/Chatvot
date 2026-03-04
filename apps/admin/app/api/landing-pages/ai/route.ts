@@ -363,7 +363,7 @@ Gradients: from-[#0a0a05] via-[#1a1a0a] to-[#2a2a1a]
 Text gradient: from-[#c8b400] to-[#ff6b00]
 CTA: bg-[#c8b400] text-black, hover bg-[#a89600], secondary: border-[#ff6b00] text-[#ff6b00]
 Icons: ☢️ battle, 🏆 trophy, 💀 CTA icon, 🛡️ users, 💊 currency, ⚡ power
-USE: accentColor "yellow" or "orange", bgGradient with deep browns/olives, game icons: skull, bomb, fire spell, poison potion
+USE: accentColor "green" or "yellow", bgGradient with deep blacks/olives/dark-greens (e.g. from-gray-950 via-green-950 to-gray-950), game icons: skull, bomb, fire spell, poison potion
 
 ─── GAMING NEON THEME ───
 Colors: primary #a855f7 (purple), accent #ec4899 (pink), background #0a0a1a
@@ -403,7 +403,7 @@ By using DIFFERENT style values across sections, you create a visually diverse, 
 
 "style" object properties:
 {
-  "accentColor": "blue" | "emerald" | "rose" | "violet" | "cyan" | "orange" | "teal" | "pink" | "indigo" | "yellow",
+  "accentColor": "blue" | "emerald" | "rose" | "violet" | "cyan" | "orange" | "teal" | "pink" | "indigo" | "yellow" | "green",
   "bgGradient": "from-slate-950 via-indigo-950 to-purple-950",
   "bgImage": "PEXELS_URL_HERE",
   "layout": "default" | "alternating" | "horizontal" | "reversed" | "cards" | "grid"
@@ -485,12 +485,23 @@ Examples of what to include in customCss (COMBINE multiple effects):
    @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
    .lp-shimmer { background:linear-gradient(90deg,#fff,#ffd700,#fff); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:shimmer 3s linear infinite; }
 
+HOW THESE CSS CLASSES ARE APPLIED BY THE RENDERER (automatically):
+- .lp-glow → Applied to ALL h1, h2, h3 headlines (hero headline + every section title)
+- .lp-pulse, .lp-btn → Applied to primary CTA buttons (hero + CTA section)
+- .lp-glass, .lp-card → Applied to feature cards, stat cards, how-it-works step cards
+- .lp-float, .lp-icon → Applied to stat icons and step icons
+- #lp-page → Wraps the entire landing page; use for global rules like #lp-page { ... }
+
 RULES:
 - ALL CSS classes MUST be prefixed with "lp-" to avoid conflicts
 - Keep it under 40 lines — focused and impactful
 - Match the COLOR of the user's theme (green for radioactive, blue for ocean, etc.)
 - Combine 3-5 effects for a polished look
 - The page already has dark backgrounds — design for dark mode
+- ALWAYS generate .lp-glow and .lp-pulse at minimum — they make the biggest visual impact
+- For radioactive themes: use green rgba(0,255,50,...) or rgba(57,255,20,...) for ALL glow effects
+- For ocean themes: use blue/cyan rgba(14,165,233,...) or rgba(6,182,212,...)
+- For inferno themes: use red/orange rgba(239,68,68,...) or rgba(249,115,22,...)
 
 ═══════════════════════════════════════════════════════`;
 
@@ -725,7 +736,7 @@ Create a COMPLETELY UNIQUE, visually stunning, THEMED landing page. The user wil
 
 THEME ADHERENCE (CRITICAL):
 - CHECK THE THEME REFERENCE section above for exact color palettes and visual styles
-- If the user says "radioactive" → Use the FALLOUT THEME colors (#c8b400 gold, #ff6b00 orange, dark olive backgrounds), accentColor "yellow"/"orange", game icons like skull, bomb, poison potion
+- If the user says "radioactive" or "fallout" → Use the FALLOUT THEME colors (toxic green #39ff14, neon green, dark charcoal/olive backgrounds), accentColor "green"/"yellow", bgGradients like "from-gray-950 via-green-950 to-gray-950", game icons like skull, bomb, poison potion, fire spell
 - If the user says "ocean luxury" → Use OCEAN THEME colors (sky blue, cyan, navy), accentColor "cyan"/"blue", game icons like anchor, pirate ship, compass, treasure
 - If the user says "fire inferno" → Use INFERNO THEME colors (red, orange, dark red), accentColor "rose"/"orange", game icons like fire spell, rage potion, sword
 - If "cyberpunk/neon" → GAMING NEON colors (purple, pink, dark navy), accentColor "violet"/"pink", cyber/tech icons
