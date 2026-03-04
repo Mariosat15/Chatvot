@@ -16,6 +16,7 @@ import {
   Users,
   MousePointer,
   Bot,
+  Power,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,15 +70,27 @@ export default function LPPageList({
     fetchPages();
   }, [fetchPages]);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Deactivate this landing page?")) return;
+  async function handleDeactivate(id: string) {
+    if (!confirm("Deactivate this landing page? It will stop showing to visitors but can be reactivated.")) return;
     try {
       const res = await fetch(`/api/landing-pages/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) throw new Error("Failed to deactivate");
       toast.success("Landing page deactivated");
       fetchPages();
     } catch {
       toast.error("Failed to deactivate");
+    }
+  }
+
+  async function handlePermanentDelete(id: string) {
+    if (!confirm("⚠️ PERMANENTLY DELETE this landing page?\n\nThis will remove the page and all its data forever. This action cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/landing-pages/${id}?permanent=true`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast.success("Landing page permanently deleted");
+      fetchPages();
+    } catch {
+      toast.error("Failed to delete");
     }
   }
 
@@ -214,7 +227,8 @@ export default function LPPageList({
               key={lp._id}
               page={lp}
               onEdit={onEdit}
-              onDelete={handleDelete}
+              onDeactivate={handleDeactivate}
+              onPermanentDelete={handlePermanentDelete}
               onCopyUrl={copyTrackingUrl}
               onViewAnalytics={onViewAnalytics}
             />
@@ -283,13 +297,15 @@ function KPICard({
 function PageRow({
   page,
   onEdit,
-  onDelete,
+  onDeactivate,
+  onPermanentDelete,
   onCopyUrl,
   onViewAnalytics,
 }: {
   page: LandingPageData;
   onEdit: (p: LandingPageData) => void;
-  onDelete: (id: string) => void;
+  onDeactivate: (id: string) => void;
+  onPermanentDelete: (id: string) => void;
   onCopyUrl: (trackingId: string) => void;
   onViewAnalytics: (p: LandingPageData) => void;
 }) {
@@ -358,11 +374,22 @@ function PageRow({
             >
               <Pencil className="h-4 w-4" />
             </Button>
+            {page.isActive ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDeactivate(page._id)}
+                title="Deactivate (keep data)"
+                className="text-yellow-400 hover:text-yellow-300"
+              >
+                <Power className="h-4 w-4" />
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onDelete(page._id)}
-              title="Deactivate"
+              onClick={() => onPermanentDelete(page._id)}
+              title="Permanently delete"
               className="text-red-400 hover:text-red-300"
             >
               <Trash2 className="h-4 w-4" />

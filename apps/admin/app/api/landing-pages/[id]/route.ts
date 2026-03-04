@@ -88,16 +88,33 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/landing-pages/[id] — Soft-delete a landing page (set isActive=false)
+ * DELETE /api/landing-pages/[id] — Delete or deactivate a landing page
+ *
+ * Query params:
+ *   ?permanent=true  → Hard delete (removes from DB)
+ *   (default)        → Soft delete (sets isActive=false)
  */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await connectToDatabase();
     const { id } = await params;
+    const isPermanent = req.nextUrl.searchParams.get("permanent") === "true";
 
+    if (isPermanent) {
+      const page = await LandingPage.findByIdAndDelete(id).lean();
+      if (!page) {
+        return NextResponse.json(
+          { error: "Landing page not found" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({ success: true, message: "Landing page permanently deleted" });
+    }
+
+    // Soft delete — just deactivate
     const page = await LandingPage.findByIdAndUpdate(
       id,
       { $set: { isActive: false } },
