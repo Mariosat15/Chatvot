@@ -129,6 +129,50 @@ async function fetchDiversePexelsImages(
   return deduped;
 }
 
+// ─── Theme Keyword Extraction ────────────────────────────────────────────────
+// Reason: Extract relevant image search terms from user instructions so Pexels
+// results match the user's specific theme rather than generic trading images.
+
+function extractThemeKeywords(instructions: string): string[] {
+  const text = instructions.toLowerCase();
+  const queries: string[] = [];
+
+  // Theme-specific keyword clusters
+  const themePatterns: Array<{ keywords: string[]; searches: string[] }> = [
+    { keywords: ["radioactive", "fallout", "wasteland", "toxic", "nuclear"], searches: ["neon green cyberpunk dark city", "toxic green glowing abstract", "post apocalyptic wasteland dark"] },
+    { keywords: ["ocean", "sea", "deep blue", "aquatic", "underwater", "marine"], searches: ["ocean deep blue underwater", "luxury yacht night ocean", "ocean waves aerial dark"] },
+    { keywords: ["fire", "inferno", "flame", "blaze", "ember", "burn"], searches: ["fire flames dramatic dark", "red ember glowing abstract", "explosion fire energy dark"] },
+    { keywords: ["neon", "synthwave", "cyberpunk", "retro", "tron", "80s"], searches: ["neon purple city night", "cyberpunk neon lights street", "retro synthwave abstract purple pink"] },
+    { keywords: ["arctic", "frost", "ice", "snow", "winter", "mountain", "glacier"], searches: ["arctic ice mountain landscape", "frost crystal blue abstract", "northern lights aurora dark"] },
+    { keywords: ["gold", "luxury", "premium", "vip", "prestige", "champion"], searches: ["gold trophy celebration dark", "luxury gold black abstract", "gold confetti celebration night"] },
+    { keywords: ["matrix", "hacker", "code", "digital", "terminal", "algorithm"], searches: ["matrix code green digital", "server room data center", "digital technology abstract green"] },
+    { keywords: ["sunset", "tropical", "beach", "paradise", "summer", "island"], searches: ["sunset tropical beach paradise", "palm trees sunset ocean", "tropical luxury resort golden hour"] },
+    { keywords: ["space", "galaxy", "cosmic", "star", "nebula", "universe"], searches: ["galaxy space nebula dark", "cosmic stars night sky", "space exploration dark dramatic"] },
+    { keywords: ["forest", "nature", "jungle", "green", "earth"], searches: ["dark forest mystical green", "nature landscape aerial", "jungle canopy dramatic light"] },
+    { keywords: ["crypto", "bitcoin", "blockchain", "web3"], searches: ["cryptocurrency bitcoin technology", "blockchain digital abstract", "crypto trading futuristic"] },
+    { keywords: ["gaming", "esport", "arena", "battle", "warrior", "combat"], searches: ["esports gaming arena neon", "competitive gaming dark dramatic", "gaming setup neon lights"] },
+  ];
+
+  for (const pattern of themePatterns) {
+    if (pattern.keywords.some((kw) => text.includes(kw))) {
+      queries.push(...pattern.searches);
+    }
+  }
+
+  // If no specific theme matched, extract key descriptive words
+  if (queries.length === 0) {
+    // Extract color + mood words
+    const colorMoodWords = text.match(/\b(dark|light|bright|neon|glowing|dramatic|cinematic|luxury|premium|professional|modern|clean|minimal|bold|futuristic|elegant|sleek|vibrant)\b/g);
+    if (colorMoodWords && colorMoodWords.length > 0) {
+      queries.push(`${colorMoodWords.slice(0, 3).join(" ")} abstract background`);
+    }
+    // Fallback to generic but relevant queries
+    queries.push("trading finance dark professional");
+  }
+
+  return queries;
+}
+
 // ─── Image Catalogue for AI ─────────────────────────────────────────────────
 
 function buildImageCatalogue(photos: PexelsPhoto[]): string {
@@ -145,16 +189,17 @@ PEXELS IMAGE CATALOGUE — Use these URLs in your output
 ═══════════════════════════════════════════════════════
 ${lines.join("\n")}
 
-IMAGE USAGE RULES:
-• You MUST use at least 4-6 different images across the page
+IMAGE PLACEMENT RULES (CRITICAL — FOLLOW EXACTLY):
+• You MUST use at least 6-8 different images across the page — MORE IS BETTER
 • Hero section → "backgroundImage" = pick the most dramatic/cinematic image
-• image-text sections → "image" = pick contextually relevant image
+• image-text sections → "image" = pick contextually relevant image for EACH section
 • banner section → "backgroundImage" = pick a wide, atmospheric image
 • CTA section → "backgroundImage" = pick an inspiring/motivational image
-• gallery items → "image" = one per item
-• features items → "image" = optionally add to 1-2 feature cards
+• gallery items → "image" = one UNIQUE image per item (use 4-6 items)
+• features items → "image" = add an image to at least 2 feature cards
 • NEVER reuse the same image URL twice on the same page
 • ALWAYS copy the full URL exactly as shown (starting with https://images.pexels.com/)
+• DISTRIBUTE images across ALL section types — don't cluster them in one place
 ═══════════════════════════════════════════════════════`;
 }
 
@@ -208,6 +253,56 @@ DESIGN RULES:
 3. Use bgImage on at least 2-3 sections (hero, banner, CTA, image-text)
 4. Alternate section backgrounds: dark gradient → image → neutral → colored → image → dark
 5. Make the page feel like it was designed by a professional agency — not a template
+
+═══════════════════════════════════════════════════════
+
+CUSTOM CSS — Theme-Level Styling (IMPORTANT)
+═══════════════════════════════════════════════════════
+
+You can output a "customCss" field alongside sections. This CSS is injected into a <style> tag
+on the page and allows you to create TRULY UNIQUE themed pages with effects that go beyond
+what the section system alone supports.
+
+THE USER'S THEME MUST BE REFLECTED IN CUSTOM CSS. If they ask for "radioactive green", every
+glow, shadow, and animation must use green. If "fire inferno", use reds and oranges.
+
+Examples of what to include in customCss (COMBINE multiple effects):
+
+1. GLOWING TEXT EFFECTS (match theme color):
+   .lp-glow { text-shadow: 0 0 20px rgba(0,255,100,0.5), 0 0 40px rgba(0,255,100,0.3); }
+
+2. PULSING CTA BUTTON:
+   @keyframes pulse-glow { 0%,100%{box-shadow:0 0 15px rgba(255,200,0,0.4)} 50%{box-shadow:0 0 35px rgba(255,200,0,0.8)} }
+   .lp-pulse { animation: pulse-glow 2s ease-in-out infinite; }
+
+3. GLASSMORPHISM CARDS:
+   .lp-glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+
+4. ANIMATED GRADIENT BACKGROUND:
+   @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+   .lp-animated-bg { background-size: 200% 200%; animation: gradient-shift 8s ease infinite; }
+
+5. FADE-IN ON SCROLL (simple):
+   @keyframes fade-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+   .lp-fade-in { animation: fade-up 0.8s ease-out forwards; }
+
+6. FLOATING PARTICLES (subtle):
+   @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-15px)} }
+   .lp-float { animation: float 4s ease-in-out infinite; }
+
+7. SCAN-LINE OVERLAY:
+   .lp-scanline::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px); pointer-events:none; }
+
+8. SHIMMER / METALLIC TEXT:
+   @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+   .lp-shimmer { background:linear-gradient(90deg,#fff,#ffd700,#fff); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:shimmer 3s linear infinite; }
+
+RULES:
+- ALL CSS classes MUST be prefixed with "lp-" to avoid conflicts
+- Keep it under 40 lines — focused and impactful
+- Match the COLOR of the user's theme (green for radioactive, blue for ocean, etc.)
+- Combine 3-5 effects for a polished look
+- The page already has dark backgrounds — design for dark mode
 
 ═══════════════════════════════════════════════════════`;
 
@@ -376,7 +471,7 @@ content: { "html": "<div>...</div>" }
 // ─── System Prompts ──────────────────────────────────────────────────────────
 
 function getEnhanceSystemPrompt(imageCatalogue: string): string {
-  return `You are a world-class landing page designer and conversion rate optimizer with 15 years of experience at top agencies like Pentagram, IDEO, and Huge. Your specialty is transforming basic templates into stunning, high-converting pages.
+  return `You are a world-class landing page designer and conversion rate optimizer with 15 years of experience at top agencies like Pentagram, IDEO, and Huge. Your specialty is transforming basic templates into stunning, high-converting pages with UNIQUE visual themes.
 
 ${DESIGN_SYSTEM}
 
@@ -385,29 +480,31 @@ ${SECTION_TYPES_DOC}
 ${imageCatalogue}
 
 YOUR ENHANCEMENT MISSION:
-You will receive an existing landing page template. Your job is to DRAMATICALLY transform it — not just edit text, but redesign the entire visual experience.
+You will receive an existing landing page template AND the user's specific theme instructions.
+Your job is to DRAMATICALLY transform it to match the user's EXACT THEME — not just edit text, but redesign the entire visual experience to match their vision.
 
 ENHANCEMENT STRATEGY:
-1. KEEP the same section types but COMPLETELY reimagine the visual design
-2. Assign DIFFERENT accentColors to different sections (e.g., hero=cyan, features=emerald, stats=violet, cta=orange)
-3. Add "style" objects to EVERY section with varied bgGradient, accentColor, and layout values
-4. ADD 1-2 new sections if they would improve the page (image-text, banner, gallery)
-5. REWRITE ALL COPY to be world-class:
+1. READ the user's instructions carefully — if they say "radioactive green", EVERYTHING must feel radioactive green. If "ocean blue luxury", EVERYTHING must feel like deep ocean luxury.
+2. Choose accentColors that MATCH the theme (green/emerald for radioactive, blue/cyan for ocean, rose/orange for fire, violet/pink for synthwave, etc.)
+3. Add "style" objects to EVERY section with varied bgGradient that match the theme
+4. ADD 2-3 new sections (image-text, banner, gallery) to create a richer page
+5. REWRITE ALL COPY to match the TONE and THEME the user describes:
+   - If gaming theme: use gaming language, competition metaphors
+   - If luxury theme: use exclusive, prestige, VIP language
+   - If tech theme: use innovation, cutting-edge, algorithm language
    - Headlines: Power words, emotional triggers, specific numbers. Max 8 words.
-   - Subheadlines: Expand with specifics — prize amounts, user counts, success rates
-   - CTAs: Action verb + clear benefit + urgency
-   - Testimonials: Real-sounding with specific details (trading pairs, amounts, timeframes)
-   - Stats: Specific non-round numbers ("$2.47M" not "$2.5M", "12,847" not "13,000")
-6. Use DIFFERENT Pexels images across multiple sections — hero, image-text, banner, CTA
-7. Use DIFFERENT background gradients for consecutive sections — alternate light/dark
-8. Use DIFFERENT layout variants where available (features: "alternating", testimonials: "cards", how-it-works: "horizontal")
+6. Use 6-8 DIFFERENT Pexels images — they should ALL be relevant to the theme
+7. Use DIFFERENT background gradients per section — but ALL within the theme color family
+8. Use DIFFERENT layout variants (features: "alternating", testimonials: "cards")
+9. Generate "customCss" with 3-5 CSS effects that match the theme
 
-CRITICAL: Return ONLY a JSON object: { "sections": [...] }
+CRITICAL: Return ONLY a JSON object: { "sections": [...], "customCss": "..." }
+The customCss should include theme-appropriate CSS animations, glows, glass effects, etc.
 NO markdown. NO explanation. NO commentary. ONLY the JSON object.`;
 }
 
 function getGenerateSystemPrompt(imageCatalogue: string): string {
-  return `You are a world-class landing page designer, copywriter, and conversion expert. You design pages that look like they belong to billion-dollar companies. Every page you create is unique, visually stunning, and converts visitors into users.
+  return `You are a world-class landing page designer, copywriter, and conversion expert with deep expertise in themed, immersive web experiences. You create pages that feel like they belong to billion-dollar brands. Every page has a UNIQUE VISUAL IDENTITY that matches the user's exact theme.
 
 The platform is a TRADING COMPETITION platform where users trade with virtual funds and compete for real cash prizes.
 
@@ -418,46 +515,66 @@ ${SECTION_TYPES_DOC}
 ${imageCatalogue}
 
 YOUR GENERATION MISSION:
-Create a COMPLETELY UNIQUE, visually stunning landing page. Every page you create must feel different from the last — different colors, different layouts, different section combinations.
+Create a COMPLETELY UNIQUE, visually stunning, THEMED landing page. The user will describe a specific theme, mood, or concept. YOU MUST FOLLOW IT EXACTLY.
+
+THEME ADHERENCE (CRITICAL):
+- If the user says "radioactive green" → ALL accent colors should be green/emerald, gradients should use green/emerald tones, copy should use radioactive/wasteland metaphors
+- If the user says "ocean luxury" → ALL accents blue/cyan, gradients navy/blue, copy uses ocean/depth metaphors
+- If the user says "fire inferno" → ALL accents rose/orange, gradients red/orange, copy uses fire/battle metaphors
+- The theme must be CONSISTENT throughout — not just the hero, but EVERY section should feel themed
+- ALL Pexels images should match the theme — don't use a beach image in a cyberpunk page
 
 MANDATORY REQUIREMENTS:
-1. Create 8-10 sections using a MIX of types — NOT just the basic 7. Include at least:
-   - 1 hero section
-   - 1-2 image-text sections (with real Pexels images)
-   - 1 features section (with varied layout)
-   - 1 stats section
-   - 1 banner OR gallery section (with Pexels images)
-   - 1 testimonials section
-   - 1 faq section
-   - 1 cta section
+1. Create 8-10 sections using a MIX of types. Include at least:
+   - 1 hero section (with dramatic Pexels background matching theme)
+   - 2-3 image-text sections (with real Pexels images, alternating "default" and "reversed" layouts)
+   - 1 features section (with "alternating" layout and images on 2+ items)
+   - 1 stats section (with specific non-round numbers)
+   - 1 banner section (with atmospheric Pexels background)
+   - 1 gallery section (with 4-6 unique Pexels images)
+   - 1 testimonials section (with "cards" layout)
+   - 1 faq section (5-6 items)
+   - 1 cta section (with Pexels background)
 
-2. VISUAL DIVERSITY — every section must have a "style" object:
-   - Use 3-4 DIFFERENT accentColors across the page
-   - Alternate bgGradient between sections
-   - Use bgImage (Pexels URLs) on at least 3 sections
+2. VISUAL THEMING — every section must have a "style" object:
+   - Use 2-3 accent colors from the SAME COLOR FAMILY (e.g., emerald + teal + cyan for green themes)
+   - Every section needs a bgGradient that uses theme-appropriate colors
+   - Use bgImage on hero, banner, CTA, and at least 1 image-text section
    - Vary layouts: features→"alternating", how-it-works→"horizontal", testimonials→"cards"
 
-3. WORLD-CLASS COPYWRITING:
-   - Hero headline: 5-8 words. Punchy. Emotional. Benefit-driven.
-     Examples: "Trade Boldly. Win Big." / "Where Skill Meets Reward" / "Your Edge in Every Market"
-   - Subheadlines: Expand with SPECIFIC numbers and social proof
-   - CTAs: "Start Winning Today — It's Free" / "Claim Your Spot Now" / "Join 12,847 Traders"
-   - Badge: Always include social proof with specific numbers
-   - Each section headline should be unique and compelling
+3. THEMED COPYWRITING:
+   - Hero headline: 5-8 words using THEME METAPHORS (not generic "Start Trading")
+   - Subheadlines: Expand with SPECIFIC numbers AND theme language
+   - CTAs: Theme-appropriate action words + benefit + urgency
+   - Badge: Social proof with specific numbers + theme flavor
+   - Every headline should use language that fits the theme world
 
-4. AUTHENTIC TESTIMONIALS with specific details:
+4. AUTHENTIC TESTIMONIALS with theme flavor:
    - Different nationalities, trading styles, experience levels
-   - Mention specific pairs (EUR/USD, BTC, Gold), amounts won, competition types
-   - Mix of 4★ and 5★ ratings for authenticity
+   - Mention specific pairs (EUR/USD, BTC, Gold), amounts won
+   - Use theme-appropriate language in quotes
+   - Mix of 4★ and 5★ ratings
 
-5. IMAGE USAGE — distribute Pexels images across:
-   - Hero background, image-text sections, banner, CTA background, gallery items
-   - Each image used ONCE — no repeats
+5. IMAGE DISTRIBUTION (CRITICAL — at least 8 unique images):
+   - Hero: 1 dramatic background
+   - Image-text sections: 1 per section (2-3 images)
+   - Banner: 1 atmospheric background
+   - Gallery: 4-6 unique images (EACH with a different URL)
+   - CTA: 1 inspiring background
+   - Features: 1-2 on feature items
+   - NEVER reuse the same URL
 
-6. Section order should FLOW like a story:
-   hero → (image-text OR features) → stats → (banner OR image-text) → how-it-works → testimonials → faq → cta
+6. CUSTOM CSS (REQUIRED):
+   Generate a "customCss" string with 3-5 CSS effects matching the theme:
+   - Glowing effects in the theme's primary color
+   - A pulsing/animated CTA button
+   - Glassmorphism or frosted glass card effects
+   - A subtle background animation or text effect
+   - All CSS classes must be prefixed with "lp-"
 
-CRITICAL: Return ONLY a JSON object: { "sections": [...] }
+Section order: hero → image-text → features → stats → banner → image-text → how-it-works → testimonials → gallery → faq → cta
+
+CRITICAL: Return ONLY a JSON object: { "sections": [...], "customCss": "..." }
 NO markdown. NO explanation. NO commentary. ONLY the JSON.`;
 }
 
@@ -520,32 +637,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Fetch Pexels images with DIVERSE queries ──────────────────────
+    // ── Fetch Pexels images with THEME-AWARE queries ──────────────────
     let pexelsPhotos: PexelsPhoto[] = [];
     if (config.pexelsKey) {
-      // Reason: 5+ queries with 6 images each gives ~25-30 diverse images for the AI to pick from
-      const searchQueries = [
-        "trading finance stock market charts",
-        "business professionals success celebration",
-        "technology data dashboard analytics",
-        "competition trophy award winning",
-        "city skyline night lights modern",
-      ];
+      // Reason: Extract theme keywords from user instructions for highly relevant images
+      const themeQueries = extractThemeKeywords(instructions);
+      const searchQueries: string[] = [];
+
+      // Priority 1: User-specified image query
       if (imageQuery) {
-        searchQueries.unshift(imageQuery);
+        searchQueries.push(imageQuery);
       }
-      if (instructions.length > 15) {
-        // Extract keywords from user instructions for contextual images
-        searchQueries.push(instructions.slice(0, 80));
-      }
+      // Priority 2: Theme-extracted queries
+      searchQueries.push(...themeQueries);
+      // Priority 3: Always include 1-2 generic trading/finance queries as fallback
+      searchQueries.push("professional trading desk monitors dark");
+      searchQueries.push("financial success celebration dark");
+
+      // Deduplicate queries
+      const uniqueQueries = [...new Set(searchQueries)].slice(0, 8);
 
       pexelsPhotos = await fetchDiversePexelsImages(
         config.pexelsKey,
-        searchQueries,
-        6,
+        uniqueQueries,
+        8, // 8 per query × 8 queries = up to 64 images, deduped to ~30-40
       );
       console.log(
-        `📸 Fetched ${pexelsPhotos.length} Pexels images from ${searchQueries.length} queries`,
+        `📸 Fetched ${pexelsPhotos.length} Pexels images from ${uniqueQueries.length} queries: [${uniqueQueries.join(", ")}]`,
       );
     } else {
       console.warn("⚠️ No Pexels API key — AI will generate without images");
@@ -574,8 +692,8 @@ export async function POST(request: NextRequest) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.9,
-      max_tokens: 12000,
+      temperature: 0.95,
+      max_tokens: 16000,
       response_format: { type: "json_object" },
     });
 
@@ -608,12 +726,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Normalize response structure
+    // Normalize response structure and extract customCss
     let rawSections: unknown[];
+    let aiCustomCss = "";
+
     if (Array.isArray(parsed)) {
       rawSections = parsed;
     } else if (parsed && typeof parsed === "object") {
       const obj = parsed as Record<string, unknown>;
+      const objMap = new Map(Object.entries(obj));
+
+      // Extract customCss if present
+      const cssVal = objMap.get("customCss") || objMap.get("custom_css") || objMap.get("css");
+      if (typeof cssVal === "string" && cssVal.trim().length > 0) {
+        aiCustomCss = cssVal.trim();
+      }
+
       const wrapperKeys = [
         "sections",
         "data",
@@ -623,11 +751,11 @@ export async function POST(request: NextRequest) {
         "content",
       ];
       const arrayKey = wrapperKeys.find((k) => {
-        const val = new Map(Object.entries(obj)).get(k);
+        const val = objMap.get(k);
         return Array.isArray(val);
       });
       if (arrayKey) {
-        rawSections = new Map(Object.entries(obj)).get(arrayKey) as unknown[];
+        rawSections = objMap.get(arrayKey) as unknown[];
       } else {
         const firstArr = Object.values(obj).find((v) => Array.isArray(v));
         if (firstArr) {
@@ -720,9 +848,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(
+      `🎨 Custom CSS: ${aiCustomCss ? `${aiCustomCss.length} chars` : "none"}`,
+    );
+
     return NextResponse.json({
       success: true,
       sections: resultSections,
+      customCss: aiCustomCss || "",
       pexelsImages: pexelsPhotos.map((p) => ({
         id: p.id,
         url: p.src.large,

@@ -14,6 +14,7 @@ export interface LandingPageData {
   trackingId: string;
   templateSlug?: string;
   sections: LPSection[];
+  customCss?: string;
   campaign: string;
   source: string;
   assignedTo: string;

@@ -44,6 +44,7 @@ import PexelsImageBrowser from "./PexelsImageBrowser";
 interface Props {
   page: LandingPageData | null;
   templateSections?: LPSection[];
+  templateCustomCss?: string;
   onBack: () => void;
   onSaved: () => void;
 }
@@ -77,7 +78,7 @@ const ACCENT_COLORS = [
 
 // ─── Main Editor ────────────────────────────────────────────────────────────
 
-export default function LPEditor({ page, templateSections, onBack, onSaved }: Props) {
+export default function LPEditor({ page, templateSections, templateCustomCss, onBack, onSaved }: Props) {
   const isNew = !page?._id;
 
   const [name, setName] = useState(page?.name || "");
@@ -91,6 +92,7 @@ export default function LPEditor({ page, templateSections, onBack, onSaved }: Pr
   const [sections, setSections] = useState<LPSection[]>(
     page?.sections || templateSections || [],
   );
+  const [customCss, setCustomCss] = useState(page?.customCss || templateCustomCss || "");
   const [saving, setSaving] = useState(false);
 
   // ── Section management ──────────────────────────────────────────────────
@@ -146,6 +148,7 @@ export default function LPEditor({ page, templateSections, onBack, onSaved }: Pr
         isActive,
         showRiskDisclaimer: showRisk,
         sections,
+        customCss: customCss || undefined,
       };
 
       let res: Response;
@@ -319,6 +322,28 @@ export default function LPEditor({ page, templateSections, onBack, onSaved }: Pr
           ))
         )}
       </div>
+
+      {/* Custom CSS */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <Code className="h-4 w-4" />
+            Custom CSS (Advanced)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-500 text-xs mb-2">
+            Add custom CSS to override default styles. AI can generate this for themed pages (e.g. animations, custom fonts, glassmorphism).
+          </p>
+          <Textarea
+            value={customCss}
+            onChange={(e) => setCustomCss(e.target.value)}
+            rows={6}
+            placeholder={`<style>\n  /* Custom page styles */\n  .hero-glow { box-shadow: 0 0 60px rgba(0,255,0,0.3); }\n</style>`}
+            className="bg-gray-800 border-gray-700 font-mono text-xs"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -54,6 +54,7 @@ export async function PUT(
       "showRiskDisclaimer",
       "seoTitle",
       "seoDescription",
+      "customCss",
     ];
 
     const bodyMap = new Map(Object.entries(body));

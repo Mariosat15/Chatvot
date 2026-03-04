@@ -24,6 +24,7 @@ export default function LandingPagesSection() {
   const [view, setView] = useState<AdminView>("list");
   const [editingPage, setEditingPage] = useState<LandingPageData | null>(null);
   const [templateSections, setTemplateSections] = useState<LandingPageData["sections"]>([]);
+  const [templateCustomCss, setTemplateCustomCss] = useState("");
   const [analyticsPage, setAnalyticsPage] = useState<LandingPageData | undefined>();
   const [aiTemplate, setAiTemplate] = useState<LPTemplate | null>(null);
 
@@ -32,6 +33,7 @@ export default function LandingPagesSection() {
     setView("list");
     setEditingPage(null);
     setTemplateSections([]);
+    setTemplateCustomCss("");
     setAnalyticsPage(undefined);
     setAiTemplate(null);
   }, []);
@@ -39,6 +41,7 @@ export default function LandingPagesSection() {
   const handleEdit = useCallback((page: LandingPageData) => {
     setEditingPage(page);
     setTemplateSections([]);
+    setTemplateCustomCss("");
     setView("editor");
   }, []);
 
@@ -54,12 +57,14 @@ export default function LandingPagesSection() {
   const handleCreateFromScratch = useCallback(() => {
     setEditingPage(null);
     setTemplateSections([]);
+    setTemplateCustomCss("");
     setView("editor");
   }, []);
 
   const handleSelectTemplate = useCallback((template: LPTemplate) => {
     setEditingPage(null);
     setTemplateSections(template.sections);
+    setTemplateCustomCss("");
     setView("editor");
   }, []);
 
@@ -78,10 +83,11 @@ export default function LandingPagesSection() {
     setView("ai-generate");
   }, []);
 
-  const handleAIAcceptSections = useCallback((sections: LPSection[]) => {
+  const handleAIAcceptSections = useCallback((sections: LPSection[], customCss?: string) => {
     // Reason: When AI produces sections, transition to the editor so the user can fine-tune
     setEditingPage(null);
     setTemplateSections(sections);
+    setTemplateCustomCss(customCss || "");
     setView("editor");
   }, []);
 
@@ -125,6 +131,7 @@ export default function LandingPagesSection() {
         <LPEditor
           page={editingPage}
           templateSections={templateSections}
+          templateCustomCss={templateCustomCss}
           onBack={goToList}
           onSaved={handleSaved}
         />

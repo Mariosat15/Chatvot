@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
       isActive: true,
       seoTitle: body.seoTitle || name,
       seoDescription: body.seoDescription || "",
+      customCss: body.customCss || "",
     });
 
     return NextResponse.json({
