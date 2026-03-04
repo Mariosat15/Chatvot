@@ -90,15 +90,42 @@ async function searchPexels(
 // ─── System Prompts ──────────────────────────────────────────────────────────
 
 const SECTION_TYPES_DOC = `
-Available section types and their content structure:
-1. "hero" — { headline, subheadline, ctaText, ctaLink, backgroundImage?, backgroundGradient?, badge? }
-2. "features" — { headline?, title?, items: [{ icon, title, description }] } (icons: Lucide names like "Zap", "Shield", "Trophy", "BarChart3", "TrendingUp", "Users", "Globe", "Rocket", "Star", "Heart", "Target", "Award")
-3. "stats" — { title?, items: [{ value, label, icon? }] }
-4. "how-it-works" — { headline?, title?, steps: [{ step, title, description, icon? }] }
-5. "testimonials" — { headline?, title?, items: [{ name, role?, quote, rating? }] }
-6. "cta" — { headline, subheadline?, ctaText, ctaLink, secondaryCtaText?, secondaryCtaLink? }
-7. "faq" — { title?, items: [{ question, answer }] }
-8. "custom-html" — { html: "string" }
+Each section object MUST have this exact structure:
+{
+  "id": "sec-{type}-{random4chars}",
+  "type": "<section_type>",
+  "order": <number>,
+  "enabled": true,
+  "content": { <content_fields> }
+}
+
+IMPORTANT: All content fields MUST be nested inside the "content" property. Never put content fields at the section root level.
+
+Available section types and their "content" fields:
+1. type "hero" → content: { "headline": "...", "subheadline": "...", "ctaText": "...", "ctaLink": "/register", "backgroundImage": "url", "backgroundGradient": "from-blue-900 to-purple-900", "badge": "🏆 #1 Platform" }
+2. type "features" → content: { "headline": "...", "items": [{ "icon": "Zap", "title": "...", "description": "..." }] }  (icon values: Lucide names — Zap, Shield, Trophy, BarChart3, TrendingUp, Users, Globe, Rocket, Star, Heart, Target, Award, Clock, DollarSign, Lock, Sparkles)
+3. type "stats" → content: { "title": "...", "items": [{ "value": "10K+", "label": "Active Traders", "icon": "Users" }] }
+4. type "how-it-works" → content: { "headline": "...", "steps": [{ "step": "1", "title": "...", "description": "...", "icon": "UserPlus" }] }
+5. type "testimonials" → content: { "headline": "...", "items": [{ "name": "...", "role": "Professional Trader", "quote": "...", "rating": 5 }] }
+6. type "cta" → content: { "headline": "...", "subheadline": "...", "ctaText": "...", "ctaLink": "/register", "secondaryCtaText": "...", "secondaryCtaLink": "/about" }
+7. type "faq" → content: { "title": "...", "items": [{ "question": "...", "answer": "..." }] }
+8. type "custom-html" → content: { "html": "<div>...</div>" }
+
+Example of a correct section:
+{
+  "id": "sec-hero-a1b2",
+  "type": "hero",
+  "order": 0,
+  "enabled": true,
+  "content": {
+    "headline": "Trade. Compete. Win Real Prizes.",
+    "subheadline": "Join thousands of traders competing with virtual funds for real cash prizes.",
+    "ctaText": "Start Trading Now",
+    "ctaLink": "/register",
+    "backgroundGradient": "from-indigo-900 via-purple-900 to-slate-900",
+    "badge": "🏆 Over $1M in Prizes Awarded"
+  }
+}
 `;
 
 function getEnhanceSystemPrompt(pexelsImages: PexelsPhoto[]): string {
@@ -118,9 +145,11 @@ Rules:
 - Testimonials should sound authentic with specific details.
 - FAQ answers should be thorough but concise.
 - Stats should use impressive but believable numbers.
-- If Pexels images are available, use them for hero backgroundImage fields.
+- If Pexels images are available, use them for hero backgroundImage fields inside content.
 - Each section MUST have a unique "id" field (use format "sec-{type}-{random4chars}").
-- Return ONLY valid JSON — an array of section objects. No markdown, no explanation.${imageList}`;
+- ALL content fields MUST be inside the "content" object — never at the section root.
+- Return a JSON object with a "sections" key containing an array of section objects: { "sections": [...] }
+- No markdown fences, no explanation — ONLY the JSON object.${imageList}`;
 }
 
 function getGenerateSystemPrompt(pexelsImages: PexelsPhoto[]): string {
@@ -140,11 +169,12 @@ Rules:
 - Headlines must be punchy, benefit-driven, and emotionally compelling.
 - Use specific numbers and details (not vague claims).
 - CTA buttons should create urgency ("Start Now", "Join 10,000+ Traders", "Get Started Free").
-- If Pexels images are available, use them for hero backgroundImage.
-- Each section MUST have a unique "id" field (use format "sec-{type}-{random4chars}").
+- If Pexels images are available, use them for hero backgroundImage inside content.
+- ALL content fields MUST be inside the "content" object — never at the section root.
 - Set "order" sequentially starting from 0.
 - Set "enabled" to true for all sections.
-- Return ONLY valid JSON — an array of section objects. No markdown, no explanation.
+- Return a JSON object with a "sections" key containing an array of section objects: { "sections": [...] }
+- No markdown fences, no explanation — ONLY the JSON object.
 - The landing page is for a trading competition platform where users trade with virtual funds and compete for real prizes.${imageList}`;
 }
 
@@ -236,7 +266,9 @@ export async function POST(request: NextRequest) {
       response_format: { type: "json_object" },
     });
 
-    const raw = completion.choices[0]?.message?.content || "[]";
+    const raw = completion.choices[0]?.message?.content || "{}";
+
+    console.log("🤖 AI raw response length:", raw.length, "chars");
 
     // ── Parse response ────────────────────────────────────────────────────
     let parsed: unknown;
@@ -245,39 +277,91 @@ export async function POST(request: NextRequest) {
     } catch {
       // Reason: Sometimes the model wraps in markdown code fences
       const cleaned = raw.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
-      parsed = JSON.parse(cleaned);
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        console.error("❌ AI response parse failed. Raw:", raw.slice(0, 500));
+        return NextResponse.json(
+          { error: "AI returned invalid JSON. Please try again." },
+          { status: 500 },
+        );
+      }
     }
 
-    // Normalize — the model might return { sections: [...] } or just [...]
-    let resultSections: LPSection[];
+    // Normalize — the model might return { sections: [...] }, { data: [...] }, or just [...]
+    let rawSections: unknown[];
     if (Array.isArray(parsed)) {
-      resultSections = parsed;
-    } else if (
-      parsed &&
-      typeof parsed === "object" &&
-      "sections" in (parsed as Record<string, unknown>) &&
-      Array.isArray((parsed as Record<string, unknown>).sections)
-    ) {
-      resultSections = (parsed as { sections: LPSection[] }).sections;
+      rawSections = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      // Reason: Try common wrapper keys the model might use
+      const obj = parsed as Record<string, unknown>;
+      const arrayKey = ["sections", "data", "result", "pages", "landing_page", "content"].find(
+        (k) => Array.isArray(obj[k]), // eslint-disable-line security/detect-object-injection
+      );
+      if (arrayKey) {
+        rawSections = obj[arrayKey] as unknown[]; // eslint-disable-line security/detect-object-injection
+      } else {
+        // Last resort: check if all values are arrays and pick the first one
+        const firstArr = Object.values(obj).find((v) => Array.isArray(v));
+        if (firstArr) {
+          rawSections = firstArr as unknown[];
+        } else {
+          console.error("❌ AI returned unexpected structure:", JSON.stringify(parsed).slice(0, 500));
+          return NextResponse.json(
+            { error: "AI returned an unexpected format. Please try again." },
+            { status: 500 },
+          );
+        }
+      }
     } else {
+      console.error("❌ AI returned non-object:", typeof parsed);
       return NextResponse.json(
         { error: "AI returned an unexpected format. Please try again." },
         { status: 500 },
       );
     }
 
-    // Validate and sanitize sections
-    resultSections = resultSections
-      .filter((s) => s && typeof s === "object" && s.type && s.content)
-      .map((s, i) => ({
-        id: s.id || `sec-${s.type}-${Math.random().toString(36).slice(2, 6)}`,
-        type: s.type,
-        order: i,
-        enabled: s.enabled !== false,
-        content: s.content || {},
-      }));
+    // Reason: Known structural fields that belong at section level, not inside content.
+    const SECTION_META_KEYS = new Set(["id", "type", "order", "enabled", "content"]);
+
+    // Validate, normalize, and sanitize sections
+    let resultSections: LPSection[] = rawSections
+      .filter((s): s is Record<string, unknown> => s != null && typeof s === "object" && !Array.isArray(s))
+      .filter((s) => typeof s.type === "string" && s.type.length > 0)
+      .map((s, i) => {
+        // Reason: If the AI put content fields at the section root instead of nesting
+        // them inside "content", we extract them automatically.
+        let content: Record<string, unknown>;
+        if (s.content && typeof s.content === "object" && !Array.isArray(s.content)) {
+          content = s.content as Record<string, unknown>;
+        } else {
+          // Extract all non-meta keys as content fields
+          content = {};
+          for (const [k, v] of Object.entries(s)) {
+            if (!SECTION_META_KEYS.has(k)) {
+              content[k] = v; // eslint-disable-line security/detect-object-injection
+            }
+          }
+        }
+
+        return {
+          id: (typeof s.id === "string" ? s.id : "") || `sec-${s.type}-${Math.random().toString(36).slice(2, 6)}`,
+          type: s.type as string,
+          order: i,
+          enabled: s.enabled !== false,
+          content,
+        };
+      });
+
+    // Filter out sections that ended up with truly empty content
+    resultSections = resultSections.filter(
+      (s) => Object.keys(s.content).length > 0,
+    );
+
+    console.log(`🤖 AI parsed ${resultSections.length} sections from response`);
 
     if (resultSections.length === 0) {
+      console.error("❌ AI sections empty after parsing. Raw:", raw.slice(0, 1000));
       return NextResponse.json(
         { error: "AI generated empty content. Please try with different instructions." },
         { status: 500 },
