@@ -15,6 +15,9 @@ import {
   PenTool,
   Layers,
   Search,
+  Upload,
+  X,
+  Paperclip,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,12 @@ import type { LPSection, LPTemplate } from "./lp-types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface UploadedImage {
+  url: string;
+  name: string;
+  previewUrl: string; // blob URL for local preview before upload completes
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -33,6 +42,7 @@ interface ChatMessage {
   sections?: LPSection[];
   customCss?: string;
   pexelsImages?: { id: number; url: string; photographer: string; alt: string }[];
+  userImages?: UploadedImage[];
   usage?: { model: string; promptTokens: number; completionTokens: number };
   timestamp: number;
 }
@@ -253,9 +263,12 @@ export default function LPAIAgent({
   const [loading, setLoading] = useState(false);
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [acceptedIdx, setAcceptedIdx] = useState<number | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -268,27 +281,97 @@ export default function LPAIAgent({
       id: "sys-init",
       role: "system",
       content: isEnhanceMode
-        ? `I'm ready to enhance your ${template?.name || "landing page"}. Tell me how you'd like me to improve it — I'll rewrite the copy, add professional images from Pexels, and optimize for conversions.`
-        : "I'm ready to create a brand-new landing page from scratch. Describe what you need — the theme, target audience, key features, and style — and I'll generate a professional page with compelling copy and Pexels images.",
+        ? `I'm ready to enhance your ${template?.name || "landing page"}. Tell me how you'd like me to improve it — I'll rewrite the copy, add professional images, and optimize for conversions.\n\n📎 **Upload your own images** using the upload button or drag & drop — I'll use only your images instead of Pexels stock photos.`
+        : "I'm ready to create a brand-new landing page from scratch. Describe what you need — the theme, target audience, key features, and style — and I'll generate a professional page with compelling copy.\n\n📎 **Upload your own images** using the upload button or drag & drop — I'll use only your images instead of Pexels stock photos.",
       timestamp: Date.now(),
     };
     setMessages([systemMsg]);
   }, [isEnhanceMode, template?.name]);
+
+  // ── Image Upload ─────────────────────────────────────────────────────────
+  const handleImageUpload = useCallback(async (files: FileList | File[]) => {
+    const validFiles = Array.from(files).filter((f) => {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`${f.name} is not an image`);
+        return false;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`${f.name} exceeds 5MB limit`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setUploading(true);
+    const newImages: UploadedImage[] = [];
+
+    for (const file of validFiles) {
+      try {
+        const previewUrl = URL.createObjectURL(file);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("field", `lp-ai-${Date.now()}`);
+
+        const res = await fetch("/api/images/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
+
+        newImages.push({ url: data.path, name: file.name, previewUrl });
+      } catch {
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+
+    if (newImages.length > 0) {
+      setUploadedImages((prev) => [...prev, ...newImages]);
+      toast.success(`${newImages.length} image${newImages.length > 1 ? "s" : ""} uploaded`);
+    }
+    setUploading(false);
+  }, []);
+
+  const removeUploadedImage = useCallback((idx: number) => {
+    setUploadedImages((prev) => {
+      const img = prev.at(idx);
+      if (img?.previewUrl) URL.revokeObjectURL(img.previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
+  }, []);
+
+  // ── Drop zone handler ──────────────────────────────────────────────────
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files.length > 0) {
+      handleImageUpload(e.dataTransfer.files);
+    }
+  }, [handleImageUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   // ── Send Message ─────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
 
+    // Capture images attached to this message
+    const attachedImages = [...uploadedImages];
+
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       role: "user",
       content: text,
+      userImages: attachedImages.length > 0 ? attachedImages : undefined,
       timestamp: Date.now(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setUploadedImages([]);
     setLoading(true);
     setAcceptedIdx(null);
 
@@ -306,6 +389,9 @@ export default function LPAIAgent({
           instructions: text,
           sections: sectionsToSend,
           imageQuery: imageQuery || undefined,
+          userImages: attachedImages.length > 0
+            ? attachedImages.map((img) => img.url)
+            : undefined,
         }),
       });
 
@@ -322,12 +408,18 @@ export default function LPAIAgent({
         return;
       }
 
+      const imageInfo = data.userImagesUsed
+        ? ` 📎 Used your ${data.userImagesUsed} uploaded image${data.userImagesUsed > 1 ? "s" : ""}.`
+        : data.pexelsImages?.length
+          ? ` Found ${data.pexelsImages.length} relevant images from Pexels.`
+          : "";
+
       const assistantMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: "assistant",
         content: mode === "enhance"
-          ? `✨ I've enhanced your landing page with ${data.sections.length} sections.${data.customCss ? " Custom CSS theme applied." : ""} The copy is now more professional and conversion-optimized.${data.pexelsImages?.length ? ` I found ${data.pexelsImages.length} relevant images from Pexels.` : ""} Review below and click **Use This** to apply.`
-          : `🚀 I've created a brand-new landing page with ${data.sections.length} sections.${data.customCss ? " 🎨 Includes custom theme CSS with animations." : ""}${data.pexelsImages?.length ? ` Included ${data.pexelsImages.length} professional images from Pexels.` : ""} Review below and click **Use This** to apply, or give me more instructions to refine it.`,
+          ? `✨ I've enhanced your landing page with ${data.sections.length} sections.${data.customCss ? " Custom CSS theme applied." : ""}${imageInfo} The copy is now more professional and conversion-optimized. Review below and click **Use This** to apply.`
+          : `🚀 I've created a brand-new landing page with ${data.sections.length} sections.${data.customCss ? " 🎨 Includes custom theme CSS with animations." : ""}${imageInfo} Review below and click **Use This** to apply, or give me more instructions to refine it.`,
         sections: data.sections,
         customCss: data.customCss || undefined,
         pexelsImages: data.pexelsImages,
@@ -347,7 +439,7 @@ export default function LPAIAgent({
     } finally {
       setLoading(false);
     }
-  }, [input, loading, mode, existingSections, template?.sections, imageQuery]);
+  }, [input, loading, mode, existingSections, template?.sections, imageQuery, uploadedImages]);
 
   // ── Accept Sections ──────────────────────────────────────────────────────
   function handleAccept(sections: LPSection[], customCss: string | undefined, msgIdx: number) {
@@ -429,7 +521,42 @@ export default function LPAIAgent({
             </div>
 
             {/* Input Area */}
-            <div className="border-t border-gray-800 p-4">
+            <div
+              className="border-t border-gray-800 p-4"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+            >
+              {/* Uploaded images preview strip */}
+              {uploadedImages.length > 0 && (
+                <div className="mb-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Paperclip className="h-3 w-3 text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400 font-medium">
+                      {uploadedImages.length} image{uploadedImages.length > 1 ? "s" : ""} attached — AI will use only these
+                    </span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {uploadedImages.map((img, idx) => (
+                      <div key={idx} className="shrink-0 relative group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img.previewUrl}
+                          alt={img.name}
+                          className="h-16 w-24 object-cover rounded-lg border border-emerald-500/30"
+                        />
+                        <button
+                          onClick={() => removeUploadedImage(idx)}
+                          className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        <p className="text-[9px] text-gray-500 mt-0.5 truncate w-24">{img.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Image search toggle */}
               {showImageSearch && (
                 <div className="flex items-center gap-2 mb-3">
@@ -437,7 +564,7 @@ export default function LPAIAgent({
                   <Input
                     value={imageQuery}
                     onChange={(e) => setImageQuery(e.target.value)}
-                    placeholder="Custom image search (e.g., 'forex trading charts')"
+                    placeholder="Custom Pexels image search (e.g., 'forex trading charts')"
                     className="bg-gray-800 border-gray-700 text-sm h-8"
                   />
                   <Button
@@ -467,9 +594,11 @@ export default function LPAIAgent({
                       }
                     }}
                     placeholder={
-                      isEnhanceMode
-                        ? "Tell me how to improve this page..."
-                        : "Describe the landing page you want..."
+                      uploadedImages.length > 0
+                        ? `${uploadedImages.length} image${uploadedImages.length > 1 ? "s" : ""} attached. Describe how to use them...`
+                        : isEnhanceMode
+                          ? "Tell me how to improve this page..."
+                          : "Describe the landing page you want..."
                     }
                     className="bg-gray-800 border-gray-700 text-sm min-h-[60px] max-h-[120px] resize-none pr-12"
                     rows={2}
@@ -492,14 +621,50 @@ export default function LPAIAgent({
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className={`h-8 ${uploadedImages.length > 0 ? "text-emerald-400" : "text-gray-500"}`}
+                    title="Upload images for the AI to use"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowImageSearch(!showImageSearch)}
                     className={`h-8 ${showImageSearch ? "text-cyan-400" : "text-gray-500"}`}
-                    title="Custom image search"
+                    title="Pexels image search"
                   >
                     <ImageIconLucide className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
+
+              {/* Hidden file input for image uploads */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleImageUpload(e.target.files);
+                  }
+                  e.target.value = "";
+                }}
+              />
+
+              {/* Drop zone hint */}
+              {uploadedImages.length === 0 && (
+                <p className="text-[10px] text-gray-600 mt-2 text-center">
+                  💡 Upload or drag & drop images here — the AI will use only your images instead of Pexels
+                </p>
+              )}
             </div>
           </Card>
         </div>
@@ -559,11 +724,12 @@ export default function LPAIAgent({
             <CardContent className="p-4">
               <p className="text-xs font-medium text-gray-400 mb-2">💡 Tips</p>
               <ul className="space-y-1.5 text-[11px] text-gray-500">
+                <li>• <span className="text-emerald-400">📎 Upload images</span> — AI uses only yours instead of Pexels</li>
+                <li>• <span className="text-gray-400">Drag & drop</span> images directly into the chat</li>
                 <li>• Be specific about your target audience</li>
                 <li>• Mention prize amounts and competition details</li>
                 <li>• Describe the tone (professional, exciting, luxury)</li>
-                <li>• Use the image search for custom stock photos</li>
-                <li>• You can iterate — ask for refinements after each generation</li>
+                <li>• You can iterate — ask for refinements</li>
                 <li>• Press Enter to send, Shift+Enter for new line</li>
               </ul>
             </CardContent>
@@ -606,6 +772,29 @@ function MessageBubble({
     return (
       <div className="flex justify-end">
         <div className="bg-violet-600/20 border border-violet-500/20 rounded-xl px-4 py-3 max-w-[85%]">
+          {/* Attached images */}
+          {message.userImages && message.userImages.length > 0 && (
+            <div className="mb-2">
+              <div className="flex items-center gap-1 mb-1.5">
+                <Paperclip className="h-3 w-3 text-emerald-400" />
+                <span className="text-[10px] text-emerald-400">
+                  {message.userImages.length} image{message.userImages.length > 1 ? "s" : ""} attached
+                </span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {message.userImages.map((img, idx) => (
+                  <div key={idx} className="shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.previewUrl || img.url}
+                      alt={img.name}
+                      className="h-14 w-20 object-cover rounded-md border border-emerald-500/20"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="text-sm text-gray-200 whitespace-pre-wrap">{message.content}</p>
         </div>
       </div>

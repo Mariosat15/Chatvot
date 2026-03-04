@@ -203,6 +203,41 @@ IMAGE PLACEMENT RULES (CRITICAL — FOLLOW EXACTLY):
 ═══════════════════════════════════════════════════════`;
 }
 
+// ─── User-Uploaded Image Catalogue ───────────────────────────────────────────
+// Reason: When users upload their own images, we build a catalogue in the same
+// format the AI expects, so it can place them across sections just like Pexels images.
+
+function buildUserImageCatalogue(imageUrls: string[]): string {
+  if (imageUrls.length === 0) return "\n(No images available — skip backgroundImage fields.)\n";
+
+  const lines = imageUrls.map(
+    (url, i) =>
+      `  [IMG${i + 1}] ${url} — "User-uploaded image ${i + 1}" (custom)`,
+  );
+
+  return `
+═══════════════════════════════════════════════════════
+USER-UPLOADED IMAGE CATALOGUE — Use ONLY these URLs
+═══════════════════════════════════════════════════════
+The user has uploaded their own images. You MUST use ONLY these images and
+MUST NOT use any other image URLs. Distribute them across sections:
+
+${lines.join("\n")}
+
+IMAGE PLACEMENT RULES (CRITICAL — FOLLOW EXACTLY):
+• You MUST use ALL of the user's uploaded images across the page
+• Hero section → "backgroundImage" = pick the most dramatic/impactful image
+• image-text sections → "image" = distribute remaining images across these sections
+• banner section → "backgroundImage" = pick a wide/atmospheric image if available
+• CTA section → "backgroundImage" = reuse the most inspiring image
+• gallery items → "image" = one image per gallery item (reuse if needed for 6 items)
+• features items → "image" = add an image to 1-2 feature cards if images remain
+• Copy the EXACT URL paths as shown above (they start with /api/assets/images/)
+• If you have fewer images than sections that need them, you may reuse images
+  but PRIORITIZE hero and image-text sections
+═══════════════════════════════════════════════════════`;
+}
+
 // ─── Platform Knowledge (Actual ChartVolt Benefits) ─────────────────────────
 // Reason: Without this, the AI makes up generic trading content instead of using
 // real platform features and benefits from the ChartVolt documentation.
@@ -816,11 +851,12 @@ NO markdown. NO explanation. NO commentary. ONLY the JSON.`;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { mode, instructions, sections, imageQuery } = body as {
+    const { mode, instructions, sections, imageQuery, userImages } = body as {
       mode: "enhance" | "generate";
       instructions: string;
       sections?: LPSection[];
       imageQuery?: string;
+      userImages?: string[]; // User-uploaded image URLs — when provided, skip Pexels
     };
 
     if (!mode || !["enhance", "generate"].includes(mode)) {
@@ -870,9 +906,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Fetch Pexels images with THEME-AWARE queries ──────────────────
+    // ── Determine image source: user uploads OR Pexels ─────────────────
+    // Reason: When user uploads their own images, use ONLY those.
+    // This gives users full control over the visual identity of the page.
+    const hasUserImages = Array.isArray(userImages) && userImages.length > 0;
     let pexelsPhotos: PexelsPhoto[] = [];
-    if (config.pexelsKey) {
+    let imageCatalogue: string;
+
+    if (hasUserImages) {
+      // ── User-provided images — skip Pexels entirely ───────────────
+      console.log(`📎 User provided ${userImages.length} images — skipping Pexels`);
+      imageCatalogue = buildUserImageCatalogue(userImages);
+    } else if (config.pexelsKey) {
+      // ── Fetch Pexels images with THEME-AWARE queries ──────────────
       // Reason: Extract theme keywords from user instructions for highly relevant images
       const themeQueries = extractThemeKeywords(instructions);
       const searchQueries: string[] = [];
@@ -898,22 +944,27 @@ export async function POST(request: NextRequest) {
       console.log(
         `📸 Fetched ${pexelsPhotos.length} Pexels images from ${uniqueQueries.length} queries: [${uniqueQueries.join(", ")}]`,
       );
+      imageCatalogue = buildImageCatalogue(pexelsPhotos);
     } else {
-      console.warn("⚠️ No Pexels API key — AI will generate without images");
+      console.warn("⚠️ No Pexels API key and no user images — AI will generate without images");
+      imageCatalogue = buildImageCatalogue([]);
     }
 
     // ── Build prompt ──────────────────────────────────────────────────
-    const imageCatalogue = buildImageCatalogue(pexelsPhotos);
     const systemPrompt =
       mode === "enhance"
         ? getEnhanceSystemPrompt(imageCatalogue)
         : getGenerateSystemPrompt(imageCatalogue);
 
+    const imageInstruction = hasUserImages
+      ? `\n\nIMPORTANT: The user uploaded ${userImages.length} custom image${userImages.length > 1 ? "s" : ""}. You MUST use ONLY the user's uploaded images (see the IMAGE CATALOGUE). Do NOT use any other image URLs. Distribute them across hero, image-text, banner, CTA, and gallery sections.`
+      : `\n\nUse 4-6 different Pexels images from the catalogue across sections.`;
+
     let userPrompt: string;
     if (mode === "enhance") {
-      userPrompt = `EXISTING LANDING PAGE SECTIONS TO ENHANCE:\n\n${JSON.stringify(sections, null, 2)}\n\nMY INSTRUCTIONS:\n${instructions}\n\nRemember: Transform the VISUAL DESIGN, not just text. Add "style" objects with different accentColors, bgGradients, layouts. Use multiple Pexels images across different sections. Make it look like a $50,000 custom-designed page.`;
+      userPrompt = `EXISTING LANDING PAGE SECTIONS TO ENHANCE:\n\n${JSON.stringify(sections, null, 2)}\n\nMY INSTRUCTIONS:\n${instructions}${imageInstruction}\n\nRemember: Transform the VISUAL DESIGN, not just text. Add "style" objects with different accentColors, bgGradients, layouts. Make it look like a $50,000 custom-designed page.`;
     } else {
-      userPrompt = `CREATE A UNIQUE LANDING PAGE WITH THESE REQUIREMENTS:\n\n${instructions}\n\nRemember:\n- Use 8-10 sections with varied types (hero, image-text, features, stats, banner, testimonials, faq, cta)\n- Every section needs a "style" object with DIFFERENT accentColors and bgGradients\n- Use 4-6 different Pexels images from the catalogue across sections\n- Write world-class copy with specific numbers and social proof\n- Make it visually stunning — this should look like it was designed by a top agency`;
+      userPrompt = `CREATE A UNIQUE LANDING PAGE WITH THESE REQUIREMENTS:\n\n${instructions}${imageInstruction}\n\nRemember:\n- Use 8-10 sections with varied types (hero, image-text, features, stats, banner, testimonials, faq, cta)\n- Every section needs a "style" object with DIFFERENT accentColors and bgGradients\n- Write world-class copy with specific numbers and social proof\n- Make it visually stunning — this should look like it was designed by a top agency`;
     }
 
     // ── Call OpenAI ───────────────────────────────────────────────────
@@ -1089,12 +1140,15 @@ export async function POST(request: NextRequest) {
       success: true,
       sections: resultSections,
       customCss: aiCustomCss || "",
-      pexelsImages: pexelsPhotos.map((p) => ({
-        id: p.id,
-        url: p.src.large,
-        photographer: p.photographer,
-        alt: p.alt,
-      })),
+      pexelsImages: hasUserImages
+        ? [] // No Pexels images when user uploaded their own
+        : pexelsPhotos.map((p) => ({
+            id: p.id,
+            url: p.src.large,
+            photographer: p.photographer,
+            alt: p.alt,
+          })),
+      userImagesUsed: hasUserImages ? userImages.length : 0,
       usage: {
         model: config.openaiModel,
         promptTokens: completion.usage?.prompt_tokens || 0,
