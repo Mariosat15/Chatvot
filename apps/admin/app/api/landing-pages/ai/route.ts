@@ -1,9 +1,13 @@
 /**
- * AI Landing Page Generator API
+ * AI Landing Page Generator API — v2 (Design-Aware)
  *
  * Two modes:
- * 1. "enhance" — Improve an existing template's sections with professional copy + Pexels images
- * 2. "generate" — Create a brand-new landing page from scratch based on user instructions
+ * 1. "enhance" — Improve an existing template with professional copy, theming, and images
+ * 2. "generate" — Create a brand-new, visually unique landing page from scratch
+ *
+ * Key improvement over v1: The AI now controls per-section styling via
+ * content.style = { accentColor, bgGradient, bgImage, layout }
+ * which the renderer uses for visual diversity.
  *
  * Uses OpenAI (configurable model) + Pexels API for images.
  */
@@ -39,7 +43,7 @@ interface LPSection {
   content: Record<string, unknown>;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Config ──────────────────────────────────────────────────────────────────
 
 async function getAIConfig(): Promise<AIConfig> {
   try {
@@ -80,6 +84,8 @@ async function getAIConfig(): Promise<AIConfig> {
   };
 }
 
+// ─── Pexels Helpers ──────────────────────────────────────────────────────────
+
 async function searchPexels(
   apiKey: string,
   query: string,
@@ -102,14 +108,10 @@ async function searchPexels(
   }
 }
 
-/**
- * Fetches images from multiple Pexels queries to give the AI rich visual variety.
- * Deduplicates by photo ID.
- */
-async function fetchMultiplePexelsQueries(
+async function fetchDiversePexelsImages(
   apiKey: string,
   queries: string[],
-  perQuery = 5,
+  perQuery = 6,
 ): Promise<PexelsPhoto[]> {
   const results = await Promise.all(
     queries.map((q) => searchPexels(apiKey, q, perQuery)),
@@ -127,182 +129,336 @@ async function fetchMultiplePexelsQueries(
   return deduped;
 }
 
-// ─── Image List Formatter ────────────────────────────────────────────────────
+// ─── Image Catalogue for AI ─────────────────────────────────────────────────
 
-function formatImageList(photos: PexelsPhoto[]): string {
-  if (photos.length === 0) return "";
-  // Reason: Categorize images to help the AI pick the right one per section.
+function buildImageCatalogue(photos: PexelsPhoto[]): string {
+  if (photos.length === 0) return "\n(No Pexels images available — skip backgroundImage fields.)\n";
+
   const lines = photos.map(
     (p, i) =>
-      `  IMG_${i + 1}: "${p.src.large}" — ${p.alt || "professional stock photo"} (${p.width}×${p.height}, by ${p.photographer})`,
+      `  [IMG${i + 1}] ${p.src.large} — "${p.alt || "professional photo"}" (${p.width}×${p.height}, by ${p.photographer})`,
   );
 
   return `
-
-AVAILABLE PEXELS IMAGES — You MUST use these real image URLs in your sections:
+═══════════════════════════════════════════════════════
+PEXELS IMAGE CATALOGUE — Use these URLs in your output
+═══════════════════════════════════════════════════════
 ${lines.join("\n")}
 
-IMAGE PLACEMENT RULES:
-- Hero section: Set "backgroundImage" to one of the above URLs (pick the most dramatic/relevant one).
-- Features section: You may add an "image" field to any feature item for visual richness.
-- CTA section: You may add a "backgroundImage" field for a compelling visual.
-- Stats section: You may add a "backgroundImage" for visual impact.
-- Pick different images for different sections — do NOT reuse the same image.
-- Always use the FULL URL exactly as shown (starting with https://images.pexels.com/).`;
+IMAGE USAGE RULES:
+• You MUST use at least 4-6 different images across the page
+• Hero section → "backgroundImage" = pick the most dramatic/cinematic image
+• image-text sections → "image" = pick contextually relevant image
+• banner section → "backgroundImage" = pick a wide, atmospheric image
+• CTA section → "backgroundImage" = pick an inspiring/motivational image
+• gallery items → "image" = one per item
+• features items → "image" = optionally add to 1-2 feature cards
+• NEVER reuse the same image URL twice on the same page
+• ALWAYS copy the full URL exactly as shown (starting with https://images.pexels.com/)
+═══════════════════════════════════════════════════════`;
 }
 
-// ─── System Prompts ──────────────────────────────────────────────────────────
+// ─── Design System Documentation ────────────────────────────────────────────
+
+const DESIGN_SYSTEM = `
+═══════════════════════════════════════════════════════
+DESIGN SYSTEM — Per-Section Visual Theming
+═══════════════════════════════════════════════════════
+
+Every section's "content" object can include a "style" sub-object that controls its visual appearance.
+By using DIFFERENT style values across sections, you create a visually diverse, professional page.
+
+"style" object properties:
+{
+  "accentColor": "blue" | "emerald" | "rose" | "violet" | "cyan" | "orange" | "teal" | "pink" | "indigo" | "yellow",
+  "bgGradient": "from-slate-950 via-indigo-950 to-purple-950",
+  "bgImage": "PEXELS_URL_HERE",
+  "layout": "default" | "alternating" | "horizontal" | "reversed" | "cards" | "grid"
+}
+
+ACCENT COLORS — Pick a PRIMARY accent for the page, then vary per section:
+• "blue" — Professional, trustworthy (finance, corporate)
+• "emerald" — Growth, success, money (trading, profits)
+• "violet" — Premium, exclusive (luxury, high-end)
+• "cyan" — Tech, innovation, speed (fintech, cutting-edge)
+• "rose" — Bold, exciting, competitive (competitions, gaming)
+• "orange" — Energy, urgency, warmth (action, engagement)
+• "teal" — Calm, sophisticated (analytics, data)
+• "indigo" — Deep, authoritative (expertise, trust)
+• "pink" — Creative, modern (trendy, social)
+• "yellow" — Classic gold, traditional (wealth, prizes)
+
+BACKGROUND GRADIENTS — Use Tailwind gradient syntax. Examples:
+• "from-slate-950 via-indigo-950 to-blue-950" (deep blue corporate)
+• "from-gray-950 via-emerald-950 to-teal-950" (dark green luxury)
+• "from-purple-950 via-violet-950 to-indigo-950" (rich purple)
+• "from-gray-950 via-rose-950 to-pink-950" (bold pink)
+• "from-slate-950 via-cyan-950 to-sky-950" (tech cyan)
+• "from-zinc-950 via-stone-900 to-gray-950" (neutral elegant)
+
+LAYOUT VARIANTS by section type:
+• features → "grid" (default cards) or "alternating" (image + text rows, best with images)
+• how-it-works → "default" (vertical list) or "horizontal" (step cards in a row)
+• testimonials → "grid" (3-col cards) or "cards" (2-col larger quote cards)
+• image-text → "default" (image left, text right) or "reversed" (image right, text left)
+
+DESIGN RULES:
+1. NEVER use the same accentColor for all sections — vary it (e.g., hero=cyan, features=emerald, cta=violet)
+2. NEVER use the same bgGradient for consecutive sections — alternate between light/dark
+3. Use bgImage on at least 2-3 sections (hero, banner, CTA, image-text)
+4. Alternate section backgrounds: dark gradient → image → neutral → colored → image → dark
+5. Make the page feel like it was designed by a professional agency — not a template
+
+═══════════════════════════════════════════════════════`;
+
+// ─── Section Types Documentation ─────────────────────────────────────────────
 
 const SECTION_TYPES_DOC = `
-Each section object MUST have this exact structure:
+═══════════════════════════════════════════════════════
+SECTION TYPES — Complete Reference
+═══════════════════════════════════════════════════════
+
+Every section MUST have this structure:
 {
   "id": "sec-{type}-{random4chars}",
   "type": "<section_type>",
-  "order": <number>,
-  "enabled": true,
-  "content": { <content_fields> }
-}
-
-CRITICAL: All content fields MUST be nested inside the "content" property. Never put content fields at the section root level.
-
-Available section types and their "content" fields:
-
-1. type "hero" → content: {
-     "headline": "Power words, benefit-driven, max 8 words",
-     "subheadline": "2-3 sentences expanding the value proposition with specific details",
-     "ctaText": "Action verb + benefit (e.g., Start Winning Today)",
-     "ctaLink": "/register",
-     "backgroundImage": "USE A PEXELS IMAGE URL HERE",
-     "backgroundGradient": "from-indigo-900 via-purple-900 to-slate-900",
-     "badge": "🏆 Social proof badge text"
-   }
-
-2. type "features" → content: {
-     "headline": "Section headline",
-     "items": [
-       { "icon": "Zap", "title": "Feature name", "description": "2-3 sentences of compelling benefit-driven copy" }
-     ]
-   }
-   Valid icon values: Zap, Shield, Trophy, BarChart3, TrendingUp, Users, Globe, Rocket, Star, Heart, Target, Award, Clock, DollarSign, Lock, Sparkles, Crown, Flame, Gift, Medal
-
-3. type "stats" → content: {
-     "title": "Section headline",
-     "items": [
-       { "value": "$2.5M+", "label": "Total Prizes Awarded", "icon": "DollarSign" }
-     ]
-   }
-   Use 3-4 impressive but believable stats with specific numbers.
-
-4. type "how-it-works" → content: {
-     "headline": "Section headline",
-     "steps": [
-       { "step": "1", "title": "Step name", "description": "Clear, specific instructions", "icon": "UserPlus" }
-     ]
-   }
-   Use exactly 3-4 steps. Keep them simple and actionable.
-
-5. type "testimonials" → content: {
-     "headline": "Section headline",
-     "items": [
-       { "name": "Full Name", "role": "Professional Trader, London", "quote": "Specific, authentic-sounding testimonial with concrete details about their experience", "rating": 5 }
-     ]
-   }
-   Create 3-4 diverse testimonials with different backgrounds, locations, and experiences.
-
-6. type "cta" → content: {
-     "headline": "Urgency-driven headline",
-     "subheadline": "Reinforce the value proposition one final time",
-     "ctaText": "Strong action CTA",
-     "ctaLink": "/register",
-     "backgroundImage": "USE A DIFFERENT PEXELS IMAGE URL HERE",
-     "secondaryCtaText": "Learn More",
-     "secondaryCtaLink": "/about"
-   }
-
-7. type "faq" → content: {
-     "title": "Section headline",
-     "items": [
-       { "question": "Common question?", "answer": "Thorough but concise answer (2-3 sentences)" }
-     ]
-   }
-   Include 4-6 FAQs covering: how it works, safety, prizes, eligibility, getting started.
-
-8. type "custom-html" → content: { "html": "<div>...</div>" }
-
-FULL CORRECT EXAMPLE:
-{
-  "id": "sec-hero-x7k2",
-  "type": "hero",
-  "order": 0,
+  "order": <sequential_number>,
   "enabled": true,
   "content": {
-    "headline": "Trade. Compete. Win Real Prizes.",
-    "subheadline": "Join 10,000+ traders competing with virtual funds for real cash prizes up to $50,000. Zero risk, maximum thrill.",
-    "ctaText": "Start Trading Now — It's Free",
-    "ctaLink": "/register",
-    "backgroundImage": "https://images.pexels.com/photos/example/pexels-photo.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
-    "backgroundGradient": "from-slate-950 via-indigo-950 to-purple-950",
-    "badge": "🏆 Over $2.5M in Prizes Awarded"
+    "style": { "accentColor": "...", "bgGradient": "...", "bgImage": "...", "layout": "..." },
+    ...content_fields
   }
 }
-`;
 
-function getEnhanceSystemPrompt(imageList: string): string {
-  return `You are a world-class landing page copywriter and conversion rate optimization expert. Your job is to DRAMATICALLY ENHANCE an existing landing page template to make it professional, compelling, and high-converting.
+CRITICAL: ALL content fields MUST be nested inside "content". NEVER put them at section root.
 
-${SECTION_TYPES_DOC}
-${imageList}
-
-ENHANCEMENT RULES:
-1. Keep the same section types and order, but COMPLETELY rewrite all copy to be professional-grade.
-2. Headlines: Use power words, emotional triggers, and specific numbers. Max 6-10 words.
-3. Subheadlines: Expand on the benefit with specifics — mention prize amounts, user counts, success rates.
-4. CTA buttons: Action verb + clear benefit + urgency (e.g., "Claim Your Free Spot Now", "Start Winning Today").
-5. Testimonials: Make them sound REAL with specific details — mention trading pairs, profit amounts, competition names.
-6. Stats: Use impressive specific numbers (not round numbers — "$2.47M" feels more real than "$2.5M").
-7. FAQ answers: Be thorough, professional, and reassuring.
-8. Badge text: Social proof with specific numbers (e.g., "🏆 Trusted by 12,847 Traders Worldwide").
-9. Gradient backgrounds: Use rich, professional gradients (from-slate-950 via-indigo-950 to-purple-950).
-10. ALWAYS use Pexels image URLs for backgroundImage in hero and CTA sections.
-11. Each section MUST have a unique "id" (format: "sec-{type}-{random4chars}").
-12. ALL content fields MUST be inside the "content" object.
-13. Return a JSON object: { "sections": [...] }
-14. NO markdown, NO explanation — ONLY the JSON object.`;
+───────────────────────────────────────────────────────
+1. type "hero" → Full-screen hero banner
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "cyan" },
+  "headline": "Max 8 power words. Benefit-driven. Emotional.",
+  "subheadline": "2-3 sentences expanding value with specific numbers and details.",
+  "ctaText": "Action Verb + Benefit (e.g. Start Winning Today)",
+  "ctaLink": "/register",
+  "backgroundImage": "PEXELS_URL",
+  "backgroundGradient": "from-slate-950 via-indigo-950 to-purple-950",
+  "badge": "🏆 Social proof with specific number",
+  "secondaryCtaText": "Learn More",
+  "secondaryCtaLink": "/about"
 }
 
-function getGenerateSystemPrompt(imageList: string): string {
-  return `You are a world-class landing page designer, copywriter, and conversion rate optimization expert. Create a STUNNING, high-converting landing page from scratch.
+───────────────────────────────────────────────────────
+2. type "features" → Feature grid or alternating rows
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "emerald", "layout": "grid" | "alternating" },
+  "headline": "Section headline",
+  "subtitle": "Optional subtitle paragraph",
+  "items": [
+    { "icon": "Zap", "title": "Feature name", "description": "2-3 compelling sentences", "image": "OPTIONAL_PEXELS_URL" }
+  ]
+}
+Icons: Zap, Shield, Trophy, BarChart3, TrendingUp, Users, Globe, Rocket, Star, Heart, Target, Award, Clock, DollarSign, Lock, Sparkles, Crown, Flame, Gift, Medal, Brain, Lightbulb, Gauge, Gem, Eye
 
-The platform is a trading competition platform where users trade with virtual funds and compete for real prizes.
+───────────────────────────────────────────────────────
+3. type "stats" → Impressive numbers grid
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "violet", "bgGradient": "from-slate-950 via-violet-950 to-indigo-950" },
+  "title": "Section headline",
+  "subtitle": "Optional subtitle",
+  "items": [
+    { "value": "$2.47M+", "label": "Total Prizes Awarded", "icon": "DollarSign" }
+  ]
+}
+Use 3-4 stats with SPECIFIC non-round numbers for credibility.
+
+───────────────────────────────────────────────────────
+4. type "how-it-works" → Step-by-step process
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "blue", "layout": "default" | "horizontal" },
+  "headline": "Section headline",
+  "subtitle": "Optional subtitle",
+  "steps": [
+    { "step": "1", "title": "Step name", "description": "Clear instructions", "icon": "UserPlus" }
+  ]
+}
+Use exactly 3-4 steps.
+
+───────────────────────────────────────────────────────
+5. type "testimonials" → Social proof quotes
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "rose", "layout": "grid" | "cards" },
+  "headline": "Section headline",
+  "subtitle": "Optional subtitle",
+  "items": [
+    { "name": "Full Name", "role": "Professional Trader, London", "quote": "Specific, authentic testimonial with concrete details", "rating": 5 }
+  ]
+}
+3-4 diverse testimonials. Different names, locations, trading styles.
+
+───────────────────────────────────────────────────────
+6. type "cta" → Final call-to-action
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "orange" },
+  "headline": "Urgency-driven headline",
+  "subheadline": "Reinforce the value one final time",
+  "ctaText": "Strong action CTA",
+  "ctaLink": "/register",
+  "backgroundImage": "PEXELS_URL",
+  "secondaryCtaText": "Learn More",
+  "secondaryCtaLink": "/about"
+}
+
+───────────────────────────────────────────────────────
+7. type "faq" → Expandable FAQ
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "teal" },
+  "title": "Section headline",
+  "subtitle": "Optional subtitle",
+  "items": [
+    { "question": "Common question?", "answer": "Thorough 2-3 sentence answer" }
+  ]
+}
+5-6 FAQs covering: how it works, safety, prizes, eligibility, getting started, cost.
+
+───────────────────────────────────────────────────────
+8. type "image-text" → Split layout (image + text side by side)
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "emerald", "layout": "default" | "reversed" },
+  "headline": "Section headline",
+  "subtitle": "Optional eyebrow text above headline",
+  "description": "1-2 paragraphs of compelling copy",
+  "image": "PEXELS_URL",
+  "bullets": ["Benefit point one", "Benefit point two", "Benefit point three"],
+  "ctaText": "Optional CTA button text",
+  "ctaLink": "/register"
+}
+
+───────────────────────────────────────────────────────
+9. type "banner" → Full-width image banner with text overlay
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "violet" },
+  "headline": "Bold statement headline",
+  "subtitle": "Supporting text",
+  "backgroundImage": "PEXELS_URL",
+  "ctaText": "Optional CTA",
+  "ctaLink": "/register"
+}
+
+───────────────────────────────────────────────────────
+10. type "gallery" → Image showcase grid
+───────────────────────────────────────────────────────
+content: {
+  "style": { "accentColor": "cyan" },
+  "headline": "Section headline",
+  "subtitle": "Optional subtitle",
+  "items": [
+    { "image": "PEXELS_URL", "title": "Caption", "description": "Optional description" }
+  ]
+}
+Use 3-6 items.
+
+───────────────────────────────────────────────────────
+11. type "custom-html" → Raw HTML (use sparingly)
+───────────────────────────────────────────────────────
+content: { "html": "<div>...</div>" }
+
+═══════════════════════════════════════════════════════`;
+
+// ─── System Prompts ──────────────────────────────────────────────────────────
+
+function getEnhanceSystemPrompt(imageCatalogue: string): string {
+  return `You are a world-class landing page designer and conversion rate optimizer with 15 years of experience at top agencies like Pentagram, IDEO, and Huge. Your specialty is transforming basic templates into stunning, high-converting pages.
+
+${DESIGN_SYSTEM}
 
 ${SECTION_TYPES_DOC}
-${imageList}
 
-GENERATION RULES:
-1. Create exactly 7 sections in this order: hero, features, stats, how-it-works, testimonials, faq, cta.
-2. Hero section MUST have a backgroundImage from Pexels AND a gradient overlay.
-3. Write EXCEPTIONAL copy — this should read like it was written by a top marketing agency:
-   - Headlines: Punchy, benefit-driven, emotionally compelling, 6-10 words max.
-   - Subheadlines: Expand on value with SPECIFIC numbers and details.
-   - CTA text: Action verb + benefit + urgency ("Start Winning Today — It's Free").
-   - Badge: Social proof ("🏆 Trusted by 12,847 Traders" or "⚡ $2.47M in Prizes Awarded").
-4. Features: Create 4-6 features with DIFFERENT Lucide icons. Each description should be 2-3 compelling sentences.
-5. Stats: 4 impressive stats with SPECIFIC numbers (not round numbers — specificity = credibility).
-6. How it works: Exactly 3-4 clear steps that make signing up feel easy and exciting.
-7. Testimonials: 3-4 DIVERSE, authentic-sounding testimonials:
-   - Different names, roles, and locations
-   - Mention specific details (trading pairs, amounts won, time on platform)
-   - Ratings of 4-5 stars
-8. FAQ: 5-6 questions covering common objections (cost, safety, how prizes work, eligibility).
-9. CTA: Strong closing section with urgency, a backgroundImage, and both primary + secondary CTA.
-10. Use Pexels images: hero backgroundImage and CTA backgroundImage should use DIFFERENT Pexels URLs.
-11. Use rich gradient backgrounds: from-slate-950, via-indigo-950, to-purple-950 (or similar dark professional gradients).
-12. Each section MUST have a unique "id" (format: "sec-{type}-{random4chars}").
-13. ALL content fields MUST be inside "content".
-14. Set "order" sequentially from 0.
-15. Set "enabled" to true for all sections.
-16. Return a JSON object: { "sections": [...] }
-17. NO markdown, NO explanation — ONLY the JSON object.`;
+${imageCatalogue}
+
+YOUR ENHANCEMENT MISSION:
+You will receive an existing landing page template. Your job is to DRAMATICALLY transform it — not just edit text, but redesign the entire visual experience.
+
+ENHANCEMENT STRATEGY:
+1. KEEP the same section types but COMPLETELY reimagine the visual design
+2. Assign DIFFERENT accentColors to different sections (e.g., hero=cyan, features=emerald, stats=violet, cta=orange)
+3. Add "style" objects to EVERY section with varied bgGradient, accentColor, and layout values
+4. ADD 1-2 new sections if they would improve the page (image-text, banner, gallery)
+5. REWRITE ALL COPY to be world-class:
+   - Headlines: Power words, emotional triggers, specific numbers. Max 8 words.
+   - Subheadlines: Expand with specifics — prize amounts, user counts, success rates
+   - CTAs: Action verb + clear benefit + urgency
+   - Testimonials: Real-sounding with specific details (trading pairs, amounts, timeframes)
+   - Stats: Specific non-round numbers ("$2.47M" not "$2.5M", "12,847" not "13,000")
+6. Use DIFFERENT Pexels images across multiple sections — hero, image-text, banner, CTA
+7. Use DIFFERENT background gradients for consecutive sections — alternate light/dark
+8. Use DIFFERENT layout variants where available (features: "alternating", testimonials: "cards", how-it-works: "horizontal")
+
+CRITICAL: Return ONLY a JSON object: { "sections": [...] }
+NO markdown. NO explanation. NO commentary. ONLY the JSON object.`;
+}
+
+function getGenerateSystemPrompt(imageCatalogue: string): string {
+  return `You are a world-class landing page designer, copywriter, and conversion expert. You design pages that look like they belong to billion-dollar companies. Every page you create is unique, visually stunning, and converts visitors into users.
+
+The platform is a TRADING COMPETITION platform where users trade with virtual funds and compete for real cash prizes.
+
+${DESIGN_SYSTEM}
+
+${SECTION_TYPES_DOC}
+
+${imageCatalogue}
+
+YOUR GENERATION MISSION:
+Create a COMPLETELY UNIQUE, visually stunning landing page. Every page you create must feel different from the last — different colors, different layouts, different section combinations.
+
+MANDATORY REQUIREMENTS:
+1. Create 8-10 sections using a MIX of types — NOT just the basic 7. Include at least:
+   - 1 hero section
+   - 1-2 image-text sections (with real Pexels images)
+   - 1 features section (with varied layout)
+   - 1 stats section
+   - 1 banner OR gallery section (with Pexels images)
+   - 1 testimonials section
+   - 1 faq section
+   - 1 cta section
+
+2. VISUAL DIVERSITY — every section must have a "style" object:
+   - Use 3-4 DIFFERENT accentColors across the page
+   - Alternate bgGradient between sections
+   - Use bgImage (Pexels URLs) on at least 3 sections
+   - Vary layouts: features→"alternating", how-it-works→"horizontal", testimonials→"cards"
+
+3. WORLD-CLASS COPYWRITING:
+   - Hero headline: 5-8 words. Punchy. Emotional. Benefit-driven.
+     Examples: "Trade Boldly. Win Big." / "Where Skill Meets Reward" / "Your Edge in Every Market"
+   - Subheadlines: Expand with SPECIFIC numbers and social proof
+   - CTAs: "Start Winning Today — It's Free" / "Claim Your Spot Now" / "Join 12,847 Traders"
+   - Badge: Always include social proof with specific numbers
+   - Each section headline should be unique and compelling
+
+4. AUTHENTIC TESTIMONIALS with specific details:
+   - Different nationalities, trading styles, experience levels
+   - Mention specific pairs (EUR/USD, BTC, Gold), amounts won, competition types
+   - Mix of 4★ and 5★ ratings for authenticity
+
+5. IMAGE USAGE — distribute Pexels images across:
+   - Hero background, image-text sections, banner, CTA background, gallery items
+   - Each image used ONCE — no repeats
+
+6. Section order should FLOW like a story:
+   hero → (image-text OR features) → stats → (banner OR image-text) → how-it-works → testimonials → faq → cta
+
+CRITICAL: Return ONLY a JSON object: { "sections": [...] }
+NO markdown. NO explanation. NO commentary. ONLY the JSON.`;
 }
 
 // ─── Route Handler ───────────────────────────────────────────────────────────
@@ -364,45 +520,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Fetch Pexels images with MULTIPLE queries for variety ─────────
+    // ── Fetch Pexels images with DIVERSE queries ──────────────────────
     let pexelsPhotos: PexelsPhoto[] = [];
     if (config.pexelsKey) {
-      // Reason: Multiple queries give the AI diverse images for different sections.
+      // Reason: 5+ queries with 6 images each gives ~25-30 diverse images for the AI to pick from
       const searchQueries = [
-        imageQuery || "trading finance charts",
-        "business success celebration",
-        "technology dashboard futuristic",
+        "trading finance stock market charts",
+        "business professionals success celebration",
+        "technology data dashboard analytics",
+        "competition trophy award winning",
+        "city skyline night lights modern",
       ];
-      // If user provided custom instructions, extract a keyword-based query
-      if (!imageQuery && instructions.length > 10) {
-        searchQueries.push(instructions.slice(0, 60));
+      if (imageQuery) {
+        searchQueries.unshift(imageQuery);
       }
-      pexelsPhotos = await fetchMultiplePexelsQueries(
+      if (instructions.length > 15) {
+        // Extract keywords from user instructions for contextual images
+        searchQueries.push(instructions.slice(0, 80));
+      }
+
+      pexelsPhotos = await fetchDiversePexelsImages(
         config.pexelsKey,
         searchQueries,
-        5,
+        6,
       );
       console.log(
         `📸 Fetched ${pexelsPhotos.length} Pexels images from ${searchQueries.length} queries`,
       );
     } else {
-      console.warn(
-        "⚠️ No Pexels API key — AI will generate without images",
-      );
+      console.warn("⚠️ No Pexels API key — AI will generate without images");
     }
 
     // ── Build prompt ──────────────────────────────────────────────────
-    const imageList = formatImageList(pexelsPhotos);
+    const imageCatalogue = buildImageCatalogue(pexelsPhotos);
     const systemPrompt =
       mode === "enhance"
-        ? getEnhanceSystemPrompt(imageList)
-        : getGenerateSystemPrompt(imageList);
+        ? getEnhanceSystemPrompt(imageCatalogue)
+        : getGenerateSystemPrompt(imageCatalogue);
 
     let userPrompt: string;
     if (mode === "enhance") {
-      userPrompt = `Here are the current sections of my landing page:\n\n${JSON.stringify(sections, null, 2)}\n\nMy instructions for improvement:\n${instructions}`;
+      userPrompt = `EXISTING LANDING PAGE SECTIONS TO ENHANCE:\n\n${JSON.stringify(sections, null, 2)}\n\nMY INSTRUCTIONS:\n${instructions}\n\nRemember: Transform the VISUAL DESIGN, not just text. Add "style" objects with different accentColors, bgGradients, layouts. Use multiple Pexels images across different sections. Make it look like a $50,000 custom-designed page.`;
     } else {
-      userPrompt = `Create a professional, high-converting landing page with these requirements:\n\n${instructions}\n\nRemember: Use the Pexels image URLs provided in your system prompt for backgroundImage fields. Make the copy exceptional — this should look like a page from a top-tier SaaS company.`;
+      userPrompt = `CREATE A UNIQUE LANDING PAGE WITH THESE REQUIREMENTS:\n\n${instructions}\n\nRemember:\n- Use 8-10 sections with varied types (hero, image-text, features, stats, banner, testimonials, faq, cta)\n- Every section needs a "style" object with DIFFERENT accentColors and bgGradients\n- Use 4-6 different Pexels images from the catalogue across sections\n- Write world-class copy with specific numbers and social proof\n- Make it visually stunning — this should look like it was designed by a top agency`;
     }
 
     // ── Call OpenAI ───────────────────────────────────────────────────
@@ -414,21 +574,25 @@ export async function POST(request: NextRequest) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.85,
-      max_tokens: 8000,
+      temperature: 0.9,
+      max_tokens: 12000,
       response_format: { type: "json_object" },
     });
 
     const raw = completion.choices[0]?.message?.content || "{}";
 
-    console.log("🤖 AI raw response length:", raw.length, "chars");
+    console.log(
+      "🤖 AI raw response length:",
+      raw.length,
+      "chars | tokens:",
+      completion.usage?.completion_tokens,
+    );
 
     // ── Parse response ────────────────────────────────────────────────
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Reason: Sometimes the model wraps in markdown code fences
       const cleaned = raw
         .replace(/```json?\s*/g, "")
         .replace(/```\s*/g, "")
@@ -436,10 +600,7 @@ export async function POST(request: NextRequest) {
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        console.error(
-          "❌ AI response parse failed. Raw:",
-          raw.slice(0, 500),
-        );
+        console.error("❌ AI response parse failed. Raw:", raw.slice(0, 500));
         return NextResponse.json(
           { error: "AI returned invalid JSON. Please try again." },
           { status: 500 },
@@ -447,13 +608,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Normalize — the model might return { sections: [...] } or other wrappers
+    // Normalize response structure
     let rawSections: unknown[];
     if (Array.isArray(parsed)) {
       rawSections = parsed;
     } else if (parsed && typeof parsed === "object") {
       const obj = parsed as Record<string, unknown>;
-      // Reason: Try common wrapper keys the model might use
       const wrapperKeys = [
         "sections",
         "data",
@@ -462,13 +622,13 @@ export async function POST(request: NextRequest) {
         "landing_page",
         "content",
       ];
-      const arrayKey = wrapperKeys.find((k) =>
-        Array.isArray(obj[k]), // eslint-disable-line security/detect-object-injection
-      );
+      const arrayKey = wrapperKeys.find((k) => {
+        const val = new Map(Object.entries(obj)).get(k);
+        return Array.isArray(val);
+      });
       if (arrayKey) {
-        rawSections = obj[arrayKey] as unknown[]; // eslint-disable-line security/detect-object-injection
+        rawSections = new Map(Object.entries(obj)).get(arrayKey) as unknown[];
       } else {
-        // Last resort: pick the first array value
         const firstArr = Object.values(obj).find((v) => Array.isArray(v));
         if (firstArr) {
           rawSections = firstArr as unknown[];
@@ -537,13 +697,13 @@ export async function POST(request: NextRequest) {
         };
       });
 
-    // Filter out sections that ended up with truly empty content
+    // Filter out sections with empty content
     resultSections = resultSections.filter(
       (s) => Object.keys(s.content).length > 0,
     );
 
     console.log(
-      `🤖 AI parsed ${resultSections.length} sections from response`,
+      `🤖 AI produced ${resultSections.length} sections (types: ${resultSections.map((s) => s.type).join(", ")})`,
     );
 
     if (resultSections.length === 0) {
@@ -580,22 +740,15 @@ export async function POST(request: NextRequest) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("❌ AI landing page error:", errMsg);
 
-    // Reason: OpenAI-specific errors have a status property
     if (errMsg.includes("401") || errMsg.includes("Incorrect API key")) {
       return NextResponse.json(
-        {
-          error:
-            "Invalid OpenAI API key. Please check your configuration.",
-        },
+        { error: "Invalid OpenAI API key. Please check your configuration." },
         { status: 401 },
       );
     }
     if (errMsg.includes("429") || errMsg.includes("Rate limit")) {
       return NextResponse.json(
-        {
-          error:
-            "AI rate limit reached. Please wait a moment and try again.",
-        },
+        { error: "AI rate limit reached. Please wait a moment and try again." },
         { status: 429 },
       );
     }

@@ -49,21 +49,21 @@ interface Props {
 // ─── Prompt Suggestions ──────────────────────────────────────────────────────
 
 const ENHANCE_SUGGESTIONS = [
-  "Make it more professional with compelling copy and urgency",
-  "Add more social proof and impressive statistics",
-  "Make the hero section more dramatic with a strong headline",
-  "Rewrite all testimonials to sound more authentic and specific",
-  "Make it focused on forex trading competitions",
-  "Optimize all CTA buttons for maximum conversions",
+  "Transform this into a premium, visually stunning page with blue and violet accents, split-layout sections, and multiple background images",
+  "Redesign with emerald/teal color scheme, add an image-text section and banner with Pexels photos, rewrite copy to be punchy and specific",
+  "Make it look like a Fortune 500 company page — cyan accents, horizontal how-it-works, alternating feature layout, world-class copy",
+  "Overhaul with rose/pink theme, add gallery section, make testimonials use cards layout, add urgency to all CTAs",
+  "Restyle with indigo/violet gradients, add 2 image-text sections with Pexels images, rewrite all headlines to be under 8 words",
+  "Full redesign: orange energy theme, horizontal steps, alternating features with images, add a banner section between stats and testimonials",
 ];
 
 const GENERATE_SUGGESTIONS = [
-  "Create a sleek, modern landing page for a forex trading competition with €50,000 prize pool",
-  "Design a landing page for a crypto trading challenge, dark theme, neon accents",
-  "Build a beginner-friendly landing page that explains trading competitions simply",
-  "Create an exclusive VIP trading tournament page with luxury feel and gold accents",
-  "Design a page for a team-based trading competition with leaderboard focus",
-  "Build a seasonal summer trading championship page with tropical energy",
+  "Create a stunning blue/cyan themed forex competition page with image-text sections, a banner, gallery, and 4+ Pexels background images. €50,000 prize pool, premium feel.",
+  "Design a dark, luxurious violet/indigo page for a VIP trading tournament. Use alternating features layout, cards testimonials, horizontal steps. Gold-tier exclusive feel.",
+  "Build a high-energy orange/rose competition page with a dramatic hero, split image-text sections, and a full gallery of trading moments. Focus on speed and adrenaline.",
+  "Create an emerald/teal professional page for a crypto trading challenge. Include image-text sections with charts, a banner mid-page, and a stats section with impressive numbers.",
+  "Design a modern, clean page with cyan accents for a beginner-friendly trading competition. Horizontal how-it-works steps, alternating features, friendly approachable copy.",
+  "Build a seasonal championship page with bold rose/pink theme, dramatic hero with Pexels image, gallery showcasing prizes, banner mid-page, and urgency-driven CTAs.",
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────

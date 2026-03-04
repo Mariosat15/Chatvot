@@ -20,6 +20,9 @@ import {
   Layers,
   Camera,
   X,
+  Image as ImageIcon,
+  Columns,
+  GalleryHorizontal,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +50,9 @@ const SECTION_TYPES = [
   { type: "testimonials", label: "Testimonials", icon: MessageSquare },
   { type: "cta", label: "Call to Action", icon: Type },
   { type: "faq", label: "FAQ", icon: HelpCircle },
+  { type: "image-text", label: "Image + Text", icon: Columns },
+  { type: "banner", label: "Banner", icon: ImageIcon },
+  { type: "gallery", label: "Gallery", icon: GalleryHorizontal },
   { type: "custom-html", label: "Custom HTML", icon: Code },
 ] as const;
 
@@ -532,6 +538,123 @@ function SectionEditor({
               }}
               rows={6}
               className="bg-gray-800 border-gray-700 font-mono text-xs mt-1"
+            />
+          </div>
+        )}
+
+        {section.type === "image-text" && (
+          <>
+            <div>
+              <Label className="text-gray-400 text-xs">Headline</Label>
+              <Input
+                value={String(content.headline || content.title || "")}
+                onChange={(e) => updateContent("headline", e.target.value)}
+                className="bg-gray-800 border-gray-700"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-400 text-xs">Description</Label>
+              <Textarea
+                value={String(content.description || "")}
+                onChange={(e) => updateContent("description", e.target.value)}
+                rows={3}
+                className="bg-gray-800 border-gray-700"
+              />
+            </div>
+            <ImageFieldWithBrowser
+              label="Section Image"
+              value={String(content.image || "")}
+              onChange={(url) => updateContent("image", url)}
+              searchHint="business professional"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-gray-400 text-xs">CTA Text</Label>
+                <Input
+                  value={String(content.ctaText || "")}
+                  onChange={(e) => updateContent("ctaText", e.target.value)}
+                  className="bg-gray-800 border-gray-700"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-400 text-xs">CTA URL</Label>
+                <Input
+                  value={String(content.ctaUrl || "")}
+                  onChange={(e) => updateContent("ctaUrl", e.target.value)}
+                  className="bg-gray-800 border-gray-700"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {section.type === "banner" && (
+          <>
+            <div>
+              <Label className="text-gray-400 text-xs">Headline</Label>
+              <Input
+                value={String(content.headline || content.title || "")}
+                onChange={(e) => updateContent("headline", e.target.value)}
+                className="bg-gray-800 border-gray-700"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-400 text-xs">Subtitle</Label>
+              <Input
+                value={String(content.subtitle || "")}
+                onChange={(e) => updateContent("subtitle", e.target.value)}
+                className="bg-gray-800 border-gray-700"
+              />
+            </div>
+            <ImageFieldWithBrowser
+              label="Background Image"
+              value={String(content.backgroundImage || "")}
+              onChange={(url) => updateContent("backgroundImage", url)}
+              searchHint="wide panoramic business"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-gray-400 text-xs">CTA Text</Label>
+                <Input
+                  value={String(content.ctaText || "")}
+                  onChange={(e) => updateContent("ctaText", e.target.value)}
+                  className="bg-gray-800 border-gray-700"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-400 text-xs">CTA URL</Label>
+                <Input
+                  value={String(content.ctaUrl || "")}
+                  onChange={(e) => updateContent("ctaUrl", e.target.value)}
+                  className="bg-gray-800 border-gray-700"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {section.type === "gallery" && (
+          <div>
+            <Label className="text-gray-400 text-xs">Title</Label>
+            <Input
+              value={String(content.title || "")}
+              onChange={(e) => updateContent("title", e.target.value)}
+              className="bg-gray-800 border-gray-700"
+            />
+            <p className="text-[10px] text-gray-600 mt-1">
+              Edit gallery items in the JSON below. Each item needs: image, title, description.
+            </p>
+            <Textarea
+              value={JSON.stringify(content.items || [], null, 2)}
+              onChange={(e) => {
+                try {
+                  updateContent("items", JSON.parse(e.target.value));
+                } catch {
+                  // Invalid JSON
+                }
+              }}
+              rows={6}
+              className="bg-gray-800 border-gray-700 font-mono text-xs mt-2"
             />
           </div>
         )}
