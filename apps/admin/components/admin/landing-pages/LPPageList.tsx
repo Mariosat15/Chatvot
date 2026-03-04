@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Users,
   MousePointer,
+  Bot,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ interface Props {
   onViewAnalytics: (page?: LandingPageData) => void;
   onBrowseTemplates: () => void;
   onCreateFromScratch: () => void;
+  onAIGenerate?: () => void;
 }
 
 export default function LPPageList({
@@ -35,6 +37,7 @@ export default function LPPageList({
   onViewAnalytics,
   onBrowseTemplates,
   onCreateFromScratch,
+  onAIGenerate,
 }: Props) {
   const [pages, setPages] = useState<LandingPageData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +157,17 @@ export default function LPPageList({
             <LayoutGrid className="h-4 w-4 mr-1" />
             Templates
           </Button>
+          {onAIGenerate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAIGenerate}
+              className="border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+            >
+              <Bot className="h-4 w-4 mr-1" />
+              AI Generate
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={onCreateFromScratch}

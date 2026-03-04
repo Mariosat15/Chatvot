@@ -8,6 +8,7 @@ import {
   Copy,
   Tag,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import type { LPTemplate } from "./lp-types";
 
 interface Props {
   onSelectTemplate: (template: LPTemplate) => void;
+  onAIEnhance?: (template: LPTemplate) => void;
   onBack: () => void;
 }
 
@@ -30,7 +32,7 @@ const CATEGORY_COLORS = new Map([
   ["product", "bg-rose-500/20 text-rose-400 border-rose-500/30"],
 ]);
 
-export default function LPTemplateGallery({ onSelectTemplate, onBack }: Props) {
+export default function LPTemplateGallery({ onSelectTemplate, onAIEnhance, onBack }: Props) {
   const [templates, setTemplates] = useState<LPTemplate[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,7 @@ export default function LPTemplateGallery({ onSelectTemplate, onBack }: Props) {
               key={template._id}
               template={template}
               onSelect={onSelectTemplate}
+              onAIEnhance={onAIEnhance}
             />
           ))}
         </div>
@@ -158,9 +161,11 @@ export default function LPTemplateGallery({ onSelectTemplate, onBack }: Props) {
 function TemplateCard({
   template,
   onSelect,
+  onAIEnhance,
 }: {
   template: LPTemplate;
   onSelect: (t: LPTemplate) => void;
+  onAIEnhance?: (t: LPTemplate) => void;
 }) {
   const categoryClass =
     CATEGORY_COLORS.get(template.category) ||
@@ -185,7 +190,7 @@ function TemplateCard({
         )}
 
         {/* Overlay actions on hover */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <Button
             size="sm"
             onClick={() => onSelect(template)}
@@ -194,6 +199,16 @@ function TemplateCard({
             <Copy className="h-3.5 w-3.5 mr-1" />
             Use Template
           </Button>
+          {onAIEnhance && (
+            <Button
+              size="sm"
+              onClick={() => onAIEnhance(template)}
+              className="bg-violet-600 hover:bg-violet-500 text-white font-medium"
+            >
+              <Bot className="h-3.5 w-3.5 mr-1" />
+              AI Enhance
+            </Button>
+          )}
         </div>
 
         {/* Category badge */}

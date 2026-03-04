@@ -75,4 +75,4 @@ export interface ConversionData {
   conversionRate: number;
 }
 
-export type AdminView = "list" | "templates" | "editor" | "analytics" | "create";
+export type AdminView = "list" | "templates" | "editor" | "analytics" | "create" | "ai-enhance" | "ai-generate";
