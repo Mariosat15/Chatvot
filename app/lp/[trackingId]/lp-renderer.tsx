@@ -3,7 +3,7 @@
 // next/image requires known hostnames in next.config, but LP images come from user/AI input.
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import {
   Trophy,
@@ -184,19 +184,24 @@ const iconMap = new Map<string, React.ComponentType<{ className?: string }>>([
 // Reason: The AI uses game icon paths like "/game-icons/skull.png" for themed icons.
 // This component renders either a Lucide SVG icon or a game icon <img> depending on the value.
 function isGameIconPath(icon: string): boolean {
-  return icon.startsWith("/game-icons/") || icon.startsWith("/assets/");
+  return icon.startsWith("/game-icons/") || icon.startsWith("/assets/") || icon.startsWith("/api/assets/");
 }
 
 function IconDisplay({
   icon,
   className,
   size = 28,
+  fallbackIndex,
 }: {
   icon: string;
   className?: string;
   size?: number;
+  /** If the game-icon image fails, show this number as fallback */
+  fallbackIndex?: number;
 }) {
-  if (isGameIconPath(icon)) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (isGameIconPath(icon) && !imgFailed) {
     return (
       <img
         src={icon}
@@ -205,9 +210,21 @@ function IconDisplay({
         height={size}
         className={`object-contain shrink-0 ${className || ""}`}
         draggable={false}
+        onError={() => setImgFailed(true)}
       />
     );
   }
+
+  // If image failed or it's a Lucide icon name
+  if (imgFailed) {
+    // Fallback: show step number or a generic Lucide icon
+    if (fallbackIndex !== undefined) {
+      return <span className={`font-extrabold ${className || ""}`}>{fallbackIndex}</span>;
+    }
+    const FallbackIcon = Zap;
+    return <FallbackIcon className={className} />;
+  }
+
   const LucideIcon = iconMap.get(icon) || Zap;
   return <LucideIcon className={className} />;
 }
@@ -689,12 +706,12 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
                     </div>
                   ) : (
                     <div className={`lg:w-1/2 h-64 lg:h-80 rounded-3xl ${accent.bg10} flex items-center justify-center`}>
-                      <IconDisplay icon={iconStr} className={`${accent.text} opacity-30`} size={96} />
+                      <IconDisplay icon={iconStr} className={`${accent.text} opacity-30`} size={96} fallbackIndex={i + 1} />
                     </div>
                   )}
                   <div className="lg:w-1/2 space-y-4">
                     <div className={`w-14 h-14 ${accent.bg10} rounded-2xl flex items-center justify-center`}>
-                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} />
+                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} fallbackIndex={i + 1} />
                     </div>
                     <h3 className="text-2xl font-bold text-white">{String(item.title || "")}</h3>
                     <p className="text-gray-400 text-lg leading-relaxed">{String(item.description || "")}</p>
@@ -736,7 +753,7 @@ function FeaturesSection({ content }: { content: Record<string, unknown> }) {
                     </div>
                   ) : (
                     <div className={`w-14 h-14 ${accent.bg10} rounded-2xl flex items-center justify-center mb-6 group-hover:${accent.bg20} transition-colors duration-300`}>
-                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} />
+                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} fallbackIndex={i + 1} />
                     </div>
                   )}
                   <h3 className="text-xl font-bold text-white mb-3">{String(item.title || "")}</h3>
@@ -771,7 +788,7 @@ function StatsSection({ content }: { content: Record<string, unknown> }) {
               <div key={String(item.id || i)} className="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-300 lp-glass lp-card">
                 {iconStr && (
                   <div className={`w-12 h-12 ${accent.bg10} rounded-xl flex items-center justify-center mx-auto mb-4 lp-float lp-icon`}>
-                    <IconDisplay icon={iconStr} className={`h-6 w-6 ${accent.text} opacity-80`} size={24} />
+                    <IconDisplay icon={iconStr} className={`h-6 w-6 ${accent.text} opacity-80`} size={24} fallbackIndex={i + 1} />
                   </div>
                 )}
                 <div className={`text-4xl md:text-5xl font-extrabold ${accent.text} mb-3 tracking-tight`}>
@@ -798,29 +815,46 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
   const layout = ss.layout || "default";
 
   if (layout === "horizontal") {
+    const colClass = steps.length <= 3
+      ? "grid-cols-1 md:grid-cols-3"
+      : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
     return (
       <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
             {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
             <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8 relative">
-            {/* Connecting line */}
-            <div className="hidden md:block absolute top-16 left-[15%] right-[15%] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+          <div className={`grid ${colClass} gap-6 relative`}>
+            {/* Connecting line between step icons (desktop only) */}
+            {steps.length > 1 && (
+              <div className="hidden md:block absolute top-[52px] left-[16%] right-[16%] h-[2px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent z-0" />
+            )}
+
             {steps.map((step: Record<string, unknown>, i: number) => {
               const iconStr = step.icon ? String(step.icon) : null;
               return (
-                <div key={String(step.id || i)} className="text-center relative group lp-glass lp-card">
-                  <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-xl ${accent.shadow} group-hover:scale-110 transition-transform duration-300 lp-float lp-icon`}>
+                <div
+                  key={String(step.id || i)}
+                  className="relative z-10 group text-center p-8 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-400 hover:-translate-y-1 lp-glass lp-card"
+                >
+                  {/* Step number badge */}
+                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-lg ${accent.shadow}`}>
+                    <span className="text-black font-bold text-xs">{i + 1}</span>
+                  </div>
+
+                  {/* Icon */}
+                  <div className={`w-14 h-14 mx-auto mb-5 rounded-xl ${accent.bg10} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 lp-float lp-icon`}>
                     {iconStr ? (
-                      <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
+                      <IconDisplay icon={iconStr} className={`h-7 w-7 ${accent.text}`} size={28} fallbackIndex={i + 1} />
                     ) : (
-                      <span className="text-black font-extrabold text-xl">{i + 1}</span>
+                      <span className={`font-extrabold text-lg ${accent.text}`}>{i + 1}</span>
                     )}
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-3">{String(step.title || "")}</h3>
+
+                  <h3 className="text-lg font-bold text-white mb-2">{String(step.title || "")}</h3>
                   <p className="text-gray-400 text-sm leading-relaxed">{String(step.description || "")}</p>
                 </div>
               );
@@ -834,34 +868,36 @@ function HowItWorksSection({ content }: { content: Record<string, unknown> }) {
   return (
     <SectionBg sectionStyle={ss} fallbackBg="bg-gray-950" className="py-24 px-6">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-20">
+        <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 lp-glow">{title}</h2>
           {subtitle && <p className="text-gray-400 text-lg max-w-2xl mx-auto">{subtitle}</p>}
           <div className={`w-20 h-1.5 bg-gradient-to-r ${accent.divider} mx-auto mt-6 rounded-full`} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-5">
           {steps.map((step: Record<string, unknown>, i: number) => {
             const iconStr = step.icon ? String(step.icon) : null;
             return (
               <div
                 key={String(step.id || i)}
-                className="flex gap-6 items-start p-8 bg-white/[0.02] border border-white/[0.06] rounded-3xl hover:border-white/[0.1] transition-all duration-300 group lp-glass lp-card"
+                className="flex gap-5 items-center p-6 bg-white/[0.03] border border-white/[0.06] rounded-2xl hover:border-white/[0.12] transition-all duration-300 group lp-glass lp-card"
               >
-                <div
-                  className={`shrink-0 w-16 h-16 bg-gradient-to-br ${accent.gradientBtn} rounded-2xl flex items-center justify-center shadow-lg ${accent.shadow} lp-float lp-icon`}
-                >
-                  {iconStr ? (
-                    <IconDisplay icon={iconStr} className="h-7 w-7 text-black" size={28} />
-                  ) : (
-                    <span className="text-black font-extrabold text-xl">{i + 1}</span>
-                  )}
+                {/* Step number + icon */}
+                <div className="shrink-0 flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${accent.gradientBtn} flex items-center justify-center shadow-lg ${accent.shadow}`}>
+                    <span className="text-black font-bold text-sm">{i + 1}</span>
+                  </div>
+                  <div className={`w-12 h-12 rounded-xl ${accent.bg10} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 lp-float lp-icon`}>
+                    {iconStr ? (
+                      <IconDisplay icon={iconStr} className={`h-6 w-6 ${accent.text}`} size={24} fallbackIndex={i + 1} />
+                    ) : (
+                      <span className={`font-extrabold text-lg ${accent.text}`}>{i + 1}</span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <span className={`text-xs font-bold ${accent.text} uppercase tracking-[0.2em] mb-2 block`}>
-                    Step {String(step.step || i + 1)}
-                  </span>
-                  <h3 className="text-xl font-bold text-white mb-2">{String(step.title || "")}</h3>
-                  <p className="text-gray-400 leading-relaxed">{String(step.description || "")}</p>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-white mb-1">{String(step.title || "")}</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">{String(step.description || "")}</p>
                 </div>
               </div>
             );
