@@ -1,5 +1,16 @@
 "use client";
 
+// #region agent log — Global: Catch "is not a constructor" error with stack
+if (typeof window !== "undefined" && !(window as unknown as Record<string,boolean>).__debugConstructorErrorHandlerSet) {
+  (window as unknown as Record<string,boolean>).__debugConstructorErrorHandlerSet = true;
+  window.addEventListener("error", (event) => {
+    if (event.message && event.message.includes("is not a constructor")) {
+      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminDashboard.tsx:GLOBAL_ERROR',message:'Constructor error caught',data:{errorMessage:event.message,filename:event.filename,lineno:event.lineno,colno:event.colno,stack:event.error?.stack?.substring(0,2000)},timestamp:Date.now(),hypothesisId:'GLOBAL'})}).catch(()=>{});
+    }
+  });
+}
+// #endregion
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -63,7 +74,7 @@ import {
   Image,
   HeartPulse,
   FileWarning,
-  Map,
+  Map as MapIcon,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -291,7 +302,7 @@ const menuGroups: MenuGroup[] = [
       {
         id: "journey-map",
         label: "Journey Map",
-        icon: <Map className="h-5 w-5" />,
+        icon: <MapIcon className="h-5 w-5" />,
         color: "text-amber-400",
         bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
       },
