@@ -83,6 +83,7 @@ export default function PexelsImageBrowser({
   const [totalResults, setTotalResults] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const perPage = 15;
@@ -103,6 +104,7 @@ export default function PexelsImageBrowser({
 
       setLoading(true);
       setHasSearched(true);
+      setErrorMsg(null);
       try {
         const params = new URLSearchParams({
           query: searchQuery.trim(),
@@ -118,7 +120,10 @@ export default function PexelsImageBrowser({
 
         if (!res.ok) {
           const data = await res.json().catch(() => null);
-          throw new Error(data?.error || "Pexels API error");
+          const errText = data?.error || `Pexels API error (${res.status})`;
+          setErrorMsg(errText);
+          setPhotos([]);
+          return;
         }
 
         const data = await res.json();
@@ -128,6 +133,7 @@ export default function PexelsImageBrowser({
         setSelectedId(null);
       } catch (err) {
         console.error("Pexels search error:", err);
+        setErrorMsg("Network error — could not reach Pexels API.");
         setPhotos([]);
       } finally {
         setLoading(false);
@@ -229,7 +235,17 @@ export default function PexelsImageBrowser({
           ) : photos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
               <ImageIconLucide className="h-16 w-16 mb-4 opacity-30" />
-              {hasSearched ? (
+              {errorMsg ? (
+                <div className="text-center max-w-md space-y-2">
+                  <p className="text-red-400 text-sm font-medium">⚠️ {errorMsg}</p>
+                  {errorMsg.includes("API key") && (
+                    <p className="text-xs text-gray-600">
+                      Go to <span className="text-cyan-400">Settings → Environment → Pexels</span> to
+                      configure your API key.
+                    </p>
+                  )}
+                </div>
+              ) : hasSearched ? (
                 <p>No images found. Try a different search term.</p>
               ) : (
                 <p>Search for images to get started</p>
