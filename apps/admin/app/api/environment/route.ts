@@ -119,9 +119,11 @@ export async function GET() {
       openaiApiKey: getVal("openaiApiKey", "OPENAI_API_KEY", ""),
       openaiModel: getVal("openaiModel", "OPENAI_MODEL", "gpt-4o-mini"),
       openaiEnabled:
-        s.openaiEnabled ?? process.env.OPENAI_ENABLED === "true",
+        (settingsMap.get("openaiEnabled") as boolean | undefined) ??
+        process.env.OPENAI_ENABLED === "true",
       openaiForEmails:
-        s.openaiForEmails ?? process.env.OPENAI_FOR_EMAILS === "true",
+        (settingsMap.get("openaiForEmails") as boolean | undefined) ??
+        process.env.OPENAI_FOR_EMAILS === "true",
 
       // Database
       mongodbUri: getVal("mongodbUri", "MONGODB_URI", ""),
