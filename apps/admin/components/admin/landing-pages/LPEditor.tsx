@@ -18,6 +18,8 @@ import {
   HelpCircle,
   Code,
   Layers,
+  Camera,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { LandingPageData, LPSection } from "./lp-types";
+import PexelsImageBrowser from "./PexelsImageBrowser";
 
 interface Props {
   page: LandingPageData | null;
@@ -463,15 +466,12 @@ function SectionEditor({
               </div>
             </div>
             {section.type === "hero" && (
-              <div>
-                <Label className="text-gray-400 text-xs">Background Image URL</Label>
-                <Input
-                  value={String(content.backgroundImage || "")}
-                  onChange={(e) => updateContent("backgroundImage", e.target.value)}
-                  placeholder="https://images.pexels.com/..."
-                  className="bg-gray-800 border-gray-700"
-                />
-              </div>
+              <ImageFieldWithBrowser
+                label="Background Image"
+                value={String(content.backgroundImage || "")}
+                onChange={(url) => updateContent("backgroundImage", url)}
+                searchHint="trading finance hero"
+              />
             )}
           </>
         )}
@@ -550,6 +550,85 @@ function SectionEditor({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Image Field with Pexels Browser ─────────────────────────────────────────
+
+function ImageFieldWithBrowser({
+  label,
+  value,
+  onChange,
+  searchHint,
+}: {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  searchHint?: string;
+}) {
+  const [showBrowser, setShowBrowser] = useState(false);
+
+  return (
+    <div>
+      <Label className="text-gray-400 text-xs">{label}</Label>
+      <div className="flex items-center gap-2 mt-1">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://images.pexels.com/..."
+          className="bg-gray-800 border-gray-700 flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowBrowser(true)}
+          className="shrink-0 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+        >
+          <Camera className="h-3.5 w-3.5 mr-1" />
+          Browse
+        </Button>
+        {value && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange("")}
+            className="shrink-0 text-red-400 hover:text-red-300"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      {/* Image Preview */}
+      {value && (
+        <div className="mt-2 relative rounded-lg overflow-hidden border border-gray-800 h-24 w-40">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={value}
+            alt={label}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+      )}
+
+      {/* Pexels Browser Modal */}
+      {showBrowser && (
+        <PexelsImageBrowser
+          currentUrl={value}
+          defaultQuery={searchHint || "business trading"}
+          onSelect={(url) => {
+            onChange(url);
+            setShowBrowser(false);
+          }}
+          onClose={() => setShowBrowser(false)}
+        />
+      )}
+    </div>
   );
 }
 

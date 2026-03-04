@@ -28,6 +28,7 @@ const FIELD_TO_ENV_KEY: Record<string, string> = {
   veriffApiKey: "VERIFF_API_KEY",
   veriffApiSecret: "VERIFF_API_SECRET",
   veriffBaseUrl: "VERIFF_BASE_URL",
+  pexelsApiKey: "PEXELS_API_KEY",
   isPrimary: "IS_PRIMARY",
   serverId: "SERVER_ID",
 };
@@ -47,6 +48,7 @@ const DB_FIELDS = new Set([
   "mongodbUri",
   "betterAuthSecret",
   "betterAuthUrl",
+  "pexelsApiKey",
 ]);
 
 // ──────────────────────────────────────────────────────────────
@@ -68,19 +70,23 @@ export async function GET() {
     // Reason: process.env is already populated by Next.js from the .env file
     // at startup. No need for manual fs.readFile — process.env is the reliable
     // source, and WhiteLabel DB overrides for fields it manages.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = settings as any;
+    // Convert settings to a Map for safe lookup (avoids object-injection-sink).
+    const settingsObj = settings.toObject?.() || settings;
+    const settingsMap = new Map<string, unknown>(Object.entries(settingsObj));
+    const envMap = new Map<string, string | undefined>(
+      Object.entries(process.env),
+    );
 
     const getVal = (dbField: string, envKey: string, fallback: string = "") => {
       // DB value takes priority (admin may have saved a value that differs from .env)
       if (DB_FIELDS.has(dbField)) {
-        const dbVal = s[dbField];
+        const dbVal = settingsMap.get(dbField);
         if (dbVal !== undefined && dbVal !== null && dbVal !== "") {
           return dbVal;
         }
       }
       // Fall back to process.env (loaded from .env at startup)
-      return process.env[envKey] || fallback;
+      return envMap.get(envKey) || fallback;
     };
 
     return NextResponse.json({
@@ -130,6 +136,9 @@ export async function GET() {
       veriffApiSecret: process.env.VERIFF_API_SECRET || "",
       veriffBaseUrl: process.env.VERIFF_BASE_URL || "",
 
+      // Pexels (Landing Pages)
+      pexelsApiKey: getVal("pexelsApiKey", "PEXELS_API_KEY", ""),
+
       // Infrastructure
       isPrimary: process.env.IS_PRIMARY || "true",
       serverId: process.env.SERVER_ID || "",
@@ -162,42 +171,52 @@ export async function PUT(request: NextRequest) {
       settings = new WhiteLabel();
     }
 
+    // Reason: Use a Map for safe lookup of request body values (avoids object-injection-sink).
+    const bodyMap = new Map<string, unknown>(Object.entries(body));
+
     const updatedDbFields: string[] = [];
+    const updatePayload = new Map<string, unknown>();
     for (const field of DB_FIELDS) {
-      if (body[field] !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (settings as any)[field] = body[field];
+      const val = bodyMap.get(field);
+      if (val !== undefined) {
+        updatePayload.set(field, val);
         updatedDbFields.push(field);
       }
     }
 
     if (updatedDbFields.length > 0) {
-      await settings.save();
+      await WhiteLabel.updateOne(
+        { _id: settings._id },
+        { $set: Object.fromEntries(updatePayload) },
+      );
       console.log(
         `✅ WhiteLabel DB updated: ${updatedDbFields.join(", ")}`,
       );
     }
 
     // ── Step 2: Write ALL changed values to .env file on disk ──
-    const envUpdates: Record<string, string> = {};
-    for (const [fieldName, envKey] of Object.entries(FIELD_TO_ENV_KEY)) {
-      if (body[fieldName] !== undefined) {
-        const value = body[fieldName];
-        // Convert booleans to strings for .env
-        envUpdates[envKey] =
-          typeof value === "boolean" ? String(value) : String(value);
+    const envUpdates = new Map<string, string>();
+    const fieldToEnvEntries = new Map(Object.entries(FIELD_TO_ENV_KEY));
+    for (const [fieldName, envKey] of fieldToEnvEntries) {
+      const val = bodyMap.get(fieldName);
+      if (val !== undefined) {
+        envUpdates.set(
+          envKey,
+          typeof val === "boolean" ? String(val) : String(val),
+        );
       }
     }
 
-    if (Object.keys(envUpdates).length > 0) {
+    if (envUpdates.size > 0) {
       await writeEnvFile(envUpdates);
       console.log(
-        `✅ .env file updated: ${Object.keys(envUpdates).join(", ")}`,
+        `✅ .env file updated: ${[...envUpdates.keys()].join(", ")}`,
       );
 
       // Reason: Update process.env in memory so the current running process
       // picks up the new values immediately (next restart reads from disk).
-      for (const [key, value] of Object.entries(envUpdates)) {
+      for (const [key, value] of envUpdates) {
+        // eslint-disable-next-line security/detect-object-injection -- key is from FIELD_TO_ENV_KEY whitelist
         process.env[key] = value;
       }
     }
@@ -243,7 +262,7 @@ export async function PUT(request: NextRequest) {
 // Helper: Read → update → write the .env file on disk
 // ──────────────────────────────────────────────────────────────
 async function writeEnvFile(
-  updates: Record<string, string>,
+  updates: Map<string, string>,
 ): Promise<void> {
   // Reason: In production the admin app's .env is a symlink to the root .env
   // (created by deploy/setup-new-customer.sh). process.cwd() resolves through
@@ -274,9 +293,9 @@ async function writeEnvFile(
 
     const key = trimmed.substring(0, eqIdx).trim();
 
-    if (key in updates) {
+    if (updates.has(key)) {
       updatedKeys.add(key);
-      const value = sanitizeEnvValue(updates[key]);
+      const value = sanitizeEnvValue(updates.get(key) ?? "");
       // Reason: Quote values that contain spaces or special characters
       if (value.includes(" ") || value.includes("#")) {
         return `${key}='${value}'`;
@@ -288,7 +307,7 @@ async function writeEnvFile(
   });
 
   // Pass 2: Append any new keys that weren't in the existing file
-  for (const [key, value] of Object.entries(updates)) {
+  for (const [key, value] of updates) {
     if (!updatedKeys.has(key)) {
       const safeValue = sanitizeEnvValue(value);
       if (safeValue.includes(" ") || safeValue.includes("#")) {
