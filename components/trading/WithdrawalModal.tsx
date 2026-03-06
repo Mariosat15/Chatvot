@@ -34,6 +34,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
@@ -89,6 +90,10 @@ interface WithdrawalInfo {
 }
 
 export default function WithdrawalModal({ children }: WithdrawalModalProps) {
+  const { settings: appSettings } = useAppSettings();
+  const currencySymbol = appSettings?.currency?.symbol || "€";
+  const currencyCode = appSettings?.currency?.code || "EUR";
+
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedMethodId, setSelectedMethodId] = useState("");
@@ -377,7 +382,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             Withdraw Funds
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Request a withdrawal of your credits to EUR
+            Request a withdrawal of your credits to {currencyCode}
           </DialogDescription>
         </DialogHeader>
 
@@ -398,7 +403,8 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               <p className="text-sm text-gray-400 mt-2">{success.message}</p>
               <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
                 <p className="text-green-400 font-bold text-lg">
-                  €{success.netAmountEUR.toFixed(2)} will be sent to you
+                  {currencySymbol}{success.netAmountEUR.toFixed(2)} will be sent
+                  to you
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   Typically arrives in 3-5 business days
@@ -482,18 +488,19 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                ≈ €{withdrawalInfo.wallet.balanceEUR.toFixed(2)} EUR
+                ≈ {currencySymbol}
+                {withdrawalInfo.wallet.balanceEUR.toFixed(2)} {currencyCode}
               </p>
             </div>
 
             {/* Amount Input */}
             <div className="space-y-2">
               <Label htmlFor="withdrawal-amount" className="text-gray-300">
-                Amount (EUR)
+                Amount ({currencyCode})
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">
-                  €
+                  {currencySymbol}
                 </span>
                 <Input
                   id="withdrawal-amount"
@@ -513,8 +520,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 />
               </div>
               <p className="text-xs text-gray-500">
-                Min: €{withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} |
-                Max: €
+                Min: {currencySymbol}
+                {withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} | Max:{" "}
+                {currencySymbol}
                 {Math.min(
                   withdrawalInfo.settings.maximumWithdrawal,
                   withdrawalInfo.wallet.balanceEUR,
@@ -565,7 +573,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 >
                   {preset === Math.floor(withdrawalInfo.wallet.balanceEUR)
                     ? "All"
-                    : `€${preset}`}
+                    : `${currencySymbol}${preset}`}
                 </Button>
               ))}
             </div>
@@ -686,18 +694,18 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Withdrawal Amount:</span>
                     <span className="font-semibold text-white">
-                      €{withdrawal.eurAmount.toFixed(2)}
+                      {currencySymbol}{withdrawal.eurAmount.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">
                       Platform Fee ({withdrawalInfo.settings.feePercentage}%
                       {withdrawalInfo.settings.feeFixed > 0 &&
-                        ` + €${withdrawalInfo.settings.feeFixed}`}
+                        ` + ${currencySymbol}${withdrawalInfo.settings.feeFixed}`}
                       ):
                     </span>
                     <span className="font-semibold text-red-400">
-                      -€{withdrawal.platformFee.toFixed(2)}
+                      -{currencySymbol}{withdrawal.platformFee.toFixed(2)}
                     </span>
                   </div>
 
@@ -705,10 +713,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
 
                   <div className="flex items-center justify-between bg-green-500/10 p-3 rounded-lg">
                     <span className="text-green-300 font-semibold">
-                      💶 You Will Receive:
+                      💰 You Will Receive:
                     </span>
                     <span className="font-bold text-green-400 text-lg">
-                      €{withdrawal.netAmount.toFixed(2)}
+                      {currencySymbol}{withdrawal.netAmount.toFixed(2)}
                     </span>
                   </div>
 

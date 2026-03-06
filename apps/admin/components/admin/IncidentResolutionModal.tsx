@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -87,6 +88,8 @@ export default function IncidentResolutionModal({
   onClose,
   onResolved,
 }: IncidentResolutionModalProps) {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<ResolveData | null>(null);
@@ -145,7 +148,7 @@ export default function IncidentResolutionModal({
 
       if (result.success) {
         toast.success(
-          `Incident resolved! ${result.resolution.compensationsIssued} compensations issued totaling €${result.resolution.totalCompensation.toFixed(2)}`,
+          `Incident resolved! ${result.resolution.compensationsIssued} compensations issued totaling ${cs}${result.resolution.totalCompensation.toFixed(2)}`,
         );
         onResolved();
         onClose();
@@ -262,7 +265,7 @@ export default function IncidentResolutionModal({
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-green-400" />
                         <span className="text-gray-300">
-                          Entry fee: €{data.summary.entryFee}
+                          Entry fee: {cs}{data.summary.entryFee}
                         </span>
                       </div>
                       <div className="col-span-2 flex items-center gap-2">
@@ -323,7 +326,7 @@ export default function IncidentResolutionModal({
                       {option.totalAmount > 0 && (
                         <div className="text-right">
                           <p className="text-lg font-bold text-red-400">
-                            -€{option.totalAmount.toFixed(2)}
+                            -{cs}{option.totalAmount.toFixed(2)}
                           </p>
                           <p className="text-xs text-gray-500">
                             Platform expense
@@ -335,7 +338,7 @@ export default function IncidentResolutionModal({
                     {option.totalAmount > 0 && (
                       <div className="mt-3 flex gap-4 text-xs text-gray-400">
                         <span>{option.affectedUsers} users</span>
-                        <span>€{option.perUserAmount.toFixed(2)} each</span>
+                        <span>{cs}{option.perUserAmount.toFixed(2)} each</span>
                       </div>
                     )}
 
@@ -382,7 +385,7 @@ export default function IncidentResolutionModal({
                   This resolution will automatically credit{" "}
                   <strong>{selectedOption.affectedUsers} users</strong> with a
                   total of{" "}
-                  <strong>€{selectedOption.totalAmount.toFixed(2)}</strong>.
+                  <strong>{cs}{selectedOption.totalAmount.toFixed(2)}</strong>.
                   This amount will be recorded as a platform expense in the
                   Financial Dashboard.
                 </p>

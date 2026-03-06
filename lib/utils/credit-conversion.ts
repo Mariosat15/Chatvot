@@ -21,14 +21,15 @@ export function formatCredits(credits: number): string {
   return `${credits.toLocaleString()} Credits`;
 }
 
-export function formatEUR(eur: number): string {
-  return `€${eur.toFixed(2)}`;
+export function formatEUR(eur: number, symbol: string = "€"): string {
+  return `${symbol}${eur.toFixed(2)}`;
 }
 
 export function formatCreditsWithEUR(
   credits: number,
   rate: number = DEFAULT_RATE,
+  symbol: string = "€",
 ): string {
   const eur = creditsToEUR(credits, rate);
-  return `${credits.toLocaleString()} Credits (≈ €${eur.toFixed(2)})`;
+  return `${credits.toLocaleString()} Credits (≈ ${symbol}${eur.toFixed(2)})`;
 }

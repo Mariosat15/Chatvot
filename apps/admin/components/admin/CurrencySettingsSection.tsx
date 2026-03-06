@@ -262,7 +262,10 @@ export default function CurrencySettingsSection() {
             </div>
 
             <div>
-              <Label className="text-gray-300">Value in EUR</Label>
+              <Label className="text-gray-300">
+                Value in Base Currency ({settings.currency.symbol}{" "}
+                {settings.currency.code})
+              </Label>
               <Input
                 type="number"
                 step="0.01"
@@ -279,7 +282,8 @@ export default function CurrencySettingsSection() {
                 className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                1 {settings.credits.name} = €{settings.credits.valueInEUR}
+                1 {settings.credits.name} = {settings.currency.symbol}
+                {settings.credits.valueInEUR}
               </p>
             </div>
 
@@ -313,7 +317,9 @@ export default function CurrencySettingsSection() {
                   }))
                 }
               />
-              <Label className="text-gray-300">Show EUR Equivalent</Label>
+              <Label className="text-gray-300">
+                Show Base Currency Equivalent
+              </Label>
             </div>
           </div>
 
@@ -324,7 +330,8 @@ export default function CurrencySettingsSection() {
               {settings.credits.symbol} 100.00 {settings.credits.name}
               {settings.credits.showEUREquivalent && (
                 <span className="text-sm text-gray-400 ml-2">
-                  (€{(100 * settings.credits.valueInEUR).toFixed(2)})
+                  ({settings.currency.symbol}
+                  {(100 * settings.credits.valueInEUR).toFixed(2)})
                 </span>
               )}
             </p>

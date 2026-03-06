@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +116,8 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 type TabType = "pending" | "history";
 
 export default function PendingPaymentsSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [activeTab, setActiveTab] = useState<TabType>("pending");
 
   // Pending tab state
@@ -445,7 +448,7 @@ export default function PendingPaymentsSection() {
                 +{payment.amount.toFixed(2)} Credits
               </p>
               <p className="text-xs text-gray-600 line-through">
-                €
+                {cs}
                 {(
                   payment.metadata?.totalCharged ||
                   payment.metadata?.eurAmount ||
@@ -462,7 +465,7 @@ export default function PendingPaymentsSection() {
                 +{payment.amount.toFixed(2)} Credits
               </p>
               <p className="text-xs text-gray-500">
-                €
+                {cs}
                 {(
                   payment.metadata?.totalCharged ||
                   payment.metadata?.eurAmount ||
@@ -706,7 +709,7 @@ export default function PendingPaymentsSection() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-100">
-                    €
+                    {cs}
                     {payments
                       .reduce(
                         (sum, p) =>
@@ -1163,7 +1166,7 @@ export default function PendingPaymentsSection() {
                     <div className="flex justify-between">
                       <span className="text-gray-400">Base Amount:</span>
                       <span className="text-white">
-                        €{detailDialog.payment.metadata.eurAmount.toFixed(2)}
+                        {cs}{detailDialog.payment.metadata.eurAmount.toFixed(2)}
                       </span>
                     </div>
                   )}
@@ -1175,7 +1178,7 @@ export default function PendingPaymentsSection() {
                           {detailDialog.payment.metadata.vatPercentage || 0}%):
                         </span>
                         <span className="text-orange-400">
-                          +€{detailDialog.payment.metadata.vatAmount.toFixed(2)}
+                          +{cs}{detailDialog.payment.metadata.vatAmount.toFixed(2)}
                         </span>
                       </div>
                     )}
@@ -1189,7 +1192,7 @@ export default function PendingPaymentsSection() {
                           %):
                         </span>
                         <span className="text-orange-400">
-                          +€
+                          +{cs}
                           {detailDialog.payment.metadata.platformFeeAmount.toFixed(
                             2,
                           )}
@@ -1202,7 +1205,7 @@ export default function PendingPaymentsSection() {
                         Total Charged:
                       </span>
                       <span className="text-white font-bold">
-                        €
+                        {cs}
                         {(
                           detailDialog.payment.metadata?.totalCharged ||
                           detailDialog.payment.metadata?.eurAmount ||

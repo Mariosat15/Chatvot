@@ -24,6 +24,7 @@ import {
   CreditCard,
   Banknote,
 } from "lucide-react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface FeeSettings {
   // Platform fees (what we charge users)
@@ -38,6 +39,10 @@ interface FeeSettings {
 }
 
 export default function FeeSettingsSection() {
+  const { settings: appSettings } = useAppSettings();
+  const cs = appSettings?.currency?.symbol || "€";
+  const cc = appSettings?.currency?.code || "EUR";
+
   const [settings, setSettings] = useState<FeeSettings>({
     platformDepositFeePercentage: 2,
     platformWithdrawalFeePercentage: 2,
@@ -112,7 +117,7 @@ export default function FeeSettingsSection() {
   };
 
   // Calculate example earnings
-  const exampleDeposit = 100; // €100 deposit
+  const exampleDeposit = 100; // 100 base currency deposit
   const platformDepositFee =
     exampleDeposit * (settings.platformDepositFeePercentage / 100);
   const bankDepositFee =
@@ -120,7 +125,7 @@ export default function FeeSettingsSection() {
     settings.bankDepositFeeFixed;
   const netDepositEarning = platformDepositFee - bankDepositFee;
 
-  const exampleWithdrawal = 100; // €100 withdrawal
+  const exampleWithdrawal = 100; // 100 base currency withdrawal
   const platformWithdrawalFee =
     exampleWithdrawal * (settings.platformWithdrawalFeePercentage / 100);
   const bankWithdrawalFee =
@@ -230,7 +235,7 @@ export default function FeeSettingsSection() {
                 <Percent className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                User deposits €100 → Platform charges €
+                User deposits {cs}100 → Platform charges {cs}
                 {platformDepositFee.toFixed(2)}
               </p>
             </div>
@@ -268,7 +273,9 @@ export default function FeeSettingsSection() {
                 />
               </div>
               <div>
-                <Label className="text-gray-400">Fixed Fee (€)</Label>
+                <Label className="text-gray-400">
+                  Fixed Fee ({cs})
+                </Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -286,8 +293,9 @@ export default function FeeSettingsSection() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              €100 deposit → Stripe takes €{bankDepositFee.toFixed(2)} (
-              {settings.bankDepositFeePercentage}% + €
+              {cs}100 deposit → Stripe takes {cs}
+              {bankDepositFee.toFixed(2)} (
+              {settings.bankDepositFeePercentage}% + {cs}
               {settings.bankDepositFeeFixed})
             </p>
           </CardContent>
@@ -326,7 +334,7 @@ export default function FeeSettingsSection() {
                 <Percent className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                User withdraws €100 → Platform charges €
+                User withdraws {cs}100 → Platform charges {cs}
                 {platformWithdrawalFee.toFixed(2)}
               </p>
             </div>
@@ -365,7 +373,9 @@ export default function FeeSettingsSection() {
                 />
               </div>
               <div>
-                <Label className="text-gray-400">Fixed Fee (€)</Label>
+                <Label className="text-gray-400">
+                  Fixed Fee ({cs})
+                </Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -383,8 +393,9 @@ export default function FeeSettingsSection() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              €100 payout → Bank takes €{bankWithdrawalFee.toFixed(2)} (
-              {settings.bankWithdrawalFeePercentage}% + €
+              {cs}100 payout → Bank takes {cs}
+              {bankWithdrawalFee.toFixed(2)} (
+              {settings.bankWithdrawalFeePercentage}% + {cs}
               {settings.bankWithdrawalFeeFixed})
             </p>
           </CardContent>
@@ -396,7 +407,7 @@ export default function FeeSettingsSection() {
         <CardHeader>
           <CardTitle className="text-white text-lg flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-emerald-400" />
-            Net Earnings Calculator (per €100)
+            Net Earnings Calculator (per {cs}100)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -404,19 +415,19 @@ export default function FeeSettingsSection() {
             {/* Deposit */}
             <div className="bg-gray-800 rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-400 mb-3">
-                Per €100 Deposit
+                Per {cs}100 Deposit
               </h4>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Platform Fee</span>
                   <span className="text-green-400">
-                    +€{platformDepositFee.toFixed(2)}
+                    +{cs}{platformDepositFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Bank Fee</span>
                   <span className="text-red-400">
-                    -€{bankDepositFee.toFixed(2)}
+                    -{cs}{bankDepositFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="border-t border-gray-700 pt-2 flex justify-between font-semibold">
@@ -428,7 +439,7 @@ export default function FeeSettingsSection() {
                         : "text-red-400"
                     }
                   >
-                    €{netDepositEarning.toFixed(2)}
+                    {cs}{netDepositEarning.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -437,19 +448,19 @@ export default function FeeSettingsSection() {
             {/* Withdrawal */}
             <div className="bg-gray-800 rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-400 mb-3">
-                Per €100 Withdrawal
+                Per {cs}100 Withdrawal
               </h4>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Platform Fee</span>
                   <span className="text-green-400">
-                    +€{platformWithdrawalFee.toFixed(2)}
+                    +{cs}{platformWithdrawalFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Bank Fee</span>
                   <span className="text-red-400">
-                    -€{bankWithdrawalFee.toFixed(2)}
+                    -{cs}{bankWithdrawalFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="border-t border-gray-700 pt-2 flex justify-between font-semibold">
@@ -461,7 +472,7 @@ export default function FeeSettingsSection() {
                         : "text-red-400"
                     }
                   >
-                    €{netWithdrawalEarning.toFixed(2)}
+                    {cs}{netWithdrawalEarning.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -493,8 +504,9 @@ export default function FeeSettingsSection() {
                   Settings → Currency
                 </li>
                 <li>
-                  <strong>Credit Conversion Rate</strong> (credits per €1) →
-                  Settings → Currency → "Value in EUR"
+                  <strong>Credit Conversion Rate</strong> (credits per{" "}
+                  {cs}1) → Settings → Currency → &quot;Value in Base
+                  Currency&quot;
                 </li>
               </ul>
             </div>

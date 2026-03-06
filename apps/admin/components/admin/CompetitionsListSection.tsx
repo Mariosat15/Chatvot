@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import {
   Trophy,
@@ -122,6 +123,8 @@ interface Competition {
 }
 
 export default function CompetitionsListSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -424,12 +427,12 @@ export default function CompetitionsListSection() {
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <DollarSign className="h-3 w-3" />
-                    Entry: €{competition.entryFee}
+                    Entry: {cs}{competition.entryFee}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Trophy className="h-3 w-3" />
-                    Pool: €{competition.prizePool?.toFixed(0) || 0}
+                    Pool: {cs}{competition.prizePool?.toFixed(0) || 0}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">

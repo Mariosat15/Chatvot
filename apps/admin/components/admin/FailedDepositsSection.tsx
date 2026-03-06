@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
   Card,
   CardContent,
@@ -80,6 +81,8 @@ interface Stats {
 }
 
 export default function FailedDepositsSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [deposits, setDeposits] = useState<FailedDeposit[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -372,7 +375,7 @@ export default function FailedDepositsSection() {
                         <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-green-400" />
                           <span className="text-lg font-bold text-white">
-                            €
+                            {cs}
                             {(
                               deposit.metadata?.eurAmount ||
                               deposit.metadata?.baseAmount ||
@@ -522,7 +525,7 @@ export default function FailedDepositsSection() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Amount</span>
                   <span className="text-green-400 font-bold">
-                    €{(selectedDeposit.metadata?.eurAmount || 0).toFixed(2)}
+                    {cs}{(selectedDeposit.metadata?.eurAmount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -658,7 +661,7 @@ export default function FailedDepositsSection() {
                   <div>
                     <span className="text-gray-500">Amount:</span>
                     <span className="text-green-400 ml-2 font-bold">
-                      €
+                      {cs}
                       {(
                         selectedDeposit.metadata?.eurAmount ||
                         selectedDeposit.metadata?.baseAmount ||
@@ -675,13 +678,13 @@ export default function FailedDepositsSection() {
                   <div>
                     <span className="text-gray-500">VAT:</span>
                     <span className="text-white ml-2">
-                      €{(selectedDeposit.metadata?.vatAmount || 0).toFixed(2)}
+                      {cs}{(selectedDeposit.metadata?.vatAmount || 0).toFixed(2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-gray-500">Platform Fee:</span>
                     <span className="text-white ml-2">
-                      €
+                      {cs}
                       {(
                         selectedDeposit.metadata?.platformFeeAmount || 0
                       ).toFixed(2)}

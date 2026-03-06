@@ -681,7 +681,7 @@ export default function CompetitionCard({
                 </div>
                 {settings?.credits.showEUREquivalent && (
                   <p className="text-xs text-gray-500">
-                    ≈ €
+                    ≈ {settings?.currency?.symbol || "€"}
                     {(
                       getPrizePool() * (settings?.credits.valueInEUR || 1)
                     ).toFixed(2)}

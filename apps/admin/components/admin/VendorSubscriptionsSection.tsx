@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
   Card,
   CardContent,
@@ -195,6 +196,8 @@ const emptyVendor: Partial<VendorSubscription> = {
 };
 
 export default function VendorSubscriptionsSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [vendors, setVendors] = useState<VendorSubscription[]>([]);
   const [summary, setSummary] = useState<VendorSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -473,7 +476,7 @@ export default function VendorSubscriptionsSection() {
                 <div>
                   <p className="text-sm text-gray-400">Monthly Cost</p>
                   <p className="text-2xl font-bold text-green-400">
-                    €{summary.totalMonthly.toFixed(2)}
+                    {cs}{summary.totalMonthly.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -487,7 +490,7 @@ export default function VendorSubscriptionsSection() {
                 <div>
                   <p className="text-sm text-gray-400">Yearly Cost</p>
                   <p className="text-2xl font-bold text-purple-400">
-                    €{summary.totalYearly.toFixed(2)}
+                    {cs}{summary.totalYearly.toFixed(2)}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -98,6 +99,8 @@ interface CompetitionOption {
 }
 
 export default function IncidentsSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(
@@ -364,7 +367,7 @@ export default function IncidentsSection() {
 
       if (data.success) {
         toast.success(
-          `Issued ${data.successCount} compensations totaling €${data.totalCompensated.toFixed(2)}`,
+          `Issued ${data.successCount} compensations totaling ${cs}${data.totalCompensated.toFixed(2)}`,
         );
         setShowCompensateModal(false);
         setCompensations([{ userId: "", amount: 0, reason: "" }]);
@@ -827,7 +830,7 @@ export default function IncidentsSection() {
                                   {comp.username || comp.userId.slice(-8)}
                                 </span>
                                 <span className="text-green-400 font-medium">
-                                  €{comp.amount.toFixed(2)}
+                                  {cs}{comp.amount.toFixed(2)}
                                 </span>
                               </div>
                               <p className="text-xs text-gray-400 mt-1">
@@ -1328,7 +1331,7 @@ export default function IncidentsSection() {
                           parseFloat(e.target.value) || 0;
                         setCompensations(newComps);
                       }}
-                      placeholder="Amount (€)"
+                      placeholder={`Amount (${cs})`}
                       className="bg-gray-700 border-gray-600"
                     />
                     <Input

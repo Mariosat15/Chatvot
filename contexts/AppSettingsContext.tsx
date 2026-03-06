@@ -39,8 +39,14 @@ interface AppSettingsContextType {
   refreshSettings: () => Promise<void>;
   formatCredits: (amount: number, showEquivalent?: boolean) => string;
   formatCurrency: (amount: number) => string;
+  /** Converts credits to base currency value. Named "EUR" for legacy reasons — works with any base currency. */
   creditsToEUR: (credits: number) => number;
+  /** Converts base currency value to credits. Named "EUR" for legacy reasons — works with any base currency. */
   eurToCredits: (eur: number) => number;
+  /** Alias for creditsToEUR — converts credits to the configured base currency value. */
+  creditsToBaseCurrency: (credits: number) => number;
+  /** Alias for eurToCredits — converts base currency value to credits. */
+  baseCurrencyToCredits: (baseCurrencyAmount: number) => number;
 }
 
 const defaultSettings: AppSettings = {
@@ -76,6 +82,8 @@ const AppSettingsContext = createContext<AppSettingsContextType>({
   formatCurrency: (amount: number) => `€${amount.toFixed(2)}`,
   creditsToEUR: (credits: number) => credits,
   eurToCredits: (eur: number) => eur,
+  creditsToBaseCurrency: (credits: number) => credits,
+  baseCurrencyToCredits: (baseCurrencyAmount: number) => baseCurrencyAmount,
 });
 
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
@@ -107,6 +115,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     await fetchSettings();
   };
 
+  // Reason: "EUR" in function names is legacy — these convert between credits and
+  // whatever base currency the admin configured in Settings → Currency.
   const creditsToEUR = (credits: number): number => {
     if (!settings) return credits;
     return credits * settings.credits.valueInEUR;
@@ -116,6 +126,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (!settings) return eur;
     return eur / settings.credits.valueInEUR;
   };
+
+  // Clear-name aliases
+  const creditsToBaseCurrency = creditsToEUR;
+  const baseCurrencyToCredits = eurToCredits;
 
   const formatCredits = (
     amount: number,
@@ -136,9 +150,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   };
 
   const formatCurrency = (amount: number): string => {
-    if (!settings) return `€${amount.toFixed(2)}`;
-
-    const { symbol } = settings.currency;
+    const symbol = settings?.currency?.symbol || "€";
     return `${symbol}${amount.toFixed(2)}`;
   };
 
@@ -152,6 +164,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         formatCurrency,
         creditsToEUR,
         eurToCredits,
+        creditsToBaseCurrency,
+        baseCurrencyToCredits,
       }}
     >
       {children}

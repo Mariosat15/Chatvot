@@ -28,7 +28,8 @@ export default function WalletBalanceDisplay({
         </div>
         {settings?.credits.showEUREquivalent && (
           <span className="text-[10px] text-yellow-300/70 tabular-nums">
-            ≈ €{(balance * (settings?.credits.valueInEUR || 1)).toFixed(2)}
+            ≈ {settings?.currency?.symbol || "€"}
+            {(balance * (settings?.credits.valueInEUR || 1)).toFixed(2)}
           </span>
         )}
       </div>

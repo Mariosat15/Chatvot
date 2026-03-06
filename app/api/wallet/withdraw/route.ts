@@ -56,6 +56,7 @@ export async function GET() {
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+    const cs = appSettings?.currency?.symbol || "€";
 
     // Determine if KYC is required - check KYC settings first, fallback to withdrawal settings
     const kycRequiredForWithdrawal =
@@ -70,6 +71,7 @@ export async function GET() {
       creditSettings,
       isSandbox,
       kycRequiredForWithdrawal,
+      cs,
     );
 
     // Calculate fees
@@ -372,6 +374,7 @@ export async function POST(request: NextRequest) {
     const kycRequiredForWithdrawal =
       (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
       withdrawalSettings.requireKYC;
+    const cs = appSettings?.currency?.symbol || "€";
 
     // Determine withdrawal method (original method, UPO card, or bank account)
     let bankAccount = null;
@@ -482,6 +485,7 @@ export async function POST(request: NextRequest) {
       creditSettings,
       isSandbox,
       kycRequiredForWithdrawal,
+      cs,
     );
 
     if (!eligibility.eligible) {
@@ -498,7 +502,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Minimum withdrawal is €${withdrawalSettings.minimumWithdrawal}`,
+          error: `Minimum withdrawal is ${cs}${withdrawalSettings.minimumWithdrawal}`,
         },
         { status: 400 },
       );
@@ -509,7 +513,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Maximum withdrawal is €${withdrawalSettings.maximumWithdrawal}`,
+          error: `Maximum withdrawal is ${cs}${withdrawalSettings.maximumWithdrawal}`,
         },
         { status: 400 },
       );
@@ -537,7 +541,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Would exceed daily limit of €${withdrawalSettings.dailyWithdrawalLimit}`,
+          error: `Would exceed daily limit of ${cs}${withdrawalSettings.dailyWithdrawalLimit}`,
         },
         { status: 400 },
       );
@@ -555,7 +559,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Would exceed monthly limit of €${withdrawalSettings.monthlyWithdrawalLimit}`,
+          error: `Would exceed monthly limit of ${cs}${withdrawalSettings.monthlyWithdrawalLimit}`,
         },
         { status: 400 },
       );
@@ -669,10 +673,10 @@ export async function POST(request: NextRequest) {
           amount: -amountCredits,
           balanceBefore,
           balanceAfter: wallet.creditBalance,
-          currency: "EUR",
+          currency: appSettings?.currency?.code || "EUR",
           exchangeRate,
           status: "pending",
-          description: `${amountCredits} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
+          description: `${amountCredits} credits (${cs}${netAmountEUR.toFixed(2)} net after ${cs}${platformFee.toFixed(2)} fee)`,
           metadata: {
             withdrawalRequestId: withdrawalRequest[0]._id,
             amountEUR,
@@ -737,7 +741,7 @@ export async function POST(request: NextRequest) {
             const nuveiResult = await nuveiService.createWithdrawRequest({
               userTokenId: `user_${session.user.id}`,
               amount: netAmountEUR.toFixed(2),
-              currency: "EUR",
+              currency: appSettings?.currency?.code || "EUR",
               merchantWDRequestId,
               userPaymentOptionId,
               email: session.user.email || undefined,
@@ -819,7 +823,7 @@ export async function POST(request: NextRequest) {
       if (meetsKYC && meetsAge && meetsHistory) {
         withdrawalRequest[0].status = "approved";
         withdrawalRequest[0].isAutoApproved = true;
-        withdrawalRequest[0].autoApprovalReason = `Met auto-approval criteria: Amount ≤ €${withdrawalSettings.autoApproveMaxAmount}, Account age ${accountAge} days, Previous withdrawals: ${previousWithdrawals}`;
+        withdrawalRequest[0].autoApprovalReason = `Met auto-approval criteria: Amount ≤ ${cs}${withdrawalSettings.autoApproveMaxAmount}, Account age ${accountAge} days, Previous withdrawals: ${previousWithdrawals}`;
         withdrawalRequest[0].processedAt = new Date();
         await withdrawalRequest[0].save();
         autoApproved = true;
@@ -898,6 +902,7 @@ async function checkWithdrawalEligibility(
   creditSettings: any,
   isSandbox: boolean,
   kycRequired: boolean = false,
+  currencySymbol: string = "€",
 ): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
 
@@ -949,7 +954,7 @@ async function checkWithdrawalEligibility(
     const userBalanceEUR = (wallet.creditBalance / conversionRate).toFixed(2);
     return {
       eligible: false,
-      reason: `Minimum withdrawal amount is €${settings.minimumWithdrawal}. Your balance is €${userBalanceEUR}`,
+      reason: `Minimum withdrawal amount is ${currencySymbol}${settings.minimumWithdrawal}. Your balance is ${currencySymbol}${userBalanceEUR}`,
       warnings,
     };
   }

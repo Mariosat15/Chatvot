@@ -82,6 +82,8 @@ export async function POST(req: NextRequest) {
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+    const currencyCode = appSettings?.currency?.code || "EUR";
+    const cs = appSettings?.currency?.symbol || "€";
 
     // Get fee settings
     const feePercentage = withdrawalSettings.useCustomFees
@@ -223,7 +225,7 @@ export async function POST(req: NextRequest) {
     >[0] = {
       userTokenId,
       amount: netAmountEUR.toFixed(2),
-      currency: "EUR",
+      currency: currencyCode,
       merchantWDRequestId,
       merchantUniqueId: `chartvolt_${merchantWDRequestId}`,
       userDetails: {
@@ -348,13 +350,13 @@ export async function POST(req: NextRequest) {
       userId,
       transactionType: "withdrawal",
       amount: -creditsNeeded,
-      currency: "EUR",
+      currency: currencyCode,
       exchangeRate,
       balanceBefore,
       balanceAfter: wallet.creditBalance,
       status: "pending",
       provider: "nuvei",
-      description: `${creditsNeeded.toFixed(0)} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
+      description: `${creditsNeeded.toFixed(0)} credits (${cs}${netAmountEUR.toFixed(2)} net after ${cs}${platformFee.toFixed(2)} fee)`,
       metadata: {
         withdrawalRequestId: withdrawalRequest._id.toString(),
         merchantWDRequestId,
@@ -420,7 +422,7 @@ export async function POST(req: NextRequest) {
       nuveiResult = await nuveiService.submitBankPayout({
         userTokenId,
         amount: netAmountEUR.toFixed(2),
-        currency: "EUR",
+        currency: currencyCode,
         merchantWDRequestId,
         userPaymentOptionId: bankUpoId,
         email: userEmail,

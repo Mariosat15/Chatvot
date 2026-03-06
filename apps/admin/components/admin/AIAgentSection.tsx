@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -247,6 +248,8 @@ const COMMAND_ACTIONS = [
 const QUICK_ACTIONS = [...COMMAND_ACTIONS.slice(0, 4)];
 
 export default function AIAgentSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -401,7 +404,7 @@ export default function AIAgentSection() {
       case "currency":
         return (
           <span className="font-mono">
-            €{typeof value === "number" ? value.toFixed(2) : value}
+            {cs}{typeof value === "number" ? value.toFixed(2) : value}
           </span>
         );
       case "date":

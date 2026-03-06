@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
   User,
   Shield,
@@ -333,6 +334,8 @@ export default function UserFullDetailPanel({
   user,
   onRefresh,
 }: UserFullDetailPanelProps) {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [loading, setLoading] = useState(true);
 
@@ -3226,11 +3229,11 @@ export default function UserFullDetailPanel({
                                   </div>
                                   <div className="text-right shrink-0">
                                     <p className="text-xl font-bold text-gray-100">
-                                      €{invoice.total?.toFixed(2) || "0.00"}
+                                      {cs}{invoice.total?.toFixed(2) || "0.00"}
                                     </p>
                                     {invoice.vatAmount > 0 && (
                                       <p className="text-xs text-gray-500">
-                                        incl. VAT €
+                                        incl. VAT {cs}
                                         {invoice.vatAmount.toFixed(2)}
                                       </p>
                                     )}

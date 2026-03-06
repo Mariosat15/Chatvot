@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import Image from "next/image";
 import {
   Shield,
@@ -88,6 +89,8 @@ const DOCUMENT_TYPES = [
 ];
 
 export default function KYCSettingsSection() {
+  const { settings: appSettings } = useAppSettings();
+  const cs = appSettings?.currency?.symbol || "€";
   const [settings, setSettings] = useState<KYCSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -662,7 +665,7 @@ export default function KYCSettingsSection() {
 
                 <div className="p-4 bg-gray-900/50 rounded-lg space-y-2">
                   <Label className="text-white">
-                    Minimum Amount Threshold (€)
+                    Minimum Amount Threshold ({cs})
                   </Label>
                   <Input
                     type="number"

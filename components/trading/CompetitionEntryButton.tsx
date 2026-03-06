@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
@@ -60,6 +61,8 @@ export default function CompetitionEntryButton({
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
   const startingCapital =
@@ -142,7 +145,7 @@ export default function CompetitionEntryButton({
   // Reason: Show terms dialog before entering a competition
   const handleEnter = async () => {
     if (!canAfford) {
-      toast.error(`Insufficient balance. Need €${entryFee}`);
+      toast.error(`Insufficient balance. Need ${cs}${entryFee}`);
       return;
     }
 
@@ -277,7 +280,7 @@ export default function CompetitionEntryButton({
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
-                  €{entryFee}
+                  {cs}{entryFee}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
@@ -287,7 +290,7 @@ export default function CompetitionEntryButton({
                     canAfford ? "text-green-500" : "text-red-500"
                   }`}
                 >
-                  €{userBalance.toFixed(2)}
+                  {cs}{userBalance.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -317,7 +320,7 @@ export default function CompetitionEntryButton({
             ) : !canAfford ? (
               <>
                 <DollarSign className="mr-2 h-4 w-4" />
-                Need €{Math.abs(entryFee - userBalance).toFixed(2)} More
+                Need {cs}{Math.abs(entryFee - userBalance).toFixed(2)} More
               </>
             ) : (
               <>

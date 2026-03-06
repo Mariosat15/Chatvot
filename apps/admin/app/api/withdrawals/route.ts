@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import AppSettings from "@/database/models/app-settings.model";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 
 /**
@@ -38,6 +39,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
 
     await connectToDatabase();
+
+    // Get base currency from settings
+    const appSettings = await AppSettings.findById("global-app-settings");
+    const currencyCode = appSettings?.currency?.code || "EUR";
 
     // Build query
     const query: any = {};
@@ -162,7 +167,7 @@ export async function GET(request: NextRequest) {
             swiftBic: w.bankDetails.swiftBic,
             country: w.bankDetails.country,
             nickname: null,
-            currency: "EUR",
+            currency: currencyCode,
             ibanLast4: w.bankDetails.iban?.replace(/\*+/g, "").slice(-4),
           };
         } else if (w.payoutMethod !== "original_method") {

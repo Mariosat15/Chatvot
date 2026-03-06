@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -185,6 +186,8 @@ interface Stats {
 type Tab = "active" | "history" | "settings";
 
 export default function ChallengesAdminSection() {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [activeTab, setActiveTab] = useState<Tab>("active");
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -412,7 +415,7 @@ export default function ChallengesAdminSection() {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-green-300">
-                    €{stats.totalFees.toFixed(0)}
+                    {cs}{stats.totalFees.toFixed(0)}
                   </div>
                   <div className="text-xs text-white/60">Platform Fees</div>
                 </div>
@@ -587,7 +590,7 @@ export default function ChallengesAdminSection() {
                       Prize Pool
                     </p>
                     <p className="text-xl font-bold text-green-400">
-                      €{stats.totalPrizePool.toFixed(0)}
+                      {cs}{stats.totalPrizePool.toFixed(0)}
                     </p>
                   </div>
                   <DollarSign className="h-5 w-5 text-green-500/50" />
@@ -774,12 +777,12 @@ export default function ChallengesAdminSection() {
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <DollarSign className="h-3 w-3" />
-                          Entry: €{challenge.entryFee}
+                          Entry: {cs}{challenge.entryFee}
                         </div>
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Trophy className="h-3 w-3" />
-                          Prize: €{challenge.winnerPrize}
+                          Prize: {cs}{challenge.winnerPrize}
                         </div>
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -789,7 +792,7 @@ export default function ChallengesAdminSection() {
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <TrendingUp className="h-3 w-3" />
-                          Capital: €{challenge.startingCapital}
+                          Capital: {cs}{challenge.startingCapital}
                         </div>
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -904,19 +907,19 @@ export default function ChallengesAdminSection() {
                   <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
                     <p className="text-xs text-gray-500">Prize Pool</p>
                     <p className="text-2xl font-bold text-yellow-400">
-                      €{selectedChallenge.prizePool}
+                      {cs}{selectedChallenge.prizePool}
                     </p>
                   </div>
                   <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
                     <p className="text-xs text-gray-500">Entry Fee</p>
                     <p className="text-2xl font-bold text-green-400">
-                      €{selectedChallenge.entryFee}
+                      {cs}{selectedChallenge.entryFee}
                     </p>
                   </div>
                   <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
                     <p className="text-xs text-gray-500">Winner Prize</p>
                     <p className="text-2xl font-bold text-yellow-400">
-                      €{selectedChallenge.winnerPrize}
+                      {cs}{selectedChallenge.winnerPrize}
                     </p>
                   </div>
                   <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
@@ -1029,7 +1032,7 @@ export default function ChallengesAdminSection() {
                                       Prize Won:
                                     </span>
                                     <span className="text-yellow-400 font-bold">
-                                      €{selectedChallenge.winnerPrize}
+                                      {cs}{selectedChallenge.winnerPrize}
                                     </span>
                                   </div>
                                 )}
@@ -1054,7 +1057,7 @@ export default function ChallengesAdminSection() {
                               <p className="text-xs text-purple-400 mt-1">
                                 GM Earned:{" "}
                                 <span className="font-bold">
-                                  €{gmInfo.netEarning.toFixed(2)}
+                                  {cs}{gmInfo.netEarning.toFixed(2)}
                                 </span>
                               </p>
                             </div>
@@ -1155,7 +1158,7 @@ export default function ChallengesAdminSection() {
                                       Prize Won:
                                     </span>
                                     <span className="text-yellow-400 font-bold">
-                                      €{selectedChallenge.winnerPrize}
+                                      {cs}{selectedChallenge.winnerPrize}
                                     </span>
                                   </div>
                                 )}
@@ -1180,7 +1183,7 @@ export default function ChallengesAdminSection() {
                               <p className="text-xs text-purple-400 mt-1">
                                 GM Earned:{" "}
                                 <span className="font-bold">
-                                  €{gmInfo.netEarning.toFixed(2)}
+                                  {cs}{gmInfo.netEarning.toFixed(2)}
                                 </span>
                               </p>
                             </div>
@@ -1227,7 +1230,7 @@ export default function ChallengesAdminSection() {
                       <div className="flex justify-between py-2">
                         <span className="text-gray-400">Platform Fee</span>
                         <span className="text-white font-semibold">
-                          {selectedChallenge.platformFeePercentage}% (€
+                          {selectedChallenge.platformFeePercentage}% ({cs}
                           {selectedChallenge.platformFeeAmount})
                         </span>
                       </div>
@@ -1286,7 +1289,7 @@ export default function ChallengesAdminSection() {
                       </p>
                       <div className="inline-block bg-yellow-500/20 px-4 py-2 rounded-lg">
                         <p className="text-yellow-400 font-bold text-xl">
-                          Earned €{selectedChallenge.winnerPrize}
+                          Earned {cs}{selectedChallenge.winnerPrize}
                         </p>
                       </div>
                     </div>
@@ -1328,7 +1331,7 @@ export default function ChallengesAdminSection() {
                   {challengeToCancel.challengedName}
                 </p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Entry Fee: €{challengeToCancel.entryFee} each • Prize: €
+                  Entry Fee: {cs}{challengeToCancel.entryFee} each • Prize: {cs}
                   {challengeToCancel.winnerPrize}
                 </p>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,6 +114,7 @@ const SEPA_COUNTRIES = [
 ];
 
 export default function BankAccountsSection() {
+  const { settings } = useAppSettings();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -368,7 +370,7 @@ export default function BankAccountsSection() {
         body: JSON.stringify({
           bankAccountId: account.id,
           countryCode: account.country,
-          currencyCode: "EUR",
+          currencyCode: settings?.currency?.code || "EUR",
         }),
       });
 

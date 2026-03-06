@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,8 @@ export default function CompetitionEditorForm({
   competitionId,
 }: CompetitionEditorFormProps) {
   const router = useRouter();
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [competition, setCompetition] = useState<any>(null);
@@ -390,7 +393,7 @@ export default function CompetitionEditorForm({
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="entryFee" className="text-gray-300">
-              Entry Fee (€) *
+              Entry Fee ({cs}) *
             </Label>
             <Input
               id="entryFee"

@@ -478,7 +478,7 @@ export default function ChallengeCard({
                 </div>
                 {settings?.credits.showEUREquivalent && (
                   <p className="text-xs text-gray-500">
-                    ≈ €
+                    ≈ {settings?.currency?.symbol || "€"}
                     {(
                       challenge.winnerPrize *
                       (settings?.credits.valueInEUR || 1)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
   Card,
   CardContent,
@@ -39,6 +40,8 @@ export default function UpcomingPaymentsWidget({
   onNavigate,
   daysAhead = 30,
 }: UpcomingPaymentsWidgetProps) {
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
   const [payments, setPayments] = useState<VendorPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalMonthly, setTotalMonthly] = useState(0);
@@ -129,7 +132,7 @@ export default function UpcomingPaymentsWidget({
           </Button>
         </div>
         <CardDescription className="flex items-center gap-2">
-          <span>Monthly cost: €{totalMonthly.toFixed(2)}</span>
+          <span>Monthly cost: {cs}{totalMonthly.toFixed(2)}</span>
           {(overdueCount > 0 || dueSoonCount > 0) && (
             <span className="flex items-center gap-1">
               •
@@ -188,7 +191,7 @@ export default function UpcomingPaymentsWidget({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-mono text-sm">
-                      €{payment.amount.toFixed(2)}
+                      {cs}{payment.amount.toFixed(2)}
                     </span>
                     {getStatusBadge(daysUntil)}
                     {payment.vendorUrl && (

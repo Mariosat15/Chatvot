@@ -939,7 +939,7 @@ export default function FinancialDashboard() {
       const result = await response.json();
       toast.success(
         result.message ||
-          `Payment of €${amount.toFixed(2)} to ${selectedVendor.name} recorded successfully`,
+          `Payment of ${currencySymbol}${amount.toFixed(2)} to ${selectedVendor.name} recorded successfully`,
       );
       setShowVendorPayDialog(false);
       setSelectedVendor(null);
@@ -992,7 +992,7 @@ export default function FinancialDashboard() {
 
       const result = await response.json();
       toast.success(
-        result.message || `€${amount.toFixed(2)} added to operating funds`,
+        result.message || `${currencySymbol}${amount.toFixed(2)} added to operating funds`,
       );
       setShowAddBalanceDialog(false);
       setBalanceAddForm({
@@ -1038,7 +1038,7 @@ export default function FinancialDashboard() {
       if (!response.ok) throw new Error("Failed to record expense");
 
       const result = await response.json();
-      toast.success(result.message || `€${amount.toFixed(2)} expense recorded`);
+      toast.success(result.message || `${currencySymbol}${amount.toFixed(2)} expense recorded`);
       setShowAddExpenseDialog(false);
       setExpenseForm({
         amount: "",
@@ -3333,7 +3333,7 @@ export default function FinancialDashboard() {
                           {item._id}
                         </p>
                         <p className="text-xl font-bold text-purple-400">
-                          €{item.total.toFixed(2)}
+                          {currencySymbol}{item.total.toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
                           {item.count} payments
@@ -3489,7 +3489,7 @@ export default function FinancialDashboard() {
                           {item._id || "Other"}
                         </p>
                         <p className="text-xl font-bold text-rose-400">
-                          €{item.total.toFixed(2)}
+                          {currencySymbol}{item.total.toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
                           {item.count} expenses
@@ -4084,8 +4084,8 @@ export default function FinancialDashboard() {
                               {tx.transactionType === "withdrawal" &&
                                 tx.metadata?.netAmountEUR !== undefined && (
                                   <div className="text-xs text-cyan-400 mt-0.5">
-                                    Net: €{tx.metadata.netAmountEUR?.toFixed(2)}{" "}
-                                    | Fee: €
+                                    Net: {currencySymbol}{tx.metadata.netAmountEUR?.toFixed(2)}{" "}
+                                    | Fee: {currencySymbol}
                                     {tx.metadata.platformFee?.toFixed(2) ||
                                       "0.00"}
                                   </div>
@@ -4608,7 +4608,7 @@ export default function FinancialDashboard() {
                           <YAxis
                             stroke="#9ca3af"
                             fontSize={10}
-                            tickFormatter={(value) => `€${value}`}
+                            tickFormatter={(value) => `${currencySymbol}${value}`}
                           />
                           <Tooltip
                             contentStyle={{
@@ -4618,7 +4618,7 @@ export default function FinancialDashboard() {
                             }}
                             labelStyle={{ color: "#fff" }}
                             formatter={(value) => [
-                              `€${(value as number)?.toFixed(2) || "0.00"}`,
+                              `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                               "",
                             ]}
                             labelFormatter={(label) =>
@@ -4699,7 +4699,7 @@ export default function FinancialDashboard() {
                           <YAxis
                             stroke="#9ca3af"
                             fontSize={10}
-                            tickFormatter={(value) => `€${value}`}
+                            tickFormatter={(value) => `${currencySymbol}${value}`}
                           />
                           <Tooltip
                             contentStyle={{
@@ -4709,7 +4709,7 @@ export default function FinancialDashboard() {
                             }}
                             labelStyle={{ color: "#fff" }}
                             formatter={(value) => [
-                              `€${(value as number)?.toFixed(2) || "0.00"}`,
+                              `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                               "",
                             ]}
                             labelFormatter={(label) =>
@@ -4778,7 +4778,7 @@ export default function FinancialDashboard() {
                                 borderRadius: "8px",
                               }}
                               formatter={(value) => [
-                                `€${(value as number)?.toFixed(2) || "0.00"}`,
+                                `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                                 "",
                               ]}
                             />
@@ -4836,7 +4836,7 @@ export default function FinancialDashboard() {
                                 borderRadius: "8px",
                               }}
                               formatter={(value) => [
-                                `€${(value as number)?.toFixed(2) || "0.00"}`,
+                                `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                                 "",
                               ]}
                             />
@@ -4959,7 +4959,7 @@ export default function FinancialDashboard() {
                         <YAxis
                           stroke="#9ca3af"
                           fontSize={10}
-                          tickFormatter={(value) => `€${value}`}
+                          tickFormatter={(value) => `${currencySymbol}${value}`}
                         />
                         <Tooltip
                           contentStyle={{
@@ -4969,7 +4969,7 @@ export default function FinancialDashboard() {
                           }}
                           labelStyle={{ color: "#fff" }}
                           formatter={(value) => [
-                            `€${(value as number)?.toFixed(2) || "0.00"}`,
+                            `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                             "",
                           ]}
                           labelFormatter={(label) =>
@@ -5047,7 +5047,7 @@ export default function FinancialDashboard() {
                         <YAxis
                           stroke="#9ca3af"
                           fontSize={10}
-                          tickFormatter={(value) => `€${value}`}
+                          tickFormatter={(value) => `${currencySymbol}${value}`}
                         />
                         <Tooltip
                           contentStyle={{
@@ -5057,7 +5057,7 @@ export default function FinancialDashboard() {
                           }}
                           labelStyle={{ color: "#fff" }}
                           formatter={(value) => [
-                            `€${(value as number)?.toFixed(2) || "0.00"}`,
+                            `${currencySymbol}${(value as number)?.toFixed(2) || "0.00"}`,
                             "",
                           ]}
                           labelFormatter={(label) =>
@@ -5450,7 +5450,7 @@ export default function FinancialDashboard() {
                   min="0"
                 />
                 <p className="text-xs text-gray-500">
-                  Default: €{selectedVendor.amount.toFixed(2)}
+                  Default: {currencySymbol}{selectedVendor.amount.toFixed(2)}
                 </p>
               </div>
 

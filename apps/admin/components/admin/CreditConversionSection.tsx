@@ -14,8 +14,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { DollarSign, TrendingUp, TrendingDown, Info } from "lucide-react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 export default function CreditConversionSection() {
+  const { settings: appSettings } = useAppSettings();
+  const cs = appSettings?.currency?.symbol || "€";
+  const cc = appSettings?.currency?.code || "EUR";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -111,7 +115,7 @@ export default function CreditConversionSection() {
                 💰 Credit Conversion Settings
               </h2>
               <p className="text-green-100 mt-1">
-                Configure how EUR converts to Credits in your platform
+                Configure how {cc} converts to Credits in your platform
               </p>
             </div>
           </div>
@@ -136,10 +140,10 @@ export default function CreditConversionSection() {
             {/* EUR to Credits Rate */}
             <div className="space-y-2">
               <Label className="text-white font-semibold">
-                EUR to Credits Conversion Rate
+                {cc} to Credits Conversion Rate
               </Label>
               <p className="text-sm text-gray-400 mb-2">
-                How many credits equal 1 EUR?
+                How many credits equal 1 {cc}?
               </p>
               <Input
                 type="number"
@@ -156,8 +160,8 @@ export default function CreditConversionSection() {
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">
-                Example: If set to 100, then 1 EUR = {settings.eurToCreditsRate}{" "}
-                Credits
+                Example: If set to 100, then 1 {cc} ={" "}
+                {settings.eurToCreditsRate} Credits
               </p>
             </div>
 
@@ -166,7 +170,7 @@ export default function CreditConversionSection() {
             {/* Minimum Deposit */}
             <div className="space-y-2">
               <Label className="text-white font-semibold">
-                Minimum Deposit (EUR)
+                Minimum Deposit ({cc})
               </Label>
               <Input
                 type="number"
@@ -189,7 +193,7 @@ export default function CreditConversionSection() {
             {/* Minimum Withdrawal */}
             <div className="space-y-2">
               <Label className="text-white font-semibold">
-                Minimum Withdrawal (EUR)
+                Minimum Withdrawal ({cc})
               </Label>
               <Input
                 type="number"
@@ -262,21 +266,21 @@ export default function CreditConversionSection() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                <span className="text-white font-semibold">€10</span>
+                <span className="text-white font-semibold">{cs}10</span>
                 <span className="text-gray-400">→</span>
                 <span className="text-green-400 font-bold">
                   {examples.eur10.toFixed(0)} Credits
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                <span className="text-white font-semibold">€50</span>
+                <span className="text-white font-semibold">{cs}50</span>
                 <span className="text-gray-400">→</span>
                 <span className="text-green-400 font-bold">
                   {examples.eur50.toFixed(0)} Credits
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                <span className="text-white font-semibold">€100</span>
+                <span className="text-white font-semibold">{cs}100</span>
                 <span className="text-gray-400">→</span>
                 <span className="text-green-400 font-bold">
                   {examples.eur100.toFixed(0)} Credits
@@ -306,16 +310,16 @@ export default function CreditConversionSection() {
                   </span>
                   <span className="text-gray-400">→</span>
                   <span className="text-blue-400 font-bold">
-                    €{examples.credits1000.toFixed(2)}
+                    {cs}{examples.credits1000.toFixed(2)}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €
+                  Fee: {cs}
                   {(
                     (examples.credits1000 * settings.withdrawalFeePercentage) /
                     100
                   ).toFixed(2)}{" "}
-                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  ({settings.withdrawalFeePercentage}%) • Net: {cs}
                   {(
                     examples.credits1000 *
                     (1 - settings.withdrawalFeePercentage / 100)
@@ -330,16 +334,16 @@ export default function CreditConversionSection() {
                   </span>
                   <span className="text-gray-400">→</span>
                   <span className="text-blue-400 font-bold">
-                    €{examples.credits5000.toFixed(2)}
+                    {cs}{examples.credits5000.toFixed(2)}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €
+                  Fee: {cs}
                   {(
                     (examples.credits5000 * settings.withdrawalFeePercentage) /
                     100
                   ).toFixed(2)}{" "}
-                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  ({settings.withdrawalFeePercentage}%) • Net: {cs}
                   {(
                     examples.credits5000 *
                     (1 - settings.withdrawalFeePercentage / 100)
@@ -354,16 +358,16 @@ export default function CreditConversionSection() {
                   </span>
                   <span className="text-gray-400">→</span>
                   <span className="text-blue-400 font-bold">
-                    €{examples.credits10000.toFixed(2)}
+                    {cs}{examples.credits10000.toFixed(2)}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 px-3">
-                  Fee: €
+                  Fee: {cs}
                   {(
                     (examples.credits10000 * settings.withdrawalFeePercentage) /
                     100
                   ).toFixed(2)}{" "}
-                  ({settings.withdrawalFeePercentage}%) • Net: €
+                  ({settings.withdrawalFeePercentage}%) • Net: {cs}
                   {(
                     examples.credits10000 *
                     (1 - settings.withdrawalFeePercentage / 100)
@@ -385,10 +389,14 @@ export default function CreditConversionSection() {
                     Important Notes:
                   </p>
                   <ul className="list-disc list-inside space-y-1.5 text-sm">
-                    <li>Users deposit EUR and receive Credits</li>
+                    <li>
+                      Users deposit {cc} and receive Credits
+                    </li>
                     <li>Credits are used for competition entry fees</li>
                     <li>Winners receive Credits from prize pools</li>
-                    <li>Users can withdraw Credits back to EUR</li>
+                    <li>
+                      Users can withdraw Credits back to {cc}
+                    </li>
                     <li>Withdrawal fee is your platform revenue</li>
                   </ul>
                 </div>

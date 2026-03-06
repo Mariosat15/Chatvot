@@ -10,6 +10,7 @@ import { initiateDeposit } from "@/lib/actions/trading/wallet.actions";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
+import AppSettings from "@/database/models/app-settings.model";
 import { connectToDatabase } from "@/database/mongoose";
 
 export async function POST(req: NextRequest) {
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
     }
 
     await connectToDatabase();
+
+    // Get base currency settings
+    const appSettings = await AppSettings.findById("global-app-settings");
+    const cs = appSettings?.currency?.symbol || "€";
+    const currencyCode = (appSettings?.currency?.code || "EUR").toLowerCase();
 
     // Check if KYC is required for deposits
     const kycSettings = await KYCSettings.findOne();
@@ -80,14 +86,14 @@ export async function POST(req: NextRequest) {
 
     if (amount < STRIPE_CONFIG.minimumDeposit) {
       return NextResponse.json(
-        { error: `Minimum deposit is €${STRIPE_CONFIG.minimumDeposit}` },
+        { error: `Minimum deposit is ${cs}${STRIPE_CONFIG.minimumDeposit}` },
         { status: 400 },
       );
     }
 
     if (amount > STRIPE_CONFIG.maximumDeposit) {
       return NextResponse.json(
-        { error: `Maximum deposit is €${STRIPE_CONFIG.maximumDeposit}` },
+        { error: `Maximum deposit is ${cs}${STRIPE_CONFIG.maximumDeposit}` },
         { status: 400 },
       );
     }
@@ -100,25 +106,25 @@ export async function POST(req: NextRequest) {
     // User receives FULL credits based on base amount (fees charged to card)
     const transaction = await initiateDeposit(
       amount,
-      STRIPE_CONFIG.currency.toUpperCase(),
+      currencyCode.toUpperCase(),
     );
 
     // Get Stripe client with database credentials
     const stripe = await getStripeClient();
 
     // Build description
-    let description = `Purchase of €${amount} credits`;
+    let description = `Purchase of ${cs}${amount} credits`;
     const feeDetails = [];
     if (vatAmount && vatAmount > 0)
-      feeDetails.push(`VAT €${vatAmount.toFixed(2)}`);
+      feeDetails.push(`VAT ${cs}${vatAmount.toFixed(2)}`);
     if (platformFeeAmount && platformFeeAmount > 0)
-      feeDetails.push(`Platform Fee €${platformFeeAmount.toFixed(2)}`);
+      feeDetails.push(`Platform Fee ${cs}${platformFeeAmount.toFixed(2)}`);
     if (feeDetails.length > 0) description += ` + ${feeDetails.join(" + ")}`;
 
     // Create Stripe Payment Intent - FORCE CARD ONLY (no Link, wallets, or saved methods)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: eurToCents(chargeAmount), // Charge total including VAT + platform fee
-      currency: STRIPE_CONFIG.currency,
+      currency: currencyCode, // Reason: Use base currency from admin settings instead of hardcoded "eur"
       // Force manual card input only - required for fraud detection
       payment_method_types: ["card"],
       // Disable automatic payment methods to prevent Link and other saved methods
@@ -144,11 +150,11 @@ export async function POST(req: NextRequest) {
     let txDescription = `Purchase of ${amount} credits`;
     const feeParts = [];
     if (vatAmount && vatAmount > 0)
-      feeParts.push(`VAT €${vatAmount.toFixed(2)}`);
+      feeParts.push(`VAT ${cs}${vatAmount.toFixed(2)}`);
     if (platformFeeAmount && platformFeeAmount > 0)
-      feeParts.push(`Fee €${platformFeeAmount.toFixed(2)}`);
+      feeParts.push(`Fee ${cs}${platformFeeAmount.toFixed(2)}`);
     if (feeParts.length > 0) {
-      txDescription = `${amount} credits (Total paid: €${chargeAmount.toFixed(2)} incl. ${feeParts.join(", ")})`;
+      txDescription = `${amount} credits (Total paid: ${cs}${chargeAmount.toFixed(2)} incl. ${feeParts.join(", ")})`;
     }
 
     await WalletTransaction.findByIdAndUpdate(transaction._id, {
@@ -163,7 +169,7 @@ export async function POST(req: NextRequest) {
 
     console.log("✅ Payment Intent created:", paymentIntent.id);
     console.log(
-      `   Total charge: €${chargeAmount} (Credits: €${amount}, VAT: €${vatAmount || 0}, Platform Fee: €${platformFeeAmount || 0})`,
+      `   Total charge: ${cs}${chargeAmount} (Credits: ${cs}${amount}, VAT: ${cs}${vatAmount || 0}, Platform Fee: ${cs}${platformFeeAmount || 0})`,
     );
 
     // Send deposit initiated notification

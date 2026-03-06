@@ -635,8 +635,10 @@ function TransactionItem({
               transaction.metadata.platformFee ? (
                 <span className="text-gray-400">
                   {" "}
-                  (You receive: €{transaction.metadata.netAmountEUR.toFixed(2)},
-                  Fee: €{transaction.metadata.platformFee.toFixed(2)})
+                  (You receive: {settings?.currency?.symbol || "€"}
+                  {transaction.metadata.netAmountEUR.toFixed(2)}, Fee:{" "}
+                  {settings?.currency?.symbol || "€"}
+                  {transaction.metadata.platformFee.toFixed(2)})
                 </span>
               ) : null}
             </p>

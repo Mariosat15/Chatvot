@@ -14,6 +14,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
+import AppSettings from "@/database/models/app-settings.model";
 import { RateLimiters, getRateLimitHeaders } from "@/lib/utils/rate-limiter";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
 
@@ -115,29 +116,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    // SECURITY: Minimum deposit (10 EUR)
+    await connectToDatabase();
+
+    // Get base currency settings
+    const appSettings = await AppSettings.findById("global-app-settings");
+    const cs = appSettings?.currency?.symbol || "€";
+    const baseCurrencyCode = appSettings?.currency?.code || "EUR";
+
+    // SECURITY: Minimum deposit
     if (amountNum < 10) {
       return NextResponse.json(
-        { error: "Minimum deposit is €10" },
+        { error: `Minimum deposit is ${cs}10` },
         { status: 400 },
       );
     }
 
-    // SECURITY: Maximum deposit (10,000 EUR) to prevent money laundering
+    // SECURITY: Maximum deposit to prevent money laundering
     if (amountNum > 10000) {
       return NextResponse.json(
-        { error: "Maximum deposit is €10,000" },
+        { error: `Maximum deposit is ${cs}10,000` },
         { status: 400 },
       );
     }
 
-    // SECURITY: Validate currency
-    const allowedCurrencies = ["EUR", "USD", "GBP"];
+    // SECURITY: Validate currency (allow base currency and common alternatives)
+    const allowedCurrencies = [baseCurrencyCode, "EUR", "USD", "GBP"];
     if (!allowedCurrencies.includes(currency.toUpperCase())) {
       return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
     }
-
-    await connectToDatabase();
 
     // SECURITY: Check for recent pending transactions to prevent duplicate orders
     const recentPending = await WalletTransaction.findOne({

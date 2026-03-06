@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import UpcomingPaymentsWidget from "@/components/admin/UpcomingPaymentsWidget";
 
 interface DashboardStats {
@@ -243,6 +244,9 @@ export default function AdminOverviewDashboard({
 }: {
   onNavigate?: (section: string) => void;
 }) {
+  const { settings: appSettings } = useAppSettings();
+  const cs = appSettings?.currency?.symbol || "€";
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -657,11 +661,11 @@ export default function AdminOverviewDashboard({
         {/* Deposits Today */}
         <StatCard
           title="Deposits Today"
-          value={`€${stats.deposits.completedTodayEUR.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+          value={`${cs}${stats.deposits.completedTodayEUR.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           subValue={`${stats.deposits.completedToday} transactions`}
           icon={ArrowDownToLine}
           trend={stats.deposits.completedToday > 0 ? "up" : "neutral"}
-          trendLabel={`Total: €${stats.deposits.totalEUR.toLocaleString()}`}
+          trendLabel={`Total: ${cs}${stats.deposits.totalEUR.toLocaleString()}`}
           color="green"
           onClick={() => onNavigate?.("financial")}
         />
@@ -672,7 +676,7 @@ export default function AdminOverviewDashboard({
           value={
             stats.withdrawals.pendingCount + stats.withdrawals.approvedCount
           }
-          subValue={`€${(stats.withdrawals.pendingEUR || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+          subValue={`${cs}${(stats.withdrawals.pendingEUR || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           icon={ArrowUpFromLine}
           trend={stats.withdrawals.pendingCount > 5 ? "up" : "neutral"}
           trendLabel={`${stats.withdrawals.processingCount} processing`}
@@ -709,7 +713,7 @@ export default function AdminOverviewDashboard({
         <StatCard
           title="Pending Deposits"
           value={stats.deposits.pendingCount}
-          subValue={`€${stats.deposits.pendingEUR.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+          subValue={`${cs}${stats.deposits.pendingEUR.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           icon={Clock}
           color={stats.deposits.pendingCount > 0 ? "yellow" : "green"}
           onClick={() => onNavigate?.("payments")}
@@ -756,7 +760,7 @@ export default function AdminOverviewDashboard({
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
                 <p className="text-sm text-gray-400">Deposits Today</p>
                 <p className="text-xl font-bold text-green-400">
-                  €
+                  {cs}
                   {stats.deposits.completedTodayEUR.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                   })}
@@ -768,7 +772,7 @@ export default function AdminOverviewDashboard({
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                 <p className="text-sm text-gray-400">Withdrawals Today</p>
                 <p className="text-xl font-bold text-yellow-400">
-                  €
+                  {cs}
                   {stats.withdrawals.completedTodayEUR.toLocaleString(
                     undefined,
                     { minimumFractionDigits: 2 },
@@ -784,7 +788,7 @@ export default function AdminOverviewDashboard({
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400">Total Deposits (All Time)</span>
                 <span className="text-white font-medium">
-                  €
+                  {cs}
                   {stats.deposits.totalEUR.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                   })}
@@ -795,7 +799,7 @@ export default function AdminOverviewDashboard({
                   Total Withdrawals (All Time)
                 </span>
                 <span className="text-white font-medium">
-                  €
+                  {cs}
                   {stats.withdrawals.totalEUR.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                   })}

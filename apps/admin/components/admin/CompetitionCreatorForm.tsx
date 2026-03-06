@@ -1065,7 +1065,7 @@ export default function CompetitionCreatorForm() {
                               Total Entry Fees
                             </div>
                             <div className="text-lg font-bold text-green-400 mt-1">
-                              €
+                              {currencySymbol}
                               {(
                                 formData.entryFeeCredits *
                                 formData.maxParticipants
@@ -1078,7 +1078,7 @@ export default function CompetitionCreatorForm() {
                               %)
                             </div>
                             <div className="text-lg font-bold text-yellow-400 mt-1">
-                              €
+                              {currencySymbol}
                               {(
                                 (formData.entryFeeCredits *
                                   formData.maxParticipants *
