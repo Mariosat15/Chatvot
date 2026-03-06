@@ -42,7 +42,6 @@ import {
   TrendingDown,
   DollarSign,
   Users,
-  Trophy,
   RefreshCw,
   Search,
   Download,
@@ -64,7 +63,6 @@ import {
   FileSpreadsheet,
   Loader2,
   Info,
-  Swords,
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ReconciliationSection from "./ReconciliationSection";
@@ -186,6 +184,12 @@ interface PlatformFinancials {
   // User deposits/withdrawals (actual money flow)
   totalUserDeposits: number; // Base EUR deposited by users for credits
   totalUserWithdrawals: number; // EUR withdrawn by users
+
+  // GM fee breakdowns by source
+  gmFeesFromCompetitions?: number;
+  gmFeesFromChallenges?: number;
+  gmCompetitionPaymentCount?: number;
+  gmChallengePaymentCount?: number;
 
   // Legacy fields for backward compatibility
   totalDepositFees?: number;
@@ -493,6 +497,7 @@ export default function FinancialDashboard() {
   // Transaction detail dialog
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [transactionInvoice, setTransactionInvoice] = useState<any>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
 
@@ -1121,49 +1126,34 @@ export default function FinancialDashboard() {
       gamemaster_earning: "bg-amber-500",
       gamemaster_challenge_referral: "bg-amber-400",
     };
-    return colors[type] || "bg-gray-500";
+    // Reason: Use Map to avoid ESLint object-injection-sink warning
+    const colorMap = new Map(Object.entries(colors));
+    return colorMap.get(type) || "bg-gray-500";
   };
 
-  const getTransactionTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      deposit: "User Deposit",
-      withdrawal: "User Withdrawal",
-      competition_entry: "Competition Entry",
-      competition_win: "Competition Win",
-      competition_refund: "Refund",
-      platform_fee: "Competition Fee",
-      admin_adjustment: "Admin Adjustment",
-      withdrawal_fee: "Withdrawal Fee",
-      admin_withdrawal: "💰 Admin Withdrawal",
-      vat_payment: "🏛️ VAT Payment",
-      vendor_payment: "🏢 Vendor Payment",
-      admin_balance_add: "💵 Balance Addition",
-      custom_expense: "📝 Custom Expense",
-      unclaimed_pool: "🎯 Unclaimed Pool",
-      deposit_fee: "Deposit Fee",
-      // Challenge transactions
-      challenge_entry: "⚔️ Challenge Entry",
-      challenge_win: "⚔️ Challenge Win",
-      challenge_platform_fee: "⚔️ Challenge Fee",
-      challenge_refund: "⚔️ Challenge Refund",
-      // GM-related transactions
-      retained_gm_fee: "🎮 Retained GM Fee",
-      gamemaster_referral: "🎮 GM Referral (Comp)",
-      gamemaster_earning: "🎮 GM Referral (Comp)",
-      gamemaster_challenge_referral: "🎮 GM Referral (Challenge)",
-    };
-    return labels[type] || type.replace(/_/g, " ");
-  };
+  const txTypeLabelMap = new Map<string, string>([
+    ["deposit", "User Deposit"], ["withdrawal", "User Withdrawal"],
+    ["competition_entry", "Competition Entry"], ["competition_win", "Competition Win"],
+    ["competition_refund", "Refund"], ["platform_fee", "Competition Fee"],
+    ["admin_adjustment", "Admin Adjustment"], ["withdrawal_fee", "Withdrawal Fee"],
+    ["admin_withdrawal", "💰 Admin Withdrawal"], ["vat_payment", "🏛️ VAT Payment"],
+    ["vendor_payment", "🏢 Vendor Payment"], ["admin_balance_add", "💵 Balance Addition"],
+    ["custom_expense", "📝 Custom Expense"], ["unclaimed_pool", "🎯 Unclaimed Pool"],
+    ["deposit_fee", "Deposit Fee"],
+    ["challenge_entry", "⚔️ Challenge Entry"], ["challenge_win", "⚔️ Challenge Win"],
+    ["challenge_platform_fee", "⚔️ Challenge Fee"], ["challenge_refund", "⚔️ Challenge Refund"],
+    ["retained_gm_fee", "🎮 Retained GM Fee"], ["gamemaster_referral", "🎮 GM Referral (Comp)"],
+    ["gamemaster_earning", "🎮 GM Referral (Comp)"], ["gamemaster_challenge_referral", "🎮 GM Referral (Challenge)"],
+  ]);
+  const getTransactionTypeLabel = (type: string) =>
+    txTypeLabelMap.get(type) || type.replace(/_/g, " ");
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      completed: "bg-green-500",
-      pending: "bg-yellow-500",
-      failed: "bg-red-500",
-      cancelled: "bg-gray-500",
-    };
-    return colors[status] || "bg-gray-500";
-  };
+  const statusColorMap = new Map<string, string>([
+    ["completed", "bg-green-500"], ["pending", "bg-yellow-500"],
+    ["failed", "bg-red-500"], ["cancelled", "bg-gray-500"],
+  ]);
+  const getStatusColor = (status: string) =>
+    statusColorMap.get(status) || "bg-gray-500";
 
   if (loading) {
     return (
@@ -1571,13 +1561,11 @@ export default function FinancialDashboard() {
                           <div className="text-xs text-gray-500">
                             Comp: {currencySymbol}
                             {(
-                              (platformFinancials as any)
-                                ?.gmFeesFromCompetitions || 0
+                              platformFinancials?.gmFeesFromCompetitions || 0
                             ).toFixed(2)}{" "}
                             | Chall: {currencySymbol}
                             {(
-                              (platformFinancials as any)
-                                ?.gmFeesFromChallenges || 0
+                              platformFinancials?.gmFeesFromChallenges || 0
                             ).toFixed(2)}
                           </div>
                         </div>
@@ -2501,13 +2489,11 @@ export default function FinancialDashboard() {
                           <p className="text-xs text-gray-500">
                             Comp: {currencySymbol}
                             {(
-                              (platformFinancials as any)
-                                ?.gmFeesFromCompetitions || 0
+                              platformFinancials?.gmFeesFromCompetitions || 0
                             ).toFixed(2)}{" "}
                             | Chall: {currencySymbol}
                             {(
-                              (platformFinancials as any)
-                                ?.gmFeesFromChallenges || 0
+                              platformFinancials?.gmFeesFromChallenges || 0
                             ).toFixed(2)}
                           </p>
                         </div>
@@ -3576,6 +3562,78 @@ export default function FinancialDashboard() {
 
         {/* WALLETS TAB */}
         <TabsContent value="wallets" className="space-y-6">
+          {/* ── Wallet Summary Cards ─────────────────────────── */}
+          {(() => {
+            const totalCredits = wallets.reduce((sum, w) => sum + (w.creditBalance || 0), 0);
+            const totalCreditsEUR = conversionRate > 0 ? totalCredits / conversionRate : 0;
+            // Reason: Use the same theoreticalBankBalance from liabilityMetrics as the overview tab
+            // to ensure consistency across all financial dashboard views.
+            const bankBalance = liabilityMetrics?.theoreticalBankBalance || 0;
+            const weOwe = totalCreditsEUR;
+            const netPosition = bankBalance - weOwe;
+            const isHealthy = netPosition >= 0;
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Card 1: Total User Credits */}
+                <Card className="bg-gradient-to-br from-violet-900/40 to-gray-900 border border-violet-500/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">💳 Total User Credits</p>
+                        <p className="text-3xl font-bold text-violet-400">
+                          {creditSymbol} {totalCredits.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          ≈ {currencySymbol}{totalCreditsEUR.toFixed(2)} @ {conversionRate}:1 rate
+                        </p>
+                      </div>
+                      <Users className="h-10 w-10 text-violet-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card 2: Money in Bank */}
+                <Card className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">🏦 Money in Bank</p>
+                        <p className="text-3xl font-bold text-green-400">
+                          {currencySymbol}{bankBalance.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Deposits − Withdrawals − Admin draws
+                        </p>
+                      </div>
+                      <Building2 className="h-10 w-10 text-green-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card 3: Net Position (Bank - What we owe) */}
+                <Card className={`bg-gradient-to-br ${isHealthy ? "from-cyan-900/40 to-gray-900 border-cyan-500/30" : "from-red-900/40 to-gray-900 border-red-500/30"} border`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          {isHealthy ? "✅" : "⚠️"} We Owe / Net Position
+                        </p>
+                        <p className={`text-3xl font-bold ${isHealthy ? "text-cyan-400" : "text-red-400"}`}>
+                          {netPosition >= 0 ? "+" : "-"}{currencySymbol}{Math.abs(netPosition).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Bank ({currencySymbol}{bankBalance.toFixed(2)}) − Owe ({currencySymbol}{weOwe.toFixed(2)})
+                        </p>
+                      </div>
+                      <PiggyBank className={`h-10 w-10 ${isHealthy ? "text-cyan-500/30" : "text-red-500/30"}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
+
           <Card className="bg-gray-900 border-gray-700">
             <CardHeader>
               <div className="flex items-center justify-between">
