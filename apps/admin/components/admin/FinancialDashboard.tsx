@@ -818,12 +818,13 @@ export default function FinancialDashboard() {
     const maxWithdrawable = Math.max(
       0,
       (liabilityMetrics?.theoreticalBankBalance || 0) -
-        (liabilityMetrics?.totalUserCreditsEUR || 0),
+        (liabilityMetrics?.totalUserCreditsEUR || 0) -
+        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
     );
 
     if (amountEUR > maxWithdrawable) {
       toast.error(
-        `Cannot withdraw more than ${currencySymbol}${maxWithdrawable.toFixed(2)} (available after user liabilities)`,
+        `Cannot withdraw more than ${currencySymbol}${maxWithdrawable.toFixed(2)} (available after obligations)`,
       );
       return;
     }
@@ -1256,12 +1257,15 @@ export default function FinancialDashboard() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">💰 Bank Balance</p>
+                    <p className="text-sm text-gray-400">🏦 Theoretical Bank Balance</p>
                     <p className="text-3xl font-bold text-green-400">
                       {currencySymbol}
                       {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(
                         2,
                       )}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      All deposits − all withdrawals − bank fees
                     </p>
                   </div>
                   <TrendingUp className="h-10 w-10 text-green-500/30" />
@@ -1273,15 +1277,20 @@ export default function FinancialDashboard() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">⚠️ User Liabilities</p>
+                    <p className="text-sm text-gray-400">⚠️ Total Obligations</p>
                     <p className="text-3xl font-bold text-red-400">
                       {currencySymbol}
-                      {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
+                      {(
+                        (liabilityMetrics?.totalUserCreditsEUR || 0) +
+                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0)
+                      ).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {liabilityMetrics?.totalUserCredits?.toLocaleString() ||
-                        0}{" "}
-                      {creditName}
+                      {liabilityMetrics?.totalUserCredits?.toLocaleString() || 0}{" "}
+                      {creditName} owed to users
+                      {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0
+                        ? ` + ${currencySymbol}${(platformFinancials?.outstandingVAT || 0).toFixed(2)} VAT`
+                        : ""}
                     </p>
                   </div>
                   <ShieldAlert className="h-10 w-10 text-red-500/30" />
@@ -1289,52 +1298,48 @@ export default function FinancialDashboard() {
               </CardContent>
             </Card>
 
-            <Card
-              className={`bg-gradient-to-br ${
+            {(() => {
+              const safeToSpend = Math.max(
+                0,
                 (liabilityMetrics?.theoreticalBankBalance || 0) -
-                  (liabilityMetrics?.totalUserCreditsEUR || 0) >=
-                0
-                  ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
-                  : "from-orange-900/40 to-gray-900 border-orange-500/30"
-              } border`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      💰 Available to Spend
-                    </p>
-                    <p
-                      className={`text-3xl font-bold ${
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) >=
-                        0
-                          ? "text-cyan-400"
-                          : "text-orange-400"
-                      }`}
-                    >
-                      {currencySymbol}
-                      {Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Coverage:{" "}
-                      {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(
-                        0,
-                      )}
-                      %
-                      {(liabilityMetrics?.coverageRatio || 1) >= 1
-                        ? " ✅"
-                        : " ⚠️"}
-                    </p>
-                  </div>
-                  <Wallet className="h-10 w-10 text-cyan-500/30" />
-                </div>
-              </CardContent>
-            </Card>
+                  (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
+              );
+              const isPositive = safeToSpend > 0;
+              return (
+                <Card
+                  className={`bg-gradient-to-br ${
+                    isPositive
+                      ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
+                      : "from-orange-900/40 to-gray-900 border-orange-500/30"
+                  } border`}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          💰 Safe to Spend / Withdraw
+                        </p>
+                        <p
+                          className={`text-3xl font-bold ${
+                            isPositive ? "text-cyan-400" : "text-orange-400"
+                          }`}
+                        >
+                          {currencySymbol}
+                          {safeToSpend.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Bank − obligations · Coverage:{" "}
+                          {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(0)}%
+                          {(liabilityMetrics?.coverageRatio || 1) >= 1 ? " ✅" : " ⚠️"}
+                        </p>
+                      </div>
+                      <Wallet className="h-10 w-10 text-cyan-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
 
           {/* TWO-COLUMN MONEY FLOW */}
@@ -1450,8 +1455,7 @@ export default function FinancialDashboard() {
                         <span className="text-green-400 font-semibold">
                           +{currencySymbol}
                           {(
-                            (platformFinancials?.totalUnclaimedPools || 0) /
-                            conversionRate
+                            platformFinancials?.totalUnclaimedPools || 0
                           ).toFixed(2)}
                         </span>
                       </div>
@@ -1551,32 +1555,6 @@ export default function FinancialDashboard() {
                         </span>
                       </div>
                     )}
-                    {/* GM Fees Paid */}
-                    {(platformFinancials?.totalGameMasterFees || 0) > 0 && (
-                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
-                        <div>
-                          <span className="text-gray-300">
-                            Game Master Fees
-                          </span>
-                          <div className="text-xs text-gray-500">
-                            Comp: {currencySymbol}
-                            {(
-                              platformFinancials?.gmFeesFromCompetitions || 0
-                            ).toFixed(2)}{" "}
-                            | Chall: {currencySymbol}
-                            {(
-                              platformFinancials?.gmFeesFromChallenges || 0
-                            ).toFixed(2)}
-                          </div>
-                        </div>
-                        <span className="text-amber-400 font-semibold">
-                          -{currencySymbol}
-                          {(
-                            platformFinancials?.totalGameMasterFees || 0
-                          ).toFixed(2)}
-                        </span>
-                      </div>
-                    )}
                     {/* Vendor Payments */}
                     {(platformFinancials?.totalVendorPayments || 0) > 0 && (
                       <div className="flex justify-between items-center py-2 border-b border-red-500/10">
@@ -1655,26 +1633,38 @@ export default function FinancialDashboard() {
                 </div>
               </div>
 
+              {/* GM Fees Info (internal credit movement, not bank outflow) */}
+              {(platformFinancials?.totalGameMasterFees || 0) > 0 && (
+                <div className="mt-4 p-3 bg-amber-950/20 border border-amber-500/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-amber-300 text-sm font-medium">
+                        👑 Game Master Referral Fees (internal credits)
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        Paid to GMs from prize pools — not a bank outflow, increases user liabilities
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Comp: {currencySymbol}
+                        {(platformFinancials?.gmFeesFromCompetitions || 0).toFixed(2)}{" "}
+                        | Chall: {currencySymbol}
+                        {(platformFinancials?.gmFeesFromChallenges || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="text-amber-400 font-semibold">
+                      {currencySymbol}
+                      {(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Bottom Summary Bar */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
+              <div className="mt-4 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-sm text-gray-400">
-                      Platform Net Earnings
-                    </p>
-                    <p className="text-2xl font-bold text-emerald-400">
-                      {currencySymbol}
-                      {(platformFinancials?.totalNetEarningsEUR || 0).toFixed(
-                        2,
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Fees earned minus bank costs
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      Current Bank Balance
+                      Theoretical Bank Balance
                     </p>
                     <p className="text-2xl font-bold text-green-400">
                       {currencySymbol}
@@ -1683,23 +1673,39 @@ export default function FinancialDashboard() {
                       )}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Total IN - Total OUT
+                      Total IN − Total OUT
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">
-                      Available to Spend/Withdraw
+                      Must Reserve for Users
+                    </p>
+                    <p className="text-2xl font-bold text-red-400">
+                      -{currencySymbol}
+                      {(
+                        (liabilityMetrics?.totalUserCreditsEUR || 0) +
+                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0)
+                      ).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      User balances{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + outstanding VAT" : ""}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">
+                      Safe to Spend / Withdraw
                     </p>
                     <p className="text-2xl font-bold text-cyan-400">
                       {currencySymbol}
                       {Math.max(
                         0,
                         (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
+                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                       ).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      After reserving user funds
+                      After all obligations
                     </p>
                   </div>
                 </div>
@@ -1854,52 +1860,46 @@ export default function FinancialDashboard() {
               </CardContent>
             </Card>
 
-            <Card
-              className={`bg-gradient-to-br ${
+            {(() => {
+              const availableToSpend = Math.max(
+                0,
                 (liabilityMetrics?.theoreticalBankBalance || 0) -
-                  (liabilityMetrics?.totalUserCreditsEUR || 0) >=
-                0
-                  ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
-                  : "from-orange-900/40 to-gray-900 border-orange-500/30"
-              } border`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      💰 Available to Spend
-                    </p>
-                    <p
-                      className={`text-3xl font-bold ${
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) >=
-                        0
-                          ? "text-cyan-400"
-                          : "text-orange-400"
-                      }`}
-                    >
-                      {currencySymbol}
-                      {Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Coverage:{" "}
-                      {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(
-                        0,
-                      )}
-                      %
-                      {(liabilityMetrics?.coverageRatio || 1) >= 1
-                        ? " ✅"
-                        : " ⚠️"}
-                    </p>
-                  </div>
-                  <Wallet className="h-10 w-10 text-cyan-500/30" />
-                </div>
-              </CardContent>
-            </Card>
+                  (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
+              );
+              const isPositive = availableToSpend > 0;
+              return (
+                <Card
+                  className={`bg-gradient-to-br ${
+                    isPositive
+                      ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
+                      : "from-orange-900/40 to-gray-900 border-orange-500/30"
+                  } border`}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          💰 Available to Spend
+                        </p>
+                        <p
+                          className={`text-3xl font-bold ${
+                            isPositive ? "text-cyan-400" : "text-orange-400"
+                          }`}
+                        >
+                          {currencySymbol}
+                          {availableToSpend.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Bank − user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " − VAT" : ""}
+                        </p>
+                      </div>
+                      <Wallet className="h-10 w-10 text-cyan-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
 
           {/* Two-Column: EUR IN vs EUR OUT */}
@@ -2107,11 +2107,12 @@ export default function FinancialDashboard() {
                       {Math.max(
                         0,
                         (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
+                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                       ).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Safe to withdraw/use
+                      After user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
                     </p>
                   </div>
                 </div>
@@ -2285,9 +2286,13 @@ export default function FinancialDashboard() {
                     </p>
                     <p className="text-3xl font-bold text-green-400">
                       {currencySymbol}
-                      {(platformFinancials?.totalNetEarningsEUR || 0).toFixed(
-                        2,
-                      )}
+                      {(
+                        (platformFinancials?.totalNetEarningsEUR || 0) -
+                        (platformFinancials?.totalGameMasterFees || 0)
+                      ).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      After bank fees &amp; GM fees
                     </p>
                   </div>
                   <TrendingUp className="h-10 w-10 text-green-500/30" />
@@ -2510,7 +2515,10 @@ export default function FinancialDashboard() {
                       <span className="text-white font-bold">TOTAL COSTS</span>
                       <span className="text-red-400 font-bold text-xl">
                         -{currencySymbol}
-                        {(platformFinancials?.totalBankFees || 0).toFixed(2)}
+                        {(
+                          (platformFinancials?.totalBankFees || 0) +
+                          (platformFinancials?.totalGameMasterFees || 0)
+                        ).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -2525,12 +2533,15 @@ export default function FinancialDashboard() {
                       = Net Platform Earnings
                     </p>
                     <p className="text-xs text-gray-400">
-                      Gross Earnings - Provider Costs
+                      Gross Earnings − Bank Fees − GM Fees
                     </p>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">
                     {currencySymbol}
-                    {(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}
+                    {(
+                      (platformFinancials?.totalNetEarningsEUR || 0) -
+                      (platformFinancials?.totalGameMasterFees || 0)
+                    ).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -2612,6 +2623,15 @@ export default function FinancialDashboard() {
                       {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
                     </span>
                   </div>
+                  {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">Outstanding VAT</span>
+                      <span className="text-orange-400 font-semibold">
+                        -{currencySymbol}
+                        {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-3 border-t-2 border-cyan-500/30">
                     <span className="text-white font-bold text-lg">
                       💰 Can Withdraw
@@ -2621,7 +2641,8 @@ export default function FinancialDashboard() {
                       {Math.max(
                         0,
                         (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
+                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                       ).toFixed(2)}
                     </span>
                   </div>
@@ -2656,7 +2677,8 @@ export default function FinancialDashboard() {
                       Math.max(
                         0,
                         (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0),
+                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                       ) <= 0
                     }
                   >
@@ -3032,11 +3054,12 @@ export default function FinancialDashboard() {
                   {Math.max(
                     0,
                     (liabilityMetrics?.theoreticalBankBalance || 0) -
-                      (liabilityMetrics?.totalUserCreditsEUR || 0),
+                      (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                      (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                   ).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Net position (Bank - User Credits)
+                  Bank − user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " − VAT" : ""}
                 </p>
               </CardContent>
             </Card>
@@ -3050,10 +3073,13 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold text-green-400">
                   {currencySymbol}
-                  {(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}
+                  {(
+                    (platformFinancials?.totalNetEarningsEUR || 0) -
+                    (platformFinancials?.totalGameMasterFees || 0)
+                  ).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  After all deductions
+                  After bank fees &amp; GM fees
                 </p>
               </CardContent>
             </Card>
@@ -3413,11 +3439,12 @@ export default function FinancialDashboard() {
                   {Math.max(
                     0,
                     (liabilityMetrics?.theoreticalBankBalance || 0) -
-                      (liabilityMetrics?.totalUserCreditsEUR || 0),
+                      (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                      (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                   ).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Available after user liabilities
+                  After user liabilities{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
                 </p>
               </CardContent>
             </Card>
@@ -3569,7 +3596,8 @@ export default function FinancialDashboard() {
             // Reason: Use the same theoreticalBankBalance from liabilityMetrics as the overview tab
             // to ensure consistency across all financial dashboard views.
             const bankBalance = liabilityMetrics?.theoreticalBankBalance || 0;
-            const weOwe = totalCreditsEUR;
+            const outstandingVAT = vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0;
+            const weOwe = totalCreditsEUR + outstandingVAT;
             const netPosition = bankBalance - weOwe;
             const isHealthy = netPosition >= 0;
 
@@ -3623,7 +3651,7 @@ export default function FinancialDashboard() {
                           {netPosition >= 0 ? "+" : "-"}{currencySymbol}{Math.abs(netPosition).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Bank ({currencySymbol}{bankBalance.toFixed(2)}) − Owe ({currencySymbol}{weOwe.toFixed(2)})
+                          Bank ({currencySymbol}{bankBalance.toFixed(2)}) − Owe ({currencySymbol}{weOwe.toFixed(2)}{outstandingVAT > 0 ? ` incl. VAT` : ""})
                         </p>
                       </div>
                       <PiggyBank className={`h-10 w-10 ${isHealthy ? "text-cyan-500/30" : "text-red-500/30"}`} />
@@ -5095,7 +5123,8 @@ export default function FinancialDashboard() {
                 {Math.max(
                   0,
                   (liabilityMetrics?.theoreticalBankBalance || 0) -
-                    (liabilityMetrics?.totalUserCreditsEUR || 0),
+                    (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                    (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                 ).toFixed(2)}
               </div>
               <div className="text-xs text-gray-500 mt-1 space-y-1">
@@ -5113,6 +5142,15 @@ export default function FinancialDashboard() {
                     {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
                   </span>
                 </div>
+                {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Outstanding VAT:</span>
+                    <span className="text-red-400">
+                      -{currencySymbol}
+                      {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5129,7 +5167,8 @@ export default function FinancialDashboard() {
                 max={Math.max(
                   0,
                   (liabilityMetrics?.theoreticalBankBalance || 0) -
-                    (liabilityMetrics?.totalUserCreditsEUR || 0),
+                    (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                    (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                 )}
                 className="mt-1 bg-gray-800 border-gray-700 text-white"
               />
@@ -5360,6 +5399,17 @@ export default function FinancialDashboard() {
                     {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
                   </span>
                 </div>
+                {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-400">
+                      Outstanding VAT:
+                    </span>
+                    <span className="text-red-400 font-mono">
+                      -{currencySymbol}
+                      {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 border-t border-gray-700">
                   <span className="text-gray-300 font-semibold">
                     Available to Pay:
@@ -5367,7 +5417,8 @@ export default function FinancialDashboard() {
                   <span
                     className={`font-mono font-bold ${
                       (liabilityMetrics?.theoreticalBankBalance || 0) -
-                        (liabilityMetrics?.totalUserCreditsEUR || 0) >=
+                        (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0) >=
                       0
                         ? "text-green-400"
                         : "text-orange-400"
@@ -5377,7 +5428,8 @@ export default function FinancialDashboard() {
                     {Math.max(
                       0,
                       (liabilityMetrics?.theoreticalBankBalance || 0) -
-                        (liabilityMetrics?.totalUserCreditsEUR || 0),
+                        (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
                     ).toFixed(2)}
                   </span>
                 </div>

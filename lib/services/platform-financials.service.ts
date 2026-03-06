@@ -242,9 +242,9 @@ export const PlatformFinancialsService = {
   /**
    * Record admin withdrawal (converting platform credits to real money)
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recordAdminWithdrawal: async (
     params: AdminWithdrawalParams,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ success: boolean; transaction?: any; error?: string }> => {
     await connectToDatabase();
 
@@ -390,42 +390,51 @@ export const PlatformFinancialsService = {
     };
 
     // Process earnings
-    let totalUnclaimedPools = 0;
-    let totalPlatformFees = 0; // Competition fees
-    let totalChallengeFees = 0; // Challenge fees
-    const totalMarketplaceSales = marketplaceSales.totalSales;
+    // Reason: ALL summary totals below are in EUR for consistent financial reporting.
+    // PlatformTransaction stores `amount` (credits for comp/challenge/unclaimed/GM fees,
+    // EUR for deposit/withdrawal fees) and `amountEUR` (always EUR).
+    // We use `earning.totalEUR` for credit-based types to get proper EUR values.
+    let totalUnclaimedPools = 0; // EUR
+    let totalPlatformFees = 0; // EUR — Competition platform fees
+    let totalChallengeFees = 0; // EUR — Challenge platform fees
+    const totalMarketplaceSales = marketplaceSales.totalSales / conversionRate; // EUR
     const marketplacePurchases = marketplaceSales.purchaseCount;
-    let totalDepositFeesGross = 0;
-    let totalWithdrawalFeesGross = 0;
-    let totalBankDepositFees = 0;
-    let totalBankWithdrawalFees = 0;
-    let netDepositEarnings = 0;
-    let netWithdrawalEarnings = 0;
-    let totalAdminWithdrawals = 0;
-    let totalAdminWithdrawalsEUR = 0;
-    let totalRetainedGmFees = 0;
+    let totalDepositFeesGross = 0; // EUR — already stored in EUR
+    let totalWithdrawalFeesGross = 0; // EUR — already stored in EUR
+    let totalBankDepositFees = 0; // EUR
+    let totalBankWithdrawalFees = 0; // EUR
+    let netDepositEarnings = 0; // EUR
+    let netWithdrawalEarnings = 0; // EUR
+    let totalAdminWithdrawals = 0; // Credits (for credit display)
+    let totalAdminWithdrawalsEUR = 0; // EUR
+    let totalRetainedGmFees = 0; // EUR
     let retainedGmFeesCount = 0;
 
     for (const earning of platformEarnings) {
       switch (earning._id) {
         case "unclaimed_pool":
-          totalUnclaimedPools = earning.total;
+          // Reason: Use totalEUR because `amount` is in credits for unclaimed pools
+          totalUnclaimedPools = earning.totalEUR;
           break;
         case "platform_fee":
-          totalPlatformFees = earning.total;
+          // Reason: Use totalEUR because `amount` is in credits for competition fees
+          totalPlatformFees = earning.totalEUR;
           break;
         case "challenge_platform_fee":
-          totalChallengeFees = earning.total;
+          // Reason: Use totalEUR because `amount` is in credits for challenge fees
+          totalChallengeFees = earning.totalEUR;
           break;
         case "deposit_fee":
-          totalDepositFeesGross = earning.totalPlatformFees || earning.total;
+          // Reason: For deposit fees, amount and amountEUR are both EUR
+          totalDepositFeesGross = earning.totalPlatformFees || earning.totalEUR;
           totalBankDepositFees = earning.totalBankFees || 0;
           netDepositEarnings =
             earning.totalNetEarnings ||
             totalDepositFeesGross - totalBankDepositFees;
           break;
         case "withdrawal_fee":
-          totalWithdrawalFeesGross = earning.totalPlatformFees || earning.total;
+          // Reason: For withdrawal fees, amount and amountEUR are both EUR
+          totalWithdrawalFeesGross = earning.totalPlatformFees || earning.totalEUR;
           totalBankWithdrawalFees = earning.totalBankFees || 0;
           netWithdrawalEarnings =
             earning.totalNetEarnings ||
@@ -436,13 +445,14 @@ export const PlatformFinancialsService = {
           totalAdminWithdrawalsEUR = Math.abs(earning.totalEUR);
           break;
         case "retained_gm_fee":
-          totalRetainedGmFees = earning.total;
+          // Reason: Use totalEUR because `amount` is in credits for retained GM fees
+          totalRetainedGmFees = earning.totalEUR;
           retainedGmFeesCount = earning.count;
           break;
       }
     }
 
-    // Calculate totals (including challenge fees, marketplace sales, and retained GM fees)
+    // Reason: All values below are now consistently in EUR
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
     const totalGrossEarnings =
       totalUnclaimedPools +
@@ -462,7 +472,7 @@ export const PlatformFinancialsService = {
       totalRetainedGmFees;
     const totalNetEarningsEUR = totalNetEarnings;
 
-    const platformNetCredits = totalNetEarnings - totalAdminWithdrawals;
+    const platformNetCredits = totalNetEarnings - totalAdminWithdrawalsEUR;
     const platformNetEUR = platformNetCredits;
 
     // Get VAT data
@@ -497,16 +507,16 @@ export const PlatformFinancialsService = {
     const totalVATPaid = vatPaidAggregation[0]?.totalPaid || 0;
     const outstandingVAT = totalVATCollected - totalVATPaid;
 
-    // Bank reconciliation:
-    // What we HAVE = Money received from users - Bank fees taken - Money paid out + Platform fees (from contests)
+    // Bank reconciliation (ALL values in EUR):
+    // What we HAVE = Money received from users - Bank fees taken - Money paid out
     // IMPORTANT: Bank fees (Stripe, etc.) are DEDUCTED from what we receive, so subtract them!
-    // Competition/Challenge fees are earned from prize pools, which come from entry fees (already in deposits)
+    // Reason: walletStats.totalDeposited is already in EUR (tracked as eurAmount on deposit).
+    // walletStats.totalWithdrawn is in CREDITS (tracked as amountCredits), so we convert to EUR.
+    const totalUserWithdrawalsEUR = walletStats.totalWithdrawn / conversionRate;
     const totalMoneyReceivedGross =
       walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
     const totalMoneyPaidOut =
-      walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid;
-    // FIXED: Subtract bank fees because they reduce what we actually have in bank
-    // Add competition/challenge fees as they represent earnings from the platform (not deducted from user wallets directly)
+      totalUserWithdrawalsEUR + totalAdminWithdrawalsEUR + totalVATPaid;
     const theoreticalBankBalance =
       totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
 
@@ -551,8 +561,8 @@ export const PlatformFinancialsService = {
       platformNetCredits,
       platformNetEUR,
 
-      totalUserDeposits: walletStats.totalDeposited,
-      totalUserWithdrawals: walletStats.totalWithdrawn,
+      totalUserDeposits: walletStats.totalDeposited, // EUR
+      totalUserWithdrawals: totalUserWithdrawalsEUR, // EUR (converted from credits)
       theoreticalBankBalance,
 
       coverageRatio,
@@ -577,8 +587,8 @@ export const PlatformFinancialsService = {
       skip?: number;
       startDate?: Date;
       endDate?: Date;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } = {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ transactions: any[]; total: number }> => {
     await connectToDatabase();
 

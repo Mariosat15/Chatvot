@@ -210,6 +210,7 @@ export async function GET(request: NextRequest) {
     // Reason: Break down competition platform fees by admin-created vs GM-created.
     // Uses the `isGmCreated` flag stored directly on PlatformTransaction at recording time,
     // avoiding expensive $lookup joins to the competitions collection.
+    // Reason: Use $amountEUR for consistent EUR reporting (amount field is in credits).
     let adminCompPlatformFees = 0;
     let gmCompPlatformFees = 0;
     let adminCompPlatformFeeCount = 0;
@@ -234,10 +235,10 @@ export async function GET(request: NextRequest) {
 
       for (const item of compFeeBreakdown) {
         if (item._id === true) {
-          gmCompPlatformFees = item.totalFees || 0;
+          gmCompPlatformFees = item.totalFeesEUR || 0;
           gmCompPlatformFeeCount = item.count || 0;
         } else {
-          adminCompPlatformFees = item.totalFees || 0;
+          adminCompPlatformFees = item.totalFeesEUR || 0;
           adminCompPlatformFeeCount = item.count || 0;
         }
       }
@@ -356,14 +357,15 @@ export async function GET(request: NextRequest) {
           totalFeeTransactions: platformFees[0]?.count || 0,
         },
         // NEW: Enhanced platform financial metrics
+        // Reason: GM fees from WalletTransaction are in credits — convert to EUR for consistency
         platformFinancials: {
           ...platformFinancialStats,
-          totalGameMasterFees: gameMasterFees[0]?.totalFees || 0,
-          gmFeesFromCompetitions: gmCompetitionFees?.totalFees || 0,
-          gmFeesFromChallenges: gmChallengeFees?.totalFees || 0,
+          totalGameMasterFees: (gameMasterFees[0]?.totalFees || 0) / conversionRate,
+          gmFeesFromCompetitions: (gmCompetitionFees?.totalFees || 0) / conversionRate,
+          gmFeesFromChallenges: (gmChallengeFees?.totalFees || 0) / conversionRate,
           gmCompetitionPaymentCount: gmCompetitionFees?.count || 0,
           gmChallengePaymentCount: gmChallengeFees?.count || 0,
-          gmFeesDetail: gmFeesDetail, // Top GMs by earnings
+          gmFeesDetail: gmFeesDetail, // Top GMs by earnings (amounts in credits)
           unclaimedPools: unclaimedPoolsSummary,
           // Reason: Breakdown of competition platform fees by creator type (admin vs GM).
           // This helps admins understand revenue attribution and validate GM competition economics.
