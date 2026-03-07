@@ -176,12 +176,18 @@ async function sendHeartbeat(): Promise<void> {
       cpuPercent = Math.round(avg / cpus.length);
     }
 
-    const onlineProcs = pm2Procs.filter((p) => p.status === "online").length;
+    // On secondary servers, the worker is intentionally stopped (IS_PRIMARY=false).
+    // Exclude it from the health check so it doesn't falsely trigger "degraded".
+    const relevantProcs = IS_PRIMARY
+      ? pm2Procs
+      : pm2Procs.filter((p) => p.name !== "chartvolt-worker");
+
+    const onlineProcs = relevantProcs.filter((p) => p.status === "online").length;
 
     const status =
       onlineProcs === 0
         ? "degraded"
-        : onlineProcs < pm2Procs.length
+        : onlineProcs < relevantProcs.length
           ? "degraded"
           : "online";
 
