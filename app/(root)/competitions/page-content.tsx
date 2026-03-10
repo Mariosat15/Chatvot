@@ -35,9 +35,10 @@ import {
   getAllDifficultyLevels,
 } from "@/lib/utils/competition-difficulty";
 
-// Auto-refresh interval — 30s is sufficient for list views where data changes
-// infrequently. Visibility/focus handlers provide instant refresh on tab switch.
-const AUTO_REFRESH_INTERVAL = 30000;
+// Adaptive poll intervals (ms) — speeds up when a competition is about to start
+const POLL_FAST = 5_000; // Within 2 min of a start time
+const POLL_NORMAL = 15_000; // Within 10 min of a start time
+const POLL_SLOW = 30_000; // Default — far from any transition
 
 interface Competition {
   _id: string;
@@ -195,6 +196,52 @@ export default function CompetitionsPageContent({
     fetchRiskSettings();
   }, []);
 
+  // Reason: Compute the fastest-needed poll interval by checking the soonest
+  // upcoming competition start time. This keeps polling lazy (30s) most of the
+  // time but ramps up to 5s when a transition is imminent.
+  const getAdaptivePollInterval = useCallback(
+    (comps: Competition[]) => {
+      const now = Date.now();
+      let soonest = Infinity;
+      for (const c of comps) {
+        if (c.status === "upcoming") {
+          const ms = new Date(c.startTime).getTime() - now;
+          if (ms < soonest) soonest = ms;
+        }
+      }
+      if (soonest <= 0) return POLL_FAST; // Already past start — check rapidly
+      if (soonest <= 2 * 60 * 1000) return POLL_FAST;
+      if (soonest <= 10 * 60 * 1000) return POLL_NORMAL;
+      return POLL_SLOW;
+    },
+    [],
+  );
+
+  // Reason: After fetching the list, if any "upcoming" competitions have already
+  // passed their startTime, the DB status is stale (the worker or detail-page
+  // visit hasn't transitioned them yet). Fire a lightweight per-competition
+  // status request that triggers the auto-transition server-side, then re-fetch
+  // the list to pick up the new status. Capped at 3 to avoid burst load.
+  const triggerStaleTransitions = useCallback(
+    async (comps: Competition[]) => {
+      const now = Date.now();
+      const stale = comps.filter(
+        (c) =>
+          c.status === "upcoming" && new Date(c.startTime).getTime() <= now,
+      );
+      if (stale.length === 0) return false;
+
+      // Fire-and-forget for up to 3 stale competitions
+      await Promise.allSettled(
+        stale.slice(0, 3).map((c) =>
+          fetch(`/api/competitions/${c._id}/status`),
+        ),
+      );
+      return true; // Signal that a re-fetch is needed
+    },
+    [],
+  );
+
   // Fetch fresh data
   const refreshData = useCallback(
     async (showSpinner = true) => {
@@ -207,8 +254,24 @@ export default function CompetitionsPageContent({
 
         if (competitionsRes.ok) {
           const data = await competitionsRes.json();
-          setCompetitions(data.competitions || []);
+          const freshComps: Competition[] = data.competitions || [];
+          setCompetitions(freshComps);
           setUserInCompetitionIdsState(data.userInCompetitionIds || []);
+
+          // Trigger transitions for stale competitions, then re-fetch once
+          const hadStale = await triggerStaleTransitions(freshComps);
+          if (hadStale) {
+            // Short delay so the server has time to persist the transition
+            await new Promise((r) => setTimeout(r, 2000));
+            const retryRes = await fetch("/api/competitions");
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              setCompetitions(retryData.competitions || []);
+              setUserInCompetitionIdsState(
+                retryData.userInCompetitionIds || [],
+              );
+            }
+          }
         }
 
         if (walletRes.ok) {
@@ -223,7 +286,7 @@ export default function CompetitionsPageContent({
         setIsRefreshing(false);
       }
     },
-    [initialBalance],
+    [initialBalance, triggerStaleTransitions],
   );
 
   // Load saved filters on mount
@@ -239,14 +302,29 @@ export default function CompetitionsPageContent({
     setIsHydrated(true);
   }, []);
 
-  // Auto-refresh interval (always on)
+  // Adaptive auto-refresh: uses setTimeout chain so interval recalculates each cycle
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshData(false); // Silent refresh (no spinner)
-    }, AUTO_REFRESH_INTERVAL);
+    let timer: NodeJS.Timeout | null = null;
+    let cancelled = false;
 
-    return () => clearInterval(interval);
-  }, [refreshData]);
+    const poll = async () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      await refreshData(false);
+      if (cancelled) return;
+      const interval = getAdaptivePollInterval(competitions);
+      timer = setTimeout(poll, interval);
+    };
+
+    // Start first cycle after the current interval
+    const interval = getAdaptivePollInterval(competitions);
+    timer = setTimeout(poll, interval);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshData, getAdaptivePollInterval]);
 
   // Refresh when tab becomes visible again
   useEffect(() => {
@@ -256,16 +334,10 @@ export default function CompetitionsPageContent({
       }
     };
 
-    const handleFocus = () => {
-      refreshData(false);
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [refreshData]);
 

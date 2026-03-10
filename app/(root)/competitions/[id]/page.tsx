@@ -256,6 +256,7 @@ const CompetitionDetailsPage = async ({
         <CompetitionStatusMonitor
           competitionId={id}
           initialStatus={competition.status}
+          startTime={competition.startTime}
           userId={userId}
         />
 
