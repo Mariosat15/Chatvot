@@ -233,13 +233,12 @@ export default function CompetitionCard({
   };
 
   useEffect(() => {
-    if (isUpcoming) {
+    if (!isUpcoming) return;
+    setLiveCountdown(getTimeUntilStart());
+    const interval = setInterval(() => {
       setLiveCountdown(getTimeUntilStart());
-      const interval = setInterval(() => {
-        setLiveCountdown(getTimeUntilStart());
-      }, 1000);
-      return () => clearInterval(interval);
-    }
+    }, 1000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUpcoming, competition.startTime]);
 
