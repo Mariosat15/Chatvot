@@ -59,9 +59,14 @@ export async function GET() {
     const cs = appSettings?.currency?.symbol || "€";
 
     // Determine if KYC is required - check KYC settings first, fallback to withdrawal settings
-    const kycRequiredForWithdrawal =
+    // Reason: requiredAmount > 0 means KYC is only needed above that threshold
+    const kycEnabledForWithdrawal =
       (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
       withdrawalSettings.requireKYC;
+
+    // For the GET (eligibility check), we don't have a specific amount yet,
+    // so we pass the threshold info to let the frontend know
+    const kycAmountThreshold = kycSettings?.requiredAmount || 0;
 
     // Check eligibility
     const eligibility = await checkWithdrawalEligibility(
@@ -70,8 +75,10 @@ export async function GET() {
       withdrawalSettings,
       creditSettings,
       isSandbox,
-      kycRequiredForWithdrawal,
+      kycEnabledForWithdrawal,
       cs,
+      kycAmountThreshold,
+      kycSettings,
     );
 
     // Calculate fees
@@ -238,7 +245,8 @@ export async function GET() {
         processingTimeHours: withdrawalSettings.processingTimeHours,
         allowedMethods: withdrawalSettings.allowedPayoutMethods,
         preferredMethod: withdrawalSettings.preferredPayoutMethod,
-        requireKYC: kycRequiredForWithdrawal,
+        requireKYC: kycEnabledForWithdrawal,
+        kycAmountThreshold,
         conversionRate: conversionRate,
       },
       isSandbox,
@@ -371,10 +379,11 @@ export async function POST(request: NextRequest) {
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
-    const kycRequiredForWithdrawal =
+    const kycEnabledForWithdrawal =
       (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
       withdrawalSettings.requireKYC;
     const cs = appSettings?.currency?.symbol || "€";
+    const kycAmountThreshold = kycSettings?.requiredAmount || 0;
 
     // Determine withdrawal method (original method, UPO card, or bank account)
     let bankAccount = null;
@@ -477,15 +486,18 @@ export async function POST(request: NextRequest) {
       payoutMethodType = "bank_transfer";
     }
 
-    // Check eligibility
+    // Check eligibility (pass actual withdrawal amount for KYC threshold check)
     const eligibility = await checkWithdrawalEligibility(
       session.user.id,
       wallet,
       withdrawalSettings,
       creditSettings,
       isSandbox,
-      kycRequiredForWithdrawal,
+      kycEnabledForWithdrawal,
       cs,
+      kycAmountThreshold,
+      kycSettings,
+      amountEUR, // Reason: pass actual amount so we can check against KYC threshold
     );
 
     if (!eligibility.eligible) {
@@ -903,6 +915,10 @@ async function checkWithdrawalEligibility(
   isSandbox: boolean,
   kycRequired: boolean = false,
   currencySymbol: string = "€",
+  kycAmountThreshold: number = 0,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  kycSettings: Record<string, any> | null = null,
+  withdrawalAmountEUR?: number,
 ): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
 
@@ -960,13 +976,30 @@ async function checkWithdrawalEligibility(
   }
 
   // Check KYC requirement (uses combined KYC settings from both models)
+  // Reason: If kycAmountThreshold > 0, KYC is only required for withdrawals >= threshold
   if (kycRequired && !wallet.kycVerified) {
-    return {
-      eligible: false,
-      reason:
-        "KYC verification required before withdrawal. Please complete identity verification.",
-      warnings,
-    };
+    const amountToCheck = withdrawalAmountEUR ?? 0;
+    const thresholdApplies =
+      kycAmountThreshold > 0 && amountToCheck > 0
+        ? amountToCheck >= kycAmountThreshold
+        : true; // threshold = 0 means always required
+
+    if (thresholdApplies) {
+      // Use custom KYC message from settings if available
+      const kycMessage =
+        kycSettings?.kycRequiredMessage ||
+        "KYC verification required before withdrawal. Please complete identity verification.";
+      return {
+        eligible: false,
+        reason: kycMessage,
+        warnings,
+      };
+    } else {
+      // Amount is below the KYC threshold — allow but warn
+      warnings.push(
+        `KYC verification will be required for withdrawals of ${currencySymbol}${kycAmountThreshold} or more.`,
+      );
+    }
   }
 
   // Check deposit requirement

@@ -15,6 +15,7 @@ export interface IKYCSession extends Document {
     | "started"
     | "submitted"
     | "approved"
+    | "pending_review"
     | "declined"
     | "resubmission_requested"
     | "expired"
@@ -106,6 +107,7 @@ const KYCSessionSchema = new Schema<IKYCSession>(
         "started",
         "submitted",
         "approved",
+        "pending_review",
         "declined",
         "resubmission_requested",
         "expired",

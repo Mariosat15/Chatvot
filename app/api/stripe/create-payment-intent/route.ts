@@ -37,11 +37,12 @@ export async function POST(req: NextRequest) {
         console.log(
           `🛡️ KYC required for deposit - user ${session.user.id} not verified`,
         );
+        // Reason: Use custom KYC message from settings if available
+        const kycMessage =
+          kycSettings?.kycRequiredMessage ||
+          "KYC verification required before depositing. Please complete identity verification first.";
         return NextResponse.json(
-          {
-            error:
-              "KYC verification required before depositing. Please complete identity verification first.",
-          },
+          { error: kycMessage },
           { status: 403 },
         );
       }

@@ -133,14 +133,14 @@ export async function GET() {
         }
       }
 
-      // Check if session has been pending too long (over 2 minutes) - likely abandoned/interrupted
-      // This allows users to quickly retry if they closed the verification window
+      // Reason: Use configurable sessionExpiryMinutes to detect abandoned sessions
+      // If a session is in 'created' or 'started' for longer than the configured expiry, mark it abandoned
       if (sessionStatus === "created" || sessionStatus === "started") {
         const sessionAge =
           Date.now() - new Date(latestSession.createdAt).getTime();
-        const twoMinutes = 2 * 60 * 1000;
+        const expiryMs = (settings.sessionExpiryMinutes || 30) * 60 * 1000;
 
-        if (sessionAge > twoMinutes) {
+        if (sessionAge > expiryMs) {
           // Mark as abandoned so user can retry
           await KYCSession.findByIdAndUpdate(latestSession._id, {
             status: "abandoned",

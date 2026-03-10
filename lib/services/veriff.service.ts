@@ -141,13 +141,12 @@ class VeriffService {
     ]);
 
     if (existingSession) {
-      // Check if session is old (over 5 minutes) - mark as expired and allow new session
-      // This allows quick retry if user interrupted/closed the verification window
+      // Reason: Use configurable sessionExpiryMinutes instead of hardcoded 5 minutes
       const sessionAge =
         Date.now() - new Date(existingSession.createdAt).getTime();
-      const fiveMinutes = 5 * 60 * 1000;
+      const expiryMs = (settings.sessionExpiryMinutes || 30) * 60 * 1000;
 
-      if (sessionAge > fiveMinutes) {
+      if (sessionAge > expiryMs) {
         // Mark old session as expired
         await KYCSession.findByIdAndUpdate(existingSession._id, {
           status: "abandoned",
@@ -368,6 +367,42 @@ class VeriffService {
       status = "expired";
     }
 
+    // Reason: Enforce allowedDocumentTypes — if Veriff approved with a disallowed document type, decline it
+    if (
+      status === "approved" &&
+      settings.allowedDocumentTypes?.length > 0 &&
+      verification.document?.type
+    ) {
+      const docType = verification.document.type.toUpperCase();
+      const allowed = settings.allowedDocumentTypes.map((t: string) =>
+        t.toUpperCase(),
+      );
+      if (!allowed.includes(docType)) {
+        console.log(
+          `⚠️ [KYC] Document type "${docType}" not in allowed list [${allowed.join(", ")}] — declining`,
+        );
+        status = "declined";
+      }
+    }
+
+    // Reason: Enforce allowedCountries — if the document country is not in the allowed list, decline
+    if (
+      status === "approved" &&
+      settings.allowedCountries?.length > 0 &&
+      verification.document?.country
+    ) {
+      const docCountry = verification.document.country.toUpperCase();
+      const allowedCountries = settings.allowedCountries.map((c: string) =>
+        c.toUpperCase(),
+      );
+      if (!allowedCountries.includes(docCountry)) {
+        console.log(
+          `⚠️ [KYC] Document country "${docCountry}" not in allowed list [${allowedCountries.join(", ")}] — declining`,
+        );
+        status = "declined";
+      }
+    }
+
     // Update session
     await KYCSession.findByIdAndUpdate(session._id, {
       status,
@@ -407,101 +442,113 @@ class VeriffService {
 
     if (wallet) {
       if (status === "approved") {
-        console.log("🎉 [KYC] Approving KYC for user:", userId);
-        // Determine expiry date:
-        // 1. Use document validUntil from Veriff if available
-        // 2. Fall back to our settings (verificationValidDays from verification date)
-        let expiresAt: Date;
+        // Reason: Respect autoApproveOnSuccess setting — if false, hold for admin review
+        if (settings.autoApproveOnSuccess === false) {
+          console.log("⏸️ [KYC] Auto-approve disabled — holding for admin review:", userId);
 
-        if (verification.document?.validUntil) {
-          // Use the document's actual expiry date from Veriff
-          expiresAt = new Date(verification.document.validUntil);
+          await CreditWallet.findByIdAndUpdate(wallet._id, {
+            kycVerified: false,
+            kycStatus: "pending_review",
+          });
+
+          // Update session to reflect it needs admin review
+          await KYCSession.findByIdAndUpdate(session._id, {
+            status: "pending_review",
+          });
+
+          // Notify user that their verification is under review
+          await sendKYCStartedNotification(userId);
+          console.log("📧 [KYC] Pending review notification sent");
         } else {
-          // Fall back to our configured validity period
-          expiresAt = new Date();
-          expiresAt.setDate(
-            expiresAt.getDate() + settings.verificationValidDays,
-          );
-        }
+          console.log("🎉 [KYC] Approving KYC for user:", userId);
+          // Determine expiry date:
+          // 1. Use document validUntil from Veriff if available
+          // 2. Fall back to our settings (verificationValidDays from verification date)
+          let expiresAt: Date;
 
-        const updateResult = await CreditWallet.findByIdAndUpdate(
-          wallet._id,
-          {
-            kycVerified: true,
-            kycStatus: "approved",
-            kycVerifiedAt: new Date(),
-            kycExpiresAt: expiresAt,
-          },
-          { new: true },
-        );
-
-        console.log("✅ [KYC] Wallet updated:", {
-          kycVerified: updateResult?.kycVerified,
-          kycStatus: updateResult?.kycStatus,
-          kycVerifiedAt: updateResult?.kycVerifiedAt,
-        });
-
-        // Send approval notification
-        await sendKYCApprovedNotification(userId);
-        console.log("📧 [KYC] Approval notification sent");
-
-        // Trigger milestone and badge check after KYC approval
-        try {
-          const { checkAndCompleteMilestones } = await import(
-            "@/lib/services/journey-progress.service"
-          );
-          const journeyResult = await checkAndCompleteMilestones(userId);
-          if (journeyResult.completed.length > 0) {
-            console.log(
-              `🗺️ [KYC] Journey milestones completed: ${journeyResult.completed.join(", ")}`
+          if (verification.document?.validUntil) {
+            // Use the document's actual expiry date from Veriff
+            expiresAt = new Date(verification.document.validUntil);
+          } else {
+            // Fall back to our configured validity period
+            expiresAt = new Date();
+            expiresAt.setDate(
+              expiresAt.getDate() + settings.verificationValidDays,
             );
           }
 
-          const { evaluateUserBadges } = await import(
-            "@/lib/services/badge-evaluation.service"
-          );
-          await evaluateUserBadges(userId);
-          console.log(`🏅 [KYC] Badge evaluation completed for user ${userId}`);
-        } catch (gamificationError) {
-          console.error("🗺️ [KYC] Error checking milestones:", gamificationError);
-          // Don't fail the KYC if gamification check fails
-        }
-
-        // Check for duplicate KYC (fraud detection)
-        try {
-          const duplicateResult = await checkForDuplicateKYC(
-            userId,
-            session._id.toString(),
+          const updateResult = await CreditWallet.findByIdAndUpdate(
+            wallet._id,
             {
-              documentNumber: verification.document?.number,
-              documentType: verification.document?.type,
-              documentCountry: verification.document?.country,
-              idNumber: verification.person?.idNumber,
-              firstName: verification.person?.firstName,
-              lastName: verification.person?.lastName,
-              dateOfBirth: verification.person?.dateOfBirth,
+              kycVerified: true,
+              kycStatus: "approved",
+              kycVerifiedAt: new Date(),
+              kycExpiresAt: expiresAt,
             },
+            { new: true },
           );
 
-          if (duplicateResult.isDuplicate) {
-            console.log(
-              `🚨 [KYC Fraud] Duplicate document detected for user ${userId}!`,
+          console.log("✅ [KYC] Wallet updated:", {
+            kycVerified: updateResult?.kycVerified,
+            kycStatus: updateResult?.kycStatus,
+            kycVerifiedAt: updateResult?.kycVerifiedAt,
+          });
+
+          // Send approval notification
+          await sendKYCApprovedNotification(userId);
+          console.log("📧 [KYC] Approval notification sent");
+
+          // Trigger milestone and badge check after KYC approval
+          try {
+            const { checkAndCompleteMilestones } = await import(
+              "@/lib/services/journey-progress.service"
             );
-            console.log(
-              `   Matched with accounts: ${duplicateResult.duplicateAccounts.map((d) => d.userId).join(", ")}`,
+            const journeyResult = await checkAndCompleteMilestones(userId);
+            if (journeyResult.completed.length > 0) {
+              console.log(
+                `🗺️ [KYC] Journey milestones completed: ${journeyResult.completed.join(", ")}`,
+              );
+            }
+
+            const { evaluateUserBadges } = await import(
+              "@/lib/services/badge-evaluation.service"
+            );
+            await evaluateUserBadges(userId);
+            console.log(`🏅 [KYC] Badge evaluation completed for user ${userId}`);
+          } catch (gamificationError) {
+            console.error("🗺️ [KYC] Error checking milestones:", gamificationError);
+            // Don't fail the KYC if gamification check fails
+          }
+
+          // Check for duplicate KYC (fraud detection)
+          try {
+            const duplicateResult = await checkForDuplicateKYC(
+              userId,
+              session._id.toString(),
+              {
+                documentNumber: verification.document?.number,
+                documentType: verification.document?.type,
+                documentCountry: verification.document?.country,
+                idNumber: verification.person?.idNumber,
+                firstName: verification.person?.firstName,
+                lastName: verification.person?.lastName,
+                dateOfBirth: verification.person?.dateOfBirth,
+              },
             );
 
-            // Optionally suspend the account if duplicate found
-            // This is commented out by default - admin should review manually
-            // await CreditWallet.findByIdAndUpdate(wallet._id, {
-            //   kycVerified: false,
-            //   kycStatus: 'flagged',
-            // });
+            if (duplicateResult.isDuplicate) {
+              console.log(
+                `🚨 [KYC Fraud] Duplicate document detected for user ${userId}!`,
+              );
+              console.log(
+                `   Matched with accounts: ${duplicateResult.duplicateAccounts.map((d) => d.userId).join(", ")}`,
+              );
+            }
+          } catch (error) {
+            console.error("Error checking for duplicate KYC:", error);
+            // Don't fail the verification if fraud check fails
           }
-        } catch (error) {
-          console.error("Error checking for duplicate KYC:", error);
-          // Don't fail the verification if fraud check fails
-        }
+        } // close autoApproveOnSuccess else branch
       } else if (status === "declined") {
         // Increment attempt count only on rejection (not on session start)
         await CreditWallet.findByIdAndUpdate(wallet._id, {
