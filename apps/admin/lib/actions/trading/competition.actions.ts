@@ -346,9 +346,10 @@ export const createCompetition = async (competitionData: {
       slug = `${baseSlug}-${counter}`;
     }
 
-    // Set registration deadline to 1 hour before start time
+    // Reason: Registration stays open until the competition starts.
+    // Setting deadline = startTime prevents the old bug where -1hr made
+    // near-future competitions immediately show "Registration Closed".
     const registrationDeadline = new Date(competitionData.startTime);
-    registrationDeadline.setHours(registrationDeadline.getHours() - 1);
 
     // Fetch current trading risk settings to save with competition
     // Use getSingleton() which uses the correct ID 'global-trading-risk-settings'
@@ -503,12 +504,18 @@ export const enterCompetition = async (competitionId: string) => {
         throw new Error("Competition is not open for entries");
       }
 
-      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed
+      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed.
+      // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
       const now = new Date();
-      if (competition.registrationDeadline && now > new Date(competition.registrationDeadline)) {
-        throw new Error(
-          "Registration for this competition has closed. No new entries are accepted."
-        );
+      if (competition.registrationDeadline) {
+        const deadline = new Date(competition.registrationDeadline);
+        const start = new Date(competition.startTime);
+        const effectiveDeadline = deadline < start ? start : deadline;
+        if (now > effectiveDeadline) {
+          throw new Error(
+            "Registration for this competition has closed. No new entries are accepted."
+          );
+        }
       }
 
       // Check if competition is full

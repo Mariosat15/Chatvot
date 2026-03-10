@@ -467,10 +467,15 @@ const CompetitionDetailsPage = async ({
                 participantStatus={userParticipant?.status}
                 userLevel={userLevel}
                 registrationClosed={
-                  // Reason: Check if registration deadline has passed to block new entries
-                  competition.registrationDeadline
-                    ? new Date() > new Date(competition.registrationDeadline)
-                    : false
+                  // Reason: Check if registration deadline has passed to block new entries.
+                  // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
+                  (() => {
+                    if (!competition.registrationDeadline) return false;
+                    const deadline = new Date(competition.registrationDeadline);
+                    const start = new Date(competition.startTime);
+                    const effectiveDeadline = deadline < start ? start : deadline;
+                    return new Date() > effectiveDeadline;
+                  })()
                 }
               />
             )}

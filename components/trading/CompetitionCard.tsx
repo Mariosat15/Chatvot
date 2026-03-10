@@ -134,10 +134,17 @@ export default function CompetitionCard({
   const isUpcoming = competition.status === "upcoming";
   const isCancelled = competition.status === "cancelled";
 
-  // Reason: Check if registration deadline has passed to block new entries
-  const registrationClosed = competition.registrationDeadline
-    ? new Date() > new Date(competition.registrationDeadline)
-    : false;
+  // Reason: Registration closes when the deadline passes. For legacy competitions
+  // where registrationDeadline was incorrectly set to 1hr before startTime,
+  // we cap the effective deadline at startTime so registration stays open until start.
+  const registrationClosed = (() => {
+    if (!competition.registrationDeadline) return false;
+    const deadline = new Date(competition.registrationDeadline);
+    const start = new Date(competition.startTime);
+    // Effective deadline is never earlier than startTime (legacy data guard)
+    const effectiveDeadline = deadline < start ? start : deadline;
+    return new Date() > effectiveDeadline;
+  })();
 
   const rankingMethod = competition.rules?.rankingMethod || "pnl";
   // eslint-disable-next-line security/detect-object-injection
@@ -296,16 +303,7 @@ export default function CompetitionCard({
     }
   };
 
-  // Format date helper
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
+  // Format date+time helper for card/list display
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-GB", {
@@ -857,7 +855,7 @@ export default function CompetitionCard({
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Starts</p>
                 <p className="text-xs font-bold text-gray-100">
-                  {formatDate(competition.startTime)}
+                  {formatDateTime(competition.startTime)}
                 </p>
               </div>
             </div>
@@ -871,7 +869,7 @@ export default function CompetitionCard({
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Ends</p>
                 <p className="text-xs font-bold text-gray-100">
-                  {formatDate(competition.endTime)}
+                  {formatDateTime(competition.endTime)}
                 </p>
               </div>
             </div>

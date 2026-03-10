@@ -118,18 +118,24 @@ export async function POST(
         );
       }
 
-      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed
+      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed.
+      // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
       const now = new Date();
-      if (competition.registrationDeadline && now > new Date(competition.registrationDeadline)) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Registration for this competition has closed. No new entries are accepted.",
-          },
-          { status: 400 },
-        );
+      if (competition.registrationDeadline) {
+        const deadline = new Date(competition.registrationDeadline);
+        const start = new Date(competition.startTime);
+        const effectiveDeadline = deadline < start ? start : deadline;
+        if (now > effectiveDeadline) {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Registration for this competition has closed. No new entries are accepted.",
+            },
+            { status: 400 },
+          );
+        }
       }
 
       if (competition.currentParticipants >= competition.maxParticipants) {
