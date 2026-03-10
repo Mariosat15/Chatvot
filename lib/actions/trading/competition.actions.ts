@@ -85,9 +85,12 @@ export const getCompetitionById = async (competitionId: string) => {
         try {
           const { cancelCompetitionAndRefund } =
             await import("@/lib/actions/trading/competition-cancel.actions");
+          // Reason: skipRevalidation=true because this runs inside getCompetitionById
+          // which executes during SSR render — revalidatePath is forbidden during render.
           await cancelCompetitionAndRefund(
             competitionId,
             `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`,
+            true, // skipRevalidation — called during render
           );
 
           // Refresh the competition data
@@ -125,9 +128,11 @@ export const getCompetitionById = async (competitionId: string) => {
         try {
           const { cancelCompetitionAndRefund } =
             await import("@/lib/actions/trading/competition-cancel.actions");
+          // Reason: skipRevalidation=true — same as above, called during render.
           await cancelCompetitionAndRefund(
             competitionId,
             `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`,
+            true, // skipRevalidation — called during render
           );
 
           competition = (await Competition.findById(

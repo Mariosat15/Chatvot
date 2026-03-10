@@ -15,6 +15,9 @@ import mongoose from "mongoose";
 export async function cancelCompetitionAndRefund(
   competitionId: string,
   reason: string,
+  // Reason: When called during SSR render (e.g. getCompetitionById backup check),
+  // revalidatePath throws. Pass true to skip it — the render already shows fresh data.
+  skipRevalidation = false,
 ): Promise<{ success: boolean; refundedCount: number; totalRefunded: number }> {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -155,11 +158,13 @@ export async function cancelCompetitionAndRefund(
     console.log(`   Refunded: ${refundedCount} participants`);
     console.log(`   Total refunded: ${totalRefunded} credits`);
 
-    // Revalidate pages to show updated status
-    revalidatePath(`/competitions/${competitionId}`);
-    revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath("/competitions");
-    revalidatePath("/admin/competitions");
+    // Revalidate pages to show updated status (skip during SSR render)
+    if (!skipRevalidation) {
+      revalidatePath(`/competitions/${competitionId}`);
+      revalidatePath(`/competitions/${competitionId}/trade`);
+      revalidatePath("/competitions");
+      revalidatePath("/admin/competitions");
+    }
 
     return {
       success: true,
