@@ -36,7 +36,7 @@ const LEVEL_NAMES: Record<number, { emoji: string; name: string }> = {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   competition: any;
   userBalance: number;
   isCompleted?: boolean;
@@ -125,7 +125,7 @@ export default function CompetitionCard({
   const [showTerms, setShowTerms] = useState(false);
   const [liveCountdown, setLiveCountdown] = useState("");
   const router = useRouter();
-  const { formatCredits, settings } = useAppSettings();
+  const { settings } = useAppSettings();
 
   const canAfford =
     userBalance >= (competition.entryFee || competition.entryFeeCredits || 0);
@@ -134,9 +134,16 @@ export default function CompetitionCard({
   const isUpcoming = competition.status === "upcoming";
   const isCancelled = competition.status === "cancelled";
 
+  // Reason: Check if registration deadline has passed to block new entries
+  const registrationClosed = competition.registrationDeadline
+    ? new Date() > new Date(competition.registrationDeadline)
+    : false;
+
   const rankingMethod = competition.rules?.rankingMethod || "pnl";
+  // eslint-disable-next-line security/detect-object-injection
   const theme = COMPETITION_THEMES[rankingMethod] || COMPETITION_THEMES.pnl;
   const rankingInfo =
+    // eslint-disable-next-line security/detect-object-injection
     RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
   // Reason: Determine who created this competition for the creator badge.
@@ -233,6 +240,7 @@ export default function CompetitionCard({
       }, 1000);
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUpcoming, competition.startTime]);
 
   const getDuration = () => {
@@ -258,8 +266,8 @@ export default function CompetitionCard({
     competition.entryFee || competition.entryFeeCredits || 0;
 
   // Reason: Show terms dialog before entering a competition
-  const handleEnter = async () => {
-    if (!canAfford || isFull) return;
+  const _handleEnter = async () => {
+    if (!canAfford || isFull || registrationClosed) return;
     setShowTerms(true);
   };
 
@@ -872,7 +880,7 @@ export default function CompetitionCard({
         </div>
 
         {/* Countdown Timer - Casino Slot Style */}
-        {isUpcoming && (
+        {isUpcoming && !registrationClosed && (
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-yellow-500/10 border border-yellow-500/30">
             <div className="flex items-center justify-center gap-3">
               <GameIcon name="fireSpell" size={16} className="animate-pulse" />
@@ -883,6 +891,18 @@ export default function CompetitionCard({
                 </span>
               </div>
               <GameIcon name="fireSpell" size={16} className="animate-pulse" />
+            </div>
+          </div>
+        )}
+
+        {/* Registration Closed Notice */}
+        {registrationClosed && !isUserIn && !isCompleted && !isCancelled && (
+          <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-red-500/10 via-red-500/5 to-red-500/10 border border-red-500/30">
+            <div className="flex items-center justify-center gap-2">
+              <GameIcon name="timer" size={16} />
+              <span className="text-xs text-red-400 font-bold">
+                Registration Closed
+              </span>
             </div>
           </div>
         )}
@@ -963,13 +983,17 @@ export default function CompetitionCard({
                 {(() => {
                   const minLevel = competition.levelRequirement.minLevel || 1;
                   const maxLevel = competition.levelRequirement.maxLevel;
-                  const minInfo = LEVEL_NAMES[minLevel] || {
+                  const minLvl = Number(minLevel);
+                  // eslint-disable-next-line security/detect-object-injection
+                  const minInfo = LEVEL_NAMES[minLvl] || {
                     emoji: "🌱",
                     name: "Novice Trader",
                   };
 
                   if (maxLevel && maxLevel !== minLevel) {
-                    const maxInfo = LEVEL_NAMES[maxLevel] || {
+                    const maxLvl = Number(maxLevel);
+                    // eslint-disable-next-line security/detect-object-injection
+                    const maxInfo = LEVEL_NAMES[maxLvl] || {
                       emoji: "👑",
                       name: "Trading God",
                     };
@@ -1002,12 +1026,14 @@ export default function CompetitionCard({
               className={`w-full font-black text-base py-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                 isUserIn
                   ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/30"
-                  : isFull || !canAfford
+                  : registrationClosed && !isUserIn
                     ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                    : `bg-gradient-to-r ${theme.gradient} text-gray-900 shadow-lg ${theme.glow} hover:shadow-xl`
+                    : isFull || !canAfford
+                      ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                      : `bg-gradient-to-r ${theme.gradient} text-gray-900 shadow-lg ${theme.glow} hover:shadow-xl`
               }`}
               disabled={
-                entering || (isFull && !isUserIn) || (!canAfford && !isUserIn)
+                entering || (isFull && !isUserIn) || (!canAfford && !isUserIn) || (registrationClosed && !isUserIn)
               }
             >
               {entering ? (
@@ -1019,6 +1045,11 @@ export default function CompetitionCard({
                 <span className="flex items-center gap-2">
                   <GameIcon name="joystick1" size={22} />
                   Enter Arena
+                </span>
+              ) : registrationClosed ? (
+                <span className="flex items-center gap-2">
+                  <GameIcon name="timer" size={20} />
+                  Registration Closed
                 </span>
               ) : isFull ? (
                 <span className="flex items-center gap-2">

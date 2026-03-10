@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
-import CompetitionStatusWrapper from "@/components/trading/CompetitionStatusWrapper";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import UTCClock from "@/components/trading/UTCClock";
@@ -467,6 +466,12 @@ const CompetitionDetailsPage = async ({
                 isFull={isFull}
                 participantStatus={userParticipant?.status}
                 userLevel={userLevel}
+                registrationClosed={
+                  // Reason: Check if registration deadline has passed to block new entries
+                  competition.registrationDeadline
+                    ? new Date() > new Date(competition.registrationDeadline)
+                    : false
+                }
               />
             )}
 
@@ -726,11 +731,15 @@ const CompetitionDetailsPage = async ({
                       "🌟 Legend",
                       "👑 Trading God",
                     ];
-                    const min = competition.levelRequirement.minLevel;
-                    const max = competition.levelRequirement.maxLevel;
-                    return max
-                      ? `${levelNames[min]} to ${levelNames[max]}`
-                      : `${levelNames[min]} or higher`;
+                    const min = Number(competition.levelRequirement.minLevel);
+                    const max = competition.levelRequirement.maxLevel ? Number(competition.levelRequirement.maxLevel) : null;
+                    // eslint-disable-next-line security/detect-object-injection
+                    const minName = levelNames[min] || `Level ${min}`;
+                    // eslint-disable-next-line security/detect-object-injection
+                    const maxName = max ? levelNames[max] || `Level ${max}` : null;
+                    return maxName
+                      ? `${minName} to ${maxName}`
+                      : `${minName} or higher`;
                   })()}
                 </p>
               </div>

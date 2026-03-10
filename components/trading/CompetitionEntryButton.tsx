@@ -41,13 +41,14 @@ const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   competition: any;
   userBalance: number;
   isUserIn: boolean;
   isFull: boolean;
   participantStatus?: string; // 'active' | 'liquidated' | 'disqualified' | 'completed' | 'cancelled'
   userLevel?: { level: number; title: string; icon: string };
+  registrationClosed?: boolean; // Whether registration deadline has passed
 }
 
 export default function CompetitionEntryButton({
@@ -57,6 +58,7 @@ export default function CompetitionEntryButton({
   isFull,
   participantStatus,
   userLevel = { level: 1, title: "Novice Trader", icon: "🌱" },
+  registrationClosed = false,
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -88,11 +90,15 @@ export default function CompetitionEntryButton({
   const getLevelReqMessage = () => {
     if (!hasLevelReq) return null;
 
-    const minLevelInfo = LEVEL_NAMES[minLevel] || {
+    const minLvl = Number(minLevel);
+    // eslint-disable-next-line security/detect-object-injection
+    const minLevelInfo = LEVEL_NAMES[minLvl] || {
       icon: "🌱",
       title: `Level ${minLevel}`,
     };
-    const maxLevelInfo = maxLevel ? LEVEL_NAMES[maxLevel] : null;
+    const maxLvl = maxLevel ? Number(maxLevel) : null;
+    // eslint-disable-next-line security/detect-object-injection
+    const maxLevelInfo = maxLvl ? LEVEL_NAMES[maxLvl] : null;
 
     if (!meetsMinLevel) {
       return {
@@ -119,12 +125,14 @@ export default function CompetitionEntryButton({
 
   const levelReqMessage = getLevelReqMessage();
 
+  // Reason: Block entry if registration deadline has passed, even if competition is still "active"
   const canEnter =
     (isActive || isUpcoming) &&
     !isFull &&
     canAfford &&
     !isUserIn &&
-    meetsLevelReq;
+    meetsLevelReq &&
+    !registrationClosed;
 
   // Check if user is disqualified (liquidated or disqualified status)
   const isDisqualified =
@@ -310,6 +318,11 @@ export default function CompetitionEntryButton({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Entering...
               </>
+            ) : registrationClosed ? (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                Registration Closed
+              </>
             ) : !meetsLevelReq ? (
               <>
                 <Lock className="mr-2 h-4 w-4" />
@@ -329,6 +342,16 @@ export default function CompetitionEntryButton({
               </>
             )}
           </Button>
+
+          {/* Registration Closed Warning */}
+          {registrationClosed && !isUserIn && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <Lock className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-400">
+                Registration for this competition has closed. No new entries are being accepted.
+              </p>
+            </div>
+          )}
 
           {/* Level Requirement Warning */}
           {levelReqMessage && (

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -23,7 +24,7 @@ export const getCompetitions = async (filters?: {
   try {
     await connectToDatabase();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const query: any = {};
     if (filters?.status) {
       query.status = filters.status;
@@ -404,6 +405,15 @@ export const enterCompetition = async (competitionId: string) => {
         );
       }
 
+      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed
+      // even if the competition status is still "upcoming" or "active"
+      const now = new Date();
+      if (competition.registrationDeadline && now > new Date(competition.registrationDeadline)) {
+        throw new Error(
+          "Registration for this competition has closed. No new entries are accepted."
+        );
+      }
+
       // Check if competition is full
       if (competition.currentParticipants >= competition.maxParticipants) {
         throw new Error("Competition is full");
@@ -713,7 +723,7 @@ export const getCompetitionLeaderboard = async (
     const participantMap = new Map(participants.map((p) => [p.userId, p]));
 
     // Prepare participant data
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const participantData = participants.map((p: any) => ({
       userId: p.userId,
       username: p.username || "Anonymous",
@@ -739,7 +749,7 @@ export const getCompetitionLeaderboard = async (
     };
 
     // Calculate rankings with tie-breaking
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const rankedParticipants = calculateRankings(
       participantData,
       rules as any,
@@ -795,7 +805,7 @@ export const getUserCompetitions = async (status?: "active" | "completed") => {
 
     await connectToDatabase();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const query: any = { userId: session.user.id };
     if (status) {
       query.status = status;
@@ -814,7 +824,7 @@ export const getUserCompetitions = async (status?: "active" | "completed") => {
     // Merge data
     const userCompetitions = participants.map((participant) => {
       const competition = competitions.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         (c: any) => c._id.toString() === participant.competitionId,
       );
       return {

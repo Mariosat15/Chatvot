@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -21,7 +22,7 @@ export const getCompetitions = async (filters?: {
   try {
     await connectToDatabase();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const query: any = {};
     if (filters?.status) {
       query.status = filters.status;
@@ -502,6 +503,14 @@ export const enterCompetition = async (competitionId: string) => {
         throw new Error("Competition is not open for entries");
       }
 
+      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed
+      const now = new Date();
+      if (competition.registrationDeadline && now > new Date(competition.registrationDeadline)) {
+        throw new Error(
+          "Registration for this competition has closed. No new entries are accepted."
+        );
+      }
+
       // Check if competition is full
       if (competition.currentParticipants >= competition.maxParticipants) {
         throw new Error("Competition is full");
@@ -800,7 +809,7 @@ export const getCompetitionLeaderboard = async (
     const { getTitleByXP } = await import("@/lib/constants/levels");
 
     // Prepare participant data
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const participantData = participants.map((p: any) => ({
       userId: p.userId,
       username: p.username || "Anonymous",
@@ -886,7 +895,7 @@ export const getUserCompetitions = async (status?: "active" | "completed") => {
 
     await connectToDatabase();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const query: any = { userId: session.user.id };
     if (status) {
       query.status = status;
@@ -905,7 +914,7 @@ export const getUserCompetitions = async (status?: "active" | "completed") => {
     // Merge data
     const userCompetitions = participants.map((participant) => {
       const competition = competitions.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         (c: any) => c._id.toString() === participant.competitionId,
       );
       return {
