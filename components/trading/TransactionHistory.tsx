@@ -36,6 +36,8 @@ interface Transaction {
     | "challenge_entry"
     | "challenge_win"
     | "challenge_refund"
+    | "challenge_declined"
+    | "challenge_expired"
     | "marketplace_purchase"
     | "incident_compensation"
     | "gamemaster_earning"
@@ -184,6 +186,8 @@ export default function TransactionHistory({
             "challenge_entry",
             "challenge_win",
             "challenge_refund",
+            "challenge_declined",
+            "challenge_expired",
           ].includes(tx.transactionType);
         case "referrals":
           return [
@@ -489,6 +493,10 @@ function TransactionItem({
         return <Swords className="h-5 w-5 text-yellow-500" />;
       case "challenge_refund":
         return <Swords className="h-5 w-5 text-purple-500" />;
+      case "challenge_declined":
+        return <Swords className="h-5 w-5 text-gray-400" />;
+      case "challenge_expired":
+        return <Swords className="h-5 w-5 text-gray-500" />;
       case "incident_compensation":
         return <Gift className="h-5 w-5 text-green-500" />;
       // GM Referral earnings
@@ -526,6 +534,10 @@ function TransactionItem({
         return "⚔️ Challenge Win";
       case "challenge_refund":
         return "⚔️ Challenge Refund";
+      case "challenge_declined":
+        return "⚔️ Challenge Declined";
+      case "challenge_expired":
+        return "⚔️ Challenge Expired";
       case "incident_compensation":
         return "💰 Compensation";
       // GM Referral earnings

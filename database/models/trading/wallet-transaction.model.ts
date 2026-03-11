@@ -15,6 +15,8 @@ export interface IWalletTransaction extends Document {
     | "challenge_entry" // User enters 1v1 challenge (deduct credits)
     | "challenge_win" // User wins 1v1 challenge (add credits)
     | "challenge_refund" // Challenge cancelled/declined (refund entry fee)
+    | "challenge_declined" // Challenge was declined by opponent (informational, €0)
+    | "challenge_expired" // Challenge expired without response (informational, €0)
     | "platform_fee" // Platform fee deducted from winnings
     | "admin_adjustment" // Manual adjustment by admin
     | "marketplace_purchase" // User purchases item from marketplace
@@ -64,6 +66,8 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         "challenge_entry",
         "challenge_win",
         "challenge_refund",
+        "challenge_declined",
+        "challenge_expired",
         "platform_fee",
         "admin_adjustment",
         "marketplace_purchase",

@@ -1121,6 +1121,8 @@ export default function FinancialDashboard() {
       challenge_win: "bg-yellow-600",
       challenge_platform_fee: "bg-orange-500",
       challenge_refund: "bg-purple-400",
+      challenge_declined: "bg-gray-400",
+      challenge_expired: "bg-gray-500",
       // GM-related transactions
       retained_gm_fee: "bg-cyan-500",
       gamemaster_referral: "bg-amber-500",
@@ -1143,6 +1145,7 @@ export default function FinancialDashboard() {
     ["deposit_fee", "Deposit Fee"],
     ["challenge_entry", "⚔️ Challenge Entry"], ["challenge_win", "⚔️ Challenge Win"],
     ["challenge_platform_fee", "⚔️ Challenge Fee"], ["challenge_refund", "⚔️ Challenge Refund"],
+    ["challenge_declined", "⚔️ Challenge Declined"], ["challenge_expired", "⚔️ Challenge Expired"],
     ["retained_gm_fee", "🎮 Retained GM Fee"], ["gamemaster_referral", "🎮 GM Referral (Comp)"],
     ["gamemaster_earning", "🎮 GM Referral (Comp)"], ["gamemaster_challenge_referral", "🎮 GM Referral (Challenge)"],
   ]);

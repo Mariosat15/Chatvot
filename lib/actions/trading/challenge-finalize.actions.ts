@@ -1507,7 +1507,10 @@ export async function finalizeEndedChallenges() {
 }
 
 /**
- * Expire pending challenges that have passed their deadline
+ * Expire pending challenges that have passed their deadline.
+ * Reason: We fetch challenges before bulk-updating so we can create
+ * informational €0 transaction records for challengers, giving them
+ * visibility that their challenge expired without any charge.
  */
 export async function expirePendingChallenges() {
   try {
@@ -1515,17 +1518,75 @@ export async function expirePendingChallenges() {
 
     const now = new Date();
 
+    // Fetch challenges first so we can record transactions for challengers
+    const expiredChallenges = await Challenge.find({
+      status: "pending",
+      acceptDeadline: { $lte: now },
+    })
+      .select("_id challengerId challengedName slug entryFee")
+      .lean();
+
+    if (expiredChallenges.length === 0) {
+      return { expired: 0 };
+    }
+
+    // Bulk expire
     const result = await Challenge.updateMany(
       {
+        _id: { $in: expiredChallenges.map((c: any) => c._id) },
         status: "pending",
-        acceptDeadline: { $lte: now },
       },
-      {
-        $set: { status: "expired" },
-      },
+      { $set: { status: "expired" } },
     );
 
     console.log(`Expired ${result.modifiedCount} pending challenges`);
+
+    // Record informational €0 transactions for challengers (fire and forget)
+    try {
+      const challengerIds = [
+        ...new Set(expiredChallenges.map((c: any) => c.challengerId)),
+      ];
+      const wallets = await CreditWallet.find({
+        userId: { $in: challengerIds },
+      })
+        .select("userId creditBalance")
+        .lean();
+      const walletMap = new Map(
+        wallets.map((w: any) => [w.userId, w.creditBalance]),
+      );
+
+      const txDocs = expiredChallenges.map((c: any) => {
+        const balance = walletMap.get(c.challengerId) ?? 0;
+        return {
+          userId: c.challengerId,
+          transactionType: "challenge_expired",
+          amount: 0,
+          balanceBefore: balance,
+          balanceAfter: balance,
+          currency: "EUR",
+          exchangeRate: 1,
+          status: "completed",
+          description: `Challenge to ${c.challengedName} expired — no response, no charge`,
+          metadata: {
+            challengeId: c._id.toString(),
+            challengeSlug: c.slug,
+            opponentName: c.challengedName,
+            originalEntryFee: c.entryFee,
+          },
+          processedAt: new Date(),
+        };
+      });
+
+      if (txDocs.length > 0) {
+        await WalletTransaction.insertMany(txDocs);
+      }
+    } catch (txError) {
+      // Reason: Transaction records are informational — don't fail expiry if they error
+      console.warn(
+        "⚠️ Failed to create expire transaction records:",
+        txError,
+      );
+    }
 
     return { expired: result.modifiedCount };
   } catch (error) {

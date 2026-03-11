@@ -3,6 +3,8 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import Challenge from "@/database/models/trading/challenge.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 // POST - Decline a challenge
 export async function POST(
@@ -48,6 +50,39 @@ export async function POST(
     challenge.declinedAt = new Date();
     await challenge.save();
 
+    // Reason: Record a €0 informational transaction so the challenger sees
+    // the decline in their wallet/transaction history. No credits were taken
+    // at challenge creation — the entry fee is only charged when both accept.
+    try {
+      const challengerWallet = await CreditWallet.findOne({
+        userId: challenge.challengerId,
+      }).lean();
+
+      if (challengerWallet) {
+        await WalletTransaction.create({
+          userId: challenge.challengerId,
+          transactionType: "challenge_declined",
+          amount: 0,
+          balanceBefore: challengerWallet.creditBalance,
+          balanceAfter: challengerWallet.creditBalance,
+          currency: "EUR",
+          exchangeRate: 1,
+          status: "completed",
+          description: `Challenge declined by ${challenge.challengedName} — no charge`,
+          metadata: {
+            challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,
+            opponentName: challenge.challengedName,
+            originalEntryFee: challenge.entryFee,
+          },
+          processedAt: new Date(),
+        });
+      }
+    } catch (txError) {
+      // Reason: Transaction record is informational — don't fail the decline if it errors
+      console.warn("⚠️ Failed to create decline transaction record:", txError);
+    }
+
     // Send notification to challenger
     try {
       const { notificationService } =
@@ -56,11 +91,10 @@ export async function POST(
         userId: challenge.challengerId,
         templateId: "challenge_declined",
         variables: {
-          // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
-          challengeSlug: challenge.slug, // For actionUrl
+          challengeSlug: challenge.slug,
           challengedName: challenge.challengedName,
-          opponentName: challenge.challengedName, // Alias for template compatibility
+          opponentName: challenge.challengedName,
           entryFee: challenge.entryFee,
         },
       });
