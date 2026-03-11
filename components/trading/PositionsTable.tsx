@@ -438,6 +438,9 @@ const PositionsTable = ({
               detail: { positionId, symbol },
             }),
           );
+          // Reason: Trigger an immediate ranking refresh so the live-ranking
+          // panel shows updated win rate / PnL without waiting for the next poll.
+          window.dispatchEvent(new CustomEvent("rankingRefreshNeeded"));
         }
 
         toast.success("Position closed!", {

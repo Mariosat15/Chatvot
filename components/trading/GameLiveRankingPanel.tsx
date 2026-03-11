@@ -75,6 +75,17 @@ export default function GameLiveRankingPanel({
     return () => clearInterval(interval);
   }, [fetchRankings]);
 
+  // Reason: Listen for the "rankingRefreshNeeded" custom event dispatched when a
+  // position is closed. This triggers an immediate re-fetch so the user sees
+  // updated win rate / PnL without waiting for the next 15-second poll.
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchRankings();
+    };
+    window.addEventListener("rankingRefreshNeeded", handleRefresh);
+    return () => window.removeEventListener("rankingRefreshNeeded", handleRefresh);
+  }, [fetchRankings]);
+
   // Get ranking method label
   const getRankingLabel = () => {
     switch (rankingMethod) {

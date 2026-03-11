@@ -54,6 +54,15 @@ export default function GameModePositions({
 
       const result = await closePosition(positionId, lockedPrice);
       if (result.success) {
+        // Reason: Dispatch events so chart removes position line and ranking panels refresh instantly
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("positionClosed", {
+              detail: { positionId, symbol },
+            }),
+          );
+          window.dispatchEvent(new CustomEvent("rankingRefreshNeeded"));
+        }
         toast.success("✅ Position Closed!", {
           description: result.message || "Position closed successfully!",
         });

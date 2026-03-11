@@ -3,15 +3,10 @@ import { connectToDatabase } from "@/database/mongoose";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
-
-// ── In-memory cache (per competition) ──────────────────────────────────
-// Rankings rarely change within 5 seconds. When multiple users view the
-// same competition, this avoids redundant DB queries per viewer.
-const rankingCache = new Map<
-  string,
-  { data: Record<string, unknown>; ts: number }
->();
-const RANKING_CACHE_TTL = 5000; // 5 seconds
+import {
+  getRankingFromCache,
+  setRankingCache,
+} from "@/lib/caches/ranking-cache";
 
 /**
  * GET /api/competitions/[id]/live-ranking
@@ -30,9 +25,9 @@ export async function GET(
 
     const { id: competitionId } = await params;
 
-    // Check cache first — avoids DB queries when multiple users poll simultaneously
-    const cached = rankingCache.get(competitionId);
-    if (cached && Date.now() - cached.ts < RANKING_CACHE_TTL) {
+    // Check shared cache first — avoids DB queries when multiple users poll simultaneously
+    const cached = getRankingFromCache(competitionId);
+    if (cached) {
       // Return cached data but personalise userRank for THIS user
       const userRanking = (
         cached.data.allRankings as Array<{ userId: string; rank: number; liveEquity: number }>
@@ -245,7 +240,7 @@ export async function GET(
       };
     });
 
-    // Store full rankings in cache for all users to share
+    // Store full rankings in shared cache for all users to share
     const cachePayload = {
       allRankings: rankingsWithPrizes,
       totalParticipants: rankings.length,
@@ -253,14 +248,15 @@ export async function GET(
       firstPlaceValue,
       rankingMethod,
     };
-    rankingCache.set(competitionId, { data: cachePayload, ts: Date.now() });
+    setRankingCache(competitionId, cachePayload);
 
     // Find current user's rank
     const userRanking = rankingsWithPrizes.find(
       (r) => r.userId === session.user.id,
     );
 
-    // PERF: Add Cache-Control to reduce redundant requests from polling clients
+    // Reason: Short cache to reduce redundant requests from polling clients,
+    // but low enough that post-trade updates appear within ~3 seconds.
     return NextResponse.json({
       rankings: buildDisplayRankings(rankingsWithPrizes, session.user.id),
       userRank: userRanking?.rank || null,
@@ -271,7 +267,7 @@ export async function GET(
       rankingMethod,
     }, {
       headers: {
-        "Cache-Control": "public, s-maxage=5, stale-while-revalidate=10",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

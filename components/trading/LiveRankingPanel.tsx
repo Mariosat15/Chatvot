@@ -82,6 +82,17 @@ export default function LiveRankingPanel({
     return () => clearInterval(interval);
   }, [fetchRankings]);
 
+  // Reason: Listen for the "rankingRefreshNeeded" custom event dispatched when a
+  // position is closed. This triggers an immediate re-fetch so the user sees
+  // updated win rate / PnL without waiting for the next 15-second poll.
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchRankings();
+    };
+    window.addEventListener("rankingRefreshNeeded", handleRefresh);
+    return () => window.removeEventListener("rankingRefreshNeeded", handleRefresh);
+  }, [fetchRankings]);
+
   const getRankIcon = (rank: number, isDisqualified: boolean) => {
     if (isDisqualified) {
       return <Skull className="h-4 w-4 text-red-500" />;

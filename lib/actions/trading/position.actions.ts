@@ -25,6 +25,7 @@ import {
 import { isMarketOpen } from "@/lib/services/market-hours.service";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import PriceLog from "@/database/models/trading/price-log.model";
+import { invalidateRankingCache } from "@/lib/caches/ranking-cache";
 
 /**
  * Check if market is open and throw error if closed
@@ -584,8 +585,11 @@ export const closePosition = async (
         );
 
         const isWinner = realizedPnl > 0;
+        const isLoser = realizedPnl < 0;
+        // Reason: Breakeven trades (PnL === 0) should NOT count as losses.
+        // Only increment winningTrades for profit, losingTrades for loss.
         const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-        const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+        const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
         // Note: totalTrades was already incremented when position was opened
         const totalTrades = participant.totalTrades;
         const winRate =
@@ -612,7 +616,7 @@ export const closePosition = async (
               currentOpenPositions: -1,
               // totalTrades already counted on position open
               winningTrades: isWinner ? 1 : 0,
-              losingTrades: isWinner ? 0 : 1,
+              losingTrades: isLoser ? 1 : 0,
             },
             $set: {
               currentCapital: newCapital,
@@ -636,6 +640,12 @@ export const closePosition = async (
 
       await mongoSession.commitTransaction();
       mongoSession.endSession(); // End session immediately after commit
+
+      // Reason: Invalidate the live-ranking cache so the next API poll
+      // returns fresh data (updated win rate, PnL, etc.) immediately.
+      if (position.competitionId) {
+        invalidateRankingCache(position.competitionId);
+      }
 
       console.log(
         `✅ Position closed: ${position.symbol}, P&L: $${realizedPnl.toFixed(2)}`,
