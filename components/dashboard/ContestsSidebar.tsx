@@ -44,9 +44,27 @@ interface ChallengeData {
   startTime: Date;
   endTime: Date;
   stakeAmount: number;
-  opponent: { name: string; pnl: number; pnlPercentage: number } | null;
+  // Reason: rankingMethod determines which metric to display in the challenge card
+  rankingMethod?: string;
+  opponent: {
+    name: string;
+    pnl: number;
+    pnlPercentage: number;
+    currentCapital?: number;
+    winRate?: number;
+    winningTrades?: number;
+    losingTrades?: number;
+    totalTrades?: number;
+  } | null;
   userPnL: number;
   userPnLPercentage: number;
+  // Additional stats for non-PnL ranking methods
+  userCurrentCapital?: number;
+  userWinRate?: number;
+  userWinningTrades?: number;
+  userLosingTrades?: number;
+  userTotalTrades?: number;
+  userStartingCapital?: number;
   isLeading: boolean;
   isWinner?: boolean;
   prizeWon?: number;
@@ -111,6 +129,46 @@ function formatCompMetric(comp: CompetitionData): string {
     }
     default:
       return `${comp.pnl >= 0 ? "+" : ""}${formatPnlPercent(comp.pnlPercentage)}`;
+  }
+}
+
+/** Reason: Format the challenge metric based on the challenge's ranking method */
+function formatChallengeMetric(ch: ChallengeData): string {
+  const method = ch.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl":
+      return `${ch.userPnL >= 0 ? "+" : ""}$${Math.abs(ch.userPnL).toFixed(2)}`;
+    case "roi":
+      return `${ch.userPnLPercentage >= 0 ? "+" : ""}${formatPnlPercent(ch.userPnLPercentage)}`;
+    case "total_capital":
+      return `$${(ch.userCurrentCapital || 0).toLocaleString()}`;
+    case "win_rate":
+      return `${(ch.userWinRate || 0).toFixed(1)}%`;
+    case "total_wins":
+      return `${ch.userWinningTrades || 0} wins`;
+    case "profit_factor": {
+      const wins = ch.userWinningTrades || 0;
+      const losses = ch.userLosingTrades || 0;
+      const pf = losses === 0 ? (wins > 0 ? Infinity : 0) : wins / losses;
+      return pf === Infinity ? "∞" : pf.toFixed(2);
+    }
+    default:
+      return `${ch.userPnLPercentage >= 0 ? "+" : ""}${formatPnlPercent(ch.userPnLPercentage)}`;
+  }
+}
+
+/** Reason: Determine if the challenge metric is positive for coloring */
+function isChallengeMetricPositive(ch: ChallengeData): boolean {
+  const method = ch.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl": return ch.userPnL >= 0;
+    case "roi": return ch.userPnLPercentage >= 0;
+    case "total_capital":
+      return (ch.userCurrentCapital || 0) >= (ch.userStartingCapital || 10000);
+    case "win_rate": return (ch.userWinRate || 0) > 50;
+    case "total_wins": return (ch.userWinningTrades || 0) > 0;
+    case "profit_factor": return (ch.userWinningTrades || 0) > (ch.userLosingTrades || 0);
+    default: return ch.userPnL >= 0;
   }
 }
 
@@ -448,20 +506,20 @@ export default function ContestsSidebar({
                     )}
                   </div>
 
-                  {/* User vs Opponent with live PnL */}
+                  {/* User vs Opponent with ranking-method-aware metric */}
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">
                       vs {ch.opponent?.name || "Waiting..."}
                     </span>
                     <span
                       className={
-                        ch.userPnLPercentage >= 0
+                        isChallengeMetricPositive(ch)
                           ? "text-green-400"
                           : "text-red-400"
                       }
+                      title={`Ranked by ${getCompMetricLabel(ch.rankingMethod)}`}
                     >
-                      {ch.userPnLPercentage >= 0 ? "+" : ""}
-                      {formatPnlPercent(ch.userPnLPercentage)}
+                      {formatChallengeMetric(ch)}
                     </span>
                   </div>
 

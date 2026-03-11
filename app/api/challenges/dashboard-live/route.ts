@@ -29,12 +29,13 @@ export async function GET() {
     await connectToDatabase();
 
     // Reason: Only fetch active challenges the user is part of — keep it lightweight
+    // Include "rules" to access rules.rankingMethod for correct metric display
     const activeChallenges = await Challenge.find({
       status: "active",
       $or: [{ challengerId: userId }, { challengedId: userId }],
     })
       .select(
-        "_id challengerId challengedId challengerName challengedName entryFee startingCapital startTime endTime status",
+        "_id challengerId challengedId challengerName challengedName entryFee startingCapital startTime endTime status rules",
       )
       .lean();
 
@@ -45,11 +46,12 @@ export async function GET() {
     const challengeIds = activeChallenges.map((c: any) => c._id.toString());
 
     // Fetch ALL participants for these challenges (both user and opponents)
+    // Reason: Include winRate, winningTrades, losingTrades for non-PnL ranking methods
     const allParticipants = await ChallengeParticipant.find({
       challengeId: { $in: challengeIds },
     })
       .select(
-        "challengeId userId username pnl pnlPercentage realizedPnl unrealizedPnl currentCapital startingCapital totalTrades status",
+        "challengeId userId username pnl pnlPercentage realizedPnl unrealizedPnl currentCapital startingCapital totalTrades winRate winningTrades losingTrades status",
       )
       .lean();
 
@@ -141,6 +143,48 @@ export async function GET() {
             : 0;
       }
 
+      // Reason: Use the challenge's ranking method to determine isLeading correctly
+      const rankingMethod = challenge.rules?.rankingMethod || "pnl";
+
+      // Reason: For PnL/ROI methods, use live-calculated values.
+      // For stats-based methods (win_rate, total_wins, profit_factor), use DB values
+      // since they only change on trade close, not tick-by-tick.
+      const getUserMetric = (): number => {
+        switch (rankingMethod) {
+          case "pnl": return userLivePnl;
+          case "roi": return userLivePnlPct;
+          case "total_capital": return (userPart?.currentCapital || 0) + userLiveUnrealized;
+          case "win_rate": return userPart?.winRate || 0;
+          case "total_wins": return userPart?.winningTrades || 0;
+          case "profit_factor": {
+            const w = userPart?.winningTrades || 0;
+            const l = userPart?.losingTrades || 0;
+            return l === 0 ? (w > 0 ? 9999 : 0) : w / l;
+          }
+          default: return userLivePnl;
+        }
+      };
+      const getOpponentMetric = (): number => {
+        if (!opponentPart) return -Infinity;
+        switch (rankingMethod) {
+          case "pnl": return opponentLivePnl;
+          case "roi": return opponentLivePnlPct;
+          case "total_capital": {
+            const oppId = opponentPart.userId;
+            const oppUnrealized = liveUnrealizedByUserChallenge.get(`${cid}:${oppId}`) ?? (opponentPart.unrealizedPnl || 0);
+            return (opponentPart.currentCapital || 0) + oppUnrealized;
+          }
+          case "win_rate": return opponentPart.winRate || 0;
+          case "total_wins": return opponentPart.winningTrades || 0;
+          case "profit_factor": {
+            const w = opponentPart.winningTrades || 0;
+            const l = opponentPart.losingTrades || 0;
+            return l === 0 ? (w > 0 ? 9999 : 0) : w / l;
+          }
+          default: return opponentLivePnl;
+        }
+      };
+
       return {
         id: cid,
         name: `Challenge vs ${opponentName || "Unknown"}`,
@@ -148,17 +192,29 @@ export async function GET() {
         startTime: challenge.startTime,
         endTime: challenge.endTime,
         stakeAmount: challenge.entryFee || 0,
+        rankingMethod,
         userPnL: +userLivePnl.toFixed(2),
         userPnLPercentage: +userLivePnlPct.toFixed(4),
+        userCurrentCapital: userPart?.currentCapital || 0,
+        userWinRate: userPart?.winRate || 0,
+        userWinningTrades: userPart?.winningTrades || 0,
+        userLosingTrades: userPart?.losingTrades || 0,
+        userTotalTrades: userPart?.totalTrades || 0,
+        userStartingCapital: userStartingCapital,
         opponent: opponentPart
           ? {
-              name:
-                opponentPart.username || opponentName || "Unknown",
+              name: opponentPart.username || opponentName || "Unknown",
               pnl: +opponentLivePnl.toFixed(2),
               pnlPercentage: +opponentLivePnlPct.toFixed(4),
+              currentCapital: opponentPart.currentCapital || 0,
+              winRate: opponentPart.winRate || 0,
+              winningTrades: opponentPart.winningTrades || 0,
+              losingTrades: opponentPart.losingTrades || 0,
+              totalTrades: opponentPart.totalTrades || 0,
             }
           : null,
-        isLeading: userLivePnl >= opponentLivePnl,
+        // Reason: Compare by the challenge's actual ranking method, not hardcoded PnL
+        isLeading: getUserMetric() >= getOpponentMetric(),
       };
     });
 

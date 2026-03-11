@@ -268,13 +268,27 @@ interface ChallengeData {
   startTime: Date;
   endTime: Date;
   stakeAmount: number;
+  // Reason: rankingMethod determines which metric to display and how to compare "isLeading"
+  rankingMethod: string;
   opponent: {
     name: string;
     pnl: number;
     pnlPercentage: number;
+    currentCapital?: number;
+    winRate?: number;
+    winningTrades?: number;
+    losingTrades?: number;
+    totalTrades?: number;
   } | null;
   userPnL: number;
   userPnLPercentage: number;
+  // Additional stats needed for non-PnL ranking methods
+  userCurrentCapital?: number;
+  userWinRate?: number;
+  userWinningTrades?: number;
+  userLosingTrades?: number;
+  userTotalTrades?: number;
+  userStartingCapital?: number;
   isLeading: boolean;
   isWinner?: boolean;
   prizeWon?: number;
@@ -361,7 +375,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt";
   const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
   // Reason: Challenge model uses challengerName/challengedName (not *Username), entryFee (not stakeAmount), and has no "name" field
-  const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName";
+  // Reason: Include "rules" to access rules.rankingMethod for correct dashboard metric display
+  const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName rules";
 
   const [
     competitionParticipations,
@@ -610,6 +625,13 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     // Reason: Challenge model has challengerName/challengedName (not *Username), and no "name" field
     const opponentName = isChallenger ? challenge.challengedName : challenge.challengerName;
 
+    // Reason: Use the challenge's ranking method to determine the correct "isLeading" comparison
+    const challengeRankingMethod = challenge.rules?.rankingMethod || "pnl";
+    const userRankingVal = getDashboardRankingValue(userParticipation, challengeRankingMethod);
+    const opponentRankingVal = opponentParticipation
+      ? getDashboardRankingValue(opponentParticipation, challengeRankingMethod)
+      : -Infinity;
+
     const challengeData: ChallengeData = {
       id: challenge._id.toString(),
       name: `Challenge vs ${opponentName || "Unknown"}`,
@@ -617,18 +639,29 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       startTime: challenge.startTime,
       endTime: challenge.endTime,
       stakeAmount: challenge.entryFee || 0, // Reason: model field is entryFee, not stakeAmount
+      rankingMethod: challengeRankingMethod,
       opponent: opponentParticipation
         ? {
             name: opponentParticipation.username || opponentName || "Unknown",
             pnl: opponentParticipation.pnl || 0,
             pnlPercentage: opponentParticipation.pnlPercentage || 0,
+            currentCapital: opponentParticipation.currentCapital || 0,
+            winRate: opponentParticipation.winRate || 0,
+            winningTrades: opponentParticipation.winningTrades || 0,
+            losingTrades: opponentParticipation.losingTrades || 0,
+            totalTrades: opponentParticipation.totalTrades || 0,
           }
         : null,
       userPnL: userParticipation.pnl || 0,
       userPnLPercentage: userParticipation.pnlPercentage || 0,
-      isLeading: opponentParticipation
-        ? (userParticipation.pnl || 0) > (opponentParticipation.pnl || 0)
-        : true,
+      userCurrentCapital: userParticipation.currentCapital || 0,
+      userWinRate: userParticipation.winRate || 0,
+      userWinningTrades: userParticipation.winningTrades || 0,
+      userLosingTrades: userParticipation.losingTrades || 0,
+      userTotalTrades: userParticipation.totalTrades || 0,
+      userStartingCapital: userParticipation.startingCapital || 0,
+      // Reason: Compare by the challenge's ranking method, not hardcoded PnL
+      isLeading: userRankingVal >= opponentRankingVal,
       isWinner: userParticipation.isWinner,
       prizeWon: userParticipation.prizeReceived,
     };
