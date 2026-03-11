@@ -329,7 +329,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   // PERF: .select() on every query to fetch only fields used by dashboard
   const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt";
   const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
-  const challengeSelect = "_id challengerId challengedId name status startTime endTime stakeAmount challengerUsername challengedUsername";
+  // Reason: Challenge model uses challengerName/challengedName (not *Username), entryFee (not stakeAmount), and has no "name" field
+  const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName";
 
   const [
     competitionParticipations,
@@ -352,6 +353,23 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       .limit(1000)
       .lean(),
   ]);
+
+  // Reason: We need opponent participations for challenge dashboard cards.
+  // The query above only fetches the current user's participations, so the opponent's
+  // PnL/performance data would never be available. Fetch opponent records separately.
+  const userChallengeIds = (allChallenges as any[]).map((c: any) => c._id.toString());
+  const opponentParticipations = userChallengeIds.length > 0
+    ? await ChallengeParticipant.find({
+        challengeId: { $in: userChallengeIds },
+        userId: { $ne: userId },
+      })
+        .select("challengeId userId username pnl pnlPercentage currentCapital startingCapital totalTrades winningTrades losingTrades status isWinner prizeReceived")
+        .lean()
+    : [];
+  // Build a quick lookup: challengeId → opponent participation
+  const opponentByChallengeId = new Map(
+    (opponentParticipations as any[]).map((p: any) => [p.challengeId?.toString(), p]),
+  );
 
   const userCompIds = [
     ...new Set(
@@ -553,24 +571,22 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     if (!userParticipation) continue;
 
     const isChallenger = challenge.challengerId === userId;
-    const opponentParticipation = (challengeParticipations as any[]).find(
-      (p: any) =>
-        p.challengeId?.toString() === challenge._id.toString() &&
-        p.userId !== userId,
-    );
+    // Reason: Use the pre-fetched opponent map instead of searching user's own array (which never has opponent records)
+    const opponentParticipation = opponentByChallengeId.get(challenge._id.toString());
+
+    // Reason: Challenge model has challengerName/challengedName (not *Username), and no "name" field
+    const opponentName = isChallenger ? challenge.challengedName : challenge.challengerName;
 
     const challengeData: ChallengeData = {
       id: challenge._id.toString(),
-      name:
-        challenge.name ||
-        `Challenge vs ${isChallenger ? challenge.challengedUsername : challenge.challengerUsername}`,
+      name: `Challenge vs ${opponentName || "Unknown"}`,
       status: challenge.status,
       startTime: challenge.startTime,
       endTime: challenge.endTime,
-      stakeAmount: challenge.stakeAmount || 0,
+      stakeAmount: challenge.entryFee || 0, // Reason: model field is entryFee, not stakeAmount
       opponent: opponentParticipation
         ? {
-            name: opponentParticipation.username,
+            name: opponentParticipation.username || opponentName || "Unknown",
             pnl: opponentParticipation.pnl || 0,
             pnlPercentage: opponentParticipation.pnlPercentage || 0,
           }
@@ -585,7 +601,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     };
 
     processedChallenges.stats.total++;
-    processedChallenges.stats.totalStaked += challenge.stakeAmount || 0;
+    processedChallenges.stats.totalStaked += challenge.entryFee || 0;
 
     if (challenge.status === "active") {
       processedChallenges.active.push(challengeData);
