@@ -388,7 +388,8 @@ export default function CompetitionsPageContent({
       return calculateCompetitionDifficulty({
         entryFeeCredits: c.entryFee || c.entryFeeCredits || 0,
         startingCapital: c.startingCapital || c.startingTradingPoints || 10000,
-        leverageAllowed: platformLeverage, // Use platform leverage, not stored competition value
+        // Reason: Use competition-specific leverage if set, otherwise platform default
+        leverageAllowed: c.leverage?.max || platformLeverage,
         maxParticipants: c.maxParticipants,
         participantCount: c.currentParticipants,
         durationHours,

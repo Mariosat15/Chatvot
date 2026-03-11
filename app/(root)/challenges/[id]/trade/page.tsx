@@ -137,7 +137,8 @@ const ChallengeTradingPage = async ({
 
   marginThresholds = riskResults[0];
   const riskSettings = riskResults[1];
-  defaultLeverage = riskSettings?.defaultLeverage || 10;
+  // Reason: Use challenge-specific leverage when set, falling back to platform default.
+  defaultLeverage = challenge.leverage?.max || riskSettings?.defaultLeverage || 10;
 
   // Calculate stats
   const equity = participant.currentCapital + participant.unrealizedPnl;

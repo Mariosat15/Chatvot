@@ -160,9 +160,9 @@ export default function CompetitionCard({
     ? `GM: ${competition.gameMasterName || "Game Master"}`
     : "Admin";
 
-  // Platform leverage is now passed as a prop from the parent (fetched ONCE)
-  // instead of each card making its own API call (was N+1 pattern: 20 cards = 20 calls)
-  const maxLeverage = platformLeverage;
+  // Reason: Use competition-specific leverage if set by admin/GM, otherwise fall back
+  // to the platform-wide leverage. This ensures each competition displays its own setting.
+  const maxLeverage = competition.leverage?.max || platformLeverage;
 
   const difficulty = useMemo(() => {
     // Check if competition has manual difficulty setting

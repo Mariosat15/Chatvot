@@ -117,7 +117,9 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
     ? tradeHistoryResult.trades
     : [];
   const marginThresholds = marginThresholdsResult;
-  const defaultLeverage = riskSettingsResult?.defaultLeverage || 10;
+  // Reason: Use competition-specific leverage when set by admin/GM,
+  // falling back to platform-wide default leverage if not configured.
+  const defaultLeverage = competition.leverage?.max || riskSettingsResult?.defaultLeverage || 10;
 
   // Calculate stats
   const equity = participant.currentCapital + participant.unrealizedPnl;

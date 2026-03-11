@@ -40,6 +40,15 @@ const RANKING_LABELS: Record<string, string> = {
   profit_factor: "Best Profit Factor",
 };
 
+const RANKING_DESCRIPTIONS: Record<string, string> = {
+  pnl: "Winner is determined by total profit & loss (realized + unrealized).",
+  roi: "Winner is determined by the highest return on investment percentage.",
+  total_capital: "Winner has the highest account balance at the end.",
+  win_rate: "Winner has the highest percentage of winning trades.",
+  total_wins: "Winner has the most profitable trades closed.",
+  profit_factor: "Winner has the best ratio of winning to losing trades.",
+};
+
 const TIEBREAKER_LABELS: Record<string, string> = {
   trades_count: "Most Trades",
   win_rate: "Higher Win Rate",
@@ -47,6 +56,15 @@ const TIEBREAKER_LABELS: Record<string, string> = {
   roi: "Higher ROI",
   join_time: "First to Join",
   split_prize: "Split Prize",
+};
+
+const TIEBREAKER_DESCRIPTIONS: Record<string, string> = {
+  trades_count: "The trader with more completed trades wins.",
+  win_rate: "The trader with a higher win rate wins.",
+  total_capital: "The trader with more capital wins.",
+  roi: "The trader with a higher return on investment wins.",
+  join_time: "The trader who accepted the challenge first wins.",
+  split_prize: "The prize is split equally between tied players.",
 };
 
 export default async function ChallengePage({ params }: ChallengePageProps) {
@@ -460,33 +478,64 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 🏆 Challenge Rules
               </h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">Ranking Method:</span>
-                  <span className="font-semibold text-blue-400">
-                    {RANKING_LABELS[challenge.rules?.rankingMethod] ||
-                      "Highest P&L"}
-                  </span>
+                {/* Ranking Method */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Ranking Method:</span>
+                    <span className="font-semibold text-blue-400">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      {RANKING_LABELS[challenge.rules?.rankingMethod] ||
+                        "Highest P&L"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {/* eslint-disable-next-line security/detect-object-injection */}
+                    {RANKING_DESCRIPTIONS[challenge.rules?.rankingMethod] ||
+                      "Winner is determined by total profit & loss."}
+                  </p>
                 </div>
+
+                {/* Tie Breaker 1 */}
                 {challenge.rules?.tieBreaker1 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Tie Breaker 1:</span>
-                    <span className="font-semibold text-purple-400">
-                      {TIEBREAKER_LABELS[challenge.rules.tieBreaker1] ||
-                        challenge.rules.tieBreaker1}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Tie Breaker 1:</span>
+                      <span className="font-semibold text-purple-400">
+                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        {TIEBREAKER_LABELS[challenge.rules.tieBreaker1] ||
+                          challenge.rules.tieBreaker1}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      If tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker1] ||
+                        "used to break ties in the ranking.").toLowerCase()}
+                    </p>
                   </div>
                 )}
+
+                {/* Tie Breaker 2 */}
                 {challenge.rules?.tieBreaker2 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Tie Breaker 2:</span>
-                    <span className="font-semibold text-purple-400">
-                      {TIEBREAKER_LABELS[challenge.rules.tieBreaker2] ||
-                        challenge.rules.tieBreaker2}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Tie Breaker 2:</span>
+                      <span className="font-semibold text-purple-400">
+                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        {TIEBREAKER_LABELS[challenge.rules.tieBreaker2] ||
+                          challenge.rules.tieBreaker2}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      If still tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker2] ||
+                        "used as a secondary tie breaker.").toLowerCase()}
+                    </p>
                   </div>
                 )}
+
+                {/* Min Trades */}
                 {challenge.rules?.minimumTrades > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between">
                     <span className="text-gray-400">Minimum Trades:</span>
                     <span className="font-semibold text-amber-400">
                       {challenge.rules.minimumTrades} trades

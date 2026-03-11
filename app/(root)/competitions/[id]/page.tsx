@@ -135,7 +135,7 @@ const CompetitionDetailsPage = async ({
           competition.startingCapital ||
           competition.startingTradingPoints ||
           10000,
-        maxLeverage: riskSettings.maxLeverage,
+        maxLeverage: competition.leverage?.max || riskSettings.maxLeverage,
         duration: Math.round(
           (new Date(competition.endTime).getTime() -
             new Date(competition.startTime).getTime()) /
@@ -576,7 +576,10 @@ const CompetitionDetailsPage = async ({
                       Leverage
                     </p>
                     <p className="text-sm font-bold text-purple-400">
-                      1:{riskSettings.maxLeverage}
+                      {/* Reason: Use competition-specific leverage, not platform-wide settings */}
+                      {competition.leverage?.enabled
+                        ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
+                        : `1:${competition.leverage?.max || riskSettings.maxLeverage}`}
                     </p>
                   </div>
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
@@ -675,24 +678,111 @@ const CompetitionDetailsPage = async ({
                     View Guide
                   </Link>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Ranking:</span>
-                    <span className="font-medium text-blue-400">
-                      {competition.rules.rankingMethod === "pnl" &&
-                        "Highest P&L"}
-                      {competition.rules.rankingMethod === "roi" &&
-                        "Highest ROI %"}
-                      {competition.rules.rankingMethod === "total_capital" &&
-                        "Highest Capital"}
-                      {competition.rules.rankingMethod === "win_rate" &&
-                        "Highest Win Rate"}
-                      {competition.rules.rankingMethod === "total_wins" &&
-                        "Most Wins"}
-                      {competition.rules.rankingMethod === "profit_factor" &&
-                        "Best Profit Factor"}
-                    </span>
+                <div className="space-y-3 text-sm">
+                  {/* Ranking Method */}
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Ranking:</span>
+                      <span className="font-semibold text-blue-400">
+                        {
+                          // eslint-disable-next-line security/detect-object-injection
+                          ({
+                            pnl: "Highest P&L",
+                            roi: "Highest ROI %",
+                            total_capital: "Highest Capital",
+                            win_rate: "Highest Win Rate",
+                            total_wins: "Most Winning Trades",
+                            profit_factor: "Best Profit Factor",
+                          } as Record<string, string>)[competition.rules.rankingMethod] || "Highest P&L"
+                        }
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {
+                        // eslint-disable-next-line security/detect-object-injection
+                        ({
+                          pnl: "Winner is determined by total profit & loss (realized + unrealized).",
+                          roi: "Winner is determined by the highest return on investment percentage.",
+                          total_capital: "Winner has the highest account balance at the end.",
+                          win_rate: "Winner has the highest percentage of winning trades.",
+                          total_wins: "Winner has the most profitable trades closed.",
+                          profit_factor: "Winner has the best ratio of winning to losing trades.",
+                        } as Record<string, string>)[competition.rules.rankingMethod] || "Winner is determined by total profit & loss."
+                      }
+                    </p>
                   </div>
+
+                  {/* Tie Breaker 1 */}
+                  {competition.rules.tieBreaker1 && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Tie Breaker 1:</span>
+                        <span className="font-semibold text-purple-400">
+                          {
+                            // eslint-disable-next-line security/detect-object-injection
+                            ({
+                              trades_count: "Most Trades",
+                              win_rate: "Higher Win Rate",
+                              total_capital: "Higher Capital",
+                              roi: "Higher ROI",
+                              join_time: "First to Join",
+                              split_prize: "Split Prize",
+                            } as Record<string, string>)[competition.rules.tieBreaker1] || competition.rules.tieBreaker1
+                          }
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {
+                          // eslint-disable-next-line security/detect-object-injection
+                          ({
+                            trades_count: "If tied, the trader with more completed trades wins.",
+                            win_rate: "If tied, the trader with a higher win rate wins.",
+                            total_capital: "If tied, the trader with more capital wins.",
+                            roi: "If tied, the trader with a higher return on investment wins.",
+                            join_time: "If tied, the trader who joined first wins.",
+                            split_prize: "If tied, the prize is split equally between tied traders.",
+                          } as Record<string, string>)[competition.rules.tieBreaker1] || "Used to break ties in the ranking."
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tie Breaker 2 */}
+                  {competition.rules.tieBreaker2 && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Tie Breaker 2:</span>
+                        <span className="font-semibold text-purple-400">
+                          {
+                            // eslint-disable-next-line security/detect-object-injection
+                            ({
+                              trades_count: "Most Trades",
+                              win_rate: "Higher Win Rate",
+                              total_capital: "Higher Capital",
+                              roi: "Higher ROI",
+                              join_time: "First to Join",
+                              split_prize: "Split Prize",
+                            } as Record<string, string>)[competition.rules.tieBreaker2] || competition.rules.tieBreaker2
+                          }
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {
+                          // eslint-disable-next-line security/detect-object-injection
+                          ({
+                            trades_count: "If still tied, the trader with more completed trades wins.",
+                            win_rate: "If still tied, the trader with a higher win rate wins.",
+                            total_capital: "If still tied, the trader with more capital wins.",
+                            roi: "If still tied, the trader with a higher return on investment wins.",
+                            join_time: "If still tied, the trader who joined first wins.",
+                            split_prize: "If still tied, the prize is split equally.",
+                          } as Record<string, string>)[competition.rules.tieBreaker2] || "Used as a secondary tie breaker."
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Min Trades */}
                   {competition.rules.minimumTrades > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Min Trades:</span>
