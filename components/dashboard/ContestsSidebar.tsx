@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   Trophy,
   Swords,
-  Clock,
   TrendingUp,
   TrendingDown,
   ChevronRight,
   Crown,
   Target,
 } from "lucide-react";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface CompetitionData {
   id: string;
@@ -47,13 +47,37 @@ interface ContestsSidebarProps {
   competitions: {
     active: CompetitionData[];
     upcoming: CompetitionData[];
-    stats: { total: number; won: number; topThreeFinishes: number; averageRank: number };
+    stats: {
+      total: number;
+      won: number;
+      topThreeFinishes: number;
+      averageRank: number;
+    };
   };
   challenges: {
     active: ChallengeData[];
     pending: ChallengeData[];
-    stats: { total: number; wins: number; losses: number; winRate: number; totalWon: number };
+    stats: {
+      total: number;
+      wins: number;
+      losses: number;
+      winRate: number;
+      totalWon: number;
+    };
   };
+}
+
+/**
+ * Reason: .toFixed(1) rounds small values like 0.01% to "0.0%".
+ * This formatter adapts precision based on the absolute value so
+ * small but meaningful percentages are still visible (e.g. +0.013%).
+ */
+function formatPnlPercent(value: number): string {
+  const abs = Math.abs(value);
+  if (abs === 0) return "0.00%";
+  if (abs < 0.01) return value.toFixed(3) + "%";
+  if (abs < 0.1) return value.toFixed(2) + "%";
+  return value.toFixed(1) + "%";
 }
 
 function TimeLeft({ endTime }: { endTime: Date }) {
@@ -63,9 +87,15 @@ function TimeLeft({ endTime }: { endTime: Date }) {
   const m = Math.floor((ms % 3600000) / 60000);
   if (h > 24) {
     const d = Math.floor(h / 24);
-    return <span className="text-gray-400 text-[10px]">{d}d left</span>;
+    return (
+      <span className="text-gray-400 text-[10px]">{d}d left</span>
+    );
   }
-  return <span className="text-yellow-400 text-[10px]">{h}h {m}m left</span>;
+  return (
+    <span className="text-yellow-400 text-[10px]">
+      {h}h {m}m left
+    </span>
+  );
 }
 
 export default function ContestsSidebar({
@@ -75,7 +105,95 @@ export default function ContestsSidebar({
   const [tab, setTab] = useState<"competitions" | "challenges">("competitions");
 
   const activeComps = competitions.active;
-  const activeChallenges = challenges.active;
+
+  // Reason: Live challenge data from polling replaces static server-side data
+  const [liveChallenges, setLiveChallenges] = useState<ChallengeData[]>(
+    challenges.active,
+  );
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Reason: Poll the lightweight dashboard-live endpoint for real-time PnL updates
+  const fetchLiveChallengeData = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
+    try {
+      const res = await fetch("/api/challenges/dashboard-live");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data.challenges && Array.isArray(data.challenges)) {
+        setLiveChallenges((prev) => {
+          // Merge live data into existing challenges, preserving any that aren't active
+          const liveMap = new Map(
+            data.challenges.map((c: ChallengeData) => [c.id, c]),
+          );
+
+          // Update active challenges with live data; keep non-active ones untouched
+          const updated = prev.map((ch) => {
+            const liveVersion = liveMap.get(ch.id);
+            return liveVersion || ch;
+          });
+
+          // Add any new active challenges from live data that weren't in the original list
+          for (const liveItem of data.challenges) {
+            if (!updated.find((u) => u.id === liveItem.id)) {
+              updated.push(liveItem);
+            }
+          }
+
+          return updated;
+        });
+      }
+    } catch {
+      // Fail silently — live data is a nice-to-have enhancement
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Only poll when there are active challenges and we're on the challenges tab
+    const hasActiveChallenges = challenges.active.length > 0;
+
+    if (!hasActiveChallenges) {
+      setLiveChallenges(challenges.active);
+      return;
+    }
+
+    // Immediate fetch on mount
+    fetchLiveChallengeData();
+
+    const scheduleNextPoll = () => {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = setTimeout(async () => {
+        await fetchLiveChallengeData();
+        if (isMountedRef.current) scheduleNextPoll();
+      }, PERFORMANCE_INTERVALS.CHALLENGE_LIVE_DATA);
+    };
+
+    scheduleNextPoll();
+
+    // Pause/resume polling based on tab visibility
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLiveChallengeData();
+        scheduleNextPoll();
+      } else {
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [challenges.active.length, fetchLiveChallengeData]);
+
+  // Use live data for display
+  const activeChallenges = liveChallenges;
 
   return (
     <motion.div
@@ -126,11 +244,15 @@ export default function ContestsSidebar({
           {/* Stats bar */}
           <div className="flex items-center justify-around text-center py-2 bg-gray-700/20 rounded-lg">
             <div>
-              <div className="text-lg font-bold text-white">{competitions.stats.total}</div>
+              <div className="text-lg font-bold text-white">
+                {competitions.stats.total}
+              </div>
               <div className="text-[10px] text-gray-500">Entered</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-yellow-400">{competitions.stats.won}</div>
+              <div className="text-lg font-bold text-yellow-400">
+                {competitions.stats.won}
+              </div>
               <div className="text-[10px] text-gray-500">Won</div>
             </div>
             <div>
@@ -180,7 +302,8 @@ export default function ContestsSidebar({
                         <Target className="w-3.5 h-3.5 text-gray-400" />
                       )}
                       <span className="text-xs text-gray-300 font-[var(--font-geist-mono)]">
-                        Rank #{comp.currentRank || "–"}/{comp.totalParticipants}
+                        Rank #{comp.currentRank || "–"}/
+                        {comp.totalParticipants}
                       </span>
                     </div>
                     <span
@@ -188,7 +311,8 @@ export default function ContestsSidebar({
                         comp.pnl >= 0 ? "text-green-400" : "text-red-400"
                       }`}
                     >
-                      {comp.pnl >= 0 ? "+" : ""}{comp.pnlPercentage.toFixed(1)}%
+                      {comp.pnl >= 0 ? "+" : ""}
+                      {formatPnlPercent(comp.pnlPercentage)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
@@ -207,11 +331,15 @@ export default function ContestsSidebar({
           {/* Challenge stats bar */}
           <div className="flex items-center justify-around text-center py-2 bg-gray-700/20 rounded-lg">
             <div>
-              <div className="text-lg font-bold text-green-400">{challenges.stats.wins}</div>
+              <div className="text-lg font-bold text-green-400">
+                {challenges.stats.wins}
+              </div>
               <div className="text-[10px] text-gray-500">Wins</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-red-400">{challenges.stats.losses}</div>
+              <div className="text-lg font-bold text-red-400">
+                {challenges.stats.losses}
+              </div>
               <div className="text-[10px] text-gray-500">Losses</div>
             </div>
             <div>
@@ -236,7 +364,11 @@ export default function ContestsSidebar({
             </div>
           ) : (
             activeChallenges.map((ch, i) => (
-              <Link key={ch.id} href={`/challenges/${ch.id}`} className="block">
+              <Link
+                key={ch.id}
+                href={`/challenges/${ch.id}`}
+                className="block"
+              >
                 <motion.div
                   className="rounded-lg border border-gray-700/30 bg-gray-800/40 p-3 hover:border-purple-500/30 transition-all cursor-pointer group"
                   initial={{ opacity: 0, x: -10 }}
@@ -253,14 +385,25 @@ export default function ContestsSidebar({
                       <TrendingDown className="w-3.5 h-3.5 text-red-400" />
                     )}
                   </div>
+
+                  {/* User vs Opponent with live PnL */}
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">
                       vs {ch.opponent?.name || "Waiting..."}
                     </span>
-                    <span className={ch.isLeading ? "text-green-400" : "text-red-400"}>
-                      {ch.userPnLPercentage >= 0 ? "+" : ""}{ch.userPnLPercentage.toFixed(1)}%
+                    <span
+                      className={
+                        ch.userPnLPercentage >= 0
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }
+                    >
+                      {ch.userPnLPercentage >= 0 ? "+" : ""}
+                      {formatPnlPercent(ch.userPnLPercentage)}
                     </span>
                   </div>
+
+                  {/* Opponent PnL and stake */}
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-[10px] text-gray-500">
                       ⚔️ ${ch.stakeAmount.toLocaleString()}
