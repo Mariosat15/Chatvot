@@ -26,6 +26,15 @@ interface CompetitionData {
   pnl: number;
   pnlPercentage: number;
   openPositions: number;
+  // Reason: Ranking method determines which metric to display in the dashboard card
+  rankingMethod?: string;
+  // Needed for non-PnL ranking methods
+  currentCapital?: number;
+  startingCapital?: number;
+  totalTrades?: number;
+  winningTrades?: number;
+  losingTrades?: number;
+  winRate?: number;
 }
 
 interface ChallengeData {
@@ -78,6 +87,59 @@ function formatPnlPercent(value: number): string {
   if (abs < 0.01) return value.toFixed(3) + "%";
   if (abs < 0.1) return value.toFixed(2) + "%";
   return value.toFixed(1) + "%";
+}
+
+/** Reason: Returns the correct display string based on the competition's ranking method */
+function formatCompMetric(comp: CompetitionData): string {
+  const method = comp.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl":
+      return `${comp.pnl >= 0 ? "+" : ""}$${Math.abs(comp.pnl).toFixed(2)}`;
+    case "roi":
+      return `${comp.pnlPercentage >= 0 ? "+" : ""}${formatPnlPercent(comp.pnlPercentage)}`;
+    case "total_capital":
+      return `$${(comp.currentCapital || 0).toLocaleString()}`;
+    case "win_rate":
+      return `${(comp.winRate || 0).toFixed(1)}%`;
+    case "total_wins":
+      return `${comp.winningTrades || 0} wins`;
+    case "profit_factor": {
+      const wins = comp.winningTrades || 0;
+      const losses = comp.losingTrades || 0;
+      const pf = losses === 0 ? (wins > 0 ? Infinity : 0) : wins / losses;
+      return pf === Infinity ? "∞" : pf.toFixed(2);
+    }
+    default:
+      return `${comp.pnl >= 0 ? "+" : ""}${formatPnlPercent(comp.pnlPercentage)}`;
+  }
+}
+
+/** Reason: Returns the metric label suffix shown on the comp card */
+function getCompMetricLabel(method?: string): string {
+  switch (method) {
+    case "pnl": return "P&L";
+    case "roi": return "ROI";
+    case "total_capital": return "Capital";
+    case "win_rate": return "Win %";
+    case "total_wins": return "Wins";
+    case "profit_factor": return "PF";
+    default: return "P&L";
+  }
+}
+
+/** Reason: Determine if the metric value is positive for coloring */
+function isCompMetricPositive(comp: CompetitionData): boolean {
+  const method = comp.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl": return comp.pnl >= 0;
+    case "roi": return comp.pnlPercentage >= 0;
+    case "total_capital":
+      return (comp.currentCapital || 0) >= (comp.startingCapital || 10000);
+    case "win_rate": return (comp.winRate || 0) > 50;
+    case "total_wins": return (comp.winningTrades || 0) > 0;
+    case "profit_factor": return (comp.winningTrades || 0) > (comp.losingTrades || 0);
+    default: return comp.pnl >= 0;
+  }
 }
 
 function TimeLeft({ endTime }: { endTime: Date }) {
@@ -308,11 +370,11 @@ export default function ContestsSidebar({
                     </div>
                     <span
                       className={`text-xs font-semibold ${
-                        comp.pnl >= 0 ? "text-green-400" : "text-red-400"
+                        isCompMetricPositive(comp) ? "text-green-400" : "text-red-400"
                       }`}
+                      title={`Ranked by ${getCompMetricLabel(comp.rankingMethod)}`}
                     >
-                      {comp.pnl >= 0 ? "+" : ""}
-                      {formatPnlPercent(comp.pnlPercentage)}
+                      {formatCompMetric(comp)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">

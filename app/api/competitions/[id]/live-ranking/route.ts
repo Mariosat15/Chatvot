@@ -226,11 +226,9 @@ export async function GET(
       const myValue = getRankingValue(r);
       const distanceToFirst = r.rank === 1 ? 0 : firstPlaceValue - myValue;
 
-      // Display value based on ranking method (what user sees as "profit")
-      const displayValue =
-        rankingMethod === "roi" || rankingMethod === "win_rate"
-          ? r.liveRoi
-          : r.livePnl;
+      // Reason: displayValue must match the ranking method so the UI column
+      // shows the actual metric being ranked by, not a hardcoded PnL/ROI.
+      const displayValue = myValue;
 
       return {
         rank: r.rank,

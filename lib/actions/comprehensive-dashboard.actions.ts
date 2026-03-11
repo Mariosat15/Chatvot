@@ -220,6 +220,8 @@ interface CompetitionData {
   currentCapital: number;
   startingCapital: number;
   totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
   winRate: number;
   openPositions: number;
   prizeWon?: number;
@@ -291,6 +293,35 @@ interface TradeData {
   closedAt: Date;
   contestName: string;
   contestType: "competition" | "challenge";
+}
+
+/**
+ * Get ranking value for dashboard sorting — mirrors competition-ranking.service.ts logic
+ * Reason: The dashboard needs to compute user rank inline without importing the full ranking service.
+ */
+function getDashboardRankingValue(p: any, method: string): number {
+  switch (method) {
+    case "pnl":
+      return p.pnl || 0;
+    case "roi":
+      return p.pnlPercentage || 0;
+    case "total_capital":
+      return p.currentCapital || 0;
+    case "win_rate":
+      return p.totalTrades > 0
+        ? ((p.winningTrades || 0) / p.totalTrades) * 100
+        : 0;
+    case "total_wins":
+      return p.winningTrades || 0;
+    case "profit_factor": {
+      const wins = p.winningTrades || 0;
+      const losses = p.losingTrades || 0;
+      if (losses === 0) return wins > 0 ? 9999 : 0;
+      return wins / losses;
+    }
+    default:
+      return p.pnl || 0;
+  }
 }
 
 interface PositionData {
@@ -460,6 +491,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     // Compute rank dynamically by sorting all participants (same as competition leaderboard).
     const rankingMethod = competition.rules?.rankingMethod || "pnl";
     let computedRank = participation.currentRank || 0;
+    // Reason: Compute live rank dynamically using the competition's actual ranking method.
+    // The old code only handled "roi" and "capital" (with a typo), leaving 4 methods defaulting to PnL.
     if (competition.status === "active" && competitionParticipants.length > 0) {
       const sorted = [...competitionParticipants]
         .filter((p: any) => (p.status || "active") !== "disqualified")
@@ -468,9 +501,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
           const bHasTrades = (b.totalTrades || 0) > 0;
           if (aHasTrades && !bHasTrades) return -1;
           if (!aHasTrades && bHasTrades) return 1;
-          if (rankingMethod === "roi") return (b.pnlPercentage || 0) - (a.pnlPercentage || 0);
-          if (rankingMethod === "capital") return (b.currentCapital || 0) - (a.currentCapital || 0);
-          return (b.pnl || 0) - (a.pnl || 0); // default: pnl
+          return getDashboardRankingValue(b, rankingMethod) - getDashboardRankingValue(a, rankingMethod);
         });
       const idx = sorted.findIndex((p: any) => p.userId?.toString() === userId);
       if (idx !== -1) computedRank = idx + 1;
@@ -492,6 +523,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       startingCapital:
         participation.startingCapital || competition.startingCapital || 10000,
       totalTrades: participation.totalTrades || 0,
+      winningTrades: participation.winningTrades || 0,
+      losingTrades: participation.losingTrades || 0,
       winRate: participation.winRate || 0,
       openPositions: participation.currentOpenPositions || 0,
       prizeWon: participation.prizeWon,

@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import {
+  getRankingConfig,
+  type RankingMethod,
+} from "@/lib/utils/ranking-utils";
 
 interface ActiveCompetitionCardProps {
   competition: any;
@@ -39,6 +43,11 @@ export default function ActiveCompetitionCard({
     (participation.currentCapital / participation.startingCapital) * 100;
   const isAtRisk = capitalPercentage < 60;
 
+  // Reason: Use competition's ranking method to show the correct metric label
+  const rankingMethod: RankingMethod =
+    competition?.rules?.rankingMethod || "pnl";
+  const rankingConfig = getRankingConfig(rankingMethod);
+
   const timeRemaining = new Date(competition.endTime).getTime() - Date.now();
   const hoursRemaining = Math.max(
     0,
@@ -62,10 +71,14 @@ export default function ActiveCompetitionCard({
               >
                 {competition.name}
               </Link>
-              <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <p className="text-sm text-gray-400 line-clamp-1 flex-1">
                   {competition.description}
                 </p>
+                {/* Ranking Method Badge */}
+                <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
+                  🏆 {rankingConfig.label}
+                </span>
                 {/* Creator Badge */}
                 <span
                   className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -178,6 +191,12 @@ export default function ActiveCompetitionCard({
             {participation.pnlPercentage >= 0 ? "+" : ""}
             {participation.pnlPercentage.toFixed(2)}% ROI
           </p>
+          {/* Reason: Show which metric determines this competition's ranking */}
+          {rankingMethod !== "pnl" && rankingMethod !== "roi" && (
+            <p className="text-[10px] text-yellow-400/70 mt-0.5">
+              Ranked by: {rankingConfig.label}
+            </p>
+          )}
         </div>
 
         {/* Positions */}

@@ -10,6 +10,35 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import WinPotentialCard from "./WinPotentialCard";
+import {
+  getRankingConfig,
+  type RankingMethod,
+} from "@/lib/utils/ranking-utils";
+
+// Reason: Extract the correct metric value for a performer based on the competition's ranking method
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function getPerformerMetricValue(participation: any, method: string): number {
+  switch (method) {
+    case "pnl":
+      return participation.pnl || 0;
+    case "roi":
+      return participation.pnlPercentage || 0;
+    case "total_capital":
+      return participation.currentCapital || 0;
+    case "win_rate":
+      return participation.winRate || 0;
+    case "total_wins":
+      return participation.winningTrades || 0;
+    case "profit_factor": {
+      const wins = participation.winningTrades || 0;
+      const losses = participation.losingTrades || 0;
+      if (losses === 0) return wins > 0 ? 9999 : 0;
+      return wins / losses;
+    }
+    default:
+      return participation.pnl || 0;
+  }
+}
 
 interface GlobalRiskMetricsProps {
   competitions: any[];
@@ -76,12 +105,15 @@ export default function GlobalRiskMetrics({
     criticalCompetitions * 10;
   const finalRiskScore = Math.max(0, Math.min(100, riskScore));
 
-  // Best and worst performers
-  const sortedByPnL = [...competitions].sort(
-    (a, b) => b.participation.pnlPercentage - a.participation.pnlPercentage,
+  // Reason: Sort by rank position (lower rank = better) since each competition
+  // may use a different ranking method (pnl, roi, win_rate, etc.)
+  const sortedByRank = [...competitions].sort(
+    (a, b) =>
+      (a.participation.currentRank || 9999) -
+      (b.participation.currentRank || 9999),
   );
-  const bestPerformer = sortedByPnL[0];
-  const worstPerformer = sortedByPnL[sortedByPnL.length - 1];
+  const bestPerformer = sortedByRank[0];
+  const worstPerformer = sortedByRank[sortedByRank.length - 1];
 
   // Risk level
   let riskLevel = "Low Risk";
@@ -247,54 +279,76 @@ export default function GlobalRiskMetrics({
       {/* Best and Worst Performers */}
       <div className="p-6 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Best Performer */}
-        <div className="bg-green-500/5 rounded-xl p-4 border border-green-500/20">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="h-4 w-4 text-green-500" />
-            <span className="text-xs font-semibold text-green-400">
-              Best Performer
-            </span>
-          </div>
-          <p className="text-sm font-bold text-gray-200 mb-1">
-            {bestPerformer.competition.name}
-          </p>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">ROI</span>
-            <span className="text-lg font-bold text-green-500">
-              +{bestPerformer.participation.pnlPercentage.toFixed(2)}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs mt-1">
-            <span className="text-gray-400">Rank</span>
-            <span className="text-yellow-500 font-semibold">
-              #{bestPerformer.participation.currentRank}
-            </span>
-          </div>
-        </div>
+        {(() => {
+          const method: RankingMethod =
+            bestPerformer.competition?.rules?.rankingMethod || "pnl";
+          const config = getRankingConfig(method);
+          const metricValue = getPerformerMetricValue(
+            bestPerformer.participation,
+            method,
+          );
+          return (
+            <div className="bg-green-500/5 rounded-xl p-4 border border-green-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-green-500" />
+                <span className="text-xs font-semibold text-green-400">
+                  Best Performer
+                </span>
+              </div>
+              <p className="text-sm font-bold text-gray-200 mb-1">
+                {bestPerformer.competition.name}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">{config.label}</span>
+                <span className="text-lg font-bold text-green-500">
+                  {config.formatValue(metricValue)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-gray-400">Rank</span>
+                <span className="text-yellow-500 font-semibold">
+                  #{bestPerformer.participation.currentRank}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Worst Performer */}
-        <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/20">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingDown className="h-4 w-4 text-red-500" />
-            <span className="text-xs font-semibold text-red-400">
-              Needs Attention
-            </span>
-          </div>
-          <p className="text-sm font-bold text-gray-200 mb-1">
-            {worstPerformer.competition.name}
-          </p>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">ROI</span>
-            <span className="text-lg font-bold text-red-500">
-              {worstPerformer.participation.pnlPercentage.toFixed(2)}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs mt-1">
-            <span className="text-gray-400">Rank</span>
-            <span className="text-yellow-500 font-semibold">
-              #{worstPerformer.participation.currentRank}
-            </span>
-          </div>
-        </div>
+        {(() => {
+          const method: RankingMethod =
+            worstPerformer.competition?.rules?.rankingMethod || "pnl";
+          const config = getRankingConfig(method);
+          const metricValue = getPerformerMetricValue(
+            worstPerformer.participation,
+            method,
+          );
+          return (
+            <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingDown className="h-4 w-4 text-red-500" />
+                <span className="text-xs font-semibold text-red-400">
+                  Needs Attention
+                </span>
+              </div>
+              <p className="text-sm font-bold text-gray-200 mb-1">
+                {worstPerformer.competition.name}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">{config.label}</span>
+                <span className="text-lg font-bold text-red-500">
+                  {config.formatValue(metricValue)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-gray-400">Rank</span>
+                <span className="text-yellow-500 font-semibold">
+                  #{worstPerformer.participation.currentRank}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
