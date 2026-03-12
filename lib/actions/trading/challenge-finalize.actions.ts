@@ -1213,9 +1213,10 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               const gmWallet = gmWalletMap.get(payment.gmId) || null;
               if (gmWallet) {
                 // IDEMPOTENCY: Check if wallet transaction already exists for this challenge
+                // Reason: Check both types for backward compatibility — old records used "gamemaster_earning"
                 const existingWalletTx = await db.collection("wallettransactions").findOne({
                   userId: payment.gmId,
-                  transactionType: "gamemaster_earning",
+                  transactionType: { $in: ["gamemaster_challenge_referral", "gamemaster_earning"] },
                   "metadata.challengeId": deferredFeeData.challengeId,
                   "metadata.referredUserId": payment.userId,
                 });
@@ -1231,16 +1232,18 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                   const balanceAfterGm = updatedGmWallet?.creditBalance || payment.amount;
                   const balanceBeforeGm = balanceAfterGm - payment.amount;
 
+                  // Reason: Use "gamemaster_challenge_referral" so financial dashboard
+                  // correctly separates challenge GM fees from competition GM fees.
                   await db.collection("wallettransactions").insertOne({
                     userId: payment.gmId,
-                    transactionType: "gamemaster_earning",
+                    transactionType: "gamemaster_challenge_referral",
                     amount: payment.amount,
                     balanceBefore: balanceBeforeGm,
                     balanceAfter: balanceAfterGm,
                     currency: "EUR",
                     exchangeRate: 1,
                     status: "completed",
-                    description: `🎮 Game Master referral earnings from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName} (1 referred user)`,
+                    description: `🎮 Game Master challenge referral from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName} (1 referred user)`,
                     metadata: {
                       challengeId: deferredFeeData.challengeId,
                       challengeName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
