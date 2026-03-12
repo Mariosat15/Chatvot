@@ -3,7 +3,7 @@
 import {
   Crown, Users, Map, ShoppingBag, HelpCircle, BarChart3, Trophy,
   Activity, MessageSquare, Shield, ChevronUp, ChevronDown, GripVertical,
-  Plus, Trash2,
+  Plus, Trash2, Star,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -242,12 +242,13 @@ export default function NewSectionEditors(props: BuilderChildProps) {
             <div className={`w-3 h-3 rounded-full ${settings.testimonialsEnabled ? "bg-green-500" : "bg-gray-500"}`} />
             <MessageSquare className="h-5 w-5 text-purple-400" />
             <span className="font-semibold text-white">Testimonials</span>
+            <span className="text-xs text-gray-500">({settings.testimonials?.length || 0} items)</span>
           </div>
         </AccordionTrigger>
         <AccordionContent className="pt-4 pb-6 space-y-4">
           <SectionHeader label="Testimonials" icon={MessageSquare} iconColor="text-purple-400" enabled={settings.testimonialsEnabled}
             onToggle={(v) => updateField("testimonialsEnabled", v)}
-            description="User testimonials and success stories."
+            description="User testimonials and success stories. Add, edit, or remove testimonials shown on the landing page."
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -258,6 +259,93 @@ export default function NewSectionEditors(props: BuilderChildProps) {
               <Label className="text-gray-400">Subtitle</Label>
               <Input value={settings.testimonialsSubtitle} onChange={(e) => updateField("testimonialsSubtitle", e.target.value)} className="bg-gray-900 border-gray-600 text-white mt-1" />
             </div>
+          </div>
+
+          {/* Testimonial Items */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-300 font-semibold">Testimonials</Label>
+              <Button size="sm" variant="outline" className="border-gray-600"
+                onClick={() => addItem("testimonials", {
+                  id: Date.now().toString(),
+                  name: "New Testimonial",
+                  role: "Trader",
+                  avatar: "",
+                  content: "Write the testimonial content here...",
+                  rating: 5,
+                  enabled: true,
+                  order: (settings.testimonials?.length || 0) + 1,
+                })}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Testimonial
+              </Button>
+            </div>
+            {(settings.testimonials || []).map((t) => (
+              <div key={t.id} className="p-3 bg-gray-900 rounded-lg space-y-3 border border-gray-700">
+                <div className="flex items-center gap-3">
+                  <Switch checked={t.enabled} onCheckedChange={(v) => updateArrayItem("testimonials", t.id, { enabled: v })} />
+                  <Input
+                    value={t.name}
+                    onChange={(e) => updateArrayItem("testimonials", t.id, { name: e.target.value })}
+                    placeholder="Name"
+                    className="bg-gray-800 border-gray-600 text-white flex-1"
+                  />
+                  <Input
+                    value={t.role}
+                    onChange={(e) => updateArrayItem("testimonials", t.id, { role: e.target.value })}
+                    placeholder="Role / Title"
+                    className="bg-gray-800 border-gray-600 text-white flex-1"
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => removeItem("testimonials", t.id)} className="text-red-500 hover:text-red-400 flex-shrink-0">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-gray-500 text-xs">Avatar URL (optional)</Label>
+                    <Input
+                      value={t.avatar}
+                      onChange={(e) => updateArrayItem("testimonials", t.id, { avatar: e.target.value })}
+                      placeholder="https://... or leave empty for default"
+                      className="bg-gray-800 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-500 text-xs">Rating (1-5)</Label>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => updateArrayItem("testimonials", t.id, { rating: star })}
+                          className="focus:outline-none"
+                        >
+                          <Star
+                            className="h-5 w-5 transition-colors"
+                            fill={star <= t.rating ? "#FFD700" : "transparent"}
+                            stroke={star <= t.rating ? "#FFD700" : "#6b7280"}
+                          />
+                        </button>
+                      ))}
+                      <span className="text-xs text-gray-500 ml-2">{t.rating}/5</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-gray-500 text-xs">Testimonial Content</Label>
+                  <Textarea
+                    value={t.content}
+                    onChange={(e) => updateArrayItem("testimonials", t.id, { content: e.target.value })}
+                    className="bg-gray-800 border-gray-600 text-white mt-1"
+                    rows={2}
+                    placeholder="What the user said about the platform..."
+                  />
+                </div>
+              </div>
+            ))}
+            {(!settings.testimonials || settings.testimonials.length === 0) && (
+              <p className="text-xs text-gray-500 text-center py-4">No testimonials yet. Click &quot;Add Testimonial&quot; to create one.</p>
+            )}
           </div>
         </AccordionContent>
       </AccordionItem>

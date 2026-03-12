@@ -204,6 +204,16 @@ export interface LandingSettings {
   testimonialsEnabled: boolean;
   testimonialsTitle: string;
   testimonialsSubtitle: string;
+  testimonials: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar: string;
+    content: string;
+    rating: number;
+    enabled: boolean;
+    order: number;
+  }>;
   trustBadgesEnabled: boolean;
   trustBadgesTitle: string;
 

@@ -6,6 +6,7 @@ import type {
   IAdminShowcaseFeature,
   IWhiteLabelFeature,
   IFAQItem,
+  ITestimonial,
 } from "./hero-settings.interfaces";
 import { newThemePresets } from "./hero-settings-new-presets";
 
@@ -385,6 +386,60 @@ export const defaultCompetitionTypes = [
   { id: "total_capital", icon: "Coins", name: "Total Capital", description: "Grow your portfolio to the maximum. The trader with the highest account balance at the end wins it all.", color: "#3b82f6", enabled: true },
   { id: "total_wins", icon: "Flame", name: "Total Wins", description: "Volume and precision. The trader with the most winning trades dominates. Every green trade is a step closer to victory.", color: "#ef4444", enabled: true },
   { id: "profit_factor", icon: "Shield", name: "Profit Factor", description: "Risk management meets performance. The ratio of gross profit to gross loss determines the champion. Smart trading wins.", color: "#06b6d4", enabled: true },
+];
+
+// Default testimonials
+export const defaultTestimonials: ITestimonial[] = [
+  {
+    id: "test1",
+    name: "Alex M.",
+    role: "Competition Champion",
+    avatar: "",
+    content: "I turned a €10 entry fee into €150 in a single P&L competition. The rush is real — and the platform makes it effortless to compete. Best trading experience I have ever had.",
+    rating: 5,
+    enabled: true,
+    order: 1,
+  },
+  {
+    id: "test2",
+    name: "Sarah K.",
+    role: "Game Master",
+    avatar: "",
+    content: "As a Game Master I host weekly competitions for my community. The referral fees alone cover my subscription — everything else is pure profit. It is a genuine business opportunity.",
+    rating: 5,
+    enabled: true,
+    order: 2,
+  },
+  {
+    id: "test3",
+    name: "Marcus T.",
+    role: "Forex Trader",
+    avatar: "",
+    content: "The 1v1 challenge system is addictive. Nothing sharpens your trading like knowing someone is watching every pip. My win rate has improved dramatically since I started competing.",
+    rating: 5,
+    enabled: true,
+    order: 3,
+  },
+  {
+    id: "test4",
+    name: "Priya R.",
+    role: "Win Rate Specialist",
+    avatar: "",
+    content: "I love that there are different competition types. Win Rate competitions reward consistency, not just big bets. It completely changed how I approach risk management.",
+    rating: 4,
+    enabled: true,
+    order: 4,
+  },
+  {
+    id: "test5",
+    name: "David L.",
+    role: "Leaderboard Regular",
+    avatar: "",
+    content: "The journey and badge system keeps me coming back every day. Watching my XP grow and unlocking new ranks feels like levelling up in a game — except the prizes are real cash.",
+    rating: 5,
+    enabled: true,
+    order: 5,
+  },
 ];
 
 // Default FAQ items

@@ -118,6 +118,9 @@ export function mapFromDbSettings(db: Record<string, any>): LandingSettings {
     testimonialsEnabled: sv.testimonials ?? true,
     testimonialsTitle: (db.testimonialsTitle as string) || defaultSettings.testimonialsTitle,
     testimonialsSubtitle: (db.testimonialsSubtitle as string) || defaultSettings.testimonialsSubtitle,
+    testimonials: (db.testimonials as LandingSettings["testimonials"])?.length > 0
+      ? (db.testimonials as LandingSettings["testimonials"])
+      : defaultSettings.testimonials,
     trustBadgesEnabled: sv.trustBadges ?? true,
     trustBadgesTitle: (db.trustBadgesTitle as string) || defaultSettings.trustBadgesTitle,
     // Reason: Strip enterprise-only and non-orderable keys from legacy data
@@ -270,6 +273,7 @@ export function mapToDbSettings(s: LandingSettings) {
     leaderboardSubtitle: s.leaderboardSubtitle,
     testimonialsTitle: s.testimonialsTitle,
     testimonialsSubtitle: s.testimonialsSubtitle,
+    testimonials: s.testimonials,
     trustBadgesTitle: s.trustBadgesTitle,
 
     ctaTitle: s.ctaTitle,

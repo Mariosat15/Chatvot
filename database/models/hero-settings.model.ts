@@ -19,6 +19,7 @@ import {
   defaultFooterMenuBusiness,
   defaultSectionOrder,
   defaultCTAButtons,
+  defaultTestimonials,
 } from "./hero-settings.defaults";
 
 // Re-export interfaces and defaults for backward compatibility
@@ -191,7 +192,7 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     // Testimonials
     testimonialsTitle: { type: String, default: "TRADER TESTIMONIALS" },
     testimonialsSubtitle: { type: String, default: "What champions say" },
-    testimonials: { type: [Object], default: [] },
+    testimonials: { type: [Object], default: defaultTestimonials },
     testimonialsLayout: { type: String, enum: ["carousel", "grid", "masonry"], default: "carousel" },
 
     // Admin Showcase

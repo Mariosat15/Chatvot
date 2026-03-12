@@ -14,6 +14,7 @@ import {
   defaultGameMasterBenefits,
   defaultCompetitionTypes,
   defaultFaqItems,
+  defaultTestimonials,
   defaultFooterMenuPlatform,
   defaultFooterMenuSupport,
   defaultFooterMenuBusiness,
@@ -202,11 +203,12 @@ export async function GET() {
       marketplaceShowItems: settings.marketplaceShowItems,
 
       // Testimonials
-      testimonialsTitle: settings.testimonialsTitle,
-      testimonialsSubtitle: settings.testimonialsSubtitle,
-      testimonials:
-        settings.testimonials?.filter((t: { enabled: boolean }) => t.enabled) ||
-        [],
+      // Reason: New section — fall back to defaults for existing DB documents
+      testimonialsTitle: settings.testimonialsTitle || "TRADER TESTIMONIALS",
+      testimonialsSubtitle: settings.testimonialsSubtitle || "What champions say",
+      testimonials: (settings.testimonials?.filter((t: { enabled: boolean }) => t.enabled) ?? []).length > 0
+        ? settings.testimonials.filter((t: { enabled: boolean }) => t.enabled)
+        : defaultTestimonials.filter(t => t.enabled),
       testimonialsLayout: settings.testimonialsLayout,
 
       // Admin Showcase
