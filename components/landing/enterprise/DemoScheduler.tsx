@@ -27,6 +27,7 @@ interface DemoSchedulerProps {
   inline?: boolean;
 }
 
+export { DemoScheduler };
 export default function DemoScheduler({
   theme,
   effectiveColors: propColors,

@@ -3,6 +3,14 @@ import { connectToDatabase } from "@/database/mongoose";
 import HeroSettings, {
   defaultThemePresets,
 } from "@/database/models/hero-settings.model";
+import {
+  defaultGameMasterBenefits,
+  defaultCompetitionTypes,
+  defaultFaqItems,
+  defaultFooterMenuPlatform,
+  defaultFooterMenuSupport,
+  defaultFooterMenuBusiness,
+} from "@/database/models/hero-settings.defaults";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import CompanySettings from "@/database/models/company-settings.model";
 
@@ -135,6 +143,26 @@ export async function GET() {
       challengesCTAText: settings.challengesCTAText,
       challengesCTALink: settings.challengesCTALink,
 
+      // Game Master Showcase
+      // Reason: These fields were added after initial deployment, so existing DB documents
+      // won't have them. We fall back to defaults so the sections render immediately.
+      gameMasterTitle: settings.gameMasterShowcaseTitle || "BECOME A GAME MASTER",
+      gameMasterSubtitle: settings.gameMasterShowcaseSubtitle || "Host competitions. Build a business. Earn from every trade.",
+      gameMasterDescription: settings.gameMasterShowcaseDescription || "Game Masters are the entrepreneurial backbone of the platform. Subscribe to a GM plan, create events, invite players, and earn referral fees from every prize pool.",
+      gameMasterBenefits: (settings.gameMasterBenefits?.filter((b: { enabled: boolean }) => b.enabled) ?? []).length > 0
+        ? settings.gameMasterBenefits.filter((b: { enabled: boolean }) => b.enabled)
+        : defaultGameMasterBenefits.filter(b => b.enabled),
+      gameMasterCTAText: settings.gameMasterShowcaseCTAText || "Become a Game Master",
+      gameMasterCTALink: settings.gameMasterShowcaseCTALink || "/sign-up",
+
+      // Competition Types Showcase
+      competitionTypesTitle: settings.competitionTypesTitle || "6 WAYS TO COMPETE",
+      competitionTypesSubtitle: settings.competitionTypesSubtitle || "Choose your battlefield. Every competition type tests a different edge.",
+      competitionTypesDescription: settings.competitionTypesDescription || "Whether you are a steady grinder, a high-risk sniper, or a consistency machine — there is a competition format designed for your style.",
+      competitionTypes: (settings.competitionTypes?.filter((t: { enabled: boolean }) => t.enabled) ?? []).length > 0
+        ? settings.competitionTypes.filter((t: { enabled: boolean }) => t.enabled)
+        : defaultCompetitionTypes.filter(t => t.enabled),
+
       // Leaderboard
       leaderboardTitle: settings.leaderboardTitle,
       leaderboardSubtitle: settings.leaderboardSubtitle,
@@ -179,10 +207,11 @@ export async function GET() {
       pricingAnnualDiscount: settings.pricingAnnualDiscount,
 
       // FAQ
-      faqTitle: settings.faqTitle,
-      faqSubtitle: settings.faqSubtitle,
-      faqItems:
-        settings.faqItems?.filter((f: { enabled: boolean }) => f.enabled) || [],
+      faqTitle: settings.faqTitle || "Frequently Asked Questions",
+      faqSubtitle: settings.faqSubtitle || "Everything you need to know about competitive trading",
+      faqItems: (settings.faqItems?.filter((f: { enabled: boolean }) => f.enabled) ?? []).length > 0
+        ? settings.faqItems.filter((f: { enabled: boolean }) => f.enabled)
+        : defaultFaqItems.filter(f => f.enabled),
       faqLayout: settings.faqLayout,
 
       // CTA
@@ -208,15 +237,15 @@ export async function GET() {
         platform:
           settings.footerMenuPlatform?.filter(
             (l: { enabled: boolean }) => l.enabled,
-          ) || [],
+          ) || defaultFooterMenuPlatform.filter(l => l.enabled),
         support:
           settings.footerMenuSupport?.filter(
             (l: { enabled: boolean }) => l.enabled,
-          ) || [],
+          ) || defaultFooterMenuSupport.filter(l => l.enabled),
         business:
           settings.footerMenuBusiness?.filter(
             (l: { enabled: boolean }) => l.enabled,
-          ) || [],
+          ) || defaultFooterMenuBusiness.filter(l => l.enabled),
       },
       footerSocialLinks:
         settings.footerSocialLinks?.filter(
@@ -225,10 +254,31 @@ export async function GET() {
       footerLegalLinks: settings.footerLegalLinks,
 
       // Section Visibility & Order (admin/enterprise features hidden from public hero page)
+      // Reason: New sections default to true so they appear on existing deployments
+      // without requiring the admin to toggle them on manually.
       sectionVisibility: {
+        hero: true,
+        features: true,
+        stats: true,
+        liveStats: true,
+        howItWorks: true,
+        gameMaster: true,
+        competitionTypes: true,
+        competitions: true,
+        challenges: true,
+        leaderboard: true,
+        activityFeed: true,
+        marketplace: true,
+        testimonials: true,
+        trustBadges: true,
+        faq: true,
+        cta: true,
+        footer: true,
+        // Apply any overrides from the admin settings
         ...settings.sectionVisibility,
-        whiteLabel: false, // White label is on /enterprise page
-        adminShowcase: false, // Admin showcase is on /enterprise page
+        // Always hide enterprise-only sections on the public hero page
+        whiteLabel: false,
+        adminShowcase: false,
       },
       sectionOrder: settings.sectionOrder,
 

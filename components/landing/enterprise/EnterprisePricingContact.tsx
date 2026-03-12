@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Check, ChevronRight, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import DemoScheduler from "./DemoScheduler";
+import { DemoScheduler } from "./DemoScheduler";
 
 interface PricingTier {
   id: string;
