@@ -4,36 +4,22 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ChevronRight, Swords, Loader2 } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { LandingTheme } from "@/lib/themes/landing-themes";
+import { GAME_ICONS } from "@/lib/constants/game-icons";
 import SectionWrapper from "./SectionWrapper";
-
-interface ActiveChallenge {
-  id: string;
-  challenger: string;
-  challenged: string;
-  stake: number;
-  stakeFormatted: string;
-  status: string;
-  statusLabel: string;
-  timeRemaining: string;
-}
-
-interface CompletedChallenge {
-  id: string;
-  winner: string;
-  loser: string;
-  winnerPrize: number;
-  winnerPrizeFormatted: string;
-  completedAt: string;
-}
-
-interface ChallengeStats {
-  totalActive: number;
-  totalCompleted: number;
-  activePrizePool: number;
-  activePrizePoolFormatted: string;
-}
+import {
+  ActiveChallenge,
+  CompletedChallenge,
+  ChallengeStats,
+  ActiveChallengeCards,
+} from "./challenge-arena-parts";
+import {
+  ArenaEmptyState,
+  RecentVictors,
+  ChallengeStatsBar,
+} from "./challenge-arena-extras";
 
 interface LiveChallengesProps {
   theme?: LandingTheme;
@@ -49,18 +35,21 @@ interface LiveChallengesProps {
   description?: string;
   ctaText?: string;
   ctaLink?: string;
-  /** Pre-fetched challenges from combined endpoint */
-  externalData?: { active: ActiveChallenge[]; completed: CompletedChallenge[]; stats: ChallengeStats };
+  externalData?: {
+    active: ActiveChallenge[];
+    completed: CompletedChallenge[];
+    stats: ChallengeStats;
+  };
 }
 
 export default function LiveChallenges({
   theme,
   effectiveColors: propColors,
   effectiveHeadingFont: propFont,
-  title = "1v1 Challenges",
-  subtitle = "Prove Your Skills",
-  description = "Challenge any trader to a head-to-head battle.",
-  ctaText = "Start a Challenge",
+  title = "1v1 Trading Duels",
+  subtitle = "Settle It Head-to-Head",
+  description = "Think you're better than another trader? Prove it. Challenge anyone to a direct 1v1 duel — choose the stake, set the rules, and let the market decide the winner. No luck, just pure skill.",
+  ctaText = "Challenge a Trader",
   ctaLink = "/challenges",
   externalData,
 }: LiveChallengesProps) {
@@ -71,6 +60,7 @@ export default function LiveChallenges({
     text: propColors?.text || "#ffffff",
   };
   const effectiveHeadingFont = propFont || "inherit";
+
   const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>(
     [],
   );
@@ -80,7 +70,6 @@ export default function LiveChallenges({
   const [stats, setStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(!externalData);
 
-  // Use external data if provided
   useEffect(() => {
     if (externalData) {
       setActiveChallenges(externalData.active || []);
@@ -90,10 +79,8 @@ export default function LiveChallenges({
     }
   }, [externalData]);
 
-  // Only poll individually if no external data
   useEffect(() => {
     if (externalData) return;
-
     const fetchChallenges = async () => {
       try {
         const response = await fetch("/api/landing/challenges");
@@ -109,303 +96,190 @@ export default function LiveChallenges({
         setLoading(false);
       }
     };
-
     fetchChallenges();
     const interval = setInterval(fetchChallenges, 30000);
     return () => clearInterval(interval);
   }, [externalData]);
 
   return (
-    <SectionWrapper id="challenges">
-      <div className="text-center max-w-3xl mx-auto mb-12">
-        <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-          style={{
-            backgroundColor: `${effectiveColors.secondary}15`,
-            border: `1px solid ${effectiveColors.secondary}30`,
-            color: effectiveColors.secondary,
-          }}
+    <SectionWrapper id="challenges" className="py-24 relative overflow-hidden">
+      {/* Decorative crossed swords background */}
+      <motion.div
+        className="absolute top-20 left-8 opacity-[0.06] pointer-events-none hidden lg:block"
+        animate={{ y: [0, -15, 0], rotate: [0, -8, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Image
+          src={GAME_ICONS.sword1}
+          alt=""
+          width={120}
+          height={120}
+          className="w-28 h-28"
+        />
+      </motion.div>
+      <motion.div
+        className="absolute top-20 right-8 opacity-[0.06] pointer-events-none hidden lg:block"
+        animate={{ y: [0, -15, 0], rotate: [0, 8, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+        style={{ transform: "scaleX(-1)" }}
+      >
+        <Image
+          src={GAME_ICONS.sword1}
+          alt=""
+          width={120}
+          height={120}
+          className="w-28 h-28"
+        />
+      </motion.div>
+      <motion.div
+        className="absolute bottom-32 left-1/2 -translate-x-1/2 opacity-[0.04] pointer-events-none hidden lg:block"
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Image
+          src={GAME_ICONS.shield1}
+          alt=""
+          width={180}
+          height={180}
+          className="w-44 h-44"
+        />
+      </motion.div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* ═══ Section Header ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
         >
-          <span>{theme?.themeIcons?.battle || "⚔️"}</span>
-          {subtitle}
-        </div>
-
-        <h2
-          className="text-4xl md:text-5xl font-black mb-6"
-          style={{
-            color: effectiveColors.text,
-            fontFamily: effectiveHeadingFont,
-          }}
-        >
-          {title}
-        </h2>
-
-        <p
-          className="text-lg leading-relaxed"
-          style={{ color: theme?.colors?.textMuted }}
-        >
-          {description}
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2
-            className="h-8 w-8 animate-spin"
-            style={{ color: effectiveColors.secondary }}
-          />
-        </div>
-      ) : (
-        <>
-          {/* Live Battle Arena */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {activeChallenges.length > 0 ? (
-              activeChallenges.slice(0, 3).map((challenge, index) => (
-                <motion.div
-                  key={challenge.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.03 }}
-                  className="relative overflow-hidden rounded-2xl p-6"
-                  style={{
-                    backgroundColor: theme?.colors?.backgroundCard,
-                    border: `1px solid ${theme?.colors?.border}`,
-                  }}
-                >
-                  {/* Status badge */}
-                  <div className="absolute top-4 right-4">
-                    <span
-                      className="px-2 py-1 rounded-full text-xs font-bold"
-                      style={{
-                        backgroundColor: `${effectiveColors.secondary}20`,
-                        color: effectiveColors.secondary,
-                      }}
-                    >
-                      {challenge.statusLabel}
-                    </span>
-                  </div>
-
-                  {/* VS Display */}
-                  <div className="flex items-center justify-center gap-4 mb-6">
-                    <div className="text-center flex-1">
-                      <div
-                        className="w-16 h-16 rounded-xl mx-auto mb-2 flex items-center justify-center text-2xl"
-                        style={{
-                          background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.primary}10)`,
-                        }}
-                      >
-                        {theme?.themeIcons?.users || "🎮"}
-                      </div>
-                      <span
-                        className="font-bold text-sm"
-                        style={{ color: effectiveColors.text }}
-                      >
-                        {challenge.challenger}
-                      </span>
-                    </div>
-
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black"
-                      style={{
-                        background: theme?.effects?.gradientStyle,
-                        color: theme?.colors?.background,
-                      }}
-                    >
-                      VS
-                    </div>
-
-                    <div className="text-center flex-1">
-                      <div
-                        className="w-16 h-16 rounded-xl mx-auto mb-2 flex items-center justify-center text-2xl"
-                        style={{
-                          background: `linear-gradient(135deg, ${effectiveColors.secondary}30, ${effectiveColors.secondary}10)`,
-                        }}
-                      >
-                        {theme?.themeIcons?.users || "🎮"}
-                      </div>
-                      <span
-                        className="font-bold text-sm"
-                        style={{ color: effectiveColors.text }}
-                      >
-                        {challenge.challenged}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Stake */}
-                  <div
-                    className="text-center p-3 rounded-xl"
-                    style={{ backgroundColor: `${effectiveColors.accent}15` }}
-                  >
-                    <span
-                      className="text-xs uppercase tracking-wider"
-                      style={{ color: theme?.colors?.textMuted }}
-                    >
-                      Prize Pool
-                    </span>
-                    <div
-                      className="text-2xl font-black"
-                      style={{ color: effectiveColors.accent }}
-                    >
-                      {challenge.stakeFormatted}
-                    </div>
-                    {challenge.timeRemaining && (
-                      <span
-                        className="text-xs"
-                        style={{ color: theme?.colors?.textMuted }}
-                      >
-                        {challenge.timeRemaining} remaining
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              // Fallback when no active challenges
-              <div
-                className="col-span-full p-8 rounded-2xl text-center"
-                style={{
-                  backgroundColor: theme?.colors?.backgroundCard,
-                  border: `1px solid ${theme?.colors?.border}`,
-                }}
-              >
-                <Swords
-                  className="h-12 w-12 mx-auto mb-4"
-                  style={{ color: effectiveColors.secondary }}
-                />
-                <h4
-                  className="font-bold text-lg mb-2"
-                  style={{ color: effectiveColors.text }}
-                >
-                  Challenge Your Friends!
-                </h4>
-                <p style={{ color: theme?.colors?.textMuted }}>
-                  Start a 1v1 trading challenge and prove your skills.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Winners Ticker */}
-          {completedChallenges.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="p-4 rounded-xl mb-8 overflow-hidden"
-              style={{
-                backgroundColor: `${effectiveColors.secondary}10`,
-                border: `1px solid ${effectiveColors.secondary}20`,
-              }}
-            >
-              <div className="flex items-center gap-3 animate-marquee">
-                <span
-                  className="text-sm font-bold whitespace-nowrap"
-                  style={{ color: effectiveColors.secondary }}
-                >
-                  🏆 Recent Winners:
-                </span>
-                {completedChallenges.map((result, i) => (
-                  <span
-                    key={i}
-                    className="flex items-center gap-2 text-sm whitespace-nowrap"
-                    style={{ color: theme?.colors?.textMuted }}
-                  >
-                    <span
-                      className="font-bold"
-                      style={{ color: effectiveColors.text }}
-                    >
-                      {result.winner}
-                    </span>
-                    defeated {result.loser} ({result.winnerPrizeFormatted})
-                    {i < completedChallenges.length - 1 && (
-                      <span
-                        className="mx-2"
-                        style={{ color: theme?.colors?.border }}
-                      >
-                        •
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Stats Bar */}
-          {stats && (
-            <div
-              className="grid grid-cols-3 gap-4 p-4 rounded-xl mb-8"
-              style={{
-                backgroundColor: theme?.colors?.backgroundCard,
-                border: `1px solid ${theme?.colors?.border}`,
-              }}
-            >
-              <div className="text-center">
-                <div
-                  className="text-2xl font-black"
-                  style={{ color: effectiveColors.secondary }}
-                >
-                  {stats.totalActive}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: theme?.colors?.textMuted }}
-                >
-                  Active Battles
-                </div>
-              </div>
-              <div className="text-center">
-                <div
-                  className="text-2xl font-black"
-                  style={{ color: effectiveColors.primary }}
-                >
-                  {stats.totalCompleted.toLocaleString()}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: theme?.colors?.textMuted }}
-                >
-                  Total Completed
-                </div>
-              </div>
-              <div className="text-center">
-                <div
-                  className="text-2xl font-black"
-                  style={{ color: effectiveColors.accent }}
-                >
-                  {stats.activePrizePoolFormatted}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: theme?.colors?.textMuted }}
-                >
-                  At Stake Now
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* CTA */}
-      <div className="text-center">
-        <Link href={ctaLink}>
-          <Button
-            size="lg"
-            className="font-bold hover:scale-105 transition-all"
+          <motion.div
+            initial={{ scale: 0 }}
+            whileInView={{ scale: 1 }}
+            viewport={{ once: true }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold mb-6"
             style={{
-              background: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
-              color: theme?.colors?.background,
-              boxShadow: `0 10px 30px ${effectiveColors.secondary}40`,
+              backgroundColor: `${effectiveColors.secondary}15`,
+              border: `1px solid ${effectiveColors.secondary}30`,
+              color: effectiveColors.secondary,
             }}
           >
-            {ctaText}
-            <ChevronRight className="h-5 w-5 ml-2" />
-          </Button>
-        </Link>
+            <Swords className="h-4 w-4" />
+            <Image
+              src={GAME_ICONS.swordNumbered}
+              alt=""
+              width={16}
+              height={16}
+              className="h-4 w-4 object-contain"
+            />
+            {subtitle}
+          </motion.div>
+
+          <h2
+            className="text-4xl md:text-6xl font-black mb-6"
+            style={{ fontFamily: effectiveHeadingFont }}
+          >
+            <span
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.accent}, ${effectiveColors.secondary})`,
+                backgroundSize: "200% 200%",
+              }}
+            >
+              {title}
+            </span>
+          </h2>
+
+          <p
+            className="text-lg max-w-3xl mx-auto leading-relaxed"
+            style={{ color: theme?.colors?.textMuted }}
+          >
+            {description}
+          </p>
+        </motion.div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2
+              className="h-8 w-8 animate-spin"
+              style={{ color: effectiveColors.secondary }}
+            />
+          </div>
+        ) : (
+          <>
+            {/* ═══ LIVE BATTLE ARENA ═══ */}
+            <div className="mb-12">
+              {activeChallenges.length > 0 ? (
+                <ActiveChallengeCards
+                  challenges={activeChallenges}
+                  effectiveColors={effectiveColors}
+                  theme={theme}
+                />
+              ) : (
+                <ArenaEmptyState
+                  effectiveColors={effectiveColors}
+                  effectiveHeadingFont={effectiveHeadingFont}
+                  theme={theme}
+                />
+              )}
+            </div>
+
+            {/* ═══ RECENT VICTORS ═══ */}
+            {completedChallenges.length > 0 && (
+              <RecentVictors
+                challenges={completedChallenges}
+                effectiveColors={effectiveColors}
+                theme={theme}
+              />
+            )}
+
+            {/* ═══ STATS BAR ═══ */}
+            {stats && (
+              <ChallengeStatsBar
+                stats={stats}
+                effectiveColors={effectiveColors}
+                theme={theme}
+              />
+            )}
+          </>
+        )}
+
+        {/* ═══ CTA ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center"
+        >
+          <Link href={ctaLink}>
+            <Button
+              size="lg"
+              className="font-bold text-lg px-10 py-6 hover:scale-105 transition-all duration-300 rounded-xl group"
+              style={{
+                background: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
+                color: theme?.colors?.background,
+                boxShadow: `0 10px 40px ${effectiveColors.secondary}40`,
+              }}
+            >
+              <Image
+                src={GAME_ICONS.swordNumbered}
+                alt=""
+                width={20}
+                height={20}
+                className="w-5 h-5 mr-2 object-contain group-hover:rotate-12 transition-transform"
+                style={{ filter: "brightness(0) invert(1)" }}
+              />
+              {ctaText}
+              <ChevronRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
+          <p
+            className="mt-4 text-sm"
+            style={{ color: theme?.colors?.textMuted }}
+          >
+            Pick your opponent. Set the stakes. Let the market decide.
+          </p>
+        </motion.div>
       </div>
     </SectionWrapper>
   );
