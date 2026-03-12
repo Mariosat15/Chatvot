@@ -15,6 +15,7 @@ import {
   Smartphone,
   Tablet,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,26 @@ export default function LPAnalytics({ selectedPage, onBack }: Props) {
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-1" />
             Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-400 border-red-500/30 hover:bg-red-500/10"
+            onClick={async () => {
+              if (!window.confirm("Are you sure you want to clear all LP visit analytics? This cannot be undone.")) return;
+              try {
+                const res = await fetch("/api/landing-pages/analytics/clear", { method: "DELETE" });
+                if (!res.ok) throw new Error("Failed");
+                const data = await res.json();
+                toast.success(`Cleared ${data.deletedVisits} visit records`);
+                fetchAnalytics();
+              } catch {
+                toast.error("Failed to clear analytics");
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Clear Stats
           </Button>
         </div>
       </div>

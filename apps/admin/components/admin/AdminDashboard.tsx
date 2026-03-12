@@ -65,6 +65,7 @@ import {
   FileWarning,
   Map as MapIcon,
   Trash2,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -123,6 +124,7 @@ import GameMasterManagementSection from "@/components/admin/GameMasterManagement
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
 import IncidentsSection from "@/components/admin/IncidentsSection";
+import VisitorAnalyticsSection from "@/components/admin/visitors/VisitorAnalyticsSection";
 import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection";
 import GamificationWizardSection from "@/components/admin/GamificationWizardSection";
 import SitePagesSection from "@/components/admin/SitePagesSection";
@@ -199,6 +201,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Sparkles className="h-5 w-5" />,
         color: "text-cyan-400",
         bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
+      },
+      {
+        id: "visitors",
+        label: "Visitors",
+        icon: <Eye className="h-5 w-5" />,
+        color: "text-indigo-400",
+        bgColor: "bg-indigo-500/10 hover:bg-indigo-500/20",
       },
       {
         id: "marketplace",
@@ -964,6 +973,8 @@ export default function AdminDashboard({
         return <SitePagesSection key={currentRefreshKey} />;
       case "landing-pages":
         return <LandingPagesSection key={currentRefreshKey} />;
+      case "visitors":
+        return <VisitorAnalyticsSection key={currentRefreshKey} />;
       case "competitions":
         return <CompetitionsListSection key={currentRefreshKey} />;
       case "challenges":

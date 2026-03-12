@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
+import SiteTracker from "@/components/tracking/SiteTracker";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import "./globals.css";
@@ -100,6 +101,7 @@ export default function RootLayout({
       >
         <AppSettingsProvider>
           <DynamicFavicon />
+          <SiteTracker />
           {children}
           <Toaster />
         </AppSettingsProvider>

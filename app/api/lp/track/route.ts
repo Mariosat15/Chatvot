@@ -50,11 +50,15 @@ export async function POST(req: NextRequest) {
       else if (userAgent.includes("iPhone") || userAgent.includes("iPad")) os = "iOS";
     }
 
-    // Get IP from headers (best-effort)
+    // Get IP from headers (Cloudflare → X-Forwarded-For → X-Real-IP)
+    const cfIp = req.headers.get("cf-connecting-ip");
     const forwardedFor = req.headers.get("x-forwarded-for");
-    const ip = forwardedFor
-      ? forwardedFor.split(",")[0].trim()
-      : req.headers.get("x-real-ip") || "";
+    const ip = cfIp
+      || (forwardedFor ? forwardedFor.split(",")[0].trim() : "")
+      || req.headers.get("x-real-ip") || "";
+
+    // Reason: Cloudflare provides geo headers on all plans — best-effort geo data
+    const country = req.headers.get("cf-ipcountry") || "";
 
     // Generate a simple visitor ID from IP + UA (for unique visitor counting)
     const visitorId = `${ip}-${(userAgent || "").slice(0, 50)}`;
@@ -76,6 +80,7 @@ export async function POST(req: NextRequest) {
       utmCampaign: body.utmCampaign || "",
       utmTerm: body.utmTerm || "",
       utmContent: body.utmContent || "",
+      country,
       enteredAt: new Date(),
     });
 

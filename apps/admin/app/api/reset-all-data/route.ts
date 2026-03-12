@@ -48,6 +48,10 @@ import { resetBadgeAndXPConfigs } from "@/lib/services/badge-config-seed.service
 import { seedMilestonesFromDefaults } from "@/lib/services/whitelabel-defaults.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getAdminSession } from "@/lib/admin/auth";
+import SiteVisit from "@/database/models/site-visit.model";
+import BlockedVisitor from "@/database/models/blocked-visitor.model";
+import LandingPageVisit from "@/database/models/landing-page-visit.model";
+import LandingPage from "@/database/models/landing-page.model";
 
 /**
  * ⚠️ DANGER: Reset ALL trading data
@@ -231,6 +235,10 @@ export async function POST(request: Request) {
       journeyMilestones: await JourneyMilestone.estimatedDocumentCount(),
       journeyMapConfigs: await JourneyMapConfig.estimatedDocumentCount(),
       userJourneyProgress: await UserJourneyProgress.estimatedDocumentCount(),
+      // Visitor tracking data
+      siteVisits: await SiteVisit.estimatedDocumentCount(),
+      blockedVisitors: await BlockedVisitor.estimatedDocumentCount(),
+      landingPageVisits: await LandingPageVisit.estimatedDocumentCount(),
     };
 
     console.log("📊 Before deletion:", before);
@@ -615,6 +623,29 @@ export async function POST(request: Request) {
       console.log("⚠️ No security logs collection found");
     }
 
+    // ============================================
+    // DELETE VISITOR TRACKING DATA
+    // ============================================
+
+    // Delete all site visits
+    const siteVisitsDeleted = await SiteVisit.deleteMany({});
+    console.log(`✅ Deleted ${siteVisitsDeleted.deletedCount} site visits`);
+
+    // Delete all blocked visitor rules
+    const blockedVisitorsDeleted = await BlockedVisitor.deleteMany({});
+    console.log(`✅ Deleted ${blockedVisitorsDeleted.deletedCount} blocked visitor rules`);
+
+    // Delete all landing page visits
+    const lpVisitsDeleted = await LandingPageVisit.deleteMany({});
+    console.log(`✅ Deleted ${lpVisitsDeleted.deletedCount} landing page visits`);
+
+    // Reset landing page counters
+    await LandingPage.updateMany(
+      {},
+      { $set: { totalVisits: 0, uniqueVisitors: 0, totalSignups: 0 } },
+    );
+    console.log("✅ Reset landing page visit counters");
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({
@@ -723,6 +754,10 @@ export async function POST(request: Request) {
       journeyMilestones: await JourneyMilestone.estimatedDocumentCount(),
       journeyMapConfigs: await JourneyMapConfig.estimatedDocumentCount(),
       userJourneyProgress: await UserJourneyProgress.estimatedDocumentCount(),
+      // Visitor tracking data
+      siteVisits: await SiteVisit.estimatedDocumentCount(),
+      blockedVisitors: await BlockedVisitor.estimatedDocumentCount(),
+      landingPageVisits: await LandingPageVisit.estimatedDocumentCount(),
     };
 
     console.log("📊 After deletion:", after);
@@ -805,6 +840,10 @@ export async function POST(request: Request) {
         journeyMilestones: before.journeyMilestones,
         journeyMapConfigs: before.journeyMapConfigs,
         userJourneyProgress: before.userJourneyProgress,
+        // Visitor tracking data
+        siteVisits: before.siteVisits,
+        blockedVisitors: before.blockedVisitors,
+        landingPageVisits: before.landingPageVisits,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
