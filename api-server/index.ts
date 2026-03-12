@@ -290,9 +290,9 @@ async function startServer() {
     await connectToDatabase();
     console.log("✅ Database connected");
 
-    // Initialize bcrypt worker pool
+    // Initialize bcrypt worker pool (async — waits for workers to settle)
     console.log("🔧 Initializing bcrypt worker pool...");
-    bcryptPool.initialize();
+    await bcryptPool.initialize();
     const poolStats = bcryptPool.getStats();
 
     // Check actual pool state - fail fast if pool failed (auth won't work without it)

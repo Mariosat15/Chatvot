@@ -42,8 +42,9 @@ class BcryptWorkerPool {
 
   /**
    * Initialize the worker pool
+   * Now async — waits briefly for workers to settle so we detect immediate crashes
    */
-  public initialize(): void {
+  public async initialize(): Promise<void> {
     // Don't initialize if already initialized or if shutting down
     if (this.initialized || this.isShuttingDown) return;
 
@@ -51,29 +52,47 @@ class BcryptWorkerPool {
       `🔧 Initializing bcrypt worker pool with ${this.poolSize} workers...`,
     );
 
-    let successCount = 0;
+    let spawnCount = 0;
     for (let i = 0; i < this.poolSize; i++) {
       if (this.createWorker()) {
-        successCount++;
+        spawnCount++;
       }
     }
 
-    if (successCount === 0) {
-      // CRITICAL: Don't set initialized=true if no workers were created
-      // This allows retry on next operation, or failing fast if workers can't be created
+    if (spawnCount === 0) {
       console.error(
-        `❌ Bcrypt worker pool failed to create any workers! Password operations will fail.`,
+        `❌ Bcrypt worker pool failed to spawn any workers! Password operations will fail.`,
       );
-      // Set initialized to true to prevent infinite retry loops, but we'll check workers.length in executeTask
       this.initialized = true;
-    } else if (successCount < this.poolSize) {
+      return;
+    }
+
+    // Reason: Workers that crash due to missing files or import errors die asynchronously.
+    // new Worker() succeeds synchronously, but the thread exits on the next event-loop tick.
+    // We wait briefly so the "exit" handlers can fire and remove dead workers before we check.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const aliveCount = this.workers.length;
+
+    if (aliveCount === 0) {
+      console.error(
+        `❌ All ${spawnCount} workers crashed immediately after spawn!`,
+      );
+      console.error(
+        `   This usually means the compiled worker file is missing or has import errors.`,
+      );
+      console.error(
+        `   Run: cd api-server && npm run build`,
+      );
+      this.initialized = true;
+    } else if (aliveCount < this.poolSize) {
       this.initialized = true;
       console.warn(
-        `⚠️ Bcrypt worker pool partially initialized (${successCount}/${this.poolSize} workers)`,
+        `⚠️ Bcrypt worker pool partially initialized (${aliveCount}/${this.poolSize} workers alive)`,
       );
     } else {
       this.initialized = true;
-      console.log(`✅ Bcrypt worker pool ready (${this.poolSize} workers)`);
+      console.log(`✅ Bcrypt worker pool ready (${aliveCount} workers)`);
     }
   }
 
@@ -246,7 +265,7 @@ class BcryptWorkerPool {
 
     // Lazy initialization
     if (!this.initialized) {
-      this.initialize();
+      await this.initialize();
     }
 
     // CRITICAL: Reject immediately if no workers are available (pool failed to initialize)
