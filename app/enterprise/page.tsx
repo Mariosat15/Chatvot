@@ -5,164 +5,29 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  Shield,
-  Zap,
-  Globe,
-  Palette,
-  BarChart3,
-  Users,
-  Trophy,
-  Settings,
-  Lock,
-  Server,
-  Headphones,
-  Code,
-  ArrowRight,
-  Check,
-  Star,
-  Building2,
-  Briefcase,
-  TrendingUp,
-  Mail,
-  Phone,
-  ChevronRight,
-  Layers,
-  Database,
-  Bell,
-  CreditCard,
-  FileText,
-  PieChart,
-  Target,
-  Award,
-  Crown,
-  Menu,
-  X,
+  Shield, Zap, Globe, Palette, BarChart3, Users, Trophy,
+  Settings, Lock, Server, Headphones, Code, Star, Building2,
+  Briefcase, TrendingUp, Layers, Database, Bell, CreditCard,
+  FileText, PieChart, Target, Award, Crown, ArrowRight, Menu, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CaseStudies, DemoScheduler } from "@/components/landing/enterprise";
+import {
+  CaseStudies,
+  EnterprisePlatformSection,
+  EnterpriseAdminShowcase,
+  EnterprisePricingContact,
+} from "@/components/landing/enterprise";
+import type { EnterpriseSettings } from "@/components/landing/enterprise/types";
 
-// Icon mapping
+// Icon mapping for hero trust badges & white label features
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  Shield,
-  Zap,
-  Globe,
-  Palette,
-  BarChart3,
-  Users,
-  Trophy,
-  Settings,
-  Lock,
-  Server,
-  Headphones,
-  Code,
-  Star,
-  Building2,
-  Briefcase,
-  TrendingUp,
-  Mail,
-  Phone,
-  Layers,
-  Database,
-  Bell,
-  CreditCard,
-  FileText,
-  PieChart,
-  Target,
-  Award,
-  Crown,
+  Shield, Zap, Globe, Palette, BarChart3, Users, Trophy,
+  Settings, Lock, Server, Headphones, Code, Star, Building2,
+  Briefcase, TrendingUp, Layers, Database, Bell, CreditCard,
+  FileText, PieChart, Target, Award, Crown,
 };
 
-interface EnterpriseSettings {
-  siteName: string;
-  logo: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  heroDescription: string;
-  heroBadge: string;
-  heroCTAText: string;
-  heroCTALink: string;
-  heroSecondaryCTAText: string;
-  heroSecondaryCTALink: string;
-  trustBadges: Array<{
-    id: string;
-    icon: string;
-    text: string;
-    enabled: boolean;
-  }>;
-  whiteLabelTitle: string;
-  whiteLabelSubtitle: string;
-  whiteLabelFeatures: Array<{
-    id: string;
-    icon: string;
-    title: string;
-    description: string;
-    enabled: boolean;
-    order: number;
-  }>;
-  adminTitle: string;
-  adminSubtitle: string;
-  adminDescription: string;
-  adminFeatures: Array<{
-    id: string;
-    icon: string;
-    title: string;
-    description: string;
-    color: string;
-    enabled: boolean;
-    order: number;
-  }>;
-  pricingTitle: string;
-  pricingSubtitle: string;
-  pricingTiers: Array<{
-    id: string;
-    name: string;
-    price: string;
-    period: string;
-    description: string;
-    features: string[];
-    ctaText: string;
-    highlighted: boolean;
-    enabled: boolean;
-    order: number;
-  }>;
-  contactTitle: string;
-  contactSubtitle: string;
-  contactEmail: string;
-  contactPhone: string;
-  contactCTAText: string;
-  sectionVisibility: {
-    hero: boolean;
-    trustBadges: boolean;
-    whiteLabel: boolean;
-    adminShowcase: boolean;
-    caseStudies?: boolean;
-    pricing: boolean;
-    contact: boolean;
-    footer: boolean;
-  };
-  footerCopyright: string;
-  // Case Studies
-  caseStudies?: Array<{
-    id: string;
-    companyName: string;
-    companyLogo: string;
-    industry: string;
-    quote: string;
-    quotePerson: string;
-    quoteTitle: string;
-    metrics: { label: string; value: string }[];
-    enabled: boolean;
-    order: number;
-  }>;
-  caseStudiesTitle?: string;
-  caseStudiesSubtitle?: string;
-  // Demo Scheduling
-  demoScheduling?: {
-    enabled: boolean;
-    calendlyUrl: string;
-    buttonText: string;
-  };
-}
+// ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function EnterprisePage() {
   const [settings, setSettings] = useState<EnterpriseSettings | null>(null);
@@ -176,7 +41,6 @@ export default function EnterprisePage() {
         if (response.ok) {
           const data = await response.json();
           if (data.enabled === false) {
-            // Enterprise page is disabled, redirect to home
             window.location.href = "/";
             return;
           }
@@ -211,6 +75,13 @@ export default function EnterprisePage() {
     );
   }
 
+  const navLinks = [
+    { label: "Features", href: "#features" },
+    { label: "Admin Panel", href: "#admin" },
+    { label: "Pricing", href: "#pricing" },
+    { label: "Contact", href: "#contact" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-950 text-white overflow-x-hidden">
       {/* Header */}
@@ -239,30 +110,15 @@ export default function EnterprisePage() {
             </Link>
 
             <nav className="hidden md:flex items-center gap-8">
-              <a
-                href="#features"
-                className="text-gray-400 hover:text-purple-400 transition-colors text-sm font-medium"
-              >
-                Features
-              </a>
-              <a
-                href="#admin"
-                className="text-gray-400 hover:text-purple-400 transition-colors text-sm font-medium"
-              >
-                Admin Panel
-              </a>
-              <a
-                href="#pricing"
-                className="text-gray-400 hover:text-purple-400 transition-colors text-sm font-medium"
-              >
-                Pricing
-              </a>
-              <a
-                href="#contact"
-                className="text-gray-400 hover:text-purple-400 transition-colors text-sm font-medium"
-              >
-                Contact
-              </a>
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-gray-400 hover:text-purple-400 transition-colors text-sm font-medium"
+                >
+                  {link.label}
+                </a>
+              ))}
             </nav>
 
             <div className="flex items-center gap-3">
@@ -279,7 +135,6 @@ export default function EnterprisePage() {
                   Get Quote
                 </Button>
               </a>
-
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden p-2 text-gray-400"
@@ -297,34 +152,16 @@ export default function EnterprisePage() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-800 bg-gray-950/95">
             <nav className="px-4 py-4 space-y-2">
-              <a
-                href="#features"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-3 px-4 text-gray-400 hover:text-white rounded-lg"
-              >
-                Features
-              </a>
-              <a
-                href="#admin"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-3 px-4 text-gray-400 hover:text-white rounded-lg"
-              >
-                Admin Panel
-              </a>
-              <a
-                href="#pricing"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-3 px-4 text-gray-400 hover:text-white rounded-lg"
-              >
-                Pricing
-              </a>
-              <a
-                href="#contact"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-3 px-4 text-gray-400 hover:text-white rounded-lg"
-              >
-                Contact
-              </a>
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block py-3 px-4 text-gray-400 hover:text-white rounded-lg"
+                >
+                  {link.label}
+                </a>
+              ))}
             </nav>
           </div>
         )}
@@ -485,189 +322,40 @@ export default function EnterprisePage() {
         </section>
       )}
 
+      {/* Platform Capabilities + Game Master Program */}
+      <EnterprisePlatformSection
+        showCapabilities={settings.sectionVisibility.platformCapabilities !== false}
+        competitionTypes={settings.competitionTypes}
+        showGameMaster={settings.sectionVisibility.gameMasterProgram !== false}
+        gameMasterBenefits={settings.gameMasterBenefits}
+      />
+
       {/* Admin Panel Showcase */}
       {settings.sectionVisibility.adminShowcase && (
-        <section
-          id="admin"
-          className="py-24 bg-gradient-to-b from-gray-900/50 to-gray-950 relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-500/5 via-transparent to-transparent" />
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-sm font-medium mb-6">
-                <Shield className="h-4 w-4" />
-                {settings.adminSubtitle}
-              </div>
-              <h2 className="text-4xl md:text-5xl font-black mb-4 text-white">
-                {settings.adminTitle}
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                {settings.adminDescription}
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {settings.adminFeatures.map((feature, index) => {
-                const IconComponent = iconMap[feature.icon];
-                return (
-                  <motion.div
-                    key={feature.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    viewport={{ once: true }}
-                    whileHover={{ y: -5, scale: 1.02 }}
-                    className="group relative p-6 rounded-2xl bg-gray-900/50 border border-gray-800/50 hover:border-yellow-500/30 overflow-hidden transition-all duration-300"
-                  >
-                    <div
-                      className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity`}
-                    />
-                    <div
-                      className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}
-                    >
-                      {IconComponent && (
-                        <IconComponent className="h-6 w-6 text-white" />
-                      )}
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-2">
-                      {feature.title}
-                    </h3>
-                    <p className="text-sm text-gray-400">
-                      {feature.description}
-                    </p>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            {/* Admin Panel Preview */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="mt-16 p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20"
-            >
-              <div className="rounded-xl bg-gray-900 border border-gray-800 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 bg-gray-800/50 border-b border-gray-700">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="ml-4 text-sm text-gray-400">
-                    admin.yourplatform.com
-                  </span>
-                </div>
-                <div className="p-8 text-center">
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 mb-4">
-                    <Settings className="h-10 w-10 text-gray-900" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">
-                    Admin Dashboard
-                  </h3>
-                  <p className="text-gray-400 mb-6">
-                    Full-featured admin panel with real-time analytics
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-4">
-                    <div className="px-4 py-2 rounded-lg bg-gray-800 text-sm text-gray-300">
-                      Users: 15,847
-                    </div>
-                    <div className="px-4 py-2 rounded-lg bg-gray-800 text-sm text-gray-300">
-                      Active: 2,341
-                    </div>
-                    <div className="px-4 py-2 rounded-lg bg-gray-800 text-sm text-gray-300">
-                      Revenue: $124,567
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
+        <EnterpriseAdminShowcase
+          adminTitle={settings.adminTitle}
+          adminSubtitle={settings.adminSubtitle}
+          adminDescription={settings.adminDescription}
+          adminFeatures={settings.adminFeatures}
+        />
       )}
 
-      {/* Pricing Section */}
-      {settings.sectionVisibility.pricing && (
-        <section id="pricing" className="py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <h2 className="text-4xl md:text-5xl font-black mb-4 text-white">
-                {settings.pricingTitle}
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                {settings.pricingSubtitle}
-              </p>
-            </motion.div>
+      {/* Pricing + Contact */}
+      <EnterprisePricingContact
+        showPricing={settings.sectionVisibility.pricing}
+        pricingTitle={settings.pricingTitle}
+        pricingSubtitle={settings.pricingSubtitle}
+        pricingTiers={settings.pricingTiers}
+        showContact={settings.sectionVisibility.contact}
+        contactTitle={settings.contactTitle}
+        contactSubtitle={settings.contactSubtitle}
+        contactEmail={settings.contactEmail}
+        contactPhone={settings.contactPhone}
+        contactCTAText={settings.contactCTAText}
+        demoScheduling={settings.demoScheduling}
+      />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {settings.pricingTiers.map((tier, index) => (
-                <motion.div
-                  key={tier.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  className={`relative p-8 rounded-2xl ${
-                    tier.highlighted
-                      ? "bg-gradient-to-br from-purple-900/50 to-pink-900/50 border-2 border-purple-500"
-                      : "bg-gray-900/50 border border-gray-800"
-                  }`}
-                >
-                  {tier.highlighted && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold">
-                      Most Popular
-                    </div>
-                  )}
-                  <h3 className="text-2xl font-bold text-white mb-2">
-                    {tier.name}
-                  </h3>
-                  <div className="mb-4">
-                    <span className="text-4xl font-black text-white">
-                      {tier.price}
-                    </span>
-                    <span className="text-gray-400">{tier.period}</span>
-                  </div>
-                  <p className="text-gray-400 mb-6">{tier.description}</p>
-                  <ul className="space-y-3 mb-8">
-                    {tier.features.map((feature, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-3 text-gray-300"
-                      >
-                        <Check className="h-5 w-5 text-green-500 shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <a href="#contact">
-                    <Button
-                      className={`w-full font-bold ${
-                        tier.highlighted
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white"
-                          : "bg-gray-800 hover:bg-gray-700 text-white"
-                      }`}
-                      size="lg"
-                    >
-                      {tier.ctaText}
-                    </Button>
-                  </a>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Case Studies Section */}
+      {/* Case Studies */}
       {settings.sectionVisibility.caseStudies &&
         settings.caseStudies &&
         settings.caseStudies.length > 0 && (
@@ -688,98 +376,6 @@ export default function EnterprisePage() {
           />
         )}
 
-      {/* Contact Section */}
-      {settings.sectionVisibility.contact && (
-        <section
-          id="contact"
-          className="py-24 bg-gradient-to-b from-gray-900/50 to-gray-950"
-        >
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-12"
-            >
-              <h2 className="text-4xl md:text-5xl font-black mb-4 text-white">
-                {settings.contactTitle}
-              </h2>
-              <p className="text-gray-400 text-lg">
-                {settings.contactSubtitle}
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="p-8 rounded-2xl bg-gray-900/50 border border-gray-800"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <a
-                  href={`mailto:${settings.contactEmail}`}
-                  className="flex items-center gap-4 p-4 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                    <Mail className="h-6 w-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Email Us</p>
-                    <p className="text-white font-medium">
-                      {settings.contactEmail}
-                    </p>
-                  </div>
-                </a>
-                <a
-                  href={`tel:${settings.contactPhone?.replace(/\D/g, "")}`}
-                  className="flex items-center gap-4 p-4 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center">
-                    <Phone className="h-6 w-6 text-pink-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Call Us</p>
-                    <p className="text-white font-medium">
-                      {settings.contactPhone}
-                    </p>
-                  </div>
-                </a>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 mb-4">
-                  Or schedule a demo call with our team
-                </p>
-                {settings.demoScheduling?.enabled &&
-                settings.demoScheduling?.calendlyUrl ? (
-                  <DemoScheduler
-                    effectiveColors={{
-                      primary: "#a855f7",
-                      secondary: "#ec4899",
-                      accent: "#fbbf24",
-                      text: "#ffffff",
-                    }}
-                    effectiveHeadingFont="inherit"
-                    calendlyUrl={settings.demoScheduling.calendlyUrl}
-                    buttonText={
-                      settings.demoScheduling.buttonText ||
-                      settings.contactCTAText
-                    }
-                  />
-                ) : (
-                  <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold px-12"
-                  >
-                    {settings.contactCTAText}
-                    <ChevronRight className="h-5 w-5 ml-2" />
-                  </Button>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      )}
-
       {/* Footer */}
       {settings.sectionVisibility.footer && (
         <footer className="py-12 border-t border-gray-800/50">
@@ -795,11 +391,9 @@ export default function EnterprisePage() {
                     className="h-6 w-auto opacity-70"
                   />
                 ) : (
-                  <>
-                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-gray-900" />
-                    </div>
-                  </>
+                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-gray-900" />
+                  </div>
                 )}
                 <span className="text-gray-400">
                   {settings.footerCopyright?.replace(
@@ -809,22 +403,13 @@ export default function EnterprisePage() {
                 </span>
               </div>
               <div className="flex items-center gap-6 text-sm text-gray-400">
-                <Link
-                  href="/"
-                  className="hover:text-purple-400 transition-colors"
-                >
+                <Link href="/" className="hover:text-purple-400 transition-colors">
                   Home
                 </Link>
-                <Link
-                  href="/terms"
-                  className="hover:text-purple-400 transition-colors"
-                >
+                <Link href="/terms" className="hover:text-purple-400 transition-colors">
                   Terms
                 </Link>
-                <Link
-                  href="/privacy"
-                  className="hover:text-purple-400 transition-colors"
-                >
+                <Link href="/privacy" className="hover:text-purple-400 transition-colors">
                   Privacy
                 </Link>
               </div>

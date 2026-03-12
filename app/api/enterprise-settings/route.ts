@@ -90,11 +90,44 @@ export async function GET() {
       contactPhone: settings.enterpriseContactPhone,
       contactCTAText: settings.enterpriseContactCTAText,
 
+      // Platform Capabilities (reuses competition types from hero)
+      competitionTypes:
+        settings.competitionTypes?.filter(
+          (t: { enabled: boolean }) => t.enabled,
+        ) || [],
+
+      // Game Master Program (reuses GM benefits from hero)
+      gameMasterBenefits:
+        settings.gameMasterBenefits
+          ?.filter((b: { enabled: boolean }) => b.enabled)
+          ?.sort(
+            (a: { order: number }, b: { order: number }) => a.order - b.order,
+          ) || [],
+
+      // Case Studies
+      caseStudies:
+        settings.enterpriseCaseStudies
+          ?.filter((c: { enabled: boolean }) => c.enabled)
+          ?.sort(
+            (a: { order: number }, b: { order: number }) => a.order - b.order,
+          ) || [],
+      caseStudiesTitle: settings.enterpriseCaseStudiesTitle,
+      caseStudiesSubtitle: settings.enterpriseCaseStudiesSubtitle,
+
+      // Demo Scheduling
+      demoScheduling: settings.enterpriseDemoScheduling || {
+        enabled: false,
+        calendlyUrl: "",
+        buttonText: "Schedule a Demo",
+      },
+
       // Section Visibility
       sectionVisibility: settings.enterpriseSectionVisibility || {
         hero: true,
         trustBadges: true,
         whiteLabel: true,
+        platformCapabilities: true,
+        gameMasterProgram: true,
         adminShowcase: true,
         pricing: true,
         contact: true,
