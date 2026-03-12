@@ -3,6 +3,13 @@ import { connectToDatabase } from "@/database/mongoose";
 import HeroSettings, {
   defaultThemePresets,
 } from "@/database/models/hero-settings.model";
+
+// Reason: This route reads from MongoDB on every request. Without this flag,
+// Next.js treats the GET handler as static and caches the response at build
+// time, which means admin changes to hero settings are never reflected on the
+// live landing page.
+export const dynamic = "force-dynamic";
+
 import {
   defaultGameMasterBenefits,
   defaultCompetitionTypes,
@@ -301,7 +308,21 @@ export async function GET() {
         whiteLabel: false,
         adminShowcase: false,
       },
-      sectionOrder: settings.sectionOrder,
+      // Reason: Fall back to the canonical order when the DB document
+      // was created before the sectionOrder field was added.
+      // Enterprise keys and "footer" are excluded — they are not orderable.
+      sectionOrder:
+        Array.isArray(settings.sectionOrder) && settings.sectionOrder.length > 0
+          ? settings.sectionOrder.filter(
+              // Reason: Strip enterprise-only keys that may exist in legacy data
+              (k: string) => !["adminShowcase", "whiteLabel", "pricing", "footer"].includes(k),
+            )
+          : [
+              "hero", "liveStats", "stats", "features", "howItWorks",
+              "gameMaster", "competitionTypes", "competitions", "challenges",
+              "activityFeed", "leaderboard", "journeyBadges", "marketplace",
+              "testimonials", "trustBadges", "faq", "cta",
+            ],
 
       // SEO
       seo: settings.seo,

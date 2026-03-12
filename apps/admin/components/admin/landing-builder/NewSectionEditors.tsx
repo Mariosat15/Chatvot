@@ -297,25 +297,26 @@ export default function NewSectionEditors(props: BuilderChildProps) {
 
 // ─── Section Order Editor ────────────────────────────────────────────────────
 
+// Reason: These labels match the canonical section keys used by the landing page.
+// "footer" is excluded because it is always rendered last and cannot be reordered.
 const ALL_SECTION_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
   hero: { label: "Hero", icon: BarChart3 },
+  liveStats: { label: "Live Stats Bar", icon: BarChart3 },
   stats: { label: "Stats Counter", icon: BarChart3 },
   features: { label: "Features Grid", icon: Shield },
   howItWorks: { label: "How It Works", icon: Map },
-  competitions: { label: "Live Competitions", icon: Trophy },
-  challenges: { label: "Live Challenges", icon: Users },
   gameMaster: { label: "Game Master", icon: Crown },
   competitionTypes: { label: "Competition Types", icon: Trophy },
+  competitions: { label: "Live Competitions", icon: Trophy },
+  challenges: { label: "Live Challenges", icon: Users },
+  activityFeed: { label: "Activity Feed", icon: Activity },
+  leaderboard: { label: "Leaderboard", icon: Users },
   journeyBadges: { label: "Journey & Badges", icon: Map },
   marketplace: { label: "Marketplace", icon: ShoppingBag },
-  liveStats: { label: "Live Stats Bar", icon: BarChart3 },
-  leaderboard: { label: "Leaderboard", icon: Users },
-  activityFeed: { label: "Activity Feed", icon: Activity },
   testimonials: { label: "Testimonials", icon: MessageSquare },
   trustBadges: { label: "Trust Badges", icon: Shield },
   faq: { label: "FAQ", icon: HelpCircle },
   cta: { label: "Final CTA", icon: Activity },
-  footer: { label: "Footer", icon: Shield },
 };
 
 interface SectionOrderEditorProps {

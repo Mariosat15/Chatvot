@@ -120,7 +120,9 @@ export function mapFromDbSettings(db: Record<string, any>): LandingSettings {
     testimonialsSubtitle: (db.testimonialsSubtitle as string) || defaultSettings.testimonialsSubtitle,
     trustBadgesEnabled: sv.trustBadges ?? true,
     trustBadgesTitle: (db.trustBadgesTitle as string) || defaultSettings.trustBadgesTitle,
-    sectionOrder: (db.sectionOrder as string[]) || defaultSettings.sectionOrder,
+    // Reason: Strip enterprise-only and non-orderable keys from legacy data
+    sectionOrder: ((db.sectionOrder as string[]) || defaultSettings.sectionOrder)
+      .filter((k: string) => !["adminShowcase", "whiteLabel", "pricing", "footer"].includes(k)),
 
     ctaEnabled: sv.cta ?? true,
     ctaTitle: (db.ctaTitle as string) || defaultSettings.ctaTitle,

@@ -579,11 +579,15 @@ export const defaultMarketplaceItems = [
 ];
 
 // Default section order
+// Reason: Canonical section order shared by admin, DB, landing page, and API.
+// Enterprise-only keys (adminShowcase, whiteLabel, pricing) are NOT included —
+// they belong on the enterprise page, not the landing page section order.
+// "footer" is omitted because it is always rendered last on the landing page.
 export const defaultSectionOrder = [
   "hero", "liveStats", "stats", "features", "howItWorks", "gameMaster",
   "competitionTypes", "competitions", "challenges", "activityFeed",
   "leaderboard", "journeyBadges", "marketplace", "testimonials", "trustBadges",
-  "adminShowcase", "whiteLabel", "pricing", "faq", "cta", "footer",
+  "faq", "cta",
 ];
 
 // Default CTA buttons (for singleton creation)

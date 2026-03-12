@@ -25,6 +25,7 @@ import {
   LandingFooter,
   FeaturesGrid,
   HowItWorksSection,
+  StatsCounter,
   LandingNav,
   JourneyBadgeShowcase,
   MarketplaceShowcase,
@@ -32,10 +33,13 @@ import {
 import type { HeroSettings } from "./types";
 
 // ─── Default section order (fallback when DB has none) ───────────────────────
+// Reason: This must match the canonical order used by the admin builder,
+// the DB default, and the API fallback so that reordering works correctly.
 
 const DEFAULT_SECTION_ORDER = [
   "hero",
   "liveStats",
+  "stats",
   "features",
   "howItWorks",
   "gameMaster",
@@ -204,6 +208,20 @@ export default function LandingPageContent() {
           heroCTAButtons={settings.heroCTAButtons}
           stats={settings.stats}
           statsAnimated={settings.statsAnimated}
+        />
+      );
+    }
+
+    // Stats Counter (standalone section with animated counters)
+    if (sv.stats && settings.stats && settings.stats.length > 0) {
+      registry["stats"] = (
+        <StatsCounter
+          key="stats"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          stats={settings.stats}
+          animated={settings.statsAnimated}
         />
       );
     }

@@ -235,11 +235,12 @@ export const defaultSettings: LandingSettings = {
   testimonialsSubtitle: "What champions say",
   trustBadgesEnabled: true,
   trustBadgesTitle: "Trusted By Traders Worldwide",
+  // Reason: Must match the canonical order in hero-settings.defaults.ts
   sectionOrder: [
-    "hero", "stats", "features", "howItWorks", "competitions", "challenges",
-    "gameMaster", "competitionTypes", "journeyBadges", "marketplace",
-    "liveStats", "leaderboard", "activityFeed", "testimonials",
-    "trustBadges", "faq", "cta", "footer",
+    "hero", "liveStats", "stats", "features", "howItWorks", "gameMaster",
+    "competitionTypes", "competitions", "challenges", "activityFeed",
+    "leaderboard", "journeyBadges", "marketplace", "testimonials",
+    "trustBadges", "faq", "cta",
   ],
 
   // Footer
