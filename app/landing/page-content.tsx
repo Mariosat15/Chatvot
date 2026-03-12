@@ -184,6 +184,9 @@ export default function LandingPageContent() {
     if (!settings) return {};
 
     const sv = settings.sectionVisibility;
+    // Reason: themeContent provides unique wording per template.
+    // Priority: themeContent (if present) → admin settings → hardcoded fallback.
+    const tc = theme?.themeContent;
 
     const registry: Record<string, React.ReactNode> = {};
 
@@ -195,9 +198,9 @@ export default function LandingPageContent() {
           theme={theme || null}
           effectiveColors={effectiveColors}
           effectiveHeadingFont={effectiveHeadingFont}
-          heroSubtitle={settings.heroSubtitle}
-          heroTitle={settings.heroTitle}
-          heroDescription={settings.heroDescription}
+          heroSubtitle={tc?.heroSubtitle || settings.heroSubtitle}
+          heroTitle={tc?.heroTitle || settings.heroTitle}
+          heroDescription={tc?.heroDescription || settings.heroDescription}
           heroCTAButtons={settings.heroCTAButtons}
           stats={settings.stats}
           statsAnimated={settings.statsAnimated}
@@ -484,10 +487,10 @@ export default function LandingPageContent() {
           title={settings.ctaTitle}
           subtitle={settings.ctaSubtitle}
           primaryCTA={{
-            text: settings.ctaButtonText,
+            text: tc?.ctaPrimaryText || settings.ctaButtonText,
             href: settings.ctaButtonLink,
           }}
-          secondaryCTA={{ text: "View Competitions", href: "/competitions" }}
+          secondaryCTA={{ text: tc?.ctaSecondaryText || "View Competitions", href: "/competitions" }}
         />
       );
     }

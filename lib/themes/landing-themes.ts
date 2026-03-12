@@ -9,6 +9,7 @@ import {
   pharaohTheme, jadeDragonTheme, bloodMoonTheme, auroraBorealisTheme, desertMirageTheme,
   galacticEmpireTheme, venomTheme, coralReefTheme, midnightJazzTheme, ironWarlordTheme,
 } from "./landing-themes-new-2";
+import { themeUniqueData } from "./theme-unique-data";
 
 export interface LandingTheme {
   id: string;
@@ -110,6 +111,15 @@ export interface LandingTheme {
     textGradient: string;
     glowEffect: string;
     borderGlow: string;
+  };
+
+  // Theme-specific default content — unique wording per template
+  themeContent?: {
+    heroTitle: string;
+    heroSubtitle: string;
+    heroDescription: string;
+    ctaPrimaryText: string;
+    ctaSecondaryText: string;
   };
 }
 
@@ -2537,7 +2547,22 @@ export const spaceMarineTheme: LandingTheme = {
 // ALL THEMES EXPORT
 // ==========================================
 
-export const allThemes: LandingTheme[] = [
+// Reason: enrichThemes applies unique icons, heroText, and content from
+// theme-unique-data.ts so every template has its own personality automatically.
+function enrichThemes(themes: LandingTheme[]): LandingTheme[] {
+  return themes.map((t) => {
+    const u = themeUniqueData[t.id];
+    if (!u) return t;
+    return {
+      ...t,
+      themeIcons: t.themeIcons ?? u.icons,
+      heroTextStyle: t.heroTextStyle ?? { titlePrefix: u.hero.titlePrefix, ctaIcon: u.hero.ctaIcon },
+      themeContent: t.themeContent ?? u.content,
+    };
+  });
+}
+
+export const allThemes: LandingTheme[] = enrichThemes([
   // Gaming
   gamingNeonTheme,
   retroArcadeTheme,
@@ -2616,7 +2641,7 @@ export const allThemes: LandingTheme[] = [
   desertMirageTheme,
   coralReefTheme,
   midnightJazzTheme,
-];
+]);
 
 // Holiday schedule for automatic theme switching
 export interface HolidaySchedule {
