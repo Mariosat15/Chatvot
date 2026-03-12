@@ -117,17 +117,95 @@ export interface LandingSettings {
   ctaButtonText: string;
   ctaButtonLink: string;
 
-  // New Sections (visibility)
+  // ── Game Master Section ──────────────────────────────────
   gameMasterEnabled: boolean;
+  gameMasterTitle: string;
+  gameMasterSubtitle: string;
+  gameMasterDescription: string;
+  gameMasterBenefits: Array<{
+    id: string;
+    icon: string;
+    title: string;
+    description: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  gameMasterCTAText: string;
+  gameMasterCTALink: string;
+
+  // ── Competition Types Section ──────────────────────────
   competitionTypesEnabled: boolean;
+  competitionTypesTitle: string;
+  competitionTypesSubtitle: string;
+  competitionTypesDescription: string;
+  competitionTypes: Array<{
+    id: string;
+    icon: string;
+    name: string;
+    description: string;
+    color: string;
+    enabled: boolean;
+  }>;
+
+  // ── Journey & Badges Section ───────────────────────────
   journeyBadgesEnabled: boolean;
+  journeyBadgesTitle: string;
+  journeyBadgesSubtitle: string;
+  journeyBadgesDescription: string;
+  journeyBadgeFeatures: Array<{
+    id: string;
+    icon: string;
+    gameIcon: string;
+    title: string;
+    description: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  journeyBadgesCTAText: string;
+  journeyBadgesCTALink: string;
+
+  // ── Marketplace Section ────────────────────────────────
   marketplaceEnabled: boolean;
+  marketplaceTitle: string;
+  marketplaceSubtitle: string;
+  marketplaceDescription: string;
+  marketplaceItems: Array<{
+    id: string;
+    icon: string;
+    gameIcon: string;
+    name: string;
+    description: string;
+    price: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  marketplaceCTAText: string;
+  marketplaceCTALink: string;
+
+  // ── FAQ Section ────────────────────────────────────────
   faqEnabled: boolean;
+  faqTitle: string;
+  faqSubtitle: string;
+  faqItems: Array<{
+    id: string;
+    question: string;
+    answer: string;
+    category: string;
+    order: number;
+    enabled: boolean;
+  }>;
+
+  // ── Simple Sections (visibility + title/subtitle) ──────
   liveStatsEnabled: boolean;
   leaderboardEnabled: boolean;
+  leaderboardTitle: string;
+  leaderboardSubtitle: string;
   activityFeedEnabled: boolean;
   testimonialsEnabled: boolean;
+  testimonialsTitle: string;
+  testimonialsSubtitle: string;
   trustBadgesEnabled: boolean;
+  trustBadgesTitle: string;
 
   // Section ordering
   sectionOrder: string[];

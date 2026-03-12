@@ -336,6 +336,19 @@ export interface IHeroSettings extends Document {
   // Marketplace Preview
   marketplaceTitle: string;
   marketplaceSubtitle: string;
+  marketplaceDescription: string;
+  marketplaceItems: Array<{
+    id: string;
+    icon: string;
+    gameIcon: string;
+    name: string;
+    description: string;
+    price: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  marketplaceCTAText: string;
+  marketplaceCTALink: string;
   marketplaceShowItems: number;
 
   // Testimonials
@@ -423,6 +436,22 @@ export interface IHeroSettings extends Document {
   };
   footerSocialLinks: ISocialLink[];
   footerLegalLinks: { label: string; href: string }[];
+
+  // Journey & Badges
+  journeyBadgesTitle: string;
+  journeyBadgesSubtitle: string;
+  journeyBadgesDescription: string;
+  journeyBadgeFeatures: Array<{
+    id: string;
+    icon: string;
+    gameIcon: string;
+    title: string;
+    description: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  journeyBadgesCTAText: string;
+  journeyBadgesCTALink: string;
 
   // Section Visibility
   sectionVisibility: ISectionVisibility;

@@ -147,17 +147,94 @@ export const defaultSettings: LandingSettings = {
   ctaButtonText: "Start Competing Now — It's Free",
   ctaButtonLink: "/sign-up",
 
-  // New Sections
+  // ── Game Master ──────────────────────────────────────────
   gameMasterEnabled: true,
+  gameMasterTitle: "BECOME A GAME MASTER",
+  gameMasterSubtitle: "Host competitions. Build a business. Earn from every trade.",
+  gameMasterDescription: "Game Masters are the entrepreneurial backbone of the platform. Subscribe to a GM plan, create events, invite players, and earn referral fees from every prize pool.",
+  gameMasterBenefits: [
+    { id: "gm1", icon: "Crown", title: "Host Your Own Tournaments", description: "Create competitions with custom rules, entry fees, prize pools, and ranking methods.", enabled: true, order: 1 },
+    { id: "gm2", icon: "DollarSign", title: "Earn Referral Fees", description: "Earn a percentage of every prize pool when your referred users compete.", enabled: true, order: 2 },
+    { id: "gm3", icon: "Users", title: "Build Your Community", description: "Invite traders, grow your player base, and track engagement with built-in analytics.", enabled: true, order: 3 },
+    { id: "gm4", icon: "Swords", title: "Create 1v1 Challenges", description: "Set up head-to-head challenges for your players with any ranking method.", enabled: true, order: 4 },
+    { id: "gm5", icon: "BarChart3", title: "Revenue Dashboard", description: "Track your earnings, player activity, and competition performance.", enabled: true, order: 5 },
+    { id: "gm6", icon: "Rocket", title: "Scale Without Limits", description: "No cap on competitions or players. Upgrade your GM subscription for premium features.", enabled: true, order: 6 },
+  ],
+  gameMasterCTAText: "Become a Game Master",
+  gameMasterCTALink: "/sign-up",
+
+  // ── Competition Types ──────────────────────────────────
   competitionTypesEnabled: true,
+  competitionTypesTitle: "6 WAYS TO COMPETE",
+  competitionTypesSubtitle: "Choose your battlefield. Every competition type tests a different edge.",
+  competitionTypesDescription: "Whether you are a steady grinder, a high-risk sniper, or a consistency machine — there is a format designed for your style.",
+  competitionTypes: [
+    { id: "pnl", icon: "TrendingUp", name: "P&L (Profit & Loss)", description: "The trader with the highest net profit at the end wins.", color: "#10b981", enabled: true },
+    { id: "roi", icon: "Target", name: "ROI (Return on Investment)", description: "Best percentage return wins — regardless of starting capital.", color: "#8b5cf6", enabled: true },
+    { id: "win_rate", icon: "Award", name: "Win Rate", description: "Highest percentage of profitable trades takes the crown.", color: "#f59e0b", enabled: true },
+    { id: "total_capital", icon: "Coins", name: "Total Capital", description: "Grow your portfolio to the maximum account balance.", color: "#3b82f6", enabled: true },
+    { id: "total_wins", icon: "Flame", name: "Total Wins", description: "Most winning trades dominates. Every green trade counts.", color: "#ef4444", enabled: true },
+    { id: "profit_factor", icon: "Shield", name: "Profit Factor", description: "Ratio of gross profit to gross loss determines the champion.", color: "#06b6d4", enabled: true },
+  ],
+
+  // ── Journey & Badges ───────────────────────────────────
   journeyBadgesEnabled: true,
+  journeyBadgesTitle: "YOUR TRADING JOURNEY",
+  journeyBadgesSubtitle: "Level up, earn badges, and climb the ranks",
+  journeyBadgesDescription: "Every trade brings you closer to the next milestone. Track your progression, unlock achievements, and prove your trading mastery.",
+  journeyBadgeFeatures: [
+    { id: "jb1", icon: "Map", gameIcon: "/game-icons/19. Maps.png", title: "Trading Journey Map", description: "Follow a visual progression through zones — from Rookie to Legend.", enabled: true, order: 1 },
+    { id: "jb2", icon: "Award", gameIcon: "/game-icons/9. STAR AWARD.png", title: "Collectible Badges", description: "Earn badges for milestones like first win, 100 trades, competition champion.", enabled: true, order: 2 },
+    { id: "jb3", icon: "Zap", gameIcon: "/game-icons/energi potion.png", title: "XP & Level System", description: "Every trade earns XP. Level up through tiered ranks and unlock perks.", enabled: true, order: 3 },
+    { id: "jb4", icon: "Trophy", gameIcon: "/game-icons/16. Crown.png", title: "Prestige Ranks", description: "Rise from Bronze to Diamond and beyond. Higher ranks unlock exclusives.", enabled: true, order: 4 },
+    { id: "jb5", icon: "Sparkles", gameIcon: "/game-icons/4. Gems.png", title: "Achievement System", description: "Hidden and visible achievements track your trading prowess.", enabled: true, order: 5 },
+    { id: "jb6", icon: "Users", gameIcon: "/game-icons/3. GOLD MEDAL.png", title: "Seasonal Leaderboards", description: "Compete for seasonal rankings and earn exclusive seasonal badges.", enabled: true, order: 6 },
+  ],
+  journeyBadgesCTAText: "Start Your Journey",
+  journeyBadgesCTALink: "/sign-up",
+
+  // ── Marketplace ────────────────────────────────────────
   marketplaceEnabled: true,
+  marketplaceTitle: "TRADING ARSENAL",
+  marketplaceSubtitle: "Upgrade your style",
+  marketplaceDescription: "Customize your trading experience with exclusive items, boosters, and premium tools from the marketplace.",
+  marketplaceItems: [
+    { id: "mp1", icon: "Sparkles", gameIcon: "/game-icons/helmet 1.png", name: "Premium Avatars", description: "Stand out with exclusive animated avatars and profile frames.", price: "From 50 Credits", enabled: true, order: 1 },
+    { id: "mp2", icon: "Gem", gameIcon: "/game-icons/14. STAR BADGE.png", name: "Exclusive Badges", description: "Collector badges that showcase your achievements. Limited edition designs.", price: "From 100 Credits", enabled: true, order: 2 },
+    { id: "mp3", icon: "Star", gameIcon: "/game-icons/technology 3.png", name: "Trading Indicators", description: "Advanced technical indicators and overlays for your competitive edge.", price: "From 200 Credits", enabled: true, order: 3 },
+    { id: "mp4", icon: "ShoppingBag", gameIcon: "/game-icons/chest 2.png", name: "Chart Themes", description: "Custom chart color schemes and visual themes for trading in style.", price: "From 75 Credits", enabled: true, order: 4 },
+    { id: "mp5", icon: "DollarSign", gameIcon: "/game-icons/lightning potion.png", name: "XP Boosters", description: "Temporary boosts that multiply your XP earnings.", price: "From 150 Credits", enabled: true, order: 5 },
+    { id: "mp6", icon: "Star", gameIcon: "/game-icons/16. Crown.png", name: "Game Master Packages", description: "Everything you need to start hosting competitions.", price: "From 500 Credits", enabled: true, order: 6 },
+  ],
+  marketplaceCTAText: "Browse Marketplace",
+  marketplaceCTALink: "/marketplace",
+
+  // ── FAQ ────────────────────────────────────────────────
   faqEnabled: true,
+  faqTitle: "Frequently Asked Questions",
+  faqSubtitle: "Everything you need to know about competitive trading",
+  faqItems: [
+    { id: "faq1", question: "What is competitive trading?", answer: "Competitive trading lets you pit your forex trading skills against other traders in organized competitions and 1v1 challenges. Trade with virtual capital, compete on metrics like P&L, ROI, or Win Rate, and win real prize pools.", category: "general", order: 1, enabled: true },
+    { id: "faq2", question: "How do competitions work?", answer: "Competitions have a fixed start and end time, an entry fee, and a prize pool. You trade forex during the competition window, and your performance is ranked against other participants.", category: "competitions", order: 2, enabled: true },
+    { id: "faq3", question: "What competition types are available?", answer: "We offer 6 ranking methods: P&L, ROI, Win Rate, Total Capital, Total Wins, and Profit Factor. Each format tests a different trading skill.", category: "competitions", order: 3, enabled: true },
+    { id: "faq4", question: "What are 1v1 challenges?", answer: "Challenges are head-to-head trading battles between two traders. Challenge any player, set the stake and ranking method, and trade in real-time.", category: "challenges", order: 4, enabled: true },
+    { id: "faq5", question: "What is a Game Master?", answer: "Game Masters host their own competitions and challenges, invite players, and earn referral fees from every prize pool.", category: "game-master", order: 5, enabled: true },
+    { id: "faq6", question: "Is real money at risk?", answer: "Trading uses virtual capital — you don't risk real funds on trades. However, entry fees use platform credits that you purchase.", category: "general", order: 6, enabled: true },
+    { id: "faq7", question: "How are winners determined?", answer: "Winners are determined by the competition's ranking method. Tiebreaker rules apply if there's a tie. Prize distribution is automatic.", category: "competitions", order: 7, enabled: true },
+    { id: "faq8", question: "Can I withdraw my winnings?", answer: "Yes. Prize winnings are credited to your wallet and can be withdrawn to your bank account.", category: "general", order: 8, enabled: true },
+  ],
+
+  // ── Simple Sections ────────────────────────────────────
   liveStatsEnabled: true,
   leaderboardEnabled: true,
+  leaderboardTitle: "TOP TRADERS",
+  leaderboardSubtitle: "The elite of the elite",
   activityFeedEnabled: true,
   testimonialsEnabled: true,
+  testimonialsTitle: "TRADER TESTIMONIALS",
+  testimonialsSubtitle: "What champions say",
   trustBadgesEnabled: true,
+  trustBadgesTitle: "Trusted By Traders Worldwide",
   sectionOrder: [
     "hero", "stats", "features", "howItWorks", "competitions", "challenges",
     "gameMaster", "competitionTypes", "journeyBadges", "marketplace",

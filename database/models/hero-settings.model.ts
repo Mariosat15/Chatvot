@@ -178,6 +178,14 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     // Marketplace
     marketplaceTitle: { type: String, default: "TRADING ARSENAL" },
     marketplaceSubtitle: { type: String, default: "Upgrade your style" },
+    marketplaceDescription: { type: String, default: "Customize your trading experience with exclusive items, boosters, and premium tools from the marketplace." },
+    marketplaceItems: { type: [Object], default: () => {
+      // Reason: lazy import to avoid circular dependency
+      const { defaultMarketplaceItems } = require("./hero-settings.defaults");
+      return defaultMarketplaceItems;
+    }},
+    marketplaceCTAText: { type: String, default: "Browse Marketplace" },
+    marketplaceCTALink: { type: String, default: "/marketplace" },
     marketplaceShowItems: { type: Number, default: 4 },
 
     // Testimonials
@@ -249,6 +257,17 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     footerMenus: { type: Object, default: {} },
     footerSocialLinks: { type: [Object], default: [] },
     footerLegalLinks: { type: [Object], default: [] },
+
+    // Journey & Badges
+    journeyBadgesTitle: { type: String, default: "YOUR TRADING JOURNEY" },
+    journeyBadgesSubtitle: { type: String, default: "Level up, earn badges, and climb the ranks" },
+    journeyBadgesDescription: { type: String, default: "Every trade brings you closer to the next milestone. Track your progression, unlock achievements, and prove your trading mastery." },
+    journeyBadgeFeatures: { type: [Object], default: () => {
+      const { defaultJourneyBadgeFeatures } = require("./hero-settings.defaults");
+      return defaultJourneyBadgeFeatures;
+    }},
+    journeyBadgesCTAText: { type: String, default: "Start Your Journey" },
+    journeyBadgesCTALink: { type: String, default: "/sign-up" },
 
     // Section Visibility
     sectionVisibility: {

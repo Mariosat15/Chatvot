@@ -148,14 +148,14 @@ export async function GET() {
       // Game Master Showcase
       // Reason: These fields were added after initial deployment, so existing DB documents
       // won't have them. We fall back to defaults so the sections render immediately.
-      gameMasterTitle: settings.gameMasterShowcaseTitle || "BECOME A GAME MASTER",
-      gameMasterSubtitle: settings.gameMasterShowcaseSubtitle || "Host competitions. Build a business. Earn from every trade.",
-      gameMasterDescription: settings.gameMasterShowcaseDescription || "Game Masters are the entrepreneurial backbone of the platform. Subscribe to a GM plan, create events, invite players, and earn referral fees from every prize pool.",
+      gameMasterTitle: settings.gameMasterTitle || "BECOME A GAME MASTER",
+      gameMasterSubtitle: settings.gameMasterSubtitle || "Host competitions. Build a business. Earn from every trade.",
+      gameMasterDescription: settings.gameMasterDescription || "Game Masters are the entrepreneurial backbone of the platform. Subscribe to a GM plan, create events, invite players, and earn referral fees from every prize pool.",
       gameMasterBenefits: (settings.gameMasterBenefits?.filter((b: { enabled: boolean }) => b.enabled) ?? []).length > 0
         ? settings.gameMasterBenefits.filter((b: { enabled: boolean }) => b.enabled)
         : defaultGameMasterBenefits.filter(b => b.enabled),
-      gameMasterCTAText: settings.gameMasterShowcaseCTAText || "Become a Game Master",
-      gameMasterCTALink: settings.gameMasterShowcaseCTALink || "/sign-up",
+      gameMasterCTAText: settings.gameMasterCTAText || "Become a Game Master",
+      gameMasterCTALink: settings.gameMasterCTALink || "/sign-up",
 
       // Competition Types Showcase
       competitionTypesTitle: settings.competitionTypesTitle || "6 WAYS TO COMPETE",

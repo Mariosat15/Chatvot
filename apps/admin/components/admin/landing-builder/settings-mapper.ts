@@ -69,16 +69,57 @@ export function mapFromDbSettings(db: Record<string, any>): LandingSettings {
     challengesCTAText: (db.challengesCTAText as string) || defaultSettings.challengesCTAText,
     challengesCTALink: (db.challengesCTALink as string) || defaultSettings.challengesCTALink,
 
+    // Game Master
     gameMasterEnabled: sv.gameMaster ?? true,
+    gameMasterTitle: (db.gameMasterTitle as string) || defaultSettings.gameMasterTitle,
+    gameMasterSubtitle: (db.gameMasterSubtitle as string) || defaultSettings.gameMasterSubtitle,
+    gameMasterDescription: (db.gameMasterDescription as string) || defaultSettings.gameMasterDescription,
+    gameMasterBenefits: (db.gameMasterBenefits as LandingSettings["gameMasterBenefits"]) || defaultSettings.gameMasterBenefits,
+    gameMasterCTAText: (db.gameMasterCTAText as string) || defaultSettings.gameMasterCTAText,
+    gameMasterCTALink: (db.gameMasterCTALink as string) || defaultSettings.gameMasterCTALink,
+
+    // Competition Types
     competitionTypesEnabled: sv.competitionTypes ?? true,
+    competitionTypesTitle: (db.competitionTypesTitle as string) || defaultSettings.competitionTypesTitle,
+    competitionTypesSubtitle: (db.competitionTypesSubtitle as string) || defaultSettings.competitionTypesSubtitle,
+    competitionTypesDescription: (db.competitionTypesDescription as string) || defaultSettings.competitionTypesDescription,
+    competitionTypes: (db.competitionTypes as LandingSettings["competitionTypes"]) || defaultSettings.competitionTypes,
+
+    // Journey & Badges
     journeyBadgesEnabled: sv.journeyBadges ?? true,
+    journeyBadgesTitle: (db.journeyBadgesTitle as string) || defaultSettings.journeyBadgesTitle,
+    journeyBadgesSubtitle: (db.journeyBadgesSubtitle as string) || defaultSettings.journeyBadgesSubtitle,
+    journeyBadgesDescription: (db.journeyBadgesDescription as string) || defaultSettings.journeyBadgesDescription,
+    journeyBadgeFeatures: (db.journeyBadgeFeatures as LandingSettings["journeyBadgeFeatures"]) || defaultSettings.journeyBadgeFeatures,
+    journeyBadgesCTAText: (db.journeyBadgesCTAText as string) || defaultSettings.journeyBadgesCTAText,
+    journeyBadgesCTALink: (db.journeyBadgesCTALink as string) || defaultSettings.journeyBadgesCTALink,
+
+    // Marketplace
     marketplaceEnabled: sv.marketplace ?? true,
+    marketplaceTitle: (db.marketplaceTitle as string) || defaultSettings.marketplaceTitle,
+    marketplaceSubtitle: (db.marketplaceSubtitle as string) || defaultSettings.marketplaceSubtitle,
+    marketplaceDescription: (db.marketplaceDescription as string) || defaultSettings.marketplaceDescription,
+    marketplaceItems: (db.marketplaceItems as LandingSettings["marketplaceItems"]) || defaultSettings.marketplaceItems,
+    marketplaceCTAText: (db.marketplaceCTAText as string) || defaultSettings.marketplaceCTAText,
+    marketplaceCTALink: (db.marketplaceCTALink as string) || defaultSettings.marketplaceCTALink,
+
+    // FAQ
     faqEnabled: sv.faq ?? true,
+    faqTitle: (db.faqTitle as string) || defaultSettings.faqTitle,
+    faqSubtitle: (db.faqSubtitle as string) || defaultSettings.faqSubtitle,
+    faqItems: (db.faqItems as LandingSettings["faqItems"]) || defaultSettings.faqItems,
+
+    // Simple sections
     liveStatsEnabled: sv.liveStats ?? true,
     leaderboardEnabled: sv.leaderboard ?? true,
+    leaderboardTitle: (db.leaderboardTitle as string) || defaultSettings.leaderboardTitle,
+    leaderboardSubtitle: (db.leaderboardSubtitle as string) || defaultSettings.leaderboardSubtitle,
     activityFeedEnabled: sv.activityFeed ?? true,
     testimonialsEnabled: sv.testimonials ?? true,
+    testimonialsTitle: (db.testimonialsTitle as string) || defaultSettings.testimonialsTitle,
+    testimonialsSubtitle: (db.testimonialsSubtitle as string) || defaultSettings.testimonialsSubtitle,
     trustBadgesEnabled: sv.trustBadges ?? true,
+    trustBadgesTitle: (db.trustBadgesTitle as string) || defaultSettings.trustBadgesTitle,
     sectionOrder: (db.sectionOrder as string[]) || defaultSettings.sectionOrder,
 
     ctaEnabled: sv.cta ?? true,
@@ -186,6 +227,48 @@ export function mapToDbSettings(s: LandingSettings) {
     challengesDescription: s.challengesDescription,
     challengesCTAText: s.challengesCTAText,
     challengesCTALink: s.challengesCTALink,
+
+    // Game Master
+    gameMasterTitle: s.gameMasterTitle,
+    gameMasterSubtitle: s.gameMasterSubtitle,
+    gameMasterDescription: s.gameMasterDescription,
+    gameMasterBenefits: s.gameMasterBenefits,
+    gameMasterCTAText: s.gameMasterCTAText,
+    gameMasterCTALink: s.gameMasterCTALink,
+
+    // Competition Types
+    competitionTypesTitle: s.competitionTypesTitle,
+    competitionTypesSubtitle: s.competitionTypesSubtitle,
+    competitionTypesDescription: s.competitionTypesDescription,
+    competitionTypes: s.competitionTypes,
+
+    // Journey & Badges
+    journeyBadgesTitle: s.journeyBadgesTitle,
+    journeyBadgesSubtitle: s.journeyBadgesSubtitle,
+    journeyBadgesDescription: s.journeyBadgesDescription,
+    journeyBadgeFeatures: s.journeyBadgeFeatures,
+    journeyBadgesCTAText: s.journeyBadgesCTAText,
+    journeyBadgesCTALink: s.journeyBadgesCTALink,
+
+    // Marketplace
+    marketplaceTitle: s.marketplaceTitle,
+    marketplaceSubtitle: s.marketplaceSubtitle,
+    marketplaceDescription: s.marketplaceDescription,
+    marketplaceItems: s.marketplaceItems,
+    marketplaceCTAText: s.marketplaceCTAText,
+    marketplaceCTALink: s.marketplaceCTALink,
+
+    // FAQ
+    faqTitle: s.faqTitle,
+    faqSubtitle: s.faqSubtitle,
+    faqItems: s.faqItems,
+
+    // Simple sections
+    leaderboardTitle: s.leaderboardTitle,
+    leaderboardSubtitle: s.leaderboardSubtitle,
+    testimonialsTitle: s.testimonialsTitle,
+    testimonialsSubtitle: s.testimonialsSubtitle,
+    trustBadgesTitle: s.trustBadgesTitle,
 
     ctaTitle: s.ctaTitle,
     ctaSubtitle: s.ctaSubtitle,

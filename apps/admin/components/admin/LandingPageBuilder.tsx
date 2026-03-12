@@ -44,7 +44,6 @@ import FooterSectionEditor from "./landing-builder/FooterSectionEditor";
 import EnterpriseTab from "./landing-builder/EnterpriseTab";
 import NewSectionEditors, {
   SectionOrderEditor,
-  type SectionVisibilitySettings,
 } from "./landing-builder/NewSectionEditors";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -338,10 +337,13 @@ export default function LandingPageBuilder() {
             {/* Competitions / Challenges / Final CTA */}
             <ContentSectionEditors settings={settings} updateField={updateField} />
 
-            {/* New Section Visibility Toggles */}
+            {/* New Section Editors (GM, Types, Leaderboard, etc.) */}
             <NewSectionEditors
-              settings={settings as unknown as SectionVisibilitySettings}
-              onToggle={(key, value) => updateField(key as keyof LandingSettings, value as never)}
+              settings={settings}
+              updateField={updateField}
+              addItem={addItem}
+              removeItem={removeItem}
+              updateArrayItem={updateArrayItem}
             />
 
             {/* Section Display Order */}
