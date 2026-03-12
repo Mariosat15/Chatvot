@@ -16,3 +16,5 @@ export { default as FeaturesGrid } from "./FeaturesGrid";
 export { default as HowItWorksSection } from "./HowItWorksSection";
 export { default as StatsCounter } from "./StatsCounter";
 export { default as LandingNav } from "./LandingNav";
+export { default as JourneyBadgeShowcase } from "./JourneyBadgeShowcase";
+export { default as MarketplaceShowcase } from "./MarketplaceShowcase";

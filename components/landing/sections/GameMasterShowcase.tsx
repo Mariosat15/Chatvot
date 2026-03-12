@@ -49,6 +49,24 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   ShoppingBag, Medal, ChevronRight,
 };
 
+// Game icon images mapped to GM benefit IDs
+const GM_GAME_ICONS: Record<string, string> = {
+  gm1: "/game-icons/1. TROPHY.png",        // Host tournaments
+  gm2: "/game-icons/Pirate Coins.png",      // Earn referral fees
+  gm3: "/game-icons/Pirate Flag.png",       // Build community
+  gm4: "/game-icons/9. Sword.png",          // 1v1 challenges
+  gm5: "/game-icons/portofolio.png",        // Revenue dashboard
+  gm6: "/game-icons/incrase provit.png",    // Scale without limits
+};
+
+// GM journey steps — showing the path from player to GM empire
+const GM_JOURNEY = [
+  { step: 1, title: "Subscribe", desc: "Choose a GM plan that fits your goals", icon: "/game-icons/15. Key.png" },
+  { step: 2, title: "Create Events", desc: "Design competitions & 1v1 challenges", icon: "/game-icons/1. TROPHY.png" },
+  { step: 3, title: "Invite Players", desc: "Build your trading community", icon: "/game-icons/Pirate Flag.png" },
+  { step: 4, title: "Earn & Grow", desc: "Collect referral fees from every prize pool", icon: "/game-icons/treasure.png" },
+];
+
 interface GameMasterBenefit {
   id: string;
   icon: string;
@@ -102,13 +120,20 @@ export default function GameMasterShowcase({
         }}
       />
 
-      {/* Decorative floating crown */}
+      {/* Floating crown (game icon) */}
       <motion.div
-        className="absolute top-20 right-10 opacity-10 text-8xl pointer-events-none hidden lg:block"
+        className="absolute top-16 right-12 opacity-[0.08] pointer-events-none hidden lg:block"
         animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
       >
-        👑
+        <img src="/game-icons/16. Crown.png" alt="" width={120} height={120} className="drop-shadow-2xl" />
+      </motion.div>
+      <motion.div
+        className="absolute bottom-20 left-8 opacity-[0.06] pointer-events-none hidden lg:block"
+        animate={{ y: [0, 15, 0], rotate: [-3, 3, -3] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <img src="/game-icons/Pirate Coins.png" alt="" width={90} height={90} className="drop-shadow-2xl" />
       </motion.div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -161,11 +186,71 @@ export default function GameMasterShowcase({
           </p>
         </motion.div>
 
-        {/* Benefits Grid */}
+        {/* ─── GM Journey Path ────────────────────────────────────────── */}
+        <div className="mb-16">
+          <h3
+            className="text-xl md:text-2xl font-bold text-center mb-10"
+            style={{ fontFamily: effectiveHeadingFont, color: effectiveColors.text }}
+          >
+            Your Game Master Journey
+          </h3>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
+            {GM_JOURNEY.map((s, i) => (
+              <motion.div
+                key={s.step}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.12 }}
+                viewport={{ once: true }}
+                whileHover={{ y: -6 }}
+                className="group flex flex-col items-center text-center"
+              >
+                {/* Step circle with game icon */}
+                <div
+                  className="relative w-20 h-20 rounded-full flex items-center justify-center mb-4 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,215,0,0.25)]"
+                  style={{
+                    background: `linear-gradient(145deg, ${effectiveColors.background}cc, ${effectiveColors.primary}12)`,
+                    border: `2px solid ${effectiveColors.primary}30`,
+                  }}
+                >
+                  <div
+                    className="absolute inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{ background: `radial-gradient(circle, ${effectiveColors.primary}20, transparent 70%)` }}
+                  />
+                  <img
+                    src={s.icon}
+                    alt={s.title}
+                    width={44}
+                    height={44}
+                    className="relative z-10 drop-shadow-lg group-hover:scale-110 transition-transform duration-300"
+                  />
+                  {/* Step number */}
+                  <span
+                    className="absolute -top-1 -left-1 w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${effectiveColors.primary}, ${effectiveColors.secondary})`,
+                      color: effectiveColors.background,
+                    }}
+                  >
+                    {s.step}
+                  </span>
+                </div>
+                <h4 className="text-sm font-bold mb-1" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>
+                  {s.title}
+                </h4>
+                <p className="text-xs" style={{ color: theme?.colors.textMuted }}>{s.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Benefits Grid — now with game-icon images */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
           {enabledBenefits.map((benefit, index) => {
-            const IconComponent =
-              iconMap[benefit.icon] || Crown;
+            const IconComponent = iconMap[benefit.icon] || Crown;
+            // eslint-disable-next-line security/detect-object-injection
+            const gameIcon = GM_GAME_ICONS[benefit.id];
             return (
               <motion.div
                 key={benefit.id}
@@ -197,18 +282,42 @@ export default function GameMasterShowcase({
                 />
 
                 <div className="relative z-10">
-                  <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300"
-                    style={{
-                      background: `linear-gradient(135deg, ${effectiveColors.primary}25, ${effectiveColors.secondary}25)`,
-                    }}
-                  >
-                    <IconComponent
-                      className="h-7 w-7"
-                      // @ts-expect-error style prop on SVG
-                      style={{ color: effectiveColors.primary }}
-                    />
+                  {/* Icon area — game icon + Lucide icon */}
+                  <div className="flex items-center gap-3 mb-5">
+                    {gameIcon ? (
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 relative overflow-hidden"
+                        style={{
+                          background: `linear-gradient(135deg, ${effectiveColors.primary}20, ${effectiveColors.secondary}15)`,
+                        }}
+                      >
+                        {/* Glow behind icon */}
+                        <div
+                          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                          style={{ background: `radial-gradient(circle, ${effectiveColors.primary}30, transparent 70%)` }}
+                        />
+                        <img
+                          src={gameIcon}
+                          alt={benefit.title}
+                          width={36}
+                          height={36}
+                          className="relative z-10 drop-shadow-md group-hover:drop-shadow-lg"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
+                        style={{
+                          background: `linear-gradient(135deg, ${effectiveColors.primary}25, ${effectiveColors.secondary}25)`,
+                        }}
+                      >
+                        <IconComponent
+                          className="h-7 w-7"
+                        />
+                      </div>
+                    )}
                   </div>
+
                   <h3
                     className="text-lg font-bold mb-3"
                     style={{

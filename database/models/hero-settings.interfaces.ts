@@ -76,6 +76,7 @@ export interface ISectionVisibility {
   leaderboard: boolean;
   activityFeed: boolean;
   marketplace: boolean;
+  journeyBadges: boolean;
   testimonials: boolean;
   trustBadges: boolean;
   adminShowcase: boolean;

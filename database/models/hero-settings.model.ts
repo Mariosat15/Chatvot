@@ -264,6 +264,7 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
       leaderboard: { type: Boolean, default: true },
       activityFeed: { type: Boolean, default: true },
       marketplace: { type: Boolean, default: true },
+      journeyBadges: { type: Boolean, default: true },
       testimonials: { type: Boolean, default: false },
       trustBadges: { type: Boolean, default: false },
       adminShowcase: { type: Boolean, default: true },

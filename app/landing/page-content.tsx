@@ -26,6 +26,8 @@ import {
   FeaturesGrid,
   HowItWorksSection,
   LandingNav,
+  JourneyBadgeShowcase,
+  MarketplaceShowcase,
 } from "@/components/landing/sections";
 import type { HeroSettings } from "./types";
 
@@ -414,6 +416,51 @@ export default function LandingPageContent() {
             theme={theme}
             effectiveColors={effectiveColors}
             effectiveHeadingFont={effectiveHeadingFont}
+          />
+        )}
+
+      {/* Journey & Badge Showcase */}
+      {settings.sectionVisibility.journeyBadges &&
+        settings.journeyBadgeFeatures &&
+        settings.journeyBadgeFeatures.length > 0 && (
+          <JourneyBadgeShowcase
+            theme={theme || null}
+            effectiveColors={effectiveColors}
+            effectiveHeadingFont={effectiveHeadingFont}
+            title={settings.journeyBadgesTitle || "YOUR TRADING JOURNEY"}
+            subtitle={
+              settings.journeyBadgesSubtitle ||
+              "Level up, earn badges, and climb the ranks"
+            }
+            description={
+              settings.journeyBadgesDescription ||
+              "Every trade brings you closer to the next milestone."
+            }
+            features={settings.journeyBadgeFeatures}
+            ctaText={settings.journeyBadgesCTAText || "Start Your Journey"}
+            ctaLink={settings.journeyBadgesCTALink || "/sign-up"}
+          />
+        )}
+
+      {/* Marketplace Showcase */}
+      {settings.sectionVisibility.marketplace &&
+        settings.marketplaceItems &&
+        settings.marketplaceItems.length > 0 && (
+          <MarketplaceShowcase
+            theme={theme || null}
+            effectiveColors={effectiveColors}
+            effectiveHeadingFont={effectiveHeadingFont}
+            title={settings.marketplaceTitle || "TRADING ARSENAL"}
+            subtitle={
+              settings.marketplaceSubtitle || "Upgrade your style"
+            }
+            description={
+              settings.marketplaceDescription ||
+              "Customize your trading experience with exclusive items."
+            }
+            items={settings.marketplaceItems}
+            ctaText={settings.marketplaceCTAText || "Browse Marketplace"}
+            ctaLink={settings.marketplaceCTALink || "/marketplace"}
           />
         )}
 

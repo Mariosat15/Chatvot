@@ -87,6 +87,37 @@ export interface HeroSettings {
   ctaDescription: string;
   ctaButtonText: string;
   ctaButtonLink: string;
+  // Journey & Badge Showcase
+  journeyBadgesTitle?: string;
+  journeyBadgesSubtitle?: string;
+  journeyBadgesDescription?: string;
+  journeyBadgeFeatures?: Array<{
+    id: string;
+    icon: string;
+    gameIcon?: string;
+    title: string;
+    description: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  journeyBadgesCTAText?: string;
+  journeyBadgesCTALink?: string;
+  // Marketplace Showcase
+  marketplaceTitle?: string;
+  marketplaceSubtitle?: string;
+  marketplaceDescription?: string;
+  marketplaceItems?: Array<{
+    id: string;
+    icon: string;
+    gameIcon?: string;
+    name: string;
+    description: string;
+    price: string;
+    enabled: boolean;
+    order: number;
+  }>;
+  marketplaceCTAText?: string;
+  marketplaceCTALink?: string;
   sectionVisibility: {
     hero: boolean;
     features: boolean;
@@ -100,6 +131,7 @@ export interface HeroSettings {
     leaderboard?: boolean;
     activityFeed?: boolean;
     marketplace?: boolean;
+    journeyBadges?: boolean;
     testimonials?: boolean;
     trustBadges?: boolean;
     faq?: boolean;

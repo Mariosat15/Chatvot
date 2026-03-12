@@ -10,6 +10,8 @@ import {
   defaultFooterMenuPlatform,
   defaultFooterMenuSupport,
   defaultFooterMenuBusiness,
+  defaultJourneyBadgeFeatures,
+  defaultMarketplaceItems,
 } from "@/database/models/hero-settings.defaults";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import CompanySettings from "@/database/models/company-settings.model";
@@ -169,9 +171,27 @@ export async function GET() {
       leaderboardShowTop: settings.leaderboardShowTop,
       leaderboardStyle: settings.leaderboardStyle,
 
-      // Marketplace
-      marketplaceTitle: settings.marketplaceTitle,
-      marketplaceSubtitle: settings.marketplaceSubtitle,
+      // Journey & Badge Showcase
+      // Reason: New section — fall back to defaults for existing DB documents
+      journeyBadgesTitle: settings.journeyBadgesTitle || "YOUR TRADING JOURNEY",
+      journeyBadgesSubtitle: settings.journeyBadgesSubtitle || "Level up, earn badges, and climb the ranks",
+      journeyBadgesDescription: settings.journeyBadgesDescription || "Every trade brings you closer to the next milestone. Track your progression, unlock achievements, and prove your trading mastery.",
+      journeyBadgeFeatures: (settings.journeyBadgeFeatures?.filter((f: { enabled: boolean }) => f.enabled) ?? []).length > 0
+        ? settings.journeyBadgeFeatures.filter((f: { enabled: boolean }) => f.enabled)
+        : defaultJourneyBadgeFeatures.filter(f => f.enabled),
+      journeyBadgesCTAText: settings.journeyBadgesCTAText || "Start Your Journey",
+      journeyBadgesCTALink: settings.journeyBadgesCTALink || "/sign-up",
+
+      // Marketplace Showcase
+      // Reason: New section — fall back to defaults for existing DB documents
+      marketplaceTitle: settings.marketplaceTitle || "TRADING ARSENAL",
+      marketplaceSubtitle: settings.marketplaceSubtitle || "Upgrade your style",
+      marketplaceDescription: settings.marketplaceDescription || "Customize your trading experience with exclusive items, boosters, and premium tools from the marketplace.",
+      marketplaceItems: (settings.marketplaceItems?.filter((i: { enabled: boolean }) => i.enabled) ?? []).length > 0
+        ? settings.marketplaceItems.filter((i: { enabled: boolean }) => i.enabled)
+        : defaultMarketplaceItems.filter(i => i.enabled),
+      marketplaceCTAText: settings.marketplaceCTAText || "Browse Marketplace",
+      marketplaceCTALink: settings.marketplaceCTALink || "/marketplace",
       marketplaceShowItems: settings.marketplaceShowItems,
 
       // Testimonials
@@ -269,6 +289,7 @@ export async function GET() {
         leaderboard: true,
         activityFeed: true,
         marketplace: true,
+        journeyBadges: true,
         testimonials: true,
         trustBadges: true,
         faq: true,

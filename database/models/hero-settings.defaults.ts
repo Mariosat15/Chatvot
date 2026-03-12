@@ -453,11 +453,133 @@ export const defaultFooterMenuBusiness = [
   { id: "3", label: "Contact Sales", href: "/enterprise#contact", enabled: true },
 ];
 
+// Default Journey & Badge features (for landing page showcase)
+export const defaultJourneyBadgeFeatures = [
+  {
+    id: "jb-progression",
+    icon: "Map",
+    gameIcon: "/game-icons/19. Maps.png",
+    title: "Trading Journey Map",
+    description: "Follow a visual progression through zones — from Rookie to Legend. Each zone unlocks new challenges, badges, and exclusive rewards.",
+    enabled: true,
+    order: 1,
+  },
+  {
+    id: "jb-badges",
+    icon: "Award",
+    gameIcon: "/game-icons/9. STAR AWARD.png",
+    title: "Collectible Badges",
+    description: "Earn badges for milestones like first win, 100 trades, competition champion, and more. Display them on your profile for all to see.",
+    enabled: true,
+    order: 2,
+  },
+  {
+    id: "jb-xp",
+    icon: "Zap",
+    gameIcon: "/game-icons/energi potion.png",
+    title: "XP & Level System",
+    description: "Every trade, competition entry, and challenge earns XP. Level up through tiered ranks and unlock perks at each milestone.",
+    enabled: true,
+    order: 3,
+  },
+  {
+    id: "jb-ranks",
+    icon: "Trophy",
+    gameIcon: "/game-icons/16. Crown.png",
+    title: "Prestige Ranks",
+    description: "Rise from Bronze to Diamond and beyond. Higher ranks unlock exclusive competition access, reduced fees, and legendary badges.",
+    enabled: true,
+    order: 4,
+  },
+  {
+    id: "jb-achievements",
+    icon: "Sparkles",
+    gameIcon: "/game-icons/4. Gems.png",
+    title: "Achievement System",
+    description: "Hidden and visible achievements track your trading prowess. Unlock secret rewards by discovering rare achievement conditions.",
+    enabled: true,
+    order: 5,
+  },
+  {
+    id: "jb-leaderboard",
+    icon: "Users",
+    gameIcon: "/game-icons/3. GOLD MEDAL.png",
+    title: "Seasonal Leaderboards",
+    description: "Compete for seasonal rankings. Top performers earn exclusive seasonal badges, bonus credits, and a spot in the Hall of Fame.",
+    enabled: true,
+    order: 6,
+  },
+];
+
+// Default Marketplace items (for landing page showcase)
+export const defaultMarketplaceItems = [
+  {
+    id: "mp-avatars",
+    icon: "Sparkles",
+    gameIcon: "/game-icons/helmet 1.png",
+    name: "Premium Avatars",
+    description: "Stand out with exclusive animated avatars and profile frames. Show your rank and style on every leaderboard.",
+    price: "From 50 Credits",
+    enabled: true,
+    order: 1,
+  },
+  {
+    id: "mp-badges",
+    icon: "Gem",
+    gameIcon: "/game-icons/14. STAR BADGE.png",
+    name: "Exclusive Badges",
+    description: "Collector badges that showcase your achievements. Limited edition designs released each season.",
+    price: "From 100 Credits",
+    enabled: true,
+    order: 2,
+  },
+  {
+    id: "mp-indicators",
+    icon: "Star",
+    gameIcon: "/game-icons/technology 3.png",
+    name: "Trading Indicators",
+    description: "Advanced technical indicators and overlays to sharpen your competitive edge in competitions.",
+    price: "From 200 Credits",
+    enabled: true,
+    order: 3,
+  },
+  {
+    id: "mp-themes",
+    icon: "ShoppingBag",
+    gameIcon: "/game-icons/chest 2.png",
+    name: "Chart Themes",
+    description: "Custom chart color schemes and visual themes. Trade in style with unique visual configurations.",
+    price: "From 75 Credits",
+    enabled: true,
+    order: 4,
+  },
+  {
+    id: "mp-boosters",
+    icon: "DollarSign",
+    gameIcon: "/game-icons/lightning potion.png",
+    name: "XP Boosters",
+    description: "Temporary boosts that multiply your XP earnings. Level up faster and unlock rewards sooner.",
+    price: "From 150 Credits",
+    enabled: true,
+    order: 5,
+  },
+  {
+    id: "mp-gm-packages",
+    icon: "Star",
+    gameIcon: "/game-icons/16. Crown.png",
+    name: "Game Master Packages",
+    description: "Everything you need to start hosting competitions. Includes templates, branding tools, and premium support.",
+    price: "From 500 Credits",
+    enabled: true,
+    order: 6,
+  },
+];
+
 // Default section order
 export const defaultSectionOrder = [
   "hero", "liveStats", "stats", "features", "howItWorks", "gameMaster",
   "competitionTypes", "competitions", "challenges", "activityFeed",
-  "leaderboard", "marketplace", "testimonials", "trustBadges",
+  "leaderboard", "journeyBadges", "marketplace", "testimonials", "trustBadges",
   "adminShowcase", "whiteLabel", "pricing", "faq", "cta", "footer",
 ];
 
