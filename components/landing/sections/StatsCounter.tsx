@@ -2,7 +2,23 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import {
+  Trophy, Swords, Users, TrendingUp, DollarSign, Zap, Award,
+  BarChart3, ShoppingBag, Star, Crown, Medal, Target, Rocket,
+  Gift, Flame, Shield, Timer, Coins, Globe, Lock, CreditCard,
+  Bell, FileText, PieChart, Headphones, Server, Database, Code,
+  Mail, Phone,
+} from "lucide-react";
 import { LandingTheme } from "@/lib/themes/landing-themes";
+
+// Icon mapping — maps icon name strings from DB to Lucide components
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  Trophy, Swords, Users, TrendingUp, DollarSign, Zap, Award,
+  BarChart3, ShoppingBag, Star, Crown, Medal, Target, Rocket,
+  Gift, Flame, Shield, Timer, Coins, Globe, Lock, CreditCard,
+  Bell, FileText, PieChart, Headphones, Server, Database, Code,
+  Mail, Phone,
+};
 
 interface Stat {
   id: string;
@@ -90,7 +106,14 @@ export default function StatsCounter({
                   }}
                 >
                   <span className="text-4xl mb-4 block group-hover:scale-110 transition-transform">
-                    {stat.icon}
+                    {(() => {
+                      const IconComp = iconMap[stat.icon];
+                      return IconComp ? (
+                        <IconComp className="h-10 w-10 mx-auto" />
+                      ) : (
+                        stat.icon
+                      );
+                    })()}
                   </span>
                   <div
                     className="text-3xl md:text-4xl font-black mb-2"

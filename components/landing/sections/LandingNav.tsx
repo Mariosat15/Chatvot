@@ -1,7 +1,9 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+// Reason: Logo is served via /api/assets/images/ (dynamic API route).
+// next/image optimization proxy cannot reliably handle API-route-served images.
 import Link from "next/link";
-import Image from "next/image";
 import { motion, MotionValue } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,12 +54,10 @@ export default function LandingNav({
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
             {settings.logo && settings.logo.length > 0 ? (
-              <Image
+              <img
                 src={settings.logo}
                 alt={settings.siteName}
-                width={140}
-                height={32}
-                className="h-8 w-auto"
+                className="h-8 w-auto max-w-[140px] object-contain"
               />
             ) : (
               <>

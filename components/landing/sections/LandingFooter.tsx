@@ -1,7 +1,9 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+// Reason: Logo is served via /api/assets/images/ (dynamic API route).
+// next/image optimization proxy cannot reliably handle API-route-served images.
 import Link from "next/link";
-import Image from "next/image";
 import { LandingTheme } from "@/lib/themes/landing-themes";
 
 interface FooterMenuLink {
@@ -125,12 +127,10 @@ export default function LandingFooter({
           <div>
             <Link href="/" className="flex items-center gap-3 mb-4">
               {logo && logo.length > 0 ? (
-                <Image
+                <img
                   src={logo}
                   alt={siteName}
-                  width={120}
-                  height={28}
-                  className="h-7 w-auto"
+                  className="h-7 w-auto max-w-[120px] object-contain"
                 />
               ) : (
                 <>

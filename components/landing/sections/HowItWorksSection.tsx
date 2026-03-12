@@ -1,7 +1,23 @@
 "use client";
 
 import { motion } from "framer-motion";
+import {
+  UserPlus, Trophy, TrendingUp, Award, Zap, Shield, Star, Crown,
+  DollarSign, BarChart3, Rocket, Gift, Flame, Target, Users, Swords,
+  Medal, Globe, Lock, CreditCard, Bell, FileText, PieChart, Headphones,
+  Server, Database, Code, Mail, Phone, Coins, ShoppingBag, Timer,
+  Sparkles, ChevronRight,
+} from "lucide-react";
 import { LandingTheme } from "@/lib/themes/landing-themes";
+
+// Icon mapping — maps icon name strings from DB to Lucide components
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  UserPlus, Trophy, TrendingUp, Award, Zap, Shield, Star, Crown,
+  DollarSign, BarChart3, Rocket, Gift, Flame, Target, Users, Swords,
+  Medal, Globe, Lock, CreditCard, Bell, FileText, PieChart, Headphones,
+  Server, Database, Code, Mail, Phone, Coins, ShoppingBag, Timer,
+  Sparkles, ChevronRight,
+};
 
 interface HowItWorksStep {
   id: string;
@@ -95,12 +111,19 @@ export default function HowItWorksSection({
                   }}
                 >
                   <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl"
+                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
                     style={{
                       background: `linear-gradient(135deg, ${effectiveColors.primary}, ${effectiveColors.secondary})`,
                     }}
                   >
-                    {step.icon}
+                    {(() => {
+                      const IconComp = iconMap[step.icon];
+                      return IconComp ? (
+                        <IconComp className="h-9 w-9 text-white" />
+                      ) : (
+                        <span className="text-3xl">⭐</span>
+                      );
+                    })()}
                   </div>
                   <div
                     className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center text-sm font-black"

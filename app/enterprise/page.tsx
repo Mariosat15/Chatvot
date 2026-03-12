@@ -1,8 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
+// Reason: Logo is served via /api/assets/images/ — next/image can't optimize API-route-served images.
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   Shield, Zap, Globe, Palette, BarChart3, Users, Trophy,
@@ -90,12 +91,10 @@ export default function EnterprisePage() {
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
               {settings.logo ? (
-                <Image
+                <img
                   src={settings.logo}
                   alt={settings.siteName}
-                  width={140}
-                  height={32}
-                  className="h-8 w-auto"
+                  className="h-8 w-auto max-w-[140px] object-contain"
                 />
               ) : (
                 <>
@@ -383,12 +382,10 @@ export default function EnterprisePage() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-3">
                 {settings.logo ? (
-                  <Image
+                  <img
                     src={settings.logo}
                     alt={settings.siteName}
-                    width={100}
-                    height={24}
-                    className="h-6 w-auto opacity-70"
+                    className="h-6 w-auto max-w-[100px] object-contain opacity-70"
                   />
                 ) : (
                   <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
