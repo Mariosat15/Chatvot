@@ -138,6 +138,7 @@ export interface HeroSettings {
     cta: boolean;
     footer: boolean;
   };
+  sectionOrder?: string[];
   // Trust Badges
   trustBadges?: Array<{
     id: string;

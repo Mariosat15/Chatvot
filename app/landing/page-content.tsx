@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Zap } from "lucide-react";
 import {
@@ -30,6 +30,27 @@ import {
   MarketplaceShowcase,
 } from "@/components/landing/sections";
 import type { HeroSettings } from "./types";
+
+// ─── Default section order (fallback when DB has none) ───────────────────────
+
+const DEFAULT_SECTION_ORDER = [
+  "hero",
+  "liveStats",
+  "features",
+  "howItWorks",
+  "gameMaster",
+  "competitionTypes",
+  "competitions",
+  "challenges",
+  "activityFeed",
+  "leaderboard",
+  "journeyBadges",
+  "marketplace",
+  "testimonials",
+  "trustBadges",
+  "faq",
+  "cta",
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -154,6 +175,352 @@ export default function LandingPageContent() {
   const { effectiveColors, effectiveHeadingFont, themeStyles } =
     useThemeColors(settings, theme);
 
+  // ─── Section Registry ─────────────────────────────────────────────────
+  // Reason: Instead of hardcoding section order in JSX, we build a map of
+  // section keys → JSX render functions so the admin-configured sectionOrder
+  // array controls what appears and in what order.
+
+  const sectionRegistry = useMemo(() => {
+    if (!settings) return {};
+
+    const sv = settings.sectionVisibility;
+
+    const registry: Record<string, React.ReactNode> = {};
+
+    // Hero Section
+    if (sv.hero) {
+      registry["hero"] = (
+        <HeroSection
+          key="hero"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          heroSubtitle={settings.heroSubtitle}
+          heroTitle={settings.heroTitle}
+          heroDescription={settings.heroDescription}
+          heroCTAButtons={settings.heroCTAButtons}
+          stats={settings.stats}
+          statsAnimated={settings.statsAnimated}
+        />
+      );
+    }
+
+    // Live Stats Bar
+    if (sv.liveStats && settings.liveDataSettings?.showRealStats) {
+      registry["liveStats"] = (
+        <LiveStatsBar
+          key="liveStats"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          customStats={settings.stats}
+          animated={settings.statsAnimated}
+          externalData={combinedData?.stats}
+        />
+      );
+    }
+
+    // Features Section
+    if (sv.features && settings.features.length > 0) {
+      registry["features"] = (
+        <FeaturesGrid
+          key="features"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.featuresTitle}
+          subtitle={settings.featuresSubtitle}
+          features={settings.features}
+        />
+      );
+    }
+
+    // How It Works Section
+    if (sv.howItWorks && settings.howItWorksSteps.length > 0) {
+      registry["howItWorks"] = (
+        <HowItWorksSection
+          key="howItWorks"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.howItWorksTitle}
+          subtitle={settings.howItWorksSubtitle}
+          steps={settings.howItWorksSteps}
+        />
+      );
+    }
+
+    // Game Master Showcase
+    if (
+      sv.gameMaster &&
+      settings.gameMasterBenefits &&
+      settings.gameMasterBenefits.length > 0
+    ) {
+      registry["gameMaster"] = (
+        <GameMasterShowcase
+          key="gameMaster"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.gameMasterTitle || "BECOME A GAME MASTER"}
+          subtitle={
+            settings.gameMasterSubtitle ||
+            "Host competitions. Build a business. Earn from every trade."
+          }
+          description={
+            settings.gameMasterDescription ||
+            "Game Masters are the entrepreneurial backbone of the platform."
+          }
+          benefits={settings.gameMasterBenefits}
+          ctaText={settings.gameMasterCTAText || "Become a Game Master"}
+          ctaLink={settings.gameMasterCTALink || "/sign-up"}
+        />
+      );
+    }
+
+    // Competition Types Showcase
+    if (
+      sv.competitionTypes &&
+      settings.competitionTypes &&
+      settings.competitionTypes.length > 0
+    ) {
+      registry["competitionTypes"] = (
+        <CompetitionTypesShowcase
+          key="competitionTypes"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.competitionTypesTitle || "6 WAYS TO COMPETE"}
+          subtitle={
+            settings.competitionTypesSubtitle ||
+            "Choose your battlefield. Every competition type tests a different edge."
+          }
+          description={
+            settings.competitionTypesDescription ||
+            "Whether you are a steady grinder, a high-risk sniper, or a consistency machine — there is a competition format designed for your style."
+          }
+          competitionTypes={settings.competitionTypes}
+        />
+      );
+    }
+
+    // Competitions Section (Live Data)
+    if (sv.competitions) {
+      registry["competitions"] = (
+        <LiveCompetitions
+          key="competitions"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.competitionsTitle}
+          subtitle={settings.competitionsSubtitle}
+          description={settings.competitionsDescription}
+          ctaText={settings.competitionsCTAText}
+          ctaLink={settings.competitionsCTALink}
+          externalData={combinedData?.competitions}
+        />
+      );
+    }
+
+    // Challenges Section (Live Data)
+    if (sv.challenges) {
+      registry["challenges"] = (
+        <LiveChallenges
+          key="challenges"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.challengesTitle}
+          subtitle={settings.challengesSubtitle}
+          description={settings.challengesDescription}
+          ctaText={settings.challengesCTAText}
+          ctaLink={settings.challengesCTALink}
+          externalData={combinedData?.challenges}
+        />
+      );
+    }
+
+    // Live Activity Feed
+    if (sv.activityFeed && settings.liveDataSettings?.showActivityFeed) {
+      registry["activityFeed"] = (
+        <section key="activityFeed" className="py-12 relative overflow-hidden">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <LiveActivityFeed
+              theme={theme}
+              effectiveColors={effectiveColors}
+              refreshInterval={
+                settings.liveDataSettings?.activityFeedRefreshRate || 30000
+              }
+              externalData={combinedData?.activity}
+            />
+          </div>
+        </section>
+      );
+    }
+
+    // Leaderboard Preview
+    if (sv.leaderboard && settings.liveDataSettings?.showLeaderboardPreview) {
+      registry["leaderboard"] = (
+        <LeaderboardPreview
+          key="leaderboard"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+        />
+      );
+    }
+
+    // Journey & Badge Showcase
+    if (
+      sv.journeyBadges &&
+      settings.journeyBadgeFeatures &&
+      settings.journeyBadgeFeatures.length > 0
+    ) {
+      registry["journeyBadges"] = (
+        <JourneyBadgeShowcase
+          key="journeyBadges"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.journeyBadgesTitle || "YOUR TRADING JOURNEY"}
+          subtitle={
+            settings.journeyBadgesSubtitle ||
+            "Level up, earn badges, and climb the ranks"
+          }
+          description={
+            settings.journeyBadgesDescription ||
+            "Every trade brings you closer to the next milestone."
+          }
+          features={settings.journeyBadgeFeatures}
+          ctaText={settings.journeyBadgesCTAText || "Start Your Journey"}
+          ctaLink={settings.journeyBadgesCTALink || "/sign-up"}
+        />
+      );
+    }
+
+    // Marketplace Showcase
+    if (
+      sv.marketplace &&
+      settings.marketplaceItems &&
+      settings.marketplaceItems.length > 0
+    ) {
+      registry["marketplace"] = (
+        <MarketplaceShowcase
+          key="marketplace"
+          theme={theme || null}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.marketplaceTitle || "TRADING ARSENAL"}
+          subtitle={settings.marketplaceSubtitle || "Upgrade your style"}
+          description={
+            settings.marketplaceDescription ||
+            "Customize your trading experience with exclusive items."
+          }
+          items={settings.marketplaceItems}
+          ctaText={settings.marketplaceCTAText || "Browse Marketplace"}
+          ctaLink={settings.marketplaceCTALink || "/marketplace"}
+        />
+      );
+    }
+
+    // Testimonials
+    if (
+      sv.testimonials &&
+      settings.testimonials &&
+      settings.testimonials.length > 0
+    ) {
+      registry["testimonials"] = (
+        <TestimonialsSection
+          key="testimonials"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          testimonials={settings.testimonials}
+          title={settings.testimonialsTitle}
+          subtitle={settings.testimonialsSubtitle}
+        />
+      );
+    }
+
+    // Trust Badges
+    if (
+      sv.trustBadges &&
+      settings.trustBadges &&
+      settings.trustBadges.length > 0
+    ) {
+      registry["trustBadges"] = (
+        <TrustBadges
+          key="trustBadges"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          badges={settings.trustBadges}
+          title={settings.trustBadgesTitle}
+        />
+      );
+    }
+
+    // FAQ
+    if (sv.faq && settings.faqItems && settings.faqItems.length > 0) {
+      registry["faq"] = (
+        <FAQSection
+          key="faq"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          faqItems={settings.faqItems}
+          title={settings.faqTitle}
+          subtitle={settings.faqSubtitle}
+        />
+      );
+    }
+
+    // Final CTA
+    if (sv.cta) {
+      registry["cta"] = (
+        <FinalCTA
+          key="cta"
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.ctaTitle}
+          subtitle={settings.ctaSubtitle}
+          primaryCTA={{
+            text: settings.ctaButtonText,
+            href: settings.ctaButtonLink,
+          }}
+          secondaryCTA={{ text: "View Competitions", href: "/competitions" }}
+        />
+      );
+    }
+
+    return registry;
+  }, [settings, theme, effectiveColors, effectiveHeadingFont, combinedData]);
+
+  // ─── Compute ordered sections ─────────────────────────────────────────
+  // Reason: Use the admin-configured sectionOrder array to determine render
+  // order. If a section key exists in the order but wasn't added to the
+  // registry (e.g. because its visibility is off), it's silently skipped.
+  const orderedSections = useMemo(() => {
+    const order = settings?.sectionOrder ?? DEFAULT_SECTION_ORDER;
+    const rendered: React.ReactNode[] = [];
+
+    for (const key of order) {
+      // eslint-disable-next-line security/detect-object-injection
+      const node = sectionRegistry[key];
+      if (node) rendered.push(node);
+    }
+
+    // Catch any sections that exist in the registry but aren't in the order
+    // array (e.g. newly added sections the admin hasn't ordered yet)
+    for (const key of Object.keys(sectionRegistry)) {
+      if (!order.includes(key)) {
+        // eslint-disable-next-line security/detect-object-injection
+        rendered.push(sectionRegistry[key]);
+      }
+    }
+
+    return rendered;
+  }, [sectionRegistry, settings?.sectionOrder]);
+
   // ─── Loading / Error states ──────────────────────────────────────────────
 
   if (loading) {
@@ -255,7 +622,7 @@ export default function LandingPageContent() {
         }
       />
 
-      {/* Navigation */}
+      {/* Navigation — always at the top */}
       <LandingNav
         settings={settings}
         theme={theme}
@@ -266,261 +633,12 @@ export default function LandingPageContent() {
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
-      {/* Hero Section */}
-      {settings.sectionVisibility.hero && (
-        <HeroSection
-          theme={theme || null}
-          effectiveColors={effectiveColors}
-          effectiveHeadingFont={effectiveHeadingFont}
-          heroSubtitle={settings.heroSubtitle}
-          heroTitle={settings.heroTitle}
-          heroDescription={settings.heroDescription}
-          heroCTAButtons={settings.heroCTAButtons}
-          stats={settings.stats}
-          statsAnimated={settings.statsAnimated}
-        />
-      )}
+      {/* ── Dynamic Section Rendering ─────────────────────────────── */}
+      {/* Reason: Sections are rendered based on settings.sectionOrder  */}
+      {/* so the admin can reorder them from the Landing Page Builder.  */}
+      {orderedSections}
 
-      {/* Live Stats Bar */}
-      {settings.sectionVisibility.liveStats &&
-        settings.liveDataSettings?.showRealStats && (
-          <LiveStatsBar
-            theme={theme}
-            effectiveColors={effectiveColors}
-            customStats={settings.stats}
-            animated={settings.statsAnimated}
-            externalData={combinedData?.stats}
-          />
-        )}
-
-      {/* Features Section */}
-      {settings.sectionVisibility.features && settings.features.length > 0 && (
-        <FeaturesGrid
-          theme={theme || null}
-          effectiveColors={effectiveColors}
-          effectiveHeadingFont={effectiveHeadingFont}
-          title={settings.featuresTitle}
-          subtitle={settings.featuresSubtitle}
-          features={settings.features}
-        />
-      )}
-
-      {/* How It Works Section */}
-      {settings.sectionVisibility.howItWorks &&
-        settings.howItWorksSteps.length > 0 && (
-          <HowItWorksSection
-            theme={theme || null}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            title={settings.howItWorksTitle}
-            subtitle={settings.howItWorksSubtitle}
-            steps={settings.howItWorksSteps}
-          />
-        )}
-
-      {/* Game Master Showcase */}
-      {settings.sectionVisibility.gameMaster &&
-        settings.gameMasterBenefits &&
-        settings.gameMasterBenefits.length > 0 && (
-          <GameMasterShowcase
-            theme={theme || null}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            title={settings.gameMasterTitle || "BECOME A GAME MASTER"}
-            subtitle={
-              settings.gameMasterSubtitle ||
-              "Host competitions. Build a business. Earn from every trade."
-            }
-            description={
-              settings.gameMasterDescription ||
-              "Game Masters are the entrepreneurial backbone of the platform."
-            }
-            benefits={settings.gameMasterBenefits}
-            ctaText={settings.gameMasterCTAText || "Become a Game Master"}
-            ctaLink={settings.gameMasterCTALink || "/sign-up"}
-          />
-        )}
-
-      {/* Competition Types Showcase */}
-      {settings.sectionVisibility.competitionTypes &&
-        settings.competitionTypes &&
-        settings.competitionTypes.length > 0 && (
-          <CompetitionTypesShowcase
-            theme={theme || null}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            title={settings.competitionTypesTitle || "6 WAYS TO COMPETE"}
-            subtitle={
-              settings.competitionTypesSubtitle ||
-              "Choose your battlefield. Every competition type tests a different edge."
-            }
-            description={
-              settings.competitionTypesDescription ||
-              "Whether you are a steady grinder, a high-risk sniper, or a consistency machine — there is a competition format designed for your style."
-            }
-            competitionTypes={settings.competitionTypes}
-          />
-        )}
-
-      {/* Competitions Section (Live Data) */}
-      {settings.sectionVisibility.competitions && (
-        <LiveCompetitions
-          theme={theme}
-          effectiveColors={effectiveColors}
-          effectiveHeadingFont={effectiveHeadingFont}
-          title={settings.competitionsTitle}
-          subtitle={settings.competitionsSubtitle}
-          description={settings.competitionsDescription}
-          ctaText={settings.competitionsCTAText}
-          ctaLink={settings.competitionsCTALink}
-          externalData={combinedData?.competitions}
-        />
-      )}
-
-      {/* Challenges Section (Live Data) */}
-      {settings.sectionVisibility.challenges && (
-        <LiveChallenges
-          theme={theme}
-          effectiveColors={effectiveColors}
-          effectiveHeadingFont={effectiveHeadingFont}
-          title={settings.challengesTitle}
-          subtitle={settings.challengesSubtitle}
-          description={settings.challengesDescription}
-          ctaText={settings.challengesCTAText}
-          ctaLink={settings.challengesCTALink}
-          externalData={combinedData?.challenges}
-        />
-      )}
-
-      {/* Live Activity Feed */}
-      {settings.sectionVisibility.activityFeed &&
-        settings.liveDataSettings?.showActivityFeed && (
-          <section className="py-12 relative overflow-hidden">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-              <LiveActivityFeed
-                theme={theme}
-                effectiveColors={effectiveColors}
-                refreshInterval={
-                  settings.liveDataSettings?.activityFeedRefreshRate || 30000
-                }
-                externalData={combinedData?.activity}
-              />
-            </div>
-          </section>
-        )}
-
-      {/* Leaderboard Preview */}
-      {settings.sectionVisibility.leaderboard &&
-        settings.liveDataSettings?.showLeaderboardPreview && (
-          <LeaderboardPreview
-            theme={theme}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-          />
-        )}
-
-      {/* Journey & Badge Showcase */}
-      {settings.sectionVisibility.journeyBadges &&
-        settings.journeyBadgeFeatures &&
-        settings.journeyBadgeFeatures.length > 0 && (
-          <JourneyBadgeShowcase
-            theme={theme || null}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            title={settings.journeyBadgesTitle || "YOUR TRADING JOURNEY"}
-            subtitle={
-              settings.journeyBadgesSubtitle ||
-              "Level up, earn badges, and climb the ranks"
-            }
-            description={
-              settings.journeyBadgesDescription ||
-              "Every trade brings you closer to the next milestone."
-            }
-            features={settings.journeyBadgeFeatures}
-            ctaText={settings.journeyBadgesCTAText || "Start Your Journey"}
-            ctaLink={settings.journeyBadgesCTALink || "/sign-up"}
-          />
-        )}
-
-      {/* Marketplace Showcase */}
-      {settings.sectionVisibility.marketplace &&
-        settings.marketplaceItems &&
-        settings.marketplaceItems.length > 0 && (
-          <MarketplaceShowcase
-            theme={theme || null}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            title={settings.marketplaceTitle || "TRADING ARSENAL"}
-            subtitle={
-              settings.marketplaceSubtitle || "Upgrade your style"
-            }
-            description={
-              settings.marketplaceDescription ||
-              "Customize your trading experience with exclusive items."
-            }
-            items={settings.marketplaceItems}
-            ctaText={settings.marketplaceCTAText || "Browse Marketplace"}
-            ctaLink={settings.marketplaceCTALink || "/marketplace"}
-          />
-        )}
-
-      {/* Testimonials */}
-      {settings.sectionVisibility.testimonials &&
-        settings.testimonials &&
-        settings.testimonials.length > 0 && (
-          <TestimonialsSection
-            theme={theme}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            testimonials={settings.testimonials}
-            title={settings.testimonialsTitle}
-            subtitle={settings.testimonialsSubtitle}
-          />
-        )}
-
-      {/* Trust Badges */}
-      {settings.sectionVisibility.trustBadges &&
-        settings.trustBadges &&
-        settings.trustBadges.length > 0 && (
-          <TrustBadges
-            theme={theme}
-            effectiveColors={effectiveColors}
-            badges={settings.trustBadges}
-            title={settings.trustBadgesTitle}
-          />
-        )}
-
-      {/* FAQ */}
-      {settings.sectionVisibility.faq &&
-        settings.faqItems &&
-        settings.faqItems.length > 0 && (
-          <FAQSection
-            theme={theme}
-            effectiveColors={effectiveColors}
-            effectiveHeadingFont={effectiveHeadingFont}
-            faqItems={settings.faqItems}
-            title={settings.faqTitle}
-            subtitle={settings.faqSubtitle}
-          />
-        )}
-
-      {/* Final CTA */}
-      {settings.sectionVisibility.cta && (
-        <FinalCTA
-          theme={theme}
-          effectiveColors={effectiveColors}
-          effectiveHeadingFont={effectiveHeadingFont}
-          title={settings.ctaTitle}
-          subtitle={settings.ctaSubtitle}
-          primaryCTA={{
-            text: settings.ctaButtonText,
-            href: settings.ctaButtonLink,
-          }}
-          secondaryCTA={{ text: "View Competitions", href: "/competitions" }}
-        />
-      )}
-
-      {/* Footer */}
+      {/* Footer — always at the bottom */}
       <LandingFooter
         theme={theme || null}
         effectiveColors={effectiveColors}
