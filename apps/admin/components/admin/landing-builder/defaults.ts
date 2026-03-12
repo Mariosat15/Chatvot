@@ -242,6 +242,13 @@ export const defaultSettings: LandingSettings = {
   ],
   trustBadgesEnabled: true,
   trustBadgesTitle: "Trusted By Traders Worldwide",
+  trustBadges: [
+    { id: "tb1", type: "security" as const, name: "SSL Encrypted", logo: "", url: "", enabled: true },
+    { id: "tb2", type: "security" as const, name: "2FA Protected", logo: "", url: "", enabled: true },
+    { id: "tb3", type: "security" as const, name: "GDPR Compliant", logo: "", url: "", enabled: true },
+    { id: "tb4", type: "partner" as const, name: "Massive.com Data", logo: "", url: "", enabled: true },
+    { id: "tb5", type: "award" as const, name: "Best Trading Platform 2026", logo: "", url: "", enabled: true },
+  ],
   // Reason: Must match the canonical order in hero-settings.defaults.ts
   sectionOrder: [
     "hero", "liveStats", "stats", "features", "howItWorks", "gameMaster",

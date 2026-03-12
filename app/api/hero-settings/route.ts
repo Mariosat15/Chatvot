@@ -20,6 +20,7 @@ import {
   defaultFooterMenuBusiness,
   defaultJourneyBadgeFeatures,
   defaultMarketplaceItems,
+  defaultTrustBadges,
 } from "@/database/models/hero-settings.defaults";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import CompanySettings from "@/database/models/company-settings.model";
@@ -281,6 +282,14 @@ export async function GET() {
           (l: { enabled: boolean }) => l.enabled,
         ) || [],
       footerLegalLinks: settings.footerLegalLinks,
+
+      // Trust Badges
+      // Reason: New section — fall back to defaults for existing DB documents
+      trustBadgesTitle: settings.trustBadgesTitle || "Trusted By Traders Worldwide",
+      trustBadges:
+        (settings.trustBadges?.filter((b: { enabled: boolean }) => b.enabled) ?? []).length > 0
+          ? settings.trustBadges.filter((b: { enabled: boolean }) => b.enabled)
+          : defaultTrustBadges.filter(b => b.enabled),
 
       // Section Visibility & Order (admin/enterprise features hidden from public hero page)
       // Reason: New sections default to true so they appear on existing deployments

@@ -20,6 +20,7 @@ import {
   defaultSectionOrder,
   defaultCTAButtons,
   defaultTestimonials,
+  defaultTrustBadges,
 } from "./hero-settings.defaults";
 
 // Re-export interfaces and defaults for backward compatibility
@@ -286,7 +287,7 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
       marketplace: { type: Boolean, default: true },
       journeyBadges: { type: Boolean, default: true },
       testimonials: { type: Boolean, default: false },
-      trustBadges: { type: Boolean, default: false },
+      trustBadges: { type: Boolean, default: true },
       adminShowcase: { type: Boolean, default: true },
       whiteLabel: { type: Boolean, default: true },
       pricing: { type: Boolean, default: false },
@@ -297,7 +298,7 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     sectionOrder: { type: [String], default: defaultSectionOrder },
 
     // Trust Badges (Landing Page)
-    trustBadges: { type: [Object], default: [] },
+    trustBadges: { type: [Object], default: defaultTrustBadges },
     trustBadgesTitle: { type: String, default: "Trusted By Traders Worldwide" },
 
     // Live Data Settings

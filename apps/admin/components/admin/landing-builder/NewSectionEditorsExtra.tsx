@@ -171,25 +171,28 @@ export default function NewSectionEditorsExtra({
               <div key={item.id} className="p-3 bg-gray-900 rounded-lg space-y-2">
                 <div className="flex items-center gap-3">
                   <Switch checked={item.enabled} onCheckedChange={(v) => updateArrayItem("marketplaceItems", item.id, { enabled: v })} />
-                  <div className="w-40">
-                    <IconPickerField value={item.icon} onChange={(v) => updateArrayItem("marketplaceItems", item.id, { icon: v })} compact />
-                  </div>
-                  <Input value={item.name} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { name: e.target.value })} className="bg-gray-800 border-gray-600 text-white flex-1" />
+                  <Input value={item.name} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { name: e.target.value })} className="bg-gray-800 border-gray-600 text-white flex-1" placeholder="Item name" />
                   <Button size="icon" variant="ghost" onClick={() => removeItem("marketplaceItems", item.id)} className="text-red-500 hover:text-red-400">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {/* Reason: Use a single icon picker that updates both icon & gameIcon fields. 
+                    Game icon paths start with "/", Lucide names do not. */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <Textarea value={item.description} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { description: e.target.value })} className="bg-gray-800 border-gray-600 text-white" rows={1} placeholder="Description" />
-                  <Input value={item.price} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { price: e.target.value })} className="bg-gray-800 border-gray-600 text-white" placeholder="Price" />
+                  <IconPickerField
+                    value={item.gameIcon || item.icon}
+                    label="Item Icon (Lucide or Game)"
+                    onChange={(v) => {
+                      if (v.startsWith("/")) {
+                        updateArrayItem("marketplaceItems", item.id, { gameIcon: v, icon: "" });
+                      } else {
+                        updateArrayItem("marketplaceItems", item.id, { icon: v, gameIcon: "" });
+                      }
+                    }}
+                  />
+                  <Input value={item.price} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { price: e.target.value })} className="bg-gray-800 border-gray-600 text-white" placeholder="Price (e.g. From 50 Credits)" />
                 </div>
-                {item.gameIcon && (
-                  <div className="flex items-center gap-2 pl-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.gameIcon} alt="" className="w-6 h-6" />
-                    <span className="text-xs text-gray-500">{item.gameIcon}</span>
-                  </div>
-                )}
+                <Textarea value={item.description} onChange={(e) => updateArrayItem("marketplaceItems", item.id, { description: e.target.value })} className="bg-gray-800 border-gray-600 text-white" rows={2} placeholder="Description" />
               </div>
             ))}
           </div>

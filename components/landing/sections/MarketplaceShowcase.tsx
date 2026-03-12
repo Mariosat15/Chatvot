@@ -3,60 +3,35 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ChevronRight, ShoppingBag, Sparkles } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LandingTheme } from "@/lib/themes/landing-themes";
 
-// Marketplace item images from /game-icons/
-const MARKETPLACE_ITEMS = [
-  {
-    id: "avatars",
-    title: "Premium Avatars",
-    description: "Stand out with exclusive animated and 3D avatars. Show your rank and style on every leaderboard.",
-    image: "/game-icons/helmet 1.png",
-    badge: "Popular",
-    bgGradient: "from-purple-500/10 to-pink-500/10",
-  },
-  {
-    id: "badges",
-    title: "Rare Badges",
-    description: "Collect limited-edition badges that showcase your achievements, competitions won, and milestones reached.",
-    image: "/game-icons/14. STAR BADGE.png",
-    badge: "Collectible",
-    bgGradient: "from-yellow-500/10 to-orange-500/10",
-  },
-  {
-    id: "borders",
-    title: "Profile Borders",
-    description: "Decorate your profile with animated borders — from golden flames to icy crystals. Prestige meets style.",
-    image: "/game-icons/Magic Shiled 3D.png",
-    badge: "Premium",
-    bgGradient: "from-cyan-500/10 to-blue-500/10",
-  },
-  {
-    id: "effects",
-    title: "Trading Effects",
-    description: "Add visual flair to your trades with particle effects, sound cues, and victory animations.",
-    image: "/game-icons/lightning speel.png",
-    badge: "New",
-    bgGradient: "from-green-500/10 to-emerald-500/10",
-  },
-  {
-    id: "titles",
-    title: "Custom Titles",
-    description: "Equip exclusive titles like 'The Oracle', 'Pip Slayer', or 'Market Shark' next to your name.",
-    image: "/game-icons/16. Crown.png",
-    badge: "Exclusive",
-    bgGradient: "from-red-500/10 to-rose-500/10",
-  },
-  {
-    id: "chest",
-    title: "Mystery Chests",
-    description: "Open chests to discover random cosmetics, XP boosts, and rare collectibles. Fortune favors the bold.",
-    image: "/game-icons/chest 1.png",
-    badge: "Loot",
-    bgGradient: "from-amber-500/10 to-yellow-500/10",
-  },
+// Fallback items used when no admin-managed items are provided
+const FALLBACK_ITEMS = [
+  { id: "avatars", name: "Premium Avatars", description: "Stand out with exclusive animated and 3D avatars.", icon: "Sparkles", gameIcon: "/game-icons/helmet 1.png", price: "From 50 Credits", enabled: true, order: 1 },
+  { id: "badges", name: "Rare Badges", description: "Collect limited-edition badges that showcase achievements.", icon: "Award", gameIcon: "/game-icons/14. STAR BADGE.png", price: "From 100 Credits", enabled: true, order: 2 },
+  { id: "borders", name: "Profile Borders", description: "Decorate your profile with animated borders.", icon: "Shield", gameIcon: "/game-icons/Magic Shiled 3D.png", price: "From 75 Credits", enabled: true, order: 3 },
+  { id: "effects", name: "Trading Effects", description: "Add visual flair to your trades with particle effects.", icon: "Zap", gameIcon: "/game-icons/lightning speel.png", price: "From 120 Credits", enabled: true, order: 4 },
+  { id: "titles", name: "Custom Titles", description: "Equip exclusive titles next to your name.", icon: "Crown", gameIcon: "/game-icons/16. Crown.png", price: "From 200 Credits", enabled: true, order: 5 },
+  { id: "chest", name: "Mystery Chests", description: "Discover random cosmetics, XP boosts, and rare collectibles.", icon: "Gift", gameIcon: "/game-icons/chest 1.png", price: "From 30 Credits", enabled: true, order: 6 },
 ];
+
+// Lucide icon map for rendering dynamic icon names
+const lucideMap = new Map(
+  Object.entries(LucideIcons as Record<string, React.FC<{ className?: string; size?: number }>>),
+);
+
+interface MarketplaceItem {
+  id: string;
+  icon: string;
+  gameIcon?: string;
+  name: string;
+  description: string;
+  price: string;
+  enabled: boolean;
+  order: number;
+}
 
 interface MarketplaceShowcaseProps {
   theme: LandingTheme | null;
@@ -69,13 +44,29 @@ interface MarketplaceShowcaseProps {
     border?: string;
   };
   effectiveHeadingFont: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  items?: MarketplaceItem[];
+  ctaText?: string;
+  ctaLink?: string;
 }
 
 export default function MarketplaceShowcase({
   theme,
   effectiveColors,
   effectiveHeadingFont,
+  title = "GEAR UP FOR GLORY",
+  subtitle = "Trading Arsenal & Marketplace",
+  description = "Customize your trading identity with exclusive cosmetics, rare collectibles, and powerful upgrades.",
+  items,
+  ctaText = "Browse Marketplace",
+  ctaLink = "/marketplace",
 }: MarketplaceShowcaseProps) {
+  // Use admin items when available, otherwise fallback
+  const displayItems = (items && items.filter(i => i.enabled).length > 0)
+    ? items.filter(i => i.enabled).sort((a, b) => a.order - b.order)
+    : FALLBACK_ITEMS;
   return (
     <section id="marketplace" className="py-24 relative overflow-hidden">
       {/* Subtle grid pattern background */}
@@ -126,7 +117,7 @@ export default function MarketplaceShowcase({
             }}
           >
             <ShoppingBag className="h-4 w-4" />
-            <span>Trading Arsenal & Marketplace</span>
+            <span>{subtitle}</span>
           </motion.div>
 
           <h2
@@ -139,11 +130,11 @@ export default function MarketplaceShowcase({
                 backgroundImage: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.accent || effectiveColors.primary})`,
               }}
             >
-              GEAR UP FOR GLORY
+              {title}
             </span>
           </h2>
           <p className="text-xl max-w-3xl mx-auto mb-2" style={{ color: effectiveColors.text }}>
-            Customize your trading identity with exclusive cosmetics, rare collectibles, and powerful upgrades.
+            {description}
           </p>
           <p className="text-lg max-w-2xl mx-auto" style={{ color: theme?.colors.textMuted }}>
             Earn items through achievements or browse the marketplace. Your style, your statement.
@@ -152,100 +143,121 @@ export default function MarketplaceShowcase({
 
         {/* Items Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-          {MARKETPLACE_ITEMS.map((item, index) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              viewport={{ once: true }}
-              whileHover={{ y: -8 }}
-              className="group relative rounded-2xl overflow-hidden transition-all duration-500"
-              style={{
-                backgroundColor: theme?.colors.backgroundCard,
-                border: `1px solid ${theme?.colors.border}`,
-              }}
-            >
-              {/* Hover glow overlay */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none"
-                style={{
-                  background: `radial-gradient(ellipse at center, ${effectiveColors.primary}08, transparent 70%)`,
-                }}
-              />
+          {displayItems.map((item, index) => {
+            // Resolve icon: prefer gameIcon image, fall back to Lucide icon
+            const hasGameIcon = item.gameIcon && item.gameIcon.startsWith("/");
+            const LucideIcon = !hasGameIcon ? lucideMap.get(item.icon) : null;
 
-              {/* Top accent */}
-              <div
-                className="absolute top-0 left-0 right-0 h-1 opacity-0 group-hover:opacity-100 transition-all duration-300"
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                viewport={{ once: true }}
+                whileHover={{ y: -8 }}
+                className="group relative rounded-2xl overflow-hidden transition-all duration-500"
                 style={{
-                  background: `linear-gradient(90deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
-                }}
-              />
-
-              {/* Badge tag */}
-              <div className="absolute top-4 right-4 z-20">
-                <span
-                  className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                  style={{
-                    background: `${effectiveColors.primary}20`,
-                    color: effectiveColors.primary,
-                    border: `1px solid ${effectiveColors.primary}30`,
-                  }}
-                >
-                  {item.badge}
-                </span>
-              </div>
-
-              {/* Image area */}
-              <div
-                className="relative h-44 flex items-center justify-center overflow-hidden"
-                style={{
-                  background: `linear-gradient(180deg, ${effectiveColors.primary}06, ${effectiveColors.secondary}04)`,
+                  backgroundColor: theme?.colors.backgroundCard,
+                  border: `1px solid ${theme?.colors.border}`,
                 }}
               >
-                {/* Radial glow behind item */}
+                {/* Hover glow overlay */}
                 <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-700"
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none"
                   style={{
-                    background: `radial-gradient(circle at center, ${effectiveColors.primary}15, transparent 60%)`,
+                    background: `radial-gradient(ellipse at center, ${effectiveColors.primary}08, transparent 70%)`,
                   }}
                 />
 
-                <motion.img
-                  src={item.image}
-                  alt={item.title}
-                  width={90}
-                  height={90}
-                  className="relative z-10 drop-shadow-2xl"
-                  whileHover={{ scale: 1.15, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
+                {/* Top accent */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-1 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                  style={{
+                    background: `linear-gradient(90deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
+                  }}
                 />
 
-                {/* Sparkle decorations */}
-                <Sparkles
-                  className="absolute top-6 left-6 h-4 w-4 opacity-0 group-hover:opacity-60 transition-all duration-500"
-                  style={{ color: effectiveColors.accent }}
-                />
-                <Sparkles
-                  className="absolute bottom-8 right-8 h-3 w-3 opacity-0 group-hover:opacity-40 transition-all duration-700"
-                  style={{ color: effectiveColors.primary }}
-                />
-              </div>
+                {/* Price tag */}
+                {item.price && (
+                  <div className="absolute top-4 right-4 z-20">
+                    <span
+                      className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                      style={{
+                        background: `${effectiveColors.primary}20`,
+                        color: effectiveColors.primary,
+                        border: `1px solid ${effectiveColors.primary}30`,
+                      }}
+                    >
+                      {item.price}
+                    </span>
+                  </div>
+                )}
 
-              {/* Content */}
-              <div className="relative z-10 p-6 pt-4">
-                <h3
-                  className="text-lg font-bold mb-2"
-                  style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+                {/* Image / Icon area */}
+                <div
+                  className="relative h-44 flex items-center justify-center overflow-hidden"
+                  style={{
+                    background: `linear-gradient(180deg, ${effectiveColors.primary}06, ${effectiveColors.secondary}04)`,
+                  }}
                 >
-                  {item.title}
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: theme?.colors.textMuted }}>
-                  {item.description}
-                </p>
-              </div>
-            </motion.div>
-          ))}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-700"
+                    style={{
+                      background: `radial-gradient(circle at center, ${effectiveColors.primary}15, transparent 60%)`,
+                    }}
+                  />
+
+                  {hasGameIcon ? (
+                    <motion.img
+                      src={item.gameIcon}
+                      alt={item.name}
+                      width={90}
+                      height={90}
+                      className="relative z-10 drop-shadow-2xl"
+                      whileHover={{ scale: 1.15, rotate: 5 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    />
+                  ) : LucideIcon ? (
+                    <motion.div
+                      className="relative z-10 w-20 h-20 rounded-2xl flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${effectiveColors.primary}20, ${effectiveColors.secondary}20)`,
+                      }}
+                      whileHover={{ scale: 1.15, rotate: 5 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <LucideIcon className="h-10 w-10" style={{ color: effectiveColors.primary }} />
+                    </motion.div>
+                  ) : (
+                    <div className="text-5xl">🎁</div>
+                  )}
+
+                  <Sparkles
+                    className="absolute top-6 left-6 h-4 w-4 opacity-0 group-hover:opacity-60 transition-all duration-500"
+                    style={{ color: effectiveColors.accent }}
+                  />
+                  <Sparkles
+                    className="absolute bottom-8 right-8 h-3 w-3 opacity-0 group-hover:opacity-40 transition-all duration-700"
+                    style={{ color: effectiveColors.primary }}
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 p-6 pt-4">
+                  <h3
+                    className="text-lg font-bold mb-2"
+                    style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+                  >
+                    {item.name}
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: theme?.colors.textMuted }}>
+                    {item.description}
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* CTA */}
@@ -255,7 +267,7 @@ export default function MarketplaceShowcase({
           viewport={{ once: true }}
           className="text-center"
         >
-          <Link href="/marketplace">
+          <Link href={ctaLink}>
             <Button
               size="lg"
               className="font-bold text-lg px-10 py-6 hover:scale-105 transition-all duration-300 rounded-xl"
@@ -266,7 +278,7 @@ export default function MarketplaceShowcase({
               }}
             >
               <ShoppingBag className="h-5 w-5 mr-2" />
-              Browse Marketplace
+              {ctaText}
               <ChevronRight className="h-5 w-5 ml-2" />
             </Button>
           </Link>

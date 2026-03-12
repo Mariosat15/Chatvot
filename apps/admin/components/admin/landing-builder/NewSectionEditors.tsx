@@ -357,16 +357,85 @@ export default function NewSectionEditors(props: BuilderChildProps) {
             <div className={`w-3 h-3 rounded-full ${settings.trustBadgesEnabled ? "bg-green-500" : "bg-gray-500"}`} />
             <Shield className="h-5 w-5 text-teal-400" />
             <span className="font-semibold text-white">Trust Badges</span>
+            <span className="text-xs text-gray-500">({settings.trustBadges?.length || 0} items)</span>
           </div>
         </AccordionTrigger>
         <AccordionContent className="pt-4 pb-6 space-y-4">
           <SectionHeader label="Trust Badges" icon={Shield} iconColor="text-teal-400" enabled={settings.trustBadgesEnabled}
             onToggle={(v) => updateField("trustBadgesEnabled", v)}
-            description="Security badges, compliance logos, and trust indicators."
+            description="Security badges, compliance logos, and trust indicators. Add certifications, partnerships, and awards."
           />
           <div>
             <Label className="text-gray-400">Section Title</Label>
             <Input value={settings.trustBadgesTitle} onChange={(e) => updateField("trustBadgesTitle", e.target.value)} className="bg-gray-900 border-gray-600 text-white mt-1" />
+          </div>
+
+          {/* Trust Badge Items */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-300 font-semibold">Badges</Label>
+              <Button size="sm" variant="outline" className="border-gray-600"
+                onClick={() => addItem("trustBadges", {
+                  id: Date.now().toString(),
+                  type: "security" as const,
+                  name: "New Badge",
+                  logo: "",
+                  url: "",
+                  enabled: true,
+                })}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Badge
+              </Button>
+            </div>
+            {(settings.trustBadges || []).map((badge) => (
+              <div key={badge.id} className="p-3 bg-gray-900 rounded-lg space-y-2 border border-gray-700">
+                <div className="flex items-center gap-3">
+                  <Switch checked={badge.enabled} onCheckedChange={(v) => updateArrayItem("trustBadges", badge.id, { enabled: v })} />
+                  <Input
+                    value={badge.name}
+                    onChange={(e) => updateArrayItem("trustBadges", badge.id, { name: e.target.value })}
+                    placeholder="Badge name"
+                    className="bg-gray-800 border-gray-600 text-white flex-1"
+                  />
+                  <select
+                    value={badge.type}
+                    onChange={(e) => updateArrayItem("trustBadges", badge.id, { type: e.target.value })}
+                    className="bg-gray-800 border border-gray-600 text-white text-xs rounded px-2 py-2 w-32"
+                  >
+                    <option value="security">🔒 Security</option>
+                    <option value="partner">🤝 Partner</option>
+                    <option value="press">📰 Press</option>
+                    <option value="award">🏆 Award</option>
+                  </select>
+                  <Button size="icon" variant="ghost" onClick={() => removeItem("trustBadges", badge.id)} className="text-red-500 hover:text-red-400 flex-shrink-0">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-gray-500 text-xs">Logo URL (optional)</Label>
+                    <Input
+                      value={badge.logo}
+                      onChange={(e) => updateArrayItem("trustBadges", badge.id, { logo: e.target.value })}
+                      placeholder="https://... or leave empty for text badge"
+                      className="bg-gray-800 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-500 text-xs">Link URL (optional)</Label>
+                    <Input
+                      value={badge.url}
+                      onChange={(e) => updateArrayItem("trustBadges", badge.id, { url: e.target.value })}
+                      placeholder="https://..."
+                      className="bg-gray-800 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {(!settings.trustBadges || settings.trustBadges.length === 0) && (
+              <p className="text-xs text-gray-500 text-center py-4">No trust badges yet. Click &quot;Add Badge&quot; to create one.</p>
+            )}
           </div>
         </AccordionContent>
       </AccordionItem>

@@ -123,6 +123,9 @@ export function mapFromDbSettings(db: Record<string, any>): LandingSettings {
       : defaultSettings.testimonials,
     trustBadgesEnabled: sv.trustBadges ?? true,
     trustBadgesTitle: (db.trustBadgesTitle as string) || defaultSettings.trustBadgesTitle,
+    trustBadges: (db.trustBadges as LandingSettings["trustBadges"])?.length > 0
+      ? (db.trustBadges as LandingSettings["trustBadges"])
+      : defaultSettings.trustBadges,
     // Reason: Strip enterprise-only and non-orderable keys from legacy data
     sectionOrder: ((db.sectionOrder as string[]) || defaultSettings.sectionOrder)
       .filter((k: string) => !["adminShowcase", "whiteLabel", "pricing", "footer"].includes(k)),
@@ -275,6 +278,7 @@ export function mapToDbSettings(s: LandingSettings) {
     testimonialsSubtitle: s.testimonialsSubtitle,
     testimonials: s.testimonials,
     trustBadgesTitle: s.trustBadgesTitle,
+    trustBadges: s.trustBadges,
 
     ctaTitle: s.ctaTitle,
     ctaSubtitle: s.ctaSubtitle,

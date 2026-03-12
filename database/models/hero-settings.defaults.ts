@@ -633,6 +633,15 @@ export const defaultMarketplaceItems = [
   },
 ];
 
+// Default trust badges
+export const defaultTrustBadges = [
+  { id: "tb1", type: "security" as const, name: "SSL Encrypted", logo: "", url: "", enabled: true },
+  { id: "tb2", type: "security" as const, name: "2FA Protected", logo: "", url: "", enabled: true },
+  { id: "tb3", type: "security" as const, name: "GDPR Compliant", logo: "", url: "", enabled: true },
+  { id: "tb4", type: "partner" as const, name: "Massive.com Data", logo: "", url: "", enabled: true },
+  { id: "tb5", type: "award" as const, name: "Best Trading Platform 2026", logo: "", url: "", enabled: true },
+];
+
 // Default section order
 // Reason: Canonical section order shared by admin, DB, landing page, and API.
 // Enterprise-only keys (adminShowcase, whiteLabel, pricing) are NOT included —

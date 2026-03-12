@@ -118,7 +118,7 @@ export default function IconPickerField({
   })();
 
   return (
-    <div>
+    <div className="relative">
       {label && (
         <Label className="text-gray-500 text-[10px] mb-0.5 block">
           {label}
@@ -168,9 +168,9 @@ export default function IconPickerField({
         )}
       </button>
 
-      {/* Dropdown picker */}
+      {/* Dropdown picker — absolute positioned so it breaks out of narrow parents */}
       {open && (
-        <div className="mt-1 bg-gray-900 border border-gray-700 rounded-lg overflow-hidden shadow-xl z-50">
+        <div className="absolute left-0 top-full mt-1 min-w-[420px] bg-gray-900 border border-gray-700 rounded-lg overflow-hidden shadow-xl z-[100]">
           {/* Tabs */}
           <div className="flex border-b border-gray-800">
             <button
@@ -190,7 +190,7 @@ export default function IconPickerField({
           </div>
 
           {tab === "lucide" ? (
-            <div className="grid grid-cols-6 gap-1 p-2 max-h-[200px] overflow-y-auto">
+            <div className="grid grid-cols-8 gap-1 p-2 max-h-[280px] overflow-y-auto">
               {LUCIDE_ICON_OPTIONS.map((opt) => (
                 <button
                   key={opt.name}
@@ -202,12 +202,12 @@ export default function IconPickerField({
                   }}
                   className={`flex items-center justify-center p-2 rounded-lg transition-all hover:bg-gray-700 ${value === opt.name ? "bg-violet-500/20 ring-1 ring-violet-500" : ""}`}
                 >
-                  <LucidePreview name={opt.name} size={20} />
+                  <LucidePreview name={opt.name} size={22} />
                 </button>
               ))}
             </div>
           ) : (
-            <div className="max-h-[300px] overflow-hidden">
+            <div className="max-h-[380px] overflow-hidden">
               <GameIconPicker
                 value={currentGameIconName}
                 onChange={(iconName) => {
@@ -218,8 +218,8 @@ export default function IconPickerField({
                   onChange(String(rawPath));
                   setOpen(false);
                 }}
-                iconSize={32}
-                maxHeight="250px"
+                iconSize={40}
+                maxHeight="320px"
               />
             </div>
           )}

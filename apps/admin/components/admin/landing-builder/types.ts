@@ -216,6 +216,14 @@ export interface LandingSettings {
   }>;
   trustBadgesEnabled: boolean;
   trustBadgesTitle: string;
+  trustBadges: Array<{
+    id: string;
+    type: "security" | "partner" | "press" | "award";
+    name: string;
+    logo: string;
+    url: string;
+    enabled: boolean;
+  }>;
 
   // Section ordering
   sectionOrder: string[];
