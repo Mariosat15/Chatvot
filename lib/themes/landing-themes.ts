@@ -1,6 +1,15 @@
 // Complete Landing Page Theme System
 // Each theme completely transforms the visual appearance
 
+import {
+  samuraiTheme, vikingTheme, steampunkTheme, synthwaveTheme, volcanicTheme,
+  neonTokyoTheme, pirateBayTheme, thunderStrikeTheme, enchantedForestTheme, crystalCaveTheme,
+} from "./landing-themes-new-1";
+import {
+  pharaohTheme, jadeDragonTheme, bloodMoonTheme, auroraBorealisTheme, desertMirageTheme,
+  galacticEmpireTheme, venomTheme, coralReefTheme, midnightJazzTheme, ironWarlordTheme,
+} from "./landing-themes-new-2";
+
 export interface LandingTheme {
   id: string;
   name: string;
@@ -12,7 +21,8 @@ export interface LandingTheme {
     | "holiday"
     | "futuristic"
     | "classic"
-    | "rpg";
+    | "rpg"
+    | "elegant";
 
   // RPG Theme Specific - icons that replace standard trading icons
   themeIcons?: {
@@ -2575,6 +2585,37 @@ export const allThemes: LandingTheme[] = [
   midnightBlueTheme,
   emeraldForestTheme,
   sunsetGlowTheme,
+
+  // ── New Themes ─────────────────────────────────
+  // RPG
+  samuraiTheme,
+  vikingTheme,
+  pirateBayTheme,
+  enchantedForestTheme,
+  crystalCaveTheme,
+  pharaohTheme,
+  jadeDragonTheme,
+
+  // Gaming
+  volcanicTheme,
+  neonTokyoTheme,
+  bloodMoonTheme,
+  venomTheme,
+  ironWarlordTheme,
+
+  // Futuristic
+  steampunkTheme,
+  synthwaveTheme,
+  galacticEmpireTheme,
+
+  // Sports
+  thunderStrikeTheme,
+
+  // Elegant
+  auroraBorealisTheme,
+  desertMirageTheme,
+  coralReefTheme,
+  midnightJazzTheme,
 ];
 
 // Holiday schedule for automatic theme switching
@@ -2677,6 +2718,7 @@ export const themeCategories = [
   { id: "casino", name: "🎰 Casino", icon: "🎲" },
   { id: "holiday", name: "🎄 Holiday", icon: "🎁" },
   { id: "classic", name: "🎨 Classic", icon: "✨" },
+  { id: "elegant", name: "💎 Elegant", icon: "🌟" },
 ];
 
 export function getThemeById(id: string): LandingTheme | undefined {

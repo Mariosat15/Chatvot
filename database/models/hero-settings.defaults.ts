@@ -7,8 +7,9 @@ import type {
   IWhiteLabelFeature,
   IFAQItem,
 } from "./hero-settings.interfaces";
+import { newThemePresets } from "./hero-settings-new-presets";
 
-// Default theme presets
+// Default theme presets (base 6 + 20 new = 26 total)
 export const defaultThemePresets: IThemePreset[] = [
   {
     id: "cyber-neon",
@@ -100,6 +101,8 @@ export const defaultThemePresets: IThemePreset[] = [
     cardStyle: "glassmorphism",
     animationStyle: "minimal",
   },
+  // Spread 20 new theme presets
+  ...newThemePresets,
 ];
 
 // Default feature cards
