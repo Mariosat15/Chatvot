@@ -7,6 +7,7 @@ import { fmtEquity, ranked, calcRoi, fmtRoi, timeLeft, getAllPositions } from '.
 import DerbyTrack from '../DerbyTrack';
 import Leaderboard from '../Leaderboard';
 import BroadcastChart from '../BroadcastChart';
+import ArenaIcon from '../ArenaIcon';
 import type { Participant } from '../types';
 
 interface OverviewSceneProps {
@@ -18,7 +19,6 @@ interface OverviewSceneProps {
   chartTf: string;
   candles: CandleData[];
   bubbles: BubbleTrade[];
-  /** Dynamic symbols from API */
   availableSymbols?: string[];
   onSymbolChange: (s: string) => void;
   onTfChange: (tf: string) => void;
@@ -36,28 +36,28 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
 
   const statCards = [
     {
-      label: 'PRIZE POOL', emoji: '💰',
+      label: 'PRIZE POOL', icon: 'Wallet',
       value: fmtEquity(event.prizePool),
       color: CV.gold, glow: `${CV.gold}15`,
     },
     {
-      label: 'RACERS', emoji: '🏇',
+      label: 'TRADERS', icon: 'Users',
       value: `${event.currentParticipants}`,
       color: CV.blue, glow: `${CV.blue}12`,
     },
     {
-      label: 'TIME LEFT', emoji: '⏱️',
+      label: 'TIME LEFT', icon: 'Timer',
       value: tl,
       color: tl === 'Ended' ? CV.red : CV.teal,
       glow: tl === 'Ended' ? `${CV.red}12` : `${CV.teal}12`,
     },
     {
-      label: 'ACTIVE TRADES', emoji: '📊',
+      label: 'ACTIVE TRADES', icon: 'BarChart3',
       value: `${positions.length}`,
       color: CV.purp, glow: `${CV.purp}12`,
     },
     {
-      label: 'LEADER', emoji: '👑',
+      label: 'LEADER', icon: 'Crown',
       value: leader ? leader.username.slice(0, 10) : '—',
       sub: leader ? fmtRoi(calcRoi(leader.liveEquity, event.startingCapital)) : '',
       color: CV.gold, glow: `${CV.gold}15`,
@@ -73,23 +73,19 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
             background: `linear-gradient(135deg, ${CV.bg2}, ${CV.bg3})`,
             borderRadius: 14, padding: '14px 14px',
             border: `1px solid ${CV.glassBorder}`,
-            textAlign: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: `0 2px 16px rgba(0,0,0,.15)`,
-            transition: 'all .2s',
+            textAlign: 'center', position: 'relative', overflow: 'hidden',
+            boxShadow: `0 2px 16px rgba(0,0,0,.15)`, transition: 'all .2s',
           }}>
-            {/* Glow accent */}
             <div style={{
               position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
               width: '60%', height: 1,
               background: `linear-gradient(90deg, transparent, ${s.color}60, transparent)`,
             }} />
-
             <div style={{
               color: CV.gray, fontSize: 9, marginBottom: 6, letterSpacing: 1, fontWeight: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             }}>
-              {s.emoji} {s.label}
+              <ArenaIcon name={s.icon} size={11} color={CV.gray} /> {s.label}
             </div>
             <div style={{
               color: s.color, fontSize: 18, fontWeight: 800,
@@ -113,14 +109,11 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
       {/* Main area: Track + Leaderboard */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Derby Track */}
           <DerbyTrack
             event={event}
             previousEquities={previousEquities}
             onSelectTrader={onSelectTrader}
           />
-
-          {/* Chart with position markers */}
           <BroadcastChart
             symbol={chartSymbol}
             tf={chartTf}
@@ -132,9 +125,7 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
             onTfChange={onTfChange}
           />
         </div>
-
-        {/* Leaderboard */}
-        <Leaderboard event={event} onSelectTrader={onSelectTrader} />
+        <Leaderboard event={event} onSelectTrader={onSelectTrader} previousEquities={previousEquities} />
       </div>
     </div>
   );

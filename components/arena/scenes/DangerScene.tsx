@@ -3,8 +3,9 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV } from '../constants';
-import { ranked, fmtEquity, fmtRoi, calcRoi, riskLevel, getTraderTitle } from '../helpers';
+import { ranked, fmtRoi, calcRoi, riskLevel, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
+import ArenaIcon from '../ArenaIcon';
 
 interface DangerSceneProps {
   event: AEvent;
@@ -48,7 +49,7 @@ const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
             border: `1px solid ${CV.red}30`,
             animation: 'glowPulse 2s ease-in-out infinite',
           }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
+            <ArenaIcon name="AlertTriangle" size={24} color={CV.red} />
           </div>
           <div>
             <span style={{
@@ -126,8 +127,8 @@ const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
           padding: '14px 18px', borderBottom: `1px solid ${CV.bd0}`,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span style={{ color: CV.red, fontWeight: 700, fontSize: 14, letterSpacing: .5 }}>
-            🚨 AT RISK
+          <span style={{ color: CV.red, fontWeight: 700, fontSize: 14, letterSpacing: .5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <ArenaIcon name="ShieldAlert" size={16} color={CV.red} /> AT RISK
           </span>
           <span style={{
             background: `${CV.red}15`, color: CV.red, padding: '2px 10px',
@@ -142,8 +143,10 @@ const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
             padding: 40, textAlign: 'center', color: CV.teal,
             fontSize: 14, fontWeight: 600,
           }}>
-            <span style={{ fontSize: 30, display: 'block', marginBottom: 8 }}>🟢</span>
-            All racers are in safe territory
+            <span style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <ArenaIcon name="CheckCircle2" size={30} color={CV.teal} />
+            </span>
+            All traders are in safe territory
           </div>
         ) : (
           inDanger.map((p, i) => {
@@ -179,7 +182,9 @@ const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: CV.txt, fontSize: 13, fontWeight: 600 }}>{p.username}</div>
-                  <div style={{ color: CV.gray, fontSize: 10 }}>{title.emoji} {title.title}</div>
+                  <div style={{ color: CV.gray, fontSize: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <ArenaIcon name={title.icon} size={9} color={CV.gray} /> {title.title}
+                  </div>
                 </div>
 
                 {/* Danger indicators */}

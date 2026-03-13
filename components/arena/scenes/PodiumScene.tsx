@@ -5,6 +5,7 @@ import type { AEvent, Participant } from '../types';
 import { CV, RANK_COLORS, RANK_GLOW } from '../constants';
 import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
+import ArenaIcon from '../ArenaIcon';
 
 interface PodiumSceneProps {
   event: AEvent;
@@ -59,18 +60,19 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
         textAlign: 'center', padding: '28px 0 16px', position: 'relative', zIndex: 2,
       }}>
         <div style={{
-          fontSize: 48, marginBottom: 10,
+          marginBottom: 10,
           filter: 'drop-shadow(0 0 20px rgba(255,212,88,.4))',
           animation: 'avatarBob 2s ease-in-out infinite',
+          display: 'flex', justifyContent: 'center',
         }}>
-          🏆
+          <ArenaIcon name="Trophy" size={48} color={CV.gold} />
         </div>
         <div style={{
           color: CV.gold, fontSize: 26, fontWeight: 800, letterSpacing: 4,
           textShadow: `0 0 30px ${CV.gold}30, 0 0 60px ${CV.gold}10`,
           animation: 'textShine 3s ease-in-out infinite',
         }}>
-          CHARTVOLT DERBY RESULTS
+          CHARTVOLT ARENA RESULTS
         </div>
         <div style={{ color: CV.lgt, fontSize: 14, marginTop: 6, fontWeight: 500 }}>
           {event.name}
@@ -156,7 +158,9 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
                 <Avatar src={p.profileImage} name={p.username} size={30} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ color: CV.txt, fontSize: 12, fontWeight: 600 }}>{p.username}</span>
-                  <span style={{ color: CV.gray, fontSize: 10, marginLeft: 8 }}>{title.emoji} {title.title}</span>
+                  <span style={{ color: CV.gray, fontSize: 10, marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <ArenaIcon name={title.icon} size={9} color={CV.gray} /> {title.title}
+                  </span>
                 </div>
                 <span style={{
                   color: roi >= 0 ? CV.teal : CV.red, fontWeight: 700,
@@ -201,11 +205,12 @@ const PodiumBlock: React.FC<{
       {/* Crown for first */}
       {isFirst && (
         <div style={{
-          fontSize: 32, marginBottom: 4,
+          marginBottom: 4,
           animation: 'avatarBob 2.5s ease-in-out infinite',
           filter: `drop-shadow(0 0 10px ${CV.gold}60)`,
+          display: 'flex', justifyContent: 'center',
         }}>
-          👑
+          <ArenaIcon name="Crown" size={32} color={CV.gold} />
         </div>
       )}
 
@@ -234,8 +239,8 @@ const PodiumBlock: React.FC<{
       }}>
         {p.username}
       </div>
-      <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
-        {title.emoji} {title.title}
+      <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <ArenaIcon name={title.icon} size={11} color={color} /> {title.title}
       </div>
       <div style={{
         color: roi >= 0 ? CV.teal : CV.red, fontWeight: 700,

@@ -23,9 +23,9 @@ export const fmtPnl = (v: number) =>
 /** Risk level from equity vs starting */
 export const riskLevel = (p: Participant, startCap: number) => {
   const dd = ((startCap - p.liveEquity) / startCap) * 100;
-  if (dd > 30) return { label: 'Aggressive', color: '#FF495B' };
-  if (dd > 15) return { label: 'Medium',     color: '#FF8243' };
-  return { label: 'Low', color: '#22c55e' };
+  if (dd > 30) return { label: 'Aggressive', color: '#FF495B', icon: 'AlertTriangle' };
+  if (dd > 15) return { label: 'Medium', color: '#FF8243', icon: 'AlertCircle' };
+  return { label: 'Low', color: '#22c55e', icon: 'ShieldCheck' };
 };
 
 /** Calculate ROI */
@@ -57,18 +57,18 @@ export const calcSharpe = (roi: number, pf: number) =>
 export const ranked = (ps: Participant[]) =>
   [...ps].sort((a, b) => b.liveEquity - a.liveEquity);
 
-/** Assign derby-style title from trading stats */
+/** Assign arena-style title from trading stats */
 export const getTraderTitle = (p: Participant, startCap: number) => {
   const roi = calcRoi(p.liveEquity, startCap);
   const wr = p.winRate;
   const dd = p.maxDrawdownPercentage;
-  if (roi > 20 && wr > 70) return { title: 'The Sniper', emoji: '🎯' };
-  if (p.totalTrades > 50 && wr > 55) return { title: 'The Scalper', emoji: '⚡' };
-  if (roi > 40) return { title: 'The Titan', emoji: '🏔️' };
-  if (roi > 0 && dd > 30) return { title: 'Risk Taker', emoji: '🔥' };
-  if (roi < 0 && p.totalTrades > 20) return { title: 'Survivor', emoji: '🛡️' };
-  if (roi < -10) return { title: 'The Underdog', emoji: '🐺' };
-  return { title: 'The Maverick', emoji: '🚀' };
+  if (roi > 20 && wr > 70) return { title: 'The Sniper', icon: 'Crosshair' };
+  if (p.totalTrades > 50 && wr > 55) return { title: 'The Scalper', icon: 'Zap' };
+  if (roi > 40) return { title: 'The Titan', icon: 'Mountain' };
+  if (roi > 0 && dd > 30) return { title: 'Risk Taker', icon: 'Flame' };
+  if (roi < 0 && p.totalTrades > 20) return { title: 'Survivor', icon: 'Shield' };
+  if (roi < -10) return { title: 'The Underdog', icon: 'Dog' };
+  return { title: 'The Maverick', icon: 'Rocket' };
 };
 
 /** Time remaining until end date */

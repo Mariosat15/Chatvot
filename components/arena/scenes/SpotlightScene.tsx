@@ -5,6 +5,7 @@ import type { AEvent, CandleData, BubbleTrade } from '../types';
 import { CV, getTier } from '../constants';
 import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, calcSharpe, getAllPositions } from '../helpers';
 import Avatar from '../Avatar';
+import ArenaIcon from '../ArenaIcon';
 import BroadcastChart from '../BroadcastChart';
 
 interface SpotlightSceneProps {
@@ -100,8 +101,8 @@ const SpotlightScene: React.FC<SpotlightSceneProps> = ({
             </div>
 
             <div style={{ color: CV.txt, fontSize: 22, fontWeight: 700, position: 'relative' }}>{p.username}</div>
-            <div style={{ color: tier.tagColor, fontSize: 13, marginTop: 4, position: 'relative' }}>
-              {title.emoji} {title.title}
+            <div style={{ color: tier.tagColor, fontSize: 13, marginTop: 4, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+              <ArenaIcon name={title.icon} size={14} color={tier.tagColor} /> {title.title}
             </div>
           </div>
 

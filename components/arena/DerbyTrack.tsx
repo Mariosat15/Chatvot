@@ -3,9 +3,12 @@
 // Horizontal track with trader avatars racing based on live equity
 import React, { useMemo } from 'react';
 import type { Participant, AEvent } from './types';
-import { CV, RANK_COLORS } from './constants';
+import { CV } from './constants';
 import { raceProgress, calcRoi, fmtRoi, fmtEquity, calcMomentum, ranked, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
+import ArenaIcon from './ArenaIcon';
+
+const MEDAL_COLORS = [CV.gold, '#C0C0C0', '#CD7F32'] as const;
 
 interface DerbyTrackProps {
   event: AEvent;
@@ -27,8 +30,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
       background: `linear-gradient(180deg, ${CV.bg2} 0%, ${CV.bg1} 100%)`,
       borderRadius: 18,
       border: `1px solid ${finalLap ? CV.red + '50' : CV.glassBorder}`,
-      padding: '20px 0 12px',
-      overflow: 'hidden',
+      padding: '20px 0 12px', overflow: 'hidden',
       animation: finalLap ? 'finalLapBg 1.5s ease-in-out infinite' : undefined,
       boxShadow: finalLap
         ? `0 0 30px ${CV.red}15, inset 0 0 60px ${CV.red}05`
@@ -53,23 +55,22 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
             background: `linear-gradient(135deg, ${CV.gold}18, ${CV.oran}18)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: `1px solid ${CV.gold}25`,
-            fontSize: 18,
           }}>
-            🏇
+            <ArenaIcon name="Gauge" size={18} color={CV.gold} />
           </div>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: CV.gold, fontWeight: 700, fontSize: 14, letterSpacing: 1 }}>
-              DERBY TRACK
+              ARENA TRACK
             </span>
             {finalLap && (
               <span style={{
-                marginLeft: 10,
                 background: `${CV.red}18`, color: CV.red,
                 padding: '2px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
                 animation: 'derbyPulse 1s ease-in-out infinite',
                 border: `1px solid ${CV.red}30`,
+                display: 'flex', alignItems: 'center', gap: 4,
               }}>
-                🏁 FINAL LAP
+                <ArenaIcon name="AlertTriangle" size={11} color={CV.red} /> FINAL LAP
               </span>
             )}
           </div>
@@ -80,7 +81,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
             animation: 'livePulse 1.5s ease-out infinite',
           }} />
           <span style={{ color: CV.gray, fontSize: 11, fontWeight: 600 }}>
-            {event.currentParticipants} RACERS
+            {event.currentParticipants} TRADERS
           </span>
         </div>
       </div>
@@ -95,8 +96,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
             position: i === 0 ? 'relative' : 'absolute',
             left: i === 0 ? undefined : `${i * 25}%`,
             transform: i === 0 ? undefined : 'translateX(-50%)',
-            color: CV.gray, fontSize: 9, fontWeight: 600, letterSpacing: .5,
-            opacity: .6,
+            color: CV.gray, fontSize: 9, fontWeight: 600, letterSpacing: .5, opacity: .6,
           }}>
             {label}
           </span>
@@ -104,8 +104,9 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
         <span style={{
           color: CV.gold, fontSize: 9, fontWeight: 700, letterSpacing: .5,
           textShadow: `0 0 8px ${CV.gold}30`,
+          display: 'flex', alignItems: 'center', gap: 3,
         }}>
-          🏁 FINISH
+          <ArenaIcon name="Target" size={10} color={CV.gold} /> FINISH
         </span>
       </div>
 
@@ -144,17 +145,18 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
               {/* Rank */}
               <div style={{
                 width: 28, textAlign: 'center',
-                color: i < 3 ? (RANK_COLORS[i] ?? CV.gray) : CV.gray,
-                fontWeight: 800, fontSize: i < 3 ? 16 : 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}
+                {i < 3 ? (
+                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS[i]} />
+                ) : (
+                  <span style={{ color: CV.gray, fontWeight: 800, fontSize: 12 }}>#{i + 1}</span>
+                )}
               </div>
 
               {/* Avatar */}
               <Avatar
-                src={p.profileImage}
-                name={p.username}
-                size={34}
+                src={p.profileImage} name={p.username} size={34}
                 rank={i + 1}
                 glow={momentum === 'boost' ? CV.teal : momentum === 'slow' ? CV.red : undefined}
                 bobbing={momentum === 'boost'}
@@ -165,47 +167,34 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
                 <div style={{
                   color: CV.txt, fontSize: 12, fontWeight: 600,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {p.username}
-                </div>
-                <div style={{ color: CV.gray, fontSize: 9 }}>
-                  {titleObj.emoji} {titleObj.title}
+                }}>{p.username}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, color: CV.gray, fontSize: 9 }}>
+                  <ArenaIcon name={titleObj.icon} size={9} color={CV.gray} />
+                  {titleObj.title}
                 </div>
               </div>
 
               {/* Track lane */}
-              <div style={{
-                flex: 1, position: 'relative', height: 32, borderRadius: 8,
-                overflow: 'hidden',
-              }}>
-                {/* Track base */}
+              <div style={{ flex: 1, position: 'relative', height: 32, borderRadius: 8, overflow: 'hidden' }}>
                 <div style={{
                   position: 'absolute', inset: 0,
                   background: `linear-gradient(90deg, ${CV.bg3}, ${CV.bg4})`,
-                  borderRadius: 8,
-                  border: `1px solid ${CV.bd0}`,
+                  borderRadius: 8, border: `1px solid ${CV.bd0}`,
                 }} />
-
-                {/* Lane markings */}
                 <div style={{
                   position: 'absolute', inset: 0,
                   backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 58px, ${CV.bd0}80 58px, ${CV.bd0}80 60px)`,
                   animation: momentum === 'boost' ? 'trackMarkings .4s linear infinite' : undefined,
                   opacity: 0.3,
                 }} />
-
-                {/* Progress bar with gradient */}
                 <div style={{
                   position: 'absolute', left: 0, top: 0, bottom: 0,
                   width: `${progress}%`,
                   background: roi >= 0
                     ? `linear-gradient(90deg, ${CV.teal}08, ${CV.teal}20, ${CV.teal}35)`
                     : `linear-gradient(90deg, ${CV.red}05, ${CV.red}15, ${CV.red}25)`,
-                  borderRadius: 8,
-                  transition: 'width 1.2s cubic-bezier(.4,0,.2,1)',
+                  borderRadius: 8, transition: 'width 1.2s cubic-bezier(.4,0,.2,1)',
                 }} />
-
-                {/* Neon glow trail on boost */}
                 {momentum === 'boost' && (
                   <div style={{
                     position: 'absolute', top: '50%', transform: 'translateY(-50%)',
@@ -216,35 +205,22 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
                     animation: 'neonTrail .6s ease-out infinite',
                   }} />
                 )}
-
-                {/* Slowdown red flash */}
                 {momentum === 'slow' && (
                   <div style={{
                     position: 'absolute', inset: 0,
-                    background: `${CV.red}06`,
-                    borderRadius: 8,
+                    background: `${CV.red}06`, borderRadius: 8,
                     animation: 'derbyPulse 1s ease-in-out infinite',
                   }} />
                 )}
-
-                {/* Avatar on track */}
                 <div style={{
-                  position: 'absolute', top: '50%',
-                  left: `${progress}%`,
+                  position: 'absolute', top: '50%', left: `${progress}%`,
                   transition: 'left 1.2s cubic-bezier(.4,0,.2,1)',
                   animation: momentum === 'boost' ? 'derbyRunFast .3s ease-in-out infinite' : 'derbyRun .8s ease-in-out infinite',
                   zIndex: 2,
                   filter: momentum === 'boost' ? `drop-shadow(0 0 6px ${CV.teal}80)` : 'none',
                 }}>
-                  <Avatar
-                    src={p.profileImage}
-                    name={p.username}
-                    size={22}
-                    glow={isLeader ? CV.gold : undefined}
-                  />
+                  <Avatar src={p.profileImage} name={p.username} size={22} glow={isLeader ? CV.gold : undefined} />
                 </div>
-
-                {/* Dust cloud on boost */}
                 {momentum === 'boost' && (
                   <>
                     <div style={{
@@ -272,8 +248,10 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
                   fontWeight: 700, fontSize: 13,
                   fontFamily: '"SF Mono", Consolas, monospace',
                   textShadow: roi >= 5 ? `0 0 8px ${CV.teal}30` : roi < -5 ? `0 0 8px ${CV.red}30` : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
                 }}>
                   {fmtRoi(roi)}
+                  <ArenaIcon name={roi >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} color={roi >= 0 ? CV.teal : CV.red} />
                 </div>
                 <div style={{
                   color: CV.gray, fontSize: 10,

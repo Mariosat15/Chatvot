@@ -5,6 +5,9 @@ import type { AEvent, Participant } from '../types';
 import { CV, TRADER_COLORS } from '../constants';
 import { ranked, calcRoi, fmtRoi, fmtEquity, raceProgress, getTraderTitle, calcMomentum } from '../helpers';
 import Avatar from '../Avatar';
+import ArenaIcon from '../ArenaIcon';
+
+const MEDAL_COLORS = [CV.gold, '#C0C0C0', '#CD7F32'] as const;
 
 interface RaceSceneProps {
   event: AEvent;
@@ -16,7 +19,6 @@ interface RaceSceneProps {
 const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }> = ({ participants, startCap }) => {
   const W = 700, H = 220;
   const sorted = ranked(participants).slice(0, 8);
-  // Build fake history from current equity (in production, replace with real snapshot history)
   const points = sorted.map((p, ci) => {
     const roi = calcRoi(p.liveEquity, startCap);
     const steps = 20;
@@ -45,13 +47,10 @@ const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }>
           </linearGradient>
         ))}
       </defs>
-      {/* Grid lines */}
       {[0, H * 0.25, H * 0.5, H * 0.75].map((y, i) => (
         <line key={i} x1={0} y1={y} x2={W} y2={y} stroke={CV.bd0} strokeWidth={0.5} opacity={0.4} />
       ))}
-      {/* Zero line */}
       <line x1={0} y1={mapY(0)} x2={W} y2={mapY(0)} stroke={CV.bd2} strokeWidth={1} strokeDasharray="6,4" opacity={0.6} />
-      {/* Lines */}
       {points.map((line, i) => (
         <polyline
           key={i}
@@ -59,7 +58,6 @@ const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }>
           fill="none" stroke={`url(#lineGrad${i})`} strokeWidth={2.5} strokeLinecap="round"
         />
       ))}
-      {/* End dots */}
       {points.map((line, i) => {
         const last = line.pts[line.pts.length - 1];
         if (!last) return null;
@@ -86,12 +84,11 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
       <div style={{
         background: `linear-gradient(180deg, ${CV.bg2}, ${CV.bg1})`,
         borderRadius: 18, border: `1px solid ${CV.glassBorder}`,
-        padding: '18px 22px',
-        boxShadow: `0 4px 24px rgba(0,0,0,.2)`,
+        padding: '18px 22px', boxShadow: `0 4px 24px rgba(0,0,0,.2)`,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18 }}>📈</span>
+            <ArenaIcon name="TrendingUp" size={18} color={CV.gold} />
             <span style={{ color: CV.gold, fontWeight: 700, fontSize: 14, letterSpacing: 1 }}>
               EQUITY RACE
             </span>
@@ -107,21 +104,20 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
         <RaceLineChart participants={event.participants} startCap={event.startingCapital} />
       </div>
 
-      {/* Full race lanes (expanded) */}
+      {/* Full race lanes */}
       <div style={{
         background: `linear-gradient(180deg, ${CV.bg2}, ${CV.bg1})`,
         borderRadius: 18, border: `1px solid ${CV.glassBorder}`,
-        padding: '16px 0',
-        boxShadow: `0 4px 24px rgba(0,0,0,.2)`,
+        padding: '16px 0', boxShadow: `0 4px 24px rgba(0,0,0,.2)`,
       }}>
         <div style={{ padding: '0 20px 14px', borderBottom: `1px solid ${CV.bd0}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>🏁</span>
+            <ArenaIcon name="Target" size={16} color={CV.gold} />
             <span style={{ color: CV.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>
               RACE POSITIONS
             </span>
           </div>
-          <span style={{ color: CV.gray, fontSize: 10 }}>{sorted.length} racers</span>
+          <span style={{ color: CV.gray, fontSize: 10 }}>{sorted.length} traders</span>
         </div>
         {sorted.map((p, i) => {
           const progress = raceProgress(p.liveEquity, event.startingCapital);
@@ -146,17 +142,17 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
             >
               <span style={{
                 width: 30, textAlign: 'center',
-                color: i < 3 ? CV.gold : CV.gray,
-                fontWeight: 700, fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}
+                {i < 3 ? (
+                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS[i]} />
+                ) : (
+                  <span style={{ color: CV.gray, fontWeight: 700, fontSize: 14 }}>#{i + 1}</span>
+                )}
               </span>
 
               <Avatar
-                src={p.profileImage}
-                name={p.username}
-                size={38}
-                rank={i + 1}
+                src={p.profileImage} name={p.username} size={38} rank={i + 1}
                 showRank
                 glow={momentum === 'boost' ? CV.teal : i === 0 ? CV.gold : undefined}
                 bobbing={i === 0 || momentum === 'boost'}
@@ -164,7 +160,10 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
 
               <div style={{ width: 90 }}>
                 <div style={{ color: CV.txt, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</div>
-                <div style={{ color: CV.gray, fontSize: 10 }}>{title.emoji} {title.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, color: CV.gray, fontSize: 10 }}>
+                  <ArenaIcon name={title.icon} size={9} color={CV.gray} />
+                  {title.title}
+                </div>
               </div>
 
               {/* Track */}

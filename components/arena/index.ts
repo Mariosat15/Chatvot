@@ -1,5 +1,6 @@
 // ─── Arena Components Barrel Export ───────────────────────────────────────────
 export { default as Avatar } from './Avatar';
+export { default as ArenaIcon } from './ArenaIcon';
 export { default as DerbyTrack } from './DerbyTrack';
 export { default as TraderCard } from './TraderCard';
 export { default as EventCard } from './EventCard';

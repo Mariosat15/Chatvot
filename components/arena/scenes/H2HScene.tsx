@@ -5,6 +5,7 @@ import type { AEvent, Participant } from '../types';
 import { CV, getTier } from '../constants';
 import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle } from '../helpers';
 import Avatar from '../Avatar';
+import ArenaIcon from '../ArenaIcon';
 
 interface H2HSceneProps {
   event: AEvent;
@@ -60,8 +61,8 @@ const TraderColumn: React.FC<{ p: Participant; rank: number; startCap: number; s
       <div style={{ color: CV.txt, fontSize: 20, fontWeight: 700, textShadow: `0 0 20px ${accent}15` }}>
         {p.username}
       </div>
-      <div style={{ color: accent, fontSize: 12, marginTop: 2, fontWeight: 600 }}>
-        {title.emoji} {title.title}
+      <div style={{ color: accent, fontSize: 12, marginTop: 2, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: align, gap: 4 }}>
+        <ArenaIcon name={title.icon} size={12} color={accent} /> {title.title}
       </div>
 
       {/* Tier badge */}
@@ -103,8 +104,8 @@ const TraderColumn: React.FC<{ p: Participant; rank: number; startCap: number; s
               padding: '3px 0', fontSize: 10,
             }}>
               <span style={{ color: CV.lgt }}>{pos.symbol}</span>
-              <span style={{ color: pos.side === 'long' ? CV.teal : CV.red, fontWeight: 700 }}>
-                {pos.side === 'long' ? '▲' : '▼'}
+              <span style={{ color: pos.side === 'long' ? CV.teal : CV.red, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
+                <ArenaIcon name={pos.side === 'long' ? 'ArrowUp' : 'ArrowDown'} size={10} color={pos.side === 'long' ? CV.teal : CV.red} />
               </span>
               <span style={{ color: pos.unrealizedPnl >= 0 ? CV.teal : CV.red, fontFamily: mono, fontWeight: 600 }}>
                 {fmtPnl(pos.unrealizedPnl)}
@@ -160,8 +161,9 @@ const H2HScene: React.FC<H2HSceneProps> = ({ event }) => {
         <span style={{
           color: CV.gold, fontSize: 20, fontWeight: 800, letterSpacing: 3,
           textShadow: `0 0 20px ${CV.gold}20`,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
         }}>
-          ⚔️ HEAD TO HEAD
+          <ArenaIcon name="Swords" size={22} color={CV.gold} /> HEAD TO HEAD
         </span>
       </div>
 

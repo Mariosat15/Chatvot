@@ -2,16 +2,21 @@
 // ─── Leaderboard — Premium Live Stats Panel ──────────────────────────────────
 import React from 'react';
 import type { Participant, AEvent } from './types';
-import { CV, RANK_COLORS } from './constants';
+import { CV } from './constants';
 import { fmtEquity, fmtRoi, calcRoi, ranked, riskLevel, getTraderTitle } from './helpers';
 import Avatar from './Avatar';
+import ArenaIcon from './ArenaIcon';
 
 interface LeaderboardProps {
   event: AEvent;
   onSelectTrader: (p: Participant) => void;
+  previousEquities?: Map<string, number>;
 }
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
+const MEDAL_ICONS = ['Medal', 'Medal', 'Medal'] as const;
+const MEDAL_COLORS = [CV.gold, '#C0C0C0', '#CD7F32'] as const;
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previousEquities }) => {
   const sorted = ranked(event.participants);
 
   return (
@@ -29,7 +34,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
         background: `linear-gradient(135deg, ${CV.gold}06, transparent)`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🏆</span>
+          <ArenaIcon name="Trophy" size={16} color={CV.gold} />
           <span style={{ color: CV.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>
             LEADERBOARD
           </span>
@@ -51,7 +56,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
         padding: '6px 14px', borderBottom: `1px solid ${CV.bd0}`,
       }}>
         <span style={{ width: 24, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'center', letterSpacing: .5 }}>#</span>
-        <span style={{ flex: 1, color: CV.gray, fontSize: 8, fontWeight: 600, letterSpacing: .5 }}>RACER</span>
+        <span style={{ flex: 1, color: CV.gray, fontSize: 8, fontWeight: 600, letterSpacing: .5 }}>TRADER</span>
         <span style={{ width: 65, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>EQUITY</span>
         <span style={{ width: 55, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>ROI</span>
       </div>
@@ -63,6 +68,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
           const risk = riskLevel(p, event.startingCapital);
           const title = getTraderTitle(p, event.startingCapital);
           const isLeader = i === 0;
+          const prevEq = previousEquities?.get(p.userId);
+          const eqDelta = prevEq ? p.liveEquity - prevEq : 0;
 
           return (
             <div
@@ -87,10 +94,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
               {/* Rank */}
               <div style={{
                 width: 24, textAlign: 'center',
-                color: i < 3 ? (RANK_COLORS[i] ?? CV.gray) : CV.gray,
-                fontWeight: 700, fontSize: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}
+                {i < 3 ? (
+                  <ArenaIcon name={MEDAL_ICONS[i]} size={16} color={MEDAL_COLORS[i]} />
+                ) : (
+                  <span style={{ color: CV.gray, fontWeight: 700, fontSize: 12 }}>{i + 1}</span>
+                )}
               </div>
 
               <Avatar src={p.profileImage} name={p.username} size={30} rank={i + 1} />
@@ -103,7 +113,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
                   {p.username}
                 </div>
                 <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginTop: 2 }}>
-                  <span style={{ color: CV.gray, fontSize: 9 }}>{title.emoji} {title.title}</span>
+                  <ArenaIcon name={title.icon} size={9} color={CV.gray} />
+                  <span style={{ color: CV.gray, fontSize: 9 }}>{title.title}</span>
                   <span style={{
                     fontSize: 7, padding: '1px 5px', borderRadius: 4,
                     background: `${risk.color}12`, color: risk.color,
@@ -115,13 +126,21 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
                 </div>
               </div>
 
-              {/* Live stats — full precision to capture small equity changes */}
+              {/* Live stats */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{
                   color: CV.txt, fontSize: 11, fontWeight: 700,
                   fontFamily: '"SF Mono", Consolas, monospace',
+                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
                 }}>
                   {fmtEquity(p.liveEquity)}
+                  {eqDelta !== 0 && (
+                    <ArenaIcon
+                      name={eqDelta > 0 ? 'ArrowUpRight' : 'ArrowDownRight'}
+                      size={10}
+                      color={eqDelta > 0 ? CV.teal : CV.red}
+                    />
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 2 }}>
                   <span style={{
@@ -156,13 +175,19 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
         display: 'flex', justifyContent: 'space-between',
       }}>
         <div>
-          <div style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>TOTAL TRADES</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <ArenaIcon name="BarChart3" size={9} color={CV.gray} />
+            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>TOTAL TRADES</span>
+          </div>
           <div style={{ color: CV.txt, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
             {sorted.reduce((acc, p) => acc + p.totalTrades, 0)}
           </div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>AVG ROI</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <ArenaIcon name="TrendingUp" size={9} color={CV.gray} />
+            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>AVG ROI</span>
+          </div>
           <div style={{
             color: CV.teal, fontSize: 12, fontWeight: 700,
             fontFamily: '"SF Mono", Consolas, monospace',
@@ -173,7 +198,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader }) => {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>OPEN POS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+            <ArenaIcon name="Activity" size={9} color={CV.gray} />
+            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>OPEN POS</span>
+          </div>
           <div style={{ color: CV.purp, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
             {sorted.reduce((acc, p) => acc + p.currentOpenPositions, 0)}
           </div>

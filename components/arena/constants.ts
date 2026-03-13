@@ -1,6 +1,6 @@
-// ─── Chartvolt Derby Theme — Premium Neon Casino ──────────────────────────────
+// ─── Chartvolt Arena Theme — Premium Neon Trading ──────────────────────────────
 
-/** Brand palette — dark-neon blue + gold derby theme */
+/** Brand palette — dark-neon blue + gold arena theme */
 export const CV = {
   // Backgrounds (deep space navy)
   bg0: '#020208', bg1: '#050814', bg2: '#0a0e22', bg3: '#0e1330', bg4: '#141938', bg5: '#1a2040',
@@ -10,7 +10,7 @@ export const CV = {
   teal: '#0FEDBE', blue: '#5B8DFF', gold: '#FFD458', gol2: '#E8BA40',
   red: '#FF495B', oran: '#FF8243', purp: '#D13BFF',
   gray: '#7B849E', lgt: '#C8D0E4', txt: '#E8ECF4', grn: '#22c55e',
-  // Derby neon
+  // Neon
   neon: '#00E5FF', neonPink: '#FF2DDB', neonGreen: '#39FF14',
   // Track
   track: '#0C3D1A', trackLight: '#1A5E2B', turf: '#145A24',
@@ -49,28 +49,28 @@ export const AV_GRADS = [
 
 /** Trader card tier config */
 export const TIER_CFG = {
-  champion: { border: CV.gold,  header: `linear-gradient(135deg,#1a1200 0%,rgba(255,212,88,.18) 100%)`, tag: 'rgba(255,212,88,.12)',  tagColor: CV.gold,  tagLabel: '🏆 Champion', glow: 'rgba(255,212,88,.35)' },
-  elite:    { border: CV.purp,  header: `linear-gradient(135deg,#12081a 0%,rgba(209,59,255,.16) 100%)`, tag: 'rgba(209,59,255,.12)', tagColor: CV.purp,  tagLabel: '⚡ Elite',    glow: 'rgba(209,59,255,.28)' },
-  veteran:  { border: CV.blue,  header: `linear-gradient(135deg,#080e22 0%,rgba(91,141,255,.16) 100%)`, tag: 'rgba(91,141,255,.12)', tagColor: CV.blue,  tagLabel: '🎯 Veteran',  glow: 'rgba(91,141,255,.25)' },
-  trader:   { border: CV.bd3,   header: `linear-gradient(135deg,${CV.bg2} 0%,${CV.bg3} 100%)`,         tag: 'rgba(136,144,164,.08)', tagColor: CV.gray,  tagLabel: '📊 Trader',   glow: 'rgba(0,0,0,0)' },
+  champion: { border: CV.gold,  header: `linear-gradient(135deg,#1a1200 0%,rgba(255,212,88,.18) 100%)`, tag: 'rgba(255,212,88,.12)',  tagColor: CV.gold,  tagLabel: 'Champion', glow: 'rgba(255,212,88,.35)' },
+  elite:    { border: CV.purp,  header: `linear-gradient(135deg,#12081a 0%,rgba(209,59,255,.16) 100%)`, tag: 'rgba(209,59,255,.12)', tagColor: CV.purp,  tagLabel: 'Elite',    glow: 'rgba(209,59,255,.28)' },
+  veteran:  { border: CV.blue,  header: `linear-gradient(135deg,#080e22 0%,rgba(91,141,255,.16) 100%)`, tag: 'rgba(91,141,255,.12)', tagColor: CV.blue,  tagLabel: 'Veteran',  glow: 'rgba(91,141,255,.25)' },
+  trader:   { border: CV.bd3,   header: `linear-gradient(135deg,${CV.bg2} 0%,${CV.bg3} 100%)`,         tag: 'rgba(136,144,164,.08)', tagColor: CV.gray,  tagLabel: 'Trader',   glow: 'rgba(0,0,0,0)' },
 };
 
 /** Assign tier by rank */
 export const getTier = (rank: number) =>
   rank <= 3 ? TIER_CFG.champion : rank <= 10 ? TIER_CFG.elite : rank <= 50 ? TIER_CFG.veteran : TIER_CFG.trader;
 
-/** Derby-specific titles assigned by trading style */
-export const TRADER_TITLES: Record<string, { title: string; emoji: string }> = {
-  sniper:      { title: 'The Sniper',      emoji: '🎯' },
-  scalper:     { title: 'The Scalper',      emoji: '⚡' },
-  titan:       { title: 'The Titan',        emoji: '🏔️' },
-  underdog:    { title: 'The Underdog',     emoji: '🐺' },
-  sharpshooter:{ title: 'Sharpshooter',     emoji: '🔫' },
-  risktaker:   { title: 'Risk Taker',       emoji: '🔥' },
-  champion:    { title: 'Champion',         emoji: '🏆' },
-  ironhand:    { title: 'Iron Hand',        emoji: '🤚' },
-  maverick:    { title: 'The Maverick',     emoji: '🚀' },
-  survivor:    { title: 'Survivor',         emoji: '🛡️' },
+/** Arena-specific titles assigned by trading style */
+export const TRADER_TITLES: Record<string, { title: string; icon: string }> = {
+  sniper:      { title: 'The Sniper',      icon: 'Crosshair' },
+  scalper:     { title: 'The Scalper',      icon: 'Zap' },
+  titan:       { title: 'The Titan',        icon: 'Mountain' },
+  underdog:    { title: 'The Underdog',     icon: 'Dog' },
+  sharpshooter:{ title: 'Sharpshooter',     icon: 'Target' },
+  risktaker:   { title: 'Risk Taker',       icon: 'Flame' },
+  champion:    { title: 'Champion',         icon: 'Trophy' },
+  ironhand:    { title: 'Iron Hand',        icon: 'Shield' },
+  maverick:    { title: 'The Maverick',     icon: 'Rocket' },
+  survivor:    { title: 'Survivor',         icon: 'ShieldCheck' },
 };
 
 /** Colors for top traders on race chart */

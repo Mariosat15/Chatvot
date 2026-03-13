@@ -27,6 +27,8 @@ export interface AEvent {
   startDate: string; endDate: string;
   description?: string; allowedAssets?: string[];
   participants: Participant[];
+  rankingMethod?: string;
+  tieBreaker?: string;
 }
 
 export interface PriceMap { [sym: string]: number }
@@ -50,4 +52,14 @@ export interface CandleData {
   high: number;
   low: number;
   close: number;
+}
+
+/** Global arena stats from the API */
+export interface ArenaStats {
+  totalPrizePool: number;
+  activePlayers: number;
+  liveNow: number;
+  upcoming: number;
+  openPositions: number;
+  totalTrades: number;
 }
