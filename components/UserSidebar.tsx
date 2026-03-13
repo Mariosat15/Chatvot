@@ -141,8 +141,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       try {
         const response = await fetch("/api/settings");
         const data = await response.json();
-        if (data.success && data.settings?.features) {
-          setArenaEnabled(data.settings.features.arenaEnabled ?? true);
+        if (data.success && data.settings) {
+          setArenaEnabled(data.settings.arenaEnabled ?? true);
         }
       } catch {
         // Default to enabled if settings fetch fails

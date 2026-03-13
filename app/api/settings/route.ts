@@ -63,9 +63,7 @@ export async function GET() {
         siteUrl: whiteLabel?.siteUrl || "",
       },
       // Feature Toggles
-      features: {
-        arenaEnabled: whiteLabel?.arenaEnabled ?? true,
-      },
+      arenaEnabled: whiteLabel?.arenaEnabled ?? true,
     };
 
     return NextResponse.json(
