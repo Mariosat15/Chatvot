@@ -27,6 +27,7 @@ export interface WhiteLabelDocument extends Document {
   inngestSigningKey: string;
   inngestEventKey: string;
   inngestMode: "dev" | "cloud";
+  arenaEnabled: boolean;
   priceFeedMode: "websocket" | "api" | "both";
   priceFeedWebsocketEnabled: boolean;
   priceFeedApiEnabled: boolean;

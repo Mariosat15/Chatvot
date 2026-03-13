@@ -30,6 +30,7 @@ import {
   Sparkles,
   Fingerprint,
   Image as ImageIcon,
+  Radio,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -69,6 +70,9 @@ export default function EnvironmentSection() {
 
     // Pexels (Landing Pages)
     pexelsApiKey: "",
+
+    // Feature Toggles
+    arenaEnabled: true,
 
     // Infrastructure
     isPrimary: "true",
@@ -332,6 +336,38 @@ export default function EnvironmentSection() {
                         <p className="text-xs text-gray-500 mt-2">
                           Base URL for API calls and internal links
                         </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Feature Toggles */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Radio className="h-5 w-5 text-cyan-400" />
+                      Feature Toggles
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <div>
+                          <Label className="text-gray-100 font-medium">
+                            Live Arena
+                          </Label>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Enable the public Live Arena page (
+                            <code className="bg-gray-800 px-1.5 py-0.5 rounded text-xs">
+                              /arena
+                            </code>
+                            ) and show it in the user navigation menu. When
+                            disabled, the page is inaccessible and hidden from
+                            menus.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={formData.arenaEnabled}
+                          onCheckedChange={(checked) =>
+                            updateField("arenaEnabled", checked)
+                          }
+                        />
                       </div>
                     </div>
                   </div>

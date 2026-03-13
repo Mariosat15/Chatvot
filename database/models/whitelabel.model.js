@@ -122,6 +122,11 @@ const WhiteLabelSchema = new mongoose_1.Schema({
         enum: ['dev', 'cloud'],
         default: 'dev' // Default to dev mode (local Inngest dev server)
     },
+    // Feature Toggles
+    arenaEnabled: {
+        type: Boolean,
+        default: true // Arena enabled by default
+    },
     // Price Feed Configuration
     priceFeedMode: {
         type: String,

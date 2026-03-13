@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,16 @@ const navItems: NavItem[] = [
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const [arenaEnabled, setArenaEnabled] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.settings?.arenaEnabled === false) setArenaEnabled(false);
+      })
+      .catch(() => {});
+  }, []);
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
@@ -70,7 +81,7 @@ export default function MobileBottomNav() {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800/50 safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-2">
-        {navItems.map((item) => {
+        {navItems.filter((item) => item.href !== "/arena" || arenaEnabled).map((item) => {
           const active = isActive(item.href);
 
           return (

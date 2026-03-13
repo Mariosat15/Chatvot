@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
@@ -61,6 +61,10 @@ export async function GET() {
         seoDescription: whiteLabel?.seoDescription || "",
         ogImageUrl: whiteLabel?.ogImageUrl || "",
         siteUrl: whiteLabel?.siteUrl || "",
+      },
+      // Feature Toggles
+      features: {
+        arenaEnabled: whiteLabel?.arenaEnabled ?? true,
       },
     };
 

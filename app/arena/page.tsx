@@ -2,6 +2,7 @@
 // ─── Chartvolt Live Arena — Premium Trading Broadcast Dashboard ──────────────
 // Route: /arena — Public broadcast-ready trading arena dashboard
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Ticker, EventCard, TraderCard,
   OverviewScene, RaceScene, SpotlightScene, H2HScene, DangerScene, PodiumScene,
@@ -56,6 +57,8 @@ function StatItem({ label, value, icon, color, glow }: {
 
 // ─── Main Arena Page ─────────────────────────────────────────────────────────
 export default function ArenaPage() {
+  const router = useRouter();
+  const [arenaAllowed, setArenaAllowed] = useState<boolean | null>(null);
   const [view, setView] = useState<'lobby' | 'live'>('lobby');
   const [events, setEvents] = useState<AEvent[]>([]);
   const [selected, setSelected] = useState<AEvent | null>(null);
@@ -69,6 +72,20 @@ export default function ArenaPage() {
   const [bubbles, setBubbles] = useState<BubbleTrade[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ArenaStats>({ totalPrizePool: 0, activePlayers: 0, liveNow: 0, upcoming: 0, openPositions: 0, totalTrades: 0 });
+
+  // Reason: Check if arena feature is enabled via admin settings; redirect if disabled
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.settings?.arenaEnabled === false) {
+          router.replace('/dashboard');
+        } else {
+          setArenaAllowed(true);
+        }
+      })
+      .catch(() => setArenaAllowed(true)); // Fail-open: allow access if settings can't be fetched
+  }, [router]);
 
   const prevEquitiesRef = useRef<Map<string, number>>(new Map());
   const [previousEquities, setPreviousEquities] = useState<Map<string, number>>(new Map());
@@ -95,8 +112,8 @@ export default function ArenaPage() {
         const posByUser: Record<string, unknown[]> = {};
         for (const pos of rawPositions) {
           const uid = pos.userId as string;
-          if (!posByUser[uid]) posByUser[uid] = [];
-          posByUser[uid].push(pos);
+          if (!posByUser[uid]) posByUser[uid] = []; // eslint-disable-line security/detect-object-injection
+          posByUser[uid].push(pos); // eslint-disable-line security/detect-object-injection
         }
         const participants: Participant[] = rawParticipants.map((p) => ({
           userId: (p.userId as string) || '',
@@ -273,6 +290,19 @@ export default function ArenaPage() {
     const sorted = ranked(selected.participants);
     return Math.max(1, sorted.findIndex(p => p.userId === traderModal.userId) + 1);
   }, [traderModal, selected]);
+
+  // Reason: Block rendering until we confirm arena is enabled
+  if (arenaAllowed === null) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#040a14',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <ArenaIcon name="Loader" size={32} color={CV.blue} />
+      </div>
+    );
+  }
 
   return (
     <div style={{

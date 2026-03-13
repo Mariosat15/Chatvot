@@ -62,6 +62,9 @@ export interface WhiteLabelDocument extends Document {
   // Pexels API (stock images for landing pages)
   pexelsApiKey: string;
 
+  // Feature Toggles
+  arenaEnabled: boolean; // Enable/disable Live Arena page and menu link
+
   // Price Feed Configuration
   priceFeedMode: "websocket" | "api" | "both"; // both = websocket primary, api fallback
   priceFeedWebsocketEnabled: boolean;
@@ -237,6 +240,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     pexelsApiKey: {
       type: String,
       default: "",
+    },
+
+    // Feature Toggles
+    arenaEnabled: {
+      type: Boolean,
+      default: true, // Arena enabled by default
     },
 
     // Price Feed Configuration

@@ -124,8 +124,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGameMaster, setIsGameMaster] = useState(false);
+  const [arenaEnabled, setArenaEnabled] = useState(true);
 
-  // Check if user is a Game Master
+  // Fetch feature flags and game master status on mount
   useEffect(() => {
     const checkGameMasterStatus = async () => {
       try {
@@ -136,7 +137,19 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         setIsGameMaster(false);
       }
     };
+    const fetchFeatureFlags = async () => {
+      try {
+        const response = await fetch("/api/settings");
+        const data = await response.json();
+        if (data.success && data.settings?.features) {
+          setArenaEnabled(data.settings.features.arenaEnabled ?? true);
+        }
+      } catch {
+        // Default to enabled if settings fetch fails
+      }
+    };
     checkGameMasterStatus();
+    fetchFeatureFlags();
   }, []);
 
   // Close mobile menu on route change
@@ -322,9 +335,11 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               Trading
             </h4>
           )}
-          {mainNavItems.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
+          {mainNavItems
+            .filter((item) => item.href !== "/arena" || arenaEnabled)
+            .map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
         </div>
 
         {/* Game Master Section - Only show if user is a Game Master */}

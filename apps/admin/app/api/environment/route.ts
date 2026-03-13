@@ -49,6 +49,7 @@ const DB_FIELDS = new Set([
   "betterAuthSecret",
   "betterAuthUrl",
   "pexelsApiKey",
+  "arenaEnabled",
 ]);
 
 // ──────────────────────────────────────────────────────────────
@@ -140,6 +141,10 @@ export async function GET() {
 
       // Pexels (Landing Pages)
       pexelsApiKey: getVal("pexelsApiKey", "PEXELS_API_KEY", ""),
+
+      // Feature Toggles
+      arenaEnabled:
+        (settingsMap.get("arenaEnabled") as boolean | undefined) ?? true,
 
       // Infrastructure
       isPrimary: process.env.IS_PRIMARY || "true",
