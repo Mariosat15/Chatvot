@@ -167,11 +167,18 @@ export async function POST(request: NextRequest) {
           let refundedCount = 0;
 
           // Refund both participants if challenge was accepted or active
+          // Reason: Credits are only deducted when the challenged user ACCEPTS.
+          // Pending challenges have zero financial impact — no refund needed.
           if (["accepted", "active"].includes(challenge.status)) {
             // Refund challenger
             await CreditWallet.updateOne(
               { userId: challenge.challengerId },
-              { $inc: { creditBalance: challenge.entryFee } },
+              {
+                $inc: {
+                  creditBalance: challenge.entryFee,
+                  totalSpentOnChallenges: -challenge.entryFee,
+                },
+              },
               { session },
             );
             refundedCount++;
@@ -179,19 +186,17 @@ export async function POST(request: NextRequest) {
             // Refund challenged user
             await CreditWallet.updateOne(
               { userId: challenge.challengedId },
-              { $inc: { creditBalance: challenge.entryFee } },
-              { session },
-            );
-            refundedCount++;
-          } else if (challenge.status === "pending") {
-            // Refund only challenger for pending challenges
-            await CreditWallet.updateOne(
-              { userId: challenge.challengerId },
-              { $inc: { creditBalance: challenge.entryFee } },
+              {
+                $inc: {
+                  creditBalance: challenge.entryFee,
+                  totalSpentOnChallenges: -challenge.entryFee,
+                },
+              },
               { session },
             );
             refundedCount++;
           }
+          // Pending challenges: no refund needed — entry fee was never charged
 
           // Update challenge status
           await Challenge.updateOne(

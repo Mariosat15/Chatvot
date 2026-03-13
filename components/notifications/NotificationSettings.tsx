@@ -49,6 +49,7 @@ interface Preferences {
   notificationsEnabled: boolean;
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
+  challengePopupEnabled: boolean;
   categoryPreferences: CategoryPreferences;
   disabledNotifications: string[];
   quietHoursEnabled: boolean;
@@ -352,6 +353,42 @@ export default function NotificationSettings() {
                   onCheckedChange={(enabled) =>
                     updatePreferences({ emailNotificationsEnabled: enabled })
                   }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-orange-400" />
+                  <div>
+                    <Label className="text-white">Challenge Popup Alerts</Label>
+                    <p className="text-xs text-gray-500">
+                      Show a popup when someone challenges you to a 1v1
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={preferences.challengePopupEnabled}
+                  onCheckedChange={async (enabled) => {
+                    try {
+                      const res = await fetch("/api/challenges/pending-popup", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ enabled }),
+                      });
+                      if (res.ok) {
+                        setPreferences((prev) =>
+                          prev ? { ...prev, challengePopupEnabled: enabled } : null,
+                        );
+                        toast.success(
+                          enabled
+                            ? "Challenge popup alerts enabled"
+                            : "Challenge popup alerts disabled",
+                        );
+                      }
+                    } catch {
+                      toast.error("Failed to update preference");
+                    }
+                  }}
                 />
               </div>
             </CardContent>

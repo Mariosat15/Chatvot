@@ -3,7 +3,7 @@
  *
  * Checks for:
  * 1. Active challenges that have ended → finalize them (determine winner, distribute stakes)
- * 2. Pending challenges that have passed acceptDeadline → expire them (refund challenger)
+ * 2. Pending challenges that have passed acceptDeadline → expire them (no refund — credits are only charged on accept)
  *
  * Benefits:
  * - Challenges end automatically
@@ -43,7 +43,6 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
     }
 
     const challengesCollection = db.collection("challenges");
-    const walletsCollection = db.collection("creditwallets");
 
     // Recovery: Reset challenges stuck in "finalizing" for more than 5 minutes.
     // This handles cases where a process crashed mid-finalization (before transaction commit).
@@ -117,22 +116,10 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
             },
           );
 
-          // Refund the challenger's entry fee
-          if (challenge.challengerId && challenge.entryFee > 0) {
-            const refundResult = await walletsCollection.updateOne(
-              { userId: challenge.challengerId },
-              {
-                $inc: {
-                  creditBalance: challenge.entryFee,
-                  totalSpentOnChallenges: -challenge.entryFee,
-                },
-              },
-            );
-
-            if (refundResult.modifiedCount > 0) {
-              result.refundedAmount += challenge.entryFee;
-            }
-          }
+          // Reason: NO refund needed here. Credits are only deducted when
+          // the challenged user ACCEPTS (in /api/challenges/[id]/accept).
+          // Pending challenges have zero financial impact — the challenger
+          // was never charged. Refunding here would give free credits.
 
           result.expiredPendingChallenges++;
         } catch (error) {

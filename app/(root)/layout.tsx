@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { FingerprintProvider } from "@/contexts/FingerprintProvider";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
+import ChallengePopup from "@/components/challenges/ChallengePopup";
 import UserSidebar from "@/components/UserSidebar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import { connectToDatabase } from "@/database/mongoose";
@@ -55,6 +56,9 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     <FingerprintProvider>
       {/* Global presence tracking for online/offline status */}
       <GlobalPresenceTracker userId={session.user.id} />
+
+      {/* Real-time challenge popup notifications (WS push) */}
+      <ChallengePopup userId={session.user.id} />
 
       <div className="min-h-screen bg-gray-950 text-gray-400 flex">
         {/* Sidebar Navigation - Desktop Only */}

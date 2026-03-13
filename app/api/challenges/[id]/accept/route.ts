@@ -111,12 +111,28 @@ export async function POST(
       );
     }
 
-    // Deduct credits from both users
-    // Challenger
-    challengerWallet.creditBalance -= challenge.entryFee;
-    challengerWallet.totalSpentOnChallenges =
-      (challengerWallet.totalSpentOnChallenges || 0) + challenge.entryFee;
-    await challengerWallet.save({ session: dbSession });
+    // Deduct credits from both users using atomic $inc
+    // Reason: .save() does full document replacement which is less resilient to
+    // concurrency issues. $inc is atomic at the MongoDB level and prevents
+    // lost-update bugs where the transaction record is committed but the wallet
+    // balance isn't properly decremented. This was the root cause of a 5-credit
+    // reconciliation discrepancy discovered on 2026-03-13.
+
+    // Challenger — atomic debit
+    const challengerBalanceBefore = challengerWallet.creditBalance;
+    const updatedChallengerWallet = await CreditWallet.findOneAndUpdate(
+      { userId: challenge.challengerId },
+      {
+        $inc: {
+          creditBalance: -challenge.entryFee,
+          totalSpentOnChallenges: challenge.entryFee,
+        },
+      },
+      { session: dbSession, new: true },
+    );
+    if (!updatedChallengerWallet) {
+      throw new Error("Failed to update challenger wallet");
+    }
 
     await WalletTransaction.create(
       [
@@ -124,8 +140,8 @@ export async function POST(
           userId: challenge.challengerId,
           transactionType: "challenge_entry",
           amount: -challenge.entryFee,
-          balanceBefore: challengerWallet.creditBalance + challenge.entryFee,
-          balanceAfter: challengerWallet.creditBalance,
+          balanceBefore: challengerBalanceBefore,
+          balanceAfter: updatedChallengerWallet.creditBalance,
           currency: "EUR",
           exchangeRate: 1,
           status: "completed",
@@ -137,11 +153,21 @@ export async function POST(
       { session: dbSession },
     );
 
-    // Challenged
-    challengedWallet.creditBalance -= challenge.entryFee;
-    challengedWallet.totalSpentOnChallenges =
-      (challengedWallet.totalSpentOnChallenges || 0) + challenge.entryFee;
-    await challengedWallet.save({ session: dbSession });
+    // Challenged — atomic debit
+    const challengedBalanceBefore = challengedWallet.creditBalance;
+    const updatedChallengedWallet = await CreditWallet.findOneAndUpdate(
+      { userId: challenge.challengedId },
+      {
+        $inc: {
+          creditBalance: -challenge.entryFee,
+          totalSpentOnChallenges: challenge.entryFee,
+        },
+      },
+      { session: dbSession, new: true },
+    );
+    if (!updatedChallengedWallet) {
+      throw new Error("Failed to update challenged wallet");
+    }
 
     await WalletTransaction.create(
       [
@@ -149,8 +175,8 @@ export async function POST(
           userId: challenge.challengedId,
           transactionType: "challenge_entry",
           amount: -challenge.entryFee,
-          balanceBefore: challengedWallet.creditBalance + challenge.entryFee,
-          balanceAfter: challengedWallet.creditBalance,
+          balanceBefore: challengedBalanceBefore,
+          balanceAfter: updatedChallengedWallet.creditBalance,
           currency: "EUR",
           exchangeRate: 1,
           status: "completed",

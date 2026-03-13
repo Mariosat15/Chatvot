@@ -23,6 +23,9 @@ export interface IUserNotificationPreferences extends Document {
     messaging: boolean; // Direct messages, support chat
   };
 
+  // Challenge popup (real-time banner when someone challenges you)
+  challengePopupEnabled: boolean;
+
   // Specific notification type overrides (optional fine-grained control)
   disabledNotifications: string[]; // Array of templateIds to disable
 
@@ -81,6 +84,10 @@ const UserNotificationPreferencesSchema =
         social: { type: Boolean, default: true },
         messaging: { type: Boolean, default: true },
       },
+      challengePopupEnabled: {
+        type: Boolean,
+        default: true,
+      },
       disabledNotifications: {
         type: [String],
         default: [],
@@ -129,6 +136,7 @@ UserNotificationPreferencesSchema.statics.getOrCreatePreferences =
           social: true,
           messaging: true,
         },
+        challengePopupEnabled: true,
         disabledNotifications: [],
         quietHoursEnabled: false,
         digestEnabled: false,

@@ -680,17 +680,25 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     );
 
     // Distribute prize based on outcome
+    // Reason: Use atomic $inc instead of .save() for wallet updates to prevent
+    // lost-update bugs where the transaction record commits but the wallet
+    // balance isn't properly updated.
     if (winnerId && !isTie) {
-      // Winner takes all
-      const winnerWallet = await CreditWallet.findOne({
-        userId: winnerId,
-      }).session(session);
-      if (winnerWallet) {
-        const balanceBefore = winnerWallet.creditBalance;
-        winnerWallet.creditBalance += winnerPrize;
-        winnerWallet.totalWonFromChallenges =
-          (winnerWallet.totalWonFromChallenges || 0) + winnerPrize;
-        await winnerWallet.save({ session });
+      // Winner takes all — atomic $inc
+      const updatedWinnerWallet = await CreditWallet.findOneAndUpdate(
+        { userId: winnerId },
+        {
+          $inc: {
+            creditBalance: winnerPrize,
+            totalWonFromChallenges: winnerPrize,
+          },
+        },
+        { session, new: true },
+      );
+
+      if (updatedWinnerWallet) {
+        const balanceAfter = updatedWinnerWallet.creditBalance;
+        const balanceBefore = balanceAfter - winnerPrize;
 
         await WalletTransaction.create(
           [
@@ -699,7 +707,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               transactionType: "challenge_win",
               amount: winnerPrize,
               balanceBefore,
-              balanceAfter: winnerWallet.creditBalance,
+              balanceAfter,
               currency: "EUR",
               exchangeRate: 1,
               status: "completed",
@@ -730,17 +738,22 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       if (settings.tiePrizeDistribution === "split_equally") {
         const splitPrize = Math.floor(winnerPrize / 2);
 
-        // Give half to each
+        // Give half to each — atomic $inc
         for (const participant of [challenger, challenged]) {
-          const wallet = await CreditWallet.findOne({
-            userId: participant.userId,
-          }).session(session);
-          if (wallet) {
-            const balanceBefore = wallet.creditBalance;
-            wallet.creditBalance += splitPrize;
-            wallet.totalWonFromChallenges =
-              (wallet.totalWonFromChallenges || 0) + splitPrize;
-            await wallet.save({ session });
+          const updatedWallet = await CreditWallet.findOneAndUpdate(
+            { userId: participant.userId },
+            {
+              $inc: {
+                creditBalance: splitPrize,
+                totalWonFromChallenges: splitPrize,
+              },
+            },
+            { session, new: true },
+          );
+
+          if (updatedWallet) {
+            const balanceAfter = updatedWallet.creditBalance;
+            const balanceBefore = balanceAfter - splitPrize;
 
             await WalletTransaction.create(
               [
@@ -749,7 +762,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                   transactionType: "challenge_win",
                   amount: splitPrize,
                   balanceBefore,
-                  balanceAfter: wallet.creditBalance,
+                  balanceAfter,
                   currency: "EUR",
                   exchangeRate: 1,
                   status: "completed",
@@ -767,16 +780,21 @@ async function _finalizeChallengeAttempt(challengeId: string) {
           }
         }
       } else if (settings.tiePrizeDistribution === "challenger_wins") {
-        // Challenger gets the prize
-        const chalWallet = await CreditWallet.findOne({
-          userId: challenger.userId,
-        }).session(session);
-        if (chalWallet) {
-          const balanceBefore = chalWallet.creditBalance;
-          chalWallet.creditBalance += winnerPrize;
-          chalWallet.totalWonFromChallenges =
-            (chalWallet.totalWonFromChallenges || 0) + winnerPrize;
-          await chalWallet.save({ session });
+        // Challenger gets the prize — atomic $inc
+        const updatedChalWallet = await CreditWallet.findOneAndUpdate(
+          { userId: challenger.userId },
+          {
+            $inc: {
+              creditBalance: winnerPrize,
+              totalWonFromChallenges: winnerPrize,
+            },
+          },
+          { session, new: true },
+        );
+
+        if (updatedChalWallet) {
+          const balanceAfter = updatedChalWallet.creditBalance;
+          const balanceBefore = balanceAfter - winnerPrize;
 
           await WalletTransaction.create(
             [
@@ -785,7 +803,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                 transactionType: "challenge_win",
                 amount: winnerPrize,
                 balanceBefore,
-                balanceAfter: chalWallet.creditBalance,
+                balanceAfter,
                 currency: "EUR",
                 exchangeRate: 1,
                 status: "completed",

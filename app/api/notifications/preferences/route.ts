@@ -210,6 +210,7 @@ export async function POST(request: NextRequest) {
               social: true,
               messaging: true,
             },
+            challengePopupEnabled: true,
             disabledNotifications: [],
             quietHoursEnabled: false,
             quietHoursStart: null,

@@ -166,6 +166,47 @@ class WebSocketNotifier {
   }
 
   /**
+   * Notify the challenged user of an incoming challenge (instant push)
+   */
+  async notifyChallengeReceived(
+    challengedId: string,
+    challenge: {
+      _id: string;
+      slug: string;
+      challengerName: string;
+      entryFee: number;
+      duration: number;
+      winnerPrize: number;
+      startingCapital: number;
+      rankingMethod: string;
+      acceptDeadline: string | Date;
+      createdAt?: string | Date;
+    },
+  ): Promise<void> {
+    await this.notify("/internal/challenge-received", {
+      challengedId,
+      challenge: {
+        _id: challenge._id,
+        slug: challenge.slug,
+        challengerName: challenge.challengerName,
+        entryFee: challenge.entryFee,
+        duration: challenge.duration,
+        winnerPrize: challenge.winnerPrize,
+        startingCapital: challenge.startingCapital,
+        rankingMethod: challenge.rankingMethod,
+        acceptDeadline:
+          challenge.acceptDeadline instanceof Date
+            ? challenge.acceptDeadline.toISOString()
+            : challenge.acceptDeadline,
+        createdAt:
+          challenge.createdAt instanceof Date
+            ? challenge.createdAt.toISOString()
+            : challenge.createdAt || new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
    * Notify employee of new chat assignment / escalation
    */
   async notifyEmployeeNewChat(

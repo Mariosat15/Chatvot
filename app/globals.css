@@ -967,3 +967,32 @@
 .animate-hex-pulse {
   animation: hexPulse 2s ease-in-out infinite;
 }
+
+/* ========================================
+   CHALLENGE POPUP ANIMATIONS
+   ======================================== */
+
+/* Popup slide-in from right */
+@keyframes challengePopupEnter {
+  0% { transform: translateX(110%); opacity: 0; }
+  70% { transform: translateX(-5%); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* Popup slide-out to right */
+@keyframes challengePopupExit {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+
+/* Top glow bar slide */
+@keyframes challengeGlowSlide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Pulsing red dot for new challenge */
+@keyframes challengePulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+}

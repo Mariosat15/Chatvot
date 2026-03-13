@@ -461,6 +461,29 @@ export async function POST(request: NextRequest) {
       } catch (notifError) {
         console.error("Error sending challenge notification:", notifError);
       }
+
+      // Reason: Push instant WS notification so the challenged user sees a popup
+      // without waiting for polling. Best-effort — failure here is non-blocking.
+      try {
+        const { wsNotifier } = await import(
+          "@/lib/services/messaging/websocket-notifier"
+        );
+        await wsNotifier.notifyChallengeReceived(challengedId, {
+          _id: challenge._id.toString(),
+          slug: challenge.slug,
+          challengerName: challenge.challengerName,
+          entryFee: challenge.entryFee,
+          duration: challenge.duration,
+          winnerPrize: challenge.winnerPrize,
+          startingCapital: challenge.startingCapital,
+          rankingMethod: challenge.rules?.rankingMethod || "pnl",
+          acceptDeadline: challenge.acceptDeadline,
+          createdAt: challenge.createdAt,
+        });
+      } catch (wsError) {
+        // Non-critical — the polling fallback still works
+        console.warn("⚠️ WS challenge push failed:", wsError);
+      }
     }
 
     timing.end(300); // Log if slower than 300ms

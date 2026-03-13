@@ -545,6 +545,30 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case "challenge-received":
+            // Push challenge notification to the challenged user instantly
+            if (data.challengedId) {
+              broadcastToParticipant(data.challengedId, {
+                type: "challenge_received",
+                data: {
+                  _id: data.challenge?._id,
+                  slug: data.challenge?.slug,
+                  challengerName: data.challenge?.challengerName,
+                  entryFee: data.challenge?.entryFee,
+                  duration: data.challenge?.duration,
+                  winnerPrize: data.challenge?.winnerPrize,
+                  startingCapital: data.challenge?.startingCapital,
+                  rankingMethod: data.challenge?.rankingMethod,
+                  acceptDeadline: data.challenge?.acceptDeadline,
+                  createdAt: data.challenge?.createdAt,
+                },
+              });
+              console.log(
+                `⚔️ Challenge notification pushed to ${data.challengedId}`,
+              );
+            }
+            break;
+
           case "data_updated":
             // Broadcast data update notification to all price viewers
             // Called when: seeding completes, gap fill completes, historical download completes

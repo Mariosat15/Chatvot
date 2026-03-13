@@ -178,9 +178,21 @@ export async function POST(
         }
 
         const balanceBefore = wallet.creditBalance;
-        wallet.creditBalance -= competition.entryFee;
-        wallet.totalSpentOnCompetitions += competition.entryFee;
-        await wallet.save({ session: mongoSession });
+        // Reason: Use atomic $inc instead of .save() to prevent lost-update bugs
+        // where the transaction record commits but the wallet balance doesn't decrement.
+        const updatedWallet = await CreditWallet.findOneAndUpdate(
+          { userId },
+          {
+            $inc: {
+              creditBalance: -competition.entryFee,
+              totalSpentOnCompetitions: competition.entryFee,
+            },
+          },
+          { session: mongoSession, new: true },
+        );
+        if (!updatedWallet) {
+          throw new Error("Failed to update wallet for competition entry");
+        }
 
         // Record transaction
         await WalletTransaction.create(
@@ -190,7 +202,7 @@ export async function POST(
               transactionType: "competition_entry",
               amount: -competition.entryFee,
               balanceBefore,
-              balanceAfter: wallet.creditBalance,
+              balanceAfter: updatedWallet.creditBalance,
               currency: "EUR",
               exchangeRate: 1,
               status: "completed",
