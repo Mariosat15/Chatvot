@@ -377,17 +377,7 @@ export default function VisitorAnalyticsSection() {
       )}
 
       {tab === "analytics" && analytics && !loading && (
-        <VisitorCharts
-          visitsByTime={analytics.visitsByTime}
-          deviceBreakdown={analytics.deviceBreakdown}
-          browserBreakdown={analytics.browserBreakdown}
-          osBreakdown={analytics.osBreakdown}
-          topCountries={analytics.topCountries}
-          topReferrers={analytics.topReferrers}
-          topPages={analytics.topPages}
-          topSearchQueries={analytics.topSearchQueries}
-          botStats={analytics.botStats}
-        />
+        <VisitorCharts analytics={analytics} />
       )}
 
       {tab === "history" && analytics && !loading && (

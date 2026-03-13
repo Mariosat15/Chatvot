@@ -61,11 +61,9 @@ function detectBot(ua: string): { isBot: boolean; botName: string } {
 }
 
 function detectSuspicious(ua: string, path: string): { isSuspicious: boolean; reason: string } {
-  // Check UA for scanner patterns
   for (const [pattern, name] of SUSPICIOUS_PATTERNS) {
     if (pattern.test(ua)) return { isSuspicious: true, reason: name };
   }
-  // Common attack paths
   const attackPaths = [
     "/wp-admin", "/wp-login", "/.env", "/phpmyadmin",
     "/administrator", "/admin.php", "/.git", "/config",
@@ -124,11 +122,10 @@ function categorisePath(path: string): "hero" | "landing" | "app" | "auth" | "ad
   if (path.startsWith("/lp/")) return "landing";
   if (path.startsWith("/sign-in") || path.startsWith("/sign-up") || path.startsWith("/verify")) return "auth";
   if (path.startsWith("/admin") || path.startsWith("/administrator")) return "admin";
-  // App pages: dashboard, competitions, challenges, trading, wallet, etc.
   const appPrefixes = [
     "/dashboard", "/competitions", "/challenges", "/wallet",
     "/profile", "/settings", "/leaderboard", "/marketplace",
-    "/friends", "/messages",
+    "/friends", "/messages", "/arena", "/championship",
   ];
   for (const prefix of appPrefixes) {
     if (path.startsWith(prefix)) return "app";
@@ -140,7 +137,6 @@ function extractSearchQuery(referrer: string): string {
   if (!referrer) return "";
   try {
     const url = new URL(referrer);
-    // Google, Bing, Yahoo, DuckDuckGo, Yandex, Baidu
     return url.searchParams.get("q")
       || url.searchParams.get("query")
       || url.searchParams.get("p")
@@ -152,11 +148,42 @@ function extractSearchQuery(referrer: string): string {
   }
 }
 
-// ─── In-memory rate limiter (prevents spam from same IP) ────────────────────
-const recentVisits = new Map<string, number>();
-const RATE_LIMIT_MS = 2000; // 2 seconds between visits from same IP
+/**
+ * Categorize the traffic source from the referrer URL.
+ * Mirrors GA4 source/medium logic.
+ */
+function categorizeTrafficSource(referrer: string, utmSource: string, utmMedium: string): string {
+  if (utmMedium === "cpc" || utmMedium === "ppc" || utmMedium === "paid") return "paid";
+  if (utmSource === "email" || utmMedium === "email") return "email";
+  if (utmSource || utmMedium) return "campaign";
+  if (!referrer) return "direct";
+  try {
+    const host = new URL(referrer).hostname.toLowerCase();
+    const socialDomains = [
+      "facebook.com", "fb.com", "twitter.com", "x.com", "instagram.com",
+      "linkedin.com", "youtube.com", "tiktok.com", "reddit.com", "pinterest.com",
+      "t.co", "threads.net", "discord.com", "telegram.org",
+    ];
+    for (const d of socialDomains) {
+      if (host.includes(d)) return "social";
+    }
+    const searchDomains = [
+      "google.", "bing.com", "yahoo.", "duckduckgo.com",
+      "yandex.", "baidu.com", "ecosia.org",
+    ];
+    for (const d of searchDomains) {
+      if (host.includes(d)) return "organic";
+    }
+    return "referral";
+  } catch {
+    return "direct";
+  }
+}
 
-// Clean up stale entries every 60 seconds
+// ─── In-memory rate limiter ──────────────────────────────────────────────────
+const recentVisits = new Map<string, number>();
+const RATE_LIMIT_MS = 2000;
+
 setInterval(() => {
   const cutoff = Date.now() - 60_000;
   for (const [key, ts] of recentVisits) {
@@ -165,19 +192,46 @@ setInterval(() => {
 }, 60_000);
 
 /**
- * POST /api/tracking/pageview — Record a site-wide page visit.
- * Best-effort, non-blocking tracking. Never returns errors to client.
+ * POST /api/tracking/pageview — Record page visits AND engagement updates.
+ * type: "pageview" — new page view record
+ * type: "engagement" — update duration/scroll depth on existing visit
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const { type } = body;
+
+    // ─── Engagement update (duration + scroll depth) ───────────────────
+    if (type === "engagement") {
+      const { path, sessionId, duration, scrollDepth } = body;
+      if (!path || !sessionId || typeof duration !== "number") {
+        return NextResponse.json({ ok: true });
+      }
+
+      await connectToDatabase();
+
+      // Reason: Update the most recent visit for this session+path with duration
+      await SiteVisit.updateOne(
+        { sessionId, path },
+        {
+          $set: {
+            duration: Math.min(duration, 3600), // Cap at 1 hour
+            scrollDepth: Math.min(Math.round(scrollDepth || 0), 100),
+          },
+        },
+        { sort: { visitedAt: -1 } },
+      );
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // ─── Page view ─────────────────────────────────────────────────────
     const { path, referrer, userAgent, screenWidth, screenHeight, language } = body;
 
     if (!path || typeof path !== "string") {
       return NextResponse.json({ ok: true });
     }
 
-    // Get IP from headers (Cloudflare → X-Forwarded-For → X-Real-IP)
     const cfIp = req.headers.get("cf-connecting-ip");
     const forwardedFor = req.headers.get("x-forwarded-for");
     const ip = cfIp
@@ -185,7 +239,6 @@ export async function POST(req: NextRequest) {
       || req.headers.get("x-real-ip")
       || "";
 
-    // Rate limit: skip if same IP visited within 2 seconds
     const rateKey = `${ip}-${path}`;
     const lastVisit = recentVisits.get(rateKey);
     if (lastVisit && Date.now() - lastVisit < RATE_LIMIT_MS) {
@@ -195,32 +248,29 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Check if visitor is blocked
     const ua = (userAgent || "").slice(0, 500);
     const isBlocked = await BlockedVisitor.exists({
       isActive: true,
       $or: [
         { type: "ip", value: ip },
-        // Reason: country blocking uses 2-letter code from Cloudflare header
         { type: "country", value: req.headers.get("cf-ipcountry") || "" },
       ],
     });
 
-    // Detect bot and suspicious activity
     const botInfo = detectBot(ua);
     const suspiciousInfo = detectSuspicious(ua, path);
 
-    // Get geo data from Cloudflare headers (free tier provides these)
     const country = req.headers.get("cf-ipcountry") || "";
     const city = req.headers.get("cf-ipcity") || "";
     const region = req.headers.get("cf-region") || "";
 
     const visitorId = `${ip}-${ua.slice(0, 50)}`;
-    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
+    const sessionId = body.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const resolution = screenWidth && screenHeight ? `${screenWidth}x${screenHeight}` : "";
+    const utmSource = (body.utmSource || "").slice(0, 200);
+    const utmMedium = (body.utmMedium || "").slice(0, 200);
+    const trafficSource = categorizeTrafficSource(referrer || "", utmSource, utmMedium);
 
-    // Update block hit count if visitor is blocked
     if (isBlocked) {
       BlockedVisitor.updateMany(
         { isActive: true, $or: [{ type: "ip", value: ip }] },
@@ -249,18 +299,21 @@ export async function POST(req: NextRequest) {
       isSuspicious: suspiciousInfo.isSuspicious,
       suspiciousReason: suspiciousInfo.reason,
       searchQuery: extractSearchQuery(referrer || ""),
-      utmSource: (body.utmSource || "").slice(0, 200),
-      utmMedium: (body.utmMedium || "").slice(0, 200),
+      utmSource,
+      utmMedium,
       utmCampaign: (body.utmCampaign || "").slice(0, 200),
       utmTerm: (body.utmTerm || "").slice(0, 200),
       utmContent: (body.utmContent || "").slice(0, 200),
+      trafficSource,
+      isNewVisitor: !!body.isNewVisitor,
+      sessionPageCount: body.sessionPageCount || 1,
+      connectionType: (body.connectionType || "").slice(0, 20),
       visitedAt: new Date(),
       isBlocked: !!isBlocked,
     });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    // Reason: Tracking must never break the user experience
     console.error("⚠️ [SiteTracker] Error recording visit:", error);
     return NextResponse.json({ ok: true });
   }

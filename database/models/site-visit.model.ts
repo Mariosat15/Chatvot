@@ -8,7 +8,7 @@ export interface ISiteVisit extends Document {
   pageCategory: "hero" | "landing" | "app" | "auth" | "admin" | "other";
   /** Visitor fingerprint (IP + UA hash) for unique counting */
   visitorId: string;
-  /** Unique session identifier */
+  /** Unique session identifier (persistent across page views in same session) */
   sessionId: string;
   /** IP address */
   ip: string;
@@ -48,9 +48,19 @@ export interface ISiteVisit extends Document {
   utmCampaign: string;
   utmTerm: string;
   utmContent: string;
+  /** Traffic source category: direct, organic, social, referral, paid, email, campaign */
+  trafficSource: string;
+  /** Whether this is a first-time visitor (never seen before) */
+  isNewVisitor: boolean;
+  /** Number of pages viewed in this session so far */
+  sessionPageCount: number;
+  /** Network connection type (e.g. "4g", "3g", "wifi") */
+  connectionType: string;
+  /** Scroll depth percentage (0-100) — updated via engagement beacon */
+  scrollDepth: number;
   /** Authenticated user ID (if logged in) */
   userId?: mongoose.Types.ObjectId;
-  /** Duration on page in seconds (updated via beacon) */
+  /** Duration on page in seconds (updated via engagement beacon) */
   duration: number;
   /** Timestamp of visit */
   visitedAt: Date;
@@ -70,7 +80,7 @@ const SiteVisitSchema = new Schema<ISiteVisit>(
       index: true,
     },
     visitorId: { type: String, default: "", index: true },
-    sessionId: { type: String, default: "" },
+    sessionId: { type: String, default: "", index: true },
     ip: { type: String, default: "", index: true },
     userAgent: { type: String, default: "" },
     referrer: { type: String, default: "" },
@@ -96,6 +106,11 @@ const SiteVisitSchema = new Schema<ISiteVisit>(
     utmCampaign: { type: String, default: "" },
     utmTerm: { type: String, default: "" },
     utmContent: { type: String, default: "" },
+    trafficSource: { type: String, default: "direct", index: true },
+    isNewVisitor: { type: Boolean, default: false },
+    sessionPageCount: { type: Number, default: 1 },
+    connectionType: { type: String, default: "" },
+    scrollDepth: { type: Number, default: 0 },
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     duration: { type: Number, default: 0 },
     visitedAt: { type: Date, default: Date.now, index: true },
@@ -112,6 +127,8 @@ SiteVisitSchema.index({ visitedAt: -1, pageCategory: 1 });
 SiteVisitSchema.index({ country: 1, visitedAt: -1 });
 SiteVisitSchema.index({ isBot: 1, visitedAt: -1 });
 SiteVisitSchema.index({ ip: 1, visitedAt: -1 });
+SiteVisitSchema.index({ sessionId: 1, path: 1 }); // For engagement updates
+SiteVisitSchema.index({ trafficSource: 1, visitedAt: -1 }); // For source analytics
 
 const SiteVisit =
   (mongoose.models.SiteVisit as mongoose.Model<ISiteVisit>) ||

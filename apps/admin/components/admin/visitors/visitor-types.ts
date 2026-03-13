@@ -7,6 +7,11 @@ export interface VisitorOverview {
   totalSuspicious: number;
   totalBlocked: number;
   avgDuration: number;
+  bounceRate: number;
+  avgPagesPerSession: number;
+  newVisitors: number;
+  returningVisitors: number;
+  avgScrollDepth: number;
 }
 
 export interface VisitTimeEntry {
@@ -14,24 +19,36 @@ export interface VisitTimeEntry {
   visits: number;
   unique: number;
   bots: number;
+  bounceRate: number;
+  avgDuration: number;
 }
 
 export interface DeviceEntry {
   device: string;
   count: number;
+  percentage: number;
 }
 
 export interface BrowserEntry {
   browser: string;
   count: number;
+  percentage: number;
 }
 
 export interface OSEntry {
   os: string;
   count: number;
+  percentage: number;
 }
 
 export interface CountryEntry {
+  country: string;
+  count: number;
+  percentage: number;
+}
+
+export interface CityEntry {
+  city: string;
   country: string;
   count: number;
 }
@@ -46,6 +63,8 @@ export interface PageEntry {
   visits: number;
   unique: number;
   category: string;
+  avgDuration: number;
+  bounceRate: number;
 }
 
 export interface SearchQueryEntry {
@@ -58,12 +77,46 @@ export interface BotEntry {
   count: number;
 }
 
+export interface TrafficSourceEntry {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
+export interface UTMCampaignEntry {
+  campaign: string;
+  source: string;
+  medium: string;
+  visits: number;
+  unique: number;
+  bounceRate: number;
+}
+
+export interface LanguageEntry {
+  language: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ResolutionEntry {
+  resolution: string;
+  count: number;
+  percentage: number;
+}
+
+export interface HourlyHeatmapEntry {
+  day: number; // 0=Sun, 6=Sat
+  hour: number; // 0-23
+  count: number;
+}
+
 export interface RecentVisit {
   _id: string;
   path: string;
   pageCategory: string;
   ip: string;
   country: string;
+  city: string;
   device: string;
   browser: string;
   os: string;
@@ -75,6 +128,15 @@ export interface RecentVisit {
   referrer: string;
   searchQuery: string;
   visitorId: string;
+  duration: number;
+  scrollDepth: number;
+  trafficSource: string;
+  isNewVisitor: boolean;
+  language: string;
+  screenResolution: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
 }
 
 export interface BlockedRule {
@@ -113,6 +175,8 @@ export interface LiveData {
     totalBlocked: number;
   };
   recentActivity: RecentVisit[];
+  topActiveCountries: CountryEntry[];
+  topActivePages: { path: string; count: number }[];
 }
 
 export interface FullAnalytics {
@@ -122,9 +186,15 @@ export interface FullAnalytics {
   browserBreakdown: BrowserEntry[];
   osBreakdown: OSEntry[];
   topCountries: CountryEntry[];
+  topCities: CityEntry[];
   topReferrers: ReferrerEntry[];
   topPages: PageEntry[];
   topSearchQueries: SearchQueryEntry[];
   botStats: BotEntry[];
+  trafficSources: TrafficSourceEntry[];
+  utmCampaigns: UTMCampaignEntry[];
+  languages: LanguageEntry[];
+  resolutions: ResolutionEntry[];
+  hourlyHeatmap: HourlyHeatmapEntry[];
   recentVisits: RecentVisit[];
 }

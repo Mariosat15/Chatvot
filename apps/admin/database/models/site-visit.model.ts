@@ -27,6 +27,11 @@ export interface ISiteVisit extends Document {
   utmCampaign: string;
   utmTerm: string;
   utmContent: string;
+  trafficSource: string;
+  isNewVisitor: boolean;
+  sessionPageCount: number;
+  connectionType: string;
+  scrollDepth: number;
   userId?: mongoose.Types.ObjectId;
   duration: number;
   visitedAt: Date;
@@ -45,7 +50,7 @@ const SiteVisitSchema = new Schema<ISiteVisit>(
       index: true,
     },
     visitorId: { type: String, default: "", index: true },
-    sessionId: { type: String, default: "" },
+    sessionId: { type: String, default: "", index: true },
     ip: { type: String, default: "", index: true },
     userAgent: { type: String, default: "" },
     referrer: { type: String, default: "" },
@@ -71,6 +76,11 @@ const SiteVisitSchema = new Schema<ISiteVisit>(
     utmCampaign: { type: String, default: "" },
     utmTerm: { type: String, default: "" },
     utmContent: { type: String, default: "" },
+    trafficSource: { type: String, default: "direct", index: true },
+    isNewVisitor: { type: Boolean, default: false },
+    sessionPageCount: { type: Number, default: 1 },
+    connectionType: { type: String, default: "" },
+    scrollDepth: { type: Number, default: 0 },
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     duration: { type: Number, default: 0 },
     visitedAt: { type: Date, default: Date.now, index: true },
@@ -84,6 +94,8 @@ SiteVisitSchema.index({ visitedAt: -1, pageCategory: 1 });
 SiteVisitSchema.index({ country: 1, visitedAt: -1 });
 SiteVisitSchema.index({ isBot: 1, visitedAt: -1 });
 SiteVisitSchema.index({ ip: 1, visitedAt: -1 });
+SiteVisitSchema.index({ sessionId: 1, path: 1 });
+SiteVisitSchema.index({ trafficSource: 1, visitedAt: -1 });
 
 const SiteVisit =
   (mongoose.models.SiteVisit as mongoose.Model<ISiteVisit>) ||

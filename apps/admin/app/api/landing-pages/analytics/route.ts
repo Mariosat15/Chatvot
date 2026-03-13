@@ -5,8 +5,8 @@ import LandingPage from "@/database/models/landing-page.model";
 import mongoose from "mongoose";
 
 /**
- * GET /api/landing-pages/analytics — Get analytics data for landing pages
- * Supports filtering by date range, trackingId, campaign, source
+ * GET /api/landing-pages/analytics — Comprehensive LP analytics
+ * Supports filtering by date range, trackingId, landingPageId, campaign, source
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,9 +17,8 @@ export async function GET(req: NextRequest) {
     const landingPageId = searchParams.get("landingPageId");
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
-    const groupBy = searchParams.get("groupBy") || "day"; // day, week, month
+    const groupBy = searchParams.get("groupBy") || "day";
 
-    // Build match filter
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const match: Record<string, any> = {};
     if (trackingId) match.trackingId = trackingId;
@@ -32,42 +31,53 @@ export async function GET(req: NextRequest) {
       if (dateTo) match.enteredAt.$lte = new Date(dateTo);
     }
 
-    // Run aggregation pipelines in parallel
     const [
       overview,
       visitsByTime,
       deviceBreakdown,
+      browserBreakdown,
+      osBreakdown,
       topCountries,
+      topCities,
       topReferrers,
+      utmSourceBreakdown,
+      utmMediumBreakdown,
+      utmCampaignBreakdown,
       conversionData,
       recentVisits,
     ] = await Promise.all([
-      // Overview summary
+      // ─── Overview with bounce & conversion rate ─────────────────
       LandingPageVisit.aggregate([
         { $match: match },
         {
-          $group: {
-            _id: null,
-            totalVisits: { $sum: 1 },
-            uniqueVisitors: { $addToSet: "$visitorId" },
-            totalConversions: {
-              $sum: { $cond: ["$converted", 1, 0] },
-            },
-            avgDuration: { $avg: "$duration" },
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            totalVisits: 1,
-            uniqueVisitors: { $size: "$uniqueVisitors" },
-            totalConversions: 1,
-            avgDuration: { $round: ["$avgDuration", 1] },
+          $facet: {
+            totals: [
+              {
+                $group: {
+                  _id: null,
+                  totalVisits: { $sum: 1 },
+                  uniqueVisitors: { $addToSet: "$visitorId" },
+                  totalConversions: {
+                    $sum: { $cond: ["$converted", 1, 0] },
+                  },
+                  avgDuration: { $avg: "$duration" },
+                  bounced: {
+                    $sum: {
+                      $cond: [
+                        { $or: [{ $eq: ["$exitPath", null] }, { $lt: ["$duration", 5] }] },
+                        1,
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
           },
         },
       ]),
 
-      // Visits over time (grouped by day/week/month)
+      // ─── Visits over time with conversions ──────────────────────
       LandingPageVisit.aggregate([
         { $match: match },
         {
@@ -76,6 +86,7 @@ export async function GET(req: NextRequest) {
             visits: { $sum: 1 },
             uniqueVisitors: { $addToSet: "$visitorId" },
             conversions: { $sum: { $cond: ["$converted", 1, 0] } },
+            avgDuration: { $avg: "$duration" },
           },
         },
         {
@@ -85,51 +96,134 @@ export async function GET(req: NextRequest) {
             visits: 1,
             uniqueVisitors: { $size: "$uniqueVisitors" },
             conversions: 1,
+            avgDuration: { $round: ["$avgDuration", 1] },
+            conversionRate: {
+              $cond: [
+                { $gt: ["$visits", 0] },
+                {
+                  $round: [
+                    { $multiply: [{ $divide: ["$conversions", "$visits"] }, 100] },
+                    1,
+                  ],
+                },
+                0,
+              ],
+            },
           },
         },
         { $sort: { date: 1 } },
         { $limit: 90 },
       ]),
 
-      // Device breakdown
+      // ─── Device breakdown ───────────────────────────────────────
       LandingPageVisit.aggregate([
         { $match: match },
-        {
-          $group: {
-            _id: "$device",
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: "$device", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
 
-      // Top countries
+      // ─── Browser breakdown ──────────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, browser: { $ne: "" } } },
+        { $group: { _id: "$browser", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      // ─── OS breakdown ───────────────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, os: { $ne: "" } } },
+        { $group: { _id: "$os", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      // ─── Top countries ──────────────────────────────────────────
       LandingPageVisit.aggregate([
         { $match: { ...match, country: { $ne: "" } } },
-        {
-          $group: {
-            _id: "$country",
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: "$country", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 20 },
       ]),
 
-      // Top referrers
+      // ─── Top cities ─────────────────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, city: { $ne: "" } } },
+        {
+          $group: {
+            _id: { city: "$city", country: "$country" },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      // ─── Top referrers ──────────────────────────────────────────
       LandingPageVisit.aggregate([
         { $match: { ...match, referrer: { $ne: "" } } },
-        {
-          $group: {
-            _id: "$referrer",
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: "$referrer", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 20 },
       ]),
 
-      // Conversion data per page
+      // ─── UTM Source breakdown ───────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, utmSource: { $ne: "" } } },
+        { $group: { _id: "$utmSource", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      // ─── UTM Medium breakdown ──────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, utmMedium: { $ne: "" } } },
+        { $group: { _id: "$utmMedium", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      // ─── UTM Campaign breakdown ────────────────────────────────
+      LandingPageVisit.aggregate([
+        { $match: { ...match, utmCampaign: { $ne: "" } } },
+        {
+          $group: {
+            _id: {
+              campaign: "$utmCampaign",
+              source: "$utmSource",
+              medium: "$utmMedium",
+            },
+            visits: { $sum: 1 },
+            conversions: { $sum: { $cond: ["$converted", 1, 0] } },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            campaign: "$_id.campaign",
+            source: "$_id.source",
+            medium: "$_id.medium",
+            visits: 1,
+            conversions: 1,
+            conversionRate: {
+              $cond: [
+                { $gt: ["$visits", 0] },
+                {
+                  $round: [
+                    { $multiply: [{ $divide: ["$conversions", "$visits"] }, 100] },
+                    1,
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+        { $sort: { visits: -1 } },
+        { $limit: 20 },
+      ]),
+
+      // ─── Conversion data per page ──────────────────────────────
       LandingPageVisit.aggregate([
         { $match: match },
         {
@@ -137,6 +231,7 @@ export async function GET(req: NextRequest) {
             _id: "$trackingId",
             visits: { $sum: 1 },
             conversions: { $sum: { $cond: ["$converted", 1, 0] } },
+            avgDuration: { $avg: "$duration" },
           },
         },
         {
@@ -144,6 +239,7 @@ export async function GET(req: NextRequest) {
             trackingId: "$_id",
             visits: 1,
             conversions: 1,
+            avgDuration: { $round: ["$avgDuration", 1] },
             conversionRate: {
               $cond: [
                 { $gt: ["$visits", 0] },
@@ -162,14 +258,40 @@ export async function GET(req: NextRequest) {
         { $limit: 50 },
       ]),
 
-      // Recent visits (for the table)
+      // ─── Recent visits ──────────────────────────────────────────
       LandingPageVisit.find(match)
         .sort({ enteredAt: -1 })
         .limit(100)
+        .select(
+          "trackingId visitorId ip country city device browser os referrer " +
+          "enteredAt exitPath duration converted utmSource utmMedium utmCampaign",
+        )
         .lean(),
     ]);
 
-    // Get landing page names for trackingIds in conversion data
+    // ─── Process overview ────────────────────────────────────────
+    const totals = overview[0]?.totals?.[0] || {};
+    const totalVisits = totals.totalVisits || 0;
+    const uniqueCount = totals.uniqueVisitors?.length || 0;
+    const totalConversions = totals.totalConversions || 0;
+    const bounced = totals.bounced || 0;
+
+    const processedOverview = {
+      totalVisits,
+      uniqueVisitors: uniqueCount,
+      totalConversions,
+      conversionRate:
+        totalVisits > 0
+          ? Math.round((totalConversions / totalVisits) * 1000) / 10
+          : 0,
+      avgDuration: Math.round((totals.avgDuration || 0) * 10) / 10,
+      bounceRate:
+        totalVisits > 0
+          ? Math.round((bounced / totalVisits) * 1000) / 10
+          : 0,
+    };
+
+    // ─── Enrich conversion data with page names ──────────────────
     const trackingIds = conversionData.map(
       (d: { trackingId: string }) => d.trackingId,
     );
@@ -178,7 +300,6 @@ export async function GET(req: NextRequest) {
       { trackingId: 1, name: 1, campaign: 1, source: 1 },
     ).lean();
 
-    // Build a map for quick lookup
     const pageMap = new Map(
       landingPages.map((p) => [
         p.trackingId,
@@ -186,9 +307,14 @@ export async function GET(req: NextRequest) {
       ]),
     );
 
-    // Enrich conversion data with page names
     const enrichedConversionData = conversionData.map(
-      (d: { trackingId: string; visits: number; conversions: number; conversionRate: number }) => ({
+      (d: {
+        trackingId: string;
+        visits: number;
+        conversions: number;
+        conversionRate: number;
+        avgDuration: number;
+      }) => ({
         ...d,
         pageName: pageMap.get(d.trackingId)?.name || "Unknown",
         campaign: pageMap.get(d.trackingId)?.campaign || "",
@@ -196,23 +322,46 @@ export async function GET(req: NextRequest) {
       }),
     );
 
+    // ─── Add percentages to breakdowns ───────────────────────────
+    const addPct = <T extends { count: number }>(arr: T[]) => {
+      const total = arr.reduce((s, x) => s + x.count, 0);
+      return arr.map((x) => ({
+        ...x,
+        percentage: total > 0 ? Math.round((x.count / total) * 1000) / 10 : 0,
+      }));
+    };
+
     return NextResponse.json({
-      overview: overview[0] || {
-        totalVisits: 0,
-        uniqueVisitors: 0,
-        totalConversions: 0,
-        avgDuration: 0,
-      },
+      overview: processedOverview,
       visitsByTime,
-      deviceBreakdown: deviceBreakdown.map(
-        (d: { _id: string; count: number }) => ({
+      deviceBreakdown: addPct(
+        deviceBreakdown.map((d: { _id: string; count: number }) => ({
           device: d._id || "unknown",
           count: d.count,
-        }),
+        })),
       ),
-      topCountries: topCountries.map(
-        (d: { _id: string; count: number }) => ({
+      browserBreakdown: addPct(
+        browserBreakdown.map((d: { _id: string; count: number }) => ({
+          browser: d._id || "Unknown",
+          count: d.count,
+        })),
+      ),
+      osBreakdown: addPct(
+        osBreakdown.map((d: { _id: string; count: number }) => ({
+          os: d._id || "Unknown",
+          count: d.count,
+        })),
+      ),
+      topCountries: addPct(
+        topCountries.map((d: { _id: string; count: number }) => ({
           country: d._id,
+          count: d.count,
+        })),
+      ),
+      topCities: topCities.map(
+        (d: { _id: { city: string; country: string }; count: number }) => ({
+          city: d._id.city,
+          country: d._id.country,
           count: d.count,
         }),
       ),
@@ -222,11 +371,24 @@ export async function GET(req: NextRequest) {
           count: d.count,
         }),
       ),
+      utmSourceBreakdown: utmSourceBreakdown.map(
+        (d: { _id: string; count: number }) => ({
+          source: d._id,
+          count: d.count,
+        }),
+      ),
+      utmMediumBreakdown: utmMediumBreakdown.map(
+        (d: { _id: string; count: number }) => ({
+          medium: d._id,
+          count: d.count,
+        }),
+      ),
+      utmCampaignBreakdown,
       conversionData: enrichedConversionData,
       recentVisits,
     });
   } catch (error) {
-    console.error("❌ Error fetching analytics:", error);
+    console.error("❌ Error fetching LP analytics:", error);
     return NextResponse.json(
       { error: "Failed to fetch analytics" },
       { status: 500 },
@@ -234,9 +396,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * Build the $group _id expression based on groupBy parameter
- */
 function getGroupByExpression(groupBy: string) {
   switch (groupBy) {
     case "week":
