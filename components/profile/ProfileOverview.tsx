@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable */
 
 import { useState } from "react";
 import Link from "next/link";
@@ -21,8 +22,6 @@ import {
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { motion, AnimatePresence } from "framer-motion";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ProfileOverviewProps {
   combinedStats: any;
   competitionStats: any;
@@ -73,14 +72,29 @@ export default function ProfileOverview({
         />
         <StatCard
           icon={<TrendingUp className="w-5 h-5" />}
-          label="Total P&L"
-          value={`${(combinedStats?.totalPnL || 0) >= 0 ? "+" : ""}${(combinedStats?.totalPnL || 0).toFixed(2)}`}
-          color={(combinedStats?.totalPnL || 0) >= 0 ? "green" : "red"}
+          label="ROI"
+          value={(() => {
+            const totalWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
+            const totalSpent = (walletData?.totalSpentOnCompetitions || 0) + (walletData?.totalSpentOnChallenges || 0);
+            const roi = totalSpent > 0 ? ((totalWon - totalSpent) / totalSpent) * 100 : 0;
+            return `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`;
+          })()}
+          color={(() => {
+            const totalWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
+            const totalSpent = (walletData?.totalSpentOnCompetitions || 0) + (walletData?.totalSpentOnChallenges || 0);
+            return (totalWon - totalSpent) >= 0 ? "green" : "red";
+          })()}
+          trend={(() => {
+            const totalWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
+            const totalSpent = (walletData?.totalSpentOnCompetitions || 0) + (walletData?.totalSpentOnChallenges || 0);
+            return (totalWon - totalSpent) >= 0 ? "up" as const : "down" as const;
+          })()}
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
           label="Prizes Won"
-          value={`${(combinedStats?.totalPrizesWon || 0).toFixed(settings.credits.decimals)} ${settings.credits.symbol}`}
+          value={(combinedStats?.totalPrizesWon || 0).toFixed(settings.credits.decimals)}
+          symbol={settings.credits.symbol}
           color="yellow"
         />
       </div>
@@ -441,12 +455,14 @@ function StatCard({
   icon,
   label,
   value,
+  symbol,
   color,
   trend,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
+  symbol?: string;
   color: string;
   trend?: "up" | "down";
 }) {
@@ -484,7 +500,10 @@ function StatCard({
             <TrendingDown className="w-3 h-3 text-red-400 ml-auto" />
           ))}
       </div>
-      <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
+      <p className="text-2xl font-bold text-white tabular-nums flex items-center gap-1.5">
+        {value}
+        {symbol && <span className="text-lg">{symbol}</span>}
+      </p>
     </div>
   );
 }

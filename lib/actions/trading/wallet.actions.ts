@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable */
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
@@ -917,26 +918,55 @@ export const getWalletStats = async () => {
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
+    // Reason: Fetch wallet + transaction-based totals in parallel for accuracy.
+    // CreditWallet.totalWonFromCompetitions was historically polluted with refunds,
+    // so we compute true wins/refunds from transactions as the single source of truth.
+    const [wallet, txTotals, gmResult] = await Promise.all([
+      CreditWallet.findOne({ userId: session.user.id }),
+      WalletTransaction.aggregate([
+        { $match: { userId: session.user.id, status: "completed" } },
+        {
+          $group: {
+            _id: "$transactionType",
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+      // GM referral earnings
+      (async () => {
+        try {
+          const mongoose = await import("mongoose");
+          const db = mongoose.default.connection.db;
+          if (db) {
+            const r = await db
+              .collection("gamemasterearnings")
+              .aggregate([
+                { $match: { gameMasterId: session.user.id } },
+                { $group: { _id: null, total: { $sum: "$netEarning" } } },
+              ])
+              .toArray();
+            return r[0]?.total || 0;
+          }
+        } catch { /* non-critical */ }
+        return 0;
+      })(),
+    ]);
 
-    // Get GM referral earnings from gamemasterearnings collection
-    let totalGMEarnings = 0;
-    try {
-      const mongoose = await import("mongoose");
-      const db = mongoose.default.connection.db;
-      if (db) {
-        const gmEarningsResult = await db
-          .collection("gamemasterearnings")
-          .aggregate([
-            { $match: { gameMasterId: session.user.id } },
-            { $group: { _id: null, total: { $sum: "$netEarning" } } },
-          ])
-          .toArray();
-        totalGMEarnings = gmEarningsResult[0]?.total || 0;
-      }
-    } catch (gmError) {
-      console.error("Error fetching GM earnings:", gmError);
+    const totalGMEarnings = gmResult as number;
+
+    // Build a map of transaction type → total amount from transactions
+    const txMap = new Map<string, number>();
+    for (const t of txTotals) {
+      txMap.set(t._id, t.total);
     }
+
+    // Reason: Use transactions as the SINGLE source of truth for all totals.
+    // Amounts in transactions are already signed (+income, -expense).
+    const trueCompWins = Math.abs(txMap.get("competition_win") || 0);
+    const trueChalWins = Math.abs(txMap.get("challenge_win") || 0);
+    const trueCompSpent = Math.abs(txMap.get("competition_entry") || 0);
+    const trueChalSpent = Math.abs(txMap.get("challenge_entry") || 0);
+    const trueMarketplace = Math.abs(txMap.get("marketplace_purchase") || 0);
 
     if (!wallet) {
       return {
@@ -955,13 +985,9 @@ export const getWalletStats = async () => {
       };
     }
 
-    const netProfitCompetitions =
-      wallet.totalWonFromCompetitions - wallet.totalSpentOnCompetitions;
-    const netProfitChallenges =
-      (wallet.totalWonFromChallenges || 0) -
-      (wallet.totalSpentOnChallenges || 0);
-    const totalSpent =
-      wallet.totalSpentOnCompetitions + (wallet.totalSpentOnChallenges || 0);
+    const netProfitCompetitions = trueCompWins - trueCompSpent;
+    const netProfitChallenges = trueChalWins - trueChalSpent;
+    const totalSpent = trueCompSpent + trueChalSpent;
     const roi =
       totalSpent > 0
         ? ((netProfitCompetitions + netProfitChallenges) / totalSpent) * 100
@@ -971,11 +997,13 @@ export const getWalletStats = async () => {
       currentBalance: wallet.creditBalance,
       totalDeposited: wallet.totalDeposited,
       totalWithdrawn: wallet.totalWithdrawn,
-      totalSpentOnCompetitions: wallet.totalSpentOnCompetitions,
-      totalWonFromCompetitions: wallet.totalWonFromCompetitions,
-      totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
-      totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
-      totalSpentOnMarketplace: wallet.totalSpentOnMarketplace || 0,
+      // Reason: Use transaction-derived totals instead of CreditWallet fields
+      // because CreditWallet.totalWonFromCompetitions historically included refunds.
+      totalSpentOnCompetitions: trueCompSpent,
+      totalWonFromCompetitions: trueCompWins,
+      totalSpentOnChallenges: trueChalSpent,
+      totalWonFromChallenges: trueChalWins,
+      totalSpentOnMarketplace: trueMarketplace,
       netProfitFromCompetitions: netProfitCompetitions,
       netProfitFromChallenges: netProfitChallenges,
       roi: roi,

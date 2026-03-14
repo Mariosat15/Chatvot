@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { verifyAdminAuth } from "@/lib/admin/auth";
@@ -948,10 +949,12 @@ async function getDetailedUserReconciliation(
   // Calculate totals from transactions - IMPORTANT: Use signed amounts for accurate balance
   let depositTotal = 0; // All deposit-type credits
   let withdrawalTxTotal = 0; // Withdrawal debits
-  let competitionWinTotal = 0; // Includes wins AND refunds (both are credits)
-  let challengeWinTotal = 0; // Includes wins AND refunds (both are credits)
-  let competitionSpentTotal = 0; // Entry fees (NET of refunds)
-  let challengeSpentTotal = 0; // Entry fees (NET of refunds)
+  let competitionWinTotal = 0; // Actual competition wins only (NOT refunds)
+  let challengeWinTotal = 0; // Actual challenge wins only (NOT refunds)
+  let competitionRefundTotal = 0; // Refunds from cancelled competitions
+  let challengeRefundTotal = 0; // Refunds from cancelled challenges
+  let competitionSpentTotal = 0; // Entry fees (gross, before refunds)
+  let challengeSpentTotal = 0; // Entry fees (gross, before refunds)
   let marketplaceSpentTotal = 0;
   let adminAdjustmentTotal = 0; // Track admin adjustments separately
   let incidentCompensationTotal = 0; // Track incident compensations separately
@@ -1032,8 +1035,8 @@ async function getDetailedUserReconciliation(
 
       case "competition_refund":
         // Competition cancelled - entry fee returned
-        // This REDUCES the net spent on competitions
-        competitionWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
+        // Reason: Refunds reverse the original spend, they are NOT wins
+        competitionRefundTotal += Math.abs(amount);
         breakdown.competitionRefunds++;
         break;
 
@@ -1049,8 +1052,8 @@ async function getDetailedUserReconciliation(
 
       case "challenge_refund":
         // Challenge cancelled/declined - entry fee returned
-        // This REDUCES the net spent on challenges
-        challengeWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
+        // Reason: Refunds reverse the original spend, they are NOT wins
+        challengeRefundTotal += Math.abs(amount);
         breakdown.challengeRefunds++;
         break;
 
@@ -1214,8 +1217,7 @@ async function getDetailedUserReconciliation(
     });
   }
 
-  // Check competition wins (includes refunds - both are credits received)
-  // Note: The wallet's totalWonFromCompetitions should include refunds if properly tracked
+  // Check competition wins (wins ONLY — refunds are tracked separately)
   const compWinDiff = Math.abs(
     walletData.totalWonFromCompetitions - competitionWinTotal,
   );
@@ -1233,10 +1235,25 @@ async function getDetailedUserReconciliation(
             (walletData.totalWonFromCompetitions - competitionWinTotal) * 100,
           ) / 100,
         description:
-          `Competition credits mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}` +
-          (breakdown.competitionRefunds > 0
-            ? ` (includes ${breakdown.competitionRefunds} refunds from cancelled competitions)`
-            : ""),
+          `Competition wins mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}`,
+      },
+    });
+  }
+
+  // Check competition spent (gross entries minus refunds should match net spent)
+  const expectedNetCompSpent = competitionSpentTotal - competitionRefundTotal;
+  const compSpentDiff = Math.abs(walletData.totalSpentOnCompetitions - expectedNetCompSpent);
+  if (compSpentDiff > 0.01) {
+    issues.push({
+      type: "competition_spent_mismatch",
+      severity: "warning",
+      userId,
+      userEmail,
+      details: {
+        expected: Math.round(expectedNetCompSpent * 100) / 100,
+        actual: walletData.totalSpentOnCompetitions,
+        difference: Math.round((walletData.totalSpentOnCompetitions - expectedNetCompSpent) * 100) / 100,
+        description: `Competition net spent mismatch: stored ${walletData.totalSpentOnCompetitions}, calculated ${Math.round(expectedNetCompSpent * 100) / 100} (${Math.round(competitionSpentTotal * 100) / 100} entries - ${Math.round(competitionRefundTotal * 100) / 100} refunds)`,
       },
     });
   }

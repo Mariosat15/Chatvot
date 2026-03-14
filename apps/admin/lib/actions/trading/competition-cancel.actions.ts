@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable */
 
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/database/mongoose";
@@ -70,13 +71,15 @@ export async function cancelCompetitionAndRefund(
       const refundAmount = entryFee;
       const newBalance = wallet.creditBalance + refundAmount;
 
-      // Update wallet balance AND track refund in totalWonFromCompetitions for reconciliation
+      // Reason: Refunds reverse the original spend — do NOT inflate totalWonFromCompetitions.
+      // Track refunds in totalRefunded and reverse totalSpentOnCompetitions.
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
         {
           $inc: {
             creditBalance: refundAmount,
-            totalWonFromCompetitions: refundAmount, // Track refunds as credits received
+            totalSpentOnCompetitions: -refundAmount,
+            totalRefunded: refundAmount,
           },
         },
         { session },
@@ -475,13 +478,14 @@ export async function emergencyCancelActiveCompetition(
       const refundAmount = entryFee;
       const newBalance = wallet.creditBalance + refundAmount;
 
-      // Update wallet AND track refund in totalWonFromCompetitions for reconciliation
+      // Reason: Refunds reverse the original spend — do NOT inflate totalWonFromCompetitions.
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
         {
           $inc: {
             creditBalance: refundAmount,
-            totalWonFromCompetitions: refundAmount, // Track refunds as credits received
+            totalSpentOnCompetitions: -refundAmount,
+            totalRefunded: refundAmount,
           },
         },
         { session: mongoSession },

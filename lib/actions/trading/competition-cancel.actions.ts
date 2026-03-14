@@ -70,14 +70,15 @@ export async function cancelCompetitionAndRefund(
       const newBalance = wallet.creditBalance + refundAmount;
 
       // Update wallet balance AND tracking fields
-      // Refund adds to totalWonFromCompetitions (it's credits received)
-      // This keeps the accounting correct for reconciliation
+      // Reason: Refunds reverse the original spend — do NOT inflate totalWonFromCompetitions.
+      // Track refunds in totalRefunded and reverse totalSpentOnCompetitions.
       await CreditWallet.findByIdAndUpdate(
         wallet._id,
         {
           $inc: {
             creditBalance: refundAmount,
-            totalWonFromCompetitions: refundAmount, // Track refund as credits received
+            totalSpentOnCompetitions: -refundAmount,
+            totalRefunded: refundAmount,
           },
         },
         { session },
