@@ -801,26 +801,27 @@ export const getWalletStats = async () => {
       };
     }
 
-    // Reason: Use WalletTransaction as single source of truth for win totals.
+    // Reason: Use WalletTransaction as SINGLE source of truth for ALL totals.
     // CreditWallet fields were historically polluted by refunds.
-    const [compWinAgg, chalWinAgg] = await Promise.all([
-      WalletTransaction.aggregate([
-        { $match: { userId: session.user.id, transactionType: "competition_win", status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-      WalletTransaction.aggregate([
-        { $match: { userId: session.user.id, transactionType: "challenge_win", status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
+    // Net spending = entries − refunds (refunds reverse the original entry fee).
+    const txTotals = await WalletTransaction.aggregate([
+      { $match: { userId: session.user.id, status: "completed" } },
+      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
     ]);
-    const txCompWins = compWinAgg[0]?.total || 0;
-    const txChalWins = chalWinAgg[0]?.total || 0;
+    const txMap = new Map<string, number>();
+    for (const t of txTotals) {
+      txMap.set(t._id, t.total);
+    }
+    const txCompWins = Math.abs(txMap.get("competition_win") || 0);
+    const txChalWins = Math.abs(txMap.get("challenge_win") || 0);
+    const txCompRefund = Math.abs(txMap.get("competition_refund") || 0);
+    const txChalRefund = Math.abs(txMap.get("challenge_refund") || 0);
+    const txCompSpent = Math.abs(txMap.get("competition_entry") || 0) - txCompRefund;
+    const txChalSpent = Math.abs(txMap.get("challenge_entry") || 0) - txChalRefund;
 
-    const netProfitCompetitions = txCompWins - wallet.totalSpentOnCompetitions;
-    const netProfitChallenges =
-      txChalWins - (wallet.totalSpentOnChallenges || 0);
-    const totalSpent =
-      wallet.totalSpentOnCompetitions + (wallet.totalSpentOnChallenges || 0);
+    const netProfitCompetitions = txCompWins - txCompSpent;
+    const netProfitChallenges = txChalWins - txChalSpent;
+    const totalSpent = txCompSpent + txChalSpent;
     const roi =
       totalSpent > 0
         ? ((netProfitCompetitions + netProfitChallenges) / totalSpent) * 100
@@ -830,9 +831,10 @@ export const getWalletStats = async () => {
       currentBalance: wallet.creditBalance,
       totalDeposited: wallet.totalDeposited,
       totalWithdrawn: wallet.totalWithdrawn,
-      totalSpentOnCompetitions: wallet.totalSpentOnCompetitions,
+      // Reason: Transaction-based spending (net of refunds) for consistency with main app
+      totalSpentOnCompetitions: txCompSpent,
       totalWonFromCompetitions: txCompWins,
-      totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
+      totalSpentOnChallenges: txChalSpent,
       totalWonFromChallenges: txChalWins,
       netProfitFromCompetitions: netProfitCompetitions,
       netProfitFromChallenges: netProfitChallenges,

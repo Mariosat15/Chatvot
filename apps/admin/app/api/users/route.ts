@@ -130,14 +130,20 @@ export async function GET(request: NextRequest) {
     }).lean();
     const walletMap = new Map(wallets.map((w: any) => [w.userId, w]));
 
-    // Reason: Use WalletTransaction as single source of truth for win totals.
-    // CreditWallet fields (totalWonFromCompetitions/Challenges) were historically
-    // polluted by refunds being counted as wins.
-    const perUserWins = await WalletTransaction.aggregate([
+    // Reason: Use WalletTransaction as SINGLE source of truth for ALL financial totals.
+    // CreditWallet fields were historically polluted by refunds.
+    // Net spending = entries − refunds (refunds reverse the original entry fee).
+    const perUserTx = await WalletTransaction.aggregate([
       {
         $match: {
           userId: { $in: userIds },
-          transactionType: { $in: ["competition_win", "challenge_win"] },
+          transactionType: {
+            $in: [
+              "competition_win", "challenge_win",
+              "competition_entry", "challenge_entry",
+              "competition_refund", "challenge_refund",
+            ],
+          },
           status: "completed",
         },
       },
@@ -148,13 +154,18 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
-    const userWinsMap = new Map<string, { compWins: number; chalWins: number }>();
-    for (const row of perUserWins) {
+    const userWinsMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number }>();
+    for (const row of perUserTx) {
       const uid = row._id.userId;
-      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0 });
+      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 });
       const entry = userWinsMap.get(uid)!;
-      if (row._id.type === "competition_win") entry.compWins = row.total;
-      else if (row._id.type === "challenge_win") entry.chalWins = row.total;
+      const absTotal = Math.abs(row.total);
+      if (row._id.type === "competition_win") entry.compWins = absTotal;
+      else if (row._id.type === "challenge_win") entry.chalWins = absTotal;
+      else if (row._id.type === "competition_entry") entry.compSpent = absTotal;
+      else if (row._id.type === "challenge_entry") entry.chalSpent = absTotal;
+      else if (row._id.type === "competition_refund") entry.compRefund = absTotal;
+      else if (row._id.type === "challenge_refund") entry.chalRefund = absTotal;
     }
 
     // Get competition stats only for displayed users
@@ -277,9 +288,9 @@ export async function GET(request: NextRequest) {
       const lostChallenges = userChalls.filter(
         (c: any) => c.status === "completed" && !c.isWinner,
       ).length;
-      // Reason: Use transaction-based wins instead of CreditWallet fields
-      const userWins = userWinsMap.get(userId) || { compWins: 0, chalWins: 0 };
-      const challengeSpent = wallet?.totalSpentOnChallenges || 0;
+      // Reason: Use transaction-based totals for BOTH wins and spending (net of refunds)
+      const userWins = userWinsMap.get(userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 };
+      const challengeSpent = userWins.chalSpent - userWins.chalRefund;
       const challengeWon = userWins.chalWins;
 
       // Calculate marketplace stats
@@ -316,21 +327,21 @@ export async function GET(request: NextRequest) {
         postalCode: user.postalCode || "",
         phone: user.phone || "",
 
-        // Wallet data — Reason: Use transaction-based wins for accuracy
+        // Wallet data — Reason: Transaction-based wins AND spending (net of refunds) for accuracy
         wallet: wallet
           ? {
               balance: wallet.creditBalance || 0,
               totalDeposited: wallet.totalDeposited || 0,
               totalWithdrawn: wallet.totalWithdrawn || 0,
               totalSpent:
-                (wallet.totalSpentOnCompetitions || 0) +
-                (wallet.totalSpentOnChallenges || 0),
+                (userWins.compSpent - userWins.compRefund) +
+                (userWins.chalSpent - userWins.chalRefund),
               totalWon: userWins.compWins + userWins.chalWins,
               netProfit:
                 userWins.compWins +
                 userWins.chalWins -
-                ((wallet.totalSpentOnCompetitions || 0) +
-                  (wallet.totalSpentOnChallenges || 0)),
+                ((userWins.compSpent - userWins.compRefund) +
+                  (userWins.chalSpent - userWins.chalRefund)),
             }
           : {
               balance: 0,

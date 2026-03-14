@@ -964,8 +964,12 @@ export const getWalletStats = async () => {
     // Amounts in transactions are already signed (+income, -expense).
     const trueCompWins = Math.abs(txMap.get("competition_win") || 0);
     const trueChalWins = Math.abs(txMap.get("challenge_win") || 0);
-    const trueCompSpent = Math.abs(txMap.get("competition_entry") || 0);
-    const trueChalSpent = Math.abs(txMap.get("challenge_entry") || 0);
+    // Reason: Net spending = entries − refunds. Refunds reverse the original entry fee,
+    // so showing gross entries overstates "Total Spent" and understates ROI.
+    const trueCompRefund = Math.abs(txMap.get("competition_refund") || 0);
+    const trueChalRefund = Math.abs(txMap.get("challenge_refund") || 0);
+    const trueCompSpent = Math.abs(txMap.get("competition_entry") || 0) - trueCompRefund;
+    const trueChalSpent = Math.abs(txMap.get("challenge_entry") || 0) - trueChalRefund;
     const trueMarketplace = Math.abs(txMap.get("marketplace_purchase") || 0);
 
     if (!wallet) {

@@ -420,10 +420,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(100).lean(),
     // Reason: Select all wallet fields needed by dashboard hero stats and charts
     CreditWallet.findOne({ userId }).select("creditBalance totalDeposited totalWithdrawn totalWonFromCompetitions totalWonFromChallenges totalSpentOnCompetitions totalSpentOnChallenges totalSpentOnMarketplace").lean(),
+    // Reason: No limit — all transactions needed for accurate dashboard totals.
+    // .limit(1000) was silently truncating data for active users.
     WalletTransaction.find({ userId, status: "completed" })
       .select("createdAt balanceAfter amount transactionType")
       .sort({ createdAt: 1 })
-      .limit(1000)
       .lean(),
   ]);
 
@@ -829,8 +830,12 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   }
   const wTrueCompWins = _txTotals.get("competition_win") || 0;
   const wTrueChalWins = _txTotals.get("challenge_win") || 0;
-  const wTrueCompSpent = _txTotals.get("competition_entry") || 0;
-  const wTrueChalSpent = _txTotals.get("challenge_entry") || 0;
+  // Reason: Net spending = entries − refunds. Refunds reverse the original entry fee,
+  // so showing gross entries overstates "Total Spent" and understates ROI.
+  const wCompRefund = _txTotals.get("competition_refund") || 0;
+  const wChalRefund = _txTotals.get("challenge_refund") || 0;
+  const wTrueCompSpent = (_txTotals.get("competition_entry") || 0) - wCompRefund;
+  const wTrueChalSpent = (_txTotals.get("challenge_entry") || 0) - wChalRefund;
   const wTotalSpentOnMarketplace = _txTotals.get("marketplace_purchase") || 0;
   const totalPrizesWon = wTrueCompWins + wTrueChalWins;
   const wTotalSpent = wTrueCompSpent + wTrueChalSpent + wTotalSpentOnMarketplace;

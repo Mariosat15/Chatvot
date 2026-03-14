@@ -278,38 +278,49 @@ export async function GET(request: NextRequest) {
       (sum, w) => sum + (w.totalWithdrawn || 0),
       0,
     );
-    const totalSpentOnCompetitions = wallets.reduce(
-      (sum, w) => sum + (w.totalSpentOnCompetitions || 0),
-      0,
-    );
-    const totalSpentOnChallenges = wallets.reduce(
-      (sum, w) => sum + (w.totalSpentOnChallenges || 0),
-      0,
-    );
 
-    // Reason: Use WalletTransaction as single source of truth for win totals.
-    // CreditWallet fields (totalWonFromCompetitions/Challenges) were historically
-    // polluted by refunds being counted as wins. Transaction aggregation is accurate.
-    const [compWinAgg, chalWinAgg] = await Promise.all([
-      WalletTransaction.aggregate([
-        { $match: { transactionType: "competition_win", status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-      WalletTransaction.aggregate([
-        { $match: { transactionType: "challenge_win", status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-    ]);
-    const totalWonFromCompetitions = compWinAgg[0]?.total || 0;
-    const totalWonFromChallenges = chalWinAgg[0]?.total || 0;
-
-    // Reason: Per-user win totals also need transaction-based calculation
-    // to avoid showing polluted CreditWallet values in the admin wallets table.
-    const perUserWins = await WalletTransaction.aggregate([
+    // Reason: Use WalletTransaction as SINGLE source of truth for ALL financial totals.
+    // CreditWallet fields were historically polluted by refunds.
+    // Net spending = entries − refunds (refunds reverse the original entry fee).
+    const platformTxTotals = await WalletTransaction.aggregate([
       {
         $match: {
-          transactionType: { $in: ["competition_win", "challenge_win"] },
           status: "completed",
+          transactionType: {
+            $in: [
+              "competition_win", "challenge_win",
+              "competition_entry", "challenge_entry",
+              "competition_refund", "challenge_refund",
+            ],
+          },
+        },
+      },
+      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+    ]);
+    const platTxMap = new Map<string, number>();
+    for (const t of platformTxTotals) {
+      platTxMap.set(t._id, t.total);
+    }
+    const totalWonFromCompetitions = Math.abs(platTxMap.get("competition_win") || 0);
+    const totalWonFromChallenges = Math.abs(platTxMap.get("challenge_win") || 0);
+    const totalCompRefund = Math.abs(platTxMap.get("competition_refund") || 0);
+    const totalChalRefund = Math.abs(platTxMap.get("challenge_refund") || 0);
+    const totalSpentOnCompetitions = Math.abs(platTxMap.get("competition_entry") || 0) - totalCompRefund;
+    const totalSpentOnChallenges = Math.abs(platTxMap.get("challenge_entry") || 0) - totalChalRefund;
+
+    // Reason: Per-user totals also need transaction-based calculation
+    // to avoid showing polluted CreditWallet values in the admin wallets table.
+    const perUserTotals = await WalletTransaction.aggregate([
+      {
+        $match: {
+          status: "completed",
+          transactionType: {
+            $in: [
+              "competition_win", "challenge_win",
+              "competition_entry", "challenge_entry",
+              "competition_refund", "challenge_refund",
+            ],
+          },
         },
       },
       {
@@ -319,14 +330,19 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
-    // Build lookup: userId -> { compWins, chalWins }
-    const userWinsMap = new Map<string, { compWins: number; chalWins: number }>();
-    for (const row of perUserWins) {
+    // Build lookup: userId -> { compWins, chalWins, compSpent, chalSpent }
+    const userTxMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number }>();
+    for (const row of perUserTotals) {
       const uid = row._id.userId;
-      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0 });
-      const entry = userWinsMap.get(uid)!;
-      if (row._id.type === "competition_win") entry.compWins = row.total;
-      else if (row._id.type === "challenge_win") entry.chalWins = row.total;
+      if (!userTxMap.has(uid)) userTxMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 });
+      const entry = userTxMap.get(uid)!;
+      const absTotal = Math.abs(row.total);
+      if (row._id.type === "competition_win") entry.compWins = absTotal;
+      else if (row._id.type === "challenge_win") entry.chalWins = absTotal;
+      else if (row._id.type === "competition_entry") entry.compSpent = absTotal;
+      else if (row._id.type === "challenge_entry") entry.chalSpent = absTotal;
+      else if (row._id.type === "competition_refund") entry.compRefund = absTotal;
+      else if (row._id.type === "challenge_refund") entry.chalRefund = absTotal;
     }
 
     // Calculate liability metrics
@@ -344,8 +360,8 @@ export async function GET(request: NextRequest) {
       data: {
         wallets: wallets.map((w) => {
           const userInfo = usersMap.get(w.userId);
-          // Reason: Use transaction-based wins instead of CreditWallet fields
-          const wins = userWinsMap.get(w.userId) || { compWins: 0, chalWins: 0 };
+          // Reason: Use transaction-based totals for BOTH wins and spending
+          const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 };
           return {
             userId: w.userId,
             userName: userInfo?.name || "Unknown",
@@ -353,10 +369,10 @@ export async function GET(request: NextRequest) {
             creditBalance: w.creditBalance,
             totalDeposited: w.totalDeposited,
             totalWithdrawn: w.totalWithdrawn,
-            totalWonFromCompetitions: wins.compWins,
-            totalSpentOnCompetitions: w.totalSpentOnCompetitions || 0,
-            totalWonFromChallenges: wins.chalWins,
-            totalSpentOnChallenges: w.totalSpentOnChallenges || 0,
+            totalWonFromCompetitions: uTx.compWins,
+            totalSpentOnCompetitions: uTx.compSpent - uTx.compRefund,
+            totalWonFromChallenges: uTx.chalWins,
+            totalSpentOnChallenges: uTx.chalSpent - uTx.chalRefund,
           };
         }),
         pendingWithdrawals: pendingWithdrawalRequests.map((w) => {

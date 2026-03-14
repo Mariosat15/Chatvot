@@ -225,7 +225,7 @@ export async function getUserCompetitionStats(
 
     await connectToDatabase();
 
-    // Reason: Fetch participations + transaction-based win totals in parallel.
+    // Reason: Fetch participations + transaction-based win/spent totals in parallel.
     // We use WalletTransaction as the SINGLE source of truth for credits won/spent,
     // because CreditWallet fields were historically polluted by refunds.
     const [participations, compTxTotals] = await Promise.all([
@@ -238,7 +238,7 @@ export async function getUserCompetitionStats(
           $match: {
             userId: targetUserId,
             status: "completed",
-            transactionType: { $in: ["competition_win", "competition_entry"] },
+            transactionType: { $in: ["competition_win", "competition_entry", "competition_refund"] },
           },
         },
         { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
@@ -251,7 +251,9 @@ export async function getUserCompetitionStats(
       compTxMap.set(t._id, Math.abs(t.total));
     }
     const trueCompWins = compTxMap.get("competition_win") || 0;
-    const _trueCompSpent = compTxMap.get("competition_entry") || 0;
+    // Reason: Net spending = entries − refunds (refunds reverse the original entry fee).
+    const _trueCompRefund = compTxMap.get("competition_refund") || 0;
+    const _trueCompSpent = (compTxMap.get("competition_entry") || 0) - _trueCompRefund;
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -492,7 +494,7 @@ export async function getUserChallengeStats(
           $match: {
             userId: targetUserId,
             status: "completed",
-            transactionType: { $in: ["challenge_win", "challenge_entry"] },
+            transactionType: { $in: ["challenge_win", "challenge_entry", "challenge_refund"] },
           },
         },
         { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
@@ -505,7 +507,9 @@ export async function getUserChallengeStats(
       chalTxMap.set(t._id, Math.abs(t.total));
     }
     const trueChalWins = chalTxMap.get("challenge_win") || 0;
-    const trueChalSpent = chalTxMap.get("challenge_entry") || 0;
+    // Reason: Net spending = entries − refunds (refunds reverse the original entry fee).
+    const trueChalRefund = chalTxMap.get("challenge_refund") || 0;
+    const trueChalSpent = (chalTxMap.get("challenge_entry") || 0) - trueChalRefund;
 
     // Calculate stats
     const completedChallenges = challenges.filter(

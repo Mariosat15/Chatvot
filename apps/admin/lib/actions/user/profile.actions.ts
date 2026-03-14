@@ -82,12 +82,15 @@ export async function getUserCompetitionStats(
     // Get wallet for spending info (balance, deposited, etc.)
     const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
 
-    // Reason: Use WalletTransaction as single source of truth for wins.
-    // CreditWallet.totalWonFromCompetitions was historically polluted by refunds.
-    const txCompWins = await WalletTransaction.aggregate([
-      { $match: { userId: targetUserId, transactionType: "competition_win", status: "completed" } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).then((r) => r[0]?.total || 0);
+    // Reason: Use WalletTransaction as single source of truth for wins AND spending.
+    // CreditWallet fields were historically polluted by refunds.
+    const compTxTotals = await WalletTransaction.aggregate([
+      { $match: { userId: targetUserId, status: "completed", transactionType: { $in: ["competition_win", "competition_entry", "competition_refund"] } } },
+      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+    ]);
+    const compTxMap = new Map<string, number>();
+    for (const t of compTxTotals) { compTxMap.set(t._id, Math.abs(t.total)); }
+    const txCompWins = compTxMap.get("competition_win") || 0;
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -352,12 +355,18 @@ export async function getUserChallengeStats(
       }
     });
 
-    // Reason: Use WalletTransaction as single source of truth for wins.
-    // CreditWallet.totalWonFromChallenges was historically polluted by refunds.
-    const txChallengeWins = await WalletTransaction.aggregate([
-      { $match: { userId: targetUserId, transactionType: "challenge_win", status: "completed" } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).then((r) => r[0]?.total || 0);
+    // Reason: Use WalletTransaction as single source of truth for wins AND spending.
+    // CreditWallet fields were historically polluted by refunds.
+    // Net spending = entries − refunds (refunds reverse the original entry fee).
+    const chalTxTotals = await WalletTransaction.aggregate([
+      { $match: { userId: targetUserId, status: "completed", transactionType: { $in: ["challenge_win", "challenge_entry", "challenge_refund"] } } },
+      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+    ]);
+    const chalTxMap = new Map<string, number>();
+    for (const t of chalTxTotals) { chalTxMap.set(t._id, Math.abs(t.total)); }
+    const txChallengeWins = chalTxMap.get("challenge_win") || 0;
+    const txChalRefund = chalTxMap.get("challenge_refund") || 0;
+    const txChalSpent = (chalTxMap.get("challenge_entry") || 0) - txChalRefund;
     if (txChallengeWins > 0) totalPrizeAmount = txChallengeWins;
 
     const overallWinRate =
@@ -403,10 +412,8 @@ export async function getUserChallengeStats(
       bestRoi,
       mostTrades,
       totalCreditsWon: txChallengeWins || totalPrizeAmount,
-      totalCreditsSpent: await WalletTransaction.aggregate([
-        { $match: { userId: targetUserId, transactionType: "challenge_entry", status: "completed" } },
-        { $group: { _id: null, total: { $sum: { $abs: "$amount" } } } },
-      ]).then((r) => r[0]?.total || 0),
+      // Reason: Net spending = entries − refunds, already computed above
+      totalCreditsSpent: txChalSpent,
       recentChallenges,
     };
   } catch (error) {
