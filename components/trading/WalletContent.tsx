@@ -6,7 +6,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
   History,
   ArrowDownCircle,
   ArrowUpCircle,
@@ -277,7 +276,7 @@ export default function WalletContent({
           📊 Stats are filtered by selected date range
         </div>
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
         {/* Total Bought */}
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
@@ -334,74 +333,6 @@ export default function WalletContent({
             </div>
             <div className="rounded-full bg-red-500/10 p-2 sm:p-3 flex-shrink-0">
               <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Spent (comp + challenge + marketplace) */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
-                Total Spent
-              </p>
-              <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalSpent.toFixed(
-                    settings.credits.decimals,
-                  )}
-                </p>
-                <span className="text-sm sm:text-lg text-yellow-500">
-                  {settings.credits.symbol}
-                </span>
-              </div>
-              {settings.credits.showEUREquivalent && (
-                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}
-                  {creditsToEUR(displayStats.totalSpent).toFixed(2)}
-                </p>
-              )}
-            </div>
-            <div className="rounded-full bg-blue-500/10 p-2 sm:p-3 flex-shrink-0">
-              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Winnings (comp + challenge) */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
-                Total Won
-              </p>
-              <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalWon.toFixed(
-                    settings.credits.decimals,
-                  )}
-                </p>
-                <span className="text-sm sm:text-lg text-yellow-500">
-                  {settings.credits.symbol}
-                </span>
-              </div>
-              {!isDateFiltered && displayStats.roi !== 0 && (
-                <p
-                  className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${displayStats.roi > 0 ? "text-green-500" : "text-red-500"}`}
-                >
-                  ROI: {displayStats.roi > 0 ? "+" : ""}
-                  {displayStats.roi.toFixed(1)}%
-                </p>
-              )}
-            </div>
-            <div
-              className={`rounded-full ${displayStats.totalWon - displayStats.totalSpent >= 0 ? "bg-green-500/10" : "bg-red-500/10"} p-2 sm:p-3 flex-shrink-0`}
-            >
-              {displayStats.totalWon - displayStats.totalSpent >= 0 ? (
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-              ) : (
-                <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-              )}
             </div>
           </div>
         </div>

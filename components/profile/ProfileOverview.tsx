@@ -12,11 +12,8 @@ import {
   BarChart3,
   Zap,
   Swords,
-  Wallet,
-  ArrowRight,
   ChevronDown,
   ChevronUp,
-  Flame,
   Clock,
   Users,
 } from "lucide-react";
@@ -35,12 +32,11 @@ export default function ProfileOverview({
   challengeStats,
   walletData,
 }: ProfileOverviewProps) {
-  const { settings, creditsToEUR } = useAppSettings();
+  const { settings } = useAppSettings();
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({
     trading: true,
-    wallet: true,
     competitions: false,
     challenges: false,
     recentComps: false,
@@ -98,68 +94,6 @@ export default function ProfileOverview({
           color="yellow"
         />
       </div>
-
-      {/* Wallet Section */}
-      <CollapsibleSection
-        title="💰 Wallet"
-        icon={<Wallet className="w-5 h-5 text-yellow-500" />}
-        isOpen={expandedSections.wallet}
-        onToggle={() => toggleSection("wallet")}
-        action={
-          <Link
-            href="/wallet"
-            className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-          >
-            View Details <ArrowRight className="w-4 h-4" />
-          </Link>
-        }
-      >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <WalletStatCard
-            label="Balance"
-            value={walletData?.currentBalance || 0}
-            symbol={settings.credits.symbol}
-            decimals={settings.credits.decimals}
-            variant="primary"
-            euroEquivalent={
-              settings.credits.showEUREquivalent
-                ? creditsToEUR(walletData?.currentBalance || 0)
-                : undefined
-            }
-            currencySymbol={settings.currency.symbol}
-          />
-          <WalletStatCard
-            label="Bought"
-            value={walletData?.totalDeposited || 0}
-            symbol={settings.credits.symbol}
-            decimals={settings.credits.decimals}
-            variant="blue"
-          />
-          <WalletStatCard
-            label="Competition Wins"
-            value={walletData?.totalWonFromCompetitions || 0}
-            symbol={settings.credits.symbol}
-            decimals={settings.credits.decimals}
-            variant="green"
-            prefix="+"
-          />
-          <WalletStatCard
-            label="Challenge Wins"
-            value={walletData?.totalWonFromChallenges || 0}
-            symbol={settings.credits.symbol}
-            decimals={settings.credits.decimals}
-            variant="orange"
-            prefix="+"
-          />
-          <WalletStatCard
-            label="Withdrawn"
-            value={walletData?.totalWithdrawn || 0}
-            symbol={settings.credits.symbol}
-            decimals={settings.credits.decimals}
-            variant="gray"
-          />
-        </div>
-      </CollapsibleSection>
 
       {/* Trading Performance Section */}
       <CollapsibleSection
@@ -504,65 +438,6 @@ function StatCard({
         {value}
         {symbol && <span className="text-lg">{symbol}</span>}
       </p>
-    </div>
-  );
-}
-
-// Component: Wallet Stat Card
-function WalletStatCard({
-  label,
-  value,
-  symbol,
-  decimals,
-  variant,
-  prefix = "",
-  euroEquivalent,
-  currencySymbol,
-}: {
-  label: string;
-  value: number;
-  symbol: string;
-  decimals: number;
-  variant: "primary" | "blue" | "green" | "orange" | "gray";
-  prefix?: string;
-  euroEquivalent?: number;
-  currencySymbol?: string;
-}) {
-  const variants: Record<string, string> = {
-    primary:
-      "bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border-yellow-500/30",
-    blue: "bg-gray-800/50 border-blue-500/20 hover:border-blue-500/40",
-    green: "bg-gray-800/50 border-green-500/20 hover:border-green-500/40",
-    orange: "bg-gray-800/50 border-orange-500/20 hover:border-orange-500/40",
-    gray: "bg-gray-800/50 border-gray-600/20 hover:border-gray-500/40",
-  };
-
-  const textColors: Record<string, string> = {
-    primary: "text-white",
-    blue: "text-blue-400",
-    green: "text-green-400",
-    orange: "text-orange-400",
-    gray: "text-gray-400",
-  };
-
-  return (
-    <div
-      className={`rounded-xl p-3 border ${variants[variant]} transition-all`}
-    >
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <div className="flex items-baseline gap-1">
-        <p className={`text-lg font-bold tabular-nums ${textColors[variant]}`}>
-          {prefix}
-          {value.toFixed(decimals)}
-        </p>
-        <span className="text-sm text-yellow-500">{symbol}</span>
-      </div>
-      {euroEquivalent !== undefined && currencySymbol && (
-        <p className="text-xs text-gray-500 mt-0.5">
-          ≈ {currencySymbol}
-          {euroEquivalent.toFixed(2)}
-        </p>
-      )}
     </div>
   );
 }
