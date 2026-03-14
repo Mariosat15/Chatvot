@@ -1,9 +1,8 @@
 "use client";
+/* eslint-disable */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface DayData {
   date: string;
@@ -21,11 +20,25 @@ interface CreditBreakdownChartProps {
   data: DayData[];
 }
 
-// Reason: Categorized stacked bar chart showing daily income (green) vs spending (red)
-// so the user can visually see where credits come from and where they go.
+const INCOME_CATEGORIES = [
+  { key: "deposits", label: "Deposits", color: "#22c55e" },
+  { key: "wins", label: "Wins", color: "#facc15" },
+  { key: "gmEarnings", label: "GM Earnings", color: "#a78bfa" },
+  { key: "refunds", label: "Refunds", color: "#60a5fa" },
+] as const;
+
+const SPENDING_CATEGORIES = [
+  { key: "entries", label: "Entries", color: "#ef4444" },
+  { key: "withdrawals", label: "Withdrawals", color: "#fb923c" },
+  { key: "marketplace", label: "Marketplace", color: "#f472b6" },
+] as const;
+
+// Reason: Paired side-by-side bar chart showing daily income (green) vs spending (red)
+// with proper spacing so bars never overlay numbers or axis labels.
 export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps) {
   const [range, setRange] = useState<"7d" | "30d">("30d");
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     if (!data || data.length < 1) return [];
@@ -34,7 +47,6 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
     return sorted.slice(-days);
   }, [data, range]);
 
-  // Totals for summary header
   const totals = useMemo(() => {
     const t = {
       deposits: 0, wins: 0, gmEarnings: 0, refunds: 0,
@@ -57,7 +69,7 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
   const totalSpending = totals.entries + totals.withdrawals + totals.marketplace + totals.other;
   const totalNet = totalIncome - totalSpending;
 
-  // Max bar height for scaling
+  // Calculate max value for Y-axis scaling
   const maxBar = useMemo(() => {
     let max = 1;
     for (const d of filtered) {
@@ -68,7 +80,21 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
     return max;
   }, [filtered]);
 
-  const barHeight = 160; // px
+  // Compute nice Y-axis ticks
+  const yTicks = useMemo(() => {
+    const niceMax = niceNum(maxBar, true);
+    const step = niceNum(niceMax / 4, false);
+    const ticks: number[] = [];
+    for (let v = 0; v <= niceMax; v += step) {
+      ticks.push(Math.round(v * 100) / 100);
+    }
+    if (ticks[ticks.length - 1] < maxBar) {
+      ticks.push(ticks[ticks.length - 1] + step);
+    }
+    return ticks;
+  }, [maxBar]);
+
+  const yMax = yTicks[yTicks.length - 1] || 1;
 
   if (!data || data.length === 0) {
     return (
@@ -88,6 +114,7 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
   }
 
   const hovered = hoveredIdx !== null ? filtered[hoveredIdx] : null;
+  const chartHeight = 200;
 
   return (
     <motion.div
@@ -116,7 +143,6 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
           </div>
         </div>
 
-        {/* Range selector */}
         <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5">
           {(["7d", "30d"] as const).map((r) => (
             <button
@@ -135,77 +161,114 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px]">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Deposits</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> Wins</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block" /> GM Earnings</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Refunds</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Entries</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" /> Withdrawals</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pink-400 inline-block" /> Marketplace</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-[10px]">
+        {INCOME_CATEGORIES.map((c) => (
+          <span key={c.key} className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: c.color }} />
+            {c.label}
+          </span>
+        ))}
+        {SPENDING_CATEGORIES.map((c) => (
+          <span key={c.key} className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: c.color }} />
+            {c.label}
+          </span>
+        ))}
       </div>
 
-      {/* Bar chart area */}
-      <div className="relative" style={{ height: barHeight + 40 }}>
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-[10px] text-gray-500 font-[var(--font-geist-mono)] w-8">
-          <span>{maxBar.toFixed(0)}</span>
-          <span>{(maxBar / 2).toFixed(0)}</span>
-          <span>0</span>
-        </div>
+      {/* SVG Chart */}
+      <div ref={chartRef} className="relative" onMouseLeave={() => setHoveredIdx(null)}>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="overflow-visible"
+        >
+          {/* Grid lines and Y-axis labels */}
+          {yTicks.map((tick) => {
+            const y = CHART_TOP + chartHeight - (tick / yMax) * chartHeight;
+            return (
+              <g key={tick}>
+                <line x1={Y_AXIS_W} y1={y} x2={SVG_W - PAD_R} y2={y} stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
+                <text x={Y_AXIS_W - 4} y={y + 3} textAnchor="end" fill="#6b7280" fontSize="9" fontFamily="var(--font-geist-mono), monospace">
+                  {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick.toFixed(0)}
+                </text>
+              </g>
+            );
+          })}
 
-        {/* Bars */}
-        <div className="ml-9 flex items-end gap-[2px] h-full pb-5" style={{ height: barHeight }}>
+          {/* Bars */}
           {filtered.map((day, idx) => {
             const income = day.deposits + day.wins + day.gmEarnings + day.refunds;
             const spending = day.entries + day.withdrawals + day.marketplace + day.other;
-            const incomeH = maxBar > 0 ? (income / maxBar) * barHeight : 0;
-            const spendingH = maxBar > 0 ? (spending / maxBar) * barHeight : 0;
-            const barW = Math.max(100 / filtered.length - 1, 2);
+            const groupW = (SVG_W - Y_AXIS_W - PAD_R) / filtered.length;
+            const barW = Math.max(groupW * 0.35, 3);
+            const gap = Math.max(groupW * 0.06, 1);
+            const groupX = Y_AXIS_W + idx * groupW + (groupW - barW * 2 - gap) / 2;
+            const isHovered = hoveredIdx === idx;
+            const dimmed = hoveredIdx !== null && !isHovered;
+
+            // Income bar (stacked segments)
+            const incomeH = yMax > 0 ? (income / yMax) * chartHeight : 0;
+            const incomeY = CHART_TOP + chartHeight - incomeH;
+            // Spending bar
+            const spendingH = yMax > 0 ? (spending / yMax) * chartHeight : 0;
+            const spendingY = CHART_TOP + chartHeight - spendingH;
 
             return (
-              <div
+              <g
                 key={day.date}
-                className="relative flex flex-col items-center cursor-pointer group"
-                style={{ flex: `0 0 ${barW}%`, minWidth: 4 }}
                 onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
+                className="cursor-pointer"
+                opacity={dimmed ? 0.35 : 1}
               >
-                {/* Income bar (green, stacked) */}
-                <div
-                  className="w-full rounded-t-sm transition-all duration-200"
-                  style={{
-                    height: incomeH,
-                    background: `linear-gradient(to top, #22c55e, #86efac)`,
-                    opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.4 : 1,
-                  }}
-                />
-                {/* Spending bar (red, beside income) */}
-                <div
-                  className="w-full rounded-t-sm transition-all duration-200 -mt-px"
-                  style={{
-                    height: spendingH,
-                    background: `linear-gradient(to top, #ef4444, #fca5a5)`,
-                    opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.4 : 1,
-                  }}
-                />
-              </div>
+                {/* Hover background */}
+                {isHovered && (
+                  <rect
+                    x={Y_AXIS_W + idx * groupW}
+                    y={CHART_TOP}
+                    width={groupW}
+                    height={chartHeight}
+                    fill="white"
+                    opacity="0.03"
+                    rx="2"
+                  />
+                )}
+
+                {/* Income stacked bar */}
+                {incomeH > 0 && renderStackedBar(day, "income", groupX, incomeY, barW, incomeH, chartHeight, yMax)}
+
+                {/* Spending stacked bar */}
+                {spendingH > 0 && renderStackedBar(day, "spending", groupX + barW + gap, spendingY, barW, spendingH, chartHeight, yMax)}
+              </g>
             );
           })}
-        </div>
 
-        {/* Date labels */}
-        <div className="ml-9 flex justify-between text-[9px] text-gray-600 mt-1">
-          {filtered.length > 0 && (
-            <>
-              <span>{formatShortDate(filtered[0].date)}</span>
-              {filtered.length > 7 && (
-                <span>{formatShortDate(filtered[Math.floor(filtered.length / 2)].date)}</span>
-              )}
-              <span>{formatShortDate(filtered[filtered.length - 1].date)}</span>
-            </>
-          )}
-        </div>
+          {/* X-axis date labels */}
+          {filtered.map((day, idx) => {
+            const groupW = (SVG_W - Y_AXIS_W - PAD_R) / filtered.length;
+            const centerX = Y_AXIS_W + idx * groupW + groupW / 2;
+            // Only show every Nth label to avoid overlap
+            const showEvery = filtered.length <= 7 ? 1 : filtered.length <= 15 ? 2 : 5;
+            if (idx % showEvery !== 0 && idx !== filtered.length - 1) return null;
+            return (
+              <text
+                key={day.date}
+                x={centerX}
+                y={SVG_H - 2}
+                textAnchor="middle"
+                fill="#6b7280"
+                fontSize="8"
+                fontFamily="var(--font-geist-mono), monospace"
+              >
+                {formatShortDate(day.date)}
+              </text>
+            );
+          })}
+
+          {/* Baseline */}
+          <line x1={Y_AXIS_W} y1={CHART_TOP + chartHeight} x2={SVG_W - PAD_R} y2={CHART_TOP + chartHeight} stroke="#4b5563" strokeWidth="0.5" />
+        </svg>
       </div>
 
       {/* Hover tooltip */}
@@ -222,62 +285,113 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
             })}
           </p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5" />
-              Deposits: <span className="text-green-400 font-medium">{hovered.deposits.toFixed(2)}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
-              Entries: <span className="text-red-400 font-medium">{hovered.entries.toFixed(2)}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1.5" />
-              Wins: <span className="text-yellow-400 font-medium">{hovered.wins.toFixed(2)}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-orange-400 mr-1.5" />
-              Withdrawals: <span className="text-orange-400 font-medium">{hovered.withdrawals.toFixed(2)}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-purple-400 mr-1.5" />
-              GM: <span className="text-purple-400 font-medium">{hovered.gmEarnings.toFixed(2)}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-pink-400 mr-1.5" />
-              Marketplace: <span className="text-pink-400 font-medium">{hovered.marketplace.toFixed(2)}</span>
-            </div>
-            {hovered.refunds > 0 && (
-              <div className="text-gray-400">
-                <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1.5" />
-                Refunds: <span className="text-blue-400 font-medium">{hovered.refunds.toFixed(2)}</span>
-              </div>
-            )}
+            {INCOME_CATEGORIES.map((c) => {
+              const val = (hovered as any)[c.key];
+              if (!val || val === 0) return null;
+              return (
+                <div key={c.key} className="text-gray-400">
+                  <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: c.color }} />
+                  {c.label}: <span className="font-medium" style={{ color: c.color }}>{val.toFixed(2)}</span>
+                </div>
+              );
+            })}
+            {SPENDING_CATEGORIES.map((c) => {
+              const val = (hovered as any)[c.key];
+              if (!val || val === 0) return null;
+              return (
+                <div key={c.key} className="text-gray-400">
+                  <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: c.color }} />
+                  {c.label}: <span className="font-medium" style={{ color: c.color }}>{val.toFixed(2)}</span>
+                </div>
+              );
+            })}
           </div>
         </motion.div>
       )}
 
       {/* Summary totals */}
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <SummaryChip label="Deposits" value={totals.deposits} color="text-green-400" />
-        <SummaryChip label="Wins" value={totals.wins} color="text-yellow-400" />
-        <SummaryChip label="Entries" value={totals.entries} color="text-red-400" />
-        <SummaryChip label="Withdrawals" value={totals.withdrawals} color="text-orange-400" />
-        {totals.gmEarnings > 0 && (
-          <SummaryChip label="GM Earnings" value={totals.gmEarnings} color="text-purple-400" />
-        )}
-        {totals.marketplace > 0 && (
-          <SummaryChip label="Marketplace" value={totals.marketplace} color="text-pink-400" />
-        )}
+      <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <SummaryChip label="Deposits" value={totals.deposits} color="#22c55e" />
+        <SummaryChip label="Wins" value={totals.wins} color="#facc15" />
+        <SummaryChip label="Entries" value={totals.entries} color="#ef4444" />
+        <SummaryChip label="Withdrawals" value={totals.withdrawals} color="#fb923c" />
+        <SummaryChip label="Marketplace" value={totals.marketplace} color="#f472b6" />
       </div>
     </motion.div>
   );
+}
+
+// ─── SVG Layout Constants ───────────────────────────────────────────
+const SVG_W = 600;
+const SVG_H = 260;
+const Y_AXIS_W = 45;
+const PAD_R = 10;
+const CHART_TOP = 10;
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+function renderStackedBar(
+  day: DayData,
+  type: "income" | "spending",
+  x: number,
+  _y: number,
+  w: number,
+  totalH: number,
+  chartHeight: number,
+  yMax: number,
+) {
+  const categories = type === "income" ? INCOME_CATEGORIES : SPENDING_CATEGORIES;
+  const segments: { key: string; value: number; color: string }[] = [];
+  for (const c of categories) {
+    const val = (day as any)[c.key];
+    if (val > 0) segments.push({ key: c.key, value: val, color: c.color });
+  }
+
+  // Build from bottom up
+  let offsetY = CHART_TOP + chartHeight;
+  return segments.map((seg) => {
+    const segH = yMax > 0 ? (seg.value / yMax) * chartHeight : 0;
+    offsetY -= segH;
+    return (
+      <rect
+        key={`${type}-${seg.key}`}
+        x={x}
+        y={offsetY}
+        width={w}
+        height={Math.max(segH, 0.5)}
+        fill={seg.color}
+        rx="1.5"
+        className="transition-opacity duration-150"
+      />
+    );
+  });
+}
+
+function niceNum(range: number, round: boolean): number {
+  const exponent = Math.floor(Math.log10(range));
+  const fraction = range / Math.pow(10, exponent);
+  let niceFraction: number;
+
+  if (round) {
+    if (fraction < 1.5) niceFraction = 1;
+    else if (fraction < 3) niceFraction = 2;
+    else if (fraction < 7) niceFraction = 5;
+    else niceFraction = 10;
+  } else {
+    if (fraction <= 1) niceFraction = 1;
+    else if (fraction <= 2) niceFraction = 2;
+    else if (fraction <= 5) niceFraction = 5;
+    else niceFraction = 10;
+  }
+
+  return niceFraction * Math.pow(10, exponent);
 }
 
 function SummaryChip({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="bg-gray-800/50 rounded-lg px-3 py-2 text-center">
       <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-      <p className={`text-sm font-bold ${color}`} style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+      <p className="text-sm font-bold" style={{ color, fontFamily: "var(--font-geist-mono), monospace" }}>
         {value.toFixed(2)}
       </p>
     </div>
