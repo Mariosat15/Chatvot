@@ -6,6 +6,7 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 // Force model registration before populate is called
 import "@/database/models/marketplace/marketplace-item.model";
 
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
     const participants = await CompetitionParticipant.find({
       userId: { $in: userIds },
     })
-      .select("userId status totalTrades pnl winningTrades")
+      .select("userId status pnl")
       .lean();
 
     // Group participants by user (O(n) with Map)
@@ -191,7 +192,7 @@ export async function GET(request: NextRequest) {
     const challengeParticipants = await ChallengeParticipant.find({
       userId: { $in: userIds },
     })
-      .select("userId status isWinner totalTrades winningTrades")
+      .select("userId status isWinner")
       .lean();
 
     // Group challenge participants by user (O(n) with Map)
@@ -248,6 +249,24 @@ export async function GET(request: NextRequest) {
       pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]),
     );
 
+    // Reason: Use TradeHistory as SINGLE SOURCE OF TRUTH for totalTrades and winRate.
+    // This matches getCombinedTradingStats (profile) and getComprehensiveDashboardData (dashboard).
+    // CompetitionParticipant/ChallengeParticipant aggregate fields can drift from actual trade records.
+    const tradeStatsByUser = await TradeHistory.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      {
+        $group: {
+          _id: "$userId",
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+        },
+      },
+    ]);
+    const tradeStatsMap = new Map<string, { totalTrades: number; winningTrades: number }>();
+    for (const row of tradeStatsByUser) {
+      tradeStatsMap.set(row._id, { totalTrades: row.totalTrades, winningTrades: row.winningTrades });
+    }
+
     // Combine all data
     const usersWithData = users.map((user: any) => {
       const userId = user.id || user._id?.toString();
@@ -266,33 +285,18 @@ export async function GET(request: NextRequest) {
         (p: any) => p.status === "completed",
       ).length;
 
-      // Reason: Include BOTH competition and challenge trades for consistency with
-      // the profile page's getCombinedTradingStats (which uses TradeHistory).
-      const compTrades = userComps.reduce(
-        (sum: number, p: any) => sum + (p.totalTrades || 0),
-        0,
-      );
-      const chalTrades = userChalls.reduce(
-        (sum: number, p: any) => sum + (p.totalTrades || 0),
-        0,
-      );
-      const totalTrades = compTrades + chalTrades;
+      // Reason: Use TradeHistory aggregate as SINGLE SOURCE OF TRUTH for totalTrades/winRate.
+      // This matches getCombinedTradingStats (profile) and getComprehensiveDashboardData (dashboard).
+      const userTradeStats = tradeStatsMap.get(userId) || { totalTrades: 0, winningTrades: 0 };
+      const totalTrades = userTradeStats.totalTrades;
+      const totalWinningTrades = userTradeStats.winningTrades;
+      const overallWinRate =
+        totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
 
       const totalPnl = userComps.reduce(
         (sum: number, p: any) => sum + (p.pnl || 0),
         0,
       );
-      const compWinningTrades = userComps.reduce(
-        (sum: number, p: any) => sum + (p.winningTrades || 0),
-        0,
-      );
-      const chalWinningTrades = userChalls.reduce(
-        (sum: number, p: any) => sum + (p.winningTrades || 0),
-        0,
-      );
-      const totalWinningTrades = compWinningTrades + chalWinningTrades;
-      const overallWinRate =
-        totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
 
       // Calculate challenge stats - use wallet data for actual money spent/won
       const totalChallenges = userChalls.length;
