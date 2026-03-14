@@ -12,10 +12,11 @@ const WalletPage = async () => {
   // Ensure wallet exists first (creates if needed)
   await getOrCreateWallet();
 
-  // Then fetch stats and transactions in parallel (both independent read-only queries)
+  // Reason: Fetch ALL transactions so the user can browse full history
+  // and download complete Excel exports. Client-side pagination handles display.
   const [stats, transactions] = await Promise.all([
     getWalletStats(),
-    getWalletTransactions(20),
+    getWalletTransactions(0),
   ]);
 
   return <WalletContent stats={stats as any} transactions={transactions} />;

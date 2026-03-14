@@ -678,60 +678,65 @@ export default function ProfileOverviewCharts({
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Donut Chart */}
-          <div className="flex justify-center">
-            <DonutChart data={walletDistribution} delay={0.7} />
+        {/* Balance + Income row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/10 rounded-xl p-3 border border-yellow-500/30">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Balance</p>
+            <p className="text-xl font-bold text-white" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              {(walletData?.currentBalance || 0).toFixed(settings.credits.decimals)}
+            </p>
+            <p className="text-xs text-yellow-400">{settings.credits.symbol}</p>
+            {settings.credits.showEUREquivalent && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                ≈ {settings.currency.symbol}{creditsToEUR(walletData?.currentBalance || 0).toFixed(2)}
+              </p>
+            )}
           </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-blue-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Deposited</p>
+            <p className="text-xl font-bold text-blue-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              {(walletData?.totalDeposited || 0).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-green-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Total Won</p>
+            <p className="text-xl font-bold text-green-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              +{((walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0)).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-purple-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">GM Earnings</p>
+            <p className="text-xl font-bold text-purple-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              {(walletData?.totalGMEarnings || 0).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+        </div>
 
-          {/* Balance Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/10 rounded-xl p-4 border border-yellow-500/30">
-              <p className="text-xs text-gray-400 mb-1">Current Balance</p>
-              <p className="text-2xl font-bold text-white">
-                {(walletData?.currentBalance || 0).toFixed(
-                  settings.credits.decimals,
-                )}
-              </p>
-              <p className="text-sm text-yellow-400">
-                {settings.credits.symbol}
-              </p>
-              {settings.credits.showEUREquivalent && (
-                <p className="text-xs text-gray-500 mt-1">
-                  ≈ {settings.currency.symbol}
-                  {creditsToEUR(walletData?.currentBalance || 0).toFixed(2)}
-                </p>
-              )}
-            </div>
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-green-500/20">
-              <p className="text-xs text-gray-400 mb-1">Total Won</p>
-              <p className="text-2xl font-bold text-green-400">
-                +
-                {(
-                  (walletData?.totalWonFromCompetitions || 0) +
-                  (walletData?.totalWonFromChallenges || 0)
-                ).toFixed(settings.credits.decimals)}
-              </p>
-              <p className="text-sm text-yellow-400">
-                {settings.credits.symbol}
-              </p>
-            </div>
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-blue-500/20">
-              <p className="text-xs text-gray-400 mb-1">Deposited</p>
-              <p className="text-xl font-bold text-blue-400">
-                {(walletData?.totalDeposited || 0).toFixed(
-                  settings.credits.decimals,
-                )}
-              </p>
-            </div>
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-600/20">
-              <p className="text-xs text-gray-400 mb-1">Withdrawn</p>
-              <p className="text-xl font-bold text-gray-400">
-                {(walletData?.totalWithdrawn || 0).toFixed(
-                  settings.credits.decimals,
-                )}
-              </p>
-            </div>
+        {/* Spending + Withdrawal row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-red-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Comp. Entries</p>
+            <p className="text-lg font-bold text-red-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              -{(walletData?.totalSpentOnCompetitions || 0).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-orange-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Challenge Entries</p>
+            <p className="text-lg font-bold text-orange-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              -{(walletData?.totalSpentOnChallenges || 0).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-pink-500/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Marketplace</p>
+            <p className="text-lg font-bold text-pink-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              -{(walletData?.totalSpentOnMarketplace || 0).toFixed(settings.credits.decimals)}
+            </p>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-600/20">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Withdrawn</p>
+            <p className="text-lg font-bold text-gray-400" style={{ fontFamily: "var(--font-geist-mono)" }}>
+              {(walletData?.totalWithdrawn || 0).toFixed(settings.credits.decimals)}
+            </p>
           </div>
         </div>
       </motion.div>

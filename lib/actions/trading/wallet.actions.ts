@@ -80,19 +80,22 @@ export const getWalletBalance = async () => {
 };
 
 // Get wallet transaction history
-export const getWalletTransactions = async (limit: number = 50) => {
+// Reason: limit=0 means "fetch all" — Mongoose .limit(0) returns all docs.
+export const getWalletTransactions = async (limit: number = 0) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
-    const transactions = await WalletTransaction.find({
+    const query = WalletTransaction.find({
       userId: session.user.id,
-    })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    }).sort({ createdAt: -1 });
+
+    // Reason: Mongoose .limit(0) is equivalent to no limit
+    if (limit > 0) query.limit(limit);
+
+    const transactions = await query.lean();
 
     // For withdrawals, get actual status from WithdrawalRequest (source of truth)
     // Batch-fetch all withdrawal requests at once instead of per-transaction (N+1 fix)
@@ -944,6 +947,7 @@ export const getWalletStats = async () => {
         totalWonFromCompetitions: 0,
         totalSpentOnChallenges: 0,
         totalWonFromChallenges: 0,
+        totalSpentOnMarketplace: 0,
         netProfitFromCompetitions: 0,
         netProfitFromChallenges: 0,
         roi: 0,
@@ -971,6 +975,7 @@ export const getWalletStats = async () => {
       totalWonFromCompetitions: wallet.totalWonFromCompetitions,
       totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
       totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
+      totalSpentOnMarketplace: wallet.totalSpentOnMarketplace || 0,
       netProfitFromCompetitions: netProfitCompetitions,
       netProfitFromChallenges: netProfitChallenges,
       roi: roi,

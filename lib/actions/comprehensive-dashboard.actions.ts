@@ -103,6 +103,17 @@ export interface ComprehensiveDashboardData {
       net: number;
       transactions: number;
     }[];
+    dailyCreditBreakdown: {
+      date: string;
+      deposits: number;
+      wins: number;
+      gmEarnings: number;
+      refunds: number;
+      entries: number;
+      withdrawals: number;
+      marketplace: number;
+      other: number;
+    }[];
     winLossDistribution: { wins: number; losses: number; breakeven: number };
     tradesBySymbol: { symbol: string; count: number; pnl: number }[];
     tradesByHour: { hour: number; count: number; pnl: number }[];
@@ -401,7 +412,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(100).lean(),
     CreditWallet.findOne({ userId }).select("creditBalance totalWonFromCompetitions totalWonFromChallenges").lean(),
     WalletTransaction.find({ userId, status: "completed" })
-      .select("createdAt balanceAfter amount")
+      .select("createdAt balanceAfter amount transactionType")
       .sort({ createdAt: 1 })
       .limit(1000)
       .lean(),
@@ -1337,8 +1348,9 @@ async function buildChartData(
       transactions: 0,
     });
   }
+  // Reason: The query already filters { status: "completed" }, so no need
+  // to re-check tx.status here (which would fail anyway since status is not in .select()).
   for (const tx of walletTransactions) {
-    if (tx.status !== "completed") continue;
     const txDate = new Date(tx.createdAt);
     const dateStr = toISODateStr(txDate);
     const entry = creditFlowMap.get(dateStr);
@@ -1365,6 +1377,68 @@ async function buildChartData(
     });
   }
 
+  // Daily Credit Breakdown — categorized income vs spending per day
+  const breakdownMap = new Map<
+    string,
+    { deposits: number; wins: number; gmEarnings: number; refunds: number; entries: number; withdrawals: number; marketplace: number; other: number }
+  >();
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    breakdownMap.set(toISODateStr(date), {
+      deposits: 0, wins: 0, gmEarnings: 0, refunds: 0,
+      entries: 0, withdrawals: 0, marketplace: 0, other: 0,
+    });
+  }
+  for (const tx of walletTransactions) {
+    const txDate = new Date(tx.createdAt);
+    const dateStr = toISODateStr(txDate);
+    const entry = breakdownMap.get(dateStr);
+    if (!entry) continue;
+    const amount = Math.abs(tx.amount || 0);
+    const txType = (tx as any).transactionType as string;
+    switch (txType) {
+      case "deposit":
+      case "manual_deposit_credit":
+      case "incident_compensation":
+        entry.deposits += amount; break;
+      case "competition_win":
+      case "challenge_win":
+        entry.wins += amount; break;
+      case "gamemaster_earning":
+      case "gamemaster_challenge_referral":
+        entry.gmEarnings += amount; break;
+      case "competition_refund":
+      case "challenge_refund":
+      case "withdrawal_refund":
+        entry.refunds += amount; break;
+      case "competition_entry":
+      case "challenge_entry":
+        entry.entries += amount; break;
+      case "withdrawal":
+      case "withdrawal_fee":
+        entry.withdrawals += amount; break;
+      case "marketplace_purchase":
+      case "gamemaster_subscription":
+        entry.marketplace += amount; break;
+      default:
+        if ((tx.amount || 0) > 0) entry.deposits += amount;
+        else entry.other += amount;
+        break;
+    }
+  }
+  const dailyCreditBreakdown = Array.from(breakdownMap.entries()).map(([date, d]) => ({
+    date,
+    deposits: Number(d.deposits.toFixed(2)),
+    wins: Number(d.wins.toFixed(2)),
+    gmEarnings: Number(d.gmEarnings.toFixed(2)),
+    refunds: Number(d.refunds.toFixed(2)),
+    entries: Number(d.entries.toFixed(2)),
+    withdrawals: Number(d.withdrawals.toFixed(2)),
+    marketplace: Number(d.marketplace.toFixed(2)),
+    other: Number(d.other.toFixed(2)),
+  }));
+
   // Sort and limit derived arrays
   const tradesBySymbol = Array.from(symbolMap.entries())
     .map(([symbol, data]) => ({ symbol, ...data }))
@@ -1390,6 +1464,7 @@ async function buildChartData(
     equityCurve,
     dailyPnL,
     dailyCreditFlow,
+    dailyCreditBreakdown,
     winLossDistribution: { wins, losses, breakeven },
     tradesBySymbol,
     tradesByHour,

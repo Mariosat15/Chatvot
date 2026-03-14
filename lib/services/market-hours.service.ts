@@ -37,6 +37,11 @@ function logOnce(key: string, message: string, level: "log" | "warn" = "log") {
   else console.log(message);
 }
 
+// Reason: Tracks last-known market status per asset class so we only log
+// when the status actually changes (OPEN→CLOSED or CLOSED→OPEN), instead
+// of logging every poll cycle, which was spamming the server logs.
+const lastKnownStatus = new Map<string, boolean>();
+
 /**
  * Get market settings from database (with caching)
  */
@@ -190,11 +195,16 @@ export async function isMarketOpen(assetClass: AssetClass = "forex"): Promise<{
   if (settings.mode === "automatic") {
     try {
       const status = await getMarketStatusFromAPI();
-      // Reason: Only log state transitions, not every poll. Log once per status.
-      logOnce(
-        `auto-${assetClass}-${status.isOpen}`,
-        `📡 [Market Hours] ${assetClass} (auto): ${status.isOpen ? "OPEN" : "CLOSED"}`,
-      );
+      // Reason: Only log when status actually transitions (OPEN↔CLOSED).
+      // Previously logged every 10 min even if status hadn't changed, spamming logs.
+      const statusKey = `auto-${assetClass}`;
+      const prevStatus = lastKnownStatus.get(statusKey);
+      if (prevStatus !== status.isOpen) {
+        lastKnownStatus.set(statusKey, status.isOpen);
+        console.log(
+          `📡 [Market Hours] ${assetClass} (auto): ${status.isOpen ? "OPEN" : "CLOSED"}`,
+        );
+      }
       return {
         isOpen: status.isOpen,
         reason: status.isOpen ? undefined : "Market is currently closed",

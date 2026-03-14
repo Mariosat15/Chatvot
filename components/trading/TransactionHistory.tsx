@@ -16,11 +16,86 @@ import {
   Calendar,
   ChevronDown,
   X,
+  Download,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/**
+ * Export transactions as a CSV file (opens natively in Excel).
+ * Reason: We use CSV instead of xlsx to avoid adding a heavy dependency.
+ * CSV opens in Excel by default on Windows and is universally compatible.
+ */
+function exportTransactionsToCSV(
+  transactions: Transaction[],
+  creditName: string,
+  currencySymbol: string,
+  creditsToEUR: (c: number) => number,
+) {
+  const headers = [
+    "Date",
+    "Type",
+    "Description",
+    `Amount (${creditName})`,
+    `Amount (${currencySymbol})`,
+    "Status",
+    "Payment Method",
+  ];
+
+  const typeLabels: Record<string, string> = {
+    deposit: "Deposit",
+    withdrawal: "Withdrawal",
+    withdrawal_fee: "Withdrawal Fee",
+    withdrawal_refund: "Withdrawal Refund",
+    manual_deposit_credit: "Manual Credit",
+    competition_entry: "Competition Entry",
+    competition_win: "Competition Win",
+    competition_refund: "Competition Refund",
+    platform_fee: "Platform Fee",
+    admin_adjustment: "Admin Adjustment",
+    challenge_entry: "Challenge Entry",
+    challenge_win: "Challenge Win",
+    challenge_refund: "Challenge Refund",
+    challenge_declined: "Challenge Declined",
+    challenge_expired: "Challenge Expired",
+    marketplace_purchase: "Marketplace Purchase",
+    gamemaster_subscription: "GM Subscription",
+    gamemaster_subscription_refund: "GM Subscription Refund",
+    incident_compensation: "Compensation",
+    gamemaster_earning: "Referral Earning",
+    gamemaster_challenge_referral: "Challenge Referral",
+  };
+
+  const rows = transactions.map((tx) => {
+    const date = new Date(tx.createdAt).toLocaleString("en-GB", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const type = typeLabels[tx.transactionType] || tx.transactionType;
+    // Escape double-quotes inside the description
+    const desc = `"${(tx.description || "").replace(/"/g, '""')}"`;
+    const amount = tx.amount.toFixed(2);
+    const eurAmount = creditsToEUR(Math.abs(tx.amount)).toFixed(2);
+    const eurSigned = tx.amount >= 0 ? eurAmount : `-${eurAmount}`;
+    return [date, type, desc, amount, eurSigned, tx.status, tx.paymentMethod || ""].join(",");
+  });
+
+  const csv = [headers.join(","), ...rows].join("\n");
+  // Reason: BOM prefix tells Excel to interpret the file as UTF-8
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 interface Transaction {
   _id: string;
@@ -28,6 +103,8 @@ interface Transaction {
     | "deposit"
     | "withdrawal"
     | "withdrawal_fee"
+    | "withdrawal_refund"
+    | "manual_deposit_credit"
     | "competition_entry"
     | "competition_win"
     | "competition_refund"
@@ -39,6 +116,8 @@ interface Transaction {
     | "challenge_declined"
     | "challenge_expired"
     | "marketplace_purchase"
+    | "gamemaster_subscription"
+    | "gamemaster_subscription_refund"
     | "incident_compensation"
     | "gamemaster_earning"
     | "gamemaster_challenge_referral";
@@ -72,6 +151,7 @@ type FilterType =
   | "withdrawals"
   | "competitions"
   | "challenges"
+  | "marketplace"
   | "referrals";
 type DatePreset = "all" | "30" | "60" | "90" | "120" | "custom";
 
@@ -81,6 +161,7 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: "withdrawals", label: "Withdrawals" },
   { value: "competitions", label: "Competitions" },
   { value: "challenges", label: "Challenges" },
+  { value: "marketplace", label: "Marketplace" },
   { value: "referrals", label: "Referrals" },
 ];
 
@@ -93,12 +174,15 @@ const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: "custom", label: "Custom Range" },
 ];
 
+const PAGE_SIZE = 25;
+
 export default function TransactionHistory({
   transactions,
   onFilteredStatsChange,
 }: TransactionHistoryProps) {
-  const { settings } = useAppSettings();
+  const { settings, creditsToEUR } = useAppSettings();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // ── Batch invoice lookup ─────────────────────────────────────────────
   // Instead of each TransactionItem fetching /api/user/invoices/by-transaction/X
@@ -189,6 +273,12 @@ export default function TransactionHistory({
             "challenge_declined",
             "challenge_expired",
           ].includes(tx.transactionType);
+        case "marketplace":
+          return [
+            "marketplace_purchase",
+            "gamemaster_subscription",
+            "gamemaster_subscription_refund",
+          ].includes(tx.transactionType);
         case "referrals":
           return [
             "gamemaster_earning",
@@ -242,7 +332,7 @@ export default function TransactionHistory({
     onFilteredStatsChange(stats);
   }, [dateFilteredTransactions, onFilteredStatsChange]);
 
-  // Check if there are any referral transactions
+  // Check which optional filter tabs should be visible
   const hasReferralTransactions = useMemo(
     () =>
       transactions.some((tx) =>
@@ -252,15 +342,31 @@ export default function TransactionHistory({
       ),
     [transactions],
   );
+  const hasMarketplaceTransactions = useMemo(
+    () =>
+      transactions.some((tx) =>
+        ["marketplace_purchase", "gamemaster_subscription", "gamemaster_subscription_refund"].includes(
+          tx.transactionType,
+        ),
+      ),
+    [transactions],
+  );
 
-  // Filter out referrals option if no referral transactions
+  // Only show filter tabs for categories that have transactions
   const availableFilters = useMemo(
     () =>
-      hasReferralTransactions
-        ? FILTER_OPTIONS
-        : FILTER_OPTIONS.filter((f) => f.value !== "referrals"),
-    [hasReferralTransactions],
+      FILTER_OPTIONS.filter((f) => {
+        if (f.value === "referrals") return hasReferralTransactions;
+        if (f.value === "marketplace") return hasMarketplaceTransactions;
+        return true;
+      }),
+    [hasReferralTransactions, hasMarketplaceTransactions],
   );
+
+  // Reason: Reset pagination when filter/date changes so user always sees first page
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filter, datePreset, customStartDate, customEndDate]);
 
   const handleDatePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -425,6 +531,31 @@ export default function TransactionHistory({
         </div>
       </div>
 
+      {/* Transaction count + Download */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-500">
+          Showing {Math.min(visibleCount, filteredTransactions.length)} of {filteredTransactions.length} transactions
+        </p>
+        {filteredTransactions.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportTransactionsToCSV(
+                filteredTransactions,
+                settings?.credits.name || "Credits",
+                settings?.currency.symbol || "€",
+                creditsToEUR,
+              )
+            }
+            className="text-xs gap-1.5 h-7"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
+        )}
+      </div>
+
       {/* Transaction List */}
       {filteredTransactions.length === 0 ? (
         <div className="py-8 text-center">
@@ -435,13 +566,35 @@ export default function TransactionHistory({
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredTransactions.map((transaction) => (
+          {filteredTransactions.slice(0, visibleCount).map((transaction) => (
             <TransactionItem
               key={transaction._id}
               transaction={transaction}
               preloadedInvoiceId={invoiceMap[transaction._id] || null}
             />
           ))}
+
+          {/* Show More / Show All */}
+          {filteredTransactions.length > visibleCount && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                className="text-xs"
+              >
+                Show More ({filteredTransactions.length - visibleCount} remaining)
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setVisibleCount(filteredTransactions.length)}
+                className="text-xs text-gray-400"
+              >
+                Show All
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -499,6 +652,11 @@ function TransactionItem({
         return <Swords className="h-5 w-5 text-gray-500" />;
       case "incident_compensation":
         return <Gift className="h-5 w-5 text-green-500" />;
+      // Marketplace purchases
+      case "marketplace_purchase":
+      case "gamemaster_subscription":
+      case "gamemaster_subscription_refund":
+        return <Zap className="h-5 w-5 text-pink-500" />;
       // GM Referral earnings
       case "gamemaster_earning":
       case "gamemaster_challenge_referral":

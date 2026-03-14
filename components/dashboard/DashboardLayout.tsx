@@ -11,6 +11,7 @@ import RecentTradesFeed from "./RecentTradesFeed";
 import StreaksShowcase from "./StreaksShowcase";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 import AccountStatusCard from "./AccountStatusCard";
+import CreditBreakdownChart from "./CreditBreakdownChart";
 
 // Reason: These charts use Lightweight Charts (browser-only) so must load client-side only
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
@@ -80,6 +81,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         <div className="lg:col-span-2 space-y-4">
           <EquityChart data={charts.walletBalanceHistory} />
           <DailyCreditFlow data={charts.dailyCreditFlow} />
+          <CreditBreakdownChart data={charts.dailyCreditBreakdown} />
         </div>
 
         {/* Right: Contests sidebar (1/3 width) */}

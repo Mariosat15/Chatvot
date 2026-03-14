@@ -35,7 +35,11 @@ interface WalletContentProps {
     totalWithdrawn: number;
     totalSpentOnCompetitions: number;
     totalWonFromCompetitions: number;
+    totalSpentOnChallenges?: number;
+    totalWonFromChallenges?: number;
+    totalSpentOnMarketplace?: number;
     netProfitFromCompetitions: number;
+    netProfitFromChallenges?: number;
     roi: number;
     kycVerified: boolean;
     withdrawalEnabled: boolean;
