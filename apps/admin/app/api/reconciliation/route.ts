@@ -488,10 +488,11 @@ export async function POST(request: NextRequest) {
       }
 
       case "competition_win_mismatch": {
-        // Include competition_win and competition_refund (both are credits received)
+        // Reason: Only count competition_win — refunds are tracked separately.
+        // The old code included competition_refund, which kept the polluted value.
         const competitionWinTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ["competition_win", "competition_refund"] },
+          transactionType: "competition_win",
           status: "completed",
         }).session(session);
 
@@ -514,16 +515,16 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Competition wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (includes refunds)`,
+          message: `Competition wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (wins only, refunds tracked separately)`,
         };
         break;
       }
 
       case "challenge_win_mismatch": {
-        // Include challenge_win and challenge_refund (both are credits received)
+        // Reason: Only count challenge_win — refunds are tracked separately.
         const challengeWinTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ["challenge_win", "challenge_refund"] },
+          transactionType: "challenge_win",
           status: "completed",
         }).session(session);
 
@@ -546,7 +547,7 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Challenge wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (includes refunds)`,
+          message: `Challenge wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (wins only, refunds tracked separately)`,
         };
         break;
       }

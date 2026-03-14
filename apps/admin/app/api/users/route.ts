@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
     const challengeParticipants = await ChallengeParticipant.find({
       userId: { $in: userIds },
     })
-      .select("userId status isWinner")
+      .select("userId status isWinner totalTrades winningTrades")
       .lean();
 
     // Group challenge participants by user (O(n) with Map)
@@ -266,18 +266,31 @@ export async function GET(request: NextRequest) {
         (p: any) => p.status === "completed",
       ).length;
 
-      const totalTrades = userComps.reduce(
+      // Reason: Include BOTH competition and challenge trades for consistency with
+      // the profile page's getCombinedTradingStats (which uses TradeHistory).
+      const compTrades = userComps.reduce(
         (sum: number, p: any) => sum + (p.totalTrades || 0),
         0,
       );
+      const chalTrades = userChalls.reduce(
+        (sum: number, p: any) => sum + (p.totalTrades || 0),
+        0,
+      );
+      const totalTrades = compTrades + chalTrades;
+
       const totalPnl = userComps.reduce(
         (sum: number, p: any) => sum + (p.pnl || 0),
         0,
       );
-      const totalWinningTrades = userComps.reduce(
+      const compWinningTrades = userComps.reduce(
         (sum: number, p: any) => sum + (p.winningTrades || 0),
         0,
       );
+      const chalWinningTrades = userChalls.reduce(
+        (sum: number, p: any) => sum + (p.winningTrades || 0),
+        0,
+      );
+      const totalWinningTrades = compWinningTrades + chalWinningTrades;
       const overallWinRate =
         totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
 
