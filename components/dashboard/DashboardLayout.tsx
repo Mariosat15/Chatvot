@@ -14,7 +14,9 @@ import AccountStatusCard from "./AccountStatusCard";
 
 // Reason: These charts use Lightweight Charts (browser-only) so must load client-side only
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
-const DailyPnLChart = dynamic(() => import("./DailyPnLBars"), { ssr: false });
+const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
+  ssr: false,
+});
 
 interface DashboardLayoutProps {
   data: ComprehensiveDashboardData;
@@ -74,10 +76,10 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
       {/* Row 5: Charts + Contests Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: Equity Chart + Daily P&L (2/3 width) */}
+        {/* Left: Wallet Balance + Daily Credit Flow (2/3 width) */}
         <div className="lg:col-span-2 space-y-4">
           <EquityChart data={charts.walletBalanceHistory} />
-          <DailyPnLChart data={charts.dailyPnL} />
+          <DailyCreditFlow data={charts.dailyCreditFlow} />
         </div>
 
         {/* Right: Contests sidebar (1/3 width) */}

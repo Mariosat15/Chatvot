@@ -6,41 +6,59 @@ import { motion } from "framer-motion";
 // Reason: Lightweight Charts is a browser-only library. This component
 // must be imported with next/dynamic { ssr: false } in the parent layout.
 
-interface EquityChartProps {
-  data: { date: string; balance: number; change: number }[];
+interface DailyCreditFlowProps {
+  data: {
+    date: string;
+    inflow: number;
+    outflow: number;
+    net: number;
+    transactions: number;
+  }[];
 }
 
-// Reason: Renamed from "Equity Curve" to "Wallet Balance" because this chart
-// tracks wallet balance history (from WalletTransaction.balanceAfter), not
-// trading equity. Uses ⚡ (Volt) branding to match the credits system.
-export default function EquityChart({ data }: EquityChartProps) {
+// Reason: Replaces "Daily P&L" with a more relevant credit flow visualization.
+// Shows daily inflows (deposits, wins, refunds, GM earnings) vs outflows
+// (entries, withdrawals, marketplace purchases) as a stacked histogram.
+export default function DailyCreditFlow({ data }: DailyCreditFlowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
-  const seriesRef = useRef<any>(null);
-  const [range, setRange] = useState<"7d" | "30d" | "90d" | "all">("all");
-  const [hoveredPoint, setHoveredPoint] = useState<{ date: string; value: number; change: number } | null>(null);
+  const [range, setRange] = useState<"7d" | "30d">("30d");
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    date: string;
+    inflow: number;
+    outflow: number;
+    net: number;
+    transactions: number;
+  } | null>(null);
 
+  // Sort oldest→newest, limit by selected range
   const filteredData = useMemo(() => {
-    if (!data || data.length < 2) return [];
-    if (range === "all") return data;
-
-    const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-    return data.slice(-days);
+    if (!data || data.length < 1) return [];
+    const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+    const days = range === "7d" ? 7 : 30;
+    return sorted.slice(-days);
   }, [data, range]);
 
-  const lastBalance = filteredData[filteredData.length - 1]?.balance ?? 0;
-  const firstBalance = filteredData[0]?.balance ?? 0;
-  const totalChange = lastBalance - firstBalance;
-  const totalChangePct = firstBalance > 0 ? (totalChange / firstBalance) * 100 : 0;
-  const isPositive = totalChange >= 0;
+  const totalNet = useMemo(
+    () => filteredData.reduce((s, d) => s + d.net, 0),
+    [filteredData],
+  );
+  const totalInflow = useMemo(
+    () => filteredData.reduce((s, d) => s + d.inflow, 0),
+    [filteredData],
+  );
+  const totalOutflow = useMemo(
+    () => filteredData.reduce((s, d) => s + d.outflow, 0),
+    [filteredData],
+  );
 
   useEffect(() => {
-    if (!containerRef.current || filteredData.length < 2) return;
+    if (!containerRef.current || filteredData.length < 1) return;
 
     let chart: any;
-    let area: any;
+    let netSeries: any;
 
-    // Reason: Dynamic import ensures Lightweight Charts doesn't SSR
+    // Dynamic import ensures Lightweight Charts doesn't SSR
     import("lightweight-charts").then((mod) => {
       if (!containerRef.current) return;
 
@@ -65,7 +83,7 @@ export default function EquityChart({ data }: EquityChartProps) {
         },
         rightPriceScale: {
           borderVisible: false,
-          scaleMargins: { top: 0.1, bottom: 0.05 },
+          scaleMargins: { top: 0.1, bottom: 0.1 },
         },
         timeScale: {
           borderVisible: false,
@@ -79,34 +97,29 @@ export default function EquityChart({ data }: EquityChartProps) {
         handleScale: { mouseWheel: false, pinch: false },
       });
 
-      // Reason: Yellow/amber Volt branding for the wallet balance chart
-      const lineColor = isPositive ? "#EAB308" : "#F59E0B";
-      const topColor = isPositive ? "rgba(234,179,8,0.25)" : "rgba(245,158,11,0.25)";
-      const bottomColor = isPositive ? "rgba(234,179,8,0.02)" : "rgba(245,158,11,0.02)";
-
-      area = chart.addAreaSeries({
-        lineColor,
-        topColor,
-        bottomColor,
-        lineWidth: 2,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 4,
-        crosshairMarkerBackgroundColor: lineColor,
-        crosshairMarkerBorderColor: "#fff",
-        crosshairMarkerBorderWidth: 2,
+      // Net credit flow as a histogram — green bars for positive (inflow > outflow),
+      // red bars for negative (outflow > inflow)
+      netSeries = chart.addHistogramSeries({
+        priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+        priceScaleId: "right",
       });
 
-      // Reason: Parse dates to YYYY-MM-DD format for Lightweight Charts time
       const chartData = filteredData.map((d) => {
         const dateStr = d.date.length === 10 ? d.date : d.date.slice(0, 10);
-        return { time: dateStr, value: d.balance };
+        return {
+          time: dateStr,
+          value: d.net,
+          color:
+            d.net >= 0
+              ? "rgba(250, 204, 21, 0.85)" // yellow for positive net (on-brand ⚡)
+              : "rgba(239, 68, 68, 0.75)", // red for negative net
+        };
       });
 
-      area.setData(chartData);
+      netSeries.setData(chartData);
       chart.timeScale().fitContent();
 
       chartRef.current = chart;
-      seriesRef.current = area;
 
       // Crosshair hover handler
       chart.subscribeCrosshairMove((param: any) => {
@@ -114,16 +127,14 @@ export default function EquityChart({ data }: EquityChartProps) {
           setHoveredPoint(null);
           return;
         }
-        const val = param.seriesData.get(area);
+        const val = param.seriesData.get(netSeries);
         if (val) {
           const matchIdx = filteredData.findIndex(
-            (d) => d.date.slice(0, 10) === String(param.time)
+            (d) => d.date.slice(0, 10) === String(param.time),
           );
-          setHoveredPoint({
-            date: String(param.time),
-            value: val.value,
-            change: matchIdx >= 0 ? filteredData[matchIdx].change : 0,
-          });
+          if (matchIdx >= 0) {
+            setHoveredPoint(filteredData[matchIdx]);
+          }
         }
       });
 
@@ -147,9 +158,9 @@ export default function EquityChart({ data }: EquityChartProps) {
         chartRef.current = null;
       }
     };
-  }, [filteredData, isPositive]);
+  }, [filteredData]);
 
-  if (!data || data.length < 2) {
+  if (!data || data.length === 0) {
     return (
       <motion.div
         className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-5"
@@ -157,10 +168,10 @@ export default function EquityChart({ data }: EquityChartProps) {
         animate={{ opacity: 1, y: 0 }}
       >
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-          ⚡ Wallet Balance
+          💰 Daily Credit Flow
         </h3>
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
-          Make a deposit to start tracking your wallet balance
+          Your credit activity will appear here
         </div>
       </motion.div>
     );
@@ -171,42 +182,47 @@ export default function EquityChart({ data }: EquityChartProps) {
       className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.35 }}
+      transition={{ duration: 0.5, delay: 0.4 }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-            ⚡ Wallet Balance
+            💰 Daily Credit Flow
           </h3>
           {hoveredPoint ? (
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-lg font-bold text-yellow-400" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
-                {hoveredPoint.value.toFixed(2)} ⚡
-              </span>
               <span
-                className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                  hoveredPoint.change >= 0
-                    ? "text-green-400 bg-green-500/10"
-                    : "text-red-400 bg-red-500/10"
+                className={`text-lg font-bold ${
+                  hoveredPoint.net >= 0 ? "text-yellow-400" : "text-red-400"
                 }`}
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
               >
-                {hoveredPoint.change >= 0 ? "+" : ""}{hoveredPoint.change.toFixed(2)}
+                {hoveredPoint.net >= 0 ? "+" : ""}
+                {hoveredPoint.net.toFixed(2)} ⚡
+              </span>
+              <span className="text-xs text-gray-500 font-[var(--font-geist-mono)]">
+                ↑{hoveredPoint.inflow.toFixed(0)} ↓
+                {hoveredPoint.outflow.toFixed(0)} · {hoveredPoint.transactions}{" "}
+                txns
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-lg font-bold text-yellow-400" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
-                {lastBalance.toFixed(2)} ⚡
-              </span>
+            <div className="flex items-center gap-3 mt-1">
               <span
-                className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                  isPositive
-                    ? "text-green-400 bg-green-500/10"
-                    : "text-red-400 bg-red-500/10"
+                className={`text-lg font-bold ${
+                  totalNet >= 0 ? "text-yellow-400" : "text-red-400"
                 }`}
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
               >
-                {isPositive ? "+" : ""}{totalChangePct.toFixed(1)}%
+                {totalNet >= 0 ? "+" : ""}
+                {totalNet.toFixed(2)} ⚡
+              </span>
+              <span className="text-xs text-gray-500">
+                <span className="text-green-400">
+                  ↑{totalInflow.toFixed(0)}
+                </span>{" "}
+                <span className="text-red-400">↓{totalOutflow.toFixed(0)}</span>
               </span>
             </div>
           )}
@@ -214,7 +230,7 @@ export default function EquityChart({ data }: EquityChartProps) {
 
         {/* Range selector */}
         <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5">
-          {(["7d", "30d", "90d", "all"] as const).map((r) => (
+          {(["7d", "30d"] as const).map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
@@ -224,7 +240,7 @@ export default function EquityChart({ data }: EquityChartProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              {r === "all" ? "All" : r.toUpperCase()}
+              {r.toUpperCase()}
             </button>
           ))}
         </div>

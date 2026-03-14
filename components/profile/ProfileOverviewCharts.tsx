@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -9,14 +9,12 @@ import {
   Target,
   Award,
   BarChart3,
-  Zap,
   Swords,
   Wallet,
   ArrowRight,
   Activity,
   DollarSign,
   Percent,
-  Users,
   Crown,
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
@@ -179,8 +177,8 @@ function BarChart({
   );
 }
 
-// Radial Progress Bar Component
-function RadialProgress({
+// Radial Progress Bar Component — kept for potential reuse
+function _RadialProgress({
   value,
   maxValue = 100,
   label,
@@ -501,31 +499,21 @@ export default function ProfileOverviewCharts({
     [combinedStats],
   );
 
-  // Wallet distribution data - shows fund sources and current balance breakdown
+  // Reason: Show actual wallet totals (single source of truth: CreditWallet model)
+  // instead of proportional allocation which produced different numbers from the cards.
   const walletDistribution = useMemo(() => {
     const deposited = walletData?.totalDeposited || 0;
     const won =
       (walletData?.totalWonFromCompetitions || 0) +
       (walletData?.totalWonFromChallenges || 0);
-    const withdrawn = walletData?.totalWithdrawn || 0;
-    const balance = walletData?.currentBalance || 0;
-
-    // Calculate what portion of balance is from each source
-    const totalReceived = deposited + won;
-    const totalSpent = totalReceived - balance + withdrawn; // Entry fees, etc.
-
-    // Show balance breakdown (proportional attribution)
-    const depositPortion =
-      totalReceived > 0 ? (deposited / totalReceived) * balance : balance;
-    const wonPortion = totalReceived > 0 ? (won / totalReceived) * balance : 0;
+    const gmEarnings = walletData?.totalGMEarnings || 0;
 
     return [
-      {
-        label: "Deposited",
-        value: Number(depositPortion.toFixed(2)),
-        color: "#3b82f6",
-      },
-      { label: "Won", value: Number(wonPortion.toFixed(2)), color: "#22c55e" },
+      { label: "Deposited", value: Number(deposited.toFixed(2)), color: "#3b82f6" },
+      { label: "Won", value: Number(won.toFixed(2)), color: "#22c55e" },
+      ...(gmEarnings > 0
+        ? [{ label: "GM Earnings", value: Number(gmEarnings.toFixed(2)), color: "#a855f7" }]
+        : []),
     ].filter((item) => item.value > 0);
   }, [walletData]);
 

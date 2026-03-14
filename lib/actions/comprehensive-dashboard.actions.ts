@@ -96,6 +96,13 @@ export interface ComprehensiveDashboardData {
     walletBalanceHistory: { date: string; balance: number; change: number }[];
     equityCurve: { date: string; equity: number; pnl: number }[];
     dailyPnL: { date: string; pnl: number; trades: number }[];
+    dailyCreditFlow: {
+      date: string;
+      inflow: number;
+      outflow: number;
+      net: number;
+      transactions: number;
+    }[];
     winLossDistribution: { wins: number; losses: number; breakeven: number };
     tradesBySymbol: { symbol: string; count: number; pnl: number }[];
     tradesByHour: { hour: number; count: number; pnl: number }[];
@@ -1316,6 +1323,48 @@ async function buildChartData(
     });
   }
 
+  // Daily Credit Flow — aggregates wallet transactions into daily inflow/outflow
+  const creditFlowMap = new Map<
+    string,
+    { inflow: number; outflow: number; transactions: number }
+  >();
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    creditFlowMap.set(toISODateStr(date), {
+      inflow: 0,
+      outflow: 0,
+      transactions: 0,
+    });
+  }
+  for (const tx of walletTransactions) {
+    if (tx.status !== "completed") continue;
+    const txDate = new Date(tx.createdAt);
+    const dateStr = toISODateStr(txDate);
+    const entry = creditFlowMap.get(dateStr);
+    if (!entry) continue; // outside 30-day window
+    const amount = tx.amount || 0;
+    if (amount > 0) entry.inflow += amount;
+    else if (amount < 0) entry.outflow += Math.abs(amount);
+    entry.transactions++;
+  }
+  const dailyCreditFlow: {
+    date: string;
+    inflow: number;
+    outflow: number;
+    net: number;
+    transactions: number;
+  }[] = [];
+  for (const [date, data] of creditFlowMap) {
+    dailyCreditFlow.push({
+      date,
+      inflow: Number(data.inflow.toFixed(2)),
+      outflow: Number(data.outflow.toFixed(2)),
+      net: Number((data.inflow - data.outflow).toFixed(2)),
+      transactions: data.transactions,
+    });
+  }
+
   // Sort and limit derived arrays
   const tradesBySymbol = Array.from(symbolMap.entries())
     .map(([symbol, data]) => ({ symbol, ...data }))
@@ -1340,6 +1389,7 @@ async function buildChartData(
     walletBalanceHistory,
     equityCurve,
     dailyPnL,
+    dailyCreditFlow,
     winLossDistribution: { wins, losses, breakeven },
     tradesBySymbol,
     tradesByHour,
