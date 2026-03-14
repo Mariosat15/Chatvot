@@ -60,6 +60,13 @@ export interface ComprehensiveDashboardData {
     largestLoss: number;
     activeContests: number;
     totalPrizesWon: number;
+    // Wallet stats for hero bar
+    creditBalance: number;
+    totalDeposited: number;
+    totalSpent: number;
+    totalWithdrawn: number;
+    roi: number;
+    gmEarnings: number;
   };
 
   // Competitions
@@ -410,7 +417,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       $or: [{ challengerId: userId }, { challengedId: userId }],
     }).select(challengeSelect).sort({ createdAt: -1 }).limit(100).lean(),
     TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(100).lean(),
-    CreditWallet.findOne({ userId }).select("creditBalance totalWonFromCompetitions totalWonFromChallenges").lean(),
+    // Reason: Select all wallet fields needed by dashboard hero stats and charts
+    CreditWallet.findOne({ userId }).select("creditBalance totalDeposited totalWithdrawn totalWonFromCompetitions totalWonFromChallenges totalSpentOnCompetitions totalSpentOnChallenges totalSpentOnMarketplace").lean(),
     WalletTransaction.find({ userId, status: "completed" })
       .select("createdAt balanceAfter amount transactionType")
       .sort({ createdAt: 1 })
@@ -812,6 +820,32 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     (walletData?.totalWonFromCompetitions || 0) +
     (walletData?.totalWonFromChallenges || 0);
 
+  // Wallet-derived stats for hero bar
+  const wCreditBalance = walletData?.creditBalance || 0;
+  const wTotalDeposited = walletData?.totalDeposited || 0;
+  const wTotalWithdrawn = walletData?.totalWithdrawn || 0;
+  const wTotalSpentOnCompetitions = walletData?.totalSpentOnCompetitions || 0;
+  const wTotalSpentOnChallenges = walletData?.totalSpentOnChallenges || 0;
+  const wTotalSpentOnMarketplace = walletData?.totalSpentOnMarketplace || 0;
+  const wTotalSpent = wTotalSpentOnCompetitions + wTotalSpentOnChallenges + wTotalSpentOnMarketplace;
+  const wNetProfit = totalPrizesWon - wTotalSpentOnCompetitions - wTotalSpentOnChallenges;
+  const wROI = (wTotalSpentOnCompetitions + wTotalSpentOnChallenges) > 0
+    ? (wNetProfit / (wTotalSpentOnCompetitions + wTotalSpentOnChallenges)) * 100
+    : 0;
+
+  // Fetch GM earnings from gamemasterearnings collection
+  let wGMEarnings = 0;
+  try {
+    const mongoose = await import("mongoose");
+    const db = mongoose.default.connection.db;
+    if (db) {
+      const gmResult = await db.collection("gamemasterearnings")
+        .aggregate([{ $match: { gameMasterId: userId } }, { $group: { _id: null, total: { $sum: "$netEarning" } } }])
+        .toArray();
+      wGMEarnings = gmResult[0]?.total || 0;
+    }
+  } catch { /* GM earnings are non-critical */ }
+
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
   const profitFactor =
     totalGrossLosses > 0
@@ -923,7 +957,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       nextLevel: null, progressPercent: 0, xpToNext: 100,
     })),
     getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),
-    UserBadge.find({ userId }).sort({ earnedAt: -1 }).limit(5).lean().catch(() => []),
+    // Reason: Fetch ALL earned badges (no limit) so dashboard can show them with expand/collapse
+    UserBadge.find({ userId }).sort({ earnedAt: -1 }).lean().catch(() => []),
   ]);
 
   // Recalculate XP progress with actual user XP
@@ -1143,6 +1178,13 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       activeContests:
         processedCompetitions.active.length + processedChallenges.active.length,
       totalPrizesWon,
+      // Wallet stats for hero bar
+      creditBalance: wCreditBalance,
+      totalDeposited: wTotalDeposited,
+      totalSpent: wTotalSpent,
+      totalWithdrawn: wTotalWithdrawn,
+      roi: wROI,
+      gmEarnings: wGMEarnings,
     },
     competitions: processedCompetitions,
     challenges: processedChallenges,

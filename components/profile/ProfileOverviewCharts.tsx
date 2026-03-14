@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+// Reason: useMemo removed — no longer needed after chart cleanup
 import Link from "next/link";
 import {
   TrendingUp,
@@ -8,13 +8,10 @@ import {
   Trophy,
   Target,
   Award,
-  BarChart3,
   Swords,
   Wallet,
   ArrowRight,
-  Activity,
   DollarSign,
-  Percent,
   Crown,
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
@@ -28,218 +25,7 @@ interface ProfileOverviewChartsProps {
   walletData: any;
 }
 
-// Animated Ring/Donut Chart Component
-function RingChart({
-  value,
-  maxValue = 100,
-  size = 120,
-  strokeWidth = 10,
-  color,
-  bgColor = "rgba(255,255,255,0.1)",
-  label,
-  sublabel,
-  icon,
-  delay = 0,
-}: {
-  value: number;
-  maxValue?: number;
-  size?: number;
-  strokeWidth?: number;
-  color: string;
-  bgColor?: string;
-  label: string;
-  sublabel?: string;
-  icon?: React.ReactNode;
-  delay?: number;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const percentage = Math.min(Math.max(value / maxValue, 0), 1);
-  const offset = circumference - percentage * circumference;
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg className="transform -rotate-90" width={size} height={size}>
-          {/* Background ring */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={bgColor}
-            strokeWidth={strokeWidth}
-          />
-          {/* Animated progress ring */}
-          <motion.circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={`url(#gradient-${label.replace(/\s/g, "")})`}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset: offset }}
-            transition={{ duration: 1.5, delay, ease: "easeOut" }}
-          />
-          <defs>
-            <linearGradient
-              id={`gradient-${label.replace(/\s/g, "")}`}
-              x1="0%"
-              y1="0%"
-              x2="100%"
-              y2="0%"
-            >
-              <stop offset="0%" stopColor={color} />
-              <stop offset="100%" stopColor={color} stopOpacity="0.6" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {icon && <div className="mb-1">{icon}</div>}
-          <motion.span
-            className="text-2xl font-bold text-white"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: delay + 0.5 }}
-          >
-            {typeof value === "number"
-              ? value % 1 === 0
-                ? value
-                : value.toFixed(1)
-              : value}
-            {maxValue === 100 && "%"}
-          </motion.span>
-        </div>
-      </div>
-      <p className="mt-2 text-sm font-medium text-gray-300">{label}</p>
-      {sublabel && <p className="text-xs text-gray-500">{sublabel}</p>}
-    </div>
-  );
-}
-
-// Vertical Bar Chart Component
-function BarChart({
-  data,
-  height = 150,
-  delay = 0,
-}: {
-  data: { label: string; value: number; color: string; maxValue?: number }[];
-  height?: number;
-  delay?: number;
-}) {
-  const maxVal = Math.max(...data.map((d) => d.maxValue || d.value), 1);
-
-  return (
-    <div className="flex items-end justify-around gap-3" style={{ height }}>
-      {data.map((item, i) => {
-        const barHeight = (item.value / maxVal) * (height - 30);
-        return (
-          <div key={item.label} className="flex flex-col items-center">
-            <motion.div
-              className="rounded-t-lg relative overflow-hidden"
-              style={{
-                width: 40,
-                background: `linear-gradient(to top, ${item.color}, ${item.color}88)`,
-              }}
-              initial={{ height: 0 }}
-              animate={{ height: Math.max(barHeight, 4) }}
-              transition={{
-                duration: 0.8,
-                delay: delay + i * 0.1,
-                ease: "easeOut",
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/10 to-white/20" />
-            </motion.div>
-            <motion.span
-              className="text-xs text-gray-400 mt-2 text-center whitespace-nowrap"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: delay + 0.5 }}
-            >
-              {item.label}
-            </motion.span>
-            <motion.span
-              className="text-sm font-bold text-white"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: delay + 0.6 }}
-            >
-              {item.value}
-            </motion.span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Radial Progress Bar Component — kept for potential reuse
-function _RadialProgress({
-  value,
-  maxValue = 100,
-  label,
-  color,
-  icon,
-  size = 80,
-  delay = 0,
-}: {
-  value: number;
-  maxValue?: number;
-  label: string;
-  color: string;
-  icon?: React.ReactNode;
-  size?: number;
-  delay?: number;
-}) {
-  const percentage = Math.min(Math.max((value / maxValue) * 100, 0), 100);
-
-  return (
-    <div className="flex items-center gap-3 bg-gray-800/40 rounded-xl p-3 border border-gray-700/50">
-      <div className="relative" style={{ width: size, height: size / 2 }}>
-        <svg viewBox="0 0 100 50" className="w-full h-full">
-          {/* Background arc */}
-          <path
-            d="M 10,50 A 40,40 0 0,1 90,50"
-            fill="none"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth="10"
-            strokeLinecap="round"
-          />
-          {/* Progress arc */}
-          <motion.path
-            d="M 10,50 A 40,40 0 0,1 90,50"
-            fill="none"
-            stroke={color}
-            strokeWidth="10"
-            strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: percentage / 100 }}
-            transition={{ duration: 1.2, delay, ease: "easeOut" }}
-          />
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className="text-xs text-gray-400 uppercase tracking-wide">
-            {label}
-          </span>
-        </div>
-        <p className="text-xl font-bold text-white mt-1">
-          {typeof value === "number"
-            ? value % 1 === 0
-              ? value
-              : value.toFixed(2)
-            : value}
-        </p>
-      </div>
-    </div>
-  );
-}
+// Removed: RingChart, BarChart, _RadialProgress components — no longer used in profile
 
 // Stat Card with Gradient Border - Consistent glow effect
 function GlowStatCard({
@@ -347,91 +133,7 @@ function GlowStatCard({
   );
 }
 
-// Mini Donut Chart for Wallet Distribution
-function DonutChart({
-  data,
-  size = 140,
-  delay = 0,
-}: {
-  data: { label: string; value: number; color: string }[];
-  size?: number;
-  delay?: number;
-}) {
-  const total = data.reduce((acc, d) => acc + Math.max(d.value, 0), 0) || 1;
-  const strokeWidth = 20;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-
-  let currentOffset = 0;
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg className="transform -rotate-90" width={size} height={size}>
-          {/* Background ring */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth={strokeWidth}
-          />
-          {/* Data segments */}
-          {data.map((segment, i) => {
-            const percentage = segment.value / total;
-            const segmentLength = percentage * circumference;
-            const offset = currentOffset;
-            currentOffset += segmentLength;
-
-            return (
-              <motion.circle
-                key={segment.label}
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                fill="none"
-                stroke={segment.color}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
-                strokeDashoffset={-offset}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: delay + i * 0.1 }}
-              />
-            );
-          })}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xs text-gray-400">Total</span>
-          <span className="text-lg font-bold text-white">
-            {total.toFixed(2)}
-          </span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        {data.map((segment, i) => (
-          <motion.div
-            key={segment.label}
-            className="flex items-center gap-2"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: delay + 0.5 + i * 0.1 }}
-          >
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: segment.color }}
-            />
-            <span className="text-xs text-gray-400">{segment.label}</span>
-            <span className="text-xs font-medium text-white">
-              {segment.value.toFixed(2)}
-            </span>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Removed: DonutChart component — no longer used in profile
 
 // Horizontal Progress Bar
 function HorizontalBar({
@@ -480,43 +182,6 @@ export default function ProfileOverviewCharts({
 }: ProfileOverviewChartsProps) {
   const { settings, creditsToEUR } = useAppSettings();
 
-  // Calculate trading performance data - must be before any early returns (Rules of Hooks)
-  const tradingBarData = useMemo(
-    () => [
-      {
-        label: "Wins",
-        value: combinedStats?.winningTrades || 0,
-        color: "#22c55e",
-        maxValue: combinedStats?.totalTrades || 1,
-      },
-      {
-        label: "Losses",
-        value: combinedStats?.losingTrades || 0,
-        color: "#ef4444",
-        maxValue: combinedStats?.totalTrades || 1,
-      },
-    ],
-    [combinedStats],
-  );
-
-  // Reason: Show actual wallet totals (single source of truth: CreditWallet model)
-  // instead of proportional allocation which produced different numbers from the cards.
-  const walletDistribution = useMemo(() => {
-    const deposited = walletData?.totalDeposited || 0;
-    const won =
-      (walletData?.totalWonFromCompetitions || 0) +
-      (walletData?.totalWonFromChallenges || 0);
-    const gmEarnings = walletData?.totalGMEarnings || 0;
-
-    return [
-      { label: "Deposited", value: Number(deposited.toFixed(2)), color: "#3b82f6" },
-      { label: "Won", value: Number(won.toFixed(2)), color: "#22c55e" },
-      ...(gmEarnings > 0
-        ? [{ label: "GM Earnings", value: Number(gmEarnings.toFixed(2)), color: "#a855f7" }]
-        : []),
-    ].filter((item) => item.value > 0);
-  }, [walletData]);
-
   const hasActivity =
     competitionStats?.totalCompetitionsEntered > 0 ||
     challengeStats?.totalChallengesEntered > 0;
@@ -526,15 +191,23 @@ export default function ProfileOverviewCharts({
 
   return (
     <div className="space-y-6">
-      {/* Hero Stats Row with Charts */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Hero Stats Row — key user metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <GlowStatCard
-          icon={<BarChart3 className="w-5 h-5 text-white" />}
-          label="Total Trades"
-          value={combinedStats?.totalTrades || 0}
-          trend={(combinedStats?.totalTrades || 0) > 0 ? "up" : "neutral"}
-          color="blue"
+          icon={<Wallet className="w-5 h-5 text-white" />}
+          label="Credit Balance"
+          value={`${(walletData?.currentBalance || 0).toFixed(settings.credits.decimals)}`}
+          subvalue={settings.credits.symbol}
+          color="yellow"
           delay={0}
+        />
+        <GlowStatCard
+          icon={<DollarSign className="w-5 h-5 text-white" />}
+          label="Total Spent"
+          value={`${((walletData?.totalSpentOnCompetitions || 0) + (walletData?.totalSpentOnChallenges || 0) + (walletData?.totalSpentOnMarketplace || 0)).toFixed(settings.credits.decimals)}`}
+          subvalue="Comp + Challenge + Market"
+          color="red"
+          delay={0.1}
         />
         <GlowStatCard
           icon={<Target className="w-5 h-5 text-white" />}
@@ -542,119 +215,26 @@ export default function ProfileOverviewCharts({
           value={`${(combinedStats?.winRate || 0).toFixed(1)}%`}
           trend={(combinedStats?.winRate || 0) >= 50 ? "up" : "down"}
           color={(combinedStats?.winRate || 0) >= 50 ? "green" : "red"}
-          delay={0.1}
+          delay={0.2}
         />
         <GlowStatCard
-          icon={<DollarSign className="w-5 h-5 text-white" />}
-          label="Total P&L"
-          value={`${(combinedStats?.totalPnL || 0) >= 0 ? "+" : ""}${(combinedStats?.totalPnL || 0).toFixed(2)}`}
-          trend={(combinedStats?.totalPnL || 0) >= 0 ? "up" : "down"}
-          color={(combinedStats?.totalPnL || 0) >= 0 ? "green" : "red"}
-          delay={0.2}
+          icon={<Crown className="w-5 h-5 text-white" />}
+          label="GM Earnings"
+          value={`${(walletData?.totalGMEarnings || 0).toFixed(settings.credits.decimals)}`}
+          subvalue={settings.credits.symbol}
+          color="purple"
+          delay={0.3}
         />
         <GlowStatCard
           icon={<Trophy className="w-5 h-5 text-white" />}
           label="Prizes Won"
-          value={`${(combinedStats?.totalPrizesWon || 0).toFixed(settings.credits.decimals)}`}
-          subvalue={settings.credits.symbol}
-          color="yellow"
-          delay={0.3}
+          value={`⚡ ${(combinedStats?.totalPrizesWon || 0).toFixed(settings.credits.decimals)}`}
+          color="orange"
+          delay={0.4}
         />
       </div>
 
-      {/* Main Charts Section */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Performance Ring Charts */}
-        <motion.div
-          className="bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <div className="flex items-center gap-2 mb-6">
-            <Activity className="w-5 h-5 text-purple-400" />
-            <h3 className="text-lg font-semibold text-white">
-              Performance Overview
-            </h3>
-          </div>
-          <div className="flex flex-wrap justify-around gap-4">
-            <RingChart
-              value={combinedStats?.winRate || 0}
-              maxValue={100}
-              size={110}
-              color="#22c55e"
-              label="Win Rate"
-              icon={<Percent className="w-4 h-4 text-green-400" />}
-              delay={0.5}
-            />
-            <RingChart
-              value={
-                combinedStats?.profitFactor === 999
-                  ? 100
-                  : Math.min((combinedStats?.profitFactor || 0) * 10, 100)
-              }
-              maxValue={100}
-              size={110}
-              color="#a855f7"
-              label="Profit Factor"
-              sublabel={
-                combinedStats?.profitFactor === 999
-                  ? "∞"
-                  : (combinedStats?.profitFactor || 0).toFixed(2)
-              }
-              delay={0.6}
-            />
-            <RingChart
-              value={Math.min(
-                Math.abs(combinedStats?.totalPnLPercentage || 0),
-                100,
-              )}
-              maxValue={100}
-              size={110}
-              color={
-                (combinedStats?.totalPnLPercentage || 0) >= 0
-                  ? "#06b6d4"
-                  : "#ef4444"
-              }
-              label="ROI"
-              sublabel={`${(combinedStats?.totalPnLPercentage || 0) >= 0 ? "+" : ""}${(combinedStats?.totalPnLPercentage || 0).toFixed(2)}%`}
-              delay={0.7}
-            />
-          </div>
-        </motion.div>
-
-        {/* Wins vs Losses Bar Chart */}
-        <motion.div
-          className="bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">
-              Trading Results
-            </h3>
-          </div>
-          <BarChart data={tradingBarData} height={140} delay={0.6} />
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-700/50">
-            <div className="text-center">
-              <p className="text-xs text-gray-400">Avg Win</p>
-              <p className="text-lg font-bold text-green-400">
-                +${(combinedStats?.averageWin || 0).toFixed(2)}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-gray-400">Avg Loss</p>
-              <p className="text-lg font-bold text-red-400">
-                -${(combinedStats?.averageLoss || 0).toFixed(2)}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+      {/* Removed: Performance Overview (ring charts) and Trading Results (bar chart) — per user request */}
 
       {/* Wallet Section with Donut Chart */}
       <motion.div

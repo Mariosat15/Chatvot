@@ -30,12 +30,12 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
     <div className="w-full space-y-4 p-3 sm:p-4 lg:p-6">
       {/* Row 1: Hero Stats */}
       <HeroStatsBar
-        totalCapital={overview.totalCapital}
-        totalPnL={overview.totalPnL}
-        totalPnLPercentage={overview.totalPnLPercentage}
+        creditBalance={overview.creditBalance}
+        totalSpent={overview.totalSpent}
         winRate={overview.winRate}
-        activeContests={overview.activeContests}
-        totalTrades={overview.totalTrades}
+        roi={overview.roi}
+        gmEarnings={overview.gmEarnings}
+        totalPrizesWon={overview.totalPrizesWon}
       />
 
       {/* Row 2: Account Status (restrictions, alerts, investigations) */}

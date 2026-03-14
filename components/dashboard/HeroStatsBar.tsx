@@ -5,44 +5,46 @@ import { motion } from "framer-motion";
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
-  Activity,
-  Trophy,
+  Wallet,
   Target,
+  Trophy,
+  ShoppingCart,
+  Percent,
 } from "lucide-react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface HeroStatsBarProps {
-  totalCapital: number;
-  totalPnL: number;
-  totalPnLPercentage: number;
+  creditBalance: number;
+  totalSpent: number;
   winRate: number;
-  activeContests: number;
-  totalTrades: number;
+  roi: number;
+  gmEarnings: number;
+  totalPrizesWon: number;
 }
 
 // Reason: Each stat card has its own glow color and icon, configured here for consistency.
 const STAT_CONFIG = [
   {
-    key: "capital",
-    label: "Total Capital",
-    icon: DollarSign,
-    color: "#3B82F6",
-    gradient: "from-blue-500/20 to-blue-600/5",
-    border: "border-blue-500/30",
-    text: "text-blue-400",
-    glowColor: "rgba(59,130,246,0.35)",
-    glowFaint: "rgba(59,130,246,0.12)",
+    key: "balance",
+    label: "Credit Balance",
+    icon: Wallet,
+    color: "#EAB308",
+    gradient: "from-yellow-500/20 to-amber-600/5",
+    border: "border-yellow-500/30",
+    text: "text-yellow-400",
+    glowColor: "rgba(234,179,8,0.35)",
+    glowFaint: "rgba(234,179,8,0.12)",
   },
   {
-    key: "pnl",
-    label: "Total P&L",
-    icon: TrendingUp,
-    color: "#22C55E",
-    gradient: "from-green-500/20 to-emerald-600/5",
-    border: "border-green-500/30",
-    text: "text-green-400",
-    glowColor: "rgba(34,197,94,0.35)",
-    glowFaint: "rgba(34,197,94,0.12)",
+    key: "spent",
+    label: "Total Spent",
+    icon: ShoppingCart,
+    color: "#EF4444",
+    gradient: "from-red-500/20 to-rose-600/5",
+    border: "border-red-500/30",
+    text: "text-red-400",
+    glowColor: "rgba(239,68,68,0.35)",
+    glowFaint: "rgba(239,68,68,0.12)",
   },
   {
     key: "winrate",
@@ -56,44 +58,63 @@ const STAT_CONFIG = [
     glowFaint: "rgba(168,85,247,0.12)",
   },
   {
-    key: "activity",
-    label: "Active Contests",
+    key: "roi",
+    label: "ROI",
+    icon: Percent,
+    color: "#06B6D4",
+    gradient: "from-cyan-500/20 to-blue-600/5",
+    border: "border-cyan-500/30",
+    text: "text-cyan-400",
+    glowColor: "rgba(6,182,212,0.35)",
+    glowFaint: "rgba(6,182,212,0.12)",
+  },
+  {
+    key: "gm",
+    label: "GM Earnings",
     icon: Trophy,
-    color: "#EAB308",
-    gradient: "from-yellow-500/20 to-amber-600/5",
-    border: "border-yellow-500/30",
-    text: "text-yellow-400",
-    glowColor: "rgba(234,179,8,0.35)",
-    glowFaint: "rgba(234,179,8,0.12)",
+    color: "#22C55E",
+    gradient: "from-green-500/20 to-emerald-600/5",
+    border: "border-green-500/30",
+    text: "text-green-400",
+    glowColor: "rgba(34,197,94,0.35)",
+    glowFaint: "rgba(34,197,94,0.12)",
+  },
+  {
+    key: "prizes",
+    label: "Prizes Won",
+    icon: Trophy,
+    color: "#F97316",
+    gradient: "from-orange-500/20 to-red-600/5",
+    border: "border-orange-500/30",
+    text: "text-orange-400",
+    glowColor: "rgba(249,115,22,0.35)",
+    glowFaint: "rgba(249,115,22,0.12)",
   },
 ];
 
-function formatCurrency(val: number): string {
-  if (Math.abs(val) >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(val) >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
-  return `$${val.toFixed(2)}`;
-}
-
 export default function HeroStatsBar({
-  totalCapital,
-  totalPnL,
-  totalPnLPercentage,
+  creditBalance,
+  totalSpent,
   winRate,
-  activeContests,
-  totalTrades,
+  roi,
+  gmEarnings,
+  totalPrizesWon,
 }: HeroStatsBarProps) {
+  const { settings } = useAppSettings();
+  const decimals = settings?.credits?.decimals ?? 2;
+  const symbol = settings?.credits?.symbol ?? "⚡";
+
   const stats = useMemo(
     () => [
       {
         ...STAT_CONFIG[0],
-        value: formatCurrency(totalCapital),
-        sub: `${totalTrades} trades`,
+        value: `⚡ ${creditBalance.toFixed(decimals)}`,
+        sub: symbol,
       },
       {
         ...STAT_CONFIG[1],
-        value: formatCurrency(totalPnL),
-        sub: `${totalPnLPercentage >= 0 ? "+" : ""}${totalPnLPercentage.toFixed(1)}%`,
-        isNeg: totalPnL < 0,
+        value: `⚡ ${totalSpent.toFixed(decimals)}`,
+        sub: "Comp + Challenges + Market",
       },
       {
         ...STAT_CONFIG[2],
@@ -102,15 +123,26 @@ export default function HeroStatsBar({
       },
       {
         ...STAT_CONFIG[3],
-        value: String(activeContests),
-        sub: "competing",
+        value: `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`,
+        sub: "return on investment",
+        isNeg: roi < 0,
+      },
+      {
+        ...STAT_CONFIG[4],
+        value: `⚡ ${gmEarnings.toFixed(decimals)}`,
+        sub: "referral earnings",
+      },
+      {
+        ...STAT_CONFIG[5],
+        value: `⚡ ${totalPrizesWon.toFixed(decimals)}`,
+        sub: "from competitions",
       },
     ],
-    [totalCapital, totalPnL, totalPnLPercentage, winRate, activeContests, totalTrades]
+    [creditBalance, totalSpent, winRate, roi, gmEarnings, totalPrizesWon, decimals, symbol],
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
       {stats.map((stat, i) => {
         const Icon = stat.icon;
         const isNeg = "isNeg" in stat && stat.isNeg;
@@ -125,7 +157,7 @@ export default function HeroStatsBar({
             } as React.CSSProperties}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: i * 0.1 }}
+            transition={{ duration: 0.5, delay: i * 0.08 }}
           >
             {/* Background decoration */}
             <div
@@ -148,7 +180,7 @@ export default function HeroStatsBar({
 
             {/* Value */}
             <div
-              className={`text-xl sm:text-2xl font-bold ${
+              className={`text-lg sm:text-xl font-bold ${
                 isNeg ? "text-red-400" : "text-white"
               }`}
               style={{ fontFamily: "var(--font-geist-mono), monospace" }}
@@ -158,20 +190,16 @@ export default function HeroStatsBar({
 
             {/* Subvalue */}
             <div className="flex items-center gap-1 mt-1">
-              {stat.key === "pnl" && (
-                isNeg ? (
+              {stat.key === "roi" &&
+                (isNeg ? (
                   <TrendingDown className="w-3 h-3 text-red-400" />
                 ) : (
                   <TrendingUp className="w-3 h-3 text-green-400" />
-                )
-              )}
-              {stat.key === "activity" && (
-                <Activity className="w-3 h-3 text-yellow-400" />
-              )}
-              <span className="text-xs sm:text-sm text-gray-500">{stat.sub}</span>
+                ))}
+              <span className="text-xs text-gray-500 truncate">{stat.sub}</span>
             </div>
 
-            {/* Sparkline decoration (subtle animated line) */}
+            {/* Sparkline decoration */}
             <svg
               className="absolute bottom-0 left-0 w-full h-8 opacity-15"
               viewBox="0 0 100 20"
@@ -184,7 +212,7 @@ export default function HeroStatsBar({
                 strokeWidth="1.5"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: 1.5, delay: i * 0.15 }}
+                transition={{ duration: 1.5, delay: i * 0.1 }}
               />
             </svg>
           </motion.div>
