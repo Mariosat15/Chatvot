@@ -95,6 +95,7 @@ interface WalletData {
   totalSpentOnCompetitions: number;
   totalWonFromChallenges: number;
   totalSpentOnChallenges: number;
+  totalSpentOnMarketplace: number;
 }
 
 interface PendingWithdrawal {
@@ -3723,8 +3724,9 @@ export default function FinancialDashboard() {
                         (wallet.totalWonFromChallenges || 0);
                       const totalSpent =
                         (wallet.totalSpentOnCompetitions || 0) +
-                        (wallet.totalSpentOnChallenges || 0);
-                      // Net from competitions/challenges only (Won - Spent)
+                        (wallet.totalSpentOnChallenges || 0) +
+                        (wallet.totalSpentOnMarketplace || 0);
+                      // Net from competitions/challenges/marketplace (Won - Spent)
                       const netPosition = totalWon - totalSpent;
                       return (
                         <TableRow
@@ -3784,6 +3786,10 @@ export default function FinancialDashboard() {
                               / ⚔️{" "}
                               {(
                                 wallet.totalSpentOnChallenges || 0
+                              ).toLocaleString()}{" "}
+                              / 🛒{" "}
+                              {(
+                                wallet.totalSpentOnMarketplace || 0
                               ).toLocaleString()}
                             </div>
                           </TableCell>

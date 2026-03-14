@@ -291,6 +291,7 @@ export async function GET(request: NextRequest) {
               "competition_win", "challenge_win",
               "competition_entry", "challenge_entry",
               "competition_refund", "challenge_refund",
+              "marketplace_purchase",
             ],
           },
         },
@@ -307,6 +308,7 @@ export async function GET(request: NextRequest) {
     const totalChalRefund = Math.abs(platTxMap.get("challenge_refund") || 0);
     const totalSpentOnCompetitions = Math.abs(platTxMap.get("competition_entry") || 0) - totalCompRefund;
     const totalSpentOnChallenges = Math.abs(platTxMap.get("challenge_entry") || 0) - totalChalRefund;
+    const totalSpentOnMarketplace = Math.abs(platTxMap.get("marketplace_purchase") || 0);
 
     // Reason: Per-user totals also need transaction-based calculation
     // to avoid showing polluted CreditWallet values in the admin wallets table.
@@ -319,6 +321,7 @@ export async function GET(request: NextRequest) {
               "competition_win", "challenge_win",
               "competition_entry", "challenge_entry",
               "competition_refund", "challenge_refund",
+              "marketplace_purchase",
             ],
           },
         },
@@ -330,11 +333,11 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
-    // Build lookup: userId -> { compWins, chalWins, compSpent, chalSpent }
-    const userTxMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number }>();
+    // Build lookup: userId -> { compWins, chalWins, compSpent, chalSpent, marketplace }
+    const userTxMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number; marketplace: number }>();
     for (const row of perUserTotals) {
       const uid = row._id.userId;
-      if (!userTxMap.has(uid)) userTxMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 });
+      if (!userTxMap.has(uid)) userTxMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 });
       const entry = userTxMap.get(uid)!;
       const absTotal = Math.abs(row.total);
       if (row._id.type === "competition_win") entry.compWins = absTotal;
@@ -343,6 +346,7 @@ export async function GET(request: NextRequest) {
       else if (row._id.type === "challenge_entry") entry.chalSpent = absTotal;
       else if (row._id.type === "competition_refund") entry.compRefund = absTotal;
       else if (row._id.type === "challenge_refund") entry.chalRefund = absTotal;
+      else if (row._id.type === "marketplace_purchase") entry.marketplace = absTotal;
     }
 
     // Calculate liability metrics
@@ -361,7 +365,7 @@ export async function GET(request: NextRequest) {
         wallets: wallets.map((w) => {
           const userInfo = usersMap.get(w.userId);
           // Reason: Use transaction-based totals for BOTH wins and spending
-          const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 };
+          const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 };
           return {
             userId: w.userId,
             userName: userInfo?.name || "Unknown",
@@ -373,6 +377,7 @@ export async function GET(request: NextRequest) {
             totalSpentOnCompetitions: uTx.compSpent - uTx.compRefund,
             totalWonFromChallenges: uTx.chalWins,
             totalSpentOnChallenges: uTx.chalSpent - uTx.chalRefund,
+            totalSpentOnMarketplace: uTx.marketplace,
           };
         }),
         pendingWithdrawals: pendingWithdrawalRequests.map((w) => {
@@ -406,6 +411,7 @@ export async function GET(request: NextRequest) {
           totalSpentOnCompetitions,
           totalWonFromChallenges,
           totalSpentOnChallenges,
+          totalSpentOnMarketplace,
           totalPlatformFees: platformFees[0]?.totalFees || 0,
           totalFeeTransactions: platformFees[0]?.count || 0,
         },

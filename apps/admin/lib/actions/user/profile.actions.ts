@@ -9,8 +9,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
 
 export interface UserCompetitionStats {
   // Overall Stats
@@ -79,18 +78,9 @@ export async function getUserCompetitionStats(
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get wallet for spending info (balance, deposited, etc.)
-    const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
-
-    // Reason: Use WalletTransaction as single source of truth for wins AND spending.
-    // CreditWallet fields were historically polluted by refunds.
-    const compTxTotals = await WalletTransaction.aggregate([
-      { $match: { userId: targetUserId, status: "completed", transactionType: { $in: ["competition_win", "competition_entry", "competition_refund"] } } },
-      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
-    ]);
-    const compTxMap = new Map<string, number>();
-    for (const t of compTxTotals) { compTxMap.set(t._id, Math.abs(t.total)); }
-    const txCompWins = compTxMap.get("competition_win") || 0;
+    // Reason: Use shared getUserFinancialSummary as SINGLE SOURCE OF TRUTH.
+    const compFinancials = await getUserFinancialSummary(targetUserId);
+    const txCompWins = compFinancials.competitionWins;
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -307,10 +297,6 @@ export async function getUserChallengeStats(
       .sort({ createdAt: -1 })
       .lean();
 
-    // Reason: Wallet no longer used for wins/spending — transaction-based
-    // aggregation below is the single source of truth. Kept for potential future use.
-    const _wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
-
     // Calculate stats
     const completedChallenges = challenges.filter(
       (c: any) => c.status === "completed",
@@ -355,18 +341,10 @@ export async function getUserChallengeStats(
       }
     });
 
-    // Reason: Use WalletTransaction as single source of truth for wins AND spending.
-    // CreditWallet fields were historically polluted by refunds.
-    // Net spending = entries − refunds (refunds reverse the original entry fee).
-    const chalTxTotals = await WalletTransaction.aggregate([
-      { $match: { userId: targetUserId, status: "completed", transactionType: { $in: ["challenge_win", "challenge_entry", "challenge_refund"] } } },
-      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
-    ]);
-    const chalTxMap = new Map<string, number>();
-    for (const t of chalTxTotals) { chalTxMap.set(t._id, Math.abs(t.total)); }
-    const txChallengeWins = chalTxMap.get("challenge_win") || 0;
-    const txChalRefund = chalTxMap.get("challenge_refund") || 0;
-    const txChalSpent = (chalTxMap.get("challenge_entry") || 0) - txChalRefund;
+    // Reason: Use shared getUserFinancialSummary as SINGLE SOURCE OF TRUTH.
+    const chalFinancials = await getUserFinancialSummary(targetUserId);
+    const txChallengeWins = chalFinancials.challengeWins;
+    const txChalSpent = chalFinancials.netChallengeSpent;
     if (txChallengeWins > 0) totalPrizeAmount = txChallengeWins;
 
     const overallWinRate =

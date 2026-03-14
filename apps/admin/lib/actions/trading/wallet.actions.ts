@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
 import mongoose from "mongoose";
 
 // Get or create user's credit wallet
@@ -784,7 +785,12 @@ export const getWalletStats = async () => {
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
+    // Reason: Use shared getUserFinancialSummary as SINGLE SOURCE OF TRUTH.
+    // Eliminates drift between user dashboard, admin dashboard, and profile.
+    const [wallet, fs] = await Promise.all([
+      CreditWallet.findOne({ userId: session.user.id }),
+      getUserFinancialSummary(session.user.id),
+    ]);
 
     if (!wallet) {
       return {
@@ -795,52 +801,29 @@ export const getWalletStats = async () => {
         totalWonFromCompetitions: 0,
         totalSpentOnChallenges: 0,
         totalWonFromChallenges: 0,
+        totalSpentOnMarketplace: 0,
         netProfitFromCompetitions: 0,
         netProfitFromChallenges: 0,
         roi: 0,
+        totalGMEarnings: fs.gmEarnings,
       };
     }
-
-    // Reason: Use WalletTransaction as SINGLE source of truth for ALL totals.
-    // CreditWallet fields were historically polluted by refunds.
-    // Net spending = entries − refunds (refunds reverse the original entry fee).
-    const txTotals = await WalletTransaction.aggregate([
-      { $match: { userId: session.user.id, status: "completed" } },
-      { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
-    ]);
-    const txMap = new Map<string, number>();
-    for (const t of txTotals) {
-      txMap.set(t._id, t.total);
-    }
-    const txCompWins = Math.abs(txMap.get("competition_win") || 0);
-    const txChalWins = Math.abs(txMap.get("challenge_win") || 0);
-    const txCompRefund = Math.abs(txMap.get("competition_refund") || 0);
-    const txChalRefund = Math.abs(txMap.get("challenge_refund") || 0);
-    const txCompSpent = Math.abs(txMap.get("competition_entry") || 0) - txCompRefund;
-    const txChalSpent = Math.abs(txMap.get("challenge_entry") || 0) - txChalRefund;
-
-    const netProfitCompetitions = txCompWins - txCompSpent;
-    const netProfitChallenges = txChalWins - txChalSpent;
-    const totalSpent = txCompSpent + txChalSpent;
-    const roi =
-      totalSpent > 0
-        ? ((netProfitCompetitions + netProfitChallenges) / totalSpent) * 100
-        : 0;
 
     return {
       currentBalance: wallet.creditBalance,
       totalDeposited: wallet.totalDeposited,
       totalWithdrawn: wallet.totalWithdrawn,
-      // Reason: Transaction-based spending (net of refunds) for consistency with main app
-      totalSpentOnCompetitions: txCompSpent,
-      totalWonFromCompetitions: txCompWins,
-      totalSpentOnChallenges: txChalSpent,
-      totalWonFromChallenges: txChalWins,
-      netProfitFromCompetitions: netProfitCompetitions,
-      netProfitFromChallenges: netProfitChallenges,
-      roi: roi,
+      totalSpentOnCompetitions: fs.netCompetitionSpent,
+      totalWonFromCompetitions: fs.competitionWins,
+      totalSpentOnChallenges: fs.netChallengeSpent,
+      totalWonFromChallenges: fs.challengeWins,
+      totalSpentOnMarketplace: fs.marketplaceSpent,
+      netProfitFromCompetitions: fs.competitionWins - fs.netCompetitionSpent,
+      netProfitFromChallenges: fs.challengeWins - fs.netChallengeSpent,
+      roi: fs.roi,
       kycVerified: wallet.kycVerified,
       withdrawalEnabled: wallet.withdrawalEnabled,
+      totalGMEarnings: fs.gmEarnings,
     };
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them

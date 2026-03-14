@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
               "competition_win", "challenge_win",
               "competition_entry", "challenge_entry",
               "competition_refund", "challenge_refund",
+              "marketplace_purchase",
             ],
           },
           status: "completed",
@@ -154,10 +155,10 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
-    const userWinsMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number }>();
+    const userWinsMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number; marketplace: number }>();
     for (const row of perUserTx) {
       const uid = row._id.userId;
-      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 });
+      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 });
       const entry = userWinsMap.get(uid)!;
       const absTotal = Math.abs(row.total);
       if (row._id.type === "competition_win") entry.compWins = absTotal;
@@ -166,6 +167,7 @@ export async function GET(request: NextRequest) {
       else if (row._id.type === "challenge_entry") entry.chalSpent = absTotal;
       else if (row._id.type === "competition_refund") entry.compRefund = absTotal;
       else if (row._id.type === "challenge_refund") entry.chalRefund = absTotal;
+      else if (row._id.type === "marketplace_purchase") entry.marketplace = absTotal;
     }
 
     // Get competition stats only for displayed users
@@ -289,7 +291,7 @@ export async function GET(request: NextRequest) {
         (c: any) => c.status === "completed" && !c.isWinner,
       ).length;
       // Reason: Use transaction-based totals for BOTH wins and spending (net of refunds)
-      const userWins = userWinsMap.get(userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0 };
+      const userWins = userWinsMap.get(userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 };
       const challengeSpent = userWins.chalSpent - userWins.chalRefund;
       const challengeWon = userWins.chalWins;
 
@@ -327,7 +329,7 @@ export async function GET(request: NextRequest) {
         postalCode: user.postalCode || "",
         phone: user.phone || "",
 
-        // Wallet data — Reason: Transaction-based wins AND spending (net of refunds) for accuracy
+        // Wallet data — Reason: Transaction-based wins AND spending (net of refunds + marketplace) for accuracy
         wallet: wallet
           ? {
               balance: wallet.creditBalance || 0,
@@ -335,13 +337,15 @@ export async function GET(request: NextRequest) {
               totalWithdrawn: wallet.totalWithdrawn || 0,
               totalSpent:
                 (userWins.compSpent - userWins.compRefund) +
-                (userWins.chalSpent - userWins.chalRefund),
+                (userWins.chalSpent - userWins.chalRefund) +
+                userWins.marketplace,
               totalWon: userWins.compWins + userWins.chalWins,
               netProfit:
                 userWins.compWins +
                 userWins.chalWins -
                 ((userWins.compSpent - userWins.compRefund) +
-                  (userWins.chalSpent - userWins.chalRefund)),
+                  (userWins.chalSpent - userWins.chalRefund) +
+                  userWins.marketplace),
             }
           : {
               balance: 0,

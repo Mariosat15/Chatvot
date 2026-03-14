@@ -13,6 +13,7 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
@@ -815,47 +816,24 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     unrealizedPnL += p.unrealizedPnl || 0;
   }
 
-  // Reason: Compute all wallet stats from TRANSACTIONS as single source of truth.
-  // CreditWallet.totalWonFromCompetitions was historically polluted with refunds.
+  // Reason: Use the shared getUserFinancialSummary service as SINGLE SOURCE OF TRUTH.
+  // This eliminates drift between user dashboard, admin dashboard, and profile pages.
   const walletData = wallet as any;
   const wCreditBalance = walletData?.creditBalance || 0;
   const wTotalDeposited = walletData?.totalDeposited || 0;
   const wTotalWithdrawn = walletData?.totalWithdrawn || 0;
 
-  // Build transaction-type totals from the already-fetched walletTransactions
-  const _txTotals = new Map<string, number>();
-  for (const tx of walletTransactions as any[]) {
-    const tt = tx.transactionType || "";
-    _txTotals.set(tt, (_txTotals.get(tt) || 0) + Math.abs(tx.amount || 0));
-  }
-  const wTrueCompWins = _txTotals.get("competition_win") || 0;
-  const wTrueChalWins = _txTotals.get("challenge_win") || 0;
-  // Reason: Net spending = entries − refunds. Refunds reverse the original entry fee,
-  // so showing gross entries overstates "Total Spent" and understates ROI.
-  const wCompRefund = _txTotals.get("competition_refund") || 0;
-  const wChalRefund = _txTotals.get("challenge_refund") || 0;
-  const wTrueCompSpent = (_txTotals.get("competition_entry") || 0) - wCompRefund;
-  const wTrueChalSpent = (_txTotals.get("challenge_entry") || 0) - wChalRefund;
-  const wTotalSpentOnMarketplace = _txTotals.get("marketplace_purchase") || 0;
-  const totalPrizesWon = wTrueCompWins + wTrueChalWins;
-  const wTotalSpent = wTrueCompSpent + wTrueChalSpent + wTotalSpentOnMarketplace;
-  const wNetProfit = totalPrizesWon - wTrueCompSpent - wTrueChalSpent;
-  const wROI = (wTrueCompSpent + wTrueChalSpent) > 0
-    ? (wNetProfit / (wTrueCompSpent + wTrueChalSpent)) * 100
-    : 0;
-
-  // Fetch GM earnings from gamemasterearnings collection
-  let wGMEarnings = 0;
-  try {
-    const mongoose = await import("mongoose");
-    const db = mongoose.default.connection.db;
-    if (db) {
-      const gmResult = await db.collection("gamemasterearnings")
-        .aggregate([{ $match: { gameMasterId: userId } }, { $group: { _id: null, total: { $sum: "$netEarning" } } }])
-        .toArray();
-      wGMEarnings = gmResult[0]?.total || 0;
-    }
-  } catch { /* GM earnings are non-critical */ }
+  const financialSummary = await getUserFinancialSummary(userId);
+  const wTrueCompWins = financialSummary.competitionWins;
+  const wTrueChalWins = financialSummary.challengeWins;
+  const wTrueCompSpent = financialSummary.netCompetitionSpent;
+  const wTrueChalSpent = financialSummary.netChallengeSpent;
+  const wTotalSpentOnMarketplace = financialSummary.marketplaceSpent;
+  const totalPrizesWon = financialSummary.totalPrizesWon;
+  const wTotalSpent = financialSummary.totalSpent;
+  const wNetProfit = financialSummary.netProfit;
+  const wROI = financialSummary.roi;
+  const wGMEarnings = financialSummary.gmEarnings;
 
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
   const profitFactor =
